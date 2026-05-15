@@ -1,9 +1,6 @@
-import Navbar from "@/components/Navbar";
-
 export default function TournamentsPage() {
-  return (
+    return (
     <main className="min-h-screen bg-black text-white">
-      <Navbar />
 
       <section className="mx-auto max-w-6xl px-6 pt-32 pb-20">
         <p className="text-sm uppercase tracking-[0.3em] text-zinc-400">
