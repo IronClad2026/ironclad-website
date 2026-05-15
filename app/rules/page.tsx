@@ -19,10 +19,7 @@ const PDF_1V1 = "/documents/1v1 rulebook.pdf";
 const PDF_4V4 = "/documents/4v4 rulebook.pdf";
 const PDF_PPA = "/documents/ict ppa.pdf";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0 },
-};
+import { fadeUp } from "@/lib/animations";
 
 type TabName = "1v1 Rules" | "4v4 Rules" | "PPA & Conduct";
 

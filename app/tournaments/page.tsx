@@ -1,29 +1,125 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { CalendarDays, Gamepad2, Swords, Trophy } from "lucide-react";
 import TournamentCard from "@/components/TournamentCard";
+
+import { fadeUp } from "@/lib/animations";
 
 export default function TournamentsPage() {
   return (
-    <main className="min-h-screen bg-black text-white">
-      <section className="mx-auto max-w-6xl px-6 pt-32 pb-20">
-        <p className="text-sm uppercase tracking-[0.3em] text-zinc-400">
-          IronClad Competitive Events
-        </p>
+    <main className="min-h-screen overflow-hidden bg-black text-white">
+      <section
+        className="relative flex min-h-screen items-center justify-center bg-contain bg-center bg-no-repeat px-6 text-center"
+        style={{
+          backgroundImage: "url('/images/ironclad-background.jpg')",
+        }}
+      >
+        <div className="absolute inset-0 bg-black/70" />
 
-        <h1 className="mt-4 text-5xl font-bold">Tournaments</h1>
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          transition={{ duration: 0.7 }}
+          className="relative z-10 max-w-5xl"
+        >
+          <p className="text-sm uppercase tracking-[0.3em] text-zinc-300">
+            IronClad Competitive Events
+          </p>
 
-        <p className="mt-6 max-w-2xl text-zinc-300">
-          Explore current and upcoming Company of Heroes 3 competitive events,
-          seasonal championships, and community tournaments.
-        </p>
+          <h1 className="mt-6 text-5xl font-bold tracking-tight md:text-7xl">
+            Tournaments
+          </h1>
 
-        <div className="mt-12">
+          <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-zinc-200">
+            Compete in structured Company of Heroes 3 events built around clear
+            rules, fair brackets, and long-term competitive progression.
+          </p>
+        </motion.div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <div className="mb-12 max-w-3xl">
+          <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
+            Current Events
+          </p>
+
+          <h2 className="mt-4 text-4xl font-bold">Active Tournament Formats</h2>
+
+          <p className="mt-6 text-zinc-300">
+            IronClad currently focuses on monthly 1v1 events, split by player
+            level, while preparing structured 4v4 competitive formats.
+          </p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
           <TournamentCard
             title="IronClad 1v1 Main Bracket"
             format="1v1"
             game="Company of Heroes 3"
-            status="Coming Soon"
-            description="Competitive 1v1 tournament for players above the required ELO threshold. Full rules, schedule, and registration details will be listed here."
+            status="Active Format"
+            description="Competitive 1v1 bracket designed for higher-level players above the required ELO threshold."
+          />
+
+          <TournamentCard
+            title="IronClad 1v1 Challenge Bracket"
+            format="1v1"
+            game="Company of Heroes 3"
+            status="Active Format"
+            description="Competitive bracket for developing players below the Main Bracket ELO threshold."
           />
         </div>
+      </section>
+
+      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-20 md:grid-cols-3">
+        {[
+          {
+            icon: Trophy,
+            title: "Monthly Events",
+            text: "Regular tournament cycles designed to build consistency and competitive momentum.",
+          },
+          {
+            icon: Swords,
+            title: "Skill-Based Brackets",
+            text: "Main and Challenge divisions help create fairer and more meaningful matches.",
+          },
+          {
+            icon: CalendarDays,
+            title: "Seasonal Progression",
+            text: "Tournament results can support future ICT points, rankings, and seasonal standings.",
+          },
+        ].map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <motion.div
+              key={item.title}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              transition={{ duration: 0.5 }}
+              className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur"
+            >
+              <Icon className="mb-5 h-11 w-11 text-zinc-200" />
+              <h3 className="text-2xl font-bold">{item.title}</h3>
+              <p className="mt-4 leading-7 text-zinc-400">{item.text}</p>
+            </motion.div>
+          );
+        })}
+      </section>
+
+      <section className="mx-auto max-w-5xl px-6 pb-28 text-center">
+        <Gamepad2 className="mx-auto mb-6 h-12 w-12 text-zinc-300" />
+
+        <h2 className="text-4xl font-bold">4v4 Format in Development</h2>
+
+        <p className="mx-auto mt-6 max-w-3xl leading-8 text-zinc-300">
+          IronClad is also exploring structured 4v4 events, team registration,
+          roster rules, and competitive procedures for larger-scale Company of
+          Heroes 3 tournaments.
+        </p>
       </section>
     </main>
   );

@@ -1,28 +1,25 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Shield, Trophy, Users, Target } from "lucide-react";
+import { Shield, Trophy, Users, Target, Swords } from "lucide-react";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 35 },
-  visible: { opacity: 1, y: 0 },
-};
+import { fadeUp } from "@/lib/animations";
 
-const cards = [
+const pillars = [
   {
     icon: Trophy,
     title: "Structured Competition",
-    text: "Monthly Company of Heroes 3 tournaments with clear formats, rules, and competitive standards.",
+    text: "Organized Company of Heroes 3 tournaments with clear formats, rules, and competitive standards.",
   },
   {
     icon: Shield,
     title: "Fair Play",
-    text: "IronClad is built around transparent rules, anti-smurf standards, and consistent tournament procedures.",
+    text: "Transparent rule enforcement, anti-smurf standards, and consistent tournament procedures.",
   },
   {
     icon: Users,
     title: "Community Growth",
-    text: "A competitive environment designed to help players improve, compete, and participate long term.",
+    text: "A long-term competitive home for players who want to improve, compete, and contribute.",
   },
 ];
 
@@ -30,7 +27,7 @@ export default function AboutPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white">
       <section
-        className="relative flex min-h-screen items-center justify-center bg-contain bg-center bg-no-repeat px-6"
+        className="relative flex min-h-screen items-center justify-center bg-contain bg-center bg-no-repeat px-6 text-center"
         style={{
           backgroundImage: "url('/images/ironclad-background.jpg')",
         }}
@@ -42,72 +39,118 @@ export default function AboutPage() {
           animate="visible"
           variants={fadeUp}
           transition={{ duration: 0.7 }}
-          className="relative z-10 max-w-4xl text-center"
+          className="relative z-10 max-w-5xl"
         >
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-300">
             About IronClad
           </p>
 
           <h1 className="mt-6 text-5xl font-bold tracking-tight md:text-7xl">
-            Competitive Structure. Fair Play. Community.
+            Built for Competitive COH3
           </h1>
 
           <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-zinc-200">
-            IronClad is building a structured competitive home for Company of
-            Heroes 3 players through organized events, clear rules, rankings,
-            and long-term esports development.
+            IronClad is a tournament initiative focused on structured events,
+            fair play, rankings, and long-term competitive development for
+            Company of Heroes 3.
           </p>
         </motion.div>
       </section>
 
-      <section className="relative mx-auto max-w-6xl px-6 py-20">
+      <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="mb-12 max-w-3xl">
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
-            Our Identity
+            Our Foundation
           </p>
 
           <h2 className="mt-4 text-4xl font-bold">What IronClad Stands For</h2>
 
           <p className="mt-6 text-zinc-300">
-            IronClad exists to give competitive Company of Heroes 3 players a
-            more organized, fair, and consistent tournament environment.
+            IronClad exists to give competitive players a serious, organized,
+            and transparent environment where tournaments feel consistent,
+            fair, and worth competing in.
           </p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
-          {cards.map((card) => {
-            const Icon = card.icon;
+          {pillars.map((pillar) => {
+            const Icon = pillar.icon;
 
             return (
               <motion.div
-                key={card.title}
+                key={pillar.title}
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true }}
                 variants={fadeUp}
                 transition={{ duration: 0.5 }}
-                className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur"
+                className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur"
               >
-                <Icon className="mb-5 h-10 w-10 text-zinc-200" />
+                <Icon className="mb-5 h-11 w-11 text-zinc-200" />
 
-                <h3 className="text-2xl font-bold">{card.title}</h3>
+                <h3 className="text-2xl font-bold">{pillar.title}</h3>
 
-                <p className="mt-4 leading-7 text-zinc-400">{card.text}</p>
+                <p className="mt-4 leading-7 text-zinc-400">{pillar.text}</p>
               </motion.div>
             );
           })}
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-6 pb-24 text-center">
+      <section className="mx-auto grid max-w-7xl gap-10 px-6 py-20 md:grid-cols-2 md:items-center">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeUp}
+        >
+          <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
+            Competitive Identity
+          </p>
+
+          <h2 className="mt-4 text-4xl font-bold">
+            More than a bracket. A competitive ecosystem.
+          </h2>
+
+          <p className="mt-6 leading-8 text-zinc-300">
+            IronClad is not just a place to register for matches. It is being
+            built as a structured competitive environment with rulebooks,
+            rankings, seasonal progression, community standards, and future
+            tournament systems.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeUp}
+          transition={{ delay: 0.15 }}
+          className="rounded-2xl border border-white/10 bg-white/5 p-8"
+        >
+          <Swords className="mb-6 h-12 w-12 text-zinc-200" />
+
+          <h3 className="text-3xl font-bold">Our Current Focus</h3>
+
+          <ul className="mt-6 space-y-4 text-zinc-300">
+            <li>• Monthly 1v1 tournament structure</li>
+            <li>• Main and Challenge bracket formats</li>
+            <li>• 4v4 competitive testing</li>
+            <li>• ICT points and rankings foundation</li>
+            <li>• Long-term esports platform development</li>
+          </ul>
+        </motion.div>
+      </section>
+
+      <section className="mx-auto max-w-5xl px-6 pb-28 text-center">
         <Target className="mx-auto mb-6 h-12 w-12 text-zinc-300" />
 
         <h2 className="text-4xl font-bold">Long-Term Vision</h2>
 
         <p className="mx-auto mt-6 max-w-3xl leading-8 text-zinc-300">
-          Our long-term goal is to grow IronClad into a trusted competitive hub
-          with seasonal events, rankings, content coverage, team formats, and
-          eventually custom tournament systems.
+          Our goal is to grow IronClad into a trusted competitive hub with
+          seasonal events, rankings, media coverage, team formats, and
+          eventually custom tournament systems owned by the IronClad brand.
         </p>
       </section>
     </main>
