@@ -1,20 +1,17 @@
-import Navbar from "@/components/Navbar";
 export default function Home() {
   return (
     <main
-      className="relative min-h-screen bg-contain bg-center text-white"
+      className="relative min-h-screen bg-contain bg-center bg-no-repeat text-white"
       style={{
         backgroundImage: "url('/images/ironclad-background.jpg')",
       }}
-    ><Navbar />
-      {/* Dark Overlay */}
+    >
       <div className="absolute inset-0 bg-black/70" />
 
-      {/* Content */}
       <section className="relative z-10 flex min-h-screen items-center justify-center px-6">
         <div className="max-w-3xl text-center">
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-300">
-            Company of Heroes 3 Tournament Hub
+            Competitive Company of Heroes 3 Events
           </p>
 
           <h1 className="mt-6 text-6xl font-bold tracking-tight">
@@ -22,7 +19,8 @@ export default function Home() {
           </h1>
 
           <p className="mt-6 text-lg text-zinc-200">
-            Competitive CoH 3 events, rankings, rules, and community-driven esports structure.
+            Join a structured competitive community built around fair play,
+            seasonal tournaments, rankings, and tactical excellence.
           </p>
 
           <div className="mt-10 flex flex-wrap justify-center gap-4">
@@ -30,12 +28,12 @@ export default function Home() {
               className="rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:scale-105"
               href="#"
             >
-              Join Discord
+              Join the Frontline
             </a>
 
             <a
               className="rounded-xl border border-zinc-500 px-6 py-3 font-semibold text-white transition hover:bg-white/10"
-              href="#"
+              href="/tournaments"
             >
               View Current Events
             </a>
