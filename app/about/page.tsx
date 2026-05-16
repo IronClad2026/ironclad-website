@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Shield, Trophy, Users, Target, Swords } from "lucide-react";
+import PageHero from "@/components/PageHero";
 
 import { fadeUp } from "@/lib/animations";
 
@@ -26,36 +27,11 @@ const pillars = [
 export default function AboutPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white">
-      <section
-        className="relative flex min-h-screen items-center justify-center bg-contain bg-center bg-no-repeat px-6 text-center"
-        style={{
-          backgroundImage: "url('/images/ironclad-background.jpg')",
-        }}
-      >
-        <div className="absolute inset-0 bg-black/70" />
-
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeUp}
-          transition={{ duration: 0.7 }}
-          className="relative z-10 max-w-5xl"
-        >
-          <p className="text-sm uppercase tracking-[0.3em] text-zinc-300">
-            About IronClad
-          </p>
-
-          <h1 className="mt-6 text-5xl font-bold tracking-tight md:text-7xl">
-            Built for Competitive COH3
-          </h1>
-
-          <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-zinc-200">
-            IronClad is a tournament initiative focused on structured events,
-            fair play, rankings, and long-term competitive development for
-            Company of Heroes 3.
-          </p>
-        </motion.div>
-      </section>
+      <PageHero
+  eyebrow="About IronClad"
+  title="Built for Competitive COH3"
+  description="IronClad is a tournament initiative focused on structured events, fair play, rankings, and long-term competitive development for Company of Heroes 3."
+/>
 
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="mb-12 max-w-3xl">

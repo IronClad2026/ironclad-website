@@ -15,9 +15,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-const PDF_1V1 = "/documents/1v1 rulebook.pdf";
-const PDF_4V4 = "/documents/4v4 rulebook.pdf";
-const PDF_PPA = "/documents/ict ppa.pdf";
+const PDF_1V1 = "/documents-rules-ppa/1v1 rulebook.pdf";
+const PDF_4V4 = "/documents-rules-ppa/4v4 rulebook.pdf";
+const PDF_PPA = "/documents-rules-ppa/ict ppa.pdf";
 
 import { fadeUp } from "@/lib/animations";
 
