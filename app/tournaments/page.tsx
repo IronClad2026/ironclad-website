@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ReactNode, ElementType } from "react";
 import { motion } from "framer-motion";
+import { Show, UserButton, useUser } from "@clerk/nextjs";
 import {
   CalendarDays,
   CheckCircle2,
@@ -131,14 +132,14 @@ const currentTournaments: TournamentCard[] = [
     time: "May Beta Event",
     checkIn: "Team Captain",
     prizePool: "Team Event",
-    players: 4,
-    maxPlayers: 4,
+    players: 8,
+    maxPlayers: 8,
     brackets: [
-      { name: "4v4 Team Bracket", requirement: "Teams of 4 players", maxPlayers: "Team Captain required", prize: "Beta Tournament" },
-      { name: "Team Identity", requirement: "Unique team name", maxPlayers: "Captain manages roster", prize: "Community Event" },
+      { name: "4v4 Team Bracket", requirement: "8 teams total", maxPlayers: "4 players per team", prize: "Beta Tournament" },
+      { name: "Team Identity", requirement: "Team Captain required", maxPlayers: "Unique team name", prize: "Community Event" },
     ],
-    details: "The 4v4 Beta Tournament is a current May IronClad Company of Heroes 3 event. Each team must include 4 players, one Team Captain, and a unique team name.",
-    rules: "Rules are listed directly on the official Battlefy tournament page. Each team must register with a Team Captain and maintain a complete 4-player roster.",
+    details: "The 4v4 Beta Tournament is a current May IronClad Company of Heroes 3 event. The format supports 8 teams total, with 4 players per team. Each team must include one Team Captain and a unique team name.",
+    rules: "Rules are listed directly on the official Battlefy tournament page. Each team must register with a Team Captain and maintain a complete 4-player roster. The event is designed for 8 teams total.",
     schedule: ["Create a unique team name", "Select one Team Captain", "Register the full 4-player roster", "Follow match instructions on Battlefy"],
     contact: "Use the official IronClad Battlefy page for registration, rules, match details, and tournament updates.",
   },
@@ -280,6 +281,8 @@ function classNames(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
 }
 
+const interactiveHover = "transform-gpu transition-all duration-300 ease-out hover:scale-[1.03] hover:border-orange-500/70 hover:shadow-lg hover:shadow-orange-950/20 active:scale-[0.99]";
+
 function StatusPill({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "green" | "red" | "amber" | "gray" }) {
   const tones = {
     blue: "border-sky-400/40 bg-sky-500/10 text-sky-200",
@@ -317,7 +320,7 @@ function Sidebar({ selectedTournament, onSelectTournament }: { selectedTournamen
         <nav className="p-3">
           <button
             onClick={() => setEventsOpen((current) => !current)}
-            className="group mb-1 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold text-slate-400 transition hover:bg-slate-800/80 hover:text-white"
+            className={classNames("group mb-1 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold text-slate-400 hover:bg-slate-800/80 hover:text-white", interactiveHover)}
           >
             <span className="flex items-center gap-3">
               <CalendarDays size={17} className="text-orange-400" />
@@ -338,7 +341,7 @@ function Sidebar({ selectedTournament, onSelectTournament }: { selectedTournamen
                         <button
                           key={event.title}
                           onClick={() => onSelectTournament(event)}
-                          className={classNames("block w-full rounded-lg bg-cover bg-center p-3 text-left transition hover:brightness-110", selected && "ring-2 ring-orange-500")}
+                          className={classNames("block w-full rounded-lg bg-cover bg-center p-3 text-left transform-gpu transition-all duration-300 ease-out hover:scale-[1.03] hover:brightness-110 active:scale-[0.99]", selected && "ring-2 ring-orange-500")}
                           style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,6,23,0.74)),url(${event.image})` }}
                         >
                           <p className="break-words text-sm font-black text-white">{event.title}</p>
@@ -360,7 +363,18 @@ function Sidebar({ selectedTournament, onSelectTournament }: { selectedTournamen
 function Hero({ tournament, onRegisterClick }: { tournament: TournamentCard; onRegisterClick: () => void }) {
   return (
     <section className="relative overflow-hidden border-b border-slate-800 bg-black">
-      <div className="absolute inset-0 opacity-60">
+      <motion.div
+        className="absolute inset-0 bg-center bg-repeat-y opacity-75"
+        style={{
+          backgroundImage: `url(${tournament.image})`,
+          backgroundSize: "100% auto",
+        }}
+        animate={{ backgroundPositionY: ["0%", "100%", "0%"] }}
+        transition={{ duration: 36, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/20" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
+      <div className="absolute inset-0 opacity-35">
         <div className="absolute left-1/3 top-0 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl" />
         <div className="absolute right-10 top-16 h-72 w-72 rounded-full bg-orange-500/20 blur-3xl" />
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(15,23,42,0.3),rgba(2,6,23,0.96)),repeating-linear-gradient(90deg,rgba(148,163,184,0.04)_0,rgba(148,163,184,0.04)_1px,transparent_1px,transparent_80px)]" />
@@ -381,11 +395,20 @@ function Hero({ tournament, onRegisterClick }: { tournament: TournamentCard; onR
               <span className="flex items-center gap-2"><Users size={16} className="text-sky-300" /> {tournament.players}/{tournament.maxPlayers} slots</span>
             </div>
           </div>
-          <div className="grid w-full max-w-full grid-cols-2 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:max-w-[720px] xl:flex-1">
-            <Metric label="Prize Pool" value={tournament.brackets.map((bracket) => `${bracket.name}: ${bracket.prize}`).join(" · ")} icon={Trophy} />
-            <Metric label="Register" value="Select format + enter code" icon={CheckCircle2} onClick={onRegisterClick} />
-            <Metric label="Format" value={tournament.format} icon={Swords} />
-            <Metric label="Status" value={tournament.status} icon={Flame} />
+          <div className="grid w-full max-w-full grid-cols-2 items-stretch gap-3 sm:max-w-sm xl:w-80 xl:flex-none">
+            <Show when="signed-out">
+              <ActionCard
+                label="Sign In"
+                description="Account access"
+                href="/sign-in"
+                icon={Users}
+              />
+            </Show>
+
+            <Show when="signed-in">
+              <AccountCard />
+            </Show>
+            <ActionCard label="Register" description="Open events" icon={CheckCircle2} onClick={onRegisterClick} />
           </div>
         </div>
       </div>
@@ -393,21 +416,34 @@ function Hero({ tournament, onRegisterClick }: { tournament: TournamentCard; onR
   );
 }
 
-function Metric({ label, value, icon: Icon, onClick }: { label: string; value: string; icon: ElementType; onClick?: () => void }) {
-  const Wrapper = onClick ? "button" : "div";
-  return (
-    <Wrapper onClick={onClick} className="flex h-full min-h-[126px] w-full min-w-0 flex-col justify-start overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/50 p-4 text-left shadow-xl shadow-black/10 backdrop-blur transition hover:border-orange-500/60">
+function ActionCard({ label, description, icon: Icon, href, onClick }: { label: string; description: string; icon: ElementType; href?: string; onClick?: () => void }) {
+  const content = (
+    <>
       <Icon size={18} className="shrink-0 text-orange-300" />
-      <p className="mt-3 break-words text-xs font-bold uppercase leading-4 tracking-wider text-slate-500">{label}</p>
-      <p className="mt-1 break-words text-sm font-black leading-5 text-white sm:text-base">{value}</p>
-    </Wrapper>
+      <p className="mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider text-white">{label}</p>
+      <p className="mt-1 break-words text-xs font-semibold leading-5 text-slate-400">{description}</p>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a href={href} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/50 p-4 text-left shadow-xl shadow-black/10 backdrop-blur hover:bg-orange-500/10", interactiveHover)}>
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/50 p-4 text-left shadow-xl shadow-black/10 backdrop-blur hover:bg-orange-500/10", interactiveHover)}>
+      {content}
+    </button>
   );
 }
 
 function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab: (tab: TabKey) => void }) {
   return (
-    <div className="border-b border-slate-800 bg-[#0f1724] px-5 lg:px-8">
-      <div className="flex gap-7 overflow-x-auto">
+    <div className="overflow-visible border-b border-slate-800 bg-[#0f1724] px-5 py-2 lg:px-8">
+      <div className="flex gap-8 overflow-x-auto overflow-y-visible px-1 py-2">
         {tabs.map((tab) => {
           const selected = activeTab === tab.key;
           return (
@@ -415,7 +451,7 @@ function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab:
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={classNames(
-                "relative py-4 text-xs font-black uppercase tracking-wider transition",
+                "relative shrink-0 transform-gpu rounded-md px-1 py-4 text-xs font-black uppercase tracking-wider transition-all duration-300 ease-out hover:scale-[1.04] active:scale-[0.99]",
                 selected ? "text-white" : "text-slate-500 hover:text-slate-200"
               )}
             >
@@ -445,12 +481,12 @@ function Overview({ tournament }: { tournament: TournamentCard }) {
         </Card>
 
         <Card>
-          <div className="flex gap-2 overflow-x-auto border-b border-slate-800 pb-4">
+          <div className="flex gap-3 overflow-x-auto overflow-y-visible border-b border-slate-800 px-1 py-3">
             {overviewPanels.map((item) => (
               <button
                 key={item.key}
                 onClick={() => setPanel(item.key)}
-                className={classNames("rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", panel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-slate-400 hover:text-white")}
+                className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, panel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-slate-400 hover:text-white")}
               >
                 {item.label}
               </button>
@@ -673,45 +709,557 @@ function Card({ children, className }: { children: ReactNode; className?: string
   return <section className={classNames("rounded-2xl border border-slate-800 bg-[#111827]/90 p-5 shadow-2xl shadow-black/20", className)}>{children}</section>;
 }
 
-function RegisterModal({ tournament, onClose }: { tournament: TournamentCard; onClose: () => void }) {
-  const [format, setFormat] = useState("");
-  const [unionCode, setUnionCode] = useState("");
-  const formatOptions = tournament.brackets.map((bracket) => `${tournament.title} · ${bracket.name}`);
+function AccountCard() {
+  const { user } = useUser();
+  const displayName = user?.username || user?.fullName || user?.primaryEmailAddress?.emailAddress || "Account";
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/80 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#111827] p-5 shadow-2xl shadow-black/40">
-        <div className="flex items-center justify-between gap-4">
-          <h3 className="min-w-0 break-words text-xl font-black text-white">Join {tournament.title}</h3>
-          <button onClick={onClose} className="shrink-0 rounded bg-slate-800 p-2 text-slate-200 hover:bg-slate-700"><X size={18} /></button>
+    <div className="flex min-h-[104px] w-full min-w-0 transform-gpu flex-col justify-center rounded-xl border border-emerald-500/45 bg-slate-950/50 p-4 shadow-xl shadow-black/10 backdrop-blur transition-all duration-300 ease-out hover:scale-[1.03] hover:border-emerald-400 hover:bg-emerald-950/35 hover:shadow-[0_0_32px_rgba(16,185,129,0.38)] active:scale-[0.99]">
+      <p className="mb-3 text-xs font-black uppercase tracking-wider text-slate-400">
+        Account
+      </p>
+
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="shrink-0">
+          <UserButton />
         </div>
 
-        {!format ? (
-          <div className="mt-5 space-y-3">
-            <p className="break-words text-sm leading-6 text-slate-300">Select the format you want to join.</p>
-            {formatOptions.map((item) => (
-              <button key={item} onClick={() => setFormat(item)} className="w-full rounded-lg border border-slate-700 bg-slate-950/50 p-4 text-left text-sm font-bold text-white transition hover:border-orange-500 hover:bg-orange-500/10">
-                <span className="block break-words">{item}</span>
-              </button>
-            ))}
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="whitespace-nowrap text-sm font-black uppercase tracking-wide text-white">
+            <span className="inline-block min-w-full animate-[account-marquee_16s_linear_infinite] pr-8">
+              {displayName}
+            </span>
+            <span className="inline-block min-w-full animate-[account-marquee_16s_linear_infinite] pr-8" aria-hidden="true">
+              {displayName}
+            </span>
           </div>
-        ) : (
-          <div className="mt-5 space-y-4">
-            <div className="rounded-lg border border-orange-500/40 bg-orange-500/10 p-3">
-              <p className="text-xs font-black uppercase tracking-wider text-orange-300">Selected Format</p>
-              <p className="mt-1 break-words text-sm font-bold text-white">{format}</p>
-            </div>
-            <label className="block">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">UNION CODE:</span>
-              <input value={unionCode} onChange={(e) => setUnionCode(e.target.value)} placeholder="Enter your Union Code" className="mt-2 w-full rounded border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-orange-500" />
-            </label>
-            <div className="flex gap-2">
-              <button onClick={() => setFormat("")} className="flex-1 rounded border border-slate-700 py-3 text-xs font-black uppercase tracking-wide text-slate-300 hover:text-white">Back</button>
-              <button onClick={onClose} className="flex-1 rounded bg-orange-500 py-3 text-xs font-black uppercase tracking-wide text-white hover:bg-orange-400">Continue</button>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function AccountMarqueeStyles() {
+  return (
+    <style jsx global>{`
+      @keyframes account-marquee {
+        0% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(-100%);
+        }
+      }
+    `}</style>
+  );
+}
+
+type RegistrationStep = "tournament" | "identity" | "competitive" | "union" | "agreements" | "submitted";
+
+type RegistrationFormState = {
+  tournamentTitle: string;
+  bracketName: string;
+  inGameName: string;
+  discordUsername: string;
+  steamUsername: string;
+  coh3PlayerCardLink: string;
+  region: string;
+  timezone: string;
+  country: string;
+  unionCode: string;
+  rulebookAgreement: boolean;
+  playerParticipationAgreement: boolean;
+  adminFinalDecisionAgreement: boolean;
+  ownershipConfirmation: boolean;
+};
+
+type RegistrationErrors = Partial<Record<keyof RegistrationFormState | "agreements", string>>;
+
+const regionOptions = [
+  "Europe",
+  "North America",
+  "South America",
+  "Oceania",
+  "Asia",
+  "Middle East",
+  "Africa",
+  "Global",
+];
+
+const timezoneOptions = [
+  "UTC",
+  "UTC-08:00 Pacific Time",
+  "UTC-05:00 Eastern Time",
+  "UTC+00:00 London / GMT",
+  "UTC+01:00 Central European Time",
+  "UTC+02:00 Eastern European Time",
+  "UTC+05:30 India Standard Time",
+  "UTC+08:00 Singapore / China",
+  "UTC+09:00 Japan / Korea",
+  "UTC+10:00 Australian Eastern Time",
+  "UTC+11:00 Sydney Daylight Time",
+  "UTC+12:00 New Zealand Time",
+];
+
+const countryOptions = [
+  "Australia",
+  "Austria",
+  "Belgium",
+  "Brazil",
+  "Canada",
+  "China",
+  "Denmark",
+  "Finland",
+  "France",
+  "Germany",
+  "Greece",
+  "India",
+  "Ireland",
+  "Italy",
+  "Japan",
+  "Netherlands",
+  "New Zealand",
+  "Norway",
+  "Poland",
+  "Portugal",
+  "Singapore",
+  "South Korea",
+  "Spain",
+  "Sweden",
+  "Switzerland",
+  "United Kingdom",
+  "United States",
+];
+
+function isValidUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function RegisterModal({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState<RegistrationStep>("tournament");
+  const [errors, setErrors] = useState<RegistrationErrors>({});
+  const [selectedTournament, setSelectedTournament] = useState<TournamentCard>(currentTournaments[0]);
+  const [form, setForm] = useState<RegistrationFormState>({
+    tournamentTitle: currentTournaments[0].title,
+    bracketName: currentTournaments[0].brackets[0]?.name ?? "",
+    inGameName: "",
+    discordUsername: "",
+    steamUsername: "",
+    coh3PlayerCardLink: "",
+    region: "",
+    timezone: "",
+    country: "",
+    unionCode: "",
+    rulebookAgreement: false,
+    playerParticipationAgreement: false,
+    adminFinalDecisionAgreement: false,
+    ownershipConfirmation: false,
+  });
+
+  const selectedBracket = selectedTournament.brackets.find((bracket) => bracket.name === form.bracketName) ?? selectedTournament.brackets[0];
+
+  const updateField = <K extends keyof RegistrationFormState>(field: K, value: RegistrationFormState[K]) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
+  };
+
+  const selectTournament = (event: TournamentCard) => {
+    setSelectedTournament(event);
+    setForm((current) => ({
+      ...current,
+      tournamentTitle: event.title,
+      bracketName: event.brackets[0]?.name ?? "",
+    }));
+    setErrors((current) => ({ ...current, tournamentTitle: undefined, bracketName: undefined }));
+  };
+
+  const validateStep = (targetStep: RegistrationStep) => {
+    const nextErrors: RegistrationErrors = {};
+
+    if (targetStep === "tournament") {
+      if (!form.tournamentTitle.trim()) {
+        nextErrors.tournamentTitle = "Please select a tournament.";
+      }
+
+      if (!form.bracketName.trim()) {
+        nextErrors.bracketName = "Please select a bracket or event type.";
+      }
+    }
+
+    if (targetStep === "identity") {
+      if (!form.inGameName.trim()) {
+        nextErrors.inGameName = "In-Game Name is required.";
+      }
+
+      if (!form.discordUsername.trim()) {
+        nextErrors.discordUsername = "Discord Username is required.";
+      }
+
+      if (!form.steamUsername.trim()) {
+        nextErrors.steamUsername = "Steam Name is required.";
+      }
+
+      if (!form.coh3PlayerCardLink.trim()) {
+        nextErrors.coh3PlayerCardLink = "CoH3 Player Card Link is required.";
+      } else if (!isValidUrl(form.coh3PlayerCardLink)) {
+        nextErrors.coh3PlayerCardLink = "Enter a valid CoH3 Player Card URL.";
+      }
+    }
+
+    if (targetStep === "competitive") {
+      if (!form.region.trim()) {
+        nextErrors.region = "Region is required.";
+      }
+
+      if (!form.timezone.trim()) {
+        nextErrors.timezone = "Timezone is required.";
+      }
+
+      if (!form.country.trim()) {
+        nextErrors.country = "Country is required.";
+      }
+    }
+
+    if (targetStep === "agreements") {
+      if (!form.rulebookAgreement) {
+        nextErrors.rulebookAgreement = "You must agree to the Rulebook.";
+      }
+
+      if (!form.playerParticipationAgreement) {
+        nextErrors.playerParticipationAgreement = "You must agree to the Player Participation Agreement.";
+      }
+
+      if (!form.adminFinalDecisionAgreement) {
+        nextErrors.adminFinalDecisionAgreement = "You must agree that admin decisions are final.";
+      }
+
+      if (!form.ownershipConfirmation) {
+        nextErrors.ownershipConfirmation = "You must confirm account/profile ownership.";
+      }
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const goToIdentityStep = () => {
+    if (validateStep("tournament")) {
+      setStep("identity");
+    }
+  };
+
+  const goToCompetitiveStep = () => {
+    if (validateStep("identity")) {
+      setStep("competitive");
+    }
+  };
+
+  const goToUnionStep = () => {
+    if (validateStep("competitive")) {
+      setStep("union");
+    }
+  };
+
+  const submitRegistration = () => {
+    if (!validateStep("agreements")) {
+      return;
+    }
+
+    const registration = {
+      ...form,
+      selectedTournament,
+      selectedBracket,
+      status: "Pending Review",
+      submittedAt: new Date().toISOString(),
+    };
+
+    console.log("IronClad registration submitted:", registration);
+    setStep("submitted");
+  };
+
+  const steps: RegistrationStep[] = ["tournament", "identity", "competitive", "union", "agreements", "submitted"];
+  const currentStepNumber = Math.max(1, steps.indexOf(step) + 1);
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 px-4 py-6">
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#111827] shadow-2xl shadow-black/50">
+        <div className="sticky top-0 z-10 border-b border-slate-800 bg-[#111827]/95 p-5 backdrop-blur">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-300">IronClad Registration</p>
+              <h3 className="mt-1 break-words text-2xl font-black text-white">Esports Player Registration</h3>
+            </div>
+            <button onClick={onClose} className="shrink-0 rounded bg-slate-800 p-2 text-slate-200 transition hover:bg-slate-700">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-full rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.min((currentStepNumber / steps.length) * 100, 100)}%` }} />
+          </div>
+        </div>
+
+        <div className="p-5">
+          {step === "tournament" && (
+            <div className="space-y-5">
+              <div>
+                <h4 className="text-xl font-black text-white">Tournament Selection</h4>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Select the tournament and bracket/event type you want to join.</p>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {currentTournaments.map((event) => {
+                  const selected = selectedTournament.title === event.title;
+                  return (
+                    <button
+                      key={event.title}
+                      onClick={() => selectTournament(event)}
+                      className={classNames("overflow-hidden rounded-xl border bg-cover bg-center p-4 text-left transition-all duration-300 hover:scale-[1.02]", selected ? "border-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.24)]" : "border-slate-700 hover:border-orange-500/70")}
+                      style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,6,23,0.68)),url(${event.image})` }}
+                    >
+                      <p className="break-words text-lg font-black text-white">{event.title}</p>
+                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{event.month} · {event.format} · {event.status}</p>
+                      <p className="mt-3 break-words text-sm leading-6 text-slate-300">{event.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.tournamentTitle && <FieldError message={errors.tournamentTitle} />}
+
+              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+                <div className="grid gap-4 md:grid-cols-[180px_1fr]">
+                  <div className="h-32 rounded-lg bg-cover bg-center" style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.25),rgba(2,6,23,0.55)),url(${selectedTournament.image})` }} />
+                  <div className="min-w-0">
+                    <h5 className="break-words text-lg font-black text-white">{selectedTournament.title}</h5>
+                    <div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
+                      <p><span className="font-bold text-slate-500">Format:</span> {selectedTournament.format}</p>
+                      <p><span className="font-bold text-slate-500">Status:</span> {selectedTournament.status}</p>
+                      <p><span className="font-bold text-slate-500">Prize Pool:</span> {selectedTournament.prizePool}</p>
+                      <p><span className="font-bold text-slate-500">Deadline:</span> Coming soon</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {selectedTournament.brackets.map((bracket) => {
+                    const selected = form.bracketName === bracket.name;
+                    return (
+                      <button
+                        key={bracket.name}
+                        onClick={() => updateField("bracketName", bracket.name)}
+                        className={classNames("rounded-lg border p-4 text-left transition-all duration-300 hover:scale-[1.02]", selected ? "border-orange-500 bg-orange-500/10" : "border-slate-700 bg-slate-950/40 hover:border-orange-500/70")}
+                      >
+                        <p className="break-words font-black text-white">{bracket.name}</p>
+                        <p className="mt-1 break-words text-xs text-slate-400">{bracket.requirement} · {bracket.maxPlayers}</p>
+                        <p className="mt-2 break-words text-sm font-bold text-orange-300">{bracket.prize}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {errors.bracketName && <FieldError message={errors.bracketName} />}
+              </div>
+
+              <ModalButtons onClose={onClose} onNext={goToIdentityStep} />
+            </div>
+          )}
+
+          {step === "identity" && (
+            <div className="space-y-5">
+              <div>
+                <h4 className="text-xl font-black text-white">Player Identity & Verification</h4>
+                <p className="mt-2 text-sm leading-6 text-slate-300">This information is used for player verification, ELO validation, anti-smurf checks, and admin review.</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <RegistrationInput label="In-Game Name" value={form.inGameName} onChange={(value) => updateField("inGameName", value)} error={errors.inGameName} required />
+                <RegistrationInput label="Discord Username" value={form.discordUsername} onChange={(value) => updateField("discordUsername", value)} error={errors.discordUsername} required />
+                <RegistrationInput label="Steam Name / Username" value={form.steamUsername} onChange={(value) => updateField("steamUsername", value)} error={errors.steamUsername} required />
+                <RegistrationInput label="CoH3 Player Card Link" value={form.coh3PlayerCardLink} onChange={(value) => updateField("coh3PlayerCardLink", value)} error={errors.coh3PlayerCardLink} required />
+              </div>
+
+              <ModalButtons onBack={() => setStep("tournament")} onNext={goToCompetitiveStep} />
+            </div>
+          )}
+
+          {step === "competitive" && (
+            <div className="space-y-5">
+              <div>
+                <h4 className="text-xl font-black text-white">Competitive Information</h4>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Provide the basic competitive details required for admin review.</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <SearchableCombobox label="Region" value={form.region} options={regionOptions} onChange={(value) => updateField("region", value)} error={errors.region} required />
+                <SearchableCombobox label="Timezone" value={form.timezone} options={timezoneOptions} onChange={(value) => updateField("timezone", value)} error={errors.timezone} required />
+                <SearchableCombobox label="Country" value={form.country} options={countryOptions} onChange={(value) => updateField("country", value)} error={errors.country} required />
+              </div>
+
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/25 p-4">
+                <p className="text-sm font-black uppercase tracking-wider text-emerald-300">Frontend ELO Verification Placeholder</p>
+                <div className="mt-3 space-y-2 text-sm leading-6 text-slate-200">
+                  <p>CoH3 Player Card detected</p>
+                  <p>ELO will be checked automatically later</p>
+                  <p>1300+ ELO → Main Bracket</p>
+                  <p>Under 1300 ELO → Challenge Bracket</p>
+                  <p>Final approval remains under admin review</p>
+                </div>
+              </div>
+
+              <ModalButtons onBack={() => setStep("identity")} onNext={goToUnionStep} />
+            </div>
+          )}
+
+          {step === "union" && (
+            <div className="space-y-5">
+              <div>
+                <h4 className="text-xl font-black text-white">UNION CODE Verification</h4>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Enter your UNION CODE if you already have one.</p>
+              </div>
+
+              <RegistrationInput label="UNION CODE" value={form.unionCode} onChange={(value) => updateField("unionCode", value)} />
+
+              <div className="rounded-xl border border-orange-500/40 bg-orange-500/10 p-4">
+                <p className="break-words text-sm leading-6 text-slate-200">You must obtain an official IronClad UNION CODE through Discord verification.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <a href="#" className="rounded-lg border border-slate-700 bg-slate-950/50 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-white transition hover:scale-[1.02] hover:border-orange-500">Join Discord</a>
+                  <a href="#" className="rounded-lg bg-orange-500 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-white transition hover:scale-[1.02] hover:bg-orange-400">Open Verification Ticket</a>
+                </div>
+              </div>
+
+              <ModalButtons onBack={() => setStep("competitive")} onNext={() => setStep("agreements")} />
+            </div>
+          )}
+
+          {step === "agreements" && (
+            <div className="space-y-5">
+              <div>
+                <h4 className="text-xl font-black text-white">Rules & Agreements</h4>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Confirm all required agreements before submitting your registration.</p>
+              </div>
+
+              <div className="space-y-3">
+                <AgreementCheckbox label="Rulebook Agreement" checked={form.rulebookAgreement} onChange={(checked) => updateField("rulebookAgreement", checked)} error={errors.rulebookAgreement} />
+                <AgreementCheckbox label="Player Participation Agreement" checked={form.playerParticipationAgreement} onChange={(checked) => updateField("playerParticipationAgreement", checked)} error={errors.playerParticipationAgreement} />
+                <AgreementCheckbox label="Admin Final Decision Agreement" checked={form.adminFinalDecisionAgreement} onChange={(checked) => updateField("adminFinalDecisionAgreement", checked)} error={errors.adminFinalDecisionAgreement} />
+                <AgreementCheckbox label="Ownership Confirmation" checked={form.ownershipConfirmation} onChange={(checked) => updateField("ownershipConfirmation", checked)} error={errors.ownershipConfirmation} />
+              </div>
+
+              <ModalButtons onBack={() => setStep("union")} onNext={submitRegistration} nextLabel="Submit Registration" />
+            </div>
+          )}
+
+          {step === "submitted" && (
+            <div className="grid place-items-center py-10 text-center">
+              <div className="grid h-16 w-16 place-items-center rounded-full border border-emerald-400/70 bg-emerald-950/40 shadow-[0_0_32px_rgba(16,185,129,0.35)]">
+                <CheckCircle2 className="text-emerald-300" size={30} />
+              </div>
+              <h4 className="mt-5 text-2xl font-black text-white">Registration Submitted</h4>
+              <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">Status: Pending Review</p>
+              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">Registrations are reviewed within 24 hours.</p>
+              <button onClick={onClose} className="mt-6 rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400">Close</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+
+  return <p className="mt-2 break-words text-xs font-bold text-orange-300">{message}</p>;
+}
+
+function RegistrationInput({ label, value, onChange, error, required = false }: { label: string; value: string; onChange: (value: string) => void; error?: string; required?: boolean }) {
+  return (
+    <label className="block min-w-0">
+      <span className="text-xs font-black uppercase tracking-wider text-slate-400">{label}{required && <span className="text-orange-300"> *</span>}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={classNames("mt-2 w-full rounded-lg border bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-orange-500", error ? "border-orange-400/80" : "border-slate-700")}
+        aria-invalid={Boolean(error)}
+      />
+      <FieldError message={error} />
+    </label>
+  );
+}
+
+function SearchableCombobox({ label, value, options, onChange, error, required = false }: { label: string; value: string; options: string[]; onChange: (value: string) => void; error?: string; required?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const filteredOptions = options.filter((option) => option.toLowerCase().includes(value.toLowerCase())).slice(0, 8);
+
+  return (
+    <label className="relative block min-w-0">
+      <span className="text-xs font-black uppercase tracking-wider text-slate-400">{label}{required && <span className="text-orange-300"> *</span>}</span>
+      <input
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        className={classNames("mt-2 w-full rounded-lg border bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-orange-500", error ? "border-orange-400/80" : "border-slate-700")}
+        aria-invalid={Boolean(error)}
+      />
+
+      {open && filteredOptions.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-700 bg-[#0f1724] p-2 shadow-2xl shadow-black/40">
+          {filteredOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onChange(option);
+                setOpen(false);
+              }}
+              className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-200 transition hover:bg-orange-500/10 hover:text-white"
+            >
+              <span className="block truncate">{option}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <FieldError message={error} />
+    </label>
+  );
+}
+
+function AgreementCheckbox({ label, checked, onChange, error }: { label: string; checked: boolean; onChange: (checked: boolean) => void; error?: string }) {
+  return (
+    <div>
+      <label className={classNames("flex cursor-pointer items-start gap-3 rounded-xl border bg-slate-950/40 p-4 transition hover:border-orange-500/70 hover:bg-orange-500/10", error ? "border-orange-400/80" : "border-slate-700")}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+          className="mt-1 h-4 w-4 shrink-0 accent-orange-500"
+          aria-invalid={Boolean(error)}
+        />
+        <span className="break-words text-sm font-bold text-slate-200">{label}</span>
+      </label>
+      <FieldError message={error} />
+    </div>
+  );
+}
+
+function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue" }: { onClose?: () => void; onBack?: () => void; onNext: () => void; nextLabel?: string }) {
+  return (
+    <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-between">
+      <div>
+        {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Back</button>}
+        {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Cancel</button>}
+      </div>
+      <button onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 sm:w-auto">{nextLabel}</button>
     </div>
   );
 }
@@ -733,6 +1281,7 @@ export default function TournamentsPage() {
   const [selectedTournament, setSelectedTournament] = useState<TournamentCard>(currentTournaments[0]);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const { isSignedIn } = useUser();
 
   const handleSelectTournament = (tournament: TournamentCard) => {
     setSelectedTournament(tournament);
@@ -741,16 +1290,27 @@ export default function TournamentsPage() {
 
   return (
     <div className="min-h-screen bg-black pt-20 text-slate-100">
+      <AccountMarqueeStyles />
       <div className="mx-auto flex max-w-[1600px]">
         <Sidebar selectedTournament={selectedTournament} onSelectTournament={handleSelectTournament} />
         <div className="min-w-0 flex-1">
-          <Hero tournament={selectedTournament} onRegisterClick={() => setShowRegisterModal(true)} />
+          <Hero
+            tournament={selectedTournament}
+            onRegisterClick={() => {
+              if (!isSignedIn) {
+                window.location.href = "/sign-in";
+                return;
+              }
+
+              setShowRegisterModal(true);
+            }}
+          />
           <TopTabs activeTab={activeTab} setActiveTab={setActiveTab} />
           <MainContent activeTab={activeTab} tournament={selectedTournament} />
         </div>
       </div>
 
-      {showRegisterModal && <RegisterModal tournament={selectedTournament} onClose={() => setShowRegisterModal(false)} />}
+      {showRegisterModal && <RegisterModal onClose={() => setShowRegisterModal(false)} />}
 
       <button onClick={() => setShowMobilePanel(true)} className="fixed bottom-5 right-5 z-40 rounded-full bg-orange-500 p-4 text-white shadow-2xl shadow-orange-950/40 lg:hidden"><Menu size={22} /></button>
       {showMobilePanel && (
