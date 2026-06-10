@@ -1,14 +1,17 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
+import { supabase } from "@/lib/supabase";
 import {
   AlertTriangle,
   CheckCircle,
   Clock,
   Database,
   Eye,
-  Filter,
   GitBranch,
+  Menu,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -24,95 +27,30 @@ type CustomClaims = {
 };
 
 type RegistrationStatus = "pending" | "manual_review" | "approved" | "rejected";
-
 type FilterStatus = "all" | RegistrationStatus;
+type AdminNotice = "note-required" | "saved" | "save-failed";
 
 type AdminPageProps = {
   searchParams?: Promise<{
     filter?: FilterStatus;
     selected?: string;
-    overrides?: string;
+    notice?: AdminNotice;
   }>;
 };
 
-const registrations = [
-  {
-    id: "reg-001",
-    player: "IronWolf",
-    discord: "@ironwolf",
-    steamName: "IronWolf_91",
-    country: "Australia",
-    region: "Oceania",
-    timezone: "AEST / Sydney",
-    tournament: "Operation Skyfall",
-    bracket: "Main",
-    elo: 1425,
-    verifiedElo: 1418,
-    eloStatus: "Verified",
-    status: "pending" as RegistrationStatus,
-    adminNotes:
-      "Player submitted complete details. ELO is close to submitted value and suitable for Main bracket.",
-  },
-  {
-    id: "reg-002",
-    player: "AxisBreaker",
-    discord: "@axisbreaker",
-    steamName: "AxisBreakerCOH",
-    country: "Germany",
-    region: "Europe",
-    timezone: "CET / Berlin",
-    tournament: "Operation Skyfall",
-    bracket: "Challenge",
-    elo: 1180,
-    verifiedElo: 1296,
-    eloStatus: "Needs Review",
-    status: "manual_review" as RegistrationStatus,
-    adminNotes:
-      "Submitted ELO is lower than verified ELO. Admin should confirm if Challenge bracket is still correct.",
-  },
-  {
-    id: "reg-003",
-    player: "SteelFox",
-    discord: "@steelfox",
-    steamName: "SteelFox_IT",
-    country: "Italy",
-    region: "Europe",
-    timezone: "CET / Rome",
-    tournament: "4v4 Beta Tournament",
-    bracket: "4v4",
-    elo: 1310,
-    verifiedElo: 1312,
-    eloStatus: "Verified",
-    status: "approved" as RegistrationStatus,
-    adminNotes:
-      "Approved for 4v4 beta. Player information looks consistent.",
-  },
-  {
-    id: "reg-004",
-    player: "RangerNine",
-    discord: "@rangernine",
-    steamName: "RangerNineUS",
-    country: "United States",
-    region: "North America",
-    timezone: "EST / New York",
-    tournament: "Operation Skyfall",
-    bracket: "Challenge",
-    elo: 980,
-    verifiedElo: 1460,
-    eloStatus: "Mismatch",
-    status: "rejected" as RegistrationStatus,
-    adminNotes:
-      "Large ELO mismatch. Registration rejected until player provides correct information.",
-  },
-];
-
-const filters = [
-  { label: "All", value: "all" },
-  { label: "Pending", value: "pending" },
-  { label: "Manual Review", value: "manual_review" },
-  { label: "Approved", value: "approved" },
-  { label: "Rejected", value: "rejected" },
-] as const;
+type SupabaseRegistration = {
+  id: string;
+  player_name: string;
+  discord_username: string;
+  steam_name: string;
+  country: string;
+  region: string;
+  timezone: string;
+  submitted_elo: number;
+  registration_status: RegistrationStatus;
+  admin_notes: string | null;
+  created_at: string;
+};
 
 const managementCards = [
   {
@@ -157,71 +95,166 @@ function getSafeFilter(filter?: string): FilterStatus {
     : "all";
 }
 
-function parseOverrides(overrides?: string) {
-  const result: Record<string, RegistrationStatus> = {};
+function getStatusBadgeClass(status: RegistrationStatus) {
+  if (status === "approved") {
+    return "border-green-500/30 bg-green-500/10 text-green-400";
+  }
 
-  if (!overrides) return result;
+  if (status === "rejected") {
+    return "border-red-500/30 bg-red-500/10 text-red-400";
+  }
 
-  overrides.split(",").forEach((item) => {
-    const [id, status] = item.split(":");
+  if (status === "manual_review") {
+    return "border-orange-500/30 bg-orange-500/10 text-orange-300";
+  }
 
-    if (
-      id &&
-      ["pending", "manual_review", "approved", "rejected"].includes(status)
-    ) {
-      result[id] = status as RegistrationStatus;
-    }
-  });
-
-  return result;
+  return "border-white/10 bg-white/[0.04] text-zinc-300";
 }
 
 function buildHref({
   filter,
   selected,
-  overrides,
+  notice,
 }: {
   filter: FilterStatus;
   selected?: string;
-  overrides?: string;
+  notice?: AdminNotice;
 }) {
   const params = new URLSearchParams();
-
   params.set("filter", filter);
 
-  if (selected) params.set("selected", selected);
-  if (overrides) params.set("overrides", overrides);
+  if (selected) {
+    params.set("selected", selected);
+  }
+
+  if (notice) {
+    params.set("notice", notice);
+  }
 
   return `/admin?${params.toString()}`;
 }
 
-function buildStatusOverrideHref({
+async function updateRegistrationStatus(formData: FormData) {
+  "use server";
+
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+
+  if (!userId || role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  const registrationId = String(formData.get("registrationId") || "");
+  const nextStatus = String(
+    formData.get("nextStatus") || ""
+  ) as RegistrationStatus;
+  const activeFilter = getSafeFilter(
+    String(formData.get("activeFilter") || "all")
+  );
+  const selected = String(formData.get("selected") || "");
+  const adminNotes = String(formData.get("adminNotes") || "").trim();
+
+  const validStatuses: RegistrationStatus[] = [
+    "pending",
+    "manual_review",
+    "approved",
+    "rejected",
+  ];
+
+  if (!registrationId || !validStatuses.includes(nextStatus)) {
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        selected: selected || undefined,
+      })
+    );
+  }
+
+  if (
+    (nextStatus === "rejected" || nextStatus === "manual_review") &&
+    !adminNotes
+  ) {
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        selected: selected || registrationId,
+        notice: "note-required",
+      })
+    );
+  }
+
+  if (adminNotes.length > 1000) {
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        selected: selected || registrationId,
+        notice: "save-failed",
+      })
+    );
+  }
+
+  const { error } = await supabase
+    .from("registrations")
+    .update({
+      registration_status: nextStatus,
+      admin_notes: adminNotes,
+    })
+    .eq("id", registrationId);
+
+  if (error) {
+    console.error("Supabase status update error:", error.message);
+
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        selected: selected || registrationId,
+        notice: "save-failed",
+      })
+    );
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildHref({
+      filter: activeFilter,
+      selected: selected || undefined,
+      notice: "saved",
+    })
+  );
+}
+
+function StatusActionButton({
   registrationId,
   nextStatus,
   activeFilter,
   selected,
-  currentOverrides,
+  adminNotes,
+  children,
+  className,
 }: {
   registrationId: string;
   nextStatus: RegistrationStatus;
   activeFilter: FilterStatus;
   selected?: string;
-  currentOverrides: Record<string, RegistrationStatus>;
+  adminNotes?: string | null;
+  children: ReactNode;
+  className: string;
 }) {
-  const nextOverrides = {
-    ...currentOverrides,
-    [registrationId]: nextStatus,
-  };
+  return (
+    <form action={updateRegistrationStatus}>
+      <input type="hidden" name="registrationId" value={registrationId} />
+      <input type="hidden" name="nextStatus" value={nextStatus} />
+      <input type="hidden" name="activeFilter" value={activeFilter} />
+      <input type="hidden" name="selected" value={selected ?? ""} />
+      <input type="hidden" name="adminNotes" value={adminNotes ?? ""} />
 
-  const overridesString = Object.entries(nextOverrides)
-    .map(([id, status]) => `${id}:${status}`)
-    .join(",");
-
-  return buildHref({
-    filter: activeFilter,
-    selected,
-    overrides: overridesString,
-  });
+      <button type="submit" className={className}>
+        {children}
+      </button>
+    </form>
+  );
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -236,70 +269,78 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const params = await searchParams;
   const activeFilter = getSafeFilter(params?.filter);
-  const statusOverrides = parseOverrides(params?.overrides);
 
-  const registrationsWithState = registrations.map((registration) => ({
-    ...registration,
-    status: statusOverrides[registration.id] ?? registration.status,
-  }));
+  const { data: registrationsData, error } = await supabase
+    .from("registrations")
+    .select(
+      "id, player_name, discord_username, steam_name, country, region, timezone, submitted_elo, registration_status, admin_notes, created_at"
+    )
+    .order("created_at", { ascending: false });
 
-  const selectedRegistration = registrationsWithState.find(
+  if (error) {
+    console.error("Supabase registrations fetch error:", error.message);
+  }
+
+  const registrations = (registrationsData ?? []) as SupabaseRegistration[];
+
+  const selectedRegistration = registrations.find(
     (registration) => registration.id === params?.selected
   );
 
   const filteredRegistrations =
     activeFilter === "all"
-      ? registrationsWithState
-      : registrationsWithState.filter(
-          (registration) => registration.status === activeFilter
+      ? registrations
+      : registrations.filter(
+          (registration) => registration.registration_status === activeFilter
         );
 
   const stats = [
     {
       label: "Pending Registrations",
-      value: registrationsWithState.filter((item) => item.status === "pending")
-        .length,
-      filter: "pending",
+      value: registrations.filter(
+        (item) => item.registration_status === "pending"
+      ).length,
+      filter: "pending" as FilterStatus,
       icon: Clock,
     },
     {
       label: "Manual Reviews",
-      value: registrationsWithState.filter(
-        (item) => item.status === "manual_review"
+      value: registrations.filter(
+        (item) => item.registration_status === "manual_review"
       ).length,
-      filter: "manual_review",
+      filter: "manual_review" as FilterStatus,
       icon: ShieldAlert,
     },
     {
       label: "Approved Players",
-      value: registrationsWithState.filter((item) => item.status === "approved")
-        .length,
-      filter: "approved",
+      value: registrations.filter(
+        (item) => item.registration_status === "approved"
+      ).length,
+      filter: "approved" as FilterStatus,
       icon: CheckCircle,
     },
     {
       label: "Rejected Players",
-      value: registrationsWithState.filter((item) => item.status === "rejected")
-        .length,
-      filter: "rejected",
+      value: registrations.filter(
+        (item) => item.registration_status === "rejected"
+      ).length,
+      filter: "rejected" as FilterStatus,
       icon: XCircle,
     },
     {
       label: "Active Tournaments",
       value: 2,
-      filter: "all",
+      filter: "all" as FilterStatus,
       icon: Trophy,
     },
-  ] as const;
+  ];
 
   return (
     <main className="min-h-screen bg-black px-6 pt-32 pb-16 text-white">
       <section className="mx-auto max-w-7xl space-y-8">
         <div
           className="relative overflow-hidden rounded-3xl border border-orange-500/30 bg-cover bg-center p-8 shadow-2xl"
-          style={{
-            backgroundImage: "url('/images/ironclad-background.jpg')",
-          }}
+          style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
         >
           <div className="absolute inset-0 bg-black/75" />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-orange-950/40" />
@@ -329,10 +370,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             return (
               <Link
                 key={stat.label}
-                href={buildHref({
-                  filter: stat.filter,
-                  overrides: params?.overrides,
-                })}
+                href={buildHref({ filter: stat.filter })}
                 className={`rounded-2xl border p-5 backdrop-blur transition hover:-translate-y-1 ${
                   isActive
                     ? "border-orange-400 bg-orange-500/20 shadow-lg shadow-orange-500/10"
@@ -340,9 +378,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 }`}
               >
                 <Icon className="h-6 w-6 text-orange-400" />
-
                 <p className="mt-4 text-3xl font-bold">{stat.value}</p>
-
                 <p className="mt-1 text-sm text-zinc-400">{stat.label}</p>
               </Link>
             );
@@ -350,68 +386,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
 
         <div className="relative z-10 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
-          <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Registration Review</h2>
-
-              <p className="mt-1 text-sm text-zinc-400">
-                Showing {filteredRegistrations.length} registration(s).
-              </p>
-            </div>
-
-            <div className="relative z-50 flex flex-col gap-3 sm:items-end">
-              <div className="rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm text-orange-300">
-                Current Filter: {formatStatus(activeFilter)}
-              </div>
-
-              <details className="group relative z-50">
-                <summary className="flex cursor-pointer list-none items-center gap-3 rounded-full border border-orange-500/30 bg-black/60 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:border-orange-400 hover:bg-orange-500/10">
-                  <Filter className="h-4 w-4" />
-
-                  <span>Filters</span>
-
-                  <span className="flex flex-col gap-1">
-                    <span className="h-0.5 w-4 rounded-full bg-orange-300" />
-                    <span className="h-0.5 w-4 rounded-full bg-orange-300" />
-                    <span className="h-0.5 w-4 rounded-full bg-orange-300" />
-                  </span>
-                </summary>
-
-                <div className="absolute right-0 top-full z-50 mt-3 w-56 rounded-2xl border border-orange-500/30 bg-black/95 p-3 shadow-2xl shadow-orange-950/40 backdrop-blur">
-                  <div className="space-y-2">
-                    {filters.map((filter) => {
-                      const isActive = activeFilter === filter.value;
-
-                      return (
-                        <Link
-                          key={filter.value}
-                          href={buildHref({
-                            filter: filter.value,
-                            overrides: params?.overrides,
-                          })}
-                          className={`block rounded-xl border px-4 py-2 text-sm font-semibold transition ${
-                            isActive
-                              ? "border-orange-400 bg-orange-500/20 text-orange-300"
-                              : "border-white/10 bg-white/[0.03] text-zinc-400 hover:border-orange-500/50 hover:text-orange-300"
-                          }`}
-                        >
-                          {filter.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              </details>
-            </div>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold">Registration Review</h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Showing {filteredRegistrations.length} registration(s).
+            </p>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-visible">
             <table className="w-full min-w-[1000px] text-left text-sm">
               <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
                 <tr>
                   <th className="py-4">Player</th>
-                  <th>Tournament</th>
-                  <th>Bracket</th>
+                  <th>Created</th>
+                  <th>Region</th>
                   <th>ELO</th>
                   <th>Country</th>
                   <th>Discord</th>
@@ -427,58 +415,86 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     className="border-b border-white/5 text-zinc-300 transition hover:bg-white/[0.03]"
                   >
                     <td className="py-4 font-semibold text-white">
-                      {registration.player}
+                      {registration.player_name || "N/A"}
                     </td>
 
-                    <td>{registration.tournament}</td>
-                    <td>{registration.bracket}</td>
-                    <td>{registration.elo}</td>
-                    <td>{registration.country}</td>
-                    <td>{registration.discord}</td>
+                    <td>
+                      {registration.created_at
+                        ? new Date(registration.created_at).toLocaleDateString()
+                        : "N/A"}
+                    </td>
+
+                    <td>{registration.region || "N/A"}</td>
+                    <td>{registration.submitted_elo ?? "N/A"}</td>
+                    <td>{registration.country || "N/A"}</td>
+                    <td>{registration.discord_username || "N/A"}</td>
 
                     <td>
-                      <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs text-orange-300">
-                        {formatStatus(registration.status)}
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                          registration.registration_status || "pending"
+                        )}`}
+                      >
+                        {formatStatus(
+                          registration.registration_status || "pending"
+                        )}
                       </span>
                     </td>
 
-                    <td>
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={buildHref({
-                            filter: activeFilter,
-                            selected: registration.id,
-                            overrides: params?.overrides,
-                          })}
-                          className="inline-flex items-center gap-1 rounded-lg border border-orange-500/30 px-3 py-1 text-xs text-orange-300 hover:bg-orange-500/10"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View Details
-                        </Link>
+                    <td className="relative">
+                      <div className="relative z-[80]">
+                        <details className="group relative inline-block">
+                          <summary className="inline-flex cursor-pointer list-none items-center justify-center rounded-xl bg-orange-500/10 p-2 text-orange-300 ring-1 ring-orange-500/20 transition hover:bg-orange-500/20 hover:ring-orange-400/40 [&::-webkit-details-marker]:hidden">
+                            <Menu className="h-4 w-4" />
+                          </summary>
 
-                        <Link
-                          href={buildStatusOverrideHref({
-                            registrationId: registration.id,
-                            nextStatus: "approved",
-                            activeFilter,
-                            currentOverrides: statusOverrides,
-                          })}
-                          className="rounded-lg border border-green-500/30 px-3 py-1 text-xs text-green-400 hover:bg-green-500/10"
-                        >
-                          Approve
-                        </Link>
+                          <div className="fixed right-10 z-[9999] mt-2 w-48 origin-top-right scale-95 rounded-2xl bg-zinc-950/95 p-2 opacity-0 shadow-2xl shadow-orange-950/60 ring-1 ring-orange-500/20 backdrop-blur-xl transition-all duration-200 group-open:scale-100 group-open:opacity-100">
+                            <div className="space-y-1.5">
+                              <Link
+                                href={buildHref({
+                                  filter: activeFilter,
+                                  selected: registration.id,
+                                })}
+                                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-orange-300 transition hover:bg-orange-500/10"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                View Details
+                              </Link>
 
-                        <Link
-                          href={buildStatusOverrideHref({
-                            registrationId: registration.id,
-                            nextStatus: "rejected",
-                            activeFilter,
-                            currentOverrides: statusOverrides,
-                          })}
-                          className="rounded-lg border border-red-500/30 px-3 py-1 text-xs text-red-400 hover:bg-red-500/10"
-                        >
-                          Reject
-                        </Link>
+                              <StatusActionButton
+                                registrationId={registration.id}
+                                nextStatus="approved"
+                                activeFilter={activeFilter}
+                                adminNotes={registration.admin_notes}
+                                className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-green-400 transition hover:bg-green-500/10"
+                              >
+                                Approve
+                              </StatusActionButton>
+
+                              <StatusActionButton
+                                registrationId={registration.id}
+                                nextStatus="rejected"
+                                activeFilter={activeFilter}
+                                selected={registration.id}
+                                adminNotes={registration.admin_notes}
+                                className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-red-400 transition hover:bg-red-500/10"
+                              >
+                                Reject
+                              </StatusActionButton>
+
+                              <StatusActionButton
+                                registrationId={registration.id}
+                                nextStatus="manual_review"
+                                activeFilter={activeFilter}
+                                selected={registration.id}
+                                adminNotes={registration.admin_notes}
+                                className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-orange-300 transition hover:bg-orange-500/10"
+                              >
+                                Review
+                              </StatusActionButton>
+                            </div>
+                          </div>
+                        </details>
                       </div>
                     </td>
                   </tr>
@@ -487,13 +503,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 {filteredRegistrations.length === 0 && (
                   <tr>
                     <td colSpan={8} className="py-10 text-center text-zinc-500">
-                      No registrations found for this filter.
+                      No registrations found for this status.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+
+          {error && (
+            <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+              Could not load registrations from Supabase. Check your table name,
+              column names, and Row Level Security policy.
+            </div>
+          )}
         </div>
 
         <div className="relative z-0 grid gap-8 lg:grid-cols-[1fr_1.2fr]">
@@ -559,7 +582,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </p>
 
                 <h2 className="mt-3 text-3xl font-bold">
-                  {selectedRegistration.player}
+                  {selectedRegistration.player_name || "N/A"}
                 </h2>
 
                 <p className="mt-2 text-sm text-zinc-400">
@@ -568,10 +591,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
 
               <Link
-                href={buildHref({
-                  filter: activeFilter,
-                  overrides: params?.overrides,
-                })}
+                href={buildHref({ filter: activeFilter })}
                 className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-zinc-400 transition hover:border-orange-500/50 hover:text-orange-300"
               >
                 <X className="h-5 w-5" />
@@ -580,18 +600,25 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
             <div className="grid gap-4 md:grid-cols-2">
               {[
-                ["Player Name", selectedRegistration.player],
-                ["Discord", selectedRegistration.discord],
-                ["Steam Name", selectedRegistration.steamName],
+                ["Player Name", selectedRegistration.player_name],
+                ["Discord", selectedRegistration.discord_username],
+                ["Steam Name", selectedRegistration.steam_name],
                 ["Country", selectedRegistration.country],
                 ["Region", selectedRegistration.region],
                 ["Timezone", selectedRegistration.timezone],
-                ["Tournament", selectedRegistration.tournament],
-                ["Bracket", selectedRegistration.bracket],
-                ["Submitted ELO", selectedRegistration.elo],
-                ["Verified ELO", selectedRegistration.verifiedElo],
-                ["ELO Status", selectedRegistration.eloStatus],
-                ["Registration Status", formatStatus(selectedRegistration.status)],
+                ["Submitted ELO", selectedRegistration.submitted_elo],
+                [
+                  "Registration Status",
+                  formatStatus(
+                    selectedRegistration.registration_status || "pending"
+                  ),
+                ],
+                [
+                  "Created At",
+                  selectedRegistration.created_at
+                    ? new Date(selectedRegistration.created_at).toLocaleString()
+                    : "N/A",
+                ],
               ].map(([label, value]) => (
                 <div
                   key={label}
@@ -600,63 +627,110 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <p className="text-xs uppercase tracking-wider text-zinc-500">
                     {label}
                   </p>
-                  <p className="mt-2 font-semibold text-white">{value}</p>
+
+                  <p className="mt-2 font-semibold text-white">
+                    {value || "N/A"}
+                  </p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-4 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
-              <p className="text-xs uppercase tracking-wider text-orange-300">
-                Admin Notes
-              </p>
-              <p className="mt-2 text-sm leading-6 text-zinc-300">
-                {selectedRegistration.adminNotes}
-              </p>
-            </div>
+            <form action={updateRegistrationStatus} className="mt-4">
+              <input
+                type="hidden"
+                name="registrationId"
+                value={selectedRegistration.id}
+              />
+              <input
+                type="hidden"
+                name="activeFilter"
+                value={activeFilter}
+              />
+              <input
+                type="hidden"
+                name="selected"
+                value={selectedRegistration.id}
+              />
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href={buildStatusOverrideHref({
-                  registrationId: selectedRegistration.id,
-                  nextStatus: "approved",
-                  activeFilter,
-                  selected: selectedRegistration.id,
-                  currentOverrides: statusOverrides,
-                })}
-                className="inline-flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 transition hover:bg-green-500/20"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Approve
-              </Link>
+              <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
+                <label
+                  htmlFor="adminNotes"
+                  className="text-xs font-bold uppercase tracking-wider text-orange-300"
+                >
+                  Admin Notes
+                </label>
+                <p className="mt-2 text-xs leading-5 text-zinc-400">
+                  Required when rejecting a registration or marking it for
+                  manual review. This note is shown to the player.
+                </p>
+                <textarea
+                  id="adminNotes"
+                  name="adminNotes"
+                  defaultValue={selectedRegistration.admin_notes ?? ""}
+                  maxLength={1000}
+                  rows={5}
+                  className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400"
+                  placeholder="Explain the decision or information needed from the player."
+                />
+              </div>
 
-              <Link
-                href={buildStatusOverrideHref({
-                  registrationId: selectedRegistration.id,
-                  nextStatus: "rejected",
-                  activeFilter,
-                  selected: selectedRegistration.id,
-                  currentOverrides: statusOverrides,
-                })}
-                className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20"
-              >
-                <XCircle className="h-4 w-4" />
-                Reject
-              </Link>
+              {params?.notice && (
+                <div
+                  className={`mt-4 rounded-xl border p-4 text-sm ${
+                    params.notice === "saved"
+                      ? "border-green-500/30 bg-green-500/10 text-green-300"
+                      : "border-red-500/30 bg-red-500/10 text-red-300"
+                  }`}
+                >
+                  {params.notice === "note-required"
+                    ? "Add an admin note before rejecting or marking this registration for manual review."
+                    : params.notice === "saved"
+                      ? "Registration decision and admin note saved."
+                      : "The registration decision could not be saved. Check the note length and try again."}
+                </div>
+              )}
 
-              <Link
-                href={buildStatusOverrideHref({
-                  registrationId: selectedRegistration.id,
-                  nextStatus: "manual_review",
-                  activeFilter,
-                  selected: selectedRegistration.id,
-                  currentOverrides: statusOverrides,
-                })}
-                className="inline-flex items-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/20"
-              >
-                <AlertTriangle className="h-4 w-4" />
-                Mark Manual Review
-              </Link>
-            </div>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  name="nextStatus"
+                  value={selectedRegistration.registration_status || "pending"}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:border-white/30 hover:bg-white/[0.08]"
+                >
+                  Save Note
+                </button>
+
+                <button
+                  type="submit"
+                  name="nextStatus"
+                  value="approved"
+                  className="inline-flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 transition hover:bg-green-500/20"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Approve
+                </button>
+
+                <button
+                  type="submit"
+                  name="nextStatus"
+                  value="rejected"
+                  className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Reject
+                </button>
+
+                <button
+                  type="submit"
+                  name="nextStatus"
+                  value="manual_review"
+                  className="inline-flex items-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/20"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Mark Manual Review
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

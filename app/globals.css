@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Account deletion must run through IronClad's Supabase-first Danger Zone. */
+.cl-navbarButton__danger,
+.cl-profileSection__danger {
+  display: none !important;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

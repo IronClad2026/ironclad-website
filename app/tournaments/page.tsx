@@ -3,14 +3,20 @@
 import { useMemo, useState } from "react";
 import type { ReactNode, ElementType } from "react";
 import { motion } from "framer-motion";
-import { Show, UserButton, useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
+import Link from "next/link";
+import { submitTournamentRegistration } from "@/app/tournaments/actions";
+import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
+import {
+  isPlayerProfileComplete,
+  type PlayerProfile,
+} from "@/lib/player-profile";
 import {
   CalendarDays,
   CheckCircle2,
   ChevronDown,
   Clock3,
   Crown,
-  Flame,
   Gamepad2,
   Info,
   LayoutDashboard,
@@ -50,13 +56,11 @@ type TournamentCard = {
   format: string;
   status: "Ongoing" | "Completed";
   image: string;
-  battlefy: string;
   description: string;
   organizer: string;
   game: string;
   region: string;
   time: string;
-  checkIn: string;
   prizePool: string;
   players: number;
   maxPlayers: number;
@@ -65,6 +69,13 @@ type TournamentCard = {
   rules: string;
   schedule: string[];
   contact: string;
+};
+
+type ArchiveEvent = {
+  title: string;
+  image: string;
+  description?: string;
+  battlefy: string;
 };
 
 type Participant = {
@@ -94,171 +105,78 @@ type Match = {
 
 const currentTournaments: TournamentCard[] = [
   {
-    title: "Operation Skyfall",
-    month: "May",
+    title: "IronClad Season One: Opening Offensive",
+    month: "Launch Season",
     format: "1v1",
     status: "Ongoing",
     image: "/images/tournaments/1v1-operation-skyfall.jpeg",
-    battlefy: "https://battlefy.com/ironclad-tournaments/operation-skyfall/69ebc7641259b1002120aeb0/info?infoTab=details",
-    description: "Monthly Company of Heroes 3 1v1 tournament with Main and Challenge brackets.",
+    description: "The first official IronClad season tournament, presented as a live development event ahead of launch.",
     organizer: "IronClad Tournaments",
     game: "Company of Heroes 3",
     region: "Global",
-    time: "Finals at 22:00 UTC",
-    checkIn: "UNION CODE",
-    prizePool: "$130 Steam Cards",
-    players: 16,
+    time: "Launch schedule to be announced",
+    prizePool: "Launch prize pool to be announced",
+    players: 0,
     maxPlayers: 16,
     brackets: [
-      { name: "Main Bracket", requirement: "ELO 1300+", maxPlayers: "Max 8 players", prize: "$100 Steam Card" },
-      { name: "Challenge Bracket", requirement: "Under 1300 ELO", maxPlayers: "Max 8 players", prize: "$30 Steam Card" },
+      { name: "Main Bracket", requirement: "ELO 1300+", maxPlayers: "Max 8 players", prize: "Prize to be announced" },
+      { name: "Challenge Bracket", requirement: "Under 1300 ELO", maxPlayers: "Max 8 players", prize: "Prize to be announced" },
     ],
-    details: "Operation Skyfall is the current May IronClad 1v1 tournament for Company of Heroes 3. Monthly 1v1 events use two brackets: Main Bracket for players with ELO 1300+ and Challenge Bracket for players under 1300 ELO.",
-    rules: "Rules are listed directly on the official Battlefy tournament page. Players register using a UNION CODE provided by IronClad. Once both brackets reach 8 players, the tournament officially starts.",
-    schedule: ["Register with IronClad UNION CODE", "Both 1v1 brackets fill to 8 players", "Challenge Bracket Finals · Last Saturday · 22:00 UTC", "Main Bracket Finals · Last Sunday · 22:00 UTC"],
-    contact: "Use the official IronClad Battlefy page for registration, rules, match details, and tournament updates.",
-  },
-  {
-    title: "4v4 Beta Tournament",
-    month: "May",
-    format: "4v4",
-    status: "Ongoing",
-    image: "/images/tournaments/4v4-beta-tournament.jpeg",
-    battlefy: "https://battlefy.com/ironclad-tournaments/4-vs-4-beta-tournament/69fba46252cae7002ffb6701/info?infoTab=details",
-    description: "Company of Heroes 3 team tournament for teams of 4 players with captains and unique team names.",
-    organizer: "IronClad Tournaments",
-    game: "Company of Heroes 3",
-    region: "Global",
-    time: "May Beta Event",
-    checkIn: "Team Captain",
-    prizePool: "Team Event",
-    players: 8,
-    maxPlayers: 8,
-    brackets: [
-      { name: "4v4 Team Bracket", requirement: "8 teams total", maxPlayers: "4 players per team", prize: "Beta Tournament" },
-      { name: "Team Identity", requirement: "Team Captain required", maxPlayers: "Unique team name", prize: "Community Event" },
-    ],
-    details: "The 4v4 Beta Tournament is a current May IronClad Company of Heroes 3 event. The format supports 8 teams total, with 4 players per team. Each team must include one Team Captain and a unique team name.",
-    rules: "Rules are listed directly on the official Battlefy tournament page. Each team must register with a Team Captain and maintain a complete 4-player roster. The event is designed for 8 teams total.",
-    schedule: ["Create a unique team name", "Select one Team Captain", "Register the full 4-player roster", "Follow match instructions on Battlefy"],
-    contact: "Use the official IronClad Battlefy page for registration, rules, match details, and tournament updates.",
+    details: "Opening Offensive is the launch-season demonstration tournament for the new IronClad platform. It previews the live registration, participant, bracket, media, and announcement experience that will support official Company of Heroes 3 events from launch onward.",
+    rules: "Players register directly through the IronClad website using the tournament registration workflow. Main and Challenge bracket placement will follow the published launch rules and final admin review.",
+    schedule: ["Website registration opens", "Player verification and admin review", "Main and Challenge brackets confirmed", "Official launch schedule announced"],
+    contact: "Use the IronClad website and official community channels for registration, rules, match details, and tournament updates.",
   },
 ];
 
-const archiveTournaments: TournamentCard[] = [
+const archiveEvents: ArchiveEvent[] = [
   {
-    title: "The Art of War",
-    month: "April",
-    format: "1v1",
-    status: "Completed",
-    image: "/images/tournaments/1v1-the-art-of-war.jpeg",
-    battlefy: "https://battlefy.com/ironclad-tournaments/the-art-of-war/69cbf56ac45e5100728854a9/info?infoTab=details",
-    description: "Archived IronClad Company of Heroes 3 monthly 1v1 tournament.",
-    organizer: "IronClad Tournaments",
-    game: "Company of Heroes 3",
-    region: "Global",
-    time: "April Tournament",
-    checkIn: "UNION CODE",
-    prizePool: "Archived Event",
-    players: 16,
-    maxPlayers: 16,
-    brackets: [
-      { name: "Main Bracket", requirement: "ELO 1300+", maxPlayers: "Max 8 players", prize: "Archived prize" },
-      { name: "Challenge Bracket", requirement: "Under 1300 ELO", maxPlayers: "Max 8 players", prize: "Archived prize" },
-    ],
-    details: "The Art of War was the April IronClad Company of Heroes 3 monthly 1v1 tournament.",
-    rules: "Rules are listed directly on the official Battlefy tournament page.",
-    schedule: ["April monthly 1v1 event", "Main and Challenge brackets", "Finals completed", "Archived on Battlefy"],
-    contact: "Use the archived Battlefy page for event history and tournament details.",
-  },
-  {
-    title: "Shadow War",
-    month: "March",
-    format: "1v1",
-    status: "Completed",
-    image: "/images/tournaments/1v1-shadow-war.jpeg",
-    battlefy: "https://battlefy.com/ironclad-tournaments/shadow-war/69a8514962c9f7002f97d606/info?infoTab=details",
-    description: "Archived IronClad Company of Heroes 3 monthly 1v1 tournament.",
-    organizer: "IronClad Tournaments",
-    game: "Company of Heroes 3",
-    region: "Global",
-    time: "March Tournament",
-    checkIn: "UNION CODE",
-    prizePool: "Archived Event",
-    players: 16,
-    maxPlayers: 16,
-    brackets: [
-      { name: "Main Bracket", requirement: "ELO 1300+", maxPlayers: "Max 8 players", prize: "Archived prize" },
-      { name: "Challenge Bracket", requirement: "Under 1300 ELO", maxPlayers: "Max 8 players", prize: "Archived prize" },
-    ],
-    details: "Shadow War was the March IronClad Company of Heroes 3 monthly 1v1 tournament.",
-    rules: "Rules are listed directly on the official Battlefy tournament page.",
-    schedule: ["March monthly 1v1 event", "Main and Challenge brackets", "Finals completed", "Archived on Battlefy"],
-    contact: "Use the archived Battlefy page for event history and tournament details.",
+    title: "Beta Blitz Tournament",
+    image: "/images/tournaments/1v1-beta-blitz-tournament.png",
+    description: "An early IronClad 1v1 tournament from the Battlefy era.",
+    battlefy: "https://battlefy.com/ironclad-tournaments/beta-blitz-tournament/695bc9ee265bc4002fd64e4d/info?infoTab=details",
   },
   {
     title: "Council of War",
-    month: "February",
-    format: "1v1",
-    status: "Completed",
     image: "/images/tournaments/1v1-council-of-war.jpeg",
+    description: "A completed IronClad 1v1 event preserved on Battlefy.",
     battlefy: "https://battlefy.com/ironclad-tournaments/council-of-war/69839d804b1a19002fe7533f/info?infoTab=details",
-    description: "Archived IronClad Company of Heroes 3 monthly 1v1 tournament.",
-    organizer: "IronClad Tournaments",
-    game: "Company of Heroes 3",
-    region: "Global",
-    time: "February Tournament",
-    checkIn: "UNION CODE",
-    prizePool: "Archived Event",
-    players: 16,
-    maxPlayers: 16,
-    brackets: [
-      { name: "Main Bracket", requirement: "ELO 1300+", maxPlayers: "Max 8 players", prize: "Archived prize" },
-      { name: "Challenge Bracket", requirement: "Under 1300 ELO", maxPlayers: "Max 8 players", prize: "Archived prize" },
-    ],
-    details: "Council of War was the February IronClad Company of Heroes 3 monthly 1v1 tournament.",
-    rules: "Rules are listed directly on the official Battlefy tournament page.",
-    schedule: ["February monthly 1v1 event", "Main and Challenge brackets", "Finals completed", "Archived on Battlefy"],
-    contact: "Use the archived Battlefy page for event history and tournament details.",
   },
   {
-    title: "Beta Blitz Tournament",
-    month: "January",
-    format: "1v1",
-    status: "Completed",
-    image: "/images/tournaments/1v1-beta-blitz-tournament.png",
-    battlefy: "https://battlefy.com/ironclad-tournaments/beta-blitz-tournament/695bc9ee265bc4002fd64e4d/info?infoTab=details",
-    description: "Archived IronClad Company of Heroes 3 monthly 1v1 tournament.",
-    organizer: "IronClad Tournaments",
-    game: "Company of Heroes 3",
-    region: "Global",
-    time: "January Tournament",
-    checkIn: "UNION CODE",
-    prizePool: "Archived Event",
-    players: 16,
-    maxPlayers: 16,
-    brackets: [
-      { name: "Main Bracket", requirement: "ELO 1300+", maxPlayers: "Max 8 players", prize: "Archived prize" },
-      { name: "Challenge Bracket", requirement: "Under 1300 ELO", maxPlayers: "Max 8 players", prize: "Archived prize" },
-    ],
-    details: "Beta Blitz Tournament was the January IronClad Company of Heroes 3 monthly 1v1 tournament.",
-    rules: "Rules are listed directly on the official Battlefy tournament page.",
-    schedule: ["January monthly 1v1 event", "Main and Challenge brackets", "Finals completed", "Archived on Battlefy"],
-    contact: "Use the archived Battlefy page for event history and tournament details.",
+    title: "Shadow War",
+    image: "/images/tournaments/1v1-shadow-war.jpeg",
+    description: "A completed monthly IronClad 1v1 tournament.",
+    battlefy: "https://battlefy.com/ironclad-tournaments/shadow-war/69a8514962c9f7002f97d606/info?infoTab=details",
+  },
+  {
+    title: "The Art of War",
+    image: "/images/tournaments/1v1-the-art-of-war.jpeg",
+    description: "A completed IronClad 1v1 event with its original details on Battlefy.",
+    battlefy: "https://battlefy.com/ironclad-tournaments/the-art-of-war/69cbf56ac45e5100728854a9/info?infoTab=details",
+  },
+  {
+    title: "Operation Skyfall",
+    image: "/images/tournaments/1v1-operation-skyfall.jpeg",
+    description: "The final featured 1v1 event from the pre-launch Battlefy archive.",
+    battlefy: "https://battlefy.com/ironclad-tournaments/operation-skyfall/69ebc7641259b1002120aeb0/info?infoTab=details",
+  },
+  {
+    title: "4v4 Beta Tournament",
+    image: "/images/tournaments/4v4-beta-tournament.jpeg",
+    description: "IronClad's original team-format beta tournament.",
+    battlefy: "https://battlefy.com/ironclad-tournaments/4-vs-4-beta-tournament/69fba46252cae7002ffb6701/info?infoTab=details",
   },
 ];
-
-const allTournaments = [...currentTournaments, ...archiveTournaments];
 
 const participants: Participant[] = [
   { seed: 1, name: "Main Bracket", tag: "ELO 1300+", status: "registered", wins: 0, losses: 0, region: "Max 8 Players" },
   { seed: 2, name: "Challenge Bracket", tag: "Under 1300 ELO", status: "registered", wins: 0, losses: 0, region: "Max 8 Players" },
-  { seed: 3, name: "4v4 Team Captains", tag: "Teams of 4", status: "captain", wins: 0, losses: 0, region: "Team Captains" },
-  { seed: 4, name: "Unique Team Names", tag: "4v4", status: "captain", wins: 0, losses: 0, region: "Company of Heroes 3" },
-  { seed: 5, name: "Battlefy Registration", tag: "UNION CODE", status: "registered", wins: 0, losses: 0, region: "IronClad" },
-  { seed: 6, name: "Rules Page", tag: "Battlefy", status: "archive", wins: 0, losses: 0, region: "Official" },
-  { seed: 7, name: "Monthly Finals", tag: "22:00 UTC", status: "registered", wins: 0, losses: 0, region: "Weekend" },
-  { seed: 8, name: "Archive", tag: "Completed", status: "archive", wins: 0, losses: 0, region: "History" },
+  { seed: 3, name: "Registration Queue", tag: "Website Entry", status: "registered", wins: 0, losses: 0, region: "IronClad" },
+  { seed: 4, name: "Player Verification", tag: "Admin Review", status: "registered", wins: 0, losses: 0, region: "Pending" },
+  { seed: 5, name: "Main Bracket Slot", tag: "Open", status: "registered", wins: 0, losses: 0, region: "Global" },
+  { seed: 6, name: "Challenge Bracket Slot", tag: "Open", status: "registered", wins: 0, losses: 0, region: "Global" },
+  { seed: 7, name: "Launch Finals", tag: "Schedule TBA", status: "registered", wins: 0, losses: 0, region: "Global" },
+  { seed: 8, name: "Season One Reserve", tag: "Waitlist", status: "archive", wins: 0, losses: 0, region: "Global" },
 ];
 
 const tabs: { key: TabKey; label: string; icon: ElementType }[] = [
@@ -298,11 +216,7 @@ function StatusPill({ children, tone = "blue" }: { children: ReactNode; tone?: "
 function Sidebar({ selectedTournament, onSelectTournament }: { selectedTournament: TournamentCard; onSelectTournament: (tournament: TournamentCard) => void }) {
   const [eventsOpen, setEventsOpen] = useState(true);
   const eventsByMonth = [
-    { month: "May", events: currentTournaments },
-    { month: "April", events: archiveTournaments.filter((event) => event.month === "April") },
-    { month: "March", events: archiveTournaments.filter((event) => event.month === "March") },
-    { month: "February", events: archiveTournaments.filter((event) => event.month === "February") },
-    { month: "January", events: archiveTournaments.filter((event) => event.month === "January") },
+    { month: "Launch Season", events: currentTournaments },
   ];
 
   return (
@@ -395,19 +309,7 @@ function Hero({ tournament, onRegisterClick }: { tournament: TournamentCard; onR
               <span className="flex items-center gap-2"><Users size={16} className="text-sky-300" /> {tournament.players}/{tournament.maxPlayers} slots</span>
             </div>
           </div>
-          <div className="grid w-full max-w-full grid-cols-2 items-stretch gap-3 sm:max-w-sm xl:w-80 xl:flex-none">
-            <Show when="signed-out">
-              <ActionCard
-                label="Sign In"
-                description="Account access"
-                href="/sign-in"
-                icon={Users}
-              />
-            </Show>
-
-            <Show when="signed-in">
-              <AccountCard />
-            </Show>
+          <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
             <ActionCard label="Register" description="Open events" icon={CheckCircle2} onClick={onRegisterClick} />
           </div>
         </div>
@@ -416,26 +318,12 @@ function Hero({ tournament, onRegisterClick }: { tournament: TournamentCard; onR
   );
 }
 
-function ActionCard({ label, description, icon: Icon, href, onClick }: { label: string; description: string; icon: ElementType; href?: string; onClick?: () => void }) {
-  const content = (
-    <>
+function ActionCard({ label, description, icon: Icon, onClick }: { label: string; description: string; icon: ElementType; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/50 p-4 text-left shadow-xl shadow-black/10 backdrop-blur hover:bg-orange-500/10", interactiveHover)}>
       <Icon size={18} className="shrink-0 text-orange-300" />
       <p className="mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider text-white">{label}</p>
       <p className="mt-1 break-words text-xs font-semibold leading-5 text-slate-400">{description}</p>
-    </>
-  );
-
-  if (href) {
-    return (
-      <a href={href} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/50 p-4 text-left shadow-xl shadow-black/10 backdrop-blur hover:bg-orange-500/10", interactiveHover)}>
-        {content}
-      </a>
-    );
-  }
-
-  return (
-    <button onClick={onClick} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/50 p-4 text-left shadow-xl shadow-black/10 backdrop-blur hover:bg-orange-500/10", interactiveHover)}>
-      {content}
     </button>
   );
 }
@@ -498,7 +386,7 @@ function Overview({ tournament }: { tournament: TournamentCard }) {
 
       <div className="space-y-6">
         <Card>
-          <h3 className="text-sm font-black uppercase tracking-wider text-white">Current Tournaments</h3>
+          <h3 className="text-sm font-black uppercase tracking-wider text-white">Live Tournament</h3>
           <div className="mt-4 space-y-3">
             {currentTournaments.map((item) => (
               <TournamentLinkCard key={item.title} item={item} />
@@ -507,15 +395,20 @@ function Overview({ tournament }: { tournament: TournamentCard }) {
         </Card>
         <Card>
           <h3 className="text-sm font-black uppercase tracking-wider text-white">Tournament Archive</h3>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            Battlefy remains the historical reference for events held before the new IronClad platform launch.
+          </p>
           <div className="mt-4 space-y-3">
-            {archiveTournaments.map((item) => (
-              <a key={item.title} href={item.battlefy} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg bg-cover bg-center p-3 transition hover:brightness-110" style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.92),rgba(2,6,23,0.72)),url(${item.image})` }}>
-                <div className="grid h-9 w-9 place-items-center rounded bg-slate-950/70 text-xs font-black text-white">{item.month.slice(0, 3)}</div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-bold text-white">{item.title}</p>
-                  <p className="text-xs text-slate-300">{item.month} · {item.format} · {item.status}</p>
+            {archiveEvents.map((item) => (
+              <a key={item.title} href={item.battlefy} target="_blank" rel="noreferrer" className="block rounded-lg bg-cover bg-center p-4 transition hover:brightness-110" style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,6,23,0.76)),url(${item.image})` }}>
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-white">{item.title}</p>
+                    {item.description && <p className="mt-1 text-xs leading-5 text-slate-300">{item.description}</p>}
+                    <p className="mt-3 text-xs font-black uppercase tracking-wider text-sky-300">View on Battlefy</p>
+                  </div>
+                  <MessageCircle size={16} className="mt-1 shrink-0 text-sky-300" />
                 </div>
-                <MessageCircle size={16} className="text-sky-300" />
               </a>
             ))}
           </div>
@@ -527,7 +420,7 @@ function Overview({ tournament }: { tournament: TournamentCard }) {
 
 function TournamentLinkCard({ item }: { item: TournamentCard }) {
   return (
-    <a href={item.battlefy} target="_blank" rel="noreferrer" className="block rounded-lg bg-slate-900/80 p-3 transition hover:bg-slate-800">
+    <div className="block rounded-lg bg-slate-900/80 p-3">
       <div className="flex items-center gap-3">
         <div className="h-12 w-16 shrink-0 rounded bg-cover bg-center" style={{ backgroundImage: `url(${item.image})` }} />
         <div className="min-w-0 flex-1">
@@ -536,7 +429,7 @@ function TournamentLinkCard({ item }: { item: TournamentCard }) {
         </div>
       </div>
       <p className="mt-3 text-xs leading-5 text-slate-400">{item.description}</p>
-    </a>
+    </div>
   );
 }
 
@@ -648,17 +541,14 @@ function Brackets({ tournament }: { tournament: TournamentCard }) {
           <h2 className="text-2xl font-black text-white">{tournament.title} Brackets</h2>
           <p className="mt-1 text-sm text-slate-400">{tournament.brackets.map((bracket) => `${bracket.name}: ${bracket.requirement}`).join(" · ")}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <a href={tournament.battlefy} target="_blank" rel="noreferrer" className="rounded border border-slate-700 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300 hover:border-sky-500 hover:text-white">Battlefy Details</a>
-          <a href={tournament.battlefy} target="_blank" rel="noreferrer" className="rounded bg-sky-500 px-4 py-2 text-xs font-black uppercase tracking-wide text-white hover:bg-sky-400">Open Event</a>
-        </div>
+        <StatusPill tone="amber">Development Preview</StatusPill>
       </div>
       <Card className="overflow-x-auto">
         <div className="min-w-[1050px] pb-4">
           <div className="grid grid-cols-3 gap-20">
-            <BracketRound title={tournament.format === "4v4" ? "Team Opening Round" : "Opening Slots"} items={matches.slice(0, tournament.format === "4v4" ? 2 : 4)} />
-            <BracketRound title={tournament.format === "4v4" ? "Team Final" : "Monthly Finals"} items={matches.slice(tournament.format === "4v4" ? 2 : 4, tournament.format === "4v4" ? 3 : 6)} spaced />
-            <BracketRound title="Official Battlefy Page" items={[{ id: "bfy", round: "External Event Page", status: tournament.status === "Completed" ? "complete" : "upcoming", teamA: { seed: 1, name: tournament.title }, teamB: { seed: 2, name: "IronClad Battlefy" } }]} finalRound />
+            <BracketRound title="Opening Slots" items={matches.slice(0, 4)} />
+            <BracketRound title="Challenge Final" items={matches.slice(4, 5)} spaced />
+            <BracketRound title="Main Championship" items={matches.slice(5, 6)} finalRound />
           </div>
         </div>
       </Card>
@@ -693,14 +583,15 @@ function TeamRow({ team }: { team: MatchTeam }) {
 }
 
 function Media({ tournament }: { tournament: TournamentCard }) {
-  return <Card><h2 className="text-xl font-black text-white">{tournament.title} Media</h2><div className="mt-5 grid gap-4 md:grid-cols-3">{[tournament, ...allTournaments.filter((item) => item.title !== tournament.title).slice(0, 2)].map((item) => <a href={item.battlefy} target="_blank" rel="noreferrer" key={item.title} className="group aspect-video rounded-xl border border-slate-700 bg-cover bg-center p-4" style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.88),rgba(2,6,23,0.45)),url(${item.image})` }}><PlayCircle className="text-white opacity-90" /><p className="mt-20 text-sm font-bold text-white">{item.title}</p><p className="text-xs text-slate-300">{item.month} · {item.format}</p></a>)}</div></Card>;
+  const mediaSlots = ["Launch Trailer", "Match Broadcast", "Finals Highlights"];
+  return <Card><h2 className="text-xl font-black text-white">{tournament.title} Media</h2><div className="mt-5 grid gap-4 md:grid-cols-3">{mediaSlots.map((label) => <div key={label} className="group aspect-video rounded-xl border border-slate-700 bg-cover bg-center p-4" style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.88),rgba(2,6,23,0.45)),url(${tournament.image})` }}><PlayCircle className="text-white opacity-90" /><p className="mt-20 text-sm font-bold text-white">{label}</p><p className="text-xs text-slate-300">Season One · Coming soon</p></div>)}</div></Card>;
 }
 
 function Announcements({ tournament }: { tournament: TournamentCard }) {
   const messages = [
     `${tournament.title} is a ${tournament.month} IronClad ${tournament.format} tournament for Company of Heroes 3.`,
-    tournament.format === "4v4" ? "4v4 Beta Tournament teams must have 4 players, one Team Captain, and a unique team name." : "Monthly 1v1 events use Main and Challenge brackets based on ELO.",
-    tournament.status === "Ongoing" ? "Use the official Battlefy page for current registration, rules, and match updates." : "This tournament is completed and available in the IronClad archive.",
+    "Season One uses Main and Challenge brackets based on ELO and final admin review.",
+    "Registration, rules, match updates, and official tournament operations will be managed through the IronClad website.",
   ];
   return <div className="space-y-4">{messages.map((text, index) => <Card key={text}><div className="flex gap-3"><Radio size={18} className="mt-1 text-orange-300" /><div><p className="text-xs font-black uppercase tracking-wider text-slate-500">IronClad Update {index + 1}</p><p className="mt-1 text-slate-200">{text}</p></div></div></Card>)}</div>;
 }
@@ -709,64 +600,15 @@ function Card({ children, className }: { children: ReactNode; className?: string
   return <section className={classNames("rounded-2xl border border-slate-800 bg-[#111827]/90 p-5 shadow-2xl shadow-black/20", className)}>{children}</section>;
 }
 
-function AccountCard() {
-  const { user } = useUser();
-  const displayName = user?.username || user?.fullName || user?.primaryEmailAddress?.emailAddress || "Account";
-
-  return (
-    <div className="flex min-h-[104px] w-full min-w-0 transform-gpu flex-col justify-center rounded-xl border border-emerald-500/45 bg-slate-950/50 p-4 shadow-xl shadow-black/10 backdrop-blur transition-all duration-300 ease-out hover:scale-[1.03] hover:border-emerald-400 hover:bg-emerald-950/35 hover:shadow-[0_0_32px_rgba(16,185,129,0.38)] active:scale-[0.99]">
-      <p className="mb-3 text-xs font-black uppercase tracking-wider text-slate-400">
-        Account
-      </p>
-
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="shrink-0">
-          <UserButton />
-        </div>
-
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <div className="whitespace-nowrap text-sm font-black uppercase tracking-wide text-white">
-            <span className="inline-block min-w-full animate-[account-marquee_16s_linear_infinite] pr-8">
-              {displayName}
-            </span>
-            <span className="inline-block min-w-full animate-[account-marquee_16s_linear_infinite] pr-8" aria-hidden="true">
-              {displayName}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AccountMarqueeStyles() {
-  return (
-    <style jsx global>{`
-      @keyframes account-marquee {
-        0% {
-          transform: translateX(0);
-        }
-        100% {
-          transform: translateX(-100%);
-        }
-      }
-    `}</style>
-  );
-}
-
-type RegistrationStep = "tournament" | "identity" | "competitive" | "union" | "agreements" | "submitted";
+type RegistrationStep =
+  | "tournament"
+  | "profile"
+  | "agreements"
+  | "submitted";
 
 type RegistrationFormState = {
   tournamentTitle: string;
   bracketName: string;
-  inGameName: string;
-  discordUsername: string;
-  steamUsername: string;
-  coh3PlayerCardLink: string;
-  region: string;
-  timezone: string;
-  country: string;
-  unionCode: string;
   rulebookAgreement: boolean;
   playerParticipationAgreement: boolean;
   adminFinalDecisionAgreement: boolean;
@@ -775,93 +617,26 @@ type RegistrationFormState = {
 
 type RegistrationErrors = Partial<Record<keyof RegistrationFormState | "agreements", string>>;
 
-const regionOptions = [
-  "Europe",
-  "North America",
-  "South America",
-  "Oceania",
-  "Asia",
-  "Middle East",
-  "Africa",
-  "Global",
-];
-
-const timezoneOptions = [
-  "UTC",
-  "UTC-08:00 Pacific Time",
-  "UTC-05:00 Eastern Time",
-  "UTC+00:00 London / GMT",
-  "UTC+01:00 Central European Time",
-  "UTC+02:00 Eastern European Time",
-  "UTC+05:30 India Standard Time",
-  "UTC+08:00 Singapore / China",
-  "UTC+09:00 Japan / Korea",
-  "UTC+10:00 Australian Eastern Time",
-  "UTC+11:00 Sydney Daylight Time",
-  "UTC+12:00 New Zealand Time",
-];
-
-const countryOptions = [
-  "Australia",
-  "Austria",
-  "Belgium",
-  "Brazil",
-  "Canada",
-  "China",
-  "Denmark",
-  "Finland",
-  "France",
-  "Germany",
-  "Greece",
-  "India",
-  "Ireland",
-  "Italy",
-  "Japan",
-  "Netherlands",
-  "New Zealand",
-  "Norway",
-  "Poland",
-  "Portugal",
-  "Singapore",
-  "South Korea",
-  "Spain",
-  "Sweden",
-  "Switzerland",
-  "United Kingdom",
-  "United States",
-];
-
-function isValidUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function RegisterModal({ onClose }: { onClose: () => void }) {
+function RegisterModal({
+  onClose,
+  profile,
+}: {
+  onClose: () => void;
+  profile: PlayerProfile;
+}) {
   const [step, setStep] = useState<RegistrationStep>("tournament");
   const [errors, setErrors] = useState<RegistrationErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
   const [selectedTournament, setSelectedTournament] = useState<TournamentCard>(currentTournaments[0]);
   const [form, setForm] = useState<RegistrationFormState>({
     tournamentTitle: currentTournaments[0].title,
     bracketName: currentTournaments[0].brackets[0]?.name ?? "",
-    inGameName: "",
-    discordUsername: "",
-    steamUsername: "",
-    coh3PlayerCardLink: "",
-    region: "",
-    timezone: "",
-    country: "",
-    unionCode: "",
     rulebookAgreement: false,
     playerParticipationAgreement: false,
     adminFinalDecisionAgreement: false,
     ownershipConfirmation: false,
   });
-
-  const selectedBracket = selectedTournament.brackets.find((bracket) => bracket.name === form.bracketName) ?? selectedTournament.brackets[0];
 
   const updateField = <K extends keyof RegistrationFormState>(field: K, value: RegistrationFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -891,40 +666,6 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
       }
     }
 
-    if (targetStep === "identity") {
-      if (!form.inGameName.trim()) {
-        nextErrors.inGameName = "In-Game Name is required.";
-      }
-
-      if (!form.discordUsername.trim()) {
-        nextErrors.discordUsername = "Discord Username is required.";
-      }
-
-      if (!form.steamUsername.trim()) {
-        nextErrors.steamUsername = "Steam Name is required.";
-      }
-
-      if (!form.coh3PlayerCardLink.trim()) {
-        nextErrors.coh3PlayerCardLink = "CoH3 Player Card Link is required.";
-      } else if (!isValidUrl(form.coh3PlayerCardLink)) {
-        nextErrors.coh3PlayerCardLink = "Enter a valid CoH3 Player Card URL.";
-      }
-    }
-
-    if (targetStep === "competitive") {
-      if (!form.region.trim()) {
-        nextErrors.region = "Region is required.";
-      }
-
-      if (!form.timezone.trim()) {
-        nextErrors.timezone = "Timezone is required.";
-      }
-
-      if (!form.country.trim()) {
-        nextErrors.country = "Country is required.";
-      }
-    }
-
     if (targetStep === "agreements") {
       if (!form.rulebookAgreement) {
         nextErrors.rulebookAgreement = "You must agree to the Rulebook.";
@@ -947,42 +688,45 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const goToIdentityStep = () => {
+  const goToProfileStep = () => {
     if (validateStep("tournament")) {
-      setStep("identity");
+      setStep("profile");
     }
   };
 
-  const goToCompetitiveStep = () => {
-    if (validateStep("identity")) {
-      setStep("competitive");
-    }
-  };
-
-  const goToUnionStep = () => {
-    if (validateStep("competitive")) {
-      setStep("union");
-    }
-  };
-
-  const submitRegistration = () => {
+  const submitRegistration = async () => {
     if (!validateStep("agreements")) {
       return;
     }
 
-    const registration = {
-      ...form,
-      selectedTournament,
-      selectedBracket,
-      status: "Pending Review",
-      submittedAt: new Date().toISOString(),
-    };
+    setIsSubmitting(true);
+    setSubmissionError("");
 
-    console.log("IronClad registration submitted:", registration);
+    const result = await submitTournamentRegistration({
+      tournamentTitle: form.tournamentTitle,
+      bracketName: form.bracketName,
+      rulebookAgreement: form.rulebookAgreement,
+      playerParticipationAgreement: form.playerParticipationAgreement,
+      adminFinalDecisionAgreement: form.adminFinalDecisionAgreement,
+      ownershipConfirmation: form.ownershipConfirmation,
+    });
+
+    setIsSubmitting(false);
+
+    if (!result.success) {
+      setSubmissionError(result.message);
+      return;
+    }
+
     setStep("submitted");
   };
 
-  const steps: RegistrationStep[] = ["tournament", "identity", "competitive", "union", "agreements", "submitted"];
+  const steps: RegistrationStep[] = [
+    "tournament",
+    "profile",
+    "agreements",
+    "submitted",
+  ];
   const currentStepNumber = Math.max(1, steps.indexOf(step) + 1);
 
   return (
@@ -1064,40 +808,48 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                 {errors.bracketName && <FieldError message={errors.bracketName} />}
               </div>
 
-              <ModalButtons onClose={onClose} onNext={goToIdentityStep} />
+              <ModalButtons onClose={onClose} onNext={goToProfileStep} />
             </div>
           )}
 
-          {step === "identity" && (
+          {step === "profile" && (
             <div className="space-y-5">
               <div>
-                <h4 className="text-xl font-black text-white">Player Identity & Verification</h4>
-                <p className="mt-2 text-sm leading-6 text-slate-300">This information is used for player verification, ELO validation, anti-smurf checks, and admin review.</p>
+                <h4 className="text-xl font-black text-white">Player Profile Confirmation</h4>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Registration uses your saved IronClad player profile. Update your profile before continuing if any information is outdated.</p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <RegistrationInput label="In-Game Name" value={form.inGameName} onChange={(value) => updateField("inGameName", value)} error={errors.inGameName} required />
-                <RegistrationInput label="Discord Username" value={form.discordUsername} onChange={(value) => updateField("discordUsername", value)} error={errors.discordUsername} required />
-                <RegistrationInput label="Steam Name / Username" value={form.steamUsername} onChange={(value) => updateField("steamUsername", value)} error={errors.steamUsername} required />
-                <RegistrationInput label="CoH3 Player Card Link" value={form.coh3PlayerCardLink} onChange={(value) => updateField("coh3PlayerCardLink", value)} error={errors.coh3PlayerCardLink} required />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <RegistrationProfileValue label="Display Name" value={profile.display_name} />
+                <RegistrationProfileValue label="IGN" value={profile.in_game_name} />
+                <RegistrationProfileValue label="Discord" value={profile.discord_username} />
+                <RegistrationProfileValue label="Steam" value={profile.steam_username} />
+                <RegistrationProfileValue label="Country" value={profile.country} />
+                <RegistrationProfileValue label="Region" value={profile.region} />
+                <RegistrationProfileValue label="Timezone" value={profile.timezone} />
+                <RegistrationProfileValue label="Current ELO" value={String(profile.current_elo)} />
+                <RegistrationProfileValue label="CoH3 Player Card" value={profile.coh3_player_card_url} className="sm:col-span-2" />
               </div>
 
-              <ModalButtons onBack={() => setStep("tournament")} onNext={goToCompetitiveStep} />
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/25 p-4">
+                <p className="text-sm font-black uppercase tracking-wider text-emerald-300">Profile Complete</p>
+                <p className="mt-2 text-sm leading-6 text-slate-200">Your saved profile identity will be attached to this registration. Final bracket placement and ELO verification remain subject to admin review.</p>
+              </div>
+
+              <Link href="/profile" className="inline-flex text-sm font-bold text-orange-300 transition hover:text-orange-200">Update Player Profile</Link>
+
+              <ModalButtons onBack={() => setStep("tournament")} onNext={() => setStep("agreements")} />
             </div>
           )}
 
-          {step === "competitive" && (
+          {false && (
             <div className="space-y-5">
               <div>
                 <h4 className="text-xl font-black text-white">Competitive Information</h4>
                 <p className="mt-2 text-sm leading-6 text-slate-300">Provide the basic competitive details required for admin review.</p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <SearchableCombobox label="Region" value={form.region} options={regionOptions} onChange={(value) => updateField("region", value)} error={errors.region} required />
-                <SearchableCombobox label="Timezone" value={form.timezone} options={timezoneOptions} onChange={(value) => updateField("timezone", value)} error={errors.timezone} required />
-                <SearchableCombobox label="Country" value={form.country} options={countryOptions} onChange={(value) => updateField("country", value)} error={errors.country} required />
-              </div>
+              <div />
 
               <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/25 p-4">
                 <p className="text-sm font-black uppercase tracking-wider text-emerald-300">Frontend ELO Verification Placeholder</p>
@@ -1110,28 +862,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
 
-              <ModalButtons onBack={() => setStep("identity")} onNext={goToUnionStep} />
-            </div>
-          )}
-
-          {step === "union" && (
-            <div className="space-y-5">
-              <div>
-                <h4 className="text-xl font-black text-white">UNION CODE Verification</h4>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Enter your UNION CODE if you already have one.</p>
-              </div>
-
-              <RegistrationInput label="UNION CODE" value={form.unionCode} onChange={(value) => updateField("unionCode", value)} />
-
-              <div className="rounded-xl border border-orange-500/40 bg-orange-500/10 p-4">
-                <p className="break-words text-sm leading-6 text-slate-200">You must obtain an official IronClad UNION CODE through Discord verification.</p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <a href="#" className="rounded-lg border border-slate-700 bg-slate-950/50 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-white transition hover:scale-[1.02] hover:border-orange-500">Join Discord</a>
-                  <a href="#" className="rounded-lg bg-orange-500 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-white transition hover:scale-[1.02] hover:bg-orange-400">Open Verification Ticket</a>
-                </div>
-              </div>
-
-              <ModalButtons onBack={() => setStep("competitive")} onNext={() => setStep("agreements")} />
+              <ModalButtons onBack={() => setStep("profile")} onNext={() => setStep("agreements")} />
             </div>
           )}
 
@@ -1149,7 +880,13 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                 <AgreementCheckbox label="Ownership Confirmation" checked={form.ownershipConfirmation} onChange={(checked) => updateField("ownershipConfirmation", checked)} error={errors.ownershipConfirmation} />
               </div>
 
-              <ModalButtons onBack={() => setStep("union")} onNext={submitRegistration} nextLabel="Submit Registration" />
+              {submissionError && (
+                <div className="rounded-xl border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
+                  {submissionError}
+                </div>
+              )}
+
+              <ModalButtons onBack={() => setStep("profile")} onNext={submitRegistration} nextLabel="Submit Registration" isLoading={isSubmitting} />
             </div>
           )}
 
@@ -1176,61 +913,20 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-2 break-words text-xs font-bold text-orange-300">{message}</p>;
 }
 
-function RegistrationInput({ label, value, onChange, error, required = false }: { label: string; value: string; onChange: (value: string) => void; error?: string; required?: boolean }) {
+function RegistrationProfileValue({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string | null;
+  className?: string;
+}) {
   return (
-    <label className="block min-w-0">
-      <span className="text-xs font-black uppercase tracking-wider text-slate-400">{label}{required && <span className="text-orange-300"> *</span>}</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={classNames("mt-2 w-full rounded-lg border bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-orange-500", error ? "border-orange-400/80" : "border-slate-700")}
-        aria-invalid={Boolean(error)}
-      />
-      <FieldError message={error} />
-    </label>
-  );
-}
-
-function SearchableCombobox({ label, value, options, onChange, error, required = false }: { label: string; value: string; options: string[]; onChange: (value: string) => void; error?: string; required?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const filteredOptions = options.filter((option) => option.toLowerCase().includes(value.toLowerCase())).slice(0, 8);
-
-  return (
-    <label className="relative block min-w-0">
-      <span className="text-xs font-black uppercase tracking-wider text-slate-400">{label}{required && <span className="text-orange-300"> *</span>}</span>
-      <input
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-        className={classNames("mt-2 w-full rounded-lg border bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-orange-500", error ? "border-orange-400/80" : "border-slate-700")}
-        aria-invalid={Boolean(error)}
-      />
-
-      {open && filteredOptions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-700 bg-[#0f1724] p-2 shadow-2xl shadow-black/40">
-          {filteredOptions.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                onChange(option);
-                setOpen(false);
-              }}
-              className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-200 transition hover:bg-orange-500/10 hover:text-white"
-            >
-              <span className="block truncate">{option}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <FieldError message={error} />
-    </label>
+    <div className={classNames("min-w-0 rounded-xl border border-slate-700 bg-slate-950/50 p-4", className)}>
+      <p className="text-xs font-black uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="mt-2 break-words text-sm font-bold text-white">{value || "N/A"}</p>
+    </div>
   );
 }
 
@@ -1252,14 +948,14 @@ function AgreementCheckbox({ label, checked, onChange, error }: { label: string;
   );
 }
 
-function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue" }: { onClose?: () => void; onBack?: () => void; onNext: () => void; nextLabel?: string }) {
+function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoading = false }: { onClose?: () => void; onBack?: () => void; onNext: () => void | Promise<void>; nextLabel?: string; isLoading?: boolean }) {
   return (
     <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-between">
       <div>
         {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Back</button>}
         {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Cancel</button>}
       </div>
-      <button onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 sm:w-auto">{nextLabel}</button>
+      <button disabled={isLoading} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? "Submitting..." : nextLabel}</button>
     </div>
   );
 }
@@ -1276,41 +972,180 @@ function MainContent({ activeTab, tournament }: { activeTab: TabKey; tournament:
   );
 }
 
+type RegistrationGate = "account" | "profile" | "error";
+
+function RegistrationGatePrompt({
+  type,
+  onClose,
+}: {
+  type: RegistrationGate;
+  onClose: () => void;
+}) {
+  const content = {
+    account: {
+      eyebrow: "IronClad Account Required",
+      title: "Do you already have an IronClad account?",
+      description:
+        "Sign in to continue, or create an account and complete your player profile before registering.",
+    },
+    profile: {
+      eyebrow: "Player Profile Required",
+      title: "Please complete your player profile before registering.",
+      description:
+        "IronClad uses your saved IGN, region, ELO, and verification details for tournament participation.",
+    },
+    error: {
+      eyebrow: "Profile Check Unavailable",
+      title: "IronClad could not verify your player profile.",
+      description:
+        "Close this message and try again. If the problem continues, open your profile to confirm your account details.",
+    },
+  }[type];
+
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-black/85 px-4 py-6 backdrop-blur">
+      <div className="w-full max-w-lg rounded-3xl border border-orange-500/30 bg-[#111827] p-6 shadow-2xl shadow-orange-950/40">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
+              {content.eyebrow}
+            </p>
+            <h2 className="mt-3 text-2xl font-black text-white">
+              {content.title}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg bg-slate-800 p-2 text-slate-300 transition hover:bg-slate-700 hover:text-white"
+            aria-label="Close registration prompt"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <p className="mt-4 leading-7 text-slate-300">{content.description}</p>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {type === "account" && (
+            <>
+              <Link
+                href="/sign-in"
+                className="rounded-xl border border-slate-700 bg-slate-950/50 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:border-orange-500"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/sign-up"
+                className="rounded-xl bg-orange-500 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:bg-orange-400"
+              >
+                Create Account
+              </Link>
+            </>
+          )}
+
+          {type !== "account" && (
+            <Link
+              href="/profile"
+              className="rounded-xl bg-orange-500 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:bg-orange-400 sm:col-span-2"
+            >
+              {type === "profile" ? "Complete Profile" : "Open Profile"}
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TournamentsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [selectedTournament, setSelectedTournament] = useState<TournamentCard>(currentTournaments[0]);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const { isSignedIn } = useUser();
+  const [registrationProfile, setRegistrationProfile] =
+    useState<PlayerProfile | null>(null);
+  const [registrationGate, setRegistrationGate] =
+    useState<RegistrationGate | null>(null);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
+  const { getToken, isSignedIn, userId } = useAuth();
+  const authenticatedSupabase = useMemo(
+    () => createAuthenticatedBrowserSupabaseClient(getToken),
+    [getToken]
+  );
 
   const handleSelectTournament = (tournament: TournamentCard) => {
     setSelectedTournament(tournament);
     setActiveTab("overview");
   };
 
+  const handleRegisterClick = async () => {
+    if (!isSignedIn || !userId) {
+      setRegistrationGate("account");
+      return;
+    }
+
+    setIsCheckingProfile(true);
+
+    const { data, error } = await authenticatedSupabase
+      .from("players")
+      .select(
+        "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, created_at, updated_at"
+      )
+      .eq("clerk_user_id", userId)
+      .maybeSingle();
+
+    setIsCheckingProfile(false);
+
+    if (error) {
+      console.error("Tournament profile eligibility check failed:", error);
+      setRegistrationGate("error");
+      return;
+    }
+
+    const profile = (data ?? null) as PlayerProfile | null;
+
+    if (!isPlayerProfileComplete(profile)) {
+      setRegistrationGate("profile");
+      return;
+    }
+
+    setRegistrationProfile(profile);
+    setShowRegisterModal(true);
+  };
+
   return (
     <div className="min-h-screen bg-black pt-20 text-slate-100">
-      <AccountMarqueeStyles />
       <div className="mx-auto flex max-w-[1600px]">
         <Sidebar selectedTournament={selectedTournament} onSelectTournament={handleSelectTournament} />
         <div className="min-w-0 flex-1">
           <Hero
             tournament={selectedTournament}
-            onRegisterClick={() => {
-              if (!isSignedIn) {
-                window.location.href = "/sign-in";
-                return;
-              }
-
-              setShowRegisterModal(true);
-            }}
+            onRegisterClick={handleRegisterClick}
           />
           <TopTabs activeTab={activeTab} setActiveTab={setActiveTab} />
           <MainContent activeTab={activeTab} tournament={selectedTournament} />
         </div>
       </div>
 
-      {showRegisterModal && <RegisterModal onClose={() => setShowRegisterModal(false)} />}
+      {showRegisterModal && registrationProfile && (
+        <RegisterModal
+          profile={registrationProfile}
+          onClose={() => setShowRegisterModal(false)}
+        />
+      )}
+      {registrationGate && (
+        <RegistrationGatePrompt
+          type={registrationGate}
+          onClose={() => setRegistrationGate(null)}
+        />
+      )}
+
+      {isCheckingProfile && (
+        <div className="fixed inset-x-0 bottom-5 z-[65] mx-auto w-fit rounded-full border border-orange-500/30 bg-black/90 px-5 py-3 text-xs font-black uppercase tracking-wider text-orange-300 shadow-2xl">
+          Checking Player Profile
+        </div>
+      )}
 
       <button onClick={() => setShowMobilePanel(true)} className="fixed bottom-5 right-5 z-40 rounded-full bg-orange-500 p-4 text-white shadow-2xl shadow-orange-950/40 lg:hidden"><Menu size={22} /></button>
       {showMobilePanel && (

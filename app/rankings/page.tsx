@@ -1,10 +1,6 @@
-import Navbar from "@/components/Navbar";
-
 export default function RankingsPage() {
   return (
     <main className="min-h-screen bg-black text-white">
-      <Navbar />
-
       <section className="mx-auto max-w-5xl px-6 pt-32 pb-20">
         <p className="text-sm uppercase tracking-[0.3em] text-zinc-400">
           IronClad Competitive Ladder

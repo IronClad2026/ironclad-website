@@ -1,4 +1,5 @@
 import CurrentTournamentCard from "@/components/CurrentTournamentCard";
+import HomeAccountSection from "@/components/HomeAccountSection";
 import { currentTournaments } from "@/data/currentTournaments";
 
 export default function Home() {
@@ -47,6 +48,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <HomeAccountSection />
 
       <section className="relative z-10 mx-auto max-w-7xl px-6 pb-24">
         <div className="mb-10">
