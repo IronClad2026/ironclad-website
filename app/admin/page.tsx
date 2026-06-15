@@ -3,7 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import AdminBracketManagement, {
+  type AdminBracketTournamentOption,
+} from "@/components/AdminBracketManagement";
 import {
   AlertTriangle,
   CheckCircle,
@@ -28,13 +31,18 @@ type CustomClaims = {
 
 type RegistrationStatus = "pending" | "manual_review" | "approved" | "rejected";
 type FilterStatus = "all" | RegistrationStatus;
-type AdminNotice = "note-required" | "saved" | "save-failed";
+type AdminNotice =
+  | "note-required"
+  | "saved"
+  | "save-failed"
+  | "bracket-preserved";
 
 type AdminPageProps = {
   searchParams?: Promise<{
     filter?: FilterStatus;
     selected?: string;
     notice?: AdminNotice;
+    bracketNotice?: "population-saved" | "population-failed";
   }>;
 };
 
@@ -50,6 +58,8 @@ type SupabaseRegistration = {
   registration_status: RegistrationStatus;
   admin_notes: string | null;
   created_at: string;
+  tournament_id: string | null;
+  tournament_bracket_id: string | null;
 };
 
 const managementCards = [
@@ -193,6 +203,54 @@ async function updateRegistrationStatus(formData: FormData) {
     );
   }
 
+  const supabase = createSupabaseAdminClient();
+  const { data: currentRegistration, error: registrationLookupError } =
+    await supabase
+      .from("registrations")
+      .select("registration_status, tournament_bracket_id")
+      .eq("id", registrationId)
+      .maybeSingle();
+
+  if (registrationLookupError || !currentRegistration) {
+    console.error(
+      "Registration status lookup error:",
+      registrationLookupError?.message
+    );
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        selected: selected || registrationId,
+        notice: "save-failed",
+      })
+    );
+  }
+
+  const approvedRosterChanged =
+    currentRegistration.registration_status !== nextStatus &&
+    (currentRegistration.registration_status === "approved" ||
+      nextStatus === "approved");
+  let bracketPreserved = false;
+
+  if (
+    approvedRosterChanged &&
+    currentRegistration.tournament_bracket_id
+  ) {
+    const { data: regenerationSafe, error: safetyError } =
+      await supabase.rpc("is_tournament_bracket_regeneration_safe", {
+        p_tournament_bracket_id:
+          currentRegistration.tournament_bracket_id,
+      });
+
+    if (safetyError) {
+      console.error(
+        "Bracket regeneration safety lookup failed:",
+        safetyError.message
+      );
+    } else {
+      bracketPreserved = regenerationSafe === false;
+    }
+  }
+
   const { error } = await supabase
     .from("registrations")
     .update({
@@ -215,12 +273,13 @@ async function updateRegistrationStatus(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
+  revalidatePath("/tournaments");
 
   redirect(
     buildHref({
       filter: activeFilter,
       selected: selected || undefined,
-      notice: "saved",
+      notice: bracketPreserved ? "bracket-preserved" : "saved",
     })
   );
 }
@@ -258,30 +317,133 @@ function StatusActionButton({
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { sessionClaims } = await auth();
+  const { userId, sessionClaims } = await auth();
 
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
   const isAdmin = role === "admin";
 
-  if (!isAdmin) {
+  if (!userId || !isAdmin) {
     redirect("/");
   }
 
   const params = await searchParams;
   const activeFilter = getSafeFilter(params?.filter);
 
-  const { data: registrationsData, error } = await supabase
-    .from("registrations")
-    .select(
-      "id, player_name, discord_username, steam_name, country, region, timezone, submitted_elo, registration_status, admin_notes, created_at"
-    )
-    .order("created_at", { ascending: false });
+  const supabase = createSupabaseAdminClient();
+  const [registrationResult, tournamentResult, generatedResult] =
+    await Promise.all([
+      supabase
+        .from("registrations")
+        .select(
+          "id, player_name, discord_username, steam_name, country, region, timezone, submitted_elo, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id"
+        )
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("tournaments")
+        .select(
+          "id, title, status, tournament_brackets(id, name)"
+        )
+        .order("start_date", { ascending: false, nullsFirst: false }),
+      supabase
+        .from("generated_brackets")
+        .select(
+          "id, tournament_bracket_id, format, slot_count, tournament_matches(player_one_slot, player_two_slot, player_one_registration_id, player_two_registration_id)"
+        ),
+    ]);
+  const registrationsData = registrationResult.data;
+  const error = registrationResult.error;
 
   if (error) {
     console.error("Supabase registrations fetch error:", error.message);
   }
 
   const registrations = (registrationsData ?? []) as SupabaseRegistration[];
+  const tournaments = (tournamentResult.data ?? []) as {
+    id: string;
+    title: string;
+    status: string;
+    tournament_brackets?: { id: string; name: string }[];
+  }[];
+  const generatedByBracket = new Map(
+    (
+      (generatedResult.data ?? []) as {
+        id: string;
+        tournament_bracket_id: string;
+        format: "single_elimination" | "round_robin";
+        slot_count: number;
+        tournament_matches?: {
+          player_one_slot: number | null;
+          player_two_slot: number | null;
+          player_one_registration_id: string | null;
+          player_two_registration_id: string | null;
+        }[];
+      }[]
+    ).map((generated) => [generated.tournament_bracket_id, generated])
+  );
+  const bracketManagementTournaments: AdminBracketTournamentOption[] =
+    tournaments
+      .map((tournament) => ({
+        id: tournament.id,
+        title: tournament.title,
+        brackets: (tournament.tournament_brackets ?? [])
+          .map((bracket) => {
+            const generated = generatedByBracket.get(bracket.id);
+            const assignments: Record<number, string | null> = {};
+            for (const match of generated?.tournament_matches ?? []) {
+              if (match.player_one_slot) {
+                assignments[match.player_one_slot] =
+                  match.player_one_registration_id;
+              }
+              if (match.player_two_slot) {
+                assignments[match.player_two_slot] =
+                  match.player_two_registration_id;
+              }
+            }
+
+            return {
+              generatedBracketId: generated?.id ?? null,
+              bracketId: bracket.id,
+              bracketName: `${bracket.name} Bracket`,
+              format: generated?.format ?? null,
+              slotCount: generated?.slot_count ?? 0,
+              actualMatchCount: generated?.tournament_matches?.length ?? 0,
+              expectedMatchCount: generated
+                ? generated.format === "single_elimination"
+                  ? generated.slot_count - 1
+                  : (generated.slot_count * (generated.slot_count - 1)) / 2
+                : 0,
+              assignments,
+              participants: registrations
+                .filter(
+                  (registration) =>
+                    registration.registration_status === "approved" &&
+                    registration.tournament_id === tournament.id &&
+                    registration.tournament_bracket_id === bracket.id
+                )
+                .map((registration) => ({
+                  id: registration.id,
+                  name: registration.player_name,
+                  country: registration.country || "N/A",
+                  elo: registration.submitted_elo ?? 0,
+                })),
+            };
+          }),
+      }))
+      .filter((tournament) => tournament.brackets.length > 0);
+
+  if (tournamentResult.error) {
+    console.error(
+      "Admin tournament operations load failed:",
+      tournamentResult.error.message
+    );
+  }
+
+  if (generatedResult.error) {
+    console.error(
+      "Admin generated brackets load failed:",
+      generatedResult.error.message
+    );
+  }
 
   const selectedRegistration = registrations.find(
     (registration) => registration.id === params?.selected
@@ -329,7 +491,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     },
     {
       label: "Active Tournaments",
-      value: 2,
+      value: tournaments.filter(
+        (tournament) =>
+          tournament.status === "registration_open" ||
+          tournament.status === "in_progress"
+      ).length,
       filter: "all" as FilterStatus,
       icon: Trophy,
     },
@@ -358,6 +524,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Control registrations, ELO checks, approvals, player verification,
               and the full IronClad tournament workflow.
             </p>
+            <Link
+              href="/admin/tournaments"
+              className="mt-7 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 font-bold text-white transition hover:bg-orange-400"
+            >
+              <Trophy className="h-4 w-4" />
+              Create Or Manage Tournaments
+            </Link>
           </div>
         </div>
 
@@ -519,30 +692,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           )}
         </div>
 
-        <div className="relative z-0 grid gap-8 lg:grid-cols-[1fr_1.2fr]">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
-            <h2 className="text-2xl font-bold">Registration Workflow</h2>
-
-            <div className="mt-6 space-y-4">
-              {[
-                "Submitted",
-                "ELO Check",
-                "Admin Review",
-                "Approved / Rejected",
-                "Player Confirmed",
-              ].map((step, index) => (
-                <div key={step} className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-orange-500/40 bg-orange-500/10 text-sm font-bold text-orange-300">
-                    {index + 1}
-                  </div>
-
-                  <div className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-zinc-300">
-                    {step}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="relative z-0 grid gap-8 lg:grid-cols-[1.2fr_1fr]">
+          <AdminBracketManagement
+            tournaments={bracketManagementTournaments}
+            notice={params?.bracketNotice}
+          />
 
           <div className="grid gap-5 sm:grid-cols-2">
             {managementCards.map((card) => {
@@ -677,7 +831,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {params?.notice && (
                 <div
                   className={`mt-4 rounded-xl border p-4 text-sm ${
-                    params.notice === "saved"
+                    params.notice === "saved" ||
+                    params.notice === "bracket-preserved"
                       ? "border-green-500/30 bg-green-500/10 text-green-300"
                       : "border-red-500/30 bg-red-500/10 text-red-300"
                   }`}
@@ -686,6 +841,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     ? "Add an admin note before rejecting or marking this registration for manual review."
                     : params.notice === "saved"
                       ? "Registration decision and admin note saved."
+                      : params.notice === "bracket-preserved"
+                        ? "Registration saved. The populated or active bracket was preserved and was not regenerated. Use an explicit administrator reset before rebuilding it."
                       : "The registration decision could not be saved. Check the note length and try again."}
                 </div>
               )}

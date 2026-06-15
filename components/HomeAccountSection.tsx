@@ -6,7 +6,8 @@ import {
   isPlayerProfileComplete,
   type PlayerProfile,
 } from "@/lib/player-profile";
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { logSupabaseError } from "@/lib/supabase-errors";
 
 export default async function HomeAccountSection() {
   const { userId } = await auth();
@@ -36,7 +37,7 @@ export default async function HomeAccountSection() {
     );
   }
 
-  const supabase = await createAuthenticatedSupabaseClient();
+  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("players")
     .select(
@@ -46,7 +47,7 @@ export default async function HomeAccountSection() {
     .maybeSingle();
 
   if (error) {
-    console.error("Home player profile load error:", error);
+    logSupabaseError("Home player profile load error:", error);
 
     return (
       <AccountShell

@@ -5,17 +5,27 @@ import {
   Clock3,
   MapPin,
   ShieldAlert,
+  Target,
   Trophy,
   UserRound,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import DashboardChampionHistory from "@/components/DashboardChampionHistory";
+import DashboardMatchHistory from "@/components/DashboardMatchHistory";
+import DashboardNotifications from "@/components/DashboardNotifications";
+import {
+  loadPlayerCareerDashboard,
+  type PlayerStatistics,
+} from "@/lib/player-dashboard";
 import {
   isPlayerProfileComplete,
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
+
+export const dynamic = "force-dynamic";
 
 type RegistrationStatus =
   | "pending"
@@ -42,7 +52,7 @@ export default async function PlayerDashboardPage() {
   }
 
   const supabase = await createAuthenticatedSupabaseClient();
-  const [profileResult, registrationsResult] = await Promise.all([
+  const [profileResult, registrationsResult, career] = await Promise.all([
     supabase
       .from("players")
       .select(
@@ -57,6 +67,7 @@ export default async function PlayerDashboardPage() {
       )
       .eq("clerk_user_id", userId)
       .order("created_at", { ascending: false }),
+    loadPlayerCareerDashboard(userId),
   ]);
 
   if (profileResult.error) {
@@ -166,6 +177,23 @@ export default async function PlayerDashboardPage() {
           )}
         </section>
 
+        <DashboardNotifications
+          key={career.notifications
+            .map((notification) => `${notification.id}:${notification.status}`)
+            .join("|")}
+          notifications={career.notifications}
+        />
+
+        {career.error && (
+          <div className="mt-6">
+            <DashboardError message={career.error} />
+          </div>
+        )}
+
+        <PlayerStatisticsSection statistics={career.statistics} />
+        <DashboardChampionHistory champions={career.champions} />
+        <DashboardMatchHistory matches={career.matchHistory} />
+
         <section className="mt-8">
           <div className="flex items-end justify-between gap-4">
             <div>
@@ -201,6 +229,67 @@ export default async function PlayerDashboardPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function PlayerStatisticsSection({
+  statistics,
+}: {
+  statistics: PlayerStatistics;
+}) {
+  const values = [
+    { label: "Matches Played", value: statistics.matchesPlayed },
+    { label: "Matches Won", value: statistics.matchesWon },
+    { label: "Matches Lost", value: statistics.matchesLost },
+    { label: "Win Rate", value: `${statistics.winRate}%` },
+    {
+      label: "Tournaments Participated",
+      value: statistics.tournamentsParticipated,
+    },
+    { label: "Tournaments Won", value: statistics.tournamentsWon },
+  ];
+
+  return (
+    <section className="mt-10">
+      <SectionHeading
+        eyebrow="Competitive Record"
+        title="Player Statistics"
+        icon={Target}
+      />
+      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        {values.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-2xl border border-white/10 bg-white/[0.04] p-5"
+          >
+            <p className="text-2xl font-black text-white">{item.value}</p>
+            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+              {item.label}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  icon: Icon,
+}: {
+  eyebrow: string;
+  title: string;
+  icon: typeof Trophy;
+}) {
+  return (
+    <div>
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
+        <Icon size={15} />
+        {eyebrow}
+      </p>
+      <h2 className="mt-3 text-3xl font-bold text-white">{title}</h2>
+    </div>
   );
 }
 
