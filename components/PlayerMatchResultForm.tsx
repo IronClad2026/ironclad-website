@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   submitMatchResult,
@@ -17,23 +17,17 @@ export default function PlayerMatchResultForm({
   match,
   playerOneName,
   playerTwoName,
-  reportedGameNumbers,
 }: {
   match: GeneratedTournamentMatch;
   playerOneName: string;
   playerTwoName: string;
-  reportedGameNumbers: number[];
 }) {
   const [state, formAction, pending] = useActionState(
     submitMatchResult,
     initialState
   );
-  const [outcome, setOutcome] = useState<"win" | "loss" | null>(null);
   const router = useRouter();
-  const nextGameNumber =
-    Array.from({ length: match.seriesBestOf }, (_, index) => index + 1).find(
-      (gameNumber) => !reportedGameNumbers.includes(gameNumber)
-    ) ?? null;
+  const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
 
   useEffect(() => {
     if (state.status === "success") router.refresh();
@@ -44,10 +38,11 @@ export default function PlayerMatchResultForm({
       <input type="hidden" name="matchId" value={match.id} />
       <div>
         <p className="text-xs font-black uppercase tracking-wider text-white">
-          Player Result Claim
+          Submit Match Result
         </p>
         <p className="mt-1 text-[11px] text-slate-500">
-          Choose your result. The opposing result is assigned automatically.
+          Enter the final BO{match.seriesBestOf} score and upload the replay.
+          Your opponent will be asked to confirm or dispute the result.
         </p>
       </div>
 
@@ -56,67 +51,55 @@ export default function PlayerMatchResultForm({
         <PlayerLabel label="Player B" name={playerTwoName} />
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+        <ScoreField
+          name="playerOneScore"
+          label={playerOneName}
+          max={winsRequired}
+        />
+        <ScoreField
+          name="playerTwoScore"
+          label={playerTwoName}
+          max={winsRequired}
+        />
+        <div className="rounded-xl border border-orange-400/20 bg-orange-500/10 p-4 text-xs text-orange-100/80">
+          Winner must finish on {winsRequired} wins.
+        </div>
+      </div>
+
       <label className="block">
-        <span className="text-xs font-bold text-slate-300">Game</span>
+        <span className="text-xs font-bold text-slate-300">Winner</span>
         <select
-          name="gameNumber"
+          name="winnerRegistrationId"
           required
-          defaultValue={nextGameNumber ?? ""}
+          defaultValue=""
           className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-orange-400"
         >
-          {nextGameNumber ? (
-            <option value={nextGameNumber}>Game {nextGameNumber}</option>
-          ) : (
-            <option value="">All games reported</option>
-          )}
+          <option value="">Select winner</option>
+          <option value={match.playerOneRegistrationId ?? ""}>
+            {playerOneName}
+          </option>
+          <option value={match.playerTwoRegistrationId ?? ""}>
+            {playerTwoName}
+          </option>
         </select>
       </label>
 
-      <fieldset>
-        <legend className="text-xs font-bold text-slate-300">Your Result</legend>
-        <input type="hidden" name="outcome" value={outcome ?? ""} />
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          <OutcomeOption
-            value="win"
-            label="Win"
-            tone="win"
-            selected={outcome === "win"}
-            onSelect={setOutcome}
-          />
-          <OutcomeOption
-            value="loss"
-            label="Loss"
-            tone="loss"
-            selected={outcome === "loss"}
-            onSelect={setOutcome}
-          />
-        </div>
-      </fieldset>
-
       <label className="block">
         <span className="text-xs font-bold text-slate-300">
-          Replay proof (.rec or .replay)
+          Replay proof (.rec required)
         </span>
         <input
           name="replay"
           type="file"
-          accept=".rec,.replay"
-          className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
-        />
-      </label>
-      <label className="block">
-        <span className="text-xs font-bold text-slate-300">
-          Victory screenshot
-        </span>
-        <input
-          name="screenshot"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept=".rec"
+          required
           className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
         />
       </label>
       <p className="text-[11px] text-slate-500">
-        At least one proof file is required. Maximum 10 MB per file.
+        Replay proof is required. Screenshots are no longer used for result
+        confirmation. Maximum 10 MB.
       </p>
       <label className="block">
         <span className="text-xs font-bold text-slate-300">
@@ -143,10 +126,10 @@ export default function PlayerMatchResultForm({
       )}
       <button
         type="submit"
-        disabled={pending || !outcome || nextGameNumber === null}
+        disabled={pending}
         className="w-full rounded-xl bg-orange-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400 disabled:opacity-50"
       >
-        {pending ? "Submitting..." : "Submit Result for Review"}
+        {pending ? "Submitting..." : "Submit for Opponent Confirmation"}
       </button>
     </form>
   );
@@ -163,31 +146,28 @@ function PlayerLabel({ label, name }: { label: string; name: string }) {
   );
 }
 
-function OutcomeOption({
-  value,
+function ScoreField({
+  name,
   label,
-  tone,
-  selected,
-  onSelect,
+  max,
 }: {
-  value: "win" | "loss";
+  name: string;
   label: string;
-  tone: "win" | "loss";
-  selected: boolean;
-  onSelect: (value: "win" | "loss") => void;
+  max: number;
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={() => onSelect(value)}
-      className={`rounded-xl border p-4 text-center font-black transition ${
-        tone === "win"
-          ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
-          : "border-red-400/30 bg-red-500/10 text-red-200"
-      } ${selected ? "ring-2 ring-current" : "hover:border-current/60"}`}
-    >
-      {label}
-    </button>
+    <label className="block">
+      <span className="block truncate text-xs font-bold text-slate-300">
+        {label}
+      </span>
+      <input
+        name={name}
+        type="number"
+        min="0"
+        max={max}
+        required
+        className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-base text-white outline-none focus:border-orange-400"
+      />
+    </label>
   );
 }

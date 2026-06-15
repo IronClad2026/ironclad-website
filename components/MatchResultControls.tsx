@@ -3,14 +3,15 @@
 import { useActionState, useState } from "react";
 import {
   saveAdminMatchResult,
-  submitMatchResult,
   reviewMatchResult,
+  reviewMatchResultReportGroup,
   type MatchResultActionState,
 } from "@/app/tournaments/match-actions";
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import PlayerMatchResultForm from "@/components/PlayerMatchResultForm";
 import type {
   GeneratedTournamentMatch,
+  MatchResultReportGroup,
   MatchResultSubmission,
   TournamentParticipant,
 } from "@/lib/tournaments";
@@ -27,6 +28,7 @@ export default function MatchResultControls({
   canSubmit,
   viewerClerkUserId,
   submissions,
+  reportGroups,
   presentation = "inline",
 }: {
   match: GeneratedTournamentMatch;
@@ -35,6 +37,7 @@ export default function MatchResultControls({
   canSubmit: boolean;
   viewerClerkUserId: string | null;
   submissions: MatchResultSubmission[];
+  reportGroups: MatchResultReportGroup[];
   presentation?: "inline" | "workspace";
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -48,37 +51,22 @@ export default function MatchResultControls({
   const pendingSubmission = submissions.find(
     (submission) => submission.status === "pending"
   );
-  const viewerPendingGameNumbers = submissions
-    .filter(
-      (submission) =>
-        submission.status === "pending" &&
-        submission.matchId === match.id &&
-        submission.submittedByClerkUserId === viewerClerkUserId
-    )
-    .map((submission) => submission.gameNumber);
-  const viewerPendingSubmissions = submissions.filter(
-    (submission) =>
-      submission.status === "pending" &&
-      submission.matchId === match.id &&
-      submission.submittedByClerkUserId === viewerClerkUserId
+  const activeReportGroup = reportGroups.find(
+    (reportGroup) =>
+      reportGroup.finalizedAt === null &&
+      ["pending_confirmation", "disputed", "under_review"].includes(
+        reportGroup.status
+      )
   );
-  const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
-  const viewerReportedSeriesComplete = [
-    match.playerOneRegistrationId,
-    match.playerTwoRegistrationId,
-  ].some(
-    (registrationId) =>
-      registrationId &&
-      viewerPendingSubmissions.filter(
-        (submission) =>
-          submission.claimedWinnerRegistrationId === registrationId
-      ).length >= winsRequired
-  );
-  const viewerCanReportAnotherGame =
-    viewerPendingGameNumbers.length < match.seriesBestOf &&
-    !viewerReportedSeriesComplete;
+  const canOpenForReportGroups = reportGroups.length > 0;
+  const canSubmitNewReport =
+    canSubmit &&
+    hasParticipants &&
+    match.status !== "completed" &&
+    !activeReportGroup &&
+    !pendingSubmission;
 
-  if (!isAdmin && !canSubmit && submissions.length === 0) {
+  if (!isAdmin && !canSubmit && submissions.length === 0 && !canOpenForReportGroups) {
     return null;
   }
 
@@ -126,33 +114,53 @@ export default function MatchResultControls({
                 match={match}
                 playerOneName={playerOne?.name ?? "Player 1"}
                 playerTwoName={playerTwo?.name ?? "Player 2"}
-                mode="admin"
               />
             </div>
           )}
 
-          {canSubmit &&
-            hasParticipants &&
-            match.status !== "completed" &&
-            viewerCanReportAnotherGame && (
+          {canSubmitNewReport && (
               <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5">
                 <PlayerMatchResultForm
                   match={match}
                   playerOneName={playerOne?.name ?? "Player 1"}
                   playerTwoName={playerTwo?.name ?? "Player 2"}
-                  reportedGameNumbers={viewerPendingGameNumbers}
                 />
               </div>
             )}
 
           {canSubmit &&
-            !viewerCanReportAnotherGame &&
+            activeReportGroup &&
             match.status !== "completed" && (
               <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
-                You have reported a complete BO{match.seriesBestOf} series.
-                The series package is under review.
+                {activeReportGroup.submittedByClerkUserId ===
+                viewerClerkUserId
+                  ? "Your result is awaiting opponent confirmation."
+                  : "Your opponent submitted a result. Confirm or dispute it from your dashboard notification."}
               </div>
             )}
+
+          {canSubmit &&
+            pendingSubmission &&
+            match.status !== "completed" &&
+            !activeReportGroup && (
+              <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
+                This match has a legacy report awaiting administrator review.
+              </div>
+            )}
+
+          {reportGroups.length > 0 && (
+            <div className="space-y-4 xl:col-span-2">
+              {reportGroups.map((reportGroup) => (
+                <ReportGroupReview
+                  key={reportGroup.id}
+                  reportGroup={reportGroup}
+                  match={match}
+                  isAdmin={isAdmin}
+                  participantsById={participantsById}
+                />
+              ))}
+            </div>
+          )}
 
           {submissions.length > 0 && (
             <div className="space-y-4 xl:col-span-2">
@@ -198,12 +206,16 @@ export default function MatchResultControls({
       >
         <span>
           {isAdmin
-            ? pendingSubmission
-              ? "Result Review Required"
-              : "Manage Match Result"
-            : pendingSubmission
-              ? "Result Pending Review"
-              : "Submit Match Result"}
+            ? activeReportGroup
+              ? "Confirmation Review Required"
+              : pendingSubmission
+                ? "Result Review Required"
+                : "Manage Match Result"
+            : activeReportGroup
+              ? "Result Pending Confirmation"
+              : pendingSubmission
+                ? "Result Pending Review"
+                : "Submit Match Result"}
         </span>
         <span className="text-slate-500">{expanded ? "Hide" : "Open"}</span>
       </button>
@@ -219,15 +231,15 @@ function ResultEntryForm({
   match,
   playerOneName,
   playerTwoName,
-  mode,
 }: {
   match: GeneratedTournamentMatch;
   playerOneName: string;
   playerTwoName: string;
-  mode: "admin" | "player";
 }) {
-  const action = mode === "admin" ? saveAdminMatchResult : submitMatchResult;
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const [state, formAction, pending] = useActionState(
+    saveAdminMatchResult,
+    initialState
+  );
   const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
 
   return (
@@ -235,7 +247,7 @@ function ResultEntryForm({
       <input type="hidden" name="matchId" value={match.id} />
       <div>
         <p className="text-xs font-black uppercase tracking-wider text-white">
-          {mode === "admin" ? "Official Result Entry" : "Player Result Claim"}
+          Official Result Entry
         </p>
         <p className="mt-1 text-[11px] text-slate-500">
           Best of {match.seriesBestOf} · winner requires {winsRequired} wins
@@ -300,60 +312,193 @@ function ResultEntryForm({
         </select>
       </label>
 
-      {mode === "player" && (
-        <>
-          <label className="block">
-            <span className="text-xs font-bold text-slate-300">
-              Replay proof (.rec or .replay)
-            </span>
-            <input
-              name="replay"
-              type="file"
-              accept=".rec,.replay"
-              className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-bold text-slate-300">
-              Victory screenshot
-            </span>
-            <input
-              name="screenshot"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
-            />
-          </label>
-          <p className="text-[11px] text-slate-500">
-            At least one proof file is required. Maximum 10 MB per file.
-          </p>
-          <label className="block">
-            <span className="text-xs font-bold text-slate-300">
-              Notes (optional)
-            </span>
-            <textarea
-              name="notes"
-              maxLength={2000}
-              rows={5}
-              className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-orange-400"
-            />
-          </label>
-        </>
-      )}
-
       <ActionMessage state={state} />
       <button
         type="submit"
         disabled={pending}
         className="w-full rounded-xl bg-orange-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400 disabled:opacity-50"
       >
-        {pending
-          ? "Saving..."
-          : mode === "admin"
-            ? "Complete Match & Advance Winner"
-            : "Submit Result for Review"}
+        {pending ? "Saving..." : "Complete Match & Advance Winner"}
       </button>
     </form>
+  );
+}
+
+function ReportGroupReview({
+  reportGroup,
+  match,
+  isAdmin,
+  participantsById,
+}: {
+  reportGroup: MatchResultReportGroup;
+  match: GeneratedTournamentMatch;
+  isAdmin: boolean;
+  participantsById: Map<string, TournamentParticipant>;
+}) {
+  const [state, formAction, pending] = useActionState(
+    reviewMatchResultReportGroup,
+    initialState
+  );
+  const reporter = participantName(
+    participantsById,
+    reportGroup.submittedByRegistrationId
+  );
+  const opponent = participantName(
+    participantsById,
+    reportGroup.opponentRegistrationId
+  );
+  const winner = participantName(
+    participantsById,
+    reportGroup.winnerRegistrationId
+  );
+  const loserRegistrationId =
+    reportGroup.winnerRegistrationId === match.playerOneRegistrationId
+      ? match.playerTwoRegistrationId
+      : match.playerOneRegistrationId;
+  const loser = loserRegistrationId
+    ? participantName(participantsById, loserRegistrationId)
+    : "Participant";
+  const actionable =
+    reportGroup.finalizedAt === null &&
+    ["pending_confirmation", "disputed", "under_review"].includes(
+      reportGroup.status
+    );
+
+  return (
+    <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wider text-sky-200">
+            Confirmation Package - {formatReportGroupStatus(reportGroup.status)}
+          </p>
+          <p className="mt-2 text-sm text-white">
+            {reportGroup.playerOneScore}-{reportGroup.playerTwoScore}{" "}
+            reported for {winner}
+          </p>
+        </div>
+        <span className="text-[10px] text-slate-500">
+          {new Date(reportGroup.createdAt).toLocaleString()}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-slate-300 sm:grid-cols-2">
+        <SummaryValue
+          label="Match"
+          value={`${match.roundName} - Match ${match.matchNumber}`}
+        />
+        <SummaryValue label="Reporting Player" value={reporter} />
+        <SummaryValue label="Opponent" value={opponent} />
+        <SummaryValue label="Reported Winner" value={winner} />
+        <SummaryValue label="Reported Loser" value={loser} />
+        <SummaryValue
+          label="Confirmation Deadline"
+          value={new Date(reportGroup.confirmationDeadlineAt).toLocaleString()}
+        />
+        {reportGroup.finalizedSource && (
+          <SummaryValue
+            label="Finalized By"
+            value={formatFinalizedSource(reportGroup.finalizedSource)}
+          />
+        )}
+      </div>
+
+      {reportGroup.disputeNotes && (
+        <div className="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 p-3">
+          <p className="text-[10px] font-black uppercase tracking-wider text-red-200">
+            Dispute Notes
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-red-100/80">
+            {reportGroup.disputeNotes}
+          </p>
+        </div>
+      )}
+
+      {reportGroup.reviewNotes && (
+        <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
+          <p className="text-[10px] font-black uppercase tracking-wider text-orange-300">
+            Review Notes
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-300">
+            {reportGroup.reviewNotes}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {reportGroup.replayProofUrl ? (
+          <a
+            href={reportGroup.replayProofUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
+          >
+            Download Replay
+          </a>
+        ) : (
+          <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200">
+            Replay unavailable
+          </span>
+        )}
+      </div>
+
+      {isAdmin && actionable && (
+        <form action={formAction} className="mt-4 space-y-2">
+          <input type="hidden" name="reportGroupId" value={reportGroup.id} />
+          <textarea
+            name="reviewNotes"
+            maxLength={2000}
+            rows={2}
+            placeholder="Administrator message (required for rejection)"
+            className="w-full resize-none rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+          />
+          <ActionMessage state={state} />
+          <div className="grid gap-2 sm:grid-cols-3">
+            <ReportGroupReviewButton
+              decision="approved"
+              label="Approve Result"
+              disabled={pending}
+              className="bg-emerald-600 hover:bg-emerald-500"
+            />
+            <ReportGroupReviewButton
+              decision="under_review"
+              label="Mark Under Review"
+              disabled={pending}
+              className="bg-amber-600 hover:bg-amber-500"
+            />
+            <ReportGroupReviewButton
+              decision="rejected"
+              label="Reject Result"
+              disabled={pending}
+              className="bg-red-700 hover:bg-red-600"
+            />
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function ReportGroupReviewButton({
+  decision,
+  label,
+  disabled,
+  className,
+}: {
+  decision: string;
+  label: string;
+  disabled: boolean;
+  className: string;
+}) {
+  return (
+    <button
+      type="submit"
+      name="decision"
+      value={decision}
+      disabled={disabled}
+      className={`rounded-lg px-2 py-2 text-[10px] font-black uppercase tracking-wider text-white transition disabled:opacity-50 ${className}`}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -611,6 +756,22 @@ function ActionMessage({ state }: { state: MatchResultActionState }) {
   );
 }
 
+function SummaryValue({ label, value }: { label: string; value: string }) {
+  return (
+    <p>
+      <span className="text-slate-500">{label}:</span>{" "}
+      <strong className="text-white">{value}</strong>
+    </p>
+  );
+}
+
+function participantName(
+  participantsById: Map<string, TournamentParticipant>,
+  registrationId: string
+) {
+  return participantsById.get(registrationId)?.name ?? "Participant";
+}
+
 function formatSubmissionStatus(status: MatchResultSubmission["status"]) {
   return {
     pending: "Under Review",
@@ -618,4 +779,27 @@ function formatSubmissionStatus(status: MatchResultSubmission["status"]) {
     rejected: "Rejected",
     resubmission_requested: "Resubmission Requested",
   }[status];
+}
+
+function formatReportGroupStatus(status: MatchResultReportGroup["status"]) {
+  return {
+    pending_confirmation: "Pending Opponent Confirmation",
+    confirmed: "Confirmed",
+    auto_approved: "Auto-Approved",
+    disputed: "Disputed",
+    under_review: "Under Review",
+    approved: "Approved",
+    rejected: "Rejected",
+    reset: "Reset",
+  }[status];
+}
+
+function formatFinalizedSource(source: string) {
+  return {
+    opponent_confirmation: "Opponent Confirmation",
+    cron_auto_approval: "Automatic Approval",
+    admin_approval: "Admin Approval",
+    admin_override: "Admin Override",
+    reset: "Reset",
+  }[source] ?? source.replaceAll("_", " ");
 }

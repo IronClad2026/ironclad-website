@@ -20,6 +20,7 @@ import {
 import type {
   GeneratedTournamentBracket,
   GeneratedTournamentMatch,
+  MatchResultReportGroup,
   MatchResultSubmission,
   TournamentCard,
   TournamentParticipant,
@@ -586,10 +587,12 @@ function Brackets({
   tournament,
   viewer,
   matchResultSubmissions,
+  matchResultReportGroups,
 }: {
   tournament: TournamentCard;
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
+  matchResultReportGroups: MatchResultReportGroup[];
 }) {
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
@@ -636,6 +639,11 @@ function Brackets({
                 generated.matches.some(
                   (match) => match.id === submission.matchId
                 )
+              ) ||
+              matchResultReportGroups.some((reportGroup) =>
+                generated.matches.some(
+                  (match) => match.id === reportGroup.matchId
+                )
               ))
         );
         return (
@@ -653,6 +661,7 @@ function Brackets({
                       participantsById={participantsById}
                       viewer={viewer}
                       matchResultSubmissions={matchResultSubmissions}
+                      matchResultReportGroups={matchResultReportGroups}
                     />
                   )}
                 </div>
@@ -704,12 +713,14 @@ function BracketMatchResultsWorkspace({
   participantsById,
   viewer,
   matchResultSubmissions,
+  matchResultReportGroups,
 }: {
   bracketName: string;
   matches: GeneratedTournamentMatch[];
   participantsById: Map<string, TournamentParticipant>;
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
+  matchResultReportGroups: MatchResultReportGroup[];
 }) {
   const [open, setOpen] = useState(false);
   const portalRoot =
@@ -723,7 +734,10 @@ function BracketMatchResultsWorkspace({
     const hasVisibleSubmission = matchResultSubmissions.some(
       (submission) => submission.matchId === match.id
     );
-    return viewer.isAdmin || canSubmit || hasVisibleSubmission;
+    const hasVisibleReportGroup = matchResultReportGroups.some(
+      (reportGroup) => reportGroup.matchId === match.id
+    );
+    return viewer.isAdmin || canSubmit || hasVisibleSubmission || hasVisibleReportGroup;
   });
   const pendingCount = visibleMatches.reduce(
     (total, match) =>
@@ -732,6 +746,14 @@ function BracketMatchResultsWorkspace({
         (submission) =>
           submission.matchId === match.id &&
           submission.status === "pending"
+      ).length +
+      matchResultReportGroups.filter(
+        (reportGroup) =>
+          reportGroup.matchId === match.id &&
+          ["pending_confirmation", "disputed", "under_review"].includes(
+            reportGroup.status
+          ) &&
+          reportGroup.finalizedAt === null
       ).length,
     0
   );
@@ -883,6 +905,10 @@ function BracketMatchResultsWorkspace({
                               submissions={matchResultSubmissions.filter(
                                 (submission) =>
                                   submission.matchId === match.id
+                              )}
+                              reportGroups={matchResultReportGroups.filter(
+                                (reportGroup) =>
+                                  reportGroup.matchId === match.id
                               )}
                               presentation="workspace"
                             />
@@ -1903,12 +1929,14 @@ function MainContent({
   tournaments,
   viewer,
   matchResultSubmissions,
+  matchResultReportGroups,
 }: {
   activeTab: TabKey;
   tournament: TournamentCard;
   tournaments: TournamentCard[];
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
+  matchResultReportGroups: MatchResultReportGroup[];
 }) {
   return (
     <main className="px-5 py-6 lg:px-8">
@@ -1921,6 +1949,7 @@ function MainContent({
           tournament={tournament}
           viewer={viewer}
           matchResultSubmissions={matchResultSubmissions}
+          matchResultReportGroups={matchResultReportGroups}
         />
       )}
       {activeTab === "media" && <Media tournament={tournament} />}
@@ -2031,10 +2060,12 @@ export default function TournamentsExperience({
   tournaments,
   viewer,
   matchResultSubmissions,
+  matchResultReportGroups,
 }: {
   tournaments: TournamentCard[];
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
+  matchResultReportGroups: MatchResultReportGroup[];
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [selectedTournamentId, setSelectedTournamentId] = useState(
@@ -2131,6 +2162,7 @@ export default function TournamentsExperience({
             tournaments={tournaments}
             viewer={viewer}
             matchResultSubmissions={matchResultSubmissions}
+            matchResultReportGroups={matchResultReportGroups}
           />
         </div>
       </div>

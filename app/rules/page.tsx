@@ -79,7 +79,7 @@ const ruleSections: Record<TabName, [string, string][]> = {
 
     [
       "Match Reporting",
-      "Results must be reported through the correct Discord or tournament reporting channel with screenshots or replay proof when requested.",
+      "Results must be reported through the tournament reporting system with replay proof when requested.",
     ],
 
     [

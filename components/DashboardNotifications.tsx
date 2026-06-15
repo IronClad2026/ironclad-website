@@ -9,13 +9,18 @@ import {
   Clock3,
   MessageSquareText,
   RotateCcw,
+  ShieldAlert,
   Trash2,
   X,
   XCircle,
 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { dismissDashboardNotifications } from "@/app/dashboard/actions";
+import {
+  confirmDashboardMatchResult,
+  dismissDashboardNotifications,
+  disputeDashboardMatchResult,
+} from "@/app/dashboard/actions";
 import type { DashboardNotification } from "@/lib/player-dashboard";
 
 export default function DashboardNotifications({
@@ -28,10 +33,13 @@ export default function DashboardNotifications({
   const [selected, setSelected] = useState<DashboardNotification | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
+  const [now, setNow] = useState(() => Date.now());
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const actionRequired = notifications.filter(
     (notification) =>
+      notification.canConfirm ||
+      notification.canDispute ||
       notification.status === "rejected" ||
       notification.status === "resubmission_requested"
   ).length;
@@ -53,6 +61,19 @@ export default function DashboardNotifications({
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [selected]);
+
+  useEffect(() => {
+    if (
+      notifications.every(
+        (notification) => notification.confirmationDeadlineAt === null
+      )
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [notifications]);
 
   const deleteNotifications = (
     notificationIds: string[],
@@ -84,6 +105,34 @@ export default function DashboardNotifications({
       });
       if (selected && dismissed.has(selected.id)) setSelected(null);
       router.refresh();
+    });
+  };
+
+  const respondToReportGroup = (
+    notification: DashboardNotification,
+    decision: "confirm" | "dispute",
+    disputeNotes = ""
+  ) => {
+    if (!notification.reportGroupId || pending) return;
+
+    setMessage("");
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("reportGroupId", notification.reportGroupId ?? "");
+      if (decision === "dispute") {
+        formData.set("disputeNotes", disputeNotes);
+      }
+
+      const result =
+        decision === "confirm"
+          ? await confirmDashboardMatchResult(formData)
+          : await disputeDashboardMatchResult(formData);
+      setMessage(result.message);
+
+      if (result.status === "success") {
+        setSelected(null);
+        router.refresh();
+      }
     });
   };
 
@@ -122,7 +171,7 @@ export default function DashboardNotifications({
                     notifications.length === 1 ? "message" : "messages"
                   }`}
               {actionRequired > 0
-                ? ` · ${actionRequired} require action`
+                ? ` - ${actionRequired} require action`
                 : ""}
             </span>
           </span>
@@ -199,6 +248,7 @@ export default function DashboardNotifications({
                       key={notification.id}
                       notification={notification}
                       checked={selectedIds.has(notification.id)}
+                      now={now}
                       pending={pending}
                       onToggle={() => toggleSelected(notification.id)}
                       onOpen={() => setSelected(notification)}
@@ -227,6 +277,9 @@ export default function DashboardNotifications({
         {selected && (
           <NotificationModal
             notification={selected}
+            now={now}
+            pending={pending}
+            onRespond={respondToReportGroup}
             onClose={() => setSelected(null)}
           />
         )}
@@ -238,6 +291,7 @@ export default function DashboardNotifications({
 function NotificationRow({
   notification,
   checked,
+  now,
   pending,
   onToggle,
   onOpen,
@@ -245,6 +299,7 @@ function NotificationRow({
 }: {
   notification: DashboardNotification;
   checked: boolean;
+  now: number;
   pending: boolean;
   onToggle: () => void;
   onOpen: () => void;
@@ -261,7 +316,7 @@ function NotificationRow({
           checked={checked}
           onChange={onToggle}
           disabled={pending}
-          aria-label={`Select notification ${notification.submissionNumber}`}
+          aria-label={`Select notification ${notificationLabel(notification)}`}
           className="h-4 w-4 accent-orange-500"
         />
       </label>
@@ -278,9 +333,14 @@ function NotificationRow({
             {content.title}
           </span>
           <span className="mt-1 block truncate text-xs text-zinc-500">
-            {notification.tournamentName} · Submission #
-            {notification.submissionNumber}
+            {notification.tournamentName} - {notificationLabel(notification)}
           </span>
+          {notification.confirmationDeadlineAt &&
+            notification.status === "pending_confirmation" && (
+              <span className="mt-1 block text-[10px] font-bold uppercase tracking-wider text-orange-300">
+                {formatTimeRemaining(notification.confirmationDeadlineAt, now)}
+              </span>
+            )}
         </span>
         <span className="shrink-0 text-[10px] text-zinc-600">
           {formatCompactDate(
@@ -292,7 +352,7 @@ function NotificationRow({
         type="button"
         onClick={onDelete}
         disabled={pending}
-        aria-label={`Delete notification ${notification.submissionNumber}`}
+        aria-label={`Delete notification ${notificationLabel(notification)}`}
         className="mt-0.5 shrink-0 rounded-lg p-2 text-zinc-600 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
       >
         <Trash2 size={15} />
@@ -303,13 +363,28 @@ function NotificationRow({
 
 function NotificationModal({
   notification,
+  now,
+  pending,
+  onRespond,
   onClose,
 }: {
   notification: DashboardNotification;
+  now: number;
+  pending: boolean;
+  onRespond: (
+    notification: DashboardNotification,
+    decision: "confirm" | "dispute",
+    disputeNotes?: string
+  ) => void;
   onClose: () => void;
 }) {
+  const [disputeNotes, setDisputeNotes] = useState("");
   const content = notificationContent(notification);
   const Icon = content.icon;
+  const responseAvailable =
+    notification.canConfirm &&
+    notification.confirmationDeadlineAt !== null &&
+    now < new Date(notification.confirmationDeadlineAt).getTime();
 
   return (
     <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
@@ -325,7 +400,7 @@ function NotificationModal({
       <motion.article
         role="dialog"
         aria-modal="true"
-        aria-labelledby={`notification-${notification.id}`}
+        aria-labelledby={`notification-${notification.sourceId}`}
         initial={{ opacity: 0, scale: 0.96, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 12 }}
@@ -343,7 +418,7 @@ function NotificationModal({
                 Match Notification
               </p>
               <h2
-                id={`notification-${notification.id}`}
+                id={`notification-${notification.sourceId}`}
                 className="mt-2 text-2xl font-black text-white"
               >
                 {content.title}
@@ -367,17 +442,20 @@ function NotificationModal({
           <Detail label="Tournament" value={notification.tournamentName} />
           <Detail
             label="Match"
-            value={`${notification.roundName} · Match ${notification.matchNumber}`}
+            value={`${notification.roundName} - Match ${notification.matchNumber}`}
           />
-          <Detail
-            label="Submission"
-            value={`#${notification.submissionNumber} · Game ${notification.gameNumber}`}
-          />
+          <Detail label="Submission" value={notificationLabel(notification)} />
           <Detail label="Opponent" value={notification.opponentName} />
           <Detail label="Reported Winner" value={notification.reportedWinner} />
           <Detail label="Reported Loser" value={notification.reportedLoser} />
           <Detail label="Reported Score" value={notification.reportedScore} />
           <Detail label="Status" value={formatStatus(notification.status)} />
+          {notification.confirmationDeadlineAt && (
+            <Detail
+              label="Time Remaining"
+              value={formatTimeRemaining(notification.confirmationDeadlineAt, now)}
+            />
+          )}
           <Detail
             label={notification.reviewedAt ? "Reviewed" : "Submitted"}
             value={formatDate(
@@ -397,6 +475,57 @@ function NotificationModal({
             </p>
           </div>
         )}
+
+        {notification.source === "report_group" &&
+          notification.status === "pending_confirmation" &&
+          !responseAvailable &&
+          !notification.submittedByViewer && (
+            <div className="mx-6 mb-6 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-5 text-sm leading-6 text-amber-100/80 sm:mx-8 sm:mb-8">
+              The confirmation window has expired. Automatic approval is
+              waiting for the scheduled job to process this result.
+            </div>
+          )}
+
+        {notification.source === "report_group" && responseAvailable && (
+          <div className="mx-6 mb-6 space-y-4 rounded-2xl border border-orange-400/20 bg-orange-500/5 p-5 sm:mx-8 sm:mb-8">
+            <p className="text-xs font-black uppercase tracking-wider text-orange-200">
+              Confirm or Dispute
+            </p>
+            <p className="text-sm leading-6 text-zinc-300">
+              Confirming approves the result immediately and advances the
+              winner. Disputing moves the report to administrator review and
+              prevents automatic approval.
+            </p>
+            <textarea
+              value={disputeNotes}
+              onChange={(event) => setDisputeNotes(event.target.value)}
+              maxLength={2000}
+              rows={3}
+              placeholder="Optional dispute notes"
+              className="w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-orange-400"
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => onRespond(notification, "confirm")}
+                className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              >
+                Confirm Result
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  onRespond(notification, "dispute", disputeNotes)
+                }
+                className="rounded-xl bg-red-700 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
+              >
+                Dispute Result
+              </button>
+            </div>
+          </div>
+        )}
       </motion.article>
     </div>
   );
@@ -414,10 +543,45 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function notificationContent(notification: DashboardNotification) {
+  if (notification.status === "pending_confirmation") {
+    if (notification.submittedByViewer) {
+      return {
+        title: `Submission #${notification.submissionNumber} awaiting confirmation`,
+        message:
+          "Your match result was submitted successfully. Your opponent must confirm or dispute before the deadline.",
+        icon: Clock3,
+        iconClassName: "text-sky-300",
+      };
+    }
+
+    return {
+      title: "Match Result Confirmation Required",
+      message: `Your opponent has submitted the result for your match in ${notification.tournamentName}. Please confirm or dispute this result before the confirmation window expires.`,
+      icon: Bell,
+      iconClassName: "text-orange-300",
+    };
+  }
   if (notification.status === "approved") {
     return {
       title: "Match result approved",
       message: "The official result has been approved and recorded.",
+      icon: CheckCircle2,
+      iconClassName: "text-emerald-300",
+    };
+  }
+  if (notification.status === "confirmed") {
+    return {
+      title: "Match result confirmed",
+      message: "The result was confirmed by the opponent and recorded.",
+      icon: CheckCircle2,
+      iconClassName: "text-emerald-300",
+    };
+  }
+  if (notification.status === "auto_approved") {
+    return {
+      title: "Match result auto-approved",
+      message:
+        "The confirmation window expired without a dispute, so the result was automatically approved.",
       icon: CheckCircle2,
       iconClassName: "text-emerald-300",
     };
@@ -431,11 +595,36 @@ function notificationContent(notification: DashboardNotification) {
       iconClassName: "text-red-300",
     };
   }
+  if (notification.status === "disputed") {
+    return {
+      title: "Match result disputed",
+      message:
+        "This result has been disputed and now requires administrator review.",
+      icon: ShieldAlert,
+      iconClassName: "text-red-300",
+    };
+  }
+  if (notification.status === "under_review") {
+    return {
+      title: "Match result under review",
+      message: "An administrator is reviewing this disputed result.",
+      icon: Clock3,
+      iconClassName: "text-amber-300",
+    };
+  }
   if (notification.status === "resubmission_requested") {
     return {
       title: "Result resubmission requested",
       message:
         "The administrator requires a corrected result or additional proof.",
+      icon: RotateCcw,
+      iconClassName: "text-amber-300",
+    };
+  }
+  if (notification.status === "reset") {
+    return {
+      title: "Match result reset",
+      message: "The result report was reset and the match remains unresolved.",
       icon: RotateCcw,
       iconClassName: "text-amber-300",
     };
@@ -458,12 +647,24 @@ function notificationContent(notification: DashboardNotification) {
   };
 }
 
+function notificationLabel(notification: DashboardNotification) {
+  return notification.submissionNumber > 0
+    ? `Submission #${notification.submissionNumber}`
+    : "Result Confirmation";
+}
+
 function formatStatus(status: DashboardNotification["status"]) {
   return {
     pending: "Under Review",
     approved: "Approved",
     rejected: "Rejected",
     resubmission_requested: "Resubmission Requested",
+    pending_confirmation: "Pending Opponent Confirmation",
+    confirmed: "Confirmed",
+    auto_approved: "Auto-Approved",
+    disputed: "Disputed",
+    under_review: "Under Review",
+    reset: "Reset",
   }[status];
 }
 
@@ -479,4 +680,31 @@ function formatCompactDate(value: string) {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
+}
+
+function formatTimeRemaining(value: string, now = Date.now()) {
+  const remainingMs = new Date(value).getTime() - now;
+
+  if (!Number.isFinite(remainingMs)) {
+    return "Time remaining unavailable";
+  }
+
+  if (remainingMs <= 0) {
+    return "Expired - awaiting automation";
+  }
+
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m remaining`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s remaining`;
+  }
+
+  return `${seconds}s remaining`;
 }

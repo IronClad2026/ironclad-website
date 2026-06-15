@@ -113,6 +113,42 @@ export type MatchResultSubmission = {
   createdAt: string;
 };
 
+export type MatchResultReportGroupStatus =
+  | "pending_confirmation"
+  | "confirmed"
+  | "auto_approved"
+  | "disputed"
+  | "under_review"
+  | "approved"
+  | "rejected"
+  | "reset";
+
+export type MatchResultReportGroup = {
+  id: string;
+  matchId: string;
+  tournamentId: string;
+  submittedByClerkUserId: string;
+  submittedByRegistrationId: string;
+  opponentRegistrationId: string;
+  winnerRegistrationId: string;
+  playerOneScore: number;
+  playerTwoScore: number;
+  replayStoragePath: string | null;
+  replayProofUrl: string | null;
+  replayProofExists: boolean;
+  status: MatchResultReportGroupStatus;
+  confirmationDeadlineAt: string;
+  confirmedAt: string | null;
+  disputedAt: string | null;
+  disputeNotes: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  finalizedAt: string | null;
+  finalizedSource: string | null;
+  createdAt: string;
+};
+
 export type TournamentStanding = {
   registrationId: string;
   wins: number;

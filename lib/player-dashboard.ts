@@ -4,6 +4,9 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type DashboardNotification = {
   id: string;
+  source: "submission" | "report_group";
+  sourceId: string;
+  reportGroupId: string | null;
   submissionNumber: number;
   gameNumber: number;
   tournamentName: string;
@@ -13,11 +16,25 @@ export type DashboardNotification = {
   reportedWinner: string;
   reportedLoser: string;
   reportedScore: string;
-  status: "pending" | "approved" | "rejected" | "resubmission_requested";
+  status:
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "resubmission_requested"
+    | "pending_confirmation"
+    | "confirmed"
+    | "auto_approved"
+    | "disputed"
+    | "under_review"
+    | "reset";
   reviewNotes: string | null;
   submittedAt: string;
   reviewedAt: string | null;
   submittedByViewer: boolean;
+  confirmationDeadlineAt: string | null;
+  finalizedAt: string | null;
+  canConfirm: boolean;
+  canDispute: boolean;
 };
 
 export type ChampionAchievement = {
@@ -104,6 +121,30 @@ type SubmissionRow = {
   created_at: string;
   replay_storage_path: string | null;
   screenshot_storage_path: string | null;
+  report_group_id: string | null;
+};
+
+type ReportGroupRow = {
+  id: string;
+  match_id: string;
+  tournament_id: string;
+  submitted_by_clerk_user_id: string;
+  submitted_by_registration_id: string;
+  opponent_registration_id: string;
+  winner_registration_id: string;
+  player_one_score: number;
+  player_two_score: number;
+  replay_storage_path: string | null;
+  status: DashboardNotification["status"];
+  confirmation_deadline_at: string;
+  confirmed_at: string | null;
+  disputed_at: string | null;
+  dispute_notes: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  finalized_at: string | null;
+  finalized_source: string | null;
+  created_at: string;
 };
 
 type GeneratedBracketRow = {
@@ -266,6 +307,7 @@ export async function loadPlayerCareerDashboard(
 
   const [
     submissionsResult,
+    reportGroupsResult,
     generatedBracketsResult,
     roundsResult,
     participantsResult,
@@ -274,7 +316,14 @@ export async function loadPlayerCareerDashboard(
     supabase
       .from("match_result_submissions")
       .select(
-        "id, submission_number, game_number, match_id, submitted_by_clerk_user_id, submitted_by_registration_id, claimed_winner_registration_id, player_one_score, player_two_score, replay_storage_path, screenshot_storage_path, status, review_notes, reviewed_at, created_at"
+        "id, submission_number, game_number, match_id, submitted_by_clerk_user_id, submitted_by_registration_id, claimed_winner_registration_id, player_one_score, player_two_score, replay_storage_path, screenshot_storage_path, status, review_notes, reviewed_at, created_at, report_group_id"
+      )
+      .in("match_id", matchIds)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("match_result_report_groups")
+      .select(
+        "id, match_id, tournament_id, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_at, review_notes, finalized_at, finalized_source, created_at"
       )
       .in("match_id", matchIds)
       .order("created_at", { ascending: false }),
@@ -301,6 +350,7 @@ export async function loadPlayerCareerDashboard(
 
   const metadataError =
     submissionsResult.error ??
+    reportGroupsResult.error ??
     generatedBracketsResult.error ??
     roundsResult.error ??
     participantsResult.error ??
@@ -377,27 +427,60 @@ export async function loadPlayerCareerDashboard(
   }
 
   const submissionRows = (submissionsResult.data ?? []) as SubmissionRow[];
+  const reportGroupRows = (reportGroupsResult.data ?? []) as ReportGroupRow[];
+  const legacyNotificationSubmissions = submissionRows.filter(
+    (submission) => submission.report_group_id === null
+  );
   const dismissalResult =
-    submissionRows.length > 0
+    legacyNotificationSubmissions.length > 0
       ? await supabase
           .from("player_notification_dismissals")
           .select("submission_id, dismissed_status")
           .eq("clerk_user_id", clerkUserId)
           .in(
             "submission_id",
-            submissionRows.map((submission) => submission.id)
+            legacyNotificationSubmissions.map((submission) => submission.id)
+          )
+      : { data: [], error: null };
+  const reportGroupDismissalResult =
+    reportGroupRows.length > 0
+      ? await supabase
+          .from("player_report_group_notification_dismissals")
+          .select("report_group_id, dismissed_status")
+          .eq("clerk_user_id", clerkUserId)
+          .in(
+            "report_group_id",
+            reportGroupRows.map((reportGroup) => reportGroup.id)
           )
       : { data: [], error: null };
   const { data: dismissalData, error: dismissalError } = dismissalResult;
+  const {
+    data: reportGroupDismissalData,
+    error: reportGroupDismissalError,
+  } = reportGroupDismissalResult;
 
   if (dismissalError) {
     console.error("Dashboard notification dismissals load error:", dismissalError);
   }
+  if (reportGroupDismissalError) {
+    console.error(
+      "Dashboard report-group notification dismissals load error:",
+      reportGroupDismissalError
+    );
+  }
 
-  const dismissedNotifications = new Set(
+  const dismissedSubmissionNotifications = new Set(
     (dismissalData ?? []).map(
       (dismissal) =>
         `${dismissal.submission_id as string}:${
+          dismissal.dismissed_status as string
+        }`
+    )
+  );
+  const dismissedReportGroupNotifications = new Set(
+    (reportGroupDismissalData ?? []).map(
+      (dismissal) =>
+        `${dismissal.report_group_id as string}:${
           dismissal.dismissed_status as string
         }`
     )
@@ -408,6 +491,7 @@ export async function loadPlayerCareerDashboard(
     registrations,
     matches,
     submissions: submissionRows,
+    reportGroups: reportGroupRows,
     generatedBrackets,
     rounds: (roundsResult.data ?? []) as RoundRow[],
     participants: (participantsResult.data ?? []) as RegistrationRow[],
@@ -417,10 +501,12 @@ export async function loadPlayerCareerDashboard(
     roundRobinMatches: (roundRobinMatchesResult.data ??
       []) as BracketMatchStatusRow[],
     approvedTournamentIds,
-    dismissedNotifications,
+    dismissedSubmissionNotifications,
+    dismissedReportGroupNotifications,
     metadataIncomplete: Boolean(
       tournamentError ||
         dismissalError ||
+        reportGroupDismissalError ||
         roundRobinMatchesResult.error
     ),
   });
@@ -431,6 +517,7 @@ function buildCareerDashboard({
   registrations,
   matches,
   submissions,
+  reportGroups,
   generatedBrackets,
   rounds,
   participants,
@@ -439,13 +526,15 @@ function buildCareerDashboard({
   standings,
   roundRobinMatches,
   approvedTournamentIds,
-  dismissedNotifications,
+  dismissedSubmissionNotifications,
+  dismissedReportGroupNotifications,
   metadataIncomplete,
 }: {
   clerkUserId: string;
   registrations: RegistrationRow[];
   matches: MatchRow[];
   submissions: SubmissionRow[];
+  reportGroups: ReportGroupRow[];
   generatedBrackets: GeneratedBracketRow[];
   rounds: RoundRow[];
   participants: RegistrationRow[];
@@ -454,7 +543,8 @@ function buildCareerDashboard({
   standings: StandingRow[];
   roundRobinMatches: BracketMatchStatusRow[];
   approvedTournamentIds: Set<string>;
-  dismissedNotifications: Set<string>;
+  dismissedSubmissionNotifications: Set<string>;
+  dismissedReportGroupNotifications: Set<string>;
   metadataIncomplete: boolean;
 }): PlayerCareerDashboard {
   const viewerRegistrationIds = new Set(
@@ -522,10 +612,21 @@ function buildCareerDashboard({
     return { generated, bracket, tournament };
   };
 
-  const notifications = submissions
+  const submissionsByReportGroupId = new Map<string, SubmissionRow[]>();
+  for (const submission of submissions) {
+    if (!submission.report_group_id) continue;
+
+    const groupSubmissions =
+      submissionsByReportGroupId.get(submission.report_group_id) ?? [];
+    groupSubmissions.push(submission);
+    submissionsByReportGroupId.set(submission.report_group_id, groupSubmissions);
+  }
+
+  const legacyNotifications = submissions
     .filter(
       (submission) =>
-        !dismissedNotifications.has(
+        submission.report_group_id === null &&
+        !dismissedSubmissionNotifications.has(
           `${submission.id}:${submission.status}`
         )
     )
@@ -565,7 +666,10 @@ function buildCareerDashboard({
     const context = match ? tournamentForMatch(match) : null;
 
     return {
-      id: submission.id,
+      id: `submission:${submission.id}`,
+      source: "submission",
+      sourceId: submission.id,
+      reportGroupId: null,
       submissionNumber: submission.submission_number,
       gameNumber: submission.game_number,
       tournamentName:
@@ -584,8 +688,87 @@ function buildCareerDashboard({
       reviewedAt: submission.reviewed_at,
       submittedByViewer:
         submission.submitted_by_clerk_user_id === clerkUserId,
+      confirmationDeadlineAt: null,
+      finalizedAt: null,
+      canConfirm: false,
+      canDispute: false,
     } satisfies DashboardNotification;
   });
+
+  const now = Date.now();
+  const reportGroupNotifications = reportGroups
+    .filter(
+      (reportGroup) =>
+        !dismissedReportGroupNotifications.has(
+          `${reportGroup.id}:${reportGroup.status}`
+        )
+    )
+    .map((reportGroup) => {
+      const match = matchesById.get(reportGroup.match_id);
+      const participantOneId = match?.player_one_registration_id ?? null;
+      const participantTwoId = match?.player_two_registration_id ?? null;
+      const winnerId = reportGroup.winner_registration_id;
+      const loserId =
+        winnerId === participantOneId ? participantTwoId : participantOneId;
+      const submittedByViewer =
+        reportGroup.submitted_by_clerk_user_id === clerkUserId;
+      const opponentId = submittedByViewer
+        ? reportGroup.opponent_registration_id
+        : reportGroup.submitted_by_registration_id;
+      const round = match ? roundsById.get(match.round_id) : null;
+      const context = match ? tournamentForMatch(match) : null;
+      const linkedSubmissions =
+        submissionsByReportGroupId.get(reportGroup.id) ?? [];
+      const firstSubmission = linkedSubmissions
+        .slice()
+        .sort(
+          (left, right) =>
+            left.submission_number - right.submission_number ||
+            new Date(left.created_at).getTime() -
+              new Date(right.created_at).getTime()
+        )[0];
+      const canRespond =
+        !submittedByViewer &&
+        reportGroup.status === "pending_confirmation" &&
+        reportGroup.finalized_at === null &&
+        now < new Date(reportGroup.confirmation_deadline_at).getTime();
+
+      return {
+        id: `report_group:${reportGroup.id}`,
+        source: "report_group",
+        sourceId: reportGroup.id,
+        reportGroupId: reportGroup.id,
+        submissionNumber: firstSubmission?.submission_number ?? 0,
+        gameNumber: firstSubmission?.game_number ?? 1,
+        tournamentName:
+          context?.tournament?.title ??
+          registrationsById.get(participantOneId ?? "")?.tournament_title ??
+          "IronClad Tournament",
+        roundName: round?.name ?? "Tournament Match",
+        matchNumber: match?.match_number ?? 0,
+        opponentName: registrationName(registrationsById, opponentId),
+        reportedWinner: registrationName(registrationsById, winnerId),
+        reportedLoser: registrationName(registrationsById, loserId),
+        reportedScore: `${reportGroup.player_one_score}-${reportGroup.player_two_score}`,
+        status: reportGroup.status,
+        reviewNotes:
+          reportGroup.review_notes ??
+          (reportGroup.status === "disputed" ? reportGroup.dispute_notes : null),
+        submittedAt: reportGroup.created_at,
+        reviewedAt: reportGroup.reviewed_at,
+        submittedByViewer,
+        confirmationDeadlineAt: reportGroup.confirmation_deadline_at,
+        finalizedAt: reportGroup.finalized_at,
+        canConfirm: canRespond,
+        canDispute: canRespond,
+      } satisfies DashboardNotification;
+    });
+
+  const notifications = [...legacyNotifications, ...reportGroupNotifications].sort(
+    (left, right) =>
+      new Date(right.submittedAt).getTime() -
+      new Date(left.submittedAt).getTime()
+  );
 
   const completedMatches = matches.filter(
     (match) =>

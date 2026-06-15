@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   mapTournamentRow,
   type GeneratedTournamentBracket,
+  type MatchResultReportGroup,
   type MatchResultSubmission,
   type TournamentParticipant,
   type TournamentRow,
@@ -224,6 +225,14 @@ export default async function TournamentsPage() {
   const matchResultSubmissions = userId
     ? await loadVisibleMatchResultSubmissions(supabase, userId, isAdmin)
     : [];
+  const matchResultReportGroups = userId
+    ? await loadVisibleMatchResultReportGroups(
+        supabase,
+        userId,
+        isAdmin,
+        viewerRegistrationIds
+      )
+    : [];
 
   if (tournaments.length === 0) {
     return (
@@ -248,6 +257,7 @@ export default async function TournamentsPage() {
         registrationIds: viewerRegistrationIds,
       }}
       matchResultSubmissions={matchResultSubmissions}
+      matchResultReportGroups={matchResultReportGroups}
     />
   );
 }
@@ -460,6 +470,121 @@ async function loadVisibleMatchResultSubmissions(
         reviewedBy: submission.reviewed_by,
         reviewedAt: submission.reviewed_at,
         createdAt: submission.created_at,
+      };
+    })
+  );
+}
+
+async function loadVisibleMatchResultReportGroups(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  userId: string,
+  isAdmin: boolean,
+  viewerRegistrationIds: string[]
+): Promise<MatchResultReportGroup[]> {
+  const select =
+    "id, match_id, tournament_id, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_by, reviewed_at, review_notes, finalized_at, finalized_source, created_at";
+
+  const loadGroups = async () => {
+    if (isAdmin) {
+      return supabase
+        .from("match_result_report_groups")
+        .select(select)
+        .order("created_at", { ascending: false });
+    }
+
+    const submitterQuery = supabase
+      .from("match_result_report_groups")
+      .select(select)
+      .eq("submitted_by_clerk_user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (viewerRegistrationIds.length === 0) {
+      return submitterQuery;
+    }
+
+    const [submitted, opponent] = await Promise.all([
+      submitterQuery,
+      supabase
+        .from("match_result_report_groups")
+        .select(select)
+        .in("opponent_registration_id", viewerRegistrationIds)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    return {
+      data: [
+        ...new Map(
+          [...(submitted.data ?? []), ...(opponent.data ?? [])].map(
+            (group) => [group.id as string, group]
+          )
+        ).values(),
+      ],
+      error: submitted.error ?? opponent.error,
+    };
+  };
+
+  const { data, error } = await loadGroups();
+
+  if (error) {
+    console.error("Match result report groups load failed:", error);
+    return [];
+  }
+
+  return Promise.all(
+    (
+      (data ?? []) as {
+        id: string;
+        match_id: string;
+        tournament_id: string;
+        submitted_by_clerk_user_id: string;
+        submitted_by_registration_id: string;
+        opponent_registration_id: string;
+        winner_registration_id: string;
+        player_one_score: number;
+        player_two_score: number;
+        replay_storage_path: string | null;
+        status: MatchResultReportGroup["status"];
+        confirmation_deadline_at: string;
+        confirmed_at: string | null;
+        disputed_at: string | null;
+        dispute_notes: string | null;
+        reviewed_by: string | null;
+        reviewed_at: string | null;
+        review_notes: string | null;
+        finalized_at: string | null;
+        finalized_source: string | null;
+        created_at: string;
+      }[]
+    ).map(async (reportGroup) => {
+      const replayProof = await createProofAccess(
+        supabase,
+        reportGroup.replay_storage_path
+      );
+
+      return {
+        id: reportGroup.id,
+        matchId: reportGroup.match_id,
+        tournamentId: reportGroup.tournament_id,
+        submittedByClerkUserId: reportGroup.submitted_by_clerk_user_id,
+        submittedByRegistrationId: reportGroup.submitted_by_registration_id,
+        opponentRegistrationId: reportGroup.opponent_registration_id,
+        winnerRegistrationId: reportGroup.winner_registration_id,
+        playerOneScore: reportGroup.player_one_score,
+        playerTwoScore: reportGroup.player_two_score,
+        replayStoragePath: reportGroup.replay_storage_path,
+        replayProofUrl: replayProof.url,
+        replayProofExists: replayProof.exists,
+        status: reportGroup.status,
+        confirmationDeadlineAt: reportGroup.confirmation_deadline_at,
+        confirmedAt: reportGroup.confirmed_at,
+        disputedAt: reportGroup.disputed_at,
+        disputeNotes: reportGroup.dispute_notes,
+        reviewedBy: reportGroup.reviewed_by,
+        reviewedAt: reportGroup.reviewed_at,
+        reviewNotes: reportGroup.review_notes,
+        finalizedAt: reportGroup.finalized_at,
+        finalizedSource: reportGroup.finalized_source,
+        createdAt: reportGroup.created_at,
       };
     })
   );

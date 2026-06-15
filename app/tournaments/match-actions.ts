@@ -17,12 +17,7 @@ export type MatchResultActionState = {
 
 const MATCH_PROOF_BUCKET = "match-proofs";
 const MAX_PROOF_SIZE = 10 * 1024 * 1024;
-const SCREENSHOT_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
-const REPLAY_EXTENSIONS = new Set(["rec", "replay"]);
+const REPLAY_EXTENSIONS = new Set(["rec"]);
 
 export async function submitMatchResult(
   _previousState: MatchResultActionState,
@@ -35,27 +30,24 @@ export async function submitMatchResult(
   }
 
   const matchId = getText(formData, "matchId");
-  const gameNumber = getPositiveInteger(formData, "gameNumber");
-  const outcome = getText(formData, "outcome");
+  const playerOneScore = getScore(formData, "playerOneScore");
+  const playerTwoScore = getScore(formData, "playerTwoScore");
+  const winnerRegistrationId = getText(formData, "winnerRegistrationId");
   const notes = getText(formData, "notes");
   const replay = getFile(formData, "replay");
-  const screenshot = getFile(formData, "screenshot");
 
-  if (!matchId || !gameNumber || !["win", "loss"].includes(outcome)) {
-    return errorState("Choose whether you won or lost the match.");
+  if (!matchId || !winnerRegistrationId) {
+    return errorState("Enter the final score and select the match winner.");
   }
 
-  if (!replay && !screenshot) {
-    return errorState("Upload a replay, victory screenshot, or both.");
+  if (!replay) {
+    return errorState("Upload the match replay before submitting.");
   }
 
-  const replayError = replay ? validateReplay(replay) : null;
-  const screenshotError = screenshot
-    ? await validateScreenshot(screenshot)
-    : null;
+  const replayError = validateReplay(replay);
 
-  if (replayError || screenshotError) {
-    return errorState(replayError ?? screenshotError ?? "Invalid proof file.");
+  if (replayError) {
+    return errorState(replayError);
   }
 
   if (notes.length > 2000) {
@@ -98,50 +90,40 @@ export async function submitMatchResult(
     return errorState("The opposing player could not be identified.");
   }
 
-  const winnerRegistrationId =
-    outcome === "win" ? ownedRegistration.id : opponentRegistrationId;
-  if (gameNumber > match.series_best_of) {
-    return errorState(
-      `Game number must be between 1 and ${match.series_best_of}.`
-    );
+  const scoreError = validateMatchScore(
+    match.series_best_of,
+    match.player_one_registration_id,
+    match.player_two_registration_id,
+    playerOneScore,
+    playerTwoScore,
+    winnerRegistrationId
+  );
+
+  if (scoreError) {
+    return errorState(scoreError);
   }
 
   const uploadRoot = `${matchId}/${userId}/${crypto.randomUUID()}`;
   const uploadedPaths: string[] = [];
 
   try {
-    const replayPath = replay
-      ? await uploadProof(
-          supabase,
-          replay,
-          `${uploadRoot}/replay.${getExtension(replay.name)}`,
-          uploadedPaths
-        )
-      : null;
-    const screenshotPath = screenshot
-      ? await uploadProof(
-          supabase,
-          screenshot,
-          `${uploadRoot}/screenshot.${getExtension(screenshot.name)}`,
-          uploadedPaths
-        )
-      : null;
-
-    await verifyUploadedProofs(
+    const replayPath = await uploadProof(
       supabase,
-      [replayPath, screenshotPath].filter(
-        (path): path is string => Boolean(path)
-      )
+      replay,
+      `${uploadRoot}/replay.${getExtension(replay.name)}`,
+      uploadedPaths
     );
 
-    const { data: submissionNumber, error: submissionError } =
-      await supabase.rpc("submit_match_game_result", {
+    await verifyUploadedProofs(supabase, [replayPath]);
+
+    const { data: report, error: submissionError } =
+      await supabase.rpc("submit_match_series_result_report", {
         p_match_id: matchId,
         p_submitted_by_clerk_user_id: userId,
-        p_game_number: gameNumber,
         p_winner_registration_id: winnerRegistrationId,
+        p_player_one_score: playerOneScore,
+        p_player_two_score: playerTwoScore,
         p_replay_storage_path: replayPath,
-        p_screenshot_storage_path: screenshotPath,
         p_notes: notes || null,
       });
 
@@ -149,10 +131,19 @@ export async function submitMatchResult(
       throw submissionError;
     }
 
+    const reportDetails = report as {
+      submission_number?: number;
+      confirmation_deadline_at?: string;
+    } | null;
+
     revalidatePath("/tournaments");
     revalidatePath("/dashboard");
     return successState(
-      `Game ${gameNumber} was added as Submission #${submissionNumber}. Continue reporting games until the series is complete.`
+      `Submission #${reportDetails?.submission_number ?? "new"} is awaiting opponent confirmation${
+        reportDetails?.confirmation_deadline_at
+          ? ` until ${formatDeadline(reportDetails.confirmation_deadline_at)}`
+          : ""
+      }.`
     );
   } catch (error) {
     if (uploadedPaths.length > 0) {
@@ -166,6 +157,122 @@ export async function submitMatchResult(
     );
   }
 
+}
+
+export async function confirmMatchResultReportGroup(
+  _previousState: MatchResultActionState,
+  formData: FormData
+): Promise<MatchResultActionState> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return errorState("Sign in before confirming a match result.");
+  }
+
+  const reportGroupId = getText(formData, "reportGroupId");
+  if (!reportGroupId) {
+    return errorState("The match result confirmation could not be found.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.rpc("confirm_match_result_report_group", {
+    p_report_group_id: reportGroupId,
+    p_confirmed_by_clerk_user_id: userId,
+  });
+
+  if (error) {
+    console.error("Match result confirmation failed:", error);
+    return errorState(error.message);
+  }
+
+  revalidateTournamentPaths();
+  return successState("Result confirmed. The winner has been advanced.");
+}
+
+export async function disputeMatchResultReportGroup(
+  _previousState: MatchResultActionState,
+  formData: FormData
+): Promise<MatchResultActionState> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return errorState("Sign in before disputing a match result.");
+  }
+
+  const reportGroupId = getText(formData, "reportGroupId");
+  const disputeNotes = getText(formData, "disputeNotes");
+
+  if (!reportGroupId) {
+    return errorState("The match result confirmation could not be found.");
+  }
+
+  if (disputeNotes.length > 2000) {
+    return errorState("Dispute notes must be 2000 characters or fewer.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.rpc("dispute_match_result_report_group", {
+    p_report_group_id: reportGroupId,
+    p_disputed_by_clerk_user_id: userId,
+    p_dispute_notes: disputeNotes || null,
+  });
+
+  if (error) {
+    console.error("Match result dispute failed:", error);
+    return errorState(error.message);
+  }
+
+  revalidateTournamentPaths();
+  return successState("Result disputed. An administrator must review it.");
+}
+
+export async function reviewMatchResultReportGroup(
+  _previousState: MatchResultActionState,
+  formData: FormData
+): Promise<MatchResultActionState> {
+  const admin = await requireAdmin();
+
+  if (!admin) {
+    return errorState("Administrator access is required.");
+  }
+
+  const reportGroupId = getText(formData, "reportGroupId");
+  const decision = getText(formData, "decision");
+  const reviewNotes = getText(formData, "reviewNotes");
+
+  if (!reportGroupId || !["approved", "rejected", "under_review"].includes(decision)) {
+    return errorState("Choose a valid report-group review decision.");
+  }
+
+  if (reviewNotes.length > 2000) {
+    return errorState("Review notes must be 2000 characters or fewer.");
+  }
+
+  if (decision === "rejected" && !reviewNotes) {
+    return errorState("Add an administrator message before rejecting a result.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.rpc("admin_finalize_match_result_report_group", {
+    p_report_group_id: reportGroupId,
+    p_decision: decision,
+    p_reviewed_by: admin.userId,
+    p_review_notes: reviewNotes || null,
+  });
+
+  if (error) {
+    console.error("Report-group review failed:", error);
+    return errorState(error.message);
+  }
+
+  revalidateTournamentPaths();
+  return successState(
+    decision === "approved"
+      ? "Report group approved and winner advanced."
+      : decision === "rejected"
+        ? "Report group rejected. The match remains unresolved."
+        : "Report group marked under review."
+  );
 }
 
 export async function saveAdminMatchResult(
@@ -414,37 +521,7 @@ function validateReplay(file: File) {
   }
 
   if (!REPLAY_EXTENSIONS.has(getExtension(file.name))) {
-    return "Replay proof must use a .rec or .replay file.";
-  }
-
-  return null;
-}
-
-async function validateScreenshot(file: File) {
-  if (file.size > MAX_PROOF_SIZE) {
-    return "Victory screenshots must be 10 MB or smaller.";
-  }
-
-  if (!SCREENSHOT_TYPES.has(file.type)) {
-    return "Victory screenshots must be PNG, JPG, or WEBP.";
-  }
-
-  const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-  const validSignature =
-    (file.type === "image/jpeg" &&
-      bytes[0] === 0xff &&
-      bytes[1] === 0xd8 &&
-      bytes[2] === 0xff) ||
-    (file.type === "image/png" &&
-      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every(
-        (byte, index) => bytes[index] === byte
-      )) ||
-    (file.type === "image/webp" &&
-      String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
-      String.fromCharCode(...bytes.slice(8, 12)) === "WEBP");
-
-  if (!validSignature) {
-    return "The screenshot file does not contain a valid supported image.";
+    return "Replay proof must use a .rec file.";
   }
 
   return null;
@@ -472,11 +549,6 @@ function getScore(formData: FormData, field: string) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
-function getPositiveInteger(formData: FormData, field: string) {
-  const value = Number(getText(formData, field));
-  return Number.isInteger(value) && value > 0 ? value : null;
-}
-
 function getFile(formData: FormData, field: string) {
   const value = formData.get(field);
   return value instanceof File && value.size > 0 ? value : null;
@@ -494,11 +566,18 @@ function getDatabaseMessage(error: unknown) {
     typeof error.message === "string"
   ) {
     if (error.message.toLowerCase().includes("duplicate")) {
-      return "You already have a result awaiting review for this match.";
+      return "This match already has a result awaiting confirmation or review.";
     }
     return error.message;
   }
   return null;
+}
+
+function formatDeadline(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function successState(message: string): MatchResultActionState {
