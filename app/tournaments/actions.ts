@@ -64,7 +64,7 @@ export async function submitTournamentRegistration(
   const { data: tournament, error: tournamentError } = await supabase
     .from("tournaments")
     .select(
-      "id, title, status, registration_open_at, registration_close_at, start_date, tournament_brackets!inner(id, name, elo_rules, max_players)"
+      "id, title, status, registration_open_at, tournament_brackets!inner(id, name, elo_rules, max_players)"
     )
     .eq("id", input.tournamentId)
     .eq("tournament_brackets.id", input.bracketId)
@@ -89,19 +89,11 @@ export async function submitTournamentRegistration(
   const registrationOpens = getOptionalTimestamp(
     tournament.registration_open_at
   );
-  const registrationCloses = getOptionalTimestamp(
-    tournament.registration_close_at
-  );
-  const tournamentStarts = getOptionalTimestamp(tournament.start_date);
 
   if (
     tournament.status !== "registration_open" ||
     registrationOpens === "invalid" ||
-    registrationCloses === "invalid" ||
-    tournamentStarts === "invalid" ||
-    (registrationOpens !== null && now < registrationOpens) ||
-    (registrationCloses !== null && now > registrationCloses) ||
-    (tournamentStarts !== null && now >= tournamentStarts)
+    (registrationOpens !== null && now < registrationOpens)
   ) {
     return {
       success: false,
@@ -117,11 +109,11 @@ export async function submitTournamentRegistration(
   }
 
   const adminSupabase = createSupabaseAdminClient();
-  const { count, error: capacityError } = await adminSupabase
+  const { data: capacityRows, error: capacityError } = await adminSupabase
     .from("registrations")
-    .select("id", { count: "exact", head: true })
+    .select("registration_status")
     .eq("tournament_bracket_id", selectedBracket.id)
-    .neq("registration_status", "rejected");
+    .in("registration_status", ["approved", "waitlisted"]);
 
   if (capacityError) {
     console.error(
@@ -135,12 +127,14 @@ export async function submitTournamentRegistration(
     };
   }
 
-  if ((count ?? 0) >= selectedBracket.max_players) {
-    return {
-      success: false,
-      message: "The selected bracket is full.",
-    };
-  }
+  const approvedCount = (capacityRows ?? []).filter(
+    (registration) => registration.registration_status === "approved"
+  ).length;
+  const waitlistedCount = (capacityRows ?? []).filter(
+    (registration) => registration.registration_status === "waitlisted"
+  ).length;
+  const waitlistOnly =
+    approvedCount >= selectedBracket.max_players || waitlistedCount > 0;
 
   tournamentId = tournament.id;
   tournamentBracketId = selectedBracket.id;
@@ -192,7 +186,7 @@ export async function submitTournamentRegistration(
     region: profile.region,
     timezone: profile.timezone,
     submitted_elo: profile.current_elo,
-    registration_status: "pending",
+    registration_status: waitlistOnly ? "waitlisted" : "pending",
     elo_status: "pending",
     admin_notes: "",
     tournament_title: tournamentTitle,
@@ -202,9 +196,11 @@ export async function submitTournamentRegistration(
     tournament_id: tournamentId,
     tournament_bracket_id: tournamentBracketId,
   };
-  const { error: registrationError } = await supabase
+  const { data: savedRegistration, error: registrationError } = await supabase
     .from("registrations")
-    .insert(registration);
+    .insert(registration)
+    .select("registration_status")
+    .single();
 
   if (registrationError) {
     console.error("IronClad registration submission failed:", registrationError);
@@ -220,7 +216,10 @@ export async function submitTournamentRegistration(
 
   return {
     success: true,
-    message: "Registration submitted.",
+    message:
+      savedRegistration?.registration_status === "waitlisted"
+        ? "Registration submitted to the waitlist."
+        : "Registration submitted.",
   };
 }
 
@@ -242,7 +241,11 @@ function getRegistrationErrorMessage(error: {
   }
 
   if (message.includes("full")) {
-    return "The selected bracket is full.";
+    return "The selected bracket is full for approved players. Waitlist registration may still be available while registration is open.";
+  }
+
+  if (message.includes("older waitlisted")) {
+    return "This bracket already has a waitlist. New registrations are added behind existing queued players.";
   }
 
   if (message.includes("registration is not available")) {

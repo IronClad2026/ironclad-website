@@ -29,7 +29,12 @@ type CustomClaims = {
   };
 };
 
-type RegistrationStatus = "pending" | "manual_review" | "approved" | "rejected";
+type RegistrationStatus =
+  | "pending"
+  | "manual_review"
+  | "approved"
+  | "rejected"
+  | "waitlisted";
 type FilterStatus = "all" | RegistrationStatus;
 type AdminNotice =
   | "note-required"
@@ -98,6 +103,7 @@ function getSafeFilter(filter?: string): FilterStatus {
     "manual_review",
     "approved",
     "rejected",
+    "waitlisted",
   ];
 
   return validFilters.includes(filter as FilterStatus)
@@ -116,6 +122,10 @@ function getStatusBadgeClass(status: RegistrationStatus) {
 
   if (status === "manual_review") {
     return "border-orange-500/30 bg-orange-500/10 text-orange-300";
+  }
+
+  if (status === "waitlisted") {
+    return "border-amber-500/30 bg-amber-500/10 text-amber-300";
   }
 
   return "border-white/10 bg-white/[0.04] text-zinc-300";
@@ -169,6 +179,7 @@ async function updateRegistrationStatus(formData: FormData) {
     "manual_review",
     "approved",
     "rejected",
+    "waitlisted",
   ];
 
   if (!registrationId || !validStatuses.includes(nextStatus)) {
@@ -341,9 +352,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, tournament_brackets(id, name)"
+          "id, title, status, grand_final_at, tournament_brackets(id, name)"
         )
-        .order("start_date", { ascending: false, nullsFirst: false }),
+        .order("grand_final_at", { ascending: false, nullsFirst: false }),
       supabase
         .from("generated_brackets")
         .select(
@@ -488,6 +499,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       ).length,
       filter: "rejected" as FilterStatus,
       icon: XCircle,
+    },
+    {
+      label: "Waitlisted Players",
+      value: registrations.filter(
+        (item) => item.registration_status === "waitlisted"
+      ).length,
+      filter: "waitlisted" as FilterStatus,
+      icon: Clock,
     },
     {
       label: "Active Tournaments",
@@ -664,6 +683,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                                 className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-orange-300 transition hover:bg-orange-500/10"
                               >
                                 Review
+                              </StatusActionButton>
+
+                              <StatusActionButton
+                                registrationId={registration.id}
+                                nextStatus="waitlisted"
+                                activeFilter={activeFilter}
+                                selected={registration.id}
+                                adminNotes={registration.admin_notes}
+                                className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-amber-300 transition hover:bg-amber-500/10"
+                              >
+                                Waitlist
                               </StatusActionButton>
                             </div>
                           </div>
@@ -885,6 +915,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Mark Manual Review
+                </button>
+
+                <button
+                  type="submit"
+                  name="nextStatus"
+                  value="waitlisted"
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/20"
+                >
+                  <Clock className="h-4 w-4" />
+                  Waitlist
                 </button>
               </div>
             </form>

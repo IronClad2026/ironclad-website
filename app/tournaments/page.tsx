@@ -29,9 +29,9 @@ export default async function TournamentsPage() {
     supabase
       .from("tournaments")
       .select(
-        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
+        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
       )
-      .order("start_date", { ascending: true, nullsFirst: false }),
+      .order("grand_final_at", { ascending: true, nullsFirst: false }),
     supabase.rpc("get_tournament_bracket_capacity"),
     supabase
       .from("registrations")
@@ -87,7 +87,8 @@ export default async function TournamentsPage() {
       | "pending"
       | "manual_review"
       | "approved"
-      | "rejected";
+      | "rejected"
+      | "waitlisted";
   }[];
   const referencedRegistrationIds = getGeneratedBracketRegistrationIds(
     generatedBracketResult.data ?? []
@@ -136,14 +137,23 @@ export default async function TournamentsPage() {
       (capacityResult.data ?? []) as {
         bracket_id: string;
         registered_players: number;
+        waitlisted_players: number;
       }[]
-    ).map((capacity) => [capacity.bracket_id, capacity.registered_players])
+    ).map((capacity) => [
+      capacity.bracket_id,
+      {
+        registeredPlayers: capacity.registered_players,
+        waitlistedPlayers: capacity.waitlisted_players,
+      },
+    ])
   );
   const tournamentRows = (tournamentResult.data ?? []) as TournamentRow[];
 
   for (const tournament of tournamentRows) {
     for (const bracket of tournament.tournament_brackets ?? []) {
-      bracket.registered_players = capacityByBracket.get(bracket.id) ?? 0;
+      const capacity = capacityByBracket.get(bracket.id);
+      bracket.registered_players = capacity?.registeredPlayers ?? 0;
+      bracket.waitlisted_players = capacity?.waitlistedPlayers ?? 0;
     }
   }
 
@@ -208,8 +218,8 @@ export default async function TournamentsPage() {
     (left, right) =>
       getTournamentPriority(left.statusValue) -
         getTournamentPriority(right.statusValue) ||
-      getTournamentStartTime(left.startsAt) -
-        getTournamentStartTime(right.startsAt)
+      getTournamentStartTime(left.grandFinalAt) -
+        getTournamentStartTime(right.grandFinalAt)
   );
   const matchResultSubmissions = userId
     ? await loadVisibleMatchResultSubmissions(supabase, userId, isAdmin)
@@ -512,7 +522,9 @@ function getTournamentPriority(status: TournamentRow["status"]) {
   }[status];
 }
 
-function getTournamentStartTime(value: string) {
+function getTournamentStartTime(value: string | null) {
+  if (!value) return Number.MAX_SAFE_INTEGER;
+
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
 }

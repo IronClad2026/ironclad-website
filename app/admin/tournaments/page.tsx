@@ -64,11 +64,11 @@ const emptyTournament: TournamentFormValues = {
   description: "",
   bannerImageUrl: "",
   registrationOpenAt: "",
-  registrationCloseAt: "",
-  startsAt: "",
-  endsAt: "",
+  grandFinalAt: "",
   status: "upcoming",
   format: "1v1",
+  ruleFormat: "format_a",
+  resultConfirmationWindowMinutes: "30",
   prizePool: "",
   rulesUrl: "",
   battlefyUrl: "",
@@ -93,11 +93,11 @@ type TournamentFormValues = {
   description: string;
   bannerImageUrl: string;
   registrationOpenAt: string;
-  registrationCloseAt: string;
-  startsAt: string;
-  endsAt: string;
+  grandFinalAt: string;
   status: string;
   format: string;
+  ruleFormat: string;
+  resultConfirmationWindowMinutes: string;
   prizePool: string;
   rulesUrl: string;
   battlefyUrl: string;
@@ -127,9 +127,9 @@ export default async function AdminTournamentsPage({
   const { data, error } = await supabase
     .from("tournaments")
     .select(
-      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
+      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
     )
-    .order("start_date", { ascending: false, nullsFirst: false });
+    .order("grand_final_at", { ascending: false, nullsFirst: false });
 
   if (error) {
     logSupabaseError("Admin tournament list load failed:", error);
@@ -329,9 +329,9 @@ export default async function AdminTournamentsPage({
                       </p>
                       <p className="mt-2 text-xs uppercase tracking-wider text-zinc-500">
                       {formatLabel(tournament.status)} -{" "}
-                        {tournament.start_date
-                          ? formatDate(tournament.start_date)
-                          : "Date TBA"}
+                      {tournament.grand_final_at
+                        ? formatDate(tournament.grand_final_at)
+                        : "Grand Final TBA"}
                       </p>
                     </div>
                   </div>
@@ -526,6 +526,33 @@ function TournamentForm({
           disabled={!isEditing}
           options={[["1v1", "1v1"]]}
         />
+        <SelectField
+          label="Rule Format"
+          name="ruleFormat"
+          defaultValue={values.ruleFormat}
+          disabled={!isEditing}
+          options={[
+            ["format_a", "Format A"],
+            ["format_b", "Format B"],
+          ]}
+        />
+        <SelectField
+          label="Result Confirmation Window"
+          name="resultConfirmationWindowMinutes"
+          defaultValue={values.resultConfirmationWindowMinutes}
+          disabled={!isEditing}
+          options={[
+            ["1", "1 minute"],
+            ["5", "5 minutes"],
+            ["15", "15 minutes"],
+            ["30", "30 minutes"],
+            ["60", "1 hour"],
+            ["120", "2 hours"],
+            ["360", "6 hours"],
+            ["720", "12 hours"],
+            ["1440", "24 hours"],
+          ]}
+        />
         <DateField
           label="Registration Opens"
           name="registrationOpenAt"
@@ -533,29 +560,18 @@ function TournamentForm({
           readOnly={!isEditing}
         />
         <DateField
-          label="Registration Closes"
-          name="registrationCloseAt"
-          defaultValue={values.registrationCloseAt}
+          label="Grand Final Date/Time"
+          name="grandFinalAt"
+          defaultValue={values.grandFinalAt}
           readOnly={!isEditing}
         />
-        <DateField
-          label="Tournament Starts"
-          name="startsAt"
-          defaultValue={values.startsAt}
-          readOnly={!isEditing}
-        />
-        <DateField
-          label="Tournament Ends"
-          name="endsAt"
-          defaultValue={values.endsAt}
-          readOnly={!isEditing}
-        />
-        <Field
-          label="Prize Pool"
+        <TextAreaField
+          label="Prize Pool (optional)"
           name="prizePool"
           defaultValue={values.prizePool}
-          required
           readOnly={!isEditing}
+          rows={4}
+          maxLength={2000}
         />
         <Field
           label="Rules URL (optional)"
@@ -749,6 +765,25 @@ function Field({
   );
 }
 
+function TextAreaField({
+  label,
+  className,
+  ...props
+}: {
+  label: string;
+  className?: string;
+} & React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <label className={className}>
+      <span className="text-sm font-bold">{label}</span>
+      <textarea
+        {...props}
+        className={fieldClassName(Boolean(props.readOnly || props.disabled))}
+      />
+    </label>
+  );
+}
+
 function DateField({
   label,
   ...props
@@ -802,17 +837,15 @@ function toFormValues(tournament: TournamentRow): TournamentFormValues {
     registrationOpenAt: tournament.registration_open_at
       ? toDateTimeLocal(tournament.registration_open_at)
       : "",
-    registrationCloseAt: tournament.registration_close_at
-      ? toDateTimeLocal(tournament.registration_close_at)
-      : "",
-    startsAt: tournament.start_date
-      ? toDateTimeLocal(tournament.start_date)
-      : "",
-    endsAt: tournament.end_date
-      ? toDateTimeLocal(tournament.end_date)
+    grandFinalAt: tournament.grand_final_at
+      ? toDateTimeLocal(tournament.grand_final_at)
       : "",
     status: tournament.status,
     format: tournament.format,
+    ruleFormat: tournament.rule_format ?? "format_a",
+    resultConfirmationWindowMinutes: String(
+      tournament.result_confirmation_window_minutes ?? 30
+    ),
     prizePool: tournament.prize_pool,
     rulesUrl: tournament.rules_url ?? "",
     battlefyUrl: tournament.battlefy_url ?? "",

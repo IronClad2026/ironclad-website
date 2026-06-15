@@ -31,7 +31,8 @@ type RegistrationStatus =
   | "pending"
   | "approved"
   | "rejected"
-  | "manual_review";
+  | "manual_review"
+  | "waitlisted";
 
 type PlayerRegistration = {
   id: string;
@@ -414,6 +415,13 @@ function RegistrationDecision({
       className:
         "border-orange-500/30 bg-orange-500/10 text-orange-200",
     },
+    waitlisted: {
+      title: "Waitlisted",
+      message:
+        "The approved roster is currently full. Your registration is queued by submission time if a slot opens.",
+      className:
+        "border-amber-500/30 bg-amber-500/10 text-amber-200",
+    },
     pending: {
       title: "Pending review",
       message:
@@ -468,6 +476,11 @@ function StatusBadge({ status }: { status: RegistrationStatus }) {
       label: "Manual Review",
       icon: ShieldAlert,
       className: "border-orange-500/40 bg-orange-500/10 text-orange-300",
+    },
+    waitlisted: {
+      label: "Waitlisted",
+      icon: Clock3,
+      className: "border-amber-500/40 bg-amber-500/10 text-amber-300",
     },
     pending: {
       label: "Pending",

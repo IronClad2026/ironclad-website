@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import type {
   TournamentFormat,
+  TournamentRuleFormat,
   TournamentStatus,
 } from "@/lib/tournaments";
 import { parseEloEligibilityRule } from "@/lib/tournaments";
@@ -24,6 +25,18 @@ const validStatuses: TournamentStatus[] = [
   "completed",
 ];
 const validFormats: TournamentFormat[] = ["1v1"];
+const validRuleFormats: TournamentRuleFormat[] = ["format_a", "format_b"];
+const validConfirmationWindows = new Set([
+  1,
+  5,
+  15,
+  30,
+  60,
+  120,
+  360,
+  720,
+  1440,
+]);
 const TOURNAMENT_BANNER_BUCKET = "tournament-banners";
 const MAX_TOURNAMENT_BANNER_BYTES = 100 * 1024 * 1024;
 const TOURNAMENT_BANNER_MIME_TYPES = [
@@ -163,14 +176,14 @@ export async function saveTournament(
     formData,
     "registrationOpenAt"
   );
-  const registrationCloseAt = parseOptionalDateTime(
-    formData,
-    "registrationCloseAt"
-  );
-  const startsAt = parseOptionalDateTime(formData, "startsAt");
-  const endsAt = parseOptionalDateTime(formData, "endsAt");
+  const grandFinalAt = parseOptionalDateTime(formData, "grandFinalAt");
   const status = getText(formData, "status") as TournamentStatus;
   const format = getText(formData, "format") as TournamentFormat;
+  const ruleFormat = getText(formData, "ruleFormat") as TournamentRuleFormat;
+  const resultConfirmationWindowMinutes = getInteger(
+    formData,
+    "resultConfirmationWindowMinutes"
+  );
   const prizePool = getText(formData, "prizePool");
   const rulesUrl = getOptionalText(formData, "rulesUrl");
   const battlefyUrl = getOptionalText(formData, "battlefyUrl");
@@ -194,13 +207,13 @@ export async function saveTournament(
     bannerImageUrl,
     status,
     format,
+    ruleFormat,
+    resultConfirmationWindowMinutes,
     prizePool,
     rulesUrl,
     battlefyUrl,
     registrationOpenAt,
-    registrationCloseAt,
-    startsAt,
-    endsAt,
+    grandFinalAt,
     mainEnabled,
     challengeEnabled,
     mainBracket,
@@ -232,15 +245,19 @@ export async function saveTournament(
     p_description: description,
     p_banner_image_url: bannerImageUrl,
     p_registration_open_at: toIsoDateTime(registrationOpenAt),
-    p_registration_close_at: toIsoDateTime(registrationCloseAt),
-    p_start_date: toIsoDateTime(startsAt),
-    p_end_date: endsAt ? new Date(endsAt).toISOString() : null,
+    p_registration_close_at: null,
+    p_start_date: null,
+    p_end_date: null,
     p_status: status,
     p_format: format,
     p_prize_pool: prizePool,
     p_rules_url: rulesUrl,
     p_battlefy_url: battlefyUrl,
     p_registration_enabled: registrationEnabled,
+    p_grand_final_at: toIsoDateTime(grandFinalAt),
+    p_rule_format: ruleFormat,
+    p_result_confirmation_window_minutes:
+      resultConfirmationWindowMinutes,
     p_brackets: brackets,
   });
 
@@ -253,7 +270,7 @@ export async function saveTournament(
   const { data: savedTournament, error: verificationError } = await supabase
     .from("tournaments")
     .select(
-      "id, title, slug, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, updated_at"
+      "id, title, slug, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, updated_at"
     )
     .eq("id", savedTournamentId)
     .maybeSingle();
@@ -267,11 +284,11 @@ export async function saveTournament(
     savedTournament.description !== description ||
     savedTournament.banner_image_url !== bannerImageUrl ||
     toTimestamp(savedTournament.registration_open_at) !== registrationOpenAt ||
-    toTimestamp(savedTournament.registration_close_at) !==
-      registrationCloseAt ||
-    toTimestamp(savedTournament.start_date) !== startsAt ||
-    toTimestamp(savedTournament.end_date) !== endsAt ||
+    toTimestamp(savedTournament.grand_final_at) !== grandFinalAt ||
     savedTournament.format !== format ||
+    savedTournament.rule_format !== ruleFormat ||
+    savedTournament.result_confirmation_window_minutes !==
+      resultConfirmationWindowMinutes ||
     savedTournament.prize_pool !== prizePool ||
     savedTournament.rules_url !== rulesUrl ||
     savedTournament.battlefy_url !== battlefyUrl ||
@@ -678,6 +695,11 @@ function getOptionalText(formData: FormData, field: string) {
   return getText(formData, field) || null;
 }
 
+function getInteger(formData: FormData, field: string) {
+  const value = Number(getText(formData, field));
+  return Number.isInteger(value) ? value : null;
+}
+
 function getTournamentValidationError(input: {
   title: string;
   slug: string;
@@ -685,13 +707,13 @@ function getTournamentValidationError(input: {
   bannerImageUrl: string;
   status: TournamentStatus;
   format: TournamentFormat;
+  ruleFormat: TournamentRuleFormat;
+  resultConfirmationWindowMinutes: number | null;
   prizePool: string;
   rulesUrl: string | null;
   battlefyUrl: string | null;
   registrationOpenAt: number | null;
-  registrationCloseAt: number | null;
-  startsAt: number | null;
-  endsAt: number | null;
+  grandFinalAt: number | null;
   mainEnabled: boolean;
   challengeEnabled: boolean;
   mainBracket: ReturnType<typeof readBracket>;
@@ -717,51 +739,26 @@ function getTournamentValidationError(input: {
   if (!validStatuses.includes(input.status)) {
     return "Select a valid tournament status.";
   }
-  if (
-    input.status === "registration_open" &&
-    !input.registrationCloseAt &&
-    !input.startsAt
-  ) {
-    return "Registration Closes and Tournament Starts dates are required when registration is open.";
-  }
-  if (
-    input.status === "registration_open" &&
-    !input.registrationCloseAt
-  ) {
-    return "Registration Closes date and time are required when registration is open.";
-  }
-  if (input.status === "registration_open" && !input.startsAt) {
-    return "Tournament Starts date and time are required when registration is open.";
-  }
   if (!validFormats.includes(input.format)) {
     return "Only 1v1 tournaments are supported until team rosters and team-based matches are implemented.";
   }
-  if (!input.prizePool) return "Prize pool information is required.";
-  if (input.prizePool.length > 200) {
-    return "Prize pool information must be 200 characters or fewer.";
+  if (!validRuleFormats.includes(input.ruleFormat)) {
+    return "Select a valid tournament rule format.";
+  }
+  if (
+    input.resultConfirmationWindowMinutes === null ||
+    !validConfirmationWindows.has(input.resultConfirmationWindowMinutes)
+  ) {
+    return "Select a valid result confirmation window.";
+  }
+  if (input.prizePool.length > 2000) {
+    return "Prize information must be 2,000 characters or fewer.";
   }
   if (input.rulesUrl && !isHttpUrl(input.rulesUrl)) {
     return "Rules URL must begin with http:// or https://.";
   }
   if (input.battlefyUrl && !isHttpUrl(input.battlefyUrl)) {
     return "Battlefy URL must begin with http:// or https://.";
-  }
-  if (
-    input.registrationOpenAt &&
-    input.registrationCloseAt &&
-    input.registrationOpenAt >= input.registrationCloseAt
-  ) {
-    return "Registration opening time must be before registration closing time.";
-  }
-  if (
-    input.registrationCloseAt &&
-    input.startsAt &&
-    input.registrationCloseAt > input.startsAt
-  ) {
-    return "Registration must close before the tournament starts.";
-  }
-  if (input.endsAt && input.startsAt && input.endsAt < input.startsAt) {
-    return "Tournament end time must be after the tournament start time.";
   }
   if (input.mainEnabled && !input.mainBracket) {
     return "Main bracket requires ELO rules and a maximum player count between 2 and 1,024.";

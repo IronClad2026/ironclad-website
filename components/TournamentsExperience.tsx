@@ -33,7 +33,6 @@ import {
   Gamepad2,
   Info,
   LayoutDashboard,
-  Medal,
   Menu,
   MessageCircle,
   PlayCircle,
@@ -235,6 +234,9 @@ function Hero({
 }) {
   const registrationOpen = isTournamentRegistrationOpen(tournament);
   const publicStatus = getPublicTournamentStatus(tournament);
+  const allBracketsWaitlistOnly = tournament.brackets.every(
+    (bracket) => bracket.isWaitlistOnly
+  );
 
   return (
     <section className="relative overflow-hidden border-b border-slate-800 bg-black">
@@ -268,6 +270,7 @@ function Hero({
                 {publicStatus}
               </StatusPill>
               <StatusPill tone="blue">{tournament.format}</StatusPill>
+              <StatusPill tone="amber">{tournament.ruleFormatLabel}</StatusPill>
               <StatusPill tone="gray">{tournament.region}</StatusPill>
             </div>
             <h1 className="mt-5 max-w-4xl text-3xl font-black tracking-tight text-white sm:text-5xl">{tournament.title}</h1>
@@ -275,7 +278,7 @@ function Hero({
               <span className="flex items-center gap-2"><Gamepad2 size={16} className="text-sky-300" /> {tournament.game}</span>
               <span className="flex items-center gap-2"><CalendarDays size={16} className="text-sky-300" /> {tournament.month} Tournament</span>
               <span className="flex items-center gap-2"><Clock3 size={16} className="text-sky-300" /> {tournament.time}</span>
-              <span className="flex items-center gap-2"><Users size={16} className="text-sky-300" /> {tournament.players}/{tournament.maxPlayers} slots</span>
+              <span className="flex items-center gap-2"><Users size={16} className="text-sky-300" /> {tournament.players}/{tournament.maxPlayers} approved slots</span>
             </div>
           </div>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
@@ -283,7 +286,9 @@ function Hero({
               label={registrationOpen ? "Register" : publicStatus}
               description={
                 registrationOpen
-                  ? "Open events"
+                  ? allBracketsWaitlistOnly
+                    ? "Waitlist open"
+                    : "Open events"
                   : "Check the tournament schedule"
               }
               icon={registrationOpen ? CheckCircle2 : Clock3}
@@ -339,6 +344,12 @@ function Overview({
   tournaments: TournamentCard[];
 }) {
   const [panel, setPanel] = useState<OverviewPanelKey>("details");
+  const panels = overviewPanels.filter(
+    (item) => item.key !== "prizes" || hasPrize(tournament)
+  );
+  const visiblePanel =
+    panel === "prizes" && !hasPrize(tournament) ? "details" : panel;
+
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
       <div className="space-y-6">
@@ -354,17 +365,17 @@ function Overview({
 
         <Card>
           <div className="flex gap-3 overflow-x-auto overflow-y-visible border-b border-slate-800 px-1 py-3">
-            {overviewPanels.map((item) => (
+            {panels.map((item) => (
               <button
                 key={item.key}
                 onClick={() => setPanel(item.key)}
-                className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, panel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-slate-400 hover:text-white")}
+                className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, visiblePanel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-slate-400 hover:text-white")}
               >
                 {item.label}
               </button>
             ))}
           </div>
-          <div className="mt-5">{renderOverviewPanel(panel, tournament)}</div>
+          <div className="mt-5">{renderOverviewPanel(visiblePanel, tournament)}</div>
         </Card>
       </div>
 
@@ -420,14 +431,23 @@ function TournamentLinkCard({ item }: { item: TournamentCard }) {
 function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard) {
   const shared = "leading-7 text-slate-300";
   if (panel === "rules") {
-    return <div className={shared}>{tournament.rules}</div>;
+    return (
+      <div className="space-y-4">
+        <Detail label="Tournament Rule Format" value={tournament.ruleFormatLabel} />
+        <p className={shared}>{tournament.rules}</p>
+      </div>
+    );
   }
   if (panel === "prizes") {
     return (
-      <div className="grid gap-3 sm:grid-cols-3">
-        {tournament.brackets.map((bracket, index) => (
-          <Prize key={bracket.name} rank={bracket.name} amount={bracket.prize} icon={index === 0 ? Crown : index === 1 ? Medal : Trophy} />
-        ))}
+      <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-5">
+        <Trophy className="text-amber-300" size={24} />
+        <p className="mt-4 text-sm font-black uppercase tracking-wider text-amber-200">
+          Prizes
+        </p>
+        <p className="mt-3 whitespace-pre-line break-words text-lg font-bold leading-8 text-white">
+          {tournament.prizePool}
+        </p>
       </div>
     );
   }
@@ -441,15 +461,14 @@ function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard
     <div className="grid gap-3 md:grid-cols-2">
       <Detail label="Event" value={tournament.title} />
       <Detail label="Format" value={tournament.format} />
+      <Detail label="Rule Format" value={tournament.ruleFormatLabel} />
       <Detail label="Registration Status" value={getPublicTournamentStatus(tournament)} />
-      <Detail label="Registration Opens" value={formatDateTime(tournament.registrationOpenAt)} />
-      <Detail label="Registration Closes" value={formatDateTime(tournament.registrationCloseAt)} />
-      <Detail label="Tournament Starts" value={formatDateTime(tournament.startsAt)} />
-      <Detail label="Tournament Ends" value={tournament.endsAt ? formatDateTime(tournament.endsAt) : "Not specified"} />
-      <Detail label="Prize Pool" value={tournament.prizePool} />
+      <Detail label="Registration Opens" value={formatOptionalDateTime(tournament.registrationOpenAt, "When status is Open")} />
+      <Detail label="Grand Final" value={formatOptionalDateTime(tournament.grandFinalAt, "Grand Final TBA")} />
+      {hasPrize(tournament) && <Detail label="Prize Pool" value={tournament.prizePool} />}
       <Detail label="Approved Participants" value={`${tournament.players} / ${tournament.maxPlayers}`} />
       {tournament.brackets.map((bracket) => (
-        <Detail key={bracket.name} label={bracket.name} value={`${bracket.requirement} - ${bracket.registeredPlayers} / ${bracket.maxPlayers.replace("Max ", "")}`} />
+        <Detail key={bracket.name} label={bracket.name} value={`${bracket.requirement} - ${bracket.registeredPlayers} / ${bracket.maxPlayers.replace("Max ", "")} approved${bracket.isWaitlistOnly ? " - waitlist only" : ""}`} />
       ))}
     </div>
   );
@@ -457,10 +476,6 @@ function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard
 
 function Detail({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4"><p className="text-xs font-black uppercase tracking-wider text-slate-500">{label}</p><p className="mt-1 break-words font-bold text-slate-100">{value}</p></div>;
-}
-
-function Prize({ rank, amount, icon: Icon }: { rank: string; amount: string; icon: ElementType }) {
-  return <div className="rounded-xl border border-slate-700 bg-slate-950/40 p-5"><Icon className="text-amber-300" size={24} /><p className="mt-4 text-sm font-black uppercase tracking-wider text-slate-500">{rank}</p><p className="mt-1 break-words text-2xl font-black text-white">{amount}</p></div>;
 }
 
 function Timeline({ tournament }: { tournament: TournamentCard }) {
@@ -1378,7 +1393,22 @@ function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "UTC",
   }).format(new Date(value));
+}
+
+function formatOptionalDateTime(
+  value: string | null | undefined,
+  fallback: string
+) {
+  if (!value) return fallback;
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? formatDateTime(value) : fallback;
+}
+
+function hasPrize(tournament: TournamentCard) {
+  return tournament.prizePool.trim().length > 0;
 }
 
 function MatchCard({ match }: { match: Match }) {
@@ -1424,9 +1454,8 @@ function Media({ tournament }: { tournament: TournamentCard }) {
 function Announcements({ tournament }: { tournament: TournamentCard }) {
   const messages = [
     `${tournament.title} is currently ${tournament.status.toLowerCase()}.`,
-    `Registration closes ${formatDateTime(tournament.registrationCloseAt)}.`,
-    `The tournament starts ${formatDateTime(tournament.startsAt)}.`,
-    `${tournament.players} approved participants are currently listed across ${tournament.brackets.length} bracket${tournament.brackets.length === 1 ? "" : "s"}.`,
+    `Grand Final: ${formatOptionalDateTime(tournament.grandFinalAt, "TBA")}.`,
+    `${tournament.players} approved participants are currently listed across ${tournament.brackets.length} bracket${tournament.brackets.length === 1 ? "" : "s"}. Full brackets and brackets with an existing queue accept waitlist registrations while registration remains open.`,
   ];
   return <div className="space-y-4">{messages.map((text, index) => <Card key={text}><div className="flex gap-3"><Radio size={18} className="mt-1 text-orange-300" /><div><p className="text-xs font-black uppercase tracking-wider text-slate-500">IronClad Update {index + 1}</p><p className="mt-1 text-slate-200">{text}</p></div></div></Card>)}</div>;
 }
@@ -1470,13 +1499,18 @@ function RegisterModal({
   const getDefaultBracket = (tournament: TournamentCard) =>
     tournament.brackets.find(
       (bracket) =>
-        !bracket.isFull &&
+        !bracket.isWaitlistOnly &&
         isEligibleForBracket(currentElo, bracket.requirement)
-    )?.name ?? "";
+    )?.name ??
+    tournament.brackets.find((bracket) =>
+      isEligibleForBracket(currentElo, bracket.requirement)
+    )?.name ??
+    "";
   const [step, setStep] = useState<RegistrationStep>("tournament");
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("Registration submitted.");
   const [selectedTournament, setSelectedTournament] =
     useState<TournamentCard>(initialTournament);
   const eligibleBracketNames = getEligibleBracketNames(
@@ -1524,8 +1558,6 @@ function RegisterModal({
 
       if (!form.bracketName.trim() || !selectedBracket) {
         nextErrors.bracketName = "Please select a bracket or event type.";
-      } else if (selectedBracket.isFull) {
-        nextErrors.bracketName = "This bracket is full.";
       } else if (
         !isEligibleForBracket(currentElo, selectedBracket.requirement)
       ) {
@@ -1599,6 +1631,7 @@ function RegisterModal({
     }
 
     setStep("submitted");
+    setSuccessMessage(result.message);
   };
 
   const steps: RegistrationStep[] = [
@@ -1670,9 +1703,12 @@ function RegisterModal({
                     <h5 className="break-words text-lg font-black text-white">{selectedTournament.title}</h5>
                     <div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
                       <p><span className="font-bold text-slate-500">Format:</span> {selectedTournament.format}</p>
+                      <p><span className="font-bold text-slate-500">Rule Format:</span> {selectedTournament.ruleFormatLabel}</p>
                       <p><span className="font-bold text-slate-500">Status:</span> {selectedTournament.status}</p>
-                      <p><span className="font-bold text-slate-500">Prize Pool:</span> {selectedTournament.prizePool}</p>
-                      <p><span className="font-bold text-slate-500">Deadline:</span> Coming soon</p>
+                      {hasPrize(selectedTournament) && (
+                        <p><span className="font-bold text-slate-500">Prize Pool:</span> {selectedTournament.prizePool}</p>
+                      )}
+                      <p><span className="font-bold text-slate-500">Grand Final:</span> {formatOptionalDateTime(selectedTournament.grandFinalAt, "TBA")}</p>
                     </div>
                   </div>
                 </div>
@@ -1687,7 +1723,7 @@ function RegisterModal({
                     return (
                       <button
                         key={bracket.name}
-                        disabled={bracket.isFull || !eligible}
+                        disabled={!eligible}
                         onClick={() => updateField("bracketName", bracket.name)}
                         className={classNames(
                           "rounded-lg border p-4 text-left transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100",
@@ -1698,12 +1734,18 @@ function RegisterModal({
                       >
                         <p className="break-words font-black text-white">{bracket.name}</p>
                         <p className="mt-1 break-words text-xs text-slate-400">
-                          {bracket.requirement} - {bracket.registeredPlayers} registered - {bracket.maxPlayers}
+                          {bracket.requirement} - {bracket.registeredPlayers} approved - {bracket.maxPlayers}
                         </p>
-                        <p className="mt-2 break-words text-sm font-bold text-orange-300">{bracket.prize}</p>
-                        {bracket.isFull && (
-                          <p className="mt-2 text-xs font-black uppercase tracking-wider text-red-300">
-                            Bracket Full
+                        <p className="mt-2 break-words text-sm font-bold text-orange-300">
+                          {bracket.isWaitlistOnly
+                            ? bracket.isFull
+                              ? "Approved roster full - waitlist only"
+                              : "Waitlist active - queued registrations first"
+                            : bracket.prize}
+                        </p>
+                        {bracket.isWaitlistOnly && (
+                          <p className="mt-2 text-xs font-black uppercase tracking-wider text-amber-300">
+                            Waitlist Only
                           </p>
                         )}
                         {!eligible && (
@@ -1791,7 +1833,7 @@ function RegisterModal({
                 <CheckCircle2 className="text-emerald-300" size={30} />
               </div>
               <h4 className="mt-5 text-2xl font-black text-white">Registration Submitted</h4>
-              <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">Status: Pending Review</p>
+              <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">{successMessage}</p>
               <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">Registrations are reviewed within 24 hours.</p>
               <button onClick={onClose} className="mt-6 rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400">Close</button>
             </div>
@@ -2132,20 +2174,11 @@ function isTournamentRegistrationOpen(tournament: TournamentCard) {
   const registrationOpens = getOptionalTimestamp(
     tournament.registrationOpenAt
   );
-  const registrationCloses = getOptionalTimestamp(
-    tournament.registrationCloseAt
-  );
-  const tournamentStarts = getOptionalTimestamp(tournament.startsAt);
 
   return (
     tournament.statusValue === "registration_open" &&
     registrationOpens !== "invalid" &&
-    registrationCloses !== "invalid" &&
-    tournamentStarts !== "invalid" &&
-    (registrationOpens === null || now >= registrationOpens) &&
-    (registrationCloses === null || now <= registrationCloses) &&
-    (tournamentStarts === null || now < tournamentStarts) &&
-    tournament.brackets.some((bracket) => !bracket.isFull)
+    (registrationOpens === null || now >= registrationOpens)
   );
 }
 
