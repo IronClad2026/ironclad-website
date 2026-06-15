@@ -395,6 +395,7 @@ async function loadVisibleMatchResultSubmissions(
     .select(
       "id, submission_number, game_number, match_id, submitted_by_clerk_user_id, submitted_by_registration_id, claimed_winner_registration_id, player_one_score, player_two_score, replay_storage_path, screenshot_storage_path, notes, status, review_notes, reviewed_by, reviewed_at, created_at"
     )
+    .is("report_group_id", null)
     .order("created_at", { ascending: false });
 
   if (!isAdmin) {
