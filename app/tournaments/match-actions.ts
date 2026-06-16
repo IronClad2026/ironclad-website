@@ -34,17 +34,25 @@ export async function submitMatchResult(
   const playerTwoScore = getScore(formData, "playerTwoScore");
   const winnerRegistrationId = getText(formData, "winnerRegistrationId");
   const notes = getText(formData, "notes");
-  const replay = getFile(formData, "replay");
+  const replayFiles = getFiles(formData, "replays");
+  const legacyReplay = getFile(formData, "replay");
+  const replays = replayFiles.length > 0
+    ? replayFiles
+    : legacyReplay
+      ? [legacyReplay]
+      : [];
 
   if (!matchId || !winnerRegistrationId) {
     return errorState("Enter the final score and select the match winner.");
   }
 
-  if (!replay) {
-    return errorState("Upload the match replay before submitting.");
+  if (replays.length === 0) {
+    return errorState("Upload the match replay files before submitting.");
   }
 
-  const replayError = validateReplay(replay);
+  const replayError = replays
+    .map((replay) => validateReplay(replay))
+    .find((error) => error !== null);
 
   if (replayError) {
     return errorState(replayError);
@@ -103,18 +111,43 @@ export async function submitMatchResult(
     return errorState(scoreError);
   }
 
+  const requiredReplayCount = (playerOneScore ?? 0) + (playerTwoScore ?? 0);
+
+  if (replays.length !== requiredReplayCount) {
+    return errorState(
+      `This score requires exactly ${requiredReplayCount} replay file${
+        requiredReplayCount === 1 ? "" : "s"
+      }.`
+    );
+  }
+
+  const replayHashes = await getReplayContentHashes(replays);
+  const uniqueReplayHashes = new Set(replayHashes);
+
+  if (uniqueReplayHashes.size !== replayHashes.length) {
+    return errorState(
+      "Each game requires a unique replay file. Remove duplicate replay uploads before submitting."
+    );
+  }
+
   const uploadRoot = `${matchId}/${userId}/${crypto.randomUUID()}`;
   const uploadedPaths: string[] = [];
 
   try {
-    const replayPath = await uploadProof(
-      supabase,
-      replay,
-      `${uploadRoot}/replay.${getExtension(replay.name)}`,
-      uploadedPaths
-    );
+    const replayPaths: string[] = [];
 
-    await verifyUploadedProofs(supabase, [replayPath]);
+    for (const [index, replay] of replays.entries()) {
+      replayPaths.push(
+        await uploadProof(
+          supabase,
+          replay,
+          `${uploadRoot}/game-${index + 1}.${getExtension(replay.name)}`,
+          uploadedPaths
+        )
+      );
+    }
+
+    await verifyUploadedProofs(supabase, replayPaths);
 
     const { data: report, error: submissionError } =
       await supabase.rpc("submit_match_series_result_report", {
@@ -123,7 +156,8 @@ export async function submitMatchResult(
         p_winner_registration_id: winnerRegistrationId,
         p_player_one_score: playerOneScore,
         p_player_two_score: playerTwoScore,
-        p_replay_storage_path: replayPath,
+        p_replay_storage_paths: replayPaths,
+        p_replay_content_hashes: replayHashes,
         p_notes: notes || null,
       });
 
@@ -527,6 +561,18 @@ function validateReplay(file: File) {
   return null;
 }
 
+async function getReplayContentHashes(files: File[]) {
+  return Promise.all(files.map((file) => getReplayContentHash(file)));
+}
+
+async function getReplayContentHash(file: File) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 async function requireAdmin() {
   const { userId, sessionClaims } = await auth();
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
@@ -552,6 +598,12 @@ function getScore(formData: FormData, field: string) {
 function getFile(formData: FormData, field: string) {
   const value = formData.get(field);
   return value instanceof File && value.size > 0 ? value : null;
+}
+
+function getFiles(formData: FormData, field: string) {
+  return formData
+    .getAll(field)
+    .filter((value): value is File => value instanceof File && value.size > 0);
 }
 
 function getExtension(fileName: string) {

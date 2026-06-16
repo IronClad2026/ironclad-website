@@ -425,15 +425,27 @@ function ReportGroupReview({
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {reportGroup.replayProofUrl ? (
-          <a
-            href={reportGroup.replayProofUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
-          >
-            Download Replay
-          </a>
+        {reportGroup.replayProofs.length > 0 ? (
+          reportGroup.replayProofs.map((proof) =>
+            proof.replayProofUrl ? (
+              <a
+                key={`${proof.gameNumber}:${proof.replayStoragePath}`}
+                href={proof.replayProofUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
+              >
+                Game {proof.gameNumber} Replay
+              </a>
+            ) : (
+              <span
+                key={`${proof.gameNumber}:${proof.replayStoragePath}`}
+                className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200"
+              >
+                Game {proof.gameNumber} replay unavailable
+              </span>
+            )
+          )
         ) : (
           <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200">
             Replay unavailable

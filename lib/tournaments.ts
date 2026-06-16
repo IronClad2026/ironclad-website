@@ -137,6 +137,12 @@ export type MatchResultReportGroup = {
   replayStoragePath: string | null;
   replayProofUrl: string | null;
   replayProofExists: boolean;
+  replayProofs: {
+    gameNumber: number;
+    replayStoragePath: string;
+    replayProofUrl: string | null;
+    replayProofExists: boolean;
+  }[];
   status: MatchResultReportGroupStatus;
   confirmationDeadlineAt: string;
   confirmedAt: string | null;

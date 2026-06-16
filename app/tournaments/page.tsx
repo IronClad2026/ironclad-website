@@ -524,36 +524,41 @@ async function loadVisibleMatchResultReportGroups(
     return [];
   }
 
+  const reportGroupRows = (data ?? []) as {
+    id: string;
+    match_id: string;
+    tournament_id: string;
+    submitted_by_clerk_user_id: string;
+    submitted_by_registration_id: string;
+    opponent_registration_id: string;
+    winner_registration_id: string;
+    player_one_score: number;
+    player_two_score: number;
+    replay_storage_path: string | null;
+    status: MatchResultReportGroup["status"];
+    confirmation_deadline_at: string;
+    confirmed_at: string | null;
+    disputed_at: string | null;
+    dispute_notes: string | null;
+    reviewed_by: string | null;
+    reviewed_at: string | null;
+    review_notes: string | null;
+    finalized_at: string | null;
+    finalized_source: string | null;
+    created_at: string;
+  }[];
+  const replayProofsByGroup = await loadReportGroupReplayProofs(
+    supabase,
+    reportGroupRows.map((reportGroup) => reportGroup.id)
+  );
+
   return Promise.all(
-    (
-      (data ?? []) as {
-        id: string;
-        match_id: string;
-        tournament_id: string;
-        submitted_by_clerk_user_id: string;
-        submitted_by_registration_id: string;
-        opponent_registration_id: string;
-        winner_registration_id: string;
-        player_one_score: number;
-        player_two_score: number;
-        replay_storage_path: string | null;
-        status: MatchResultReportGroup["status"];
-        confirmation_deadline_at: string;
-        confirmed_at: string | null;
-        disputed_at: string | null;
-        dispute_notes: string | null;
-        reviewed_by: string | null;
-        reviewed_at: string | null;
-        review_notes: string | null;
-        finalized_at: string | null;
-        finalized_source: string | null;
-        created_at: string;
-      }[]
-    ).map(async (reportGroup) => {
+    reportGroupRows.map(async (reportGroup) => {
       const replayProof = await createProofAccess(
         supabase,
         reportGroup.replay_storage_path
       );
+      const replayProofs = replayProofsByGroup.get(reportGroup.id) ?? [];
 
       return {
         id: reportGroup.id,
@@ -568,6 +573,19 @@ async function loadVisibleMatchResultReportGroups(
         replayStoragePath: reportGroup.replay_storage_path,
         replayProofUrl: replayProof.url,
         replayProofExists: replayProof.exists,
+        replayProofs:
+          replayProofs.length > 0
+            ? replayProofs
+            : replayProof.url && reportGroup.replay_storage_path
+              ? [
+                  {
+                    gameNumber: 1,
+                    replayStoragePath: reportGroup.replay_storage_path,
+                    replayProofUrl: replayProof.url,
+                    replayProofExists: replayProof.exists,
+                  },
+                ]
+              : [],
         status: reportGroup.status,
         confirmationDeadlineAt: reportGroup.confirmation_deadline_at,
         confirmedAt: reportGroup.confirmed_at,
@@ -582,6 +600,59 @@ async function loadVisibleMatchResultReportGroups(
       };
     })
   );
+}
+
+async function loadReportGroupReplayProofs(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  reportGroupIds: string[]
+) {
+  const replayProofsByGroup = new Map<
+    string,
+    MatchResultReportGroup["replayProofs"]
+  >();
+
+  if (reportGroupIds.length === 0) {
+    return replayProofsByGroup;
+  }
+
+  const { data, error } = await supabase
+    .from("match_result_submissions")
+    .select("report_group_id, game_number, replay_storage_path")
+    .in("report_group_id", reportGroupIds)
+    .not("replay_storage_path", "is", null)
+    .order("game_number", { ascending: true });
+
+  if (error) {
+    console.error("Report group replay proofs load failed:", error);
+    return replayProofsByGroup;
+  }
+
+  await Promise.all(
+    (
+      (data ?? []) as {
+        report_group_id: string;
+        game_number: number;
+        replay_storage_path: string;
+      }[]
+    ).map(async (proof) => {
+      const replayProof = await createProofAccess(
+        supabase,
+        proof.replay_storage_path
+      );
+      const groupProofs =
+        replayProofsByGroup.get(proof.report_group_id) ?? [];
+
+      groupProofs.push({
+        gameNumber: proof.game_number,
+        replayStoragePath: proof.replay_storage_path,
+        replayProofUrl: replayProof.url,
+        replayProofExists: replayProof.exists,
+      });
+      replayProofsByGroup.set(proof.report_group_id, groupProofs);
+    })
+  );
+
+  return replayProofsByGroup;
 }
 
 async function createProofAccess(
