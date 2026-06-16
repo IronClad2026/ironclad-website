@@ -343,6 +343,45 @@ export async function saveAdminMatchResult(
     return errorState(scoreError);
   }
 
+  const { data: activeReportGroup, error: activeReportGroupError } =
+    await supabase
+      .from("match_result_report_groups")
+      .select("id")
+      .eq("match_id", matchId)
+      .is("finalized_at", null)
+      .in("status", ["pending_confirmation", "disputed", "under_review"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+  if (activeReportGroupError) {
+    console.error("Active report-group lookup failed:", activeReportGroupError);
+    return errorState("The active match report could not be checked.");
+  }
+
+  if (activeReportGroup) {
+    const { error } = await supabase.rpc(
+      "admin_finalize_match_result_report_group",
+      {
+        p_report_group_id: activeReportGroup.id,
+        p_decision: "approved",
+        p_reviewed_by: admin.userId,
+        p_review_notes: "Official result entered by an administrator.",
+        p_player_one_score: playerOneScore,
+        p_player_two_score: playerTwoScore,
+        p_winner_registration_id: winnerRegistrationId,
+      }
+    );
+
+    if (error) {
+      console.error("Admin report-group override failed:", error);
+      return errorState(error.message);
+    }
+
+    revalidateTournamentPaths();
+    return successState("Report group overridden and winner advanced.");
+  }
+
   const { error } = await supabase.rpc("apply_admin_official_match_result", {
     p_match_id: matchId,
     p_player_one_score: playerOneScore,
@@ -358,6 +397,91 @@ export async function saveAdminMatchResult(
 
   revalidateTournamentPaths();
   return successState("Official result saved and winner advanced.");
+}
+
+export async function editAdminMatchParticipants(
+  _previousState: MatchResultActionState,
+  formData: FormData
+): Promise<MatchResultActionState> {
+  const admin = await requireAdmin();
+
+  if (!admin) {
+    return errorState("Administrator access is required.");
+  }
+
+  const matchId = getText(formData, "matchId");
+  const playerOneRegistrationId = getNullableText(
+    formData,
+    "playerOneRegistrationId"
+  );
+  const playerTwoRegistrationId = getNullableText(
+    formData,
+    "playerTwoRegistrationId"
+  );
+
+  if (!matchId) {
+    return errorState("The selected match could not be found.");
+  }
+
+  if (
+    playerOneRegistrationId &&
+    playerTwoRegistrationId &&
+    playerOneRegistrationId === playerTwoRegistrationId
+  ) {
+    return errorState("A player cannot occupy both match slots.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.rpc("admin_update_match_participants", {
+    p_match_id: matchId,
+    p_player_one_registration_id: playerOneRegistrationId,
+    p_player_two_registration_id: playerTwoRegistrationId,
+    p_updated_by: admin.userId,
+  });
+
+  if (error) {
+    console.error("Admin match participant edit failed:", error);
+    return errorState(error.message);
+  }
+
+  revalidateTournamentPaths();
+  return successState("Match participants updated.");
+}
+
+export async function resetAdminMatch(
+  _previousState: MatchResultActionState,
+  formData: FormData
+): Promise<MatchResultActionState> {
+  const admin = await requireAdmin();
+
+  if (!admin) {
+    return errorState("Administrator access is required.");
+  }
+
+  const matchId = getText(formData, "matchId");
+  const confirmation = getText(formData, "confirmation");
+
+  if (!matchId) {
+    return errorState("The selected match could not be found.");
+  }
+
+  if (confirmation !== "RESET") {
+    return errorState("Type RESET before resetting this match.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.rpc("admin_reset_tournament_match", {
+    p_match_id: matchId,
+    p_reset_by: admin.userId,
+  });
+
+  if (error) {
+    console.error("Admin match reset failed:", error);
+    return errorState(error.message);
+  }
+
+  revalidateTournamentPaths();
+  return successState("Match reset. Proof records were preserved for audit.");
 }
 
 export async function reviewMatchResult(
@@ -588,6 +712,11 @@ function revalidateTournamentPaths() {
 
 function getText(formData: FormData, field: string) {
   return String(formData.get(field) ?? "").trim();
+}
+
+function getNullableText(formData: FormData, field: string) {
+  const value = getText(formData, field);
+  return value.length > 0 ? value : null;
 }
 
 function getScore(formData: FormData, field: string) {

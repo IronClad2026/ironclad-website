@@ -600,6 +600,15 @@ function Brackets({
       participant,
     ])
   );
+  const [selectedAdminMatchId, setSelectedAdminMatchId] =
+    useState<string | null>(null);
+  const selectedAdminMatch =
+    selectedAdminMatchId === null
+      ? null
+      : tournament.generatedBrackets
+          .flatMap((generated) => generated.matches)
+          .find((match) => match.id === selectedAdminMatchId) ?? null;
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -693,16 +702,41 @@ function Brackets({
                 matches={generated.matches}
                 standings={generated.standings}
                 participantsById={participantsById}
+                onAdminMatchSelect={
+                  viewer.isAdmin
+                    ? (match) => setSelectedAdminMatchId(match.id)
+                    : undefined
+                }
               />
             ) : (
               <SingleEliminationBracket
                 matches={generated.matches}
                 participantsById={participantsById}
+                onAdminMatchSelect={
+                  viewer.isAdmin
+                    ? (match) => setSelectedAdminMatchId(match.id)
+                    : undefined
+                }
               />
             )}
           </Card>
         );
       })}
+      {viewer.isAdmin && selectedAdminMatch && (
+        <AdminMatchManagementModal
+          tournament={tournament}
+          match={selectedAdminMatch}
+          participantsById={participantsById}
+          viewer={viewer}
+          submissions={matchResultSubmissions.filter(
+            (submission) => submission.matchId === selectedAdminMatch.id
+          )}
+          reportGroups={matchResultReportGroups.filter(
+            (reportGroup) => reportGroup.matchId === selectedAdminMatch.id
+          )}
+          onClose={() => setSelectedAdminMatchId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -927,6 +961,255 @@ function BracketMatchResultsWorkspace({
   );
 }
 
+function AdminMatchManagementModal({
+  tournament,
+  match,
+  participantsById,
+  viewer,
+  submissions,
+  reportGroups,
+  onClose,
+}: {
+  tournament: TournamentCard;
+  match: GeneratedTournamentMatch;
+  participantsById: Map<string, TournamentParticipant>;
+  viewer: TournamentViewer;
+  submissions: MatchResultSubmission[];
+  reportGroups: MatchResultReportGroup[];
+  onClose: () => void;
+}) {
+  const portalRoot =
+    typeof document === "undefined" ? null : document.body;
+  const displayMatch = toDisplayMatch(match, participantsById);
+  const playerOne = match.playerOneRegistrationId
+    ? participantsById.get(match.playerOneRegistrationId)
+    : null;
+  const playerTwo = match.playerTwoRegistrationId
+    ? participantsById.get(match.playerTwoRegistrationId)
+    : null;
+  const activeReportGroup =
+    reportGroups.find(
+      (reportGroup) =>
+        reportGroup.finalizedAt === null &&
+        ["pending_confirmation", "disputed", "under_review"].includes(
+          reportGroup.status
+        )
+    ) ?? reportGroups[0];
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  if (!portalRoot) {
+    return null;
+  }
+
+  return createPortal(
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[10000] grid place-items-center p-3 sm:p-6">
+        <motion.button
+          type="button"
+          aria-label="Close match management"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 h-full w-full cursor-default bg-black/85 backdrop-blur-md"
+        />
+        <motion.section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`admin-match-${match.id}`}
+          initial={{ opacity: 0, scale: 0.96, y: 18 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.97, y: 12 }}
+          transition={{ duration: 0.2 }}
+          className="relative flex max-h-[88vh] w-[94vw] max-w-5xl flex-col overflow-hidden rounded-3xl border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(15,23,42,0.98),rgba(3,7,18,0.99))] shadow-[0_0_90px_rgba(249,115,22,0.18)]"
+        >
+          <header className="relative shrink-0 border-b border-white/10 px-5 py-5 sm:px-7">
+            <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.9)]" />
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
+                  Direct Match Management
+                </p>
+                <h2
+                  id={`admin-match-${match.id}`}
+                  className="mt-2 break-words text-2xl font-black text-white"
+                >
+                  {tournament.title}
+                </h2>
+                <p className="mt-2 text-sm text-slate-400">
+                  {match.roundName} - Match {match.matchNumber}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-slate-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
+                aria-label="Close match management"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </header>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7">
+            <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+              <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Match Snapshot
+                  </p>
+                  <MatchStatus status={displayMatch.status} />
+                </div>
+                <div className="grid gap-3">
+                  <MatchManagementRow
+                    label="Player 1"
+                    value={playerOne?.name ?? "TBD"}
+                    score={match.playerOneScore}
+                    winner={
+                      match.winnerRegistrationId ===
+                      match.playerOneRegistrationId
+                    }
+                  />
+                  <MatchManagementRow
+                    label="Player 2"
+                    value={playerTwo?.name ?? "TBD"}
+                    score={match.playerTwoScore}
+                    winner={
+                      match.winnerRegistrationId ===
+                      match.playerTwoRegistrationId
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-5 text-xs leading-5 text-slate-300">
+                <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  Review State
+                </p>
+                <div className="mt-4 space-y-3">
+                  <SummaryLine
+                    label="Current score"
+                    value={
+                      match.playerOneScore !== null &&
+                      match.playerTwoScore !== null
+                        ? `${match.playerOneScore}-${match.playerTwoScore}`
+                        : "Not recorded"
+                    }
+                  />
+                  <SummaryLine
+                    label="Match status"
+                    value={match.status.replaceAll("_", " ")}
+                  />
+                  <SummaryLine
+                    label="Report group"
+                    value={
+                      activeReportGroup
+                        ? activeReportGroup.status.replaceAll("_", " ")
+                        : "None"
+                    }
+                  />
+                  <SummaryLine
+                    label="Replay packages"
+                    value={`${reportGroups.reduce(
+                      (total, reportGroup) =>
+                        total + reportGroup.replayProofs.length,
+                      0
+                    )} linked`}
+                  />
+                  <SummaryLine
+                    label="Legacy submissions"
+                    value={String(submissions.length)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-3xl border border-white/10 bg-black/25 p-4 sm:p-5">
+              <MatchResultControls
+                match={match}
+                participantsById={participantsById}
+                isAdmin={viewer.isAdmin}
+                viewerClerkUserId={viewer.clerkUserId}
+                canSubmit={viewer.registrationIds.some(
+                  (registrationId) =>
+                    registrationId === match.playerOneRegistrationId ||
+                    registrationId === match.playerTwoRegistrationId
+                )}
+                submissions={submissions}
+                reportGroups={reportGroups}
+                participantOptions={tournament.bracketParticipants}
+                showDirectAdminControls
+                presentation="workspace"
+              />
+            </div>
+          </div>
+        </motion.section>
+      </div>
+    </AnimatePresence>,
+    portalRoot
+  );
+}
+
+function MatchManagementRow({
+  label,
+  value,
+  score,
+  winner,
+}: {
+  label: string;
+  value: string;
+  score: number | null;
+  winner: boolean;
+}) {
+  return (
+    <div
+      className={classNames(
+        "flex items-center justify-between gap-4 rounded-xl border px-4 py-3",
+        winner
+          ? "border-orange-400/35 bg-orange-500/10 text-white"
+          : "border-white/10 bg-white/[0.03] text-slate-300"
+      )}
+    >
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+          {label}
+        </p>
+        <p className="mt-1 truncate text-sm font-black">{value}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        {winner && <Crown size={16} className="text-orange-300" />}
+        <span className="grid h-9 w-10 place-items-center rounded-lg border border-white/10 bg-black/35 font-mono text-sm font-black text-white">
+          {score ?? "-"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SummaryLine({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="flex justify-between gap-3">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-right font-bold capitalize text-slate-100">
+        {value}
+      </span>
+    </p>
+  );
+}
+
 function ChampionPresentation({
   bracketName,
   champion,
@@ -1050,9 +1333,11 @@ function getBracketChampion(
 function SingleEliminationBracket({
   matches,
   participantsById,
+  onAdminMatchSelect,
 }: {
   matches: GeneratedTournamentMatch[];
   participantsById: Map<string, TournamentParticipant>;
+  onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
 }) {
   const rounds = Array.from(
     matches.reduce((groups, match) => {
@@ -1155,6 +1440,11 @@ function SingleEliminationBracket({
                     connectorDirection={
                       matchIndex % 2 === 0 ? "down" : "up"
                     }
+                    onAdminSelect={
+                      onAdminMatchSelect
+                        ? () => onAdminMatchSelect(match)
+                        : undefined
+                    }
                   />
                 ))}
               </div>
@@ -1171,15 +1461,50 @@ function ModernBracketMatch({
   isActiveRound,
   hasNextRound,
   connectorDirection,
+  onAdminSelect,
 }: {
   match: Match;
   isActiveRound: boolean;
   hasNextRound: boolean;
   connectorDirection: "up" | "down";
+  onAdminSelect?: () => void;
 }) {
   const completed = match.status === "complete";
   const live = match.status === "live";
   const pendingReview = match.status === "pending_review";
+  const card = (
+    <div
+      className={classNames(
+        "overflow-hidden rounded-xl border bg-slate-950/70 text-left shadow-2xl backdrop-blur-xl transition",
+        onAdminSelect && "cursor-pointer hover:border-orange-300/80",
+        live
+          ? "border-orange-400/80 shadow-[0_0_28px_rgba(249,115,22,0.22)]"
+          : pendingReview
+            ? "border-amber-400/50 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
+          : completed
+            ? "border-emerald-500/30 shadow-black/30"
+            : isActiveRound
+              ? "border-orange-500/35 shadow-[0_0_18px_rgba(249,115,22,0.10)]"
+              : "border-white/10 shadow-black/30"
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+          Match {match.id}
+        </span>
+        <div className="flex items-center gap-2">
+          {onAdminSelect && (
+            <span className="rounded border border-orange-400/25 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">
+              Manage
+            </span>
+          )}
+          <MatchStatus status={match.status} />
+        </div>
+      </div>
+      <BroadcastTeamRow team={match.teamA} />
+      <BroadcastTeamRow team={match.teamB} />
+    </div>
+  );
 
   return (
     <motion.div
@@ -1201,29 +1526,17 @@ function ModernBracketMatch({
           <span className="pointer-events-none absolute left-[calc(100%+1.75rem)] top-1/2 h-px w-7 bg-slate-600" />
         </>
       )}
-      <div
-        className={classNames(
-          "overflow-hidden rounded-xl border bg-slate-950/70 shadow-2xl backdrop-blur-xl transition",
-          live
-            ? "border-orange-400/80 shadow-[0_0_28px_rgba(249,115,22,0.22)]"
-            : pendingReview
-              ? "border-amber-400/50 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
-            : completed
-              ? "border-emerald-500/30 shadow-black/30"
-              : isActiveRound
-                ? "border-orange-500/35 shadow-[0_0_18px_rgba(249,115,22,0.10)]"
-                : "border-white/10 shadow-black/30"
-        )}
-      >
-        <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-            Match {match.id}
-          </span>
-          <MatchStatus status={match.status} />
-        </div>
-        <BroadcastTeamRow team={match.teamA} />
-        <BroadcastTeamRow team={match.teamB} />
-      </div>
+      {onAdminSelect ? (
+        <button
+          type="button"
+          onClick={onAdminSelect}
+          className="block w-full text-left"
+        >
+          {card}
+        </button>
+      ) : (
+        card
+      )}
     </motion.div>
   );
 }
@@ -1301,10 +1614,12 @@ function RoundRobinBracket({
   matches,
   standings,
   participantsById,
+  onAdminMatchSelect,
 }: {
   matches: GeneratedTournamentMatch[];
   standings: TournamentCard["generatedBrackets"][number]["standings"];
   participantsById: Map<string, TournamentParticipant>;
+  onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
 }) {
   return (
     <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -1313,6 +1628,9 @@ function RoundRobinBracket({
           <MatchCard
             key={match.id}
             match={toDisplayMatch(match, participantsById)}
+            onAdminSelect={
+              onAdminMatchSelect ? () => onAdminMatchSelect(match) : undefined
+            }
           />
         ))}
       </div>
@@ -1437,12 +1755,18 @@ function hasPrize(tournament: TournamentCard) {
   return tournament.prizePool.trim().length > 0;
 }
 
-function MatchCard({ match }: { match: Match }) {
-  return (
-    <motion.div
-      whileHover={{ y: -2 }}
+function MatchCard({
+  match,
+  onAdminSelect,
+}: {
+  match: Match;
+  onAdminSelect?: () => void;
+}) {
+  const card = (
+    <div
       className={classNames(
-        "overflow-hidden rounded-xl border bg-slate-950/70 shadow-xl backdrop-blur",
+        "overflow-hidden rounded-xl border bg-slate-950/70 text-left shadow-xl backdrop-blur",
+        onAdminSelect && "cursor-pointer transition hover:border-orange-300/80",
         match.status === "live"
           ? "border-orange-400/70 shadow-[0_0_24px_rgba(249,115,22,0.18)]"
           : match.status === "complete"
@@ -1452,10 +1776,36 @@ function MatchCard({ match }: { match: Match }) {
     >
       <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
         <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Match {match.id}</span>
-        <MatchStatus status={match.status} />
+        <div className="flex items-center gap-2">
+          {onAdminSelect && (
+            <span className="rounded border border-orange-400/25 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">
+              Manage
+            </span>
+          )}
+          <MatchStatus status={match.status} />
+        </div>
       </div>
       <TeamRow team={match.teamA} />
       <TeamRow team={match.teamB} />
+    </div>
+  );
+
+  return (
+    <motion.div
+      whileHover={{ y: -2 }}
+      className="rounded-xl"
+    >
+      {onAdminSelect ? (
+        <button
+          type="button"
+          onClick={onAdminSelect}
+          className="block w-full text-left"
+        >
+          {card}
+        </button>
+      ) : (
+        card
+      )}
     </motion.div>
   );
 }
