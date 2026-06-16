@@ -228,9 +228,11 @@ function Sidebar({
 
 function Hero({
   tournament,
+  viewerRegistration,
   onRegisterClick,
 }: {
   tournament: TournamentCard;
+  viewerRegistration: TournamentViewerRegistration | null;
   onRegisterClick: () => void;
 }) {
   const registrationOpen = isTournamentRegistrationOpen(tournament);
@@ -243,6 +245,9 @@ function Hero({
       ? "Join Waitlist"
       : "Register"
     : publicStatus;
+  const registrationState = viewerRegistration
+    ? getViewerRegistrationDisplay(tournament, viewerRegistration)
+    : null;
 
   return (
     <section className="relative overflow-hidden border-b border-slate-800 bg-black">
@@ -288,23 +293,145 @@ function Hero({
             </div>
           </div>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
-            <ActionCard
-              label={actionLabel}
-              description={
-                registrationOpen
-                  ? allBracketsWaitlistOnly
-                    ? "Waitlist open"
-                    : "Open events"
-                  : "Check the tournament schedule"
-              }
-              icon={registrationOpen ? CheckCircle2 : Clock3}
-              onClick={onRegisterClick}
-            />
+            {registrationState ? (
+              <RegistrationStateCard state={registrationState} />
+            ) : (
+              <ActionCard
+                label={actionLabel}
+                description={
+                  registrationOpen
+                    ? allBracketsWaitlistOnly
+                      ? "Waitlist open"
+                      : "Open events"
+                    : "Check the tournament schedule"
+                }
+                icon={registrationOpen ? CheckCircle2 : Clock3}
+                onClick={onRegisterClick}
+              />
+            )}
           </div>
         </div>
       </div>
     </section>
   );
+}
+
+type ViewerRegistrationDisplay = {
+  title: string;
+  description: string;
+  tone: "green" | "amber" | "red" | "blue";
+  icon: ElementType;
+  details: string[];
+};
+
+function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) {
+  const tones = {
+    green: "border-emerald-400/45 bg-emerald-500/10 text-emerald-100",
+    amber: "border-amber-400/45 bg-amber-500/10 text-amber-100",
+    red: "border-red-400/45 bg-red-500/10 text-red-100",
+    blue: "border-sky-400/45 bg-sky-500/10 text-sky-100",
+  };
+  const Icon = state.icon;
+
+  return (
+    <div
+      className={classNames(
+        "min-h-[104px] w-full min-w-0 overflow-hidden rounded-xl border p-4 text-left shadow-xl shadow-black/10 backdrop-blur",
+        tones[state.tone]
+      )}
+    >
+      <Icon size={18} className="shrink-0" />
+      <p className="mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider text-white">
+        {state.title}
+      </p>
+      <p className="mt-1 break-words text-xs font-semibold leading-5 opacity-90">
+        {state.description}
+      </p>
+      {state.details.length > 0 && (
+        <div className="mt-3 space-y-1 text-[11px] font-semibold leading-4 opacity-80">
+          {state.details.map((detail) => (
+            <p key={detail}>{detail}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getViewerRegistrationDisplay(
+  tournament: TournamentCard,
+  registration: TournamentViewerRegistration
+): ViewerRegistrationDisplay {
+  const details = [
+    `Registration Status: ${formatRegistrationStatus(registration.status)}`,
+    registration.bracketName ? `Bracket: ${registration.bracketName}` : null,
+    registration.createdAt
+      ? `Registration Date: ${new Date(registration.createdAt).toLocaleDateString()}`
+      : null,
+  ].filter((detail) => detail !== null);
+
+  if (registration.status === "approved") {
+    return {
+      title: `Registered - ${tournament.title}`,
+      description: `You are registered for ${tournament.title}.`,
+      tone: "green",
+      icon: CheckCircle2,
+      details,
+    };
+  }
+
+  if (registration.status === "waitlisted") {
+    return {
+      title: `Waitlisted - ${tournament.title}`,
+      description: `You are currently on the waitlist for ${tournament.title}.`,
+      tone: "amber",
+      icon: Clock3,
+      details: [
+        ...details,
+        registration.waitlistPosition
+          ? `Waitlist Position: #${registration.waitlistPosition}`
+          : null,
+      ].filter((detail) => detail !== null),
+    };
+  }
+
+  if (registration.status === "rejected") {
+    return {
+      title: "Registration Not Approved",
+      description:
+        registration.adminNotes?.trim() ||
+        "This registration was not approved by tournament administration.",
+      tone: "red",
+      icon: X,
+      details,
+    };
+  }
+
+  if (registration.status === "manual_review") {
+    return {
+      title: "Registration Under Manual Review",
+      description:
+        "Tournament administration is reviewing your registration details.",
+      tone: "blue",
+      icon: Info,
+      details,
+    };
+  }
+
+  return {
+    title: "Registration Submitted - Awaiting Review",
+    description:
+      "Your tournament registration has been submitted and is awaiting administrator review.",
+    tone: "blue",
+    icon: Clock3,
+    details,
+  };
+}
+
+function formatRegistrationStatus(status: TournamentViewerRegistration["status"]) {
+  return status
+    .replace("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function ActionCard({ label, description, icon: Icon, onClick }: { label: string; description: string; icon: ElementType; onClick: () => void }) {
@@ -2409,6 +2536,23 @@ type TournamentViewer = {
   isAdmin: boolean;
   clerkUserId: string | null;
   registrationIds: string[];
+  registrations: TournamentViewerRegistration[];
+};
+
+type TournamentViewerRegistration = {
+  id: string;
+  tournamentId: string;
+  tournamentBracketId: string;
+  bracketName: string;
+  status:
+    | "pending"
+    | "manual_review"
+    | "approved"
+    | "rejected"
+    | "waitlisted";
+  adminNotes: string | null;
+  createdAt: string | null;
+  waitlistPosition: number | null;
 };
 
 export default function TournamentsExperience({
@@ -2430,6 +2574,10 @@ export default function TournamentsExperience({
     tournaments.find(
       (tournament) => tournament.id === selectedTournamentId
     ) ?? tournaments[0];
+  const selectedViewerRegistration =
+    viewer.registrations.find(
+      (registration) => registration.tournamentId === selectedTournament.id
+    ) ?? null;
   const [showMobilePanel, setShowMobilePanel] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [registrationProfile, setRegistrationProfile] =
@@ -2452,6 +2600,10 @@ export default function TournamentsExperience({
   };
 
   const handleRegisterClick = async () => {
+    if (selectedViewerRegistration) {
+      return;
+    }
+
     if (!isTournamentRegistrationOpen(selectedTournament)) {
       setRegistrationGate("closed");
       return;
@@ -2508,6 +2660,7 @@ export default function TournamentsExperience({
         <div className="min-w-0 flex-1">
           <Hero
             tournament={selectedTournament}
+            viewerRegistration={selectedViewerRegistration}
             onRegisterClick={handleRegisterClick}
           />
           <TopTabs activeTab={activeTab} setActiveTab={setActiveTab} />

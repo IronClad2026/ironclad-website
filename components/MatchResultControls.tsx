@@ -73,6 +73,8 @@ export default function MatchResultControls({
     match.status !== "completed" &&
     !activeReportGroup &&
     !pendingSubmission;
+  const shouldShowAdminResultEntry =
+    isAdmin && hasParticipants && !activeReportGroup && !pendingSubmission;
 
   if (!isAdmin && !canSubmit && submissions.length === 0 && !canOpenForReportGroups) {
     return null;
@@ -116,7 +118,7 @@ export default function MatchResultControls({
             </div>
           )}
 
-          {isAdmin && hasParticipants && (
+          {shouldShowAdminResultEntry && (
             <div className="rounded-2xl border border-orange-400/20 bg-orange-500/[0.04] p-5">
               <ResultEntryForm
                 match={match}

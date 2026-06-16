@@ -37,7 +37,7 @@ export default async function TournamentsPage() {
     supabase
       .from("registrations")
       .select(
-        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, registration_status"
+        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, registration_status, admin_notes, created_at"
       )
       .not("tournament_id", "is", null)
       .not("tournament_bracket_id", "is", null),
@@ -90,6 +90,8 @@ export default async function TournamentsPage() {
       | "approved"
       | "rejected"
       | "waitlisted";
+    admin_notes: string | null;
+    created_at: string | null;
   }[];
   const referencedRegistrationIds = getGeneratedBracketRegistrationIds(
     generatedBracketResult.data ?? []
@@ -166,6 +168,30 @@ export default async function TournamentsPage() {
       ])
     )
   );
+  const waitlistPositionByRegistration =
+    buildWaitlistPositionMap(registrations);
+  const viewerRegistrations = userId
+    ? registrations
+        .filter((registration) => registration.clerk_user_id === userId)
+        .map((registration) => ({
+          id: registration.id,
+          tournamentId: registration.tournament_id,
+          tournamentBracketId: registration.tournament_bracket_id,
+          bracketName:
+            bracketNames.get(registration.tournament_bracket_id) ??
+            "Tournament Bracket",
+          status: registration.registration_status,
+          adminNotes:
+            registration.registration_status === "rejected"
+              ? registration.admin_notes
+              : null,
+          createdAt: registration.created_at,
+          waitlistPosition:
+            registration.registration_status === "waitlisted"
+              ? waitlistPositionByRegistration.get(registration.id) ?? null
+              : null,
+        }))
+    : [];
   const participantsByTournament = new Map<string, TournamentParticipant[]>();
   const bracketParticipantsByTournament = new Map<
     string,
@@ -249,6 +275,7 @@ export default async function TournamentsPage() {
         isAdmin,
         clerkUserId: userId,
         registrationIds: viewerRegistrationIds,
+        registrations: viewerRegistrations,
       }}
       matchResultSubmissions={matchResultSubmissions}
       matchResultReportGroups={matchResultReportGroups}
@@ -317,6 +344,47 @@ function getGeneratedBracketRegistrationIds(rows: unknown[]) {
   }
 
   return registrationIds;
+}
+
+function buildWaitlistPositionMap(
+  registrations: {
+    id: string;
+    tournament_bracket_id: string;
+    registration_status: string;
+    created_at: string | null;
+  }[]
+) {
+  const positions = new Map<string, number>();
+  const byBracket = registrations.reduce((groups, registration) => {
+    if (registration.registration_status !== "waitlisted") {
+      return groups;
+    }
+
+    const group = groups.get(registration.tournament_bracket_id) ?? [];
+    group.push(registration);
+    groups.set(registration.tournament_bracket_id, group);
+    return groups;
+  }, new Map<string, typeof registrations>());
+
+  for (const group of byBracket.values()) {
+    group
+      .slice()
+      .sort((left, right) => {
+        const leftTime = new Date(left.created_at ?? "").getTime();
+        const rightTime = new Date(right.created_at ?? "").getTime();
+
+        return (
+          (Number.isFinite(leftTime) ? leftTime : 0) -
+            (Number.isFinite(rightTime) ? rightTime : 0) ||
+          left.id.localeCompare(right.id)
+        );
+      })
+      .forEach((registration, index) => {
+        positions.set(registration.id, index + 1);
+      });
+  }
+
+  return positions;
 }
 
 function mapGeneratedBrackets(

@@ -1,9 +1,12 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import AdminRegistrationReviewRows, {
+  type AdminRegistrationReviewRow,
+} from "@/components/AdminRegistrationReviewRows";
+import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
 import AdminBracketManagement, {
   type AdminBracketTournamentOption,
 } from "@/components/AdminBracketManagement";
@@ -12,9 +15,7 @@ import {
   CheckCircle,
   Clock,
   Database,
-  Eye,
   GitBranch,
-  Menu,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -37,6 +38,7 @@ type RegistrationStatus =
   | "rejected"
   | "waitlisted";
 type FilterStatus = "all" | RegistrationStatus;
+type AdminFocusTarget = "note" | "reject" | "manual_review" | "waitlist";
 type AdminNotice =
   | "note-required"
   | "saved"
@@ -47,13 +49,19 @@ type AdminNotice =
   | "registration-delete-blocked"
   | "waitlist-order-blocked"
   | "bracket-full"
-  | "registration-closed";
+  | "registration-closed"
+  | "registration-locked"
+  | "registration-bulk-approved"
+  | "registration-bulk-partial"
+  | "registration-bulk-failed";
 
 type AdminPageProps = {
   searchParams?: Promise<{
     filter?: FilterStatus;
     selected?: string;
     notice?: AdminNotice;
+    detail?: string;
+    focus?: AdminFocusTarget;
     bracketNotice?: "population-saved" | "population-failed";
   }>;
 };
@@ -75,6 +83,7 @@ type SupabaseRegistration = {
   tournament_title: string | null;
   bracket_name: string | null;
   waitlist_position?: number | null;
+  registration_order?: number | null;
 };
 
 type AdminTournamentOption = {
@@ -130,34 +139,18 @@ function getSafeFilter(filter?: string): FilterStatus {
     : "all";
 }
 
-function getStatusBadgeClass(status: RegistrationStatus) {
-  if (status === "approved") {
-    return "border-green-500/30 bg-green-500/10 text-green-400";
-  }
-
-  if (status === "rejected") {
-    return "border-red-500/30 bg-red-500/10 text-red-400";
-  }
-
-  if (status === "manual_review") {
-    return "border-orange-500/30 bg-orange-500/10 text-orange-300";
-  }
-
-  if (status === "waitlisted") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-300";
-  }
-
-  return "border-white/10 bg-white/[0.04] text-zinc-300";
-}
-
 function buildHref({
   filter,
   selected,
   notice,
+  detail,
+  focus,
 }: {
   filter: FilterStatus;
   selected?: string;
   notice?: AdminNotice;
+  detail?: string;
+  focus?: AdminFocusTarget;
 }) {
   const params = new URLSearchParams();
   params.set("filter", filter);
@@ -168,6 +161,14 @@ function buildHref({
 
   if (notice) {
     params.set("notice", notice);
+  }
+
+  if (detail) {
+    params.set("detail", detail);
+  }
+
+  if (focus) {
+    params.set("focus", focus);
   }
 
   return `/admin?${params.toString()}`;
@@ -235,10 +236,65 @@ function buildWaitlistPositionMap(registrations: SupabaseRegistration[]) {
   return positions;
 }
 
+function buildRegistrationPriorityMap(registrations: SupabaseRegistration[]) {
+  const priorities = new Map<string, number>();
+
+  registrations
+    .slice()
+    .sort(compareWaitlistedRegistrations)
+    .forEach((registration, index) => {
+      priorities.set(registration.id, index + 1);
+    });
+
+  return priorities;
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
   );
+}
+
+function describeRegistrationUpdateFailure(message: string) {
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes("older waitlisted")) {
+    return "older waitlisted players must be promoted first";
+  }
+
+  if (lowerMessage.includes("bracket is full")) {
+    return "bracket capacity is full";
+  }
+
+  if (lowerMessage.includes("registration is not available")) {
+    return "registration is closed or the tournament is locked";
+  }
+
+  if (
+    lowerMessage.includes("roster is locked") ||
+    lowerMessage.includes("bracket generation")
+  ) {
+    return "bracket roster is locked after bracket generation";
+  }
+
+  if (lowerMessage.includes("elo")) {
+    return "player does not satisfy the bracket ELO rules";
+  }
+
+  return message;
+}
+
+function buildBulkApprovalDetail(failures: string[], approvedCount: number) {
+  const visibleFailures = failures.slice(0, 8);
+  const remaining = failures.length - visibleFailures.length;
+  const prefix =
+    approvedCount > 0
+      ? `${approvedCount} registration(s) approved. `
+      : "No registrations were approved. ";
+  const suffix =
+    remaining > 0 ? ` ${remaining} additional failure(s) omitted.` : "";
+
+  return `${prefix}${visibleFailures.join("; ")}.${suffix}`.slice(0, 900);
 }
 
 async function updateRegistrationStatus(formData: FormData) {
@@ -364,6 +420,9 @@ async function updateRegistrationStatus(formData: FormData) {
       ? "waitlist-order-blocked"
       : lowerMessage.includes("bracket is full")
         ? "bracket-full"
+        : lowerMessage.includes("roster is locked") ||
+            lowerMessage.includes("bracket generation")
+          ? "registration-locked"
         : lowerMessage.includes("registration is not available")
           ? "registration-closed"
           : "save-failed";
@@ -383,7 +442,7 @@ async function updateRegistrationStatus(formData: FormData) {
 
   redirect(
     buildHref({
-      filter: activeFilter,
+      filter: !selected && nextStatus === "approved" ? "approved" : activeFilter,
       selected: selected || undefined,
       notice: bracketPreserved ? "bracket-preserved" : "saved",
     })
@@ -561,35 +620,124 @@ async function deleteSelectedRegistrations(formData: FormData) {
   );
 }
 
-function StatusActionButton({
-  registrationId,
-  nextStatus,
-  activeFilter,
-  selected,
-  adminNotes,
-  children,
-  className,
-}: {
-  registrationId: string;
-  nextStatus: RegistrationStatus;
-  activeFilter: FilterStatus;
-  selected?: string;
-  adminNotes?: string | null;
-  children: ReactNode;
-  className: string;
-}) {
-  return (
-    <form action={updateRegistrationStatus}>
-      <input type="hidden" name="registrationId" value={registrationId} />
-      <input type="hidden" name="nextStatus" value={nextStatus} />
-      <input type="hidden" name="activeFilter" value={activeFilter} />
-      <input type="hidden" name="selected" value={selected ?? ""} />
-      <input type="hidden" name="adminNotes" value={adminNotes ?? ""} />
+async function approveSelectedRegistrations(formData: FormData) {
+  "use server";
 
-      <button type="submit" className={className}>
-        {children}
-      </button>
-    </form>
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+
+  if (!userId || role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  const activeFilter = getSafeFilter(
+    String(formData.get("activeFilter") || "all")
+  );
+  const registrationIds = [
+    ...new Set(
+      formData
+        .getAll("registrationId")
+        .map((value) => String(value))
+        .filter(isUuid)
+    ),
+  ].slice(0, 100);
+
+  if (registrationIds.length === 0) {
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice: "registration-bulk-failed",
+        detail: "Select at least one registration to approve.",
+      })
+    );
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data: registrationsForApproval, error: lookupError } = await supabase
+    .from("registrations")
+    .select("id, player_name, registration_status, created_at")
+    .in("id", registrationIds);
+
+  if (lookupError || !registrationsForApproval) {
+    console.error("Registration bulk approval lookup failed:", lookupError);
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice: "registration-bulk-failed",
+        detail: "Selected registrations could not be loaded.",
+      })
+    );
+  }
+
+  const registrationsById = new Map(
+    registrationsForApproval.map((registration) => [
+      registration.id,
+      registration,
+    ])
+  );
+  const failures = registrationIds
+    .filter((registrationId) => !registrationsById.has(registrationId))
+    .map((registrationId) => `${registrationId}: registration not found`);
+  const orderedRegistrations = [...registrationsForApproval].sort(
+    (left, right) => {
+      const leftTime = new Date(left.created_at ?? "").getTime();
+      const rightTime = new Date(right.created_at ?? "").getTime();
+
+      return (
+        (Number.isFinite(leftTime) ? leftTime : 0) -
+          (Number.isFinite(rightTime) ? rightTime : 0) ||
+        left.id.localeCompare(right.id)
+      );
+    }
+  );
+  let approvedCount = 0;
+
+  for (const registration of orderedRegistrations) {
+    if (registration.registration_status === "approved") {
+      approvedCount += 1;
+      continue;
+    }
+
+    const { error } = await supabase
+      .from("registrations")
+      .update({ registration_status: "approved" })
+      .eq("id", registration.id);
+
+    if (error) {
+      failures.push(
+        `${registration.player_name || registration.id}: ${describeRegistrationUpdateFailure(
+          error.message
+        )}`
+      );
+    } else {
+      approvedCount += 1;
+    }
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/tournaments");
+  revalidatePath("/admin/tournaments");
+
+  if (failures.length > 0) {
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice:
+          approvedCount > 0
+            ? "registration-bulk-partial"
+            : "registration-bulk-failed",
+        detail: buildBulkApprovalDetail(failures, approvedCount),
+      })
+    );
+  }
+
+  redirect(
+    buildHref({
+      filter: "approved",
+      notice: "registration-bulk-approved",
+      detail: `${approvedCount} registration(s) approved.`,
+    })
   );
 }
 
@@ -635,6 +783,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const baseRegistrations = (registrationsData ?? []) as SupabaseRegistration[];
+  const registrationPriorityById =
+    buildRegistrationPriorityMap(baseRegistrations);
   const tournaments = [
     ...((tournamentResult.data ?? []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
@@ -672,6 +822,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const registrations = baseRegistrations.map((registration) => ({
     ...registration,
     waitlist_position: waitlistPositionByRegistration.get(registration.id) ?? null,
+    registration_order: registrationPriorityById.get(registration.id) ?? 0,
   }));
   const waitlistNotices = registrations
     .filter(
@@ -798,6 +949,26 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       : registrations.filter(
           (registration) => registration.registration_status === activeFilter
         );
+  const registrationReviewRows: AdminRegistrationReviewRow[] =
+    filteredRegistrations.map((registration) => ({
+      id: registration.id,
+      playerName: registration.player_name,
+      tournamentName:
+        registration.tournament_title ||
+        (registration.tournament_id
+          ? tournamentsById.get(registration.tournament_id) ?? ""
+          : ""),
+      bracketName: registration.bracket_name,
+      createdAt: registration.created_at,
+      region: registration.region,
+      submittedElo: registration.submitted_elo,
+      country: registration.country,
+      discordUsername: registration.discord_username,
+      status: registration.registration_status || "pending",
+      adminNotes: registration.admin_notes,
+      waitlistPosition: registration.waitlist_position ?? null,
+      registrationOrder: registration.registration_order ?? 0,
+    }));
 
   const stats = [
     {
@@ -919,24 +1090,55 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
 
             <form
-              id="delete-registrations-form"
+              id="registration-bulk-form"
               action={deleteSelectedRegistrations}
             >
               <input type="hidden" name="activeFilter" value={activeFilter} />
             </form>
-            <button
-              type="submit"
-              form="delete-registrations-form"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-red-200 transition hover:border-red-400/60 hover:bg-red-500/20"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Selected
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="submit"
+                form="registration-bulk-form"
+                formAction={approveSelectedRegistrations}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Approve Selected
+              </button>
+              <button
+                type="submit"
+                form="registration-bulk-form"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-red-200 transition hover:border-red-400/60 hover:bg-red-500/20"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Selected
+              </button>
+            </div>
           </div>
 
           {params?.notice === "registration-deleted" && (
             <div className="mb-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-semibold text-green-300">
               Selected registration(s) deleted.
+            </div>
+          )}
+
+          {params?.notice === "registration-bulk-approved" && (
+            <div className="mb-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-semibold text-green-300">
+              {params.detail || "Selected registration(s) approved."}
+            </div>
+          )}
+
+          {params?.notice === "registration-bulk-partial" && (
+            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold leading-6 text-amber-200">
+              {params.detail ||
+                "Some selected registration(s) were approved. Others failed validation."}
+            </div>
+          )}
+
+          {params?.notice === "registration-bulk-failed" && (
+            <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold leading-6 text-red-300">
+              {params.detail ||
+                "Selected registration(s) could not be approved."}
             </div>
           )}
 
@@ -975,6 +1177,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Registration update blocked because this tournament is no longer
               open for roster changes. Set the tournament back to registration
               open before making waitlist promotions.
+            </div>
+          )}
+
+          {params?.notice === "registration-locked" && (
+            <div className="mb-5 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-semibold leading-6 text-orange-200">
+              Waitlist promotion blocked because this bracket has already been
+              generated or the tournament is live. Use the protected bracket
+              management workflow for post-generation roster corrections.
             </div>
           )}
 
@@ -1026,11 +1236,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           )}
 
           <div className="overflow-x-auto overflow-y-visible">
-            <table className="w-full min-w-[1320px] text-left text-sm">
+            <table className="w-full min-w-[1220px] text-left text-sm">
               <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
                 <tr>
                   <th className="py-4">
-                    <span className="sr-only">Select</span>
+                    <AdminRegistrationSelectAll
+                      formId="registration-bulk-form"
+                      name="registrationId"
+                    />
                   </th>
                   <th>Player Name</th>
                   <th>Tournament Name</th>
@@ -1041,162 +1254,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <th>Discord</th>
                   <th>Registration Status</th>
                   <th>Waitlist</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
 
-              <tbody>
-                {filteredRegistrations.map((registration) => (
-                  <tr
-                    key={registration.id}
-                    className="border-b border-white/5 text-zinc-300 transition hover:bg-white/[0.03]"
-                  >
-                    <td className="py-4">
-                      <input
-                        form="delete-registrations-form"
-                        type="checkbox"
-                        name="registrationId"
-                        value={registration.id}
-                        aria-label={`Select registration for ${
-                          registration.player_name || "player"
-                        }`}
-                        className="h-4 w-4 rounded border-white/20 bg-black/40 text-orange-500 focus:ring-orange-500"
-                      />
-                    </td>
-
-                    <td className="font-semibold text-white">
-                      {registration.player_name || "N/A"}
-                    </td>
-
-                    <td>
-                      <p className="font-semibold text-white">
-                        {registration.tournament_title ||
-                          (registration.tournament_id
-                            ? tournamentsById.get(registration.tournament_id)
-                            : null) ||
-                          "N/A"}
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {registration.bracket_name
-                          ? `${registration.bracket_name} Bracket`
-                          : "Bracket not assigned"}
-                      </p>
-                    </td>
-
-                    <td>
-                      {registration.created_at
-                        ? new Date(registration.created_at).toLocaleDateString()
-                        : "N/A"}
-                    </td>
-
-                    <td>{registration.region || "N/A"}</td>
-                    <td>{registration.submitted_elo ?? "N/A"}</td>
-                    <td>{registration.country || "N/A"}</td>
-                    <td>{registration.discord_username || "N/A"}</td>
-
-                    <td>
-                      <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                          registration.registration_status || "pending"
-                        )}`}
-                      >
-                        {formatStatus(
-                          registration.registration_status || "pending"
-                        )}
-                      </span>
-                    </td>
-
-                    <td>
-                      {registration.registration_status === "waitlisted" ? (
-                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-black text-amber-300">
-                          #{registration.waitlist_position ?? "?"}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-zinc-600">-</span>
-                      )}
-                    </td>
-
-                    <td className="relative">
-                      <div className="relative z-[80]">
-                        <details className="group relative inline-block">
-                          <summary className="inline-flex cursor-pointer list-none items-center justify-center rounded-xl bg-orange-500/10 p-2 text-orange-300 ring-1 ring-orange-500/20 transition hover:bg-orange-500/20 hover:ring-orange-400/40 [&::-webkit-details-marker]:hidden">
-                            <Menu className="h-4 w-4" />
-                          </summary>
-
-                          <div className="fixed right-10 z-[9999] mt-2 w-48 origin-top-right scale-95 rounded-2xl bg-zinc-950/95 p-2 opacity-0 shadow-2xl shadow-orange-950/60 ring-1 ring-orange-500/20 backdrop-blur-xl transition-all duration-200 group-open:scale-100 group-open:opacity-100">
-                            <div className="space-y-1.5">
-                              <Link
-                                href={buildHref({
-                                  filter: activeFilter,
-                                  selected: registration.id,
-                                })}
-                                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-orange-300 transition hover:bg-orange-500/10"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                View Details
-                              </Link>
-
-                              <StatusActionButton
-                                registrationId={registration.id}
-                                nextStatus="approved"
-                                activeFilter={activeFilter}
-                                adminNotes={registration.admin_notes}
-                                className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-green-400 transition hover:bg-green-500/10"
-                              >
-                                {registration.registration_status ===
-                                "waitlisted"
-                                  ? "Promote / Approve"
-                                  : "Approve"}
-                              </StatusActionButton>
-
-                              <StatusActionButton
-                                registrationId={registration.id}
-                                nextStatus="rejected"
-                                activeFilter={activeFilter}
-                                selected={registration.id}
-                                adminNotes={registration.admin_notes}
-                                className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-red-400 transition hover:bg-red-500/10"
-                              >
-                                Reject
-                              </StatusActionButton>
-
-                              <StatusActionButton
-                                registrationId={registration.id}
-                                nextStatus="manual_review"
-                                activeFilter={activeFilter}
-                                selected={registration.id}
-                                adminNotes={registration.admin_notes}
-                                className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-orange-300 transition hover:bg-orange-500/10"
-                              >
-                                Review
-                              </StatusActionButton>
-
-                              <StatusActionButton
-                                registrationId={registration.id}
-                                nextStatus="waitlisted"
-                                activeFilter={activeFilter}
-                                selected={registration.id}
-                                adminNotes={registration.admin_notes}
-                                className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-amber-300 transition hover:bg-amber-500/10"
-                              >
-                                Waitlist
-                              </StatusActionButton>
-                            </div>
-                          </div>
-                        </details>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-
-                {filteredRegistrations.length === 0 && (
-                  <tr>
-                    <td colSpan={11} className="py-10 text-center text-zinc-500">
-                      No registrations found for this status.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
+              <AdminRegistrationReviewRows
+                registrations={registrationReviewRows}
+                activeFilter={activeFilter}
+                formId="registration-bulk-form"
+                updateRegistrationStatusAction={updateRegistrationStatus}
+              />
             </table>
           </div>
 
@@ -1345,6 +1411,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   defaultValue={selectedRegistration.admin_notes ?? ""}
                   maxLength={1000}
                   rows={5}
+                  autoFocus={
+                    params?.focus === "note" || params?.focus === "reject"
+                  }
                   className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400"
                   placeholder="Explain the decision or information needed from the player."
                 />
@@ -1365,7 +1434,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       ? "Registration decision and admin note saved."
                       : params.notice === "bracket-preserved"
                         ? "Registration saved. The populated or active bracket was preserved and was not regenerated. Use an explicit administrator reset before rebuilding it."
-                      : "The registration decision could not be saved. Check the note length and try again."}
+                        : params.notice === "registration-locked"
+                          ? "This bracket has already been generated or the tournament is live. Use the protected bracket management workflow for roster corrections."
+                          : "The registration decision could not be saved. Check the note length and try again."}
                 </div>
               )}
 
@@ -1386,7 +1457,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   className="inline-flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 transition hover:bg-green-500/20"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  Approve
+                  {selectedRegistration.registration_status === "waitlisted"
+                    ? "Approve From Waitlist"
+                    : "Approve"}
                 </button>
 
                 <button
@@ -1403,6 +1476,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   type="submit"
                   name="nextStatus"
                   value="manual_review"
+                  autoFocus={params?.focus === "manual_review"}
                   className="inline-flex items-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/20"
                 >
                   <AlertTriangle className="h-4 w-4" />
@@ -1413,6 +1487,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   type="submit"
                   name="nextStatus"
                   value="waitlisted"
+                  autoFocus={params?.focus === "waitlist"}
                   className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/20"
                 >
                   <Clock className="h-4 w-4" />
