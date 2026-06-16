@@ -18,6 +18,7 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   Trophy,
   X,
   XCircle,
@@ -40,7 +41,10 @@ type AdminNotice =
   | "note-required"
   | "saved"
   | "save-failed"
-  | "bracket-preserved";
+  | "bracket-preserved"
+  | "registration-deleted"
+  | "registration-delete-failed"
+  | "registration-delete-blocked";
 
 type AdminPageProps = {
   searchParams?: Promise<{
@@ -65,6 +69,17 @@ type SupabaseRegistration = {
   created_at: string;
   tournament_id: string | null;
   tournament_bracket_id: string | null;
+  tournament_title: string | null;
+  bracket_name: string | null;
+};
+
+type AdminTournamentOption = {
+  id: string;
+  title: string;
+  status: string;
+  grand_final_at: string | null;
+  created_at: string;
+  tournament_brackets?: { id: string; name: string }[];
 };
 
 const managementCards = [
@@ -152,6 +167,33 @@ function buildHref({
   }
 
   return `/admin?${params.toString()}`;
+}
+
+function compareAdminTournaments(
+  left: AdminTournamentOption,
+  right: AdminTournamentOption
+) {
+  const leftHistorical = left.status === "completed" ? 1 : 0;
+  const rightHistorical = right.status === "completed" ? 1 : 0;
+
+  if (leftHistorical !== rightHistorical) {
+    return leftHistorical - rightHistorical;
+  }
+
+  return getAdminTournamentSortTime(right) - getAdminTournamentSortTime(left);
+}
+
+function getAdminTournamentSortTime(tournament: AdminTournamentOption) {
+  const dateValue = tournament.grand_final_at ?? tournament.created_at;
+  const timestamp = new Date(dateValue).getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
 }
 
 async function updateRegistrationStatus(formData: FormData) {
@@ -295,6 +337,177 @@ async function updateRegistrationStatus(formData: FormData) {
   );
 }
 
+async function deleteSelectedRegistrations(formData: FormData) {
+  "use server";
+
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+
+  if (!userId || role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  const activeFilter = getSafeFilter(
+    String(formData.get("activeFilter") || "all")
+  );
+  const registrationIds = [
+    ...new Set(
+      formData
+        .getAll("registrationId")
+        .map((value) => String(value))
+        .filter(isUuid)
+    ),
+  ].slice(0, 100);
+
+  if (registrationIds.length === 0) {
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice: "registration-delete-failed",
+      })
+    );
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data: registrationsForDelete, error: lookupError } = await supabase
+    .from("registrations")
+    .select("id, registration_status, tournament_bracket_id")
+    .in("id", registrationIds);
+
+  if (
+    lookupError ||
+    !registrationsForDelete ||
+    registrationsForDelete.length !== registrationIds.length
+  ) {
+    console.error("Registration delete lookup failed:", lookupError?.message);
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice: "registration-delete-failed",
+      })
+    );
+  }
+
+  const approvedBracketIds = [
+    ...new Set(
+      registrationsForDelete
+        .filter(
+          (registration) =>
+            registration.registration_status === "approved" &&
+            registration.tournament_bracket_id
+        )
+        .map((registration) => registration.tournament_bracket_id as string)
+    ),
+  ];
+
+  const conflictQueries = [
+    approvedBracketIds.length > 0
+      ? supabase
+          .from("generated_brackets")
+          .select("id")
+          .in("tournament_bracket_id", approvedBracketIds)
+          .limit(1)
+      : null,
+    supabase
+      .from("tournament_matches")
+      .select("id")
+      .in("player_one_registration_id", registrationIds)
+      .limit(1),
+    supabase
+      .from("tournament_matches")
+      .select("id")
+      .in("player_two_registration_id", registrationIds)
+      .limit(1),
+    supabase
+      .from("tournament_matches")
+      .select("id")
+      .in("winner_registration_id", registrationIds)
+      .limit(1),
+    supabase
+      .from("tournament_standings")
+      .select("registration_id")
+      .in("registration_id", registrationIds)
+      .limit(1),
+    supabase
+      .from("match_result_submissions")
+      .select("id")
+      .in("submitted_by_registration_id", registrationIds)
+      .limit(1),
+    supabase
+      .from("match_result_submissions")
+      .select("id")
+      .in("claimed_winner_registration_id", registrationIds)
+      .limit(1),
+    supabase
+      .from("match_result_report_groups")
+      .select("id")
+      .in("submitted_by_registration_id", registrationIds)
+      .limit(1),
+    supabase
+      .from("match_result_report_groups")
+      .select("id")
+      .in("opponent_registration_id", registrationIds)
+      .limit(1),
+    supabase
+      .from("match_result_report_groups")
+      .select("id")
+      .in("winner_registration_id", registrationIds)
+      .limit(1),
+  ].filter((query) => query !== null);
+
+  const conflictResults = await Promise.all(conflictQueries);
+  const conflictError = conflictResults.find((result) => result.error)?.error;
+  const hasConflict = conflictResults.some(
+    (result) => (result.data ?? []).length > 0
+  );
+
+  if (conflictError) {
+    console.error("Registration delete conflict check failed:", conflictError);
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice: "registration-delete-failed",
+      })
+    );
+  }
+
+  if (hasConflict) {
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice: "registration-delete-blocked",
+      })
+    );
+  }
+
+  const { error } = await supabase
+    .from("registrations")
+    .delete()
+    .in("id", registrationIds);
+
+  if (error) {
+    console.error("Registration delete failed:", error.message);
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice: "registration-delete-failed",
+      })
+    );
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/tournaments");
+  revalidatePath("/admin/tournaments");
+
+  redirect(
+    buildHref({
+      filter: activeFilter,
+      notice: "registration-deleted",
+    })
+  );
+}
+
 function StatusActionButton({
   registrationId,
   nextStatus,
@@ -346,13 +559,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("registrations")
         .select(
-          "id, player_name, discord_username, steam_name, country, region, timezone, submitted_elo, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id"
+          "id, player_name, discord_username, steam_name, country, region, timezone, submitted_elo, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name"
         )
         .order("created_at", { ascending: false }),
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, grand_final_at, tournament_brackets(id, name)"
+          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name)"
         )
         .order("grand_final_at", { ascending: false, nullsFirst: false }),
       supabase
@@ -369,12 +582,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const registrations = (registrationsData ?? []) as SupabaseRegistration[];
-  const tournaments = (tournamentResult.data ?? []) as {
-    id: string;
-    title: string;
-    status: string;
-    tournament_brackets?: { id: string; name: string }[];
-  }[];
+  const tournaments = [
+    ...((tournamentResult.data ?? []) as AdminTournamentOption[]),
+  ].sort(compareAdminTournaments);
+  const tournamentsById = new Map(
+    tournaments.map((tournament) => [tournament.id, tournament.title])
+  );
   const generatedByBracket = new Map(
     (
       (generatedResult.data ?? []) as {
@@ -578,24 +791,67 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
 
         <div className="relative z-10 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold">Registration Review</h2>
-            <p className="mt-1 text-sm text-zinc-400">
-              Showing {filteredRegistrations.length} registration(s).
-            </p>
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Registration Review</h2>
+              <p className="mt-1 text-sm text-zinc-400">
+                Showing {filteredRegistrations.length} registration(s).
+              </p>
+            </div>
+
+            <form
+              id="delete-registrations-form"
+              action={deleteSelectedRegistrations}
+            >
+              <input type="hidden" name="activeFilter" value={activeFilter} />
+            </form>
+            <button
+              type="submit"
+              form="delete-registrations-form"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-red-200 transition hover:border-red-400/60 hover:bg-red-500/20"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Selected
+            </button>
           </div>
 
+          {params?.notice === "registration-deleted" && (
+            <div className="mb-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-semibold text-green-300">
+              Selected registration(s) deleted.
+            </div>
+          )}
+
+          {params?.notice === "registration-delete-blocked" && (
+            <div className="mb-5 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-semibold leading-6 text-orange-200">
+              Selected registration(s) are tied to generated bracket data,
+              matches, standings, submissions, or report groups. Reset or
+              remove the related tournament data before deleting them.
+            </div>
+          )}
+
+          {params?.notice === "registration-delete-failed" && (
+            <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold text-red-300">
+              Registration deletion failed. Select at least one registration and
+              confirm the selected records are not protected by active
+              tournament data.
+            </div>
+          )}
+
           <div className="overflow-x-auto overflow-y-visible">
-            <table className="w-full min-w-[1000px] text-left text-sm">
+            <table className="w-full min-w-[1250px] text-left text-sm">
               <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
                 <tr>
-                  <th className="py-4">Player</th>
+                  <th className="py-4">
+                    <span className="sr-only">Select</span>
+                  </th>
+                  <th>Player Name</th>
+                  <th>Tournament Name</th>
                   <th>Created</th>
                   <th>Region</th>
                   <th>ELO</th>
                   <th>Country</th>
                   <th>Discord</th>
-                  <th>Status</th>
+                  <th>Registration Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -606,8 +862,36 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     key={registration.id}
                     className="border-b border-white/5 text-zinc-300 transition hover:bg-white/[0.03]"
                   >
-                    <td className="py-4 font-semibold text-white">
+                    <td className="py-4">
+                      <input
+                        form="delete-registrations-form"
+                        type="checkbox"
+                        name="registrationId"
+                        value={registration.id}
+                        aria-label={`Select registration for ${
+                          registration.player_name || "player"
+                        }`}
+                        className="h-4 w-4 rounded border-white/20 bg-black/40 text-orange-500 focus:ring-orange-500"
+                      />
+                    </td>
+
+                    <td className="font-semibold text-white">
                       {registration.player_name || "N/A"}
+                    </td>
+
+                    <td>
+                      <p className="font-semibold text-white">
+                        {registration.tournament_title ||
+                          (registration.tournament_id
+                            ? tournamentsById.get(registration.tournament_id)
+                            : null) ||
+                          "N/A"}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {registration.bracket_name
+                          ? `${registration.bracket_name} Bracket`
+                          : "Bracket not assigned"}
+                      </p>
                     </td>
 
                     <td>
@@ -705,7 +989,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
                 {filteredRegistrations.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-zinc-500">
+                    <td colSpan={10} className="py-10 text-center text-zinc-500">
                       No registrations found for this status.
                     </td>
                   </tr>

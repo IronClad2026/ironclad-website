@@ -32,7 +32,7 @@ export default async function TournamentsPage() {
       .select(
         "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
       )
-      .order("grand_final_at", { ascending: true, nullsFirst: false }),
+      .order("grand_final_at", { ascending: false, nullsFirst: false }),
     supabase.rpc("get_tournament_bracket_capacity"),
     supabase
       .from("registrations")
@@ -215,13 +215,7 @@ export default async function TournamentsPage() {
     tournament.players = tournament.participants.length;
     return tournament;
   });
-  tournaments.sort(
-    (left, right) =>
-      getTournamentPriority(left.statusValue) -
-        getTournamentPriority(right.statusValue) ||
-      getTournamentStartTime(left.grandFinalAt) -
-        getTournamentStartTime(right.grandFinalAt)
-  );
+  tournaments.sort(compareTournamentCards);
   const matchResultSubmissions = userId
     ? await loadVisibleMatchResultSubmissions(supabase, userId, isAdmin)
     : [];
@@ -639,18 +633,23 @@ async function proofObjectExists(
   return data.some((object) => object.name === fileName);
 }
 
-function getTournamentPriority(status: TournamentRow["status"]) {
-  return {
-    registration_open: 0,
-    in_progress: 1,
-    upcoming: 2,
-    completed: 3,
-  }[status];
+function compareTournamentCards(
+  left: ReturnType<typeof mapTournamentRow>,
+  right: ReturnType<typeof mapTournamentRow>
+) {
+  const leftHistorical = left.statusValue === "completed" ? 1 : 0;
+  const rightHistorical = right.statusValue === "completed" ? 1 : 0;
+
+  if (leftHistorical !== rightHistorical) {
+    return leftHistorical - rightHistorical;
+  }
+
+  return getTournamentSortTime(right) - getTournamentSortTime(left);
 }
 
-function getTournamentStartTime(value: string | null) {
-  if (!value) return Number.MAX_SAFE_INTEGER;
+function getTournamentSortTime(tournament: ReturnType<typeof mapTournamentRow>) {
+  const dateValue = tournament.grandFinalAt ?? tournament.createdAt;
+  const timestamp = new Date(dateValue).getTime();
 
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }

@@ -57,6 +57,24 @@ type AdminNotice =
   | "cleanup-completed"
   | "cleanup-failed";
 
+function compareTournamentRows(left: TournamentRow, right: TournamentRow) {
+  const leftHistorical = left.status === "completed" ? 1 : 0;
+  const rightHistorical = right.status === "completed" ? 1 : 0;
+
+  if (leftHistorical !== rightHistorical) {
+    return leftHistorical - rightHistorical;
+  }
+
+  return getTournamentSortTime(right) - getTournamentSortTime(left);
+}
+
+function getTournamentSortTime(tournament: TournamentRow) {
+  const dateValue = tournament.grand_final_at ?? tournament.created_at;
+  const timestamp = new Date(dateValue).getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 const emptyTournament: TournamentFormValues = {
   id: null,
   title: "",
@@ -135,7 +153,9 @@ export default async function AdminTournamentsPage({
     logSupabaseError("Admin tournament list load failed:", error);
   }
 
-  const tournaments = (data ?? []) as TournamentRow[];
+  const tournaments = [...((data ?? []) as TournamentRow[])].sort(
+    compareTournamentRows
+  );
   const [
     generatedResult,
     approvedResult,
@@ -153,7 +173,7 @@ export default async function AdminTournamentsPage({
       .eq("registration_status", "approved")
       .not("tournament_bracket_id", "is", null),
     Promise.all(
-      ((data ?? []) as TournamentRow[]).map(async (tournament) => {
+      tournaments.map(async (tournament) => {
         const { data: preview, error: previewError } = await supabase.rpc(
           "get_tournament_deletion_preview",
           { p_tournament_id: tournament.id }

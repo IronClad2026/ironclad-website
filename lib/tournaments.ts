@@ -43,6 +43,7 @@ export type TournamentCard = {
   contact: string;
   registrationOpenAt: string;
   grandFinalAt: string | null;
+  createdAt: string;
   resultConfirmationWindowMinutes: number;
   rulesUrl: string | null;
   battlefyUrl: string | null;
@@ -286,6 +287,7 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
       "Use the IronClad website and official community channels for registration, match details, and tournament updates.",
     registrationOpenAt: row.registration_open_at ?? "",
     grandFinalAt: row.grand_final_at,
+    createdAt: row.created_at,
     resultConfirmationWindowMinutes:
       row.result_confirmation_window_minutes ?? 30,
     rulesUrl: row.rules_url,

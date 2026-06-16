@@ -98,8 +98,7 @@ export default function PlayerMatchResultForm({
         />
       </label>
       <p className="text-[11px] text-slate-500">
-        Replay proof is required. Screenshots are no longer used for result
-        confirmation. Maximum 10 MB.
+        Replay proof is required.
       </p>
       <label className="block">
         <span className="text-xs font-bold text-slate-300">

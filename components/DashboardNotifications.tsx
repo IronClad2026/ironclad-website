@@ -385,6 +385,9 @@ function NotificationModal({
     notification.canConfirm &&
     notification.confirmationDeadlineAt !== null &&
     now < new Date(notification.confirmationDeadlineAt).getTime();
+  const showConfirmationSummary =
+    notification.source === "report_group" &&
+    notification.status === "pending_confirmation";
 
   return (
     <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
@@ -404,26 +407,26 @@ function NotificationModal({
         initial={{ opacity: 0, scale: 0.96, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 12 }}
-        className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.16),transparent_35%),linear-gradient(145deg,#111827,#030712)] shadow-[0_0_80px_rgba(249,115,22,0.16)]"
+        className="relative max-h-[88vh] w-[min(92vw,30rem)] overflow-y-auto rounded-2xl border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.16),transparent_35%),linear-gradient(145deg,#111827,#030712)] shadow-[0_0_60px_rgba(249,115,22,0.14)]"
       >
-        <header className="flex items-start justify-between gap-5 border-b border-white/10 p-6 sm:p-8">
-          <div className="flex items-start gap-4">
+        <header className="flex items-start justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
+          <div className="flex min-w-0 items-start gap-3">
             <span
-              className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-white/10 bg-black/30 ${content.iconClassName}`}
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-black/30 ${content.iconClassName}`}
             >
-              <Icon size={22} />
+              <Icon size={20} />
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
                 Match Notification
               </p>
               <h2
                 id={`notification-${notification.sourceId}`}
-                className="mt-2 text-2xl font-black text-white"
+                className="mt-1.5 break-words text-lg font-black text-white sm:text-xl"
               >
                 {content.title}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">
+              <p className="mt-1.5 text-xs leading-5 text-zinc-400">
                 {content.message}
               </p>
             </div>
@@ -432,13 +435,72 @@ function NotificationModal({
             type="button"
             onClick={onClose}
             aria-label="Close notification"
-            className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-2.5 text-zinc-400 transition hover:border-orange-400/40 hover:text-white"
+            className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 transition hover:border-orange-400/40 hover:text-white"
           >
-            <X size={19} />
+            <X size={17} />
           </button>
         </header>
 
-        <div className="grid gap-3 p-6 sm:grid-cols-2 sm:p-8">
+        {showConfirmationSummary && (
+          <div className="space-y-3 border-b border-white/10 p-4 sm:p-5">
+            <div className="grid gap-2 text-xs sm:grid-cols-3">
+              <CompactDetail
+                label="Opponent"
+                value={notification.opponentName}
+              />
+              <CompactDetail
+                label="Score"
+                value={notification.reportedScore}
+              />
+              <CompactDetail
+                label="Time"
+                value={
+                  notification.confirmationDeadlineAt
+                    ? formatTimeRemaining(
+                        notification.confirmationDeadlineAt,
+                        now
+                      )
+                    : "Unavailable"
+                }
+              />
+            </div>
+
+            {responseAvailable && (
+              <div className="space-y-3 rounded-xl border border-orange-400/20 bg-orange-500/5 p-3">
+                <textarea
+                  value={disputeNotes}
+                  onChange={(event) => setDisputeNotes(event.target.value)}
+                  maxLength={2000}
+                  rows={2}
+                  placeholder="Optional dispute notes"
+                  className="w-full resize-none rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => onRespond(notification, "confirm")}
+                    className="rounded-lg bg-emerald-600 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    Confirm Result
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      onRespond(notification, "dispute", disputeNotes)
+                    }
+                    className="rounded-lg bg-red-700 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
+                  >
+                    Dispute Result
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="grid gap-2 p-4 sm:grid-cols-2 sm:p-5">
           <Detail label="Tournament" value={notification.tournamentName} />
           <Detail
             label="Match"
@@ -480,52 +542,11 @@ function NotificationModal({
           notification.status === "pending_confirmation" &&
           !responseAvailable &&
           !notification.submittedByViewer && (
-            <div className="mx-6 mb-6 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-5 text-sm leading-6 text-amber-100/80 sm:mx-8 sm:mb-8">
+            <div className="mx-4 mb-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80 sm:mx-5 sm:mb-5">
               The confirmation window has expired. Automatic approval is
               waiting for the scheduled job to process this result.
             </div>
           )}
-
-        {notification.source === "report_group" && responseAvailable && (
-          <div className="mx-6 mb-6 space-y-4 rounded-2xl border border-orange-400/20 bg-orange-500/5 p-5 sm:mx-8 sm:mb-8">
-            <p className="text-xs font-black uppercase tracking-wider text-orange-200">
-              Confirm or Dispute
-            </p>
-            <p className="text-sm leading-6 text-zinc-300">
-              Confirming approves the result immediately and advances the
-              winner. Disputing moves the report to administrator review and
-              prevents automatic approval.
-            </p>
-            <textarea
-              value={disputeNotes}
-              onChange={(event) => setDisputeNotes(event.target.value)}
-              maxLength={2000}
-              rows={3}
-              placeholder="Optional dispute notes"
-              className="w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-orange-400"
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => onRespond(notification, "confirm")}
-                className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-emerald-500 disabled:opacity-50"
-              >
-                Confirm Result
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() =>
-                  onRespond(notification, "dispute", disputeNotes)
-                }
-                className="rounded-xl bg-red-700 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
-              >
-                Dispute Result
-              </button>
-            </div>
-          </div>
-        )}
       </motion.article>
     </div>
   );
@@ -533,11 +554,22 @@ function NotificationModal({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/25 p-4">
+    <div className="min-w-0 rounded-lg border border-white/10 bg-black/25 p-3">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>
-      <p className="mt-2 text-sm font-bold text-white">{value}</p>
+      <p className="mt-1 break-words text-xs font-bold text-white">{value}</p>
+    </div>
+  );
+}
+
+function CompactDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-white/10 bg-black/25 p-2.5">
+      <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-xs font-black text-white">{value}</p>
     </div>
   );
 }
