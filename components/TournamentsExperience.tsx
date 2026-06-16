@@ -238,6 +238,11 @@ function Hero({
   const allBracketsWaitlistOnly = tournament.brackets.every(
     (bracket) => bracket.isWaitlistOnly
   );
+  const actionLabel = registrationOpen
+    ? allBracketsWaitlistOnly
+      ? "Join Waitlist"
+      : "Register"
+    : publicStatus;
 
   return (
     <section className="relative overflow-hidden border-b border-slate-800 bg-black">
@@ -284,7 +289,7 @@ function Hero({
           </div>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
             <ActionCard
-              label={registrationOpen ? "Register" : publicStatus}
+              label={actionLabel}
               description={
                 registrationOpen
                   ? allBracketsWaitlistOnly
@@ -1923,7 +1928,7 @@ function RegisterModal({
     if (targetStep === "tournament") {
       if (!isTournamentRegistrationOpen(selectedTournament)) {
         nextErrors.tournamentTitle =
-          "Registration is not currently open for this tournament.";
+          "This tournament is full or already in progress. We hope to see you in the next one.";
       } else if (!form.tournamentTitle.trim()) {
         nextErrors.tournamentTitle = "Please select a tournament.";
       }
@@ -1972,7 +1977,7 @@ function RegisterModal({
   const submitRegistration = async () => {
     if (!isTournamentRegistrationOpen(selectedTournament)) {
       setSubmissionError(
-        "Registration is not currently open for this tournament."
+        "This tournament is full or already in progress. We hope to see you in the next one."
       );
       setStep("tournament");
       return;
@@ -2332,9 +2337,9 @@ function RegistrationGatePrompt({
     },
     closed: {
       eyebrow: "Registration Unavailable",
-      title: "Registration is not open for this tournament.",
+      title: "This tournament is full or already in progress.",
       description:
-        "Review the tournament schedule and return when the event status is Open.",
+        "We hope to see you in the next one.",
     },
     error: {
       eyebrow: "Profile Check Unavailable",

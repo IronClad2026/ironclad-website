@@ -97,7 +97,8 @@ export async function submitTournamentRegistration(
   ) {
     return {
       success: false,
-      message: "Registration is not currently open for this tournament.",
+      message:
+        "This tournament is full or already in progress. We hope to see you in the next one.",
     };
   }
 
@@ -199,7 +200,7 @@ export async function submitTournamentRegistration(
   const { data: savedRegistration, error: registrationError } = await supabase
     .from("registrations")
     .insert(registration)
-    .select("registration_status")
+    .select("id, tournament_bracket_id, registration_status")
     .single();
 
   if (registrationError) {
@@ -214,11 +215,23 @@ export async function submitTournamentRegistration(
   revalidatePath("/admin");
   revalidatePath("/tournaments");
 
+  const waitlistPosition =
+    savedRegistration?.registration_status === "waitlisted" &&
+    savedRegistration.tournament_bracket_id
+      ? await loadWaitlistPosition(
+          adminSupabase,
+          savedRegistration.tournament_bracket_id,
+          savedRegistration.id
+        )
+      : null;
+
   return {
     success: true,
     message:
       savedRegistration?.registration_status === "waitlisted"
-        ? "Registration submitted to the waitlist."
+        ? `Registration submitted to waitlist${
+            waitlistPosition ? ` position #${waitlistPosition}` : ""
+          }.`
         : "Registration submitted.",
   };
 }
@@ -249,7 +262,7 @@ function getRegistrationErrorMessage(error: {
   }
 
   if (message.includes("registration is not available")) {
-    return "Registration is not currently available for this tournament.";
+    return "This tournament is full or already in progress. We hope to see you in the next one.";
   }
 
   if (
@@ -260,4 +273,28 @@ function getRegistrationErrorMessage(error: {
   }
 
   return "Registration could not be submitted. Please try again or contact an admin.";
+}
+
+async function loadWaitlistPosition(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  tournamentBracketId: string,
+  registrationId: string
+) {
+  const { data, error } = await supabase
+    .from("registrations")
+    .select("id")
+    .eq("tournament_bracket_id", tournamentBracketId)
+    .eq("registration_status", "waitlisted")
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) {
+    console.error("Waitlist position lookup failed:", error);
+    return null;
+  }
+
+  const index = (data ?? []).findIndex(
+    (registration) => registration.id === registrationId
+  );
+  return index >= 0 ? index + 1 : null;
 }

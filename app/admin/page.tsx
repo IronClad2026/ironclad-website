@@ -44,7 +44,10 @@ type AdminNotice =
   | "bracket-preserved"
   | "registration-deleted"
   | "registration-delete-failed"
-  | "registration-delete-blocked";
+  | "registration-delete-blocked"
+  | "waitlist-order-blocked"
+  | "bracket-full"
+  | "registration-closed";
 
 type AdminPageProps = {
   searchParams?: Promise<{
@@ -71,6 +74,7 @@ type SupabaseRegistration = {
   tournament_bracket_id: string | null;
   tournament_title: string | null;
   bracket_name: string | null;
+  waitlist_position?: number | null;
 };
 
 type AdminTournamentOption = {
@@ -79,7 +83,7 @@ type AdminTournamentOption = {
   status: string;
   grand_final_at: string | null;
   created_at: string;
-  tournament_brackets?: { id: string; name: string }[];
+  tournament_brackets?: { id: string; name: string; max_players: number }[];
 };
 
 const managementCards = [
@@ -188,6 +192,47 @@ function getAdminTournamentSortTime(tournament: AdminTournamentOption) {
   const timestamp = new Date(dateValue).getTime();
 
   return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareWaitlistedRegistrations(
+  left: SupabaseRegistration,
+  right: SupabaseRegistration
+) {
+  const leftTime = new Date(left.created_at).getTime();
+  const rightTime = new Date(right.created_at).getTime();
+  const timeDelta =
+    (Number.isFinite(leftTime) ? leftTime : 0) -
+    (Number.isFinite(rightTime) ? rightTime : 0);
+
+  return timeDelta || left.id.localeCompare(right.id);
+}
+
+function buildWaitlistPositionMap(registrations: SupabaseRegistration[]) {
+  const positions = new Map<string, number>();
+  const byBracket = registrations.reduce((groups, registration) => {
+    if (
+      registration.registration_status !== "waitlisted" ||
+      !registration.tournament_bracket_id
+    ) {
+      return groups;
+    }
+
+    const group = groups.get(registration.tournament_bracket_id) ?? [];
+    group.push(registration);
+    groups.set(registration.tournament_bracket_id, group);
+    return groups;
+  }, new Map<string, SupabaseRegistration[]>());
+
+  for (const group of byBracket.values()) {
+    group
+      .slice()
+      .sort(compareWaitlistedRegistrations)
+      .forEach((registration, index) => {
+        positions.set(registration.id, index + 1);
+      });
+  }
+
+  return positions;
 }
 
 function isUuid(value: string) {
@@ -314,12 +359,20 @@ async function updateRegistrationStatus(formData: FormData) {
 
   if (error) {
     console.error("Supabase status update error:", error.message);
+    const lowerMessage = error.message.toLowerCase();
+    const notice: AdminNotice = lowerMessage.includes("older waitlisted")
+      ? "waitlist-order-blocked"
+      : lowerMessage.includes("bracket is full")
+        ? "bracket-full"
+        : lowerMessage.includes("registration is not available")
+          ? "registration-closed"
+          : "save-failed";
 
     redirect(
       buildHref({
         filter: activeFilter,
         selected: selected || registrationId,
-        notice: "save-failed",
+        notice,
       })
     );
   }
@@ -565,7 +618,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name)"
+          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, max_players)"
         )
         .order("grand_final_at", { ascending: false, nullsFirst: false }),
       supabase
@@ -581,13 +634,79 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     console.error("Supabase registrations fetch error:", error.message);
   }
 
-  const registrations = (registrationsData ?? []) as SupabaseRegistration[];
+  const baseRegistrations = (registrationsData ?? []) as SupabaseRegistration[];
   const tournaments = [
     ...((tournamentResult.data ?? []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
   const tournamentsById = new Map(
     tournaments.map((tournament) => [tournament.id, tournament.title])
   );
+  const bracketMetaById = new Map(
+    tournaments.flatMap((tournament) =>
+      (tournament.tournament_brackets ?? []).map((bracket) => [
+        bracket.id,
+        {
+          tournamentId: tournament.id,
+          tournamentTitle: tournament.title,
+          bracketName: `${bracket.name} Bracket`,
+          maxPlayers: bracket.max_players,
+        },
+      ])
+    )
+  );
+  const approvedCountByBracket = new Map<string, number>();
+  for (const registration of baseRegistrations) {
+    if (
+      registration.registration_status === "approved" &&
+      registration.tournament_bracket_id
+    ) {
+      approvedCountByBracket.set(
+        registration.tournament_bracket_id,
+        (approvedCountByBracket.get(registration.tournament_bracket_id) ?? 0) +
+          1
+      );
+    }
+  }
+  const waitlistPositionByRegistration =
+    buildWaitlistPositionMap(baseRegistrations);
+  const registrations = baseRegistrations.map((registration) => ({
+    ...registration,
+    waitlist_position: waitlistPositionByRegistration.get(registration.id) ?? null,
+  }));
+  const waitlistNotices = registrations
+    .filter(
+      (registration) =>
+        registration.registration_status === "waitlisted" &&
+        registration.tournament_bracket_id
+    )
+    .slice()
+    .sort(compareWaitlistedRegistrations)
+    .slice(0, 6);
+  const waitlistSlotNotices = Array.from(
+    registrations
+      .filter(
+        (registration) =>
+          registration.registration_status === "waitlisted" &&
+          registration.tournament_bracket_id
+      )
+      .reduce((groups, registration) => {
+        const bracketId = registration.tournament_bracket_id as string;
+        const group = groups.get(bracketId) ?? [];
+        group.push(registration);
+        groups.set(bracketId, group);
+        return groups;
+      }, new Map<string, SupabaseRegistration[]>())
+  )
+    .map(([bracketId, waitlisted]) => {
+      const meta = bracketMetaById.get(bracketId);
+      const approvedCount = approvedCountByBracket.get(bracketId) ?? 0;
+      const openSlots = Math.max((meta?.maxPlayers ?? 0) - approvedCount, 0);
+      const nextPlayer = waitlisted.slice().sort(compareWaitlistedRegistrations)[0];
+      return meta && openSlots > 0 && nextPlayer
+        ? { bracketId, meta, openSlots, nextPlayer }
+        : null;
+    })
+    .filter((notice) => notice !== null);
   const generatedByBracket = new Map(
     (
       (generatedResult.data ?? []) as {
@@ -837,8 +956,77 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           )}
 
+          {params?.notice === "waitlist-order-blocked" && (
+            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold leading-6 text-amber-200">
+              Waitlist promotion blocked. Promote the oldest waitlisted player
+              for this bracket first, unless you explicitly change the queue.
+            </div>
+          )}
+
+          {params?.notice === "bracket-full" && (
+            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold leading-6 text-amber-200">
+              Approval blocked because the bracket is already at approved
+              capacity.
+            </div>
+          )}
+
+          {params?.notice === "registration-closed" && (
+            <div className="mb-5 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-semibold leading-6 text-orange-200">
+              Registration update blocked because this tournament is no longer
+              open for roster changes. Set the tournament back to registration
+              open before making waitlist promotions.
+            </div>
+          )}
+
+          {(waitlistNotices.length > 0 || waitlistSlotNotices.length > 0) && (
+            <div className="mb-5 grid gap-3 lg:grid-cols-2">
+              {waitlistNotices.length > 0 && (
+                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+                  <p className="text-xs font-black uppercase tracking-wider text-amber-300">
+                    Waitlist Activity
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-amber-50/90">
+                    {waitlistNotices.map((registration) => (
+                      <p key={registration.id}>
+                        {registration.player_name || "Player"} joined Waitlist
+                        Position #{registration.waitlist_position ?? "?"} for{" "}
+                        {registration.tournament_title ||
+                          (registration.tournament_id
+                            ? tournamentsById.get(registration.tournament_id)
+                            : null) ||
+                          "this tournament"}
+                        .
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {waitlistSlotNotices.length > 0 && (
+                <div className="rounded-2xl border border-green-500/25 bg-green-500/10 p-4">
+                  <p className="text-xs font-black uppercase tracking-wider text-green-300">
+                    Slot Available
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-green-50/90">
+                    {waitlistSlotNotices.map((notice) => (
+                      <p key={notice.bracketId}>
+                        {notice.openSlots} slot
+                        {notice.openSlots === 1 ? "" : "s"} available in{" "}
+                        {notice.meta.tournamentTitle} -{" "}
+                        {notice.meta.bracketName}. Next queued player:{" "}
+                        {notice.nextPlayer.player_name || "Player"} at
+                        Waitlist Position #
+                        {notice.nextPlayer.waitlist_position ?? "?"}.
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="overflow-x-auto overflow-y-visible">
-            <table className="w-full min-w-[1250px] text-left text-sm">
+            <table className="w-full min-w-[1320px] text-left text-sm">
               <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
                 <tr>
                   <th className="py-4">
@@ -852,6 +1040,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <th>Country</th>
                   <th>Discord</th>
                   <th>Registration Status</th>
+                  <th>Waitlist</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -917,6 +1106,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       </span>
                     </td>
 
+                    <td>
+                      {registration.registration_status === "waitlisted" ? (
+                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-black text-amber-300">
+                          #{registration.waitlist_position ?? "?"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-600">-</span>
+                      )}
+                    </td>
+
                     <td className="relative">
                       <div className="relative z-[80]">
                         <details className="group relative inline-block">
@@ -944,7 +1143,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                                 adminNotes={registration.admin_notes}
                                 className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-green-400 transition hover:bg-green-500/10"
                               >
-                                Approve
+                                {registration.registration_status ===
+                                "waitlisted"
+                                  ? "Promote / Approve"
+                                  : "Approve"}
                               </StatusActionButton>
 
                               <StatusActionButton
@@ -989,7 +1191,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
                 {filteredRegistrations.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-10 text-center text-zinc-500">
+                    <td colSpan={11} className="py-10 text-center text-zinc-500">
                       No registrations found for this status.
                     </td>
                   </tr>
@@ -1080,6 +1282,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   formatStatus(
                     selectedRegistration.registration_status || "pending"
                   ),
+                ],
+                [
+                  "Waitlist Position",
+                  selectedRegistration.registration_status === "waitlisted"
+                    ? `#${selectedRegistration.waitlist_position ?? "?"}`
+                    : "N/A",
                 ],
                 [
                   "Created At",
