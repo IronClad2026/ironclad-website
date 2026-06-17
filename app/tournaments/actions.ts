@@ -7,6 +7,7 @@ import {
   isPlayerProfileComplete,
   type PlayerProfile,
 } from "@/lib/player-profile";
+import { createInAppNotification } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -224,6 +225,24 @@ export async function submitTournamentRegistration(
           savedRegistration.id
         )
       : null;
+
+  await createInAppNotification({
+    recipientRole: "admin",
+    type: "registration.submitted",
+    title: "New Tournament Registration",
+    message: `${profile.in_game_name} registered for ${tournamentTitle}.`,
+    actorClerkUserId: userId,
+    actorDisplayName: profile.in_game_name,
+    tournamentId,
+    tournamentTitle,
+    registrationId: savedRegistration.id,
+    metadata: {
+      bracketId: tournamentBracketId,
+      bracketName,
+      registrationStatus: savedRegistration.registration_status,
+      waitlistPosition,
+    },
+  });
 
   return {
     success: true,

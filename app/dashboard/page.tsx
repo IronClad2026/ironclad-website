@@ -14,7 +14,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import DashboardChampionHistory from "@/components/DashboardChampionHistory";
 import DashboardMatchHistory from "@/components/DashboardMatchHistory";
-import DashboardNotifications from "@/components/DashboardNotifications";
+import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
+import InAppNotificationCenter from "@/components/InAppNotificationCenter";
+import { loadPlayerNotifications } from "@/lib/notifications";
 import {
   loadPlayerCareerDashboard,
   type PlayerStatistics,
@@ -53,23 +55,25 @@ export default async function PlayerDashboardPage() {
   }
 
   const supabase = await createAuthenticatedSupabaseClient();
-  const [profileResult, registrationsResult, career] = await Promise.all([
-    supabase
-      .from("players")
-      .select(
-        "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, created_at, updated_at"
-      )
-      .eq("clerk_user_id", userId)
-      .maybeSingle(),
-    supabase
-      .from("registrations")
-      .select(
-        "id, tournament_title, bracket_name, registration_status, elo_status, submitted_elo, admin_notes, created_at"
-      )
-      .eq("clerk_user_id", userId)
-      .order("created_at", { ascending: false }),
-    loadPlayerCareerDashboard(userId),
-  ]);
+  const [profileResult, registrationsResult, career, playerNotifications] =
+    await Promise.all([
+      supabase
+        .from("players")
+        .select(
+          "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, discord_public_enabled, created_at, updated_at"
+        )
+        .eq("clerk_user_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("registrations")
+        .select(
+          "id, tournament_title, bracket_name, registration_status, elo_status, submitted_elo, admin_notes, created_at"
+        )
+        .eq("clerk_user_id", userId)
+        .order("created_at", { ascending: false }),
+      loadPlayerCareerDashboard(userId),
+      loadPlayerNotifications(userId),
+    ]);
 
   if (profileResult.error) {
     console.error("Dashboard profile load error:", profileResult.error);
@@ -178,12 +182,37 @@ export default async function PlayerDashboardPage() {
           )}
         </section>
 
-        <DashboardNotifications
-          key={career.notifications
-            .map((notification) => `${notification.id}:${notification.status}`)
-            .join("|")}
-          notifications={career.notifications}
-        />
+        <div className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] lg:items-start">
+          <InAppNotificationCenter
+            key={[
+              playerNotifications.unreadCount,
+              ...playerNotifications.notifications.map(
+                (notification) =>
+                  `${notification.id}:${notification.readAt ?? ""}`
+              ),
+              ...career.notifications.map(
+                (notification) => `${notification.id}:${notification.status}`
+              ),
+            ].join("|")}
+            scope="player"
+            title="Notifications"
+            description="Recent IronClad updates for registrations, waitlist movement, and match result decisions."
+            emptyMessage="Registration and match updates will appear here."
+            notifications={playerNotifications.notifications}
+            totalCount={playerNotifications.totalCount}
+            unreadCount={playerNotifications.unreadCount}
+            error={playerNotifications.error}
+            className="max-w-2xl lg:max-w-none"
+            matchNotifications={career.notifications}
+          />
+
+          {profile && (
+            <DiscordContactVisibilityCard
+              initialEnabled={Boolean(profile.discord_public_enabled)}
+              hasDiscordUsername={Boolean(profile.discord_username?.trim())}
+            />
+          )}
+        </div>
 
         {career.error && (
           <div className="mt-6">

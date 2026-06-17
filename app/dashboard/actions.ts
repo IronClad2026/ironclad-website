@@ -2,7 +2,9 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { notifyAdminsOfMatchDispute } from "@/lib/notification-events";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export type NotificationDismissalResult = {
   status: "success" | "error";
@@ -13,6 +15,12 @@ export type NotificationDismissalResult = {
 export type NotificationActionResult = {
   status: "success" | "error";
   message: string;
+};
+
+export type DiscordVisibilityActionResult = {
+  status: "success" | "error";
+  message: string;
+  enabled: boolean;
 };
 
 type NotificationIdentifier = {
@@ -244,10 +252,64 @@ export async function disputeDashboardMatchResult(
     return actionErrorResult(error.message);
   }
 
+  await notifyAdminsOfMatchDispute(supabase, reportGroupId, userId);
+
   revalidateDashboardPaths();
   return {
     status: "success",
     message: "Result disputed. An administrator must review it.",
+  };
+}
+
+export async function updateDiscordPublicEnabled(
+  enabled: boolean
+): Promise<DiscordVisibilityActionResult> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return {
+      status: "error",
+      message: "Sign in before updating Discord contact visibility.",
+      enabled: false,
+    };
+  }
+
+  const nextEnabled = Boolean(enabled);
+  const supabase = await createAuthenticatedSupabaseClient();
+  const { data, error } = await supabase
+    .from("players")
+    .update({ discord_public_enabled: nextEnabled })
+    .eq("clerk_user_id", userId)
+    .select("id, discord_public_enabled")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Discord contact visibility update failed:", error);
+    return {
+      status: "error",
+      message: "Discord contact visibility could not be updated.",
+      enabled: !nextEnabled,
+    };
+  }
+
+  if (!data) {
+    return {
+      status: "error",
+      message: "Complete your player profile before changing this setting.",
+      enabled: false,
+    };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/players");
+  revalidatePath(`/players/${data.id as string}`);
+
+  return {
+    status: "success",
+    message: nextEnabled
+      ? "Discord contact is visible on your public profile."
+      : "Discord contact is hidden from your public profile.",
+    enabled: Boolean(data.discord_public_enabled),
   };
 }
 

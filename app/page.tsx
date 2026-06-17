@@ -1,6 +1,7 @@
 import CurrentTournamentCard from "@/components/CurrentTournamentCard";
 import HomeAccountSection from "@/components/HomeAccountSection";
 import { currentTournaments } from "@/data/currentTournaments";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -50,6 +51,35 @@ export default function Home() {
       </section>
 
       <HomeAccountSection />
+
+      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-20">
+        <div className="group relative overflow-hidden rounded-3xl border border-orange-400/25 bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(249,115,22,0.07))] p-8 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-300/45 hover:shadow-[0_0_55px_rgba(249,115,22,0.16)] md:p-10">
+          <div className="absolute -top-24 right-0 h-56 w-56 rounded-full bg-orange-500/15 blur-3xl transition group-hover:bg-orange-400/20" />
+          <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-amber-400/10 blur-3xl" />
+
+          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">
+                IronClad Players
+              </p>
+              <h2 className="mt-4 text-4xl font-black text-white md:text-5xl">
+                Discover the Public Roster
+              </h2>
+              <p className="mt-5 text-lg leading-8 text-zinc-300">
+                Browse registered IronClad players, compare ELO, view public
+                profiles, and contact opponents through Discord.
+              </p>
+            </div>
+
+            <Link
+              href="/players"
+              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-orange-500 px-6 py-3 font-black text-white transition hover:scale-105 hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+            >
+              Browse Players
+            </Link>
+          </div>
+        </div>
+      </section>
 
       <section className="relative z-10 mx-auto max-w-7xl px-6 pb-24">
         <div className="mb-10">

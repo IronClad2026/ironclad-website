@@ -2,6 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
+import {
+  createInAppNotification,
+  createInAppNotifications,
+  loadAdminNotifications,
+  type NotificationCreateInput,
+} from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import AdminRegistrationReviewRows, {
   type AdminRegistrationReviewRow,
@@ -10,12 +16,11 @@ import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll"
 import AdminBracketManagement, {
   type AdminBracketTournamentOption,
 } from "@/components/AdminBracketManagement";
+import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Database,
-  GitBranch,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -69,6 +74,7 @@ type AdminPageProps = {
 type SupabaseRegistration = {
   id: string;
   player_name: string;
+  clerk_user_id: string;
   discord_username: string;
   steam_name: string;
   country: string;
@@ -96,21 +102,6 @@ type AdminTournamentOption = {
 };
 
 const managementCards = [
-  {
-    title: "Manage Tournaments",
-    description: "Create, edit, and monitor active IronClad tournaments.",
-    icon: Trophy,
-  },
-  {
-    title: "Manage Brackets",
-    description: "Review Main, Challenge, and 4v4 bracket structures.",
-    icon: GitBranch,
-  },
-  {
-    title: "Player Database",
-    description: "View player profiles, registration history, and admin notes.",
-    icon: Database,
-  },
   {
     title: "ELO Verification Queue",
     description: "Check player ELO before final admin approval.",
@@ -297,6 +288,86 @@ function buildBulkApprovalDetail(failures: string[], approvedCount: number) {
   return `${prefix}${visibleFailures.join("; ")}.${suffix}`.slice(0, 900);
 }
 
+function buildRegistrationStatusNotification({
+  previousStatus,
+  nextStatus,
+  registration,
+  actorClerkUserId,
+}: {
+  previousStatus: RegistrationStatus;
+  nextStatus: RegistrationStatus;
+  registration: {
+    id: string;
+    clerk_user_id: string | null;
+    player_name: string | null;
+    tournament_id: string | null;
+    tournament_title: string | null;
+    bracket_name: string | null;
+  };
+  actorClerkUserId: string;
+}): NotificationCreateInput | null {
+  if (!registration.clerk_user_id || previousStatus === nextStatus) {
+    return null;
+  }
+
+  const tournamentTitle = registration.tournament_title || "this tournament";
+  const base = {
+    recipientClerkUserId: registration.clerk_user_id,
+    recipientRole: "player" as const,
+    actorClerkUserId,
+    actorDisplayName: "IronClad Admin",
+    tournamentId: registration.tournament_id,
+    tournamentTitle: registration.tournament_title,
+    registrationId: registration.id,
+    metadata: {
+      previousStatus,
+      nextStatus,
+      bracketName: registration.bracket_name,
+    },
+  };
+
+  if (nextStatus === "approved") {
+    const promoted = previousStatus === "waitlisted";
+    return {
+      ...base,
+      type: promoted ? "registration.promoted" : "registration.approved",
+      title: promoted ? "Promoted from Waitlist" : "Registration Approved",
+      message: promoted
+        ? `You have been promoted from the waitlist and are now an official participant in ${tournamentTitle}.`
+        : `You have been approved for ${tournamentTitle}.`,
+    };
+  }
+
+  if (nextStatus === "rejected") {
+    return {
+      ...base,
+      type: "registration.rejected",
+      title: "Registration Rejected",
+      message: `Your registration for ${tournamentTitle} has been rejected.`,
+    };
+  }
+
+  if (nextStatus === "waitlisted") {
+    return {
+      ...base,
+      type: "registration.waitlisted",
+      title: "Waitlist Status",
+      message: `You have been added to the waitlist for ${tournamentTitle}.`,
+    };
+  }
+
+  if (nextStatus === "manual_review") {
+    return {
+      ...base,
+      type: "registration.manual_review",
+      title: "Registration Under Review",
+      message: `Your registration for ${tournamentTitle} is currently under manual review.`,
+    };
+  }
+
+  return null;
+}
+
 async function updateRegistrationStatus(formData: FormData) {
   "use server";
 
@@ -361,7 +432,9 @@ async function updateRegistrationStatus(formData: FormData) {
   const { data: currentRegistration, error: registrationLookupError } =
     await supabase
       .from("registrations")
-      .select("registration_status, tournament_bracket_id")
+      .select(
+        "id, registration_status, tournament_bracket_id, clerk_user_id, player_name, tournament_id, tournament_title, bracket_name"
+      )
       .eq("id", registrationId)
       .maybeSingle();
 
@@ -434,6 +507,17 @@ async function updateRegistrationStatus(formData: FormData) {
         notice,
       })
     );
+  }
+
+  const notification = buildRegistrationStatusNotification({
+    previousStatus: currentRegistration.registration_status,
+    nextStatus,
+    registration: currentRegistration,
+    actorClerkUserId: userId,
+  });
+
+  if (notification) {
+    await createInAppNotification(notification);
   }
 
   revalidatePath("/admin");
@@ -655,7 +739,9 @@ async function approveSelectedRegistrations(formData: FormData) {
   const supabase = createSupabaseAdminClient();
   const { data: registrationsForApproval, error: lookupError } = await supabase
     .from("registrations")
-    .select("id, player_name, registration_status, created_at")
+    .select(
+      "id, player_name, registration_status, created_at, clerk_user_id, tournament_id, tournament_title, bracket_name"
+    )
     .in("id", registrationIds);
 
   if (lookupError || !registrationsForApproval) {
@@ -691,6 +777,7 @@ async function approveSelectedRegistrations(formData: FormData) {
     }
   );
   let approvedCount = 0;
+  const approvalNotifications: NotificationCreateInput[] = [];
 
   for (const registration of orderedRegistrations) {
     if (registration.registration_status === "approved") {
@@ -711,7 +798,21 @@ async function approveSelectedRegistrations(formData: FormData) {
       );
     } else {
       approvedCount += 1;
+      const notification = buildRegistrationStatusNotification({
+        previousStatus: registration.registration_status,
+        nextStatus: "approved",
+        registration,
+        actorClerkUserId: userId,
+      });
+
+      if (notification) {
+        approvalNotifications.push(notification);
+      }
     }
+  }
+
+  if (approvalNotifications.length > 0) {
+    await createInAppNotifications(approvalNotifications);
   }
 
   revalidatePath("/admin");
@@ -755,12 +856,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const activeFilter = getSafeFilter(params?.filter);
 
   const supabase = createSupabaseAdminClient();
-  const [registrationResult, tournamentResult, generatedResult] =
+  const [
+    registrationResult,
+    tournamentResult,
+    generatedResult,
+    adminNotifications,
+  ] =
     await Promise.all([
       supabase
         .from("registrations")
         .select(
-          "id, player_name, discord_username, steam_name, country, region, timezone, submitted_elo, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name"
+          "id, player_name, clerk_user_id, discord_username, steam_name, country, region, timezone, submitted_elo, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name"
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -774,6 +880,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         .select(
           "id, tournament_bracket_id, format, slot_count, tournament_matches(player_one_slot, player_two_slot, player_one_registration_id, player_two_registration_id)"
         ),
+      loadAdminNotifications(50),
     ]);
   const registrationsData = registrationResult.data;
   const error = registrationResult.error;
@@ -1281,6 +1388,25 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           />
 
           <div className="grid gap-5 sm:grid-cols-2">
+            <InAppNotificationCenter
+              key={[
+                adminNotifications.unreadCount,
+                ...adminNotifications.notifications.map(
+                  (notification) =>
+                    `${notification.id}:${notification.readAt ?? ""}`
+                ),
+              ].join("|")}
+              scope="admin"
+              title="Admin Notification Center"
+              description="Recent registration, match result, and dispute events that need administrative awareness."
+              emptyMessage="New registrations, submitted results, and disputes will appear here."
+              notifications={adminNotifications.notifications}
+              totalCount={adminNotifications.totalCount}
+              unreadCount={adminNotifications.unreadCount}
+              error={adminNotifications.error}
+              className="sm:col-span-2"
+            />
+
             {managementCards.map((card) => {
               const Icon = card.icon;
 

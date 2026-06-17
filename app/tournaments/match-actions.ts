@@ -2,6 +2,15 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import {
+  createInAppNotification,
+  createInAppNotifications,
+} from "@/lib/notifications";
+import {
+  notifyAdminsOfMatchDispute,
+  notifyPlayersOfLegacyMatchResultReview,
+  notifyPlayersOfReportGroupReview,
+} from "@/lib/notification-events";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type CustomClaims = {
@@ -166,9 +175,30 @@ export async function submitMatchResult(
     }
 
     const reportDetails = report as {
+      report_group_id?: string;
       submission_number?: number;
       confirmation_deadline_at?: string;
     } | null;
+
+    const submitterName = ownedRegistrationName(match, ownedRegistration.id);
+    await createInAppNotification({
+      recipientRole: "admin",
+      type: "match.result_submitted",
+      title: "Match Result Submitted",
+      message: `${submitterName} submitted a result for Match #${match.match_number}.`,
+      actorClerkUserId: userId,
+      actorDisplayName: submitterName,
+      tournamentId: match.tournament_id,
+      tournamentTitle: match.tournament_title,
+      matchId,
+      reportGroupId: reportDetails?.report_group_id ?? null,
+      metadata: {
+        roundName: match.round_name,
+        matchNumber: match.match_number,
+        reportedScore: `${playerOneScore}-${playerTwoScore}`,
+        winnerRegistrationId,
+      },
+    });
 
     revalidatePath("/tournaments");
     revalidatePath("/dashboard");
@@ -256,6 +286,8 @@ export async function disputeMatchResultReportGroup(
     return errorState(error.message);
   }
 
+  await notifyAdminsOfMatchDispute(supabase, reportGroupId, userId);
+
   revalidateTournamentPaths();
   return successState("Result disputed. An administrator must review it.");
 }
@@ -298,6 +330,12 @@ export async function reviewMatchResultReportGroup(
     console.error("Report-group review failed:", error);
     return errorState(error.message);
   }
+
+  await notifyPlayersOfReportGroupReview(supabase, {
+    reportGroupId,
+    decision,
+    reviewedBy: admin.userId,
+  });
 
   revalidateTournamentPaths();
   return successState(
@@ -378,6 +416,12 @@ export async function saveAdminMatchResult(
       return errorState(error.message);
     }
 
+    await notifyPlayersOfReportGroupReview(supabase, {
+      reportGroupId: activeReportGroup.id,
+      decision: "approved",
+      reviewedBy: admin.userId,
+    });
+
     revalidateTournamentPaths();
     return successState("Report group overridden and winner advanced.");
   }
@@ -394,6 +438,8 @@ export async function saveAdminMatchResult(
     console.error("Admin match result save failed:", error);
     return errorState(error.message);
   }
+
+  await notifyPlayersOfAdminOfficialMatchResult(supabase, match, admin.userId);
 
   revalidateTournamentPaths();
   return successState("Official result saved and winner advanced.");
@@ -531,6 +577,12 @@ export async function reviewMatchResult(
     return errorState(error.message);
   }
 
+  await notifyPlayersOfLegacyMatchResultReview(supabase, {
+    submissionId,
+    decision,
+    reviewedBy: admin.userId,
+  });
+
   revalidateTournamentPaths();
   return successState(
     decision === "approved"
@@ -543,8 +595,14 @@ export async function reviewMatchResult(
 
 type MatchMutationRow = {
   id: string;
+  generated_bracket_id: string;
+  tournament_id: string | null;
+  tournament_title: string | null;
   player_one_registration_id: string | null;
   player_two_registration_id: string | null;
+  player_one_name: string | null;
+  player_two_name: string | null;
+  match_number: number;
   round_name: string;
   series_best_of: number;
 };
@@ -558,7 +616,7 @@ async function loadMatchForMutation(
   const { data, error } = await supabase
     .from("tournament_matches")
     .select(
-      "id, series_best_of, player_one_registration_id, player_two_registration_id, bracket_rounds!inner(name)"
+      "id, generated_bracket_id, match_number, series_best_of, player_one_registration_id, player_two_registration_id, player_one:registrations!tournament_matches_player_one_registration_id_fkey(player_name), player_two:registrations!tournament_matches_player_two_registration_id_fkey(player_name), bracket_rounds!inner(name), generated_brackets!inner(tournament_brackets!inner(tournament_id, tournaments!inner(id, title)))"
     )
     .eq("id", matchId)
     .maybeSingle();
@@ -568,17 +626,117 @@ async function loadMatchForMutation(
     return null;
   }
 
-  const round = Array.isArray(data.bracket_rounds)
-    ? data.bracket_rounds[0]
-    : data.bracket_rounds;
+  const row = data as unknown as {
+    id: string;
+    generated_bracket_id: string;
+    match_number: number;
+    series_best_of: number;
+    player_one_registration_id: string | null;
+    player_two_registration_id: string | null;
+    player_one?: { player_name: string | null } | { player_name: string | null }[];
+    player_two?: { player_name: string | null } | { player_name: string | null }[];
+    bracket_rounds?: { name: string | null } | { name: string | null }[];
+    generated_brackets?: {
+      tournament_brackets?: {
+        tournament_id: string | null;
+        tournaments?: { id: string; title: string | null } | { id: string; title: string | null }[];
+      } | {
+        tournament_id: string | null;
+        tournaments?: { id: string; title: string | null } | { id: string; title: string | null }[];
+      }[];
+    } | {
+      tournament_brackets?: {
+        tournament_id: string | null;
+        tournaments?: { id: string; title: string | null } | { id: string; title: string | null }[];
+      } | {
+        tournament_id: string | null;
+        tournaments?: { id: string; title: string | null } | { id: string; title: string | null }[];
+      }[];
+    }[];
+  };
+  const round = first(row.bracket_rounds);
+  const playerOne = first(row.player_one);
+  const playerTwo = first(row.player_two);
+  const generatedBracket = first(row.generated_brackets);
+  const tournamentBracket = first(generatedBracket?.tournament_brackets);
+  const tournament = first(tournamentBracket?.tournaments);
 
   return {
-    id: data.id,
-    player_one_registration_id: data.player_one_registration_id,
-    player_two_registration_id: data.player_two_registration_id,
+    id: row.id,
+    generated_bracket_id: row.generated_bracket_id,
+    tournament_id: tournament?.id ?? tournamentBracket?.tournament_id ?? null,
+    tournament_title: tournament?.title ?? null,
+    player_one_registration_id: row.player_one_registration_id,
+    player_two_registration_id: row.player_two_registration_id,
+    player_one_name: playerOne?.player_name ?? null,
+    player_two_name: playerTwo?.player_name ?? null,
+    match_number: row.match_number,
     round_name: round?.name ?? "",
-    series_best_of: data.series_best_of,
+    series_best_of: row.series_best_of,
   };
+}
+
+function ownedRegistrationName(match: MatchMutationRow, registrationId: string) {
+  if (registrationId === match.player_one_registration_id) {
+    return match.player_one_name || "Player 1";
+  }
+
+  if (registrationId === match.player_two_registration_id) {
+    return match.player_two_name || "Player 2";
+  }
+
+  return "A player";
+}
+
+async function notifyPlayersOfAdminOfficialMatchResult(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  match: MatchMutationRow,
+  reviewedBy: string
+) {
+  const registrationIds = [
+    match.player_one_registration_id,
+    match.player_two_registration_id,
+  ].filter((value): value is string => Boolean(value));
+
+  if (registrationIds.length === 0) return;
+
+  const { data, error } = await supabase
+    .from("registrations")
+    .select("id, clerk_user_id")
+    .in("id", registrationIds);
+
+  if (error) {
+    console.error("Official result notification lookup failed:", error.message);
+    return;
+  }
+
+  const notifications = (data ?? [])
+    .map((registration) => registration.clerk_user_id)
+    .filter((value): value is string => Boolean(value))
+    .map((recipientClerkUserId) => ({
+      recipientClerkUserId,
+      recipientRole: "player" as const,
+      type: "match.result_approved",
+      title: "Match Result Approved",
+      message: "Your submitted match result has been approved.",
+      actorClerkUserId: reviewedBy,
+      actorDisplayName: "IronClad Admin",
+      tournamentId: match.tournament_id,
+      tournamentTitle: match.tournament_title,
+      matchId: match.id,
+      metadata: {
+        roundName: match.round_name,
+        matchNumber: match.match_number,
+      },
+    }));
+
+  if (notifications.length > 0) {
+    await createInAppNotifications(notifications);
+  }
+}
+
+function first<T>(value: T | T[] | null | undefined): T | undefined {
+  return Array.isArray(value) ? value[0] : value ?? undefined;
 }
 
 function validateMatchScore(

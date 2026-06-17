@@ -12,6 +12,8 @@ export type PlayerProfile = {
   current_elo: number | null;
   avatar_url: string | null;
   bio: string | null;
+  public_profile_enabled?: boolean;
+  discord_public_enabled?: boolean;
   profile_completed: boolean;
   created_at: string;
   updated_at: string;

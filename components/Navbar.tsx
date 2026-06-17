@@ -27,6 +27,7 @@ export default function Navbar() {
         <div className="hidden items-center gap-8 text-sm font-medium text-zinc-300 md:flex">
           <Link href="/" className="hover:text-white">Home</Link>
           <Link href="/tournaments" className="hover:text-white">Tournaments</Link>
+          <Link href="/players" className="hover:text-white">Players</Link>
           <Link href="/rules" className="hover:text-white">Rules</Link>
           <Link href="/rankings" className="hover:text-white">Rankings</Link>
           <Link href="/about" className="hover:text-white">About</Link>
@@ -57,6 +58,7 @@ export default function Navbar() {
           <div className="flex flex-col gap-4 text-sm font-medium">
             <Link href="/" onClick={() => setIsOpen(false)}>Home</Link>
             <Link href="/tournaments" onClick={() => setIsOpen(false)}>Tournaments</Link>
+            <Link href="/players" onClick={() => setIsOpen(false)}>Players</Link>
             <Link href="/rules" onClick={() => setIsOpen(false)}>Rules</Link>
             <Link href="/rankings" onClick={() => setIsOpen(false)}>Rankings</Link>
             <Link href="/about" onClick={() => setIsOpen(false)}>About</Link>
