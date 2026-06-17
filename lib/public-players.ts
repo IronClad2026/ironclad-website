@@ -12,6 +12,7 @@ export type PublicPlayerProfile = {
   publicProfileEnabled: boolean;
   discordPublicEnabled: boolean;
   discordUsername: string | null;
+  hasAvatar: boolean;
   avatarUrl: string | null;
   createdAt: string;
 };
@@ -26,6 +27,7 @@ type PublicPlayerProfileRow = {
   public_profile_enabled: boolean;
   discord_public_enabled: boolean;
   discord_username: string | null;
+  has_avatar: boolean;
   avatar_url: string | null;
   created_at: string;
 };
@@ -40,6 +42,7 @@ const PUBLIC_PLAYER_PROFILE_COLUMNS = [
   "public_profile_enabled",
   "discord_public_enabled",
   "discord_username",
+  "has_avatar",
   "avatar_url",
   "created_at",
 ].join(", ");
@@ -102,7 +105,8 @@ function mapPublicPlayerProfile(
     publicProfileEnabled: row.public_profile_enabled,
     discordPublicEnabled: row.discord_public_enabled,
     discordUsername: row.discord_public_enabled ? row.discord_username : null,
-    avatarUrl: row.avatar_url,
+    hasAvatar: row.has_avatar,
+    avatarUrl: row.has_avatar ? `/players/${row.id}/avatar` : null,
     createdAt: row.created_at,
   };
 }

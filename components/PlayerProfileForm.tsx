@@ -248,7 +248,7 @@ export default function PlayerProfileForm({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur md:p-8">
+      <section className="relative z-30 overflow-visible rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur focus-within:z-[1300] md:p-8">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
             Competitive Profile

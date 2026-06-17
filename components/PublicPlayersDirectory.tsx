@@ -53,7 +53,7 @@ export default function PublicPlayersDirectory({
 
   return (
     <section className="mx-auto max-w-7xl px-6 py-12 sm:py-16">
-      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/20 backdrop-blur md:p-6">
+      <div className="relative z-30 overflow-visible rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/20 backdrop-blur focus-within:z-[1300] md:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-400">
@@ -120,7 +120,7 @@ export default function PublicPlayersDirectory({
       ) : filteredPlayers.length === 0 ? (
         <EmptyState message="No public players match those filters." />
       ) : (
-        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="relative z-0 mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filteredPlayers.map((player) => (
             <PublicPlayerCard key={player.id} player={player} />
           ))}
