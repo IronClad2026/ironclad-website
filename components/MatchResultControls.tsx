@@ -230,7 +230,7 @@ export default function MatchResultControls({
               ? "Confirmation Review Required"
               : pendingSubmission
                 ? "Result Review Required"
-                : "Manage Match Result"
+                : "Result Controls"
             : activeReportGroup
               ? "Result Pending Confirmation"
               : pendingSubmission
@@ -247,7 +247,7 @@ export default function MatchResultControls({
   );
 }
 
-function ResultEntryForm({
+export function ResultEntryForm({
   match,
   playerOneName,
   playerTwoName,
@@ -344,7 +344,7 @@ function ResultEntryForm({
   );
 }
 
-function AdminParticipantEditForm({
+export function AdminParticipantEditForm({
   match,
   participantOptions,
 }: {
@@ -434,7 +434,11 @@ function AdminParticipantEditForm({
   );
 }
 
-function AdminResetMatchForm({ match }: { match: GeneratedTournamentMatch }) {
+export function AdminResetMatchForm({
+  match,
+}: {
+  match: GeneratedTournamentMatch;
+}) {
   const [confirmation, setConfirmation] = useState("");
   const [state, formAction, pending] = useActionState(
     resetAdminMatch,
@@ -487,7 +491,7 @@ function AdminResetMatchForm({ match }: { match: GeneratedTournamentMatch }) {
   );
 }
 
-function ReportGroupReview({
+export function ReportGroupReview({
   reportGroup,
   match,
   isAdmin,

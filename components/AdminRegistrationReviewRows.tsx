@@ -247,7 +247,7 @@ function RegistrationContextMenu({
               registration={registration}
               activeFilter={activeFilter}
               updateRegistrationStatusAction={updateRegistrationStatusAction}
-              onClose={onClose}
+              onSubmitStart={onClose}
             />
           ) : (
             <MenuLink
@@ -272,16 +272,16 @@ function DirectStatusAction({
   registration,
   activeFilter,
   updateRegistrationStatusAction,
-  onClose,
+  onSubmitStart,
 }: {
   action: Extract<MenuAction, { kind: "direct" }>;
   registration: AdminRegistrationReviewRow;
   activeFilter: FilterStatus;
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
-  onClose: () => void;
+  onSubmitStart: () => void;
 }) {
   return (
-    <form action={updateRegistrationStatusAction}>
+    <form action={updateRegistrationStatusAction} onSubmit={onSubmitStart}>
       <input type="hidden" name="registrationId" value={registration.id} />
       <input type="hidden" name="nextStatus" value={action.nextStatus} />
       <input type="hidden" name="activeFilter" value={activeFilter} />
@@ -293,7 +293,6 @@ function DirectStatusAction({
       />
       <button
         type="submit"
-        onClick={onClose}
         className={`w-full rounded-xl px-3 py-2.5 text-left text-xs font-black uppercase tracking-wider transition ${action.className}`}
       >
         {action.label}

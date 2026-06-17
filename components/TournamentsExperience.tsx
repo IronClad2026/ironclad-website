@@ -7,7 +7,13 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { submitTournamentRegistration } from "@/app/tournaments/actions";
-import MatchResultControls from "@/components/MatchResultControls";
+import MatchResultControls, {
+  AdminParticipantEditForm,
+  AdminResetMatchForm,
+  ReportGroupReview,
+  ResultEntryForm,
+} from "@/components/MatchResultControls";
+import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import {
   getEligibleBracketNames,
@@ -39,7 +45,6 @@ import {
   PlayCircle,
   Radio,
   Search,
-  Settings2,
   Swords,
   Trophy,
   Users,
@@ -766,16 +771,16 @@ function Brackets({
           : null;
         const canOpenResults = Boolean(
           generated &&
-            (viewer.isAdmin ||
-              generated.matches.some(
-                (match) =>
-                  viewer.registrationIds.includes(
-                    match.playerOneRegistrationId ?? ""
-                  ) ||
-                  viewer.registrationIds.includes(
-                    match.playerTwoRegistrationId ?? ""
-                  )
-              ) ||
+            !viewer.isAdmin &&
+            (generated.matches.some(
+              (match) =>
+                viewer.registrationIds.includes(
+                  match.playerOneRegistrationId ?? ""
+                ) ||
+                viewer.registrationIds.includes(
+                  match.playerTwoRegistrationId ?? ""
+                )
+            ) ||
               matchResultSubmissions.some((submission) =>
                 generated.matches.some(
                   (match) => match.id === submission.matchId
@@ -947,8 +952,8 @@ function BracketMatchResultsWorkspace({
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-2 rounded-xl border border-orange-400/40 bg-orange-500/10 px-4 py-2 text-xs font-black uppercase tracking-wider text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 hover:shadow-[0_0_24px_rgba(249,115,22,0.15)]"
       >
-        <Settings2 size={15} />
-        {viewer.isAdmin ? "Manage Match Results" : "Match Results"}
+        <Swords size={15} />
+        Match Results
         {pendingCount > 0 && (
           <span className="grid h-5 min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] text-black">
             {pendingCount}
@@ -1126,7 +1131,14 @@ function AdminMatchManagementModal({
         ["pending_confirmation", "disputed", "under_review"].includes(
           reportGroup.status
         )
-    ) ?? reportGroups[0];
+    ) ?? null;
+  const visibleReportGroup = activeReportGroup ?? reportGroups[0] ?? null;
+  const hasPendingSubmission = submissions.some(
+    (submission) => submission.status === "pending"
+  );
+  const hasParticipants = Boolean(playerOne && playerTwo);
+  const canEnterOfficialResult =
+    hasParticipants && !activeReportGroup && !hasPendingSubmission;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1248,8 +1260,8 @@ function AdminMatchManagementModal({
                   <SummaryLine
                     label="Report group"
                     value={
-                      activeReportGroup
-                        ? activeReportGroup.status.replaceAll("_", " ")
+                      visibleReportGroup
+                        ? visibleReportGroup.status.replaceAll("_", " ")
                         : "None"
                     }
                   />
@@ -1266,26 +1278,60 @@ function AdminMatchManagementModal({
                     value={String(submissions.length)}
                   />
                 </div>
+                <div className="mt-5 space-y-4">
+                  {reportGroups.map((reportGroup) => (
+                    <ReportGroupReview
+                      key={reportGroup.id}
+                      reportGroup={reportGroup}
+                      match={match}
+                      isAdmin={viewer.isAdmin}
+                      participantsById={participantsById}
+                    />
+                  ))}
+                  {submissions.length > 0 && (
+                    <AdminMatchResultSummaries
+                      match={match}
+                      submissions={submissions}
+                      participantsById={participantsById}
+                    />
+                  )}
+                  {reportGroups.length === 0 && submissions.length === 0 && (
+                    <p className="rounded-xl border border-dashed border-white/10 p-4 text-slate-500">
+                      No player reports or confirmation packages are attached to
+                      this match.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="mt-5 rounded-3xl border border-white/10 bg-black/25 p-4 sm:p-5">
-              <MatchResultControls
-                match={match}
-                participantsById={participantsById}
-                isAdmin={viewer.isAdmin}
-                viewerClerkUserId={viewer.clerkUserId}
-                canSubmit={viewer.registrationIds.some(
-                  (registrationId) =>
-                    registrationId === match.playerOneRegistrationId ||
-                    registrationId === match.playerTwoRegistrationId
+            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-orange-400/20 bg-orange-500/[0.04] p-5">
+                {canEnterOfficialResult ? (
+                  <ResultEntryForm
+                    match={match}
+                    playerOneName={playerOne?.name ?? "Player 1"}
+                    playerTwoName={playerTwo?.name ?? "Player 2"}
+                  />
+                ) : (
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider text-white">
+                      Official Result Entry
+                    </p>
+                    <p className="mt-3 text-xs leading-5 text-slate-400">
+                      {!hasParticipants
+                        ? "Both participants must be assigned before an official result can be entered."
+                        : "Resolve the active review package or pending legacy submission before entering a direct official result."}
+                    </p>
+                  </div>
                 )}
-                submissions={submissions}
-                reportGroups={reportGroups}
+              </div>
+
+              <AdminParticipantEditForm
+                match={match}
                 participantOptions={tournament.bracketParticipants}
-                showDirectAdminControls
-                presentation="workspace"
               />
+              <AdminResetMatchForm match={match} />
             </div>
           </div>
         </motion.section>
