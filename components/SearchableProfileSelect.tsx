@@ -54,7 +54,7 @@ export default function SearchableProfileSelect({
   const visibleValue = open ? searchQuery : value;
 
   return (
-    <div className={`min-w-0 ${className}`}>
+    <div className={`relative z-0 min-w-0 focus-within:z-[1200] ${className}`}>
       <label htmlFor={inputId} className="text-sm font-bold text-white">
         {label}
       </label>

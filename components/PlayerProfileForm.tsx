@@ -26,6 +26,19 @@ const regions = [
   "Africa",
   "Global",
 ];
+const regionSelectOptions = regions.map((region) => ({
+  label: region,
+  value: region,
+}));
+function getExactRegionOption(value: string) {
+  const normalizedValue = value.trim().toLowerCase();
+
+  return regionSelectOptions.find(
+    (option) =>
+      option.label.toLowerCase() === normalizedValue ||
+      option.value.toLowerCase() === normalizedValue
+  );
+}
 
 const timezones = [
   "UTC",
@@ -80,6 +93,7 @@ export default function PlayerProfileForm({
   );
   const initialElo = profile?.current_elo?.toString() ?? "";
   const [country, setCountry] = useState(profile?.country ?? "");
+  const [region, setRegion] = useState(profile?.region ?? "");
   const [timezone, setTimezone] = useState(profile?.timezone ?? "");
   const [currentElo, setCurrentElo] = useState(initialElo);
   const [eloSearch, setEloSearch] = useState(
@@ -255,12 +269,18 @@ export default function PlayerProfileForm({
             error={state.errors.country}
             required
           />
-          <ProfileInput
+          <SearchableProfileSelect
             label="Region"
             name="region"
-            defaultValue={profile?.region}
+            value={region}
+            submittedValue={region}
+            options={regionSelectOptions}
+            onCustomValueChange={(value) => {
+              setRegion(getExactRegionOption(value)?.value ?? "");
+            }}
+            onSelect={(option) => setRegion(option.value)}
             error={state.errors.region}
-            list="profile-regions"
+            placeholder="Search regions"
             required
           />
           <SearchableProfileSelect
@@ -298,11 +318,6 @@ export default function PlayerProfileForm({
           />
         </div>
 
-        <datalist id="profile-regions">
-          {regions.map((region) => (
-            <option key={region} value={region} />
-          ))}
-        </datalist>
       </section>
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur md:p-8">

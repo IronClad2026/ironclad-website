@@ -169,7 +169,7 @@ export async function saveTournament(
 
   const tournamentId = getOptionalText(formData, "tournamentId");
   const title = getText(formData, "title");
-  const slug = getText(formData, "slug").toLowerCase();
+  let slug = generateTournamentSlug(title);
   const description = getText(formData, "description");
   const bannerImageUrl = getText(formData, "bannerImageUrl");
   const registrationOpenAt = parseOptionalDateTime(
@@ -226,6 +226,18 @@ export async function saveTournament(
   }
 
   const supabase = createSupabaseAdminClient();
+  try {
+    slug = tournamentId
+      ? await getExistingTournamentSlug(supabase, tournamentId)
+      : await getAvailableTournamentSlug(supabase, slug);
+  } catch (slugError) {
+    console.error("Tournament slug generation failed:", slugError);
+    return {
+      error:
+        "Unable to preserve or generate the tournament URL. Rename the tournament or try again.",
+    };
+  }
+
   if (
     bannerImageUrl.includes(
       `/storage/v1/object/public/${TOURNAMENT_BANNER_BUCKET}/`
@@ -695,6 +707,68 @@ function getOptionalText(formData: FormData, field: string) {
   return getText(formData, field) || null;
 }
 
+function generateTournamentSlug(title: string) {
+  const slug = title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+
+  return slug || `tournament-${randomUUID().slice(0, 8)}`;
+}
+
+async function getAvailableTournamentSlug(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  baseSlug: string,
+) {
+  let candidate = baseSlug;
+
+  for (let suffix = 2; suffix <= 100; suffix += 1) {
+    const query = supabase
+      .from("tournaments")
+      .select("id")
+      .eq("slug", candidate)
+      .limit(1);
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return candidate;
+    }
+
+    candidate = `${baseSlug}-${suffix}`;
+  }
+
+  return `${baseSlug}-${randomUUID().slice(0, 8)}`;
+}
+
+async function getExistingTournamentSlug(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  tournamentId: string
+) {
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("slug")
+    .eq("id", tournamentId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.slug) {
+    throw new Error("Tournament not found.");
+  }
+
+  return data.slug;
+}
+
 function getInteger(formData: FormData, field: string) {
   const value = Number(getText(formData, field));
   return Number.isInteger(value) ? value : null;
@@ -791,7 +865,7 @@ function getDatabaseSaveError(message?: string) {
 
   const normalized = message.toLowerCase();
   if (normalized.includes("duplicate") || normalized.includes("unique")) {
-    return "A tournament with this slug already exists. Choose a different slug.";
+    return "A tournament with this generated URL already exists. Rename the tournament or try again.";
   }
   if (normalized.includes("permission") || normalized.includes("policy")) {
     return `Database permission denied: ${message}`;

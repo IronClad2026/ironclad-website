@@ -30,3 +30,33 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media (min-width: 1800px) {
+  .max-w-7xl {
+    max-width: min(92vw, 112rem);
+  }
+
+  .max-w-6xl {
+    max-width: min(90vw, 100rem);
+  }
+}
+
+@media (min-width: 2400px) {
+  .max-w-7xl {
+    max-width: min(92vw, 144rem);
+  }
+
+  .max-w-6xl {
+    max-width: min(90vw, 128rem);
+  }
+}
+
+@media (min-width: 3400px) {
+  .max-w-7xl {
+    max-width: min(92vw, 220rem);
+  }
+
+  .max-w-6xl {
+    max-width: min(90vw, 192rem);
+  }
+}

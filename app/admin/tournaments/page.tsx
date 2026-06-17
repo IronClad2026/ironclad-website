@@ -503,13 +503,6 @@ function TournamentForm({
           required
           readOnly={!isEditing}
         />
-        <Field
-          label="Slug"
-          name="slug"
-          defaultValue={values.slug}
-          required
-          readOnly={!isEditing}
-        />
         <TournamentBannerPicker
           defaultValue={values.bannerImageUrl}
           tournamentId={values.id}
