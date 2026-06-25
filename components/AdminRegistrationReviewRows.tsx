@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 export type AdminRegistrationReviewRow = {
   id: string;
+  tournamentId: string | null;
   playerName: string;
   tournamentName: string;
   bracketName: string | null;
@@ -53,11 +54,13 @@ export default function AdminRegistrationReviewRows({
   registrations,
   activeFilter,
   formId,
+  selectionScope,
   updateRegistrationStatusAction,
 }: {
   registrations: AdminRegistrationReviewRow[];
   activeFilter: FilterStatus;
   formId: string;
+  selectionScope?: string;
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
 }) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
@@ -121,6 +124,7 @@ export default function AdminRegistrationReviewRows({
                 name="registrationId"
                 value={registration.id}
                 data-registration-selection="true"
+                data-registration-selection-scope={selectionScope}
                 aria-label={`Select registration for ${
                   registration.playerName || "player"
                 }`}

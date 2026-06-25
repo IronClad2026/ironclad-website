@@ -15,6 +15,7 @@ import { redirect } from "next/navigation";
 import DashboardChampionHistory from "@/components/DashboardChampionHistory";
 import DashboardMatchHistory from "@/components/DashboardMatchHistory";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
+import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import { loadPlayerNotifications } from "@/lib/notifications";
 import {
@@ -121,7 +122,7 @@ export default async function PlayerDashboardPage() {
           ) : profile ? (
             <div className="grid gap-8 lg:grid-cols-[auto_1fr_auto] lg:items-center">
               <PlayerAvatar
-                avatarUrl={profile.avatar_url}
+                avatarUrl={getPlayerAvatarDisplayUrl(profile)}
                 displayName={profile.display_name}
               />
 

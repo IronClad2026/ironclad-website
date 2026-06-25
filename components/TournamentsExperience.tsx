@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode, ElementType } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { submitTournamentRegistration } from "@/app/tournaments/actions";
 import MatchResultControls, {
   AdminParticipantEditForm,
@@ -138,6 +139,33 @@ const overviewPanels: { key: OverviewPanelKey; label: string }[] = [
   { key: "schedule", label: "Schedule" },
   { key: "contact", label: "Contact" },
 ];
+
+function getValidTab(value: string | null): TabKey {
+  return tabs.some((tab) => tab.key === value) ? (value as TabKey) : "overview";
+}
+
+function getValidOverviewPanel(value: string | null): OverviewPanelKey {
+  return overviewPanels.some((panel) => panel.key === value)
+    ? (value as OverviewPanelKey)
+    : "details";
+}
+
+function findTournamentFromUrl(
+  tournaments: TournamentCard[],
+  value: string | null
+) {
+  if (!value) return null;
+
+  return (
+    tournaments.find(
+      (tournament) => tournament.slug === value || tournament.id === value
+    ) ?? null
+  );
+}
+
+function getTournamentUrlValue(tournament: TournamentCard) {
+  return tournament.slug || tournament.id;
+}
 
 function classNames(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
@@ -477,16 +505,21 @@ function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab:
 function Overview({
   tournament,
   tournaments,
+  activePanel,
+  setActivePanel,
 }: {
   tournament: TournamentCard;
   tournaments: TournamentCard[];
+  activePanel: OverviewPanelKey;
+  setActivePanel: (panel: OverviewPanelKey) => void;
 }) {
-  const [panel, setPanel] = useState<OverviewPanelKey>("details");
   const panels = overviewPanels.filter(
     (item) => item.key !== "prizes" || hasPrize(tournament)
   );
   const visiblePanel =
-    panel === "prizes" && !hasPrize(tournament) ? "details" : panel;
+    activePanel === "prizes" && !hasPrize(tournament)
+      ? "details"
+      : activePanel;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
@@ -506,7 +539,7 @@ function Overview({
             {panels.map((item) => (
               <button
                 key={item.key}
-                onClick={() => setPanel(item.key)}
+                onClick={() => setActivePanel(item.key)}
                 className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, visiblePanel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-slate-400 hover:text-white")}
               >
                 {item.label}
@@ -2453,6 +2486,8 @@ function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoadi
 
 function MainContent({
   activeTab,
+  activeOverviewPanel,
+  setActiveOverviewPanel,
   tournament,
   tournaments,
   viewer,
@@ -2460,6 +2495,8 @@ function MainContent({
   matchResultReportGroups,
 }: {
   activeTab: TabKey;
+  activeOverviewPanel: OverviewPanelKey;
+  setActiveOverviewPanel: (panel: OverviewPanelKey) => void;
   tournament: TournamentCard;
   tournaments: TournamentCard[];
   viewer: TournamentViewer;
@@ -2469,7 +2506,12 @@ function MainContent({
   return (
     <main className="px-5 py-6 lg:px-8">
       {activeTab === "overview" && (
-        <Overview tournament={tournament} tournaments={tournaments} />
+        <Overview
+          tournament={tournament}
+          tournaments={tournaments}
+          activePanel={activeOverviewPanel}
+          setActivePanel={setActiveOverviewPanel}
+        />
       )}
       {activeTab === "participants" && <Participants tournament={tournament} />}
       {activeTab === "brackets" && (
@@ -2612,14 +2654,23 @@ export default function TournamentsExperience({
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
 }) {
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
-  const [selectedTournamentId, setSelectedTournamentId] = useState(
-    tournaments[0].id
-  );
-  const selectedTournament =
-    tournaments.find(
-      (tournament) => tournament.id === selectedTournamentId
-    ) ?? tournaments[0];
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchParamString = searchParams.toString();
+  const rawTournamentParam = searchParams.get("tournament");
+  const rawTabParam = searchParams.get("tab");
+  const rawPanelParam = searchParams.get("panel");
+  const activeTab = getValidTab(rawTabParam);
+  const urlTournament = findTournamentFromUrl(tournaments, rawTournamentParam);
+  const selectedTournament = urlTournament ?? tournaments[0];
+  const requestedOverviewPanel = getValidOverviewPanel(rawPanelParam);
+  const activeOverviewPanel =
+    activeTab === "overview" &&
+    requestedOverviewPanel === "prizes" &&
+    !hasPrize(selectedTournament)
+      ? "details"
+      : requestedOverviewPanel;
   const selectedViewerRegistration =
     viewer.registrations.find(
       (registration) => registration.tournamentId === selectedTournament.id
@@ -2640,9 +2691,112 @@ export default function TournamentsExperience({
     return createAuthenticatedBrowserSupabaseClient(getToken);
   }, [getToken]);
 
+  const updateTournamentUrl = useCallback(
+    ({
+      tournament,
+      tab,
+      panel,
+    }: {
+      tournament: TournamentCard;
+      tab: TabKey;
+      panel: OverviewPanelKey;
+    },
+    mode: "push" | "replace" = "push") => {
+      const params = new URLSearchParams(searchParamString);
+      params.set("tournament", getTournamentUrlValue(tournament));
+      params.set("tab", tab);
+
+      if (tab === "overview") {
+        params.set("panel", panel);
+      } else {
+        params.delete("panel");
+      }
+
+      const nextQuery = params.toString();
+      const nextPath = nextQuery ? `${pathname}?${nextQuery}` : pathname;
+      const currentPath = searchParamString
+        ? `${pathname}?${searchParamString}`
+        : pathname;
+
+      if (nextPath !== currentPath) {
+        if (mode === "replace") {
+          router.replace(nextPath, { scroll: false });
+        } else {
+          router.push(nextPath, { scroll: false });
+        }
+      }
+    },
+    [pathname, router, searchParamString]
+  );
+
+  useEffect(() => {
+    const hasTournamentStateParam =
+      rawTournamentParam !== null ||
+      rawTabParam !== null ||
+      rawPanelParam !== null;
+
+    if (!hasTournamentStateParam) {
+      return;
+    }
+
+    const missingTournamentParam = rawTournamentParam === null;
+    const invalidTournamentParam =
+      rawTournamentParam !== null && urlTournament === null;
+    const invalidTabParam = rawTabParam !== null && rawTabParam !== activeTab;
+    const invalidPanelParam =
+      rawPanelParam !== null &&
+      (activeTab !== "overview" || rawPanelParam !== activeOverviewPanel);
+
+    if (
+      !missingTournamentParam &&
+      !invalidTournamentParam &&
+      !invalidTabParam &&
+      !invalidPanelParam
+    ) {
+      return;
+    }
+
+    updateTournamentUrl(
+      {
+        tournament: selectedTournament,
+        tab: activeTab,
+        panel: activeOverviewPanel,
+      },
+      "replace"
+    );
+  }, [
+    activeOverviewPanel,
+    activeTab,
+    rawPanelParam,
+    rawTabParam,
+    rawTournamentParam,
+    selectedTournament,
+    updateTournamentUrl,
+    urlTournament,
+  ]);
+
   const handleSelectTournament = (tournament: TournamentCard) => {
-    setSelectedTournamentId(tournament.id);
-    setActiveTab("overview");
+    updateTournamentUrl({
+      tournament,
+      tab: "overview",
+      panel: "details",
+    });
+  };
+
+  const handleSetActiveTab = (tab: TabKey) => {
+    updateTournamentUrl({
+      tournament: selectedTournament,
+      tab,
+      panel: activeOverviewPanel,
+    });
+  };
+
+  const handleSetActiveOverviewPanel = (panel: OverviewPanelKey) => {
+    updateTournamentUrl({
+      tournament: selectedTournament,
+      tab: "overview",
+      panel,
+    });
   };
 
   const handleRegisterClick = async () => {
@@ -2709,9 +2863,11 @@ export default function TournamentsExperience({
             viewerRegistration={selectedViewerRegistration}
             onRegisterClick={handleRegisterClick}
           />
-          <TopTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+          <TopTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
           <MainContent
             activeTab={activeTab}
+            activeOverviewPanel={activeOverviewPanel}
+            setActiveOverviewPanel={handleSetActiveOverviewPanel}
             tournament={selectedTournament}
             tournaments={tournaments}
             viewer={viewer}
@@ -2747,7 +2903,7 @@ export default function TournamentsExperience({
         <div className="fixed inset-0 z-50 bg-black/70 lg:hidden">
           <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="ml-auto h-full w-80 bg-[#111827] p-4">
             <div className="flex items-center justify-between"><h3 className="font-black text-white">Tournament Menu</h3><button onClick={() => setShowMobilePanel(false)} className="rounded bg-slate-800 p-2"><X size={18} /></button></div>
-            <div className="mt-5 space-y-2">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.key} onClick={() => { setActiveTab(tab.key); setShowMobilePanel(false); }} className="flex w-full items-center gap-3 rounded-lg bg-slate-950/40 px-3 py-3 text-left font-semibold text-slate-200"><Icon size={17} />{tab.label}</button>; })}</div>
+            <div className="mt-5 space-y-2">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.key} onClick={() => { handleSetActiveTab(tab.key); setShowMobilePanel(false); }} className="flex w-full items-center gap-3 rounded-lg bg-slate-950/40 px-3 py-3 text-left font-semibold text-slate-200"><Icon size={17} />{tab.label}</button>; })}</div>
           </motion.div>
         </div>
       )}

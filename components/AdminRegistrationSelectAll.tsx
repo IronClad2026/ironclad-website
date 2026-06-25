@@ -11,9 +11,11 @@ type SelectionState = {
 export default function AdminRegistrationSelectAll({
   formId,
   name,
+  scope,
 }: {
   formId: string;
   name: string;
+  scope?: string;
 }) {
   const checkboxRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<SelectionState>({
@@ -24,7 +26,7 @@ export default function AdminRegistrationSelectAll({
 
   useEffect(() => {
     const refresh = () => {
-      const inputs = getRegistrationInputs(formId, name);
+      const inputs = getRegistrationInputs(formId, name, scope);
       const checkedCount = inputs.filter((input) => input.checked).length;
 
       setState({
@@ -40,7 +42,7 @@ export default function AdminRegistrationSelectAll({
     return () => {
       document.removeEventListener("change", refresh);
     };
-  }, [formId, name]);
+  }, [formId, name, scope]);
 
   useEffect(() => {
     if (checkboxRef.current) {
@@ -56,7 +58,7 @@ export default function AdminRegistrationSelectAll({
       checked={state.checked}
       disabled={state.disabled}
       onChange={(event) => {
-        const inputs = getRegistrationInputs(formId, name);
+        const inputs = getRegistrationInputs(formId, name, scope);
         for (const input of inputs) {
           input.checked = event.currentTarget.checked;
           input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -67,10 +69,18 @@ export default function AdminRegistrationSelectAll({
   );
 }
 
-function getRegistrationInputs(formId: string, name: string) {
+function getRegistrationInputs(
+  formId: string,
+  name: string,
+  scope?: string
+) {
   return Array.from(
     document.querySelectorAll<HTMLInputElement>(
       `input[type="checkbox"][form="${formId}"][name="${name}"][data-registration-selection="true"]`
     )
-  ).filter((input) => !input.disabled);
+  ).filter(
+    (input) =>
+      !input.disabled &&
+      (!scope || input.dataset.registrationSelectionScope === scope)
+  );
 }

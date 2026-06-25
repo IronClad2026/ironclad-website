@@ -4,6 +4,12 @@ import { useActionState, useEffect, useState } from "react";
 import { Camera, UserRound } from "lucide-react";
 import { savePlayerProfile } from "@/app/profile/actions";
 import SearchableProfileSelect from "@/components/SearchableProfileSelect";
+import {
+  ALLOWED_AVATAR_MIME_TYPES,
+  getPlayerAvatarDisplayUrl,
+  MAX_AVATAR_UPLOAD_SIZE_BYTES,
+  MAX_AVATAR_UPLOAD_SIZE_LABEL,
+} from "@/lib/avatar";
 import { countrySelectOptions } from "@/lib/countries";
 import { eloRanges } from "@/lib/elo-options";
 import {
@@ -99,7 +105,9 @@ export default function PlayerProfileForm({
   const [eloSearch, setEloSearch] = useState(
     eloRanges.find((range) => range.value === initialElo)?.label ?? initialElo
   );
-  const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url ?? "");
+  const [avatarPreview, setAvatarPreview] = useState(
+    getPlayerAvatarDisplayUrl(profile) ?? ""
+  );
   const [avatarClientError, setAvatarClientError] = useState("");
 
   useEffect(() => {
@@ -147,7 +155,7 @@ export default function PlayerProfileForm({
               <input
                 name="avatar"
                 type="file"
-                accept="image/png,image/jpeg,image/webp"
+                accept={ALLOWED_AVATAR_MIME_TYPES.join(",")}
                 className="sr-only"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -159,8 +167,8 @@ export default function PlayerProfileForm({
                   }
 
                   if (
-                    !["image/png", "image/jpeg", "image/webp"].includes(
-                      file.type
+                    !ALLOWED_AVATAR_MIME_TYPES.some(
+                      (contentType) => contentType === file.type
                     )
                   ) {
                     event.target.value = "";
@@ -170,10 +178,10 @@ export default function PlayerProfileForm({
                     return;
                   }
 
-                  if (file.size > 2 * 1024 * 1024) {
+                  if (file.size > MAX_AVATAR_UPLOAD_SIZE_BYTES) {
                     event.target.value = "";
                     setAvatarClientError(
-                      "Avatar image must be 2 MB or smaller."
+                      `Avatar image must be ${MAX_AVATAR_UPLOAD_SIZE_LABEL} or smaller.`
                     );
                     return;
                   }
@@ -184,7 +192,8 @@ export default function PlayerProfileForm({
             </label>
 
             <p className="mt-3 text-xs leading-5 text-zinc-500">
-              PNG, JPG, JPEG, or WEBP. Maximum file size 2 MB.
+              PNG, JPG, JPEG, or WEBP. Maximum file size{" "}
+              {MAX_AVATAR_UPLOAD_SIZE_LABEL}.
             </p>
             <FieldError
               message={avatarClientError || state.errors.avatar}

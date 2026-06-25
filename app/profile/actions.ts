@@ -6,6 +6,12 @@ import type {
   ProfileActionState,
   ProfileField,
 } from "@/lib/player-profile";
+import {
+  ALLOWED_AVATAR_MIME_TYPES,
+  getPlayerAvatarProxyUrl,
+  MAX_AVATAR_UPLOAD_SIZE_BYTES,
+  MAX_AVATAR_UPLOAD_SIZE_LABEL,
+} from "@/lib/avatar";
 import { isPlayerProfileComplete } from "@/lib/player-profile";
 import { supabaseUrl } from "@/lib/supabase-config";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
@@ -24,12 +30,7 @@ type ValidatedProfile = {
 };
 
 const AVATAR_BUCKET = "player-avatars";
-const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
-const ALLOWED_AVATAR_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
+const ALLOWED_AVATAR_TYPES = new Set<string>(ALLOWED_AVATAR_MIME_TYPES);
 
 export async function savePlayerProfile(
   _previousState: ProfileActionState,
@@ -58,7 +59,7 @@ export async function savePlayerProfile(
   const supabase = await createAuthenticatedSupabaseClient();
   const { data: existingProfile, error: existingProfileError } = await supabase
     .from("players")
-    .select("avatar_url")
+    .select("id, avatar_url")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
@@ -74,10 +75,13 @@ export async function savePlayerProfile(
 
   const avatar = formData.get("avatar");
   let avatarUrl: string | undefined;
+  const playerId = existingProfile?.id ?? crypto.randomUUID();
 
   if (avatar instanceof File && avatar.size > 0) {
-    const avatarBytes = new Uint8Array(await avatar.arrayBuffer());
-    const avatarError = validateAvatar(avatar, avatarBytes);
+    const avatarSignature = new Uint8Array(
+      await avatar.slice(0, 12).arrayBuffer()
+    );
+    const avatarError = validateAvatar(avatar, avatarSignature);
 
     if (avatarError) {
       return {
@@ -111,7 +115,7 @@ export async function savePlayerProfile(
     try {
       const result = await supabase.storage
         .from(AVATAR_BUCKET)
-        .upload(avatarPath, avatarBytes, {
+        .upload(avatarPath, avatar, {
           cacheControl: "3600",
           contentType: avatar.type,
           upsert: true,
@@ -144,11 +148,7 @@ export async function savePlayerProfile(
       clerkUserId: userId,
     });
 
-    const { data } = supabase.storage
-      .from(AVATAR_BUCKET)
-      .getPublicUrl(avatarPath);
-
-    avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
+    avatarUrl = getPlayerAvatarProxyUrl(playerId, Date.now());
   }
 
   const finalAvatarUrl = avatarUrl ?? existingProfile?.avatar_url ?? null;
@@ -158,6 +158,7 @@ export async function savePlayerProfile(
   });
   const { error } = await supabase.from("players").upsert(
     {
+      id: playerId,
       clerk_user_id: userId,
       ...validation.data,
       profile_completed: profileCompleted,
@@ -261,8 +262,8 @@ function validateAvatar(file: File, bytes: Uint8Array) {
     return "Use a PNG, JPG, JPEG, or WEBP image.";
   }
 
-  if (file.size > MAX_AVATAR_SIZE) {
-    return "Avatar image must be 2 MB or smaller.";
+  if (file.size > MAX_AVATAR_UPLOAD_SIZE_BYTES) {
+    return `Avatar image must be ${MAX_AVATAR_UPLOAD_SIZE_LABEL} or smaller.`;
   }
 
   if (!hasValidImageSignature(file.type, bytes)) {
