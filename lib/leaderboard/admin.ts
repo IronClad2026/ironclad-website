@@ -316,10 +316,35 @@ export async function deleteLeaderboardRecalculationRuns(
   }
 
   const supabase = createSupabaseAdminClient();
+  const { data: matchingRows, error: matchError } = await supabase
+    .from("leaderboard_recalculation_runs")
+    .select("id")
+    .in("id", uniqueRunIds);
+
+  if (matchError) {
+    console.error(
+      "Leaderboard recalculation run deletion lookup failed:",
+      matchError
+    );
+    return errorResult("Unable to verify recalculation run records for deletion.");
+  }
+
+  const matchingRunIds = (matchingRows ?? []).map((run) => run.id);
+
+  console.info("Leaderboard recalculation run deletion matched rows:", {
+    requestedCount: uniqueRunIds.length,
+    matchedCount: matchingRunIds.length,
+    matchingRunIds,
+  });
+
+  if (matchingRunIds.length === 0) {
+    return errorResult("No matching recalculation run records were found.");
+  }
+
   const { data, error } = await supabase
     .from("leaderboard_recalculation_runs")
     .delete()
-    .in("id", uniqueRunIds)
+    .in("id", matchingRunIds)
     .select("id");
 
   if (error) {
@@ -331,12 +356,31 @@ export async function deleteLeaderboardRecalculationRuns(
 
   if (deletedCount === 0) {
     console.warn("Leaderboard recalculation run deletion matched no rows:", {
-      requestedIds: uniqueRunIds,
+      requestedIds: matchingRunIds,
     });
     return errorResult("No matching recalculation run records were found.");
   }
 
   const deletedRunIds = (data ?? []).map((run) => run.id);
+  const { data: remainingRows, error: verifyError } = await supabase
+    .from("leaderboard_recalculation_runs")
+    .select("id")
+    .in("id", deletedRunIds);
+
+  if (verifyError) {
+    console.error(
+      "Leaderboard recalculation run deletion verification failed:",
+      verifyError
+    );
+    return errorResult("Unable to verify recalculation run record deletion.");
+  }
+
+  if ((remainingRows ?? []).length > 0) {
+    console.error("Leaderboard recalculation run records remained after delete:", {
+      remainingRunIds: remainingRows.map((run) => run.id),
+    });
+    return errorResult("Unable to delete recalculation run records.");
+  }
 
   console.info("Leaderboard recalculation run deletion completed:", {
     requestedCount: uniqueRunIds.length,
@@ -347,8 +391,8 @@ export async function deleteLeaderboardRecalculationRuns(
     status: "success",
     message:
       deletedCount === 1
-        ? "1 recalculation run record deleted."
-        : `${deletedCount} recalculation run records deleted.`,
+        ? "Deleted 1 recalculation run record."
+        : `Deleted ${deletedCount} recalculation run records.`,
     deletedRunIds,
   };
 }

@@ -61,14 +61,34 @@ export async function deleteLeaderboardRecalculationRunRecords(
   _previousState: LeaderboardRunDeleteActionState,
   formData: FormData
 ): Promise<LeaderboardRunDeleteActionState> {
-  const runIds = formData.getAll("runId").map((runId) => String(runId));
+  const rawRunIdEntries = formData.getAll("runId");
+  const runIds = rawRunIdEntries.map((runId) => String(runId));
+  const formDataEntries = rawRunIdEntries.map((value) => ({
+    key: "runId",
+    value: typeof value === "string" ? value : `[file:${value.name}]`,
+  }));
 
-  console.info("Leaderboard recalculation run delete action received IDs:", {
+  console.info("Leaderboard recalculation run delete action received form data:", {
+    entries: formDataEntries,
+    rawRunIdEntries: rawRunIdEntries.map((runId) => String(runId)),
     count: runIds.length,
   });
 
+  if (runIds.length === 0) {
+    return {
+      status: "error",
+      message: "No recalculation run records were submitted for deletion.",
+    };
+  }
+
   try {
     const result = await deleteLeaderboardRecalculationRuns(runIds);
+
+    console.info("Leaderboard recalculation run delete action result:", {
+      status: result.status,
+      deletedRunIds: result.deletedRunIds ?? [],
+      deletedCount: result.deletedRunIds?.length ?? 0,
+    });
 
     if (result.status === "success") {
       revalidatePath("/admin");

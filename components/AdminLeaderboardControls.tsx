@@ -3,9 +3,11 @@
 import {
   type FormEvent,
   useActionState,
+  useEffect,
   useMemo,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import {
   BarChart3,
   CheckCircle2,
@@ -48,6 +50,7 @@ export default function AdminLeaderboardControls({
   recentRuns,
   className = "",
 }: AdminLeaderboardControlsProps) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(
     runLeaderboardRecalculation,
     initialState
@@ -93,6 +96,12 @@ export default function AdminLeaderboardControls({
   const allVisibleSelected =
     visibleRunIds.length > 0 &&
     visibleRunIds.every((runId) => selectedRunIds.has(runId));
+
+  useEffect(() => {
+    if (deleteState.status === "success") {
+      router.refresh();
+    }
+  }, [deleteState.status, deleteState.deletedRunIds, router]);
 
   const toggleRunSelection = (runId: string, selected: boolean) => {
     setSelectedRunIds((current) => {
@@ -418,13 +427,10 @@ export default function AdminLeaderboardControls({
                                           confirmRunDeletion(event, 1)
                                         }
                                       >
-                                        <input
-                                          type="hidden"
-                                          name="runId"
-                                          value={run.id}
-                                        />
                                         <button
                                           type="submit"
+                                          name="runId"
+                                          value={run.id}
                                           disabled={deletePending}
                                           className="inline-flex items-center justify-center gap-1.5 rounded-full border border-red-400/25 bg-red-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-red-100 transition hover:border-red-300/60 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
