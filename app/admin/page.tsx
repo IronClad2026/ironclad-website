@@ -16,7 +16,12 @@ import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll"
 import AdminBracketManagement, {
   type AdminBracketTournamentOption,
 } from "@/components/AdminBracketManagement";
+import AdminLeaderboardControls from "@/components/AdminLeaderboardControls";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
+import {
+  getCompletedLeaderboardTournaments,
+  getRecentLeaderboardRecalculationRuns,
+} from "@/lib/leaderboard/admin";
 import {
   AlertTriangle,
   CheckCircle,
@@ -861,6 +866,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     tournamentResult,
     generatedResult,
     adminNotifications,
+    completedLeaderboardTournaments,
+    leaderboardRecalculationRuns,
   ] =
     await Promise.all([
       supabase
@@ -881,6 +888,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           "id, tournament_bracket_id, format, slot_count, tournament_matches(player_one_slot, player_two_slot, player_one_registration_id, player_two_registration_id)"
         ),
       loadAdminNotifications(50),
+      getCompletedLeaderboardTournaments(),
+      getRecentLeaderboardRecalculationRuns(8),
     ]);
   const registrationsData = registrationResult.data;
   const error = registrationResult.error;
@@ -1388,6 +1397,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           />
 
           <div className="grid gap-5 sm:grid-cols-2">
+            <AdminLeaderboardControls
+              completedTournaments={completedLeaderboardTournaments}
+              recentRuns={leaderboardRecalculationRuns}
+              className="sm:col-span-2"
+            />
+
             <InAppNotificationCenter
               key={[
                 adminNotifications.unreadCount,
