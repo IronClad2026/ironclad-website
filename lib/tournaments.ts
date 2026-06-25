@@ -124,10 +124,21 @@ export type MatchResultReportGroupStatus =
   | "rejected"
   | "reset";
 
+export type MatchResultReportGroupResultType = "normal" | "no_show";
+
+export type MatchResultReportGroupNoShowStatus =
+  | "pending"
+  | "confirmed"
+  | "disputed"
+  | "approved"
+  | "rejected"
+  | "auto_confirmed";
+
 export type MatchResultReportGroup = {
   id: string;
   matchId: string;
   tournamentId: string;
+  resultType: MatchResultReportGroupResultType;
   submittedByClerkUserId: string;
   submittedByRegistrationId: string;
   opponentRegistrationId: string;
@@ -151,6 +162,12 @@ export type MatchResultReportGroup = {
   reviewedBy: string | null;
   reviewedAt: string | null;
   reviewNotes: string | null;
+  noShowReportedByRegistrationId: string | null;
+  noShowRegistrationId: string | null;
+  noShowStatus: MatchResultReportGroupNoShowStatus | null;
+  noShowNote: string | null;
+  noShowResolvedAt: string | null;
+  noShowResolvedBy: string | null;
   finalizedAt: string | null;
   finalizedSource: string | null;
   createdAt: string;

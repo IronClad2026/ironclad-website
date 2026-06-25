@@ -8,6 +8,7 @@ import {
 } from "@/lib/notifications";
 import {
   notifyAdminsOfMatchDispute,
+  notifyNoShowReporterOfResponse,
   notifyPlayersOfLegacyMatchResultReview,
   notifyPlayersOfReportGroupReview,
 } from "@/lib/notification-events";
@@ -223,6 +224,142 @@ export async function submitMatchResult(
 
 }
 
+export async function submitNoShowReport(
+  _previousState: MatchResultActionState,
+  formData: FormData
+): Promise<MatchResultActionState> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return errorState("Sign in before reporting a no-show.");
+  }
+
+  const matchId = getText(formData, "matchId");
+  const noShowRegistrationId = getText(formData, "noShowRegistrationId");
+  const notes = getText(formData, "noShowNotes");
+
+  if (!matchId || !noShowRegistrationId) {
+    return errorState("Choose the opponent who did not show up.");
+  }
+
+  if (notes.length > 2000) {
+    return errorState("No-show notes must be 2000 characters or fewer.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const match = await loadMatchForMutation(supabase, matchId);
+
+  if (!match) {
+    return errorState("This tournament match is no longer available.");
+  }
+
+  const participantRegistrationIds = [
+    match.player_one_registration_id,
+    match.player_two_registration_id,
+  ].filter((value): value is string => Boolean(value));
+
+  if (participantRegistrationIds.length !== 2) {
+    return errorState("Both match participants must be assigned.");
+  }
+
+  const { data: registrations, error: registrationError } = await supabase
+    .from("registrations")
+    .select("id, clerk_user_id, player_name")
+    .in("id", participantRegistrationIds);
+
+  if (registrationError) {
+    console.error("No-show participant lookup failed:", registrationError);
+    return errorState("The match participants could not be verified.");
+  }
+
+  const registrationById = new Map(
+    (registrations ?? []).map((registration) => [
+      registration.id,
+      registration,
+    ])
+  );
+  const ownedRegistration = (registrations ?? []).find(
+    (registration) => registration.clerk_user_id === userId
+  );
+
+  if (!ownedRegistration) {
+    return errorState(
+      "You can only report a no-show for matches you are participating in."
+    );
+  }
+
+  if (ownedRegistration.id === noShowRegistrationId) {
+    return errorState("You cannot report yourself as a no-show.");
+  }
+
+  if (!participantRegistrationIds.includes(noShowRegistrationId)) {
+    return errorState("The reported player is not a participant in this match.");
+  }
+
+  const { data: report, error } = await supabase.rpc(
+    "submit_match_no_show_report",
+    {
+      p_match_id: matchId,
+      p_submitted_by_clerk_user_id: userId,
+      p_no_show_registration_id: noShowRegistrationId,
+      p_notes: notes || null,
+    }
+  );
+
+  if (error) {
+    console.error("No-show report submission failed:", error);
+    return errorState(
+      getDatabaseMessage(error) ??
+        "The no-show report could not be submitted. Please try again."
+    );
+  }
+
+  const reportDetails = report as {
+    report_group_id?: string;
+    confirmation_deadline_at?: string;
+  } | null;
+  const submitterName =
+    ownedRegistration.player_name ??
+    ownedRegistrationName(match, ownedRegistration.id);
+  const missingRegistration = registrationById.get(noShowRegistrationId);
+  const missingName =
+    missingRegistration?.player_name ??
+    ownedRegistrationName(match, noShowRegistrationId);
+
+  if (missingRegistration?.clerk_user_id) {
+    await createInAppNotification({
+      recipientClerkUserId: missingRegistration.clerk_user_id,
+      recipientRole: "player",
+      type: "match.no_show_reported",
+      title: "No-Show Reported",
+      message: `${submitterName} reported you as a no-show for Match #${match.match_number}. Confirm or dispute before the deadline.`,
+      actorClerkUserId: userId,
+      actorDisplayName: submitterName,
+      tournamentId: match.tournament_id,
+      tournamentTitle: match.tournament_title,
+      matchId,
+      reportGroupId: reportDetails?.report_group_id ?? null,
+      metadata: {
+        roundName: match.round_name,
+        matchNumber: match.match_number,
+        resultType: "no_show",
+        noShowRegistrationId,
+        noShowPlayerName: missingName,
+      },
+    });
+  }
+
+  revalidatePath("/tournaments");
+  revalidatePath("/dashboard");
+  return successState(
+    `No-show report submitted. ${missingName} must confirm or dispute${
+      reportDetails?.confirmation_deadline_at
+        ? ` by ${formatDeadline(reportDetails.confirmation_deadline_at)}`
+        : ""
+    }.`
+  );
+}
+
 export async function confirmMatchResultReportGroup(
   _previousState: MatchResultActionState,
   formData: FormData
@@ -248,6 +385,12 @@ export async function confirmMatchResultReportGroup(
     console.error("Match result confirmation failed:", error);
     return errorState(error.message);
   }
+
+  await notifyNoShowReporterOfResponse(supabase, {
+    reportGroupId,
+    decision: "confirmed",
+    actorClerkUserId: userId,
+  });
 
   revalidateTournamentPaths();
   return successState("Result confirmed. The winner has been advanced.");
@@ -287,6 +430,11 @@ export async function disputeMatchResultReportGroup(
   }
 
   await notifyAdminsOfMatchDispute(supabase, reportGroupId, userId);
+  await notifyNoShowReporterOfResponse(supabase, {
+    reportGroupId,
+    decision: "disputed",
+    actorClerkUserId: userId,
+  });
 
   revalidateTournamentPaths();
   return successState("Result disputed. An administrator must review it.");

@@ -16,6 +16,8 @@ type ReportGroupNotificationContext = {
   tournamentTitle: string | null;
   matchNumber: number | null;
   roundName: string | null;
+  resultType: "normal" | "no_show";
+  noShowRegistrationId: string | null;
   submittedByClerkUserId: string | null;
   submittedByName: string;
   opponentClerkUserId: string | null;
@@ -53,11 +55,15 @@ export async function notifyAdminsOfMatchDispute(
         ? context.opponentName
         : "A player";
 
+  const isNoShow = context.resultType === "no_show";
+
   await createInAppNotification({
     recipientRole: "admin",
-    type: "match.dispute_opened",
-    title: "New Match Dispute",
-    message: `${actorName} opened a dispute for Match #${context.matchNumber ?? "?"}.`,
+    type: isNoShow ? "match.no_show_disputed" : "match.dispute_opened",
+    title: isNoShow ? "New No-Show Dispute" : "New Match Dispute",
+    message: `${actorName} opened a ${
+      isNoShow ? "no-show dispute" : "dispute"
+    } for Match #${context.matchNumber ?? "?"}.`,
     actorClerkUserId,
     actorDisplayName: actorName,
     tournamentId: context.tournamentId,
@@ -68,6 +74,64 @@ export async function notifyAdminsOfMatchDispute(
       roundName: context.roundName,
       matchNumber: context.matchNumber,
       reportedScore: context.reportedScore,
+      resultType: context.resultType,
+      noShowRegistrationId: context.noShowRegistrationId,
+    },
+  });
+}
+
+export async function notifyNoShowReporterOfResponse(
+  supabase: SupabaseAdminClient,
+  {
+    reportGroupId,
+    decision,
+    actorClerkUserId,
+  }: {
+    reportGroupId: string;
+    decision: "confirmed" | "disputed";
+    actorClerkUserId: string;
+  }
+) {
+  const context = await loadReportGroupNotificationContext(
+    supabase,
+    reportGroupId
+  );
+
+  if (
+    !context ||
+    context.resultType !== "no_show" ||
+    !context.submittedByClerkUserId
+  ) {
+    return;
+  }
+
+  await createInAppNotification({
+    recipientClerkUserId: context.submittedByClerkUserId,
+    recipientRole: "player",
+    type:
+      decision === "confirmed"
+        ? "match.no_show_confirmed"
+        : "match.no_show_disputed",
+    title:
+      decision === "confirmed"
+        ? "No-Show Confirmed"
+        : "No-Show Disputed",
+    message:
+      decision === "confirmed"
+        ? `Your no-show report for Match #${context.matchNumber ?? "?"} was confirmed.`
+        : `Your no-show report for Match #${context.matchNumber ?? "?"} was disputed and now requires administrator review.`,
+    actorClerkUserId,
+    actorDisplayName: context.opponentName,
+    tournamentId: context.tournamentId,
+    tournamentTitle: context.tournamentTitle,
+    matchId: context.matchId,
+    reportGroupId: context.id,
+    metadata: {
+      roundName: context.roundName,
+      matchNumber: context.matchNumber,
+      resultType: context.resultType,
+      noShowRegistrationId: context.noShowRegistrationId,
+      decision,
     },
   });
 }
@@ -107,10 +171,13 @@ export async function notifyPlayersOfReportGroupReview(
       tournamentTitle: context.tournamentTitle,
       matchId: context.matchId,
       reportGroupId: context.id,
+      resultType: context.resultType,
       metadata: {
         roundName: context.roundName,
         matchNumber: context.matchNumber,
         reportedScore: context.reportedScore,
+        resultType: context.resultType,
+        noShowRegistrationId: context.noShowRegistrationId,
       },
     })
   );
@@ -164,7 +231,7 @@ async function loadReportGroupNotificationContext(
   const { data: reportGroup, error } = await supabase
     .from("match_result_report_groups")
     .select(
-      "id, match_id, tournament_id, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, player_one_score, player_two_score"
+      "id, match_id, tournament_id, result_type, no_show_registration_id, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, player_one_score, player_two_score"
     )
     .eq("id", reportGroupId)
     .maybeSingle();
@@ -192,6 +259,9 @@ async function loadReportGroupNotificationContext(
     tournamentTitle: tournament,
     matchNumber: match?.matchNumber ?? null,
     roundName: match?.roundName ?? null,
+    resultType:
+      reportGroup.result_type === "no_show" ? "no_show" : "normal",
+    noShowRegistrationId: reportGroup.no_show_registration_id ?? null,
     submittedByClerkUserId:
       submittedBy?.clerk_user_id ?? reportGroup.submitted_by_clerk_user_id,
     submittedByName: submittedBy?.player_name ?? "A player",
@@ -347,6 +417,7 @@ function buildMatchReviewNotification({
   tournamentTitle,
   matchId,
   reportGroupId,
+  resultType = "normal",
   metadata,
 }: {
   recipientClerkUserId: string;
@@ -356,18 +427,43 @@ function buildMatchReviewNotification({
   tournamentTitle: string | null;
   matchId: string;
   reportGroupId: string | null;
+  resultType?: "normal" | "no_show";
   metadata: Record<string, unknown>;
 }): NotificationCreateInput {
   const approved = decision === "approved";
+  const noShow = resultType === "no_show";
+  const noShowRejected = noShow && decision === "rejected";
 
   return {
     recipientClerkUserId,
     recipientRole: "player",
-    type: approved ? "match.result_approved" : "match.result_review_required",
-    title: approved ? "Match Result Approved" : "Match Result Requires Review",
-    message: approved
-      ? "Your submitted match result has been approved."
-      : "Your submitted match result requires further review.",
+    type: noShow
+      ? approved
+        ? "match.no_show_approved"
+        : noShowRejected
+          ? "match.no_show_rejected"
+          : "match.no_show_review_required"
+      : approved
+        ? "match.result_approved"
+        : "match.result_review_required",
+    title: noShow
+      ? approved
+        ? "No-Show Confirmed"
+        : noShowRejected
+          ? "No-Show Rejected"
+          : "No-Show Requires Review"
+      : approved
+        ? "Match Result Approved"
+        : "Match Result Requires Review",
+    message: noShow
+      ? approved
+        ? "The no-show report has been approved and the match result recorded."
+        : noShowRejected
+          ? "The no-show report was rejected. The match remains unresolved."
+          : "The no-show report requires further review."
+      : approved
+        ? "Your submitted match result has been approved."
+        : "Your submitted match result requires further review.",
     actorClerkUserId: reviewedBy,
     actorDisplayName: "IronClad Admin",
     tournamentId,

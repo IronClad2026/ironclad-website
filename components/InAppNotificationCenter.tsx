@@ -941,11 +941,14 @@ function MatchActionNotificationItem({
         className="min-w-0 flex-1 text-left disabled:opacity-60"
       >
         <span className="text-sm font-black text-white">
-          Match Result Confirmation Required
+          {notification.resultType === "no_show"
+            ? "No-Show Confirmation Required"
+            : "Match Result Confirmation Required"}
         </span>
         <span className="mt-1 block text-sm leading-5 text-zinc-300">
-          Your opponent submitted a result for {notification.tournamentName}.
-          Reported score: {notification.reportedScore}.
+          {notification.resultType === "no_show"
+            ? `Your opponent reported a no-show for ${notification.tournamentName}.`
+            : `Your opponent submitted a result for ${notification.tournamentName}. Reported score: ${notification.reportedScore}.`}
         </span>
         <span className="mt-2 block text-[10px] font-black uppercase tracking-wider text-orange-300">
           Open tournament to confirm or dispute
@@ -1009,7 +1012,7 @@ function NotificationIcon({ type }: { type: string }) {
     return <ShieldAlert className={className} />;
   }
 
-  if (type.includes("match.dispute")) {
+  if (type.includes("match.dispute") || type.includes("match.no_show")) {
     return <MessageSquareWarning className={className} />;
   }
 
