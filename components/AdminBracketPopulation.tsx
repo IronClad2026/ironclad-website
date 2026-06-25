@@ -211,7 +211,7 @@ function AdminBracketPopulationWorkspace({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 w-full rounded-lg bg-orange-500 px-4 py-2 text-sm font-black text-white transition hover:bg-orange-400"
+        className="mt-3 w-full rounded-lg bg-orange-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400"
       >
         {buttonLabel}
       </button>

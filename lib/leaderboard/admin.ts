@@ -40,6 +40,7 @@ export type LeaderboardAdminActionResult = {
   status: "success" | "error" | "pending";
   message: string;
   runId?: string;
+  deletedRunIds?: string[];
 };
 
 export type LeaderboardCompletedTournament = {
@@ -55,7 +56,9 @@ export type LeaderboardRecalculationRun = {
   startedAt: string;
   finishedAt: string | null;
   notes: string | null;
+  tournamentId: string | null;
   tournamentTitle: string | null;
+  seasonId: string | null;
   seasonName: string | null;
 };
 
@@ -275,11 +278,79 @@ export async function getRecentLeaderboardRecalculationRuns(
     startedAt: run.started_at,
     finishedAt: run.finished_at,
     notes: run.notes,
+    tournamentId: run.tournament_id,
     tournamentTitle: run.tournament_id
       ? tournamentTitles.get(run.tournament_id) ?? null
       : null,
+    seasonId: run.season_id,
     seasonName: run.season_id ? seasonNames.get(run.season_id) ?? null : null,
   }));
+}
+
+export async function deleteLeaderboardRecalculationRuns(
+  runIds: string[]
+): Promise<LeaderboardAdminActionResult> {
+  const admin = await requireAdminUser();
+
+  if (!admin) {
+    return errorResult(
+      "Only administrators can delete leaderboard recalculation run records."
+    );
+  }
+
+  const uniqueRunIds = [
+    ...new Set(runIds.map((runId) => runId.trim()).filter(Boolean)),
+  ];
+
+  console.info("Leaderboard recalculation run deletion requested:", {
+    requestedCount: runIds.length,
+    uniqueCount: uniqueRunIds.length,
+  });
+
+  if (uniqueRunIds.length === 0) {
+    return errorResult("Select at least one recalculation run record to delete.");
+  }
+
+  if (uniqueRunIds.some((runId) => !uuidPattern.test(runId))) {
+    return errorResult("One or more recalculation run IDs were invalid.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("leaderboard_recalculation_runs")
+    .delete()
+    .in("id", uniqueRunIds)
+    .select("id");
+
+  if (error) {
+    console.error("Leaderboard recalculation run deletion failed:", error);
+    return errorResult("Recalculation run records could not be deleted.");
+  }
+
+  const deletedCount = data?.length ?? 0;
+
+  if (deletedCount === 0) {
+    console.warn("Leaderboard recalculation run deletion matched no rows:", {
+      requestedIds: uniqueRunIds,
+    });
+    return errorResult("No matching recalculation run records were found.");
+  }
+
+  const deletedRunIds = (data ?? []).map((run) => run.id);
+
+  console.info("Leaderboard recalculation run deletion completed:", {
+    requestedCount: uniqueRunIds.length,
+    deletedCount,
+  });
+
+  return {
+    status: "success",
+    message:
+      deletedCount === 1
+        ? "1 recalculation run record deleted."
+        : `${deletedCount} recalculation run records deleted.`,
+    deletedRunIds,
+  };
 }
 
 async function requireAdminUser() {
