@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Trash2,
   Trophy,
+  X,
   XCircle,
 } from "lucide-react";
 import {
@@ -63,6 +64,8 @@ export default function AdminLeaderboardControls({
   const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [dismissedDeleteState, setDismissedDeleteState] =
+    useState<LeaderboardRunDeleteActionState | null>(null);
   const hasCompletedTournaments = completedTournaments.length > 0;
   const deletedRunIdSet = useMemo(
     () =>
@@ -96,12 +99,29 @@ export default function AdminLeaderboardControls({
   const allVisibleSelected =
     visibleRunIds.length > 0 &&
     visibleRunIds.every((runId) => selectedRunIds.has(runId));
+  const showDeleteMessage =
+    !deletePending &&
+    deleteState.status !== "idle" &&
+    Boolean(deleteState.message) &&
+    dismissedDeleteState !== deleteState;
 
   useEffect(() => {
     if (deleteState.status === "success") {
       router.refresh();
     }
   }, [deleteState.status, deleteState.deletedRunIds, router]);
+
+  useEffect(() => {
+    if (deleteState.status !== "success" || !deleteState.message) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setDismissedDeleteState(deleteState);
+    }, 4000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [deleteState]);
 
   const toggleRunSelection = (runId: string, selected: boolean) => {
     setSelectedRunIds((current) => {
@@ -149,6 +169,8 @@ export default function AdminLeaderboardControls({
       event.preventDefault();
       return;
     }
+
+    setDismissedDeleteState(deleteState);
   };
 
   return (
@@ -340,17 +362,25 @@ export default function AdminLeaderboardControls({
                   </form>
                 </div>
 
-                {deleteState.status !== "idle" && (
+                {showDeleteMessage && (
                   <div
                     role="status"
                     aria-live="polite"
-                    className={`mt-3 rounded-xl border p-3 text-sm font-semibold ${
+                    className={`mt-3 flex items-start justify-between gap-3 rounded-xl border p-3 text-sm font-semibold ${
                       deleteState.status === "success"
                         ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
                         : "border-red-400/30 bg-red-500/10 text-red-200"
                     }`}
                   >
-                    {deleteState.message}
+                    <span>{deleteState.message}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDismissedDeleteState(deleteState)}
+                      className="rounded-full p-1 text-current opacity-70 transition hover:bg-white/10 hover:opacity-100"
+                      aria-label="Dismiss recalculation run delete message"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
                 )}
 
