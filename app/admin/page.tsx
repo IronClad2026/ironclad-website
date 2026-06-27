@@ -16,19 +16,19 @@ import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll"
 import AdminBracketManagement, {
   type AdminBracketTournamentOption,
 } from "@/components/AdminBracketManagement";
+import AdminEloVerificationChecker from "@/components/AdminEloVerificationChecker";
 import AdminLeaderboardControls from "@/components/AdminLeaderboardControls";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import {
   getCompletedLeaderboardTournaments,
   getRecentLeaderboardRecalculationRuns,
 } from "@/lib/leaderboard/admin";
+import { getEloVerificationSetting } from "@/lib/platform-settings";
 import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Search,
   ShieldAlert,
-  ShieldCheck,
   Trash2,
   Trophy,
   X,
@@ -105,14 +105,6 @@ type AdminTournamentOption = {
   created_at: string;
   tournament_brackets?: { id: string; name: string; max_players: number }[];
 };
-
-const managementCards = [
-  {
-    title: "ELO Verification Queue",
-    description: "Check player ELO before final admin approval.",
-    icon: Search,
-  },
-];
 
 function formatStatus(status: string) {
   return status
@@ -868,6 +860,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     adminNotifications,
     completedLeaderboardTournaments,
     leaderboardRecalculationRuns,
+    eloVerificationSetting,
   ] =
     await Promise.all([
       supabase
@@ -890,6 +883,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       loadAdminNotifications(50),
       getCompletedLeaderboardTournaments(),
       getRecentLeaderboardRecalculationRuns(8),
+      getEloVerificationSetting(),
     ]);
   const registrationsData = registrationResult.data;
   const error = registrationResult.error;
@@ -1499,10 +1493,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </section>
 
         <div className="relative z-0 grid gap-8 lg:grid-cols-[1.2fr_1fr]">
-          <AdminBracketManagement
-            tournaments={bracketManagementTournaments}
-            notice={params?.bracketNotice}
-          />
+          <div className="grid gap-5 self-start">
+            <AdminBracketManagement
+              tournaments={bracketManagementTournaments}
+              notice={params?.bracketNotice}
+            />
+
+            <AdminEloVerificationChecker setting={eloVerificationSetting} />
+          </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
             <AdminLeaderboardControls
@@ -1529,30 +1527,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               error={adminNotifications.error}
               className="sm:col-span-2"
             />
-
-            {managementCards.map((card) => {
-              const Icon = card.icon;
-
-              return (
-                <div
-                  key={card.title}
-                  className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur transition hover:-translate-y-1 hover:border-orange-500/60 hover:bg-orange-500/10"
-                >
-                  <Icon className="h-8 w-8 text-orange-400" />
-
-                  <h3 className="mt-5 text-xl font-bold">{card.title}</h3>
-
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">
-                    {card.description}
-                  </p>
-
-                  <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-orange-300">
-                    Preview module
-                    <ShieldCheck className="h-4 w-4" />
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </section>
