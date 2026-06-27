@@ -21,7 +21,7 @@ type ValidatedProfile = {
   in_game_name: string;
   discord_username: string;
   steam_username: string;
-  coh3_player_card_url: string;
+  coh3_player_card_url: string | null;
   country: string;
   region: string;
   timezone: string;
@@ -331,11 +331,10 @@ function validateProfile(formData: FormData): {
   requireText(errors, "region", values.region, "Region", 100);
   requireText(errors, "timezone", values.timezone, "Timezone", 100);
 
-  if (!values.coh3PlayerCardUrl) {
-    errors.coh3PlayerCardUrl = "CoH3 Player Card URL is required.";
-  } else if (
-    values.coh3PlayerCardUrl.length > 500 ||
-    !isHttpUrl(values.coh3PlayerCardUrl)
+  if (
+    values.coh3PlayerCardUrl &&
+    (values.coh3PlayerCardUrl.length > 500 ||
+      !isHttpUrl(values.coh3PlayerCardUrl))
   ) {
     errors.coh3PlayerCardUrl = "Enter a valid HTTP or HTTPS URL.";
   }
@@ -365,7 +364,7 @@ function validateProfile(formData: FormData): {
       in_game_name: values.inGameName,
       discord_username: values.discordUsername,
       steam_username: values.steamUsername,
-      coh3_player_card_url: values.coh3PlayerCardUrl,
+      coh3_player_card_url: values.coh3PlayerCardUrl || null,
       country: values.country,
       region: values.region,
       timezone: values.timezone,

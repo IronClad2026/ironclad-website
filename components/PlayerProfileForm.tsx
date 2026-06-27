@@ -251,7 +251,7 @@ export default function PlayerProfileForm({
             type="url"
             defaultValue={profile?.coh3_player_card_url}
             error={state.errors.coh3PlayerCardUrl}
-            required
+            description="Optional unless ELO Verification Checker is enabled for tournament registration."
             className="md:col-span-2"
           />
         </div>

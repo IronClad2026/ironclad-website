@@ -2,9 +2,12 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { normalizeCoh3StatsProfileUrl } from "@/lib/coh3-stats-profile";
+import { getEloVerificationSetting } from "@/lib/platform-settings";
 import { isEligibleForBracket } from "@/lib/tournaments";
 import {
   isPlayerProfileComplete,
+  isPlayerProfileTournamentReady,
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createInAppNotification } from "@/lib/notifications";
@@ -20,6 +23,7 @@ type TournamentRegistrationInput = {
   playerParticipationAgreement: boolean;
   adminFinalDecisionAgreement: boolean;
   ownershipConfirmation: boolean;
+  coh3PlayerCardUrl?: string;
 };
 
 export type TournamentRegistrationResult = {
@@ -160,13 +164,84 @@ export async function submitTournamentRegistration(
     };
   }
 
-  const profile = (data ?? null) as PlayerProfile | null;
+  let profile = (data ?? null) as PlayerProfile | null;
 
-  if (!isPlayerProfileComplete(profile) || !profile) {
+  if (!profile || !isPlayerProfileComplete(profile)) {
     return {
       success: false,
       message: "Complete your player profile before registering.",
       requiresProfile: true,
+    };
+  }
+
+  const eloVerificationSetting = await getEloVerificationSetting();
+  const savedCoh3ProfileUrl = normalizeCoh3StatsProfileUrl(
+    profile.coh3_player_card_url
+  );
+  const submittedCoh3ProfileUrl = normalizeCoh3StatsProfileUrl(
+    input.coh3PlayerCardUrl
+  );
+  const shouldSaveSubmittedCoh3ProfileUrl =
+    eloVerificationSetting.enabled &&
+    !savedCoh3ProfileUrl &&
+    Boolean(submittedCoh3ProfileUrl);
+  const effectiveCoh3ProfileUrl = eloVerificationSetting.enabled
+    ? savedCoh3ProfileUrl ?? submittedCoh3ProfileUrl
+    : profile.coh3_player_card_url;
+  const registrationProfile = {
+    ...profile,
+    coh3_player_card_url: effectiveCoh3ProfileUrl,
+  };
+
+  if (
+    !isPlayerProfileTournamentReady(
+      registrationProfile,
+      eloVerificationSetting.enabled
+    )
+  ) {
+    return {
+      success: false,
+      message:
+        "ELO Verification Checker is enabled. Enter a valid coh3stats.com player profile URL to register.",
+    };
+  }
+
+  const profileUpdates: {
+    coh3_player_card_url?: string;
+    profile_completed?: boolean;
+  } = {};
+
+  if (shouldSaveSubmittedCoh3ProfileUrl && submittedCoh3ProfileUrl) {
+    profileUpdates.coh3_player_card_url = submittedCoh3ProfileUrl;
+  }
+
+  if (!profile.profile_completed) {
+    profileUpdates.profile_completed = true;
+  }
+
+  if (Object.keys(profileUpdates).length > 0) {
+    const { error: profileUpdateError } = await adminSupabase
+      .from("players")
+      .update(profileUpdates)
+      .eq("id", profile.id)
+      .eq("clerk_user_id", userId);
+
+    if (profileUpdateError) {
+      console.error(
+        "Tournament registration profile update failed:",
+        profileUpdateError
+      );
+
+      return {
+        success: false,
+        message:
+          "IronClad could not update your player profile for registration.",
+      };
+    }
+
+    profile = {
+      ...profile,
+      ...profileUpdates,
     };
   }
 
@@ -193,7 +268,7 @@ export async function submitTournamentRegistration(
     admin_notes: "",
     tournament_title: tournamentTitle,
     bracket_name: bracketName,
-    coh3_player_card_url: profile.coh3_player_card_url,
+    coh3_player_card_url: effectiveCoh3ProfileUrl,
     clerk_user_id: userId,
     tournament_id: tournamentId,
     tournament_bracket_id: tournamentBracketId,

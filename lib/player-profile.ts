@@ -45,13 +45,22 @@ export function isPlayerProfileComplete(
       (hasText(profile.display_name) || hasText(profile.in_game_name)) &&
       hasText(profile.discord_username) &&
       hasText(profile.steam_username) &&
-      hasText(profile.coh3_player_card_url) &&
       hasText(profile.country) &&
       hasText(profile.region) &&
       hasText(profile.timezone) &&
       Number.isInteger(profile.current_elo) &&
       Number(profile.current_elo) >= 0 &&
       Number(profile.current_elo) <= 5000
+  );
+}
+
+export function isPlayerProfileTournamentReady(
+  profile: Partial<PlayerProfileCompletionData> | null | undefined,
+  eloVerificationEnabled: boolean
+) {
+  return Boolean(
+    isPlayerProfileComplete(profile) &&
+      (!eloVerificationEnabled || hasText(profile?.coh3_player_card_url))
   );
 }
 

@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import TournamentsExperience from "@/components/TournamentsExperience";
+import { getEloVerificationSetting } from "@/lib/platform-settings";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   mapTournamentRow,
@@ -26,6 +27,7 @@ export default async function TournamentsPage() {
     capacityResult,
     registrationResult,
     generatedBracketResult,
+    eloVerificationSetting,
   ] = await Promise.all([
     supabase
       .from("tournaments")
@@ -46,6 +48,7 @@ export default async function TournamentsPage() {
       .select(
         "id, tournament_bracket_id, format, slot_count, generated_at, bracket_rounds(id, round_number, name, tournament_matches(id, match_number, series_best_of, status, player_one_slot, player_two_slot, player_one_registration_id, player_two_registration_id, player_one_score, player_two_score, winner_registration_id, official_result_submission_id, official_result_decided_by, official_result_decided_at)), tournament_standings(registration_id, wins, losses, points, rank)"
       ),
+    getEloVerificationSetting(),
   ]);
 
   if (tournamentResult.error) {
@@ -279,6 +282,7 @@ export default async function TournamentsPage() {
       }}
       matchResultSubmissions={matchResultSubmissions}
       matchResultReportGroups={matchResultReportGroups}
+      eloVerificationEnabled={eloVerificationSetting.enabled}
     />
   );
 }
