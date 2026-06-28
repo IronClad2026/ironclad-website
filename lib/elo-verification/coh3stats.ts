@@ -15,6 +15,7 @@ export type EloVerificationResult =
       profileId: string;
       mode: Coh3Mode;
       verifiedElo: number;
+      verifiedPlayerName: string;
       highestFaction: Coh3Faction;
       factionElos: Record<Coh3Faction, number | null>;
       source: "coh3stats";
@@ -65,7 +66,23 @@ type RawPlayerProfile = {
 type FactionFetchResult = {
   faction: Coh3Faction;
   elo: number | null;
+  playerName: string | null;
   error: string | null;
+};
+
+export type EloIdentityStatus = "matched" | "mismatch" | "unavailable";
+
+export type EloIdentityComparisonResult = {
+  status: EloIdentityStatus;
+  websiteName: string;
+  coh3StatsName: string;
+};
+
+export type ExactEloComparisonResult = {
+  enteredElo: number;
+  verifiedElo: number;
+  difference: number;
+  matches: boolean;
 };
 
 const COH3_FACTIONS = ["us", "british", "wehrmacht", "dak"] as const;
@@ -80,6 +97,49 @@ const COH3_STORAGE_FACTIONS: Record<Coh3Faction, string> = {
   british: "british",
   wehrmacht: "german",
   dak: "dak",
+};
+
+const PLAYER_NAME_KEYS = [
+  "alias",
+  "name",
+  "player_name",
+  "display_name",
+  "steam_name",
+  "profile_name",
+] as const;
+
+const PROFILE_ID_KEYS = [
+  "profile_id",
+  "profileId",
+  "profileID",
+  "profileid",
+] as const;
+
+// COH3 Stats exposes per-mode, per-faction leaderboard ratings. IronClad uses
+// the highest rounded rating across the four factions for the selected mode.
+const RATING_KEYS = [
+  "elo",
+  "rating",
+  "rank_rating",
+  "leaderboard_rating",
+  "mmr",
+] as const;
+
+const MODE_KEYS = ["mode", "type", "leaderboard_type", "game_type"] as const;
+const FACTION_KEYS = ["faction", "race", "side", "army"] as const;
+
+const FACTION_TOKENS: Record<Coh3Faction, string[]> = {
+  us: ["us", "usf", "american", "americans", "usforces", "americanforces"],
+  british: ["british", "brits", "uk", "britishforces"],
+  wehrmacht: ["wehrmacht", "wehr", "german", "germans"],
+  dak: [
+    "dak",
+    "afrika",
+    "afrikakorps",
+    "africakorps",
+    "deutschesafrikakorps",
+    "deutschesafrikakorpsdak",
+  ],
 };
 
 export function parseCoh3StatsProfileUrl(input: string) {
@@ -134,6 +194,61 @@ export function compareClaimedEloWithVerifiedElo({
   };
 }
 
+export function compareEnteredEloWithCoh3StatsElo({
+  enteredElo,
+  verifiedElo,
+}: {
+  enteredElo: number;
+  verifiedElo: number;
+}): ExactEloComparisonResult {
+  const normalizedEnteredElo = Math.round(enteredElo);
+  const normalizedVerifiedElo = Math.round(verifiedElo);
+  const difference = Math.abs(normalizedEnteredElo - normalizedVerifiedElo);
+
+  return {
+    enteredElo: normalizedEnteredElo,
+    verifiedElo: normalizedVerifiedElo,
+    difference,
+    matches: difference === 0,
+  };
+}
+
+export function normalizePlayerNameForEloIdentityCheck(name: string) {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function comparePlayerNameForEloIdentityCheck({
+  websiteName,
+  coh3StatsName,
+}: {
+  websiteName: string | null | undefined;
+  coh3StatsName: string | null | undefined;
+}): EloIdentityComparisonResult {
+  const normalizedWebsiteName = normalizePlayerNameForEloIdentityCheck(
+    websiteName ?? ""
+  );
+  const normalizedCoh3StatsName = normalizePlayerNameForEloIdentityCheck(
+    coh3StatsName ?? ""
+  );
+
+  if (!normalizedWebsiteName || !normalizedCoh3StatsName) {
+    return {
+      status: "unavailable",
+      websiteName: normalizedWebsiteName,
+      coh3StatsName: normalizedCoh3StatsName,
+    };
+  }
+
+  return {
+    status:
+      normalizedWebsiteName === normalizedCoh3StatsName
+        ? "matched"
+        : "mismatch",
+    websiteName: normalizedWebsiteName,
+    coh3StatsName: normalizedCoh3StatsName,
+  };
+}
+
 // Server-side usage: await verifyCoh3StatsElo({ profileUrlOrId, mode: "1v1" });
 export async function verifyCoh3StatsElo({
   profileUrlOrId,
@@ -163,24 +278,39 @@ export async function verifyCoh3StatsElo({
   }
 
   try {
-    const candidateTimestamps = getLeaderboardCandidateTimestamps(now);
-    const factionResults = await Promise.all(
-      COH3_FACTIONS.map((faction) =>
-        fetchFactionElo({
-          faction,
-          mode: normalizedMode,
-          profileId: parsedProfile.profileId,
-          candidateTimestamps,
-          fetcher,
-          timeoutMs,
-        })
-      )
-    );
-    const factionElos = mapFactionElos(factionResults);
-    const highest = selectHighestFactionElo(factionElos);
+    const exportResult = await fetchPlayerExportProfile({
+      profileId: parsedProfile.profileId,
+      mode: normalizedMode,
+      fetcher,
+      timeoutMs,
+    });
 
-    if (!highest) {
-      const loadErrors = factionResults
+    if (exportResult.status === "ok") {
+      const exportVerification = buildVerificationFromPayload({
+        payload: exportResult.data,
+        profileId: parsedProfile.profileId,
+        mode: normalizedMode,
+        checkedAt,
+      });
+
+      if (exportVerification.ok) {
+        return exportVerification;
+      }
+    }
+
+    const storageVerification = await fetchStorageLeaderboardVerification({
+      profileId: parsedProfile.profileId,
+      mode: normalizedMode,
+      candidateTimestamps: getLeaderboardCandidateTimestamps(now),
+      fetcher,
+      timeoutMs,
+    });
+
+    if (
+      !storageVerification.highest ||
+      !storageVerification.verifiedPlayerName
+    ) {
+      const loadErrors = storageVerification.factionResults
         .map((result) => result.error)
         .filter((error): error is string => Boolean(error));
 
@@ -189,9 +319,12 @@ export async function verifyCoh3StatsElo({
         profileId: parsedProfile.profileId,
         mode: normalizedMode,
         error:
-          loadErrors.length > 0
-            ? `COH3 Stats leaderboard data could not be loaded: ${loadErrors[0]}`
-            : "No COH3 Stats leaderboard ELO was found for this profile and mode.",
+          !storageVerification.verifiedPlayerName &&
+          storageVerification.highest
+            ? "COH3 Stats player name was not found for this profile."
+            : loadErrors.length > 0
+              ? `COH3 Stats leaderboard data could not be loaded: ${loadErrors[0]}`
+              : "No COH3 Stats leaderboard ELO was found for this profile and mode.",
       });
     }
 
@@ -199,9 +332,10 @@ export async function verifyCoh3StatsElo({
       ok: true,
       profileId: parsedProfile.profileId,
       mode: normalizedMode,
-      verifiedElo: highest.elo,
-      highestFaction: highest.faction,
-      factionElos,
+      verifiedElo: storageVerification.highest.elo,
+      verifiedPlayerName: storageVerification.verifiedPlayerName,
+      highestFaction: storageVerification.highest.faction,
+      factionElos: storageVerification.factionElos,
       source: COH3_STATS_SOURCE,
       checkedAt,
     };
@@ -238,6 +372,111 @@ function failure({
   };
 }
 
+function buildVerificationFromPayload({
+  payload,
+  profileId,
+  mode,
+  checkedAt,
+}: {
+  payload: unknown;
+  profileId: string;
+  mode: Coh3Mode;
+  checkedAt: string;
+}): EloVerificationResult {
+  const factionElos = extractFactionElosFromPayload(payload, profileId, mode);
+  const highest = selectHighestFactionElo(factionElos);
+  const verifiedPlayerName = extractPlayerNameFromPayload(payload, profileId);
+
+  if (!verifiedPlayerName) {
+    return failure({
+      checkedAt,
+      profileId,
+      mode,
+      error: "COH3 Stats player name was not found for this profile.",
+    });
+  }
+
+  if (!highest) {
+    return failure({
+      checkedAt,
+      profileId,
+      mode,
+      error: "No COH3 Stats leaderboard ELO was found for this profile and mode.",
+    });
+  }
+
+  return {
+    ok: true,
+    profileId,
+    mode,
+    verifiedElo: highest.elo,
+    verifiedPlayerName,
+    highestFaction: highest.faction,
+    factionElos,
+    source: COH3_STATS_SOURCE,
+    checkedAt,
+  };
+}
+
+async function fetchPlayerExportProfile({
+  profileId,
+  mode,
+  fetcher,
+  timeoutMs,
+}: {
+  profileId: string;
+  mode: Coh3Mode;
+  fetcher: typeof fetch;
+  timeoutMs: number;
+}) {
+  const params = new URLSearchParams({
+    types: JSON.stringify([mode]),
+    profileIDs: JSON.stringify([Number(profileId)]),
+  });
+
+  return fetchJson({
+    url: `https://coh3stats.com/api/playerExport?${params.toString()}`,
+    fetcher,
+    timeoutMs,
+  });
+}
+
+async function fetchStorageLeaderboardVerification({
+  profileId,
+  mode,
+  candidateTimestamps,
+  fetcher,
+  timeoutMs,
+}: {
+  profileId: string;
+  mode: Coh3Mode;
+  candidateTimestamps: number[];
+  fetcher: typeof fetch;
+  timeoutMs: number;
+}) {
+  const factionResults = await Promise.all(
+    COH3_FACTIONS.map((faction) =>
+      fetchFactionElo({
+        faction,
+        mode,
+        profileId,
+        candidateTimestamps,
+        fetcher,
+        timeoutMs,
+      })
+    )
+  );
+  const factionElos = mapFactionElos(factionResults);
+
+  return {
+    factionResults,
+    factionElos,
+    highest: selectHighestFactionElo(factionElos),
+    verifiedPlayerName:
+      factionResults.find((result) => result.playerName)?.playerName ?? null,
+  };
+}
+
 async function fetchFactionElo({
   faction,
   mode,
@@ -268,9 +507,12 @@ async function fetchFactionElo({
       continue;
     }
 
+    const profileMatch = findProfileRatingAndName(profileId, result.data);
+
     return {
       faction,
-      elo: findHighestProfileRating(profileId, result.data),
+      elo: profileMatch.elo,
+      playerName: profileMatch.playerName,
       error: null,
     };
   }
@@ -278,6 +520,7 @@ async function fetchFactionElo({
   return {
     faction,
     elo: null,
+    playerName: null,
     error:
       errors[0] ??
       `No recent COH3 Stats leaderboard dump found for ${mode} ${faction}.`,
@@ -359,21 +602,109 @@ function getLeaderboardCandidateTimestamps(now: Date) {
   );
 }
 
-function findHighestProfileRating(profileId: string, payload: unknown) {
+function extractFactionElosFromPayload(
+  payload: unknown,
+  profileId: string,
+  mode: Coh3Mode
+) {
+  const factionElos: Record<Coh3Faction, number | null> = {
+    us: null,
+    british: null,
+    wehrmacht: null,
+    dak: null,
+  };
+
+  const visit = (
+    value: unknown,
+    path: string[],
+    ancestorReferencesProfile: boolean
+  ) => {
+    if (Array.isArray(value)) {
+      value.forEach((item, index) =>
+        visit(item, [...path, String(index)], ancestorReferencesProfile)
+      );
+      return;
+    }
+
+    if (!isRecord(value)) {
+      return;
+    }
+
+    const referencesProfile =
+      ancestorReferencesProfile || recordReferencesProfileId(value, profileId);
+    const rating = getRatingFromRecord(value);
+
+    if (referencesProfile && rating !== null) {
+      const detectedMode = detectMode(path, value);
+      const faction = detectFaction(path, value);
+
+      if (detectedMode === mode && faction) {
+        factionElos[faction] =
+          factionElos[faction] === null
+            ? rating
+            : Math.max(factionElos[faction], rating);
+      }
+    }
+
+    Object.entries(value).forEach(([key, child]) =>
+      visit(child, [...path, key], referencesProfile)
+    );
+  };
+
+  visit(payload, [], false);
+
+  return factionElos;
+}
+
+function extractPlayerNameFromPayload(payload: unknown, profileId: string) {
+  const matches: Record<string, unknown>[] = [];
+
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    if (!isRecord(value)) {
+      return;
+    }
+
+    if (recordHasDirectProfileId(value, profileId)) {
+      matches.push(value);
+    }
+
+    Object.values(value).forEach(visit);
+  };
+
+  visit(payload);
+
+  for (const match of matches) {
+    const name = getPreferredPlayerName(match);
+
+    if (name) {
+      return name;
+    }
+  }
+
+  return null;
+}
+
+function findProfileRatingAndName(profileId: string, payload: unknown) {
   const leaderboardFile = payload as RawLeaderboardFile;
 
   if (!Array.isArray(leaderboardFile.leaderboards)) {
-    return null;
+    return { elo: null, playerName: null };
   }
 
   let highestRating: number | null = null;
+  let playerName: string | null = null;
 
   for (const row of leaderboardFile.leaderboards as RawLeaderboardStat[]) {
     if (!Array.isArray(row.members)) {
       continue;
     }
 
-    const includesProfile = row.members.some(
+    const matchedMember = row.members.find(
       (member) =>
         String((member as RawPlayerProfile).profile_id ?? "") === profileId
     );
@@ -383,15 +714,165 @@ function findHighestProfileRating(profileId: string, payload: unknown) {
         : null;
 
     if (
-      includesProfile &&
+      matchedMember &&
       rating !== null &&
       (highestRating === null || rating > highestRating)
     ) {
       highestRating = rating;
+      playerName = isRecord(matchedMember)
+        ? getPreferredPlayerName(matchedMember)
+        : null;
     }
   }
 
-  return highestRating;
+  return { elo: highestRating, playerName };
+}
+
+function recordReferencesProfileId(
+  record: Record<string, unknown>,
+  profileId: string
+) {
+  if (recordHasDirectProfileId(record, profileId)) {
+    return true;
+  }
+
+  return Object.values(record).some((value) =>
+    valueReferencesProfileId(value, profileId)
+  );
+}
+
+function valueReferencesProfileId(value: unknown, profileId: string): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) => valueReferencesProfileId(item, profileId));
+  }
+
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return recordReferencesProfileId(value, profileId);
+}
+
+function recordHasDirectProfileId(
+  record: Record<string, unknown>,
+  profileId: string
+) {
+  return PROFILE_ID_KEYS.some((key) => String(record[key] ?? "") === profileId);
+}
+
+function getPreferredPlayerName(record: Record<string, unknown>): string | null {
+  for (const key of PLAYER_NAME_KEYS) {
+    const value = record[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  const nestedProfile = record.profile;
+
+  if (isRecord(nestedProfile)) {
+    return getPreferredPlayerName(nestedProfile);
+  }
+
+  for (const key of ["player", "member"]) {
+    const nestedRecord = record[key];
+
+    if (isRecord(nestedRecord)) {
+      const nestedName = getPreferredPlayerName(nestedRecord);
+
+      if (nestedName) {
+        return nestedName;
+      }
+    }
+  }
+
+  return null;
+}
+
+function getRatingFromRecord(record: Record<string, unknown>) {
+  for (const key of RATING_KEYS) {
+    const value = record[key];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return Math.round(value);
+    }
+
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+
+      if (Number.isFinite(parsed)) {
+        return Math.round(parsed);
+      }
+    }
+  }
+
+  return null;
+}
+
+function detectMode(path: string[], record: Record<string, unknown>) {
+  const tokens = [
+    ...path,
+    ...MODE_KEYS.map((key) => record[key]).filter(
+      (value): value is string | number =>
+        typeof value === "string" || typeof value === "number"
+    ),
+  ].map(normalizeToken);
+  const validModes: Coh3Mode[] = ["1v1", "2v2", "3v3", "4v4"];
+
+  for (const token of tokens) {
+    const mode = normalizeCoh3Mode(token);
+
+    if (mode) {
+      return mode;
+    }
+
+    const embeddedMode = validModes.find((candidate) =>
+      token.includes(candidate)
+    );
+
+    if (embeddedMode) {
+      return embeddedMode;
+    }
+  }
+
+  return null;
+}
+
+function detectFaction(path: string[], record: Record<string, unknown>) {
+  const tokens = [
+    ...path,
+    ...FACTION_KEYS.map((key) => record[key]).filter(
+      (value): value is string | number =>
+        typeof value === "string" || typeof value === "number"
+    ),
+  ].map(normalizeToken);
+
+  for (const [faction, aliases] of Object.entries(FACTION_TOKENS) as [
+    Coh3Faction,
+    string[],
+  ][]) {
+    if (
+      tokens.some((token) =>
+        aliases.some(
+          (alias) =>
+            token === alias || (alias.length > 2 && token.includes(alias))
+        )
+      )
+    ) {
+      return faction;
+    }
+  }
+
+  return null;
+}
+
+function normalizeToken(value: string | number) {
+  return String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function mapFactionElos(results: FactionFetchResult[]) {

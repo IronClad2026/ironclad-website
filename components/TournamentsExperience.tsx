@@ -2071,6 +2071,15 @@ type RegistrationErrors = Partial<
   Record<keyof RegistrationFormState | "agreements" | "coh3ProfileUrl", string>
 >;
 
+type EloVerificationApiResponse = {
+  ok: boolean;
+  reason?: "invalid_url" | "ign_mismatch" | "elo_mismatch" | "external_error";
+  message: string;
+  profileId?: string;
+  coh3statsName?: string;
+  coh3statsElo?: number;
+};
+
 function RegisterModal({
   onClose,
   profile,
@@ -2173,10 +2182,9 @@ function RegisterModal({
     if (targetStep === "profile" && needsCoh3ProfileUrlInput) {
       if (!coh3ProfileUrl.trim()) {
         nextErrors.coh3ProfileUrl =
-          "COH3 Stats Profile URL is required while ELO Verification Checker is enabled.";
+          "Please enter a valid coh3stats profile URL.";
       } else if (!isValidCoh3StatsProfileUrl(coh3ProfileUrl)) {
-        nextErrors.coh3ProfileUrl =
-          "Enter a valid coh3stats.com player profile URL.";
+        nextErrors.coh3ProfileUrl = "Please enter a valid coh3stats profile URL.";
       }
     }
 
@@ -2234,6 +2242,29 @@ function RegisterModal({
 
     setIsSubmitting(true);
     setSubmissionError("");
+
+    if (eloVerificationEnabled) {
+      const verificationResult = await verifyEloBeforeRegistrationSubmit({
+        ign: profile.in_game_name,
+        enteredElo: profile.current_elo,
+        coh3statsProfileUrl: needsCoh3ProfileUrlInput
+          ? coh3ProfileUrl.trim()
+          : profile.coh3_player_card_url ?? "",
+        tournamentId: selectedTournament.id,
+        mode: selectedTournament.format,
+      });
+
+      if (!verificationResult.ok) {
+        setIsSubmitting(false);
+        setSubmissionError(verificationResult.message);
+
+        if (verificationResult.reason === "invalid_url") {
+          setStep("profile");
+        }
+
+        return;
+      }
+    }
 
     const result = await submitTournamentRegistration({
       tournamentId: selectedTournament.id,
@@ -2527,6 +2558,56 @@ function RegistrationProfileValue({
       <p className="mt-2 break-words text-sm font-bold text-white">{value || "N/A"}</p>
     </div>
   );
+}
+
+async function verifyEloBeforeRegistrationSubmit({
+  ign,
+  enteredElo,
+  coh3statsProfileUrl,
+  tournamentId,
+  mode,
+}: {
+  ign: string;
+  enteredElo: number | null;
+  coh3statsProfileUrl: string;
+  tournamentId: string;
+  mode: string;
+}): Promise<EloVerificationApiResponse> {
+  try {
+    const response = await fetch("/api/elo-verification/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ign,
+        enteredElo,
+        coh3statsProfileUrl,
+        tournamentId,
+        mode,
+      }),
+    });
+    const result = (await response.json()) as EloVerificationApiResponse;
+
+    if (!response.ok || !result.ok) {
+      return {
+        ok: false,
+        reason: result.reason ?? "external_error",
+        message:
+          result.message ||
+          "Could not verify the coh3stats profile right now. Please try again later.",
+      };
+    }
+
+    return result;
+  } catch {
+    return {
+      ok: false,
+      reason: "external_error",
+      message:
+        "Could not verify the coh3stats profile right now. Please try again later.",
+    };
+  }
 }
 
 function AgreementCheckbox({ label, checked, onChange, error }: { label: string; checked: boolean; onChange: (checked: boolean) => void; error?: string }) {
