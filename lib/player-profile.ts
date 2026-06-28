@@ -6,6 +6,7 @@ export type PlayerProfile = {
   discord_username: string | null;
   steam_username: string | null;
   coh3_player_card_url: string | null;
+  coh3_profile_id?: string | null;
   country: string | null;
   region: string | null;
   timezone: string | null;

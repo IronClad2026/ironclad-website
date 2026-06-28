@@ -23,7 +23,10 @@ import {
   getCompletedLeaderboardTournaments,
   getRecentLeaderboardRecalculationRuns,
 } from "@/lib/leaderboard/admin";
-import { getEloVerificationSetting } from "@/lib/platform-settings";
+import {
+  getEloVerificationSetting,
+  getEloVerificationSupportLinkSetting,
+} from "@/lib/platform-settings";
 import {
   AlertTriangle,
   CheckCircle,
@@ -861,6 +864,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     completedLeaderboardTournaments,
     leaderboardRecalculationRuns,
     eloVerificationSetting,
+    eloVerificationSupportLinkSetting,
   ] =
     await Promise.all([
       supabase
@@ -884,6 +888,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       getCompletedLeaderboardTournaments(),
       getRecentLeaderboardRecalculationRuns(8),
       getEloVerificationSetting(),
+      getEloVerificationSupportLinkSetting(),
     ]);
   const registrationsData = registrationResult.data;
   const error = registrationResult.error;
@@ -1499,7 +1504,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               notice={params?.bracketNotice}
             />
 
-            <AdminEloVerificationChecker setting={eloVerificationSetting} />
+            <AdminEloVerificationChecker
+              setting={eloVerificationSetting}
+              supportLinkSetting={eloVerificationSupportLinkSetting}
+            />
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">

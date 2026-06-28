@@ -8,6 +8,7 @@ import {
   type Coh3Faction,
   type Coh3Mode,
 } from "@/lib/elo-verification/coh3stats";
+import { DEFAULT_ELO_VERIFICATION_SUPPORT_URL } from "@/lib/platform-settings";
 
 export type RegistrationEloVerificationReason =
   | "invalid_url"
@@ -26,6 +27,7 @@ export type RegistrationEloVerificationResult =
       highestFaction: Coh3Faction;
       factionElos: Record<Coh3Faction, number | null>;
       difference: number;
+      tolerance: number;
       checkedAt: string;
       normalizedProfileUrl: string;
     }
@@ -36,6 +38,7 @@ export type RegistrationEloVerificationResult =
       profileId?: string;
       coh3statsName?: string;
       coh3statsElo?: number;
+      supportUrl?: string;
     };
 
 export async function verifyRegistrationEloIdentity({
@@ -43,11 +46,13 @@ export async function verifyRegistrationEloIdentity({
   enteredElo,
   coh3statsProfileUrl,
   mode,
+  supportUrl = DEFAULT_ELO_VERIFICATION_SUPPORT_URL,
 }: {
   ign: string | null | undefined;
   enteredElo: number | string | null | undefined;
   coh3statsProfileUrl: string | null | undefined;
   mode: string | null | undefined;
+  supportUrl?: string | null | undefined;
 }): Promise<RegistrationEloVerificationResult> {
   const parsedProfile = parseCoh3StatsProfileUrl(coh3statsProfileUrl);
 
@@ -113,13 +118,17 @@ export async function verifyRegistrationEloIdentity({
   });
 
   if (!eloComparison.matches) {
+    const effectiveSupportUrl =
+      supportUrl?.trim() || DEFAULT_ELO_VERIFICATION_SUPPORT_URL;
+
     return {
       ok: false,
       reason: "elo_mismatch",
-      message: "The ELO entered does not match the ELO found on coh3stats.",
+      message: buildEloMismatchSupportMessage(effectiveSupportUrl),
       profileId: verification.profileId,
       coh3statsName: verification.verifiedPlayerName,
       coh3statsElo: verification.verifiedElo,
+      supportUrl: effectiveSupportUrl,
     };
   }
 
@@ -133,7 +142,16 @@ export async function verifyRegistrationEloIdentity({
     highestFaction: verification.highestFaction,
     factionElos: verification.factionElos,
     difference: eloComparison.difference,
+    tolerance: eloComparison.tolerance,
     checkedAt: verification.checkedAt,
     normalizedProfileUrl: parsedProfile.normalizedUrl,
   };
+}
+
+function buildEloMismatchSupportMessage(
+  supportUrl: string | null | undefined
+) {
+  const discordUrl = supportUrl ?? DEFAULT_ELO_VERIFICATION_SUPPORT_URL;
+
+  return `Your registration could not be completed because the ELO information provided does not match our verification requirements.\n\nIf you believe this is a mistake or need more information, please contact an admin on Discord by opening a ticket in the 1v1 ticket channel.\n\nDiscord server: ${discordUrl}`;
 }

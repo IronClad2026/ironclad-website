@@ -2071,15 +2071,6 @@ type RegistrationErrors = Partial<
   Record<keyof RegistrationFormState | "agreements" | "coh3ProfileUrl", string>
 >;
 
-type EloVerificationApiResponse = {
-  ok: boolean;
-  reason?: "invalid_url" | "ign_mismatch" | "elo_mismatch" | "external_error";
-  message: string;
-  profileId?: string;
-  coh3statsName?: string;
-  coh3statsElo?: number;
-};
-
 function RegisterModal({
   onClose,
   profile,
@@ -2111,6 +2102,9 @@ function RegisterModal({
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
+  const [submissionErrorSupportUrl, setSubmissionErrorSupportUrl] = useState<
+    string | null
+  >(null);
   const [successMessage, setSuccessMessage] = useState("Registration submitted.");
   const [coh3ProfileUrl, setCoh3ProfileUrl] = useState(
     profile.coh3_player_card_url ?? ""
@@ -2227,6 +2221,7 @@ function RegisterModal({
       setSubmissionError(
         "This tournament is full or already in progress. We hope to see you in the next one."
       );
+      setSubmissionErrorSupportUrl(null);
       setStep("tournament");
       return;
     }
@@ -2242,29 +2237,7 @@ function RegisterModal({
 
     setIsSubmitting(true);
     setSubmissionError("");
-
-    if (eloVerificationEnabled) {
-      const verificationResult = await verifyEloBeforeRegistrationSubmit({
-        ign: profile.in_game_name,
-        enteredElo: profile.current_elo,
-        coh3statsProfileUrl: needsCoh3ProfileUrlInput
-          ? coh3ProfileUrl.trim()
-          : profile.coh3_player_card_url ?? "",
-        tournamentId: selectedTournament.id,
-        mode: selectedTournament.format,
-      });
-
-      if (!verificationResult.ok) {
-        setIsSubmitting(false);
-        setSubmissionError(verificationResult.message);
-
-        if (verificationResult.reason === "invalid_url") {
-          setStep("profile");
-        }
-
-        return;
-      }
-    }
+    setSubmissionErrorSupportUrl(null);
 
     const result = await submitTournamentRegistration({
       tournamentId: selectedTournament.id,
@@ -2287,9 +2260,11 @@ function RegisterModal({
 
     if (!result.success) {
       setSubmissionError(result.message);
+      setSubmissionErrorSupportUrl(result.supportUrl ?? null);
       return;
     }
 
+    setSubmissionErrorSupportUrl(null);
     setStep("submitted");
     setSuccessMessage(result.message);
   };
@@ -2511,8 +2486,11 @@ function RegisterModal({
               </div>
 
               {submissionError && (
-                <div className="rounded-xl border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
-                  {submissionError}
+                <div className="whitespace-pre-line rounded-xl border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
+                  <RegistrationSubmissionError
+                    message={submissionError}
+                    supportUrl={submissionErrorSupportUrl}
+                  />
                 </div>
               )}
 
@@ -2543,6 +2521,39 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-2 break-words text-xs font-bold text-orange-300">{message}</p>;
 }
 
+function RegistrationSubmissionError({
+  message,
+  supportUrl,
+}: {
+  message: string;
+  supportUrl: string | null;
+}) {
+  const marker = "Discord server:";
+
+  if (!supportUrl || !message.includes(marker)) {
+    return <>{message}</>;
+  }
+
+  const [beforeMarker] = message.split(marker);
+
+  return (
+    <>
+      <span>{beforeMarker.trimEnd()}</span>
+      <span className="mt-3 block">
+        {marker}{" "}
+        <a
+          href={supportUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="break-all text-orange-100 underline decoration-orange-300/70 underline-offset-4 transition hover:text-white"
+        >
+          {supportUrl}
+        </a>
+      </span>
+    </>
+  );
+}
+
 function RegistrationProfileValue({
   label,
   value,
@@ -2558,56 +2569,6 @@ function RegistrationProfileValue({
       <p className="mt-2 break-words text-sm font-bold text-white">{value || "N/A"}</p>
     </div>
   );
-}
-
-async function verifyEloBeforeRegistrationSubmit({
-  ign,
-  enteredElo,
-  coh3statsProfileUrl,
-  tournamentId,
-  mode,
-}: {
-  ign: string;
-  enteredElo: number | null;
-  coh3statsProfileUrl: string;
-  tournamentId: string;
-  mode: string;
-}): Promise<EloVerificationApiResponse> {
-  try {
-    const response = await fetch("/api/elo-verification/verify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ign,
-        enteredElo,
-        coh3statsProfileUrl,
-        tournamentId,
-        mode,
-      }),
-    });
-    const result = (await response.json()) as EloVerificationApiResponse;
-
-    if (!response.ok || !result.ok) {
-      return {
-        ok: false,
-        reason: result.reason ?? "external_error",
-        message:
-          result.message ||
-          "Could not verify the coh3stats profile right now. Please try again later.",
-      };
-    }
-
-    return result;
-  } catch {
-    return {
-      ok: false,
-      reason: "external_error",
-      message:
-        "Could not verify the coh3stats profile right now. Please try again later.",
-    };
-  }
 }
 
 function AgreementCheckbox({ label, checked, onChange, error }: { label: string; checked: boolean; onChange: (checked: boolean) => void; error?: string }) {

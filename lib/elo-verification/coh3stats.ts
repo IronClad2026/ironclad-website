@@ -82,6 +82,7 @@ export type ExactEloComparisonResult = {
   enteredElo: number;
   verifiedElo: number;
   difference: number;
+  tolerance: number;
   matches: boolean;
 };
 
@@ -91,6 +92,7 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 const DAY_SECONDS = 86_400;
 const LEADERBOARD_READY_UTC_HOUR = 5;
 const LEADERBOARD_CANDIDATE_DAYS = 4;
+export const ELO_AUTO_VERIFY_TOLERANCE = 75;
 
 const COH3_STORAGE_FACTIONS: Record<Coh3Faction, string> = {
   us: "american",
@@ -113,6 +115,9 @@ const PROFILE_ID_KEYS = [
   "profileId",
   "profileID",
   "profileid",
+  "relic_id",
+  "relicId",
+  "relicID",
 ] as const;
 
 // COH3 Stats exposes per-mode, per-faction leaderboard ratings. IronClad uses
@@ -209,7 +214,8 @@ export function compareEnteredEloWithCoh3StatsElo({
     enteredElo: normalizedEnteredElo,
     verifiedElo: normalizedVerifiedElo,
     difference,
-    matches: difference === 0,
+    tolerance: ELO_AUTO_VERIFY_TOLERANCE,
+    matches: difference <= ELO_AUTO_VERIFY_TOLERANCE,
   };
 }
 
@@ -434,11 +440,20 @@ async function fetchPlayerExportProfile({
     profileIDs: JSON.stringify([Number(profileId)]),
   });
 
-  return fetchJson({
+  const result = await fetchText({
     url: `https://coh3stats.com/api/playerExport?${params.toString()}`,
     fetcher,
     timeoutMs,
   });
+
+  if (result.status !== "ok") {
+    return result;
+  }
+
+  return {
+    status: "ok" as const,
+    data: parsePlayerExportCsv(result.data, mode),
+  };
 }
 
 async function fetchStorageLeaderboardVerification({
@@ -567,6 +582,163 @@ async function fetchJson({
       error: error instanceof Error ? error.message : "COH3 Stats fetch failed.",
     };
   }
+}
+
+async function fetchText({
+  url,
+  fetcher,
+  timeoutMs,
+}: {
+  url: string;
+  fetcher: typeof fetch;
+  timeoutMs: number;
+}): Promise<
+  | { status: "ok"; data: string }
+  | { status: "not_found" }
+  | { status: "error"; error: string }
+> {
+  try {
+    const response = await fetcher(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (response.status === 404) {
+      return { status: "not_found" };
+    }
+
+    if (!response.ok) {
+      return {
+        status: "error",
+        error: `COH3 Stats returned HTTP ${response.status}.`,
+      };
+    }
+
+    return {
+      status: "ok",
+      data: await response.text(),
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      error: error instanceof Error ? error.message : "COH3 Stats fetch failed.",
+    };
+  }
+}
+
+function parsePlayerExportCsv(input: string, mode: Coh3Mode) {
+  const rows = parseCsvRows(input.trim());
+  const [headers, ...records] = rows;
+
+  if (!headers || records.length === 0) {
+    return { players: [] };
+  }
+
+  return {
+    players: records.map((record) => {
+      const row = Object.fromEntries(
+        headers.map((header, index) => [header, record[index] ?? ""])
+      );
+      const profileId = row.relic_id ?? "";
+      const alias = row.alias ?? "";
+
+      return {
+        profile_id: profileId,
+        relic_id: profileId,
+        alias,
+        leaderboards: COH3_FACTIONS.map((faction) => {
+          const column = getPlayerExportEloColumn({ faction, mode });
+
+          return {
+            mode,
+            faction,
+            rating: parseNullableNumber(row[column]),
+            profile: {
+              profile_id: profileId,
+              relic_id: profileId,
+              alias,
+            },
+          };
+        }),
+      };
+    }),
+  };
+}
+
+function parseCsvRows(input: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let value = "";
+  let quoted = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    const nextCharacter = input[index + 1];
+
+    if (character === '"' && quoted && nextCharacter === '"') {
+      value += '"';
+      index += 1;
+      continue;
+    }
+
+    if (character === '"') {
+      quoted = !quoted;
+      continue;
+    }
+
+    if (character === "," && !quoted) {
+      row.push(value);
+      value = "";
+      continue;
+    }
+
+    if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && nextCharacter === "\n") {
+        index += 1;
+      }
+
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+      continue;
+    }
+
+    value += character;
+  }
+
+  row.push(value);
+  rows.push(row);
+
+  return rows.filter((currentRow) =>
+    currentRow.some((currentValue) => currentValue.trim())
+  );
+}
+
+function getPlayerExportEloColumn({
+  faction,
+  mode,
+}: {
+  faction: Coh3Faction;
+  mode: Coh3Mode;
+}) {
+  const factionColumn: Record<Coh3Faction, string> = {
+    us: "american",
+    british: "british",
+    wehrmacht: "german",
+    dak: "dak",
+  };
+
+  return `${factionColumn[faction]}_${mode}_elo`;
+}
+
+function parseNullableNumber(value: string | undefined) {
+  if (!value || value === "null" || value === "undefined") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getLeaderboardUrl({

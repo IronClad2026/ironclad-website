@@ -12,8 +12,14 @@ import {
   MAX_AVATAR_UPLOAD_SIZE_BYTES,
   MAX_AVATAR_UPLOAD_SIZE_LABEL,
 } from "@/lib/avatar";
+import { parseCoh3StatsProfileUrl } from "@/lib/coh3-stats-profile";
+import {
+  checkCoh3ProfileOwnership,
+  COH3_PROFILE_LINKED_ACCOUNT_MISMATCH_MESSAGE,
+} from "@/lib/coh3-profile-ownership";
 import { isPlayerProfileComplete } from "@/lib/player-profile";
 import { supabaseUrl } from "@/lib/supabase-config";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 type ValidatedProfile = {
@@ -59,7 +65,7 @@ export async function savePlayerProfile(
   const supabase = await createAuthenticatedSupabaseClient();
   const { data: existingProfile, error: existingProfileError } = await supabase
     .from("players")
-    .select("id, avatar_url")
+    .select("id, avatar_url, coh3_profile_id")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
@@ -76,6 +82,45 @@ export async function savePlayerProfile(
   const avatar = formData.get("avatar");
   let avatarUrl: string | undefined;
   const playerId = existingProfile?.id ?? crypto.randomUUID();
+  const parsedCoh3Profile = parseCoh3StatsProfileUrl(
+    validation.data.coh3_player_card_url
+  );
+  const linkedCoh3ProfileId =
+    typeof existingProfile?.coh3_profile_id === "string"
+      ? existingProfile.coh3_profile_id
+      : null;
+
+  if (
+    linkedCoh3ProfileId &&
+    parsedCoh3Profile?.profileId !== linkedCoh3ProfileId
+  ) {
+    return {
+      status: "error",
+      message: "Review the highlighted profile fields.",
+      errors: {
+        coh3PlayerCardUrl: COH3_PROFILE_LINKED_ACCOUNT_MISMATCH_MESSAGE,
+      },
+    };
+  }
+
+  if (parsedCoh3Profile) {
+    const ownershipCheck = await checkCoh3ProfileOwnership({
+      supabase: createSupabaseAdminClient(),
+      profileId: parsedCoh3Profile.profileId,
+      playerId,
+      linkedProfileId: linkedCoh3ProfileId,
+    });
+
+    if (!ownershipCheck.ok) {
+      return {
+        status: "error",
+        message: "Review the highlighted profile fields.",
+        errors: {
+          coh3PlayerCardUrl: ownershipCheck.message,
+        },
+      };
+    }
+  }
 
   if (avatar instanceof File && avatar.size > 0) {
     const avatarSignature = new Uint8Array(
