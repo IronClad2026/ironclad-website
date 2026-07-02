@@ -6,11 +6,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import type {
+  TournamentBracketFieldPrefix,
+  TournamentBracketName,
   TournamentFormat,
   TournamentRuleFormat,
   TournamentStatus,
 } from "@/lib/tournaments";
-import { parseEloEligibilityRule } from "@/lib/tournaments";
+import {
+  TOURNAMENT_BRACKET_CONFIGS,
+  parseEloEligibilityRule,
+} from "@/lib/tournaments";
 
 type CustomClaims = {
   metadata?: {
@@ -188,16 +193,13 @@ export async function saveTournament(
   const rulesUrl = getOptionalText(formData, "rulesUrl");
   const battlefyUrl = getOptionalText(formData, "battlefyUrl");
   const registrationEnabled = status === "registration_open";
-  const mainEnabled = formData.get("mainEnabled") === "on";
-  const challengeEnabled = formData.get("challengeEnabled") === "on";
-  const mainBracket = readBracket(formData, "main", "Main");
-  const challengeBracket = readBracket(
-    formData,
-    "challenge",
-    "Challenge"
-  );
-  const brackets = [mainBracket, challengeBracket].filter(
-    (bracket) => bracket !== null
+  const bracketInputs = TOURNAMENT_BRACKET_CONFIGS.map((config) => ({
+    config,
+    enabled: formData.get(`${config.fieldPrefix}Enabled`) === "on",
+    bracket: readBracket(formData, config.fieldPrefix, config.name),
+  }));
+  const brackets = bracketInputs.flatMap((input) =>
+    input.bracket ? [input.bracket] : []
   );
 
   const validationError = getTournamentValidationError({
@@ -214,10 +216,7 @@ export async function saveTournament(
     battlefyUrl,
     registrationOpenAt,
     grandFinalAt,
-    mainEnabled,
-    challengeEnabled,
-    mainBracket,
-    challengeBracket,
+    brackets: bracketInputs,
     bracketCount: brackets.length,
   });
 
@@ -672,8 +671,8 @@ function getErrorMessage(error: unknown) {
 
 function readBracket(
   formData: FormData,
-  fieldPrefix: "main" | "challenge",
-  name: "Main" | "Challenge"
+  fieldPrefix: TournamentBracketFieldPrefix,
+  name: TournamentBracketName
 ) {
   if (formData.get(`${fieldPrefix}Enabled`) !== "on") {
     return null;
@@ -788,10 +787,11 @@ function getTournamentValidationError(input: {
   battlefyUrl: string | null;
   registrationOpenAt: number | null;
   grandFinalAt: number | null;
-  mainEnabled: boolean;
-  challengeEnabled: boolean;
-  mainBracket: ReturnType<typeof readBracket>;
-  challengeBracket: ReturnType<typeof readBracket>;
+  brackets: {
+    config: (typeof TOURNAMENT_BRACKET_CONFIGS)[number];
+    enabled: boolean;
+    bracket: ReturnType<typeof readBracket>;
+  }[];
   bracketCount: number;
 }) {
   if (!input.title) return "Tournament title is required.";
@@ -834,23 +834,16 @@ function getTournamentValidationError(input: {
   if (input.battlefyUrl && !isHttpUrl(input.battlefyUrl)) {
     return "Battlefy URL must begin with http:// or https://.";
   }
-  if (input.mainEnabled && !input.mainBracket) {
-    return "Main bracket requires ELO rules and a maximum player count between 2 and 1,024.";
-  }
-  if (input.challengeEnabled && !input.challengeBracket) {
-    return "Challenge bracket requires ELO rules and a maximum player count between 2 and 1,024.";
-  }
-  if (
-    input.mainBracket &&
-    !parseEloEligibilityRule(input.mainBracket.elo_rules)
-  ) {
-    return "Main bracket ELO rules must use a supported range, upper/lower limit, or unrestricted rule.";
-  }
-  if (
-    input.challengeBracket &&
-    !parseEloEligibilityRule(input.challengeBracket.elo_rules)
-  ) {
-    return "Challenge bracket ELO rules must use a supported range, upper/lower limit, or unrestricted rule.";
+  for (const bracketInput of input.brackets) {
+    if (bracketInput.enabled && !bracketInput.bracket) {
+      return `${bracketInput.config.label} requires ELO rules and a maximum player count between 2 and 1,024.`;
+    }
+    if (
+      bracketInput.bracket &&
+      !parseEloEligibilityRule(bracketInput.bracket.elo_rules)
+    ) {
+      return `${bracketInput.config.label} ELO rules must use a supported range, upper/lower limit, or unrestricted rule.`;
+    }
   }
   if (input.bracketCount === 0) {
     return "Enable and configure at least one tournament bracket.";

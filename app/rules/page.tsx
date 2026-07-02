@@ -34,8 +34,9 @@ const quickRules: {
     icon: Trophy,
     title: "1v1 Tournament Format",
     items: [
-      "Main Bracket: 1300+ ELO",
-      "Challenge Bracket: Below 1300 ELO",
+      "Academy Bracket: Below 1100 ELO",
+      "Challenge Bracket: 1100-1399 ELO",
+      "Main / Elite Bracket: 1400+ ELO",
       "Monthly tournaments",
       "ICT points system",
       "Bo3 matches / Bo5 finals",
@@ -64,7 +65,7 @@ const ruleSections: Record<TabName, [string, string][]> = {
 
     [
       "Bracket Structure",
-      "The 1v1 format is divided into a Main Bracket for 1300+ ELO players and a Challenge Bracket for players below 1300 ELO.",
+      "The 1v1 format is divided into Academy, Challenge, and Main / Elite brackets using non-overlapping ELO ranges.",
     ],
 
     [

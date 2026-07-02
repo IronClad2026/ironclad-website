@@ -27,6 +27,7 @@ import {
   getEloVerificationSetting,
   getEloVerificationSupportLinkSetting,
 } from "@/lib/platform-settings";
+import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 import {
   AlertTriangle,
   CheckCircle,
@@ -913,7 +914,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {
           tournamentId: tournament.id,
           tournamentTitle: tournament.title,
-          bracketName: `${bracket.name} Bracket`,
+          bracketName: getTournamentBracketDisplayName(bracket.name),
           maxPlayers: bracket.max_players,
         },
       ])
@@ -1012,7 +1013,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             return {
               generatedBracketId: generated?.id ?? null,
               bracketId: bracket.id,
-              bracketName: `${bracket.name} Bracket`,
+              bracketName: getTournamentBracketDisplayName(bracket.name),
               format: generated?.format ?? null,
               slotCount: generated?.slot_count ?? 0,
               actualMatchCount: generated?.tournament_matches?.length ?? 0,

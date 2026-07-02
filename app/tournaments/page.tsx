@@ -3,6 +3,7 @@ import TournamentsExperience from "@/components/TournamentsExperience";
 import { getEloVerificationSetting } from "@/lib/platform-settings";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
+  getTournamentBracketDisplayName,
   mapTournamentRow,
   type GeneratedTournamentBracket,
   type MatchResultReportGroup,
@@ -167,7 +168,7 @@ export default async function TournamentsPage() {
     tournamentRows.flatMap((tournament) =>
       (tournament.tournament_brackets ?? []).map((bracket) => [
         bracket.id,
-        `${bracket.name} Bracket`,
+        getTournamentBracketDisplayName(bracket.name),
       ])
     )
   );

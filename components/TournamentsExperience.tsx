@@ -656,37 +656,32 @@ function Timeline({ tournament }: { tournament: TournamentCard }) {
 
 function Participants({ tournament }: { tournament: TournamentCard }) {
   const [query, setQuery] = useState("");
-  const mainRequirement =
-    tournament.brackets.find((bracket) =>
-      bracket.name.startsWith("Main")
-    )?.requirement ?? "Configured ELO rules";
-  const challengeRequirement =
-    tournament.brackets.find((bracket) =>
-      bracket.name.startsWith("Challenge")
-    )?.requirement ?? "Configured ELO rules";
-  const participantsByBracket = useMemo(
-    () => ({
-      main: tournament.participants.filter((participant) =>
-        participant.bracketName.startsWith("Main")
-      ),
-      challenge: tournament.participants.filter((participant) =>
-        participant.bracketName.startsWith("Challenge")
-      ),
-    }),
-    [tournament.participants]
+  const participantSections = useMemo(
+    () =>
+      tournament.brackets.map((bracket) => ({
+        bracket,
+        participants: tournament.participants.filter(
+          (participant) => participant.bracketId === bracket.id
+        ),
+      })).map((section) => ({
+        ...section,
+        totalCount: section.participants.length,
+      })),
+    [tournament.brackets, tournament.participants]
   );
   const filteredByBracket = useMemo(() => {
+      const normalizedQuery = query.toLowerCase();
       const matchesQuery = (participant: TournamentParticipant) =>
         `${participant.name} ${participant.country} ${participant.elo}`
           .toLowerCase()
-          .includes(query.toLowerCase());
+          .includes(normalizedQuery);
 
-      return {
-        main: participantsByBracket.main.filter(matchesQuery),
-        challenge: participantsByBracket.challenge.filter(matchesQuery),
-      };
+      return participantSections.map((section) => ({
+        ...section,
+        participants: section.participants.filter(matchesQuery),
+      }));
     },
-    [participantsByBracket, query]
+    [participantSections, query]
   );
 
   return (
@@ -701,18 +696,15 @@ function Participants({ tournament }: { tournament: TournamentCard }) {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search entries" className="w-full rounded border border-slate-700 bg-slate-950 py-2 pl-10 pr-3 text-sm text-white outline-none focus:border-sky-500" />
         </div>
       </div>
-      <ParticipantSection
-        title="Main Bracket Participants"
-        requirement={mainRequirement}
-        participants={filteredByBracket.main}
-        totalCount={participantsByBracket.main.length}
-      />
-      <ParticipantSection
-        title="Challenger Bracket Participants"
-        requirement={challengeRequirement}
-        participants={filteredByBracket.challenge}
-        totalCount={participantsByBracket.challenge.length}
-      />
+      {filteredByBracket.map((section) => (
+        <ParticipantSection
+          key={section.bracket.id}
+          title={`${section.bracket.name} Participants`}
+          requirement={section.bracket.requirement}
+          participants={section.participants}
+          totalCount={section.totalCount}
+        />
+      ))}
     </div>
   );
 }

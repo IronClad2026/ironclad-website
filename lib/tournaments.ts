@@ -6,6 +6,53 @@ export type TournamentStatus =
 
 export type TournamentFormat = "1v1" | "2v2" | "4v4";
 export type TournamentRuleFormat = "format_a" | "format_b";
+export type TournamentBracketName = "Academy" | "Challenge" | "Main";
+export type TournamentBracketFieldPrefix = "academy" | "challenge" | "main";
+
+export const TOURNAMENT_BRACKET_CONFIGS: readonly {
+  name: TournamentBracketName;
+  fieldPrefix: TournamentBracketFieldPrefix;
+  label: string;
+  defaultEloRules: string;
+  defaultMaxPlayers: number;
+}[] = [
+  {
+    name: "Academy",
+    fieldPrefix: "academy",
+    label: "Academy Bracket",
+    defaultEloRules: "Below 1100 ELO",
+    defaultMaxPlayers: 8,
+  },
+  {
+    name: "Challenge",
+    fieldPrefix: "challenge",
+    label: "Challenge Bracket",
+    defaultEloRules: "1100-1399 ELO",
+    defaultMaxPlayers: 8,
+  },
+  {
+    name: "Main",
+    fieldPrefix: "main",
+    label: "Main / Elite Bracket",
+    defaultEloRules: "1400+ ELO",
+    defaultMaxPlayers: 8,
+  },
+];
+
+const bracketOrder = new Map(
+  TOURNAMENT_BRACKET_CONFIGS.map((bracket, index) => [bracket.name, index])
+);
+
+export function getTournamentBracketDisplayName(name: string) {
+  return (
+    TOURNAMENT_BRACKET_CONFIGS.find((bracket) => bracket.name === name)
+      ?.label ?? (name.endsWith("Bracket") ? name : `${name} Bracket`)
+  );
+}
+
+export function getTournamentBracketSortOrder(name: string) {
+  return bracketOrder.get(name as TournamentBracketName) ?? Number.MAX_SAFE_INTEGER;
+}
 
 export type TournamentCard = {
   id: string;
@@ -218,7 +265,7 @@ export type TournamentRow = {
 export type TournamentBracketRow = {
   id: string;
   tournament_id: string;
-  name: "Main" | "Challenge";
+  name: TournamentBracketName;
   elo_rules: string;
   max_players: number;
   registered_players?: number;
@@ -240,9 +287,11 @@ const ruleFormatLabels: Record<TournamentRuleFormat, string> = {
 };
 
 export function mapTournamentRow(row: TournamentRow): TournamentCard {
-  const bracketOrder = { Main: 0, Challenge: 1 };
   const brackets = [...(row.tournament_brackets ?? [])].sort(
-    (left, right) => bracketOrder[left.name] - bracketOrder[right.name]
+    (left, right) =>
+      getTournamentBracketSortOrder(left.name) -
+        getTournamentBracketSortOrder(right.name) ||
+      left.name.localeCompare(right.name)
   );
   const grandFinalDate = row.grand_final_at
     ? new Date(row.grand_final_at)
@@ -290,7 +339,7 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
     ),
     brackets: brackets.map((bracket) => ({
       id: bracket.id,
-      name: `${bracket.name} Bracket`,
+      name: getTournamentBracketDisplayName(bracket.name),
       requirement: bracket.elo_rules,
       maxPlayers: `Max ${bracket.max_players} players`,
       registeredPlayers: bracket.registered_players ?? 0,

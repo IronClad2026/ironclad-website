@@ -110,7 +110,7 @@ export default function AboutPage() {
 
           <ul className="mt-6 space-y-4 text-zinc-300">
             <li>• Monthly 1v1 tournament structure</li>
-            <li>• Main and Challenge bracket formats</li>
+            <li>• Academy, Challenge, and Main / Elite bracket formats</li>
             <li>• 4v4 competitive testing</li>
             <li>• ICT points and rankings foundation</li>
             <li>• Long-term esports platform development</li>
