@@ -33,17 +33,22 @@ const bracketOptions: Array<{
   {
     value: "overall",
     label: "Overall",
-    description: "Main and Challenge combined",
+    description: "Academy, Challenge, and Main combined",
   },
   {
-    value: "main",
-    label: "Main Bracket",
-    description: "Main bracket scoring",
+    value: "academy",
+    label: "Academy Bracket",
+    description: "Academy bracket scoring",
   },
   {
     value: "challenge",
     label: "Challenge Bracket",
     description: "Challenge bracket scoring",
+  },
+  {
+    value: "main",
+    label: "Main / Elite Bracket",
+    description: "Main / Elite bracket scoring",
   },
 ];
 
@@ -192,9 +197,9 @@ function LeaderboardHero({
             Leaderboard & Ranking
           </h1>
           <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300 md:text-lg">
-            Track IronClad seasonal performance across Main and Challenge
-            brackets. Points reset between seasons while all-time achievements
-            remain archived.
+            Track IronClad seasonal performance across Academy, Challenge, and
+            Main / Elite brackets. Points reset between seasons while all-time
+            achievements remain archived.
           </p>
         </div>
 
@@ -793,7 +798,8 @@ function formatElo(value: number | null) {
 }
 
 function formatBracketLabel(bracketType: LeaderboardBracketType) {
-  if (bracketType === "main") return "Main Bracket";
+  if (bracketType === "academy") return "Academy Bracket";
+  if (bracketType === "main") return "Main / Elite Bracket";
   if (bracketType === "challenge") return "Challenge Bracket";
   return "Overall";
 }

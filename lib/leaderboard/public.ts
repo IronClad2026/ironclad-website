@@ -2,7 +2,11 @@ import "server-only";
 
 import { supabase } from "@/lib/supabase";
 
-export type LeaderboardBracketType = "overall" | "main" | "challenge";
+export type LeaderboardBracketType =
+  | "overall"
+  | "academy"
+  | "challenge"
+  | "main";
 export type LeaderboardScope = "season" | "all_time";
 
 export type PublicLeaderboardSeason = {
