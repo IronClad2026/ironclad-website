@@ -51,28 +51,28 @@ export default function AdminBracketManagement({
   };
 
   return (
-    <section className="rounded-3xl border border-orange-500/25 bg-gradient-to-br from-zinc-950 via-zinc-950 to-orange-950/30 p-6 shadow-2xl shadow-orange-950/10 backdrop-blur">
-      <div className="flex items-start gap-4">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-300">
-          <GitBranch size={23} />
+    <section className="self-start rounded-3xl border border-orange-500/25 bg-gradient-to-br from-zinc-950 via-zinc-950 to-orange-950/30 p-4 shadow-2xl shadow-orange-950/10 backdrop-blur sm:p-5">
+      <div className="flex items-start gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-300">
+          <GitBranch size={20} />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-400">
             Tournament Operations
           </p>
-          <h2 className="mt-2 text-2xl font-bold">
+          <h2 className="mt-1 text-xl font-bold">
             Manual Bracket Placement
           </h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-400">
-            Select a tournament and generated bracket, then assign approved
-            participants to exact public bracket slots.
+          <p className="mt-1 text-sm leading-5 text-zinc-400">
+            Pick a generated bracket and assign approved participants to exact
+            public slots.
           </p>
         </div>
       </div>
 
       {notice && (
         <div
-          className={`mt-5 rounded-xl border p-4 text-sm font-bold ${
+          className={`mt-4 rounded-xl border p-3 text-sm font-bold ${
             notice === "population-saved"
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
               : "border-red-500/30 bg-red-500/10 text-red-300"
@@ -85,12 +85,12 @@ export default function AdminBracketManagement({
       )}
 
       {tournaments.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-black/20 p-6 text-sm text-zinc-500">
+        <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm text-zinc-500">
           No generated tournament brackets are available.
         </div>
       ) : (
         <>
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
             <label>
               <span className="text-xs font-black uppercase tracking-wider text-zinc-500">
                 Tournament
@@ -98,7 +98,7 @@ export default function AdminBracketManagement({
               <select
                 value={selectedTournament?.id ?? ""}
                 onChange={(event) => selectTournament(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 font-bold text-white outline-none transition focus:border-orange-400"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-orange-400"
               >
                 {tournaments.map((tournament) => (
                   <option key={tournament.id} value={tournament.id}>
@@ -115,7 +115,7 @@ export default function AdminBracketManagement({
               <select
                 value={selectedBracket?.bracketId ?? ""}
                 onChange={(event) => setBracketId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 font-bold text-white outline-none transition focus:border-orange-400"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-orange-400"
               >
                 {(selectedTournament?.brackets ?? []).map((bracket) => (
                   <option key={bracket.bracketId} value={bracket.bracketId}>
@@ -127,14 +127,14 @@ export default function AdminBracketManagement({
           </div>
 
           {selectedBracket?.generatedBracketId && selectedBracket.format ? (
-            <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-5">
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
               {selectedBracket.actualMatchCount <
                 selectedBracket.expectedMatchCount && (
-                <div className="mb-5 rounded-xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+                <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">
                   <p className="font-black uppercase tracking-wider">
                     Bracket synchronization repair required
                   </p>
-                  <p className="mt-2 leading-6">
+                  <p className="mt-1 leading-5">
                     This bracket has {selectedBracket.actualMatchCount} of{" "}
                     {selectedBracket.expectedMatchCount} required match records.
                     Use Repair Missing Match Records before saving player
@@ -142,19 +142,19 @@ export default function AdminBracketManagement({
                   </p>
                   <Link
                     href={`/admin/tournaments?selected=${selectedTournament.id}`}
-                    className="mt-3 inline-flex font-black text-amber-200 underline underline-offset-4"
+                    className="mt-2 inline-flex font-black text-amber-200 underline underline-offset-4"
                   >
                     Open Tournament Structure
                   </Link>
                 </div>
               )}
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="font-black text-white">
-                {selectedTournament.title} - {selectedBracket.bracketName}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-black text-white">
+                    {selectedTournament.title} - {selectedBracket.bracketName}
                   </p>
-                  <p className="mt-1 text-sm text-zinc-500">
-                {selectedBracket.slotCount} slots -{" "}
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {selectedBracket.slotCount} slots -{" "}
                     {selectedBracket.participants.length} approved participants
                   </p>
                 </div>
@@ -177,7 +177,7 @@ export default function AdminBracketManagement({
               />
             </div>
           ) : (
-            <p className="mt-5 rounded-2xl border border-dashed border-white/10 p-5 text-sm text-zinc-500">
+            <p className="mt-4 rounded-2xl border border-dashed border-white/10 p-4 text-sm text-zinc-500">
               The selected bracket has no generated structure yet.
             </p>
           )}

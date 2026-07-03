@@ -388,6 +388,7 @@ function NotificationModal({
   const showConfirmationSummary =
     notification.source === "report_group" &&
     notification.status === "pending_confirmation";
+  const isNoShow = notification.resultType === "no_show";
 
   return (
     <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
@@ -449,8 +450,8 @@ function NotificationModal({
                 value={notification.opponentName}
               />
               <CompactDetail
-                label="Score"
-                value={notification.reportedScore}
+                label={isNoShow ? "Report" : "Score"}
+                value={isNoShow ? "No-show / forfeit" : notification.reportedScore}
               />
               <CompactDetail
                 label="Time"
@@ -482,7 +483,7 @@ function NotificationModal({
                     onClick={() => onRespond(notification, "confirm")}
                     className="rounded-lg bg-emerald-600 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-emerald-500 disabled:opacity-50"
                   >
-                    Confirm Result
+                    {isNoShow ? "Confirm No-Show" : "Confirm Result"}
                   </button>
                   <button
                     type="button"
@@ -492,7 +493,7 @@ function NotificationModal({
                     }
                     className="rounded-lg bg-red-700 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
                   >
-                    Dispute Result
+                    {isNoShow ? "Dispute No-Show" : "Dispute Result"}
                   </button>
                 </div>
               </div>
@@ -508,9 +509,18 @@ function NotificationModal({
           />
           <Detail label="Submission" value={notificationLabel(notification)} />
           <Detail label="Opponent" value={notification.opponentName} />
-          <Detail label="Reported Winner" value={notification.reportedWinner} />
-          <Detail label="Reported Loser" value={notification.reportedLoser} />
-          <Detail label="Reported Score" value={notification.reportedScore} />
+          <Detail
+            label={isNoShow ? "Forfeit Winner" : "Reported Winner"}
+            value={notification.reportedWinner}
+          />
+          <Detail
+            label={isNoShow ? "Missing Player" : "Reported Loser"}
+            value={notification.reportedLoser}
+          />
+          <Detail
+            label={isNoShow ? "Report Type" : "Reported Score"}
+            value={isNoShow ? "No-show / forfeit" : notification.reportedScore}
+          />
           <Detail label="Status" value={formatStatus(notification.status)} />
           {notification.confirmationDeadlineAt && (
             <Detail
@@ -577,12 +587,31 @@ function CompactDetail({ label, value }: { label: string; value: string }) {
 function notificationContent(notification: DashboardNotification) {
   if (notification.status === "pending_confirmation") {
     if (notification.submittedByViewer) {
+      if (notification.resultType === "no_show") {
+        return {
+          title: "No-show report awaiting confirmation",
+          message:
+            "Your no-show report was submitted successfully. Your opponent must confirm or dispute before the deadline.",
+          icon: Clock3,
+          iconClassName: "text-sky-300",
+        };
+      }
+
       return {
         title: `Submission #${notification.submissionNumber} awaiting confirmation`,
         message:
           "Your match result was submitted successfully. Your opponent must confirm or dispute before the deadline.",
         icon: Clock3,
         iconClassName: "text-sky-300",
+      };
+    }
+
+    if (notification.resultType === "no_show") {
+      return {
+        title: "No-Show Confirmation Required",
+        message: `Your opponent reported you as a no-show in ${notification.tournamentName}. Confirm or dispute this report before the confirmation window expires.`,
+        icon: ShieldAlert,
+        iconClassName: "text-orange-300",
       };
     }
 
@@ -594,6 +623,15 @@ function notificationContent(notification: DashboardNotification) {
     };
   }
   if (notification.status === "approved") {
+    if (notification.resultType === "no_show") {
+      return {
+        title: "No-show report approved",
+        message: "The no-show report has been approved and recorded.",
+        icon: CheckCircle2,
+        iconClassName: "text-emerald-300",
+      };
+    }
+
     return {
       title: "Match result approved",
       message: "The official result has been approved and recorded.",
@@ -602,6 +640,15 @@ function notificationContent(notification: DashboardNotification) {
     };
   }
   if (notification.status === "confirmed") {
+    if (notification.resultType === "no_show") {
+      return {
+        title: "No-show confirmed",
+        message: "The no-show report was confirmed and recorded.",
+        icon: CheckCircle2,
+        iconClassName: "text-emerald-300",
+      };
+    }
+
     return {
       title: "Match result confirmed",
       message: "The result was confirmed by the opponent and recorded.",
@@ -610,6 +657,16 @@ function notificationContent(notification: DashboardNotification) {
     };
   }
   if (notification.status === "auto_approved") {
+    if (notification.resultType === "no_show") {
+      return {
+        title: "No-show auto-confirmed",
+        message:
+          "The confirmation window expired without a dispute, so the no-show was automatically confirmed.",
+        icon: CheckCircle2,
+        iconClassName: "text-emerald-300",
+      };
+    }
+
     return {
       title: "Match result auto-approved",
       message:
@@ -619,6 +676,16 @@ function notificationContent(notification: DashboardNotification) {
     };
   }
   if (notification.status === "rejected") {
+    if (notification.resultType === "no_show") {
+      return {
+        title: "No-show report rejected",
+        message:
+          "The no-show report was rejected. Review the administrator message before continuing the match flow.",
+        icon: XCircle,
+        iconClassName: "text-red-300",
+      };
+    }
+
     return {
       title: "Match result rejected",
       message:
@@ -628,6 +695,16 @@ function notificationContent(notification: DashboardNotification) {
     };
   }
   if (notification.status === "disputed") {
+    if (notification.resultType === "no_show") {
+      return {
+        title: "No-show disputed",
+        message:
+          "This no-show report has been disputed and now requires administrator review.",
+        icon: ShieldAlert,
+        iconClassName: "text-red-300",
+      };
+    }
+
     return {
       title: "Match result disputed",
       message:
@@ -637,6 +714,15 @@ function notificationContent(notification: DashboardNotification) {
     };
   }
   if (notification.status === "under_review") {
+    if (notification.resultType === "no_show") {
+      return {
+        title: "No-show under review",
+        message: "An administrator is reviewing this no-show dispute.",
+        icon: Clock3,
+        iconClassName: "text-amber-300",
+      };
+    }
+
     return {
       title: "Match result under review",
       message: "An administrator is reviewing this disputed result.",
@@ -680,6 +766,10 @@ function notificationContent(notification: DashboardNotification) {
 }
 
 function notificationLabel(notification: DashboardNotification) {
+  if (notification.resultType === "no_show") {
+    return "No-Show Report";
+  }
+
   return notification.submissionNumber > 0
     ? `Submission #${notification.submissionNumber}`
     : "Result Confirmation";

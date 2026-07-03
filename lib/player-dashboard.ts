@@ -7,6 +7,16 @@ export type DashboardNotification = {
   source: "submission" | "report_group";
   sourceId: string;
   reportGroupId: string | null;
+  resultType: "normal" | "no_show";
+  noShowRegistrationId: string | null;
+  noShowStatus:
+    | "pending"
+    | "confirmed"
+    | "disputed"
+    | "approved"
+    | "rejected"
+    | "auto_confirmed"
+    | null;
   submissionNumber: number;
   gameNumber: number;
   tournamentName: string;
@@ -128,6 +138,7 @@ type ReportGroupRow = {
   id: string;
   match_id: string;
   tournament_id: string;
+  result_type: "normal" | "no_show" | null;
   submitted_by_clerk_user_id: string;
   submitted_by_registration_id: string;
   opponent_registration_id: string;
@@ -142,6 +153,8 @@ type ReportGroupRow = {
   dispute_notes: string | null;
   reviewed_at: string | null;
   review_notes: string | null;
+  no_show_registration_id: string | null;
+  no_show_status: DashboardNotification["noShowStatus"];
   finalized_at: string | null;
   finalized_source: string | null;
   created_at: string;
@@ -323,7 +336,7 @@ export async function loadPlayerCareerDashboard(
     supabase
       .from("match_result_report_groups")
       .select(
-        "id, match_id, tournament_id, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_at, review_notes, finalized_at, finalized_source, created_at"
+        "id, match_id, tournament_id, result_type, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_at, review_notes, no_show_registration_id, no_show_status, finalized_at, finalized_source, created_at"
       )
       .in("match_id", matchIds)
       .order("created_at", { ascending: false }),
@@ -670,6 +683,9 @@ function buildCareerDashboard({
       source: "submission",
       sourceId: submission.id,
       reportGroupId: null,
+      resultType: "normal",
+      noShowRegistrationId: null,
+      noShowStatus: null,
       submissionNumber: submission.submission_number,
       gameNumber: submission.game_number,
       tournamentName:
@@ -734,11 +750,14 @@ function buildCareerDashboard({
         now < new Date(reportGroup.confirmation_deadline_at).getTime();
 
       return {
-        id: `report_group:${reportGroup.id}`,
-        source: "report_group",
-        sourceId: reportGroup.id,
-        reportGroupId: reportGroup.id,
-        submissionNumber: firstSubmission?.submission_number ?? 0,
+      id: `report_group:${reportGroup.id}`,
+      source: "report_group",
+      sourceId: reportGroup.id,
+      reportGroupId: reportGroup.id,
+      resultType: reportGroup.result_type ?? "normal",
+      noShowRegistrationId: reportGroup.no_show_registration_id,
+      noShowStatus: reportGroup.no_show_status,
+      submissionNumber: firstSubmission?.submission_number ?? 0,
         gameNumber: firstSubmission?.game_number ?? 1,
         tournamentName:
           context?.tournament?.title ??

@@ -16,14 +16,23 @@ import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll"
 import AdminBracketManagement, {
   type AdminBracketTournamentOption,
 } from "@/components/AdminBracketManagement";
+import AdminEloVerificationChecker from "@/components/AdminEloVerificationChecker";
+import AdminLeaderboardControls from "@/components/AdminLeaderboardControls";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
+import {
+  getCompletedLeaderboardTournaments,
+  getRecentLeaderboardRecalculationRuns,
+} from "@/lib/leaderboard/admin";
+import {
+  getEloVerificationSetting,
+  getEloVerificationSupportLinkSetting,
+} from "@/lib/platform-settings";
+import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Search,
   ShieldAlert,
-  ShieldCheck,
   Trash2,
   Trophy,
   X,
@@ -100,14 +109,6 @@ type AdminTournamentOption = {
   created_at: string;
   tournament_brackets?: { id: string; name: string; max_players: number }[];
 };
-
-const managementCards = [
-  {
-    title: "ELO Verification Queue",
-    description: "Check player ELO before final admin approval.",
-    icon: Search,
-  },
-];
 
 function formatStatus(status: string) {
   return status
@@ -861,6 +862,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     tournamentResult,
     generatedResult,
     adminNotifications,
+    completedLeaderboardTournaments,
+    leaderboardRecalculationRuns,
+    eloVerificationSetting,
+    eloVerificationSupportLinkSetting,
   ] =
     await Promise.all([
       supabase
@@ -881,6 +886,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           "id, tournament_bracket_id, format, slot_count, tournament_matches(player_one_slot, player_two_slot, player_one_registration_id, player_two_registration_id)"
         ),
       loadAdminNotifications(50),
+      getCompletedLeaderboardTournaments(),
+      getRecentLeaderboardRecalculationRuns(8),
+      getEloVerificationSetting(),
+      getEloVerificationSupportLinkSetting(),
     ]);
   const registrationsData = registrationResult.data;
   const error = registrationResult.error;
@@ -905,7 +914,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {
           tournamentId: tournament.id,
           tournamentTitle: tournament.title,
-          bracketName: `${bracket.name} Bracket`,
+          bracketName: getTournamentBracketDisplayName(bracket.name),
           maxPlayers: bracket.max_players,
         },
       ])
@@ -1004,7 +1013,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             return {
               generatedBracketId: generated?.id ?? null,
               bracketId: bracket.id,
-              bracketName: `${bracket.name} Bracket`,
+              bracketName: getTournamentBracketDisplayName(bracket.name),
               format: generated?.format ?? null,
               slotCount: generated?.slot_count ?? 0,
               actualMatchCount: generated?.tournament_matches?.length ?? 0,
@@ -1059,6 +1068,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const registrationReviewRows: AdminRegistrationReviewRow[] =
     filteredRegistrations.map((registration) => ({
       id: registration.id,
+      tournamentId: registration.tournament_id,
       playerName: registration.player_name,
       tournamentName:
         registration.tournament_title ||
@@ -1076,6 +1086,77 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       waitlistPosition: registration.waitlist_position ?? null,
       registrationOrder: registration.registration_order ?? 0,
     }));
+  const totalRegistrationCountByTournament = registrations.reduce(
+    (counts, registration) => {
+      const key = registration.tournament_id ?? "unassigned";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      return counts;
+    },
+    new Map<string, number>()
+  );
+  const registrationRowsByTournament = registrationReviewRows.reduce(
+    (groups, registration) => {
+      const key = registration.tournamentId ?? "unassigned";
+      const group = groups.get(key) ?? [];
+      group.push(registration);
+      groups.set(key, group);
+      return groups;
+    },
+    new Map<string, AdminRegistrationReviewRow[]>()
+  );
+  const tournamentIdsWithMetadata = new Set(
+    tournaments.map((tournament) => tournament.id)
+  );
+  const registrationReviewGroups = tournaments.map((tournament) => ({
+    key: tournament.id,
+    title: tournament.title,
+    status: tournament.status,
+    rows: registrationRowsByTournament.get(tournament.id) ?? [],
+    totalCount: totalRegistrationCountByTournament.get(tournament.id) ?? 0,
+  }));
+  const fallbackRegistrationGroupKeys = new Set([
+    ...totalRegistrationCountByTournament.keys(),
+    ...registrationRowsByTournament.keys(),
+  ]);
+
+  for (const key of fallbackRegistrationGroupKeys) {
+    if (key === "unassigned" || tournamentIdsWithMetadata.has(key)) {
+      continue;
+    }
+
+    const rows = registrationRowsByTournament.get(key) ?? [];
+    const storedTitle =
+      rows.find((row) => row.tournamentName.trim())?.tournamentName.trim() ||
+      registrations
+        .find((registration) => registration.tournament_id === key)
+        ?.tournament_title?.trim();
+
+    registrationReviewGroups.push({
+      key,
+      title: storedTitle
+        ? `${storedTitle} (metadata unavailable)`
+        : "Tournament metadata unavailable",
+      status: "metadata_unavailable",
+      rows,
+      totalCount: totalRegistrationCountByTournament.get(key) ?? rows.length,
+    });
+  }
+
+  const unassignedRegistrationRows =
+    registrationRowsByTournament.get("unassigned") ?? [];
+
+  if (
+    unassignedRegistrationRows.length > 0 ||
+    (totalRegistrationCountByTournament.get("unassigned") ?? 0) > 0
+  ) {
+    registrationReviewGroups.push({
+      key: "unassigned",
+      title: "Unknown tournament",
+      status: "unknown",
+      rows: unassignedRegistrationRows,
+      totalCount: totalRegistrationCountByTournament.get("unassigned") ?? 0,
+    });
+  }
 
   const stats = [
     {
@@ -1187,7 +1268,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           })}
         </div>
 
-        <div className="relative z-10 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
+        <section className="relative z-10 space-y-5">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
           <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="text-2xl font-bold">Registration Review</h2>
@@ -1342,35 +1424,70 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           )}
 
-          <div className="overflow-x-auto overflow-y-visible">
-            <table className="w-full min-w-[1220px] text-left text-sm">
-              <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
-                <tr>
-                  <th className="py-4">
-                    <AdminRegistrationSelectAll
-                      formId="registration-bulk-form"
-                      name="registrationId"
-                    />
-                  </th>
-                  <th>Player Name</th>
-                  <th>Tournament Name</th>
-                  <th>Created</th>
-                  <th>Region</th>
-                  <th>ELO</th>
-                  <th>Country</th>
-                  <th>Discord</th>
-                  <th>Registration Status</th>
-                  <th>Waitlist</th>
-                </tr>
-              </thead>
+          </div>
 
-              <AdminRegistrationReviewRows
-                registrations={registrationReviewRows}
-                activeFilter={activeFilter}
-                formId="registration-bulk-form"
-                updateRegistrationStatusAction={updateRegistrationStatus}
-              />
-            </table>
+          <div className="space-y-5">
+            {registrationReviewGroups.map((group) => (
+              <div
+                key={group.key}
+                className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur"
+              >
+                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
+                      Tournament Registrations
+                    </p>
+                    <h3 className="mt-2 text-xl font-bold text-white">
+                      {group.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      Showing {group.rows.length} of {group.totalCount}{" "}
+                      registration(s)
+                      {activeFilter === "all"
+                        ? "."
+                        : ` matching ${formatStatus(activeFilter)}.`}
+                    </p>
+                  </div>
+
+                  <span className="w-fit rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-black uppercase tracking-wider text-zinc-300">
+                    {formatStatus(group.status)}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto overflow-y-visible">
+                  <table className="w-full min-w-[1220px] text-left text-sm">
+                    <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
+                      <tr>
+                        <th className="py-4">
+                          <AdminRegistrationSelectAll
+                            formId="registration-bulk-form"
+                            name="registrationId"
+                            scope={group.key}
+                          />
+                        </th>
+                        <th>Player Name</th>
+                        <th>Tournament Name</th>
+                        <th>Created</th>
+                        <th>Region</th>
+                        <th>ELO</th>
+                        <th>Country</th>
+                        <th>Discord</th>
+                        <th>Registration Status</th>
+                        <th>Waitlist</th>
+                      </tr>
+                    </thead>
+
+                    <AdminRegistrationReviewRows
+                      registrations={group.rows}
+                      activeFilter={activeFilter}
+                      formId="registration-bulk-form"
+                      selectionScope={group.key}
+                      updateRegistrationStatusAction={updateRegistrationStatus}
+                    />
+                  </table>
+                </div>
+              </div>
+            ))}
           </div>
 
           {error && (
@@ -1379,15 +1496,28 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               column names, and Row Level Security policy.
             </div>
           )}
-        </div>
+        </section>
 
         <div className="relative z-0 grid gap-8 lg:grid-cols-[1.2fr_1fr]">
-          <AdminBracketManagement
-            tournaments={bracketManagementTournaments}
-            notice={params?.bracketNotice}
-          />
+          <div className="grid gap-5 self-start">
+            <AdminBracketManagement
+              tournaments={bracketManagementTournaments}
+              notice={params?.bracketNotice}
+            />
+
+            <AdminEloVerificationChecker
+              setting={eloVerificationSetting}
+              supportLinkSetting={eloVerificationSupportLinkSetting}
+            />
+          </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
+            <AdminLeaderboardControls
+              completedTournaments={completedLeaderboardTournaments}
+              recentRuns={leaderboardRecalculationRuns}
+              className="sm:col-span-2"
+            />
+
             <InAppNotificationCenter
               key={[
                 adminNotifications.unreadCount,
@@ -1406,30 +1536,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               error={adminNotifications.error}
               className="sm:col-span-2"
             />
-
-            {managementCards.map((card) => {
-              const Icon = card.icon;
-
-              return (
-                <div
-                  key={card.title}
-                  className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur transition hover:-translate-y-1 hover:border-orange-500/60 hover:bg-orange-500/10"
-                >
-                  <Icon className="h-8 w-8 text-orange-400" />
-
-                  <h3 className="mt-5 text-xl font-bold">{card.title}</h3>
-
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">
-                    {card.description}
-                  </p>
-
-                  <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-orange-300">
-                    Preview module
-                    <ShieldCheck className="h-4 w-4" />
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </section>

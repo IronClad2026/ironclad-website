@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode, ElementType } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { submitTournamentRegistration } from "@/app/tournaments/actions";
 import MatchResultControls, {
   AdminParticipantEditForm,
@@ -19,6 +20,7 @@ import {
   getEligibleBracketNames,
   isEligibleForBracket,
 } from "@/lib/tournaments";
+import { isValidCoh3StatsProfileUrl } from "@/lib/coh3-stats-profile";
 import {
   isPlayerProfileComplete,
   type PlayerProfile,
@@ -138,6 +140,33 @@ const overviewPanels: { key: OverviewPanelKey; label: string }[] = [
   { key: "schedule", label: "Schedule" },
   { key: "contact", label: "Contact" },
 ];
+
+function getValidTab(value: string | null): TabKey {
+  return tabs.some((tab) => tab.key === value) ? (value as TabKey) : "overview";
+}
+
+function getValidOverviewPanel(value: string | null): OverviewPanelKey {
+  return overviewPanels.some((panel) => panel.key === value)
+    ? (value as OverviewPanelKey)
+    : "details";
+}
+
+function findTournamentFromUrl(
+  tournaments: TournamentCard[],
+  value: string | null
+) {
+  if (!value) return null;
+
+  return (
+    tournaments.find(
+      (tournament) => tournament.slug === value || tournament.id === value
+    ) ?? null
+  );
+}
+
+function getTournamentUrlValue(tournament: TournamentCard) {
+  return tournament.slug || tournament.id;
+}
 
 function classNames(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
@@ -477,16 +506,21 @@ function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab:
 function Overview({
   tournament,
   tournaments,
+  activePanel,
+  setActivePanel,
 }: {
   tournament: TournamentCard;
   tournaments: TournamentCard[];
+  activePanel: OverviewPanelKey;
+  setActivePanel: (panel: OverviewPanelKey) => void;
 }) {
-  const [panel, setPanel] = useState<OverviewPanelKey>("details");
   const panels = overviewPanels.filter(
     (item) => item.key !== "prizes" || hasPrize(tournament)
   );
   const visiblePanel =
-    panel === "prizes" && !hasPrize(tournament) ? "details" : panel;
+    activePanel === "prizes" && !hasPrize(tournament)
+      ? "details"
+      : activePanel;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
@@ -506,7 +540,7 @@ function Overview({
             {panels.map((item) => (
               <button
                 key={item.key}
-                onClick={() => setPanel(item.key)}
+                onClick={() => setActivePanel(item.key)}
                 className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, visiblePanel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-slate-400 hover:text-white")}
               >
                 {item.label}
@@ -622,37 +656,32 @@ function Timeline({ tournament }: { tournament: TournamentCard }) {
 
 function Participants({ tournament }: { tournament: TournamentCard }) {
   const [query, setQuery] = useState("");
-  const mainRequirement =
-    tournament.brackets.find((bracket) =>
-      bracket.name.startsWith("Main")
-    )?.requirement ?? "Configured ELO rules";
-  const challengeRequirement =
-    tournament.brackets.find((bracket) =>
-      bracket.name.startsWith("Challenge")
-    )?.requirement ?? "Configured ELO rules";
-  const participantsByBracket = useMemo(
-    () => ({
-      main: tournament.participants.filter((participant) =>
-        participant.bracketName.startsWith("Main")
-      ),
-      challenge: tournament.participants.filter((participant) =>
-        participant.bracketName.startsWith("Challenge")
-      ),
-    }),
-    [tournament.participants]
+  const participantSections = useMemo(
+    () =>
+      tournament.brackets.map((bracket) => ({
+        bracket,
+        participants: tournament.participants.filter(
+          (participant) => participant.bracketId === bracket.id
+        ),
+      })).map((section) => ({
+        ...section,
+        totalCount: section.participants.length,
+      })),
+    [tournament.brackets, tournament.participants]
   );
   const filteredByBracket = useMemo(() => {
+      const normalizedQuery = query.toLowerCase();
       const matchesQuery = (participant: TournamentParticipant) =>
         `${participant.name} ${participant.country} ${participant.elo}`
           .toLowerCase()
-          .includes(query.toLowerCase());
+          .includes(normalizedQuery);
 
-      return {
-        main: participantsByBracket.main.filter(matchesQuery),
-        challenge: participantsByBracket.challenge.filter(matchesQuery),
-      };
+      return participantSections.map((section) => ({
+        ...section,
+        participants: section.participants.filter(matchesQuery),
+      }));
     },
-    [participantsByBracket, query]
+    [participantSections, query]
   );
 
   return (
@@ -667,18 +696,15 @@ function Participants({ tournament }: { tournament: TournamentCard }) {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search entries" className="w-full rounded border border-slate-700 bg-slate-950 py-2 pl-10 pr-3 text-sm text-white outline-none focus:border-sky-500" />
         </div>
       </div>
-      <ParticipantSection
-        title="Main Bracket Participants"
-        requirement={mainRequirement}
-        participants={filteredByBracket.main}
-        totalCount={participantsByBracket.main.length}
-      />
-      <ParticipantSection
-        title="Challenger Bracket Participants"
-        requirement={challengeRequirement}
-        participants={filteredByBracket.challenge}
-        totalCount={participantsByBracket.challenge.length}
-      />
+      {filteredByBracket.map((section) => (
+        <ParticipantSection
+          key={section.bracket.id}
+          title={`${section.bracket.name} Participants`}
+          requirement={section.bracket.requirement}
+          participants={section.participants}
+          totalCount={section.totalCount}
+        />
+      ))}
     </div>
   );
 }
@@ -2033,18 +2059,22 @@ type RegistrationFormState = {
   ownershipConfirmation: boolean;
 };
 
-type RegistrationErrors = Partial<Record<keyof RegistrationFormState | "agreements", string>>;
+type RegistrationErrors = Partial<
+  Record<keyof RegistrationFormState | "agreements" | "coh3ProfileUrl", string>
+>;
 
 function RegisterModal({
   onClose,
   profile,
   tournaments,
   initialTournamentId,
+  eloVerificationEnabled,
 }: {
   onClose: () => void;
   profile: PlayerProfile;
   tournaments: TournamentCard[];
   initialTournamentId: string;
+  eloVerificationEnabled: boolean;
 }) {
   const initialTournament =
     tournaments.find((tournament) => tournament.id === initialTournamentId) ??
@@ -2064,9 +2094,20 @@ function RegisterModal({
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
+  const [submissionErrorSupportUrl, setSubmissionErrorSupportUrl] = useState<
+    string | null
+  >(null);
   const [successMessage, setSuccessMessage] = useState("Registration submitted.");
+  const [coh3ProfileUrl, setCoh3ProfileUrl] = useState(
+    profile.coh3_player_card_url ?? ""
+  );
   const [selectedTournament, setSelectedTournament] =
     useState<TournamentCard>(initialTournament);
+  const savedCoh3ProfileUrlIsValid = isValidCoh3StatsProfileUrl(
+    profile.coh3_player_card_url
+  );
+  const needsCoh3ProfileUrlInput =
+    eloVerificationEnabled && !savedCoh3ProfileUrlIsValid;
   const eligibleBracketNames = getEligibleBracketNames(
     currentElo,
     selectedTournament.brackets
@@ -2083,6 +2124,11 @@ function RegisterModal({
   const updateField = <K extends keyof RegistrationFormState>(field: K, value: RegistrationFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
+  };
+
+  const updateCoh3ProfileUrl = (value: string) => {
+    setCoh3ProfileUrl(value);
+    setErrors((current) => ({ ...current, coh3ProfileUrl: undefined }));
   };
 
   const selectTournament = (event: TournamentCard) => {
@@ -2119,6 +2165,15 @@ function RegisterModal({
       }
     }
 
+    if (targetStep === "profile" && needsCoh3ProfileUrlInput) {
+      if (!coh3ProfileUrl.trim()) {
+        nextErrors.coh3ProfileUrl =
+          "Please enter a valid coh3stats profile URL.";
+      } else if (!isValidCoh3StatsProfileUrl(coh3ProfileUrl)) {
+        nextErrors.coh3ProfileUrl = "Please enter a valid coh3stats profile URL.";
+      }
+    }
+
     if (targetStep === "agreements") {
       if (!form.rulebookAgreement) {
         nextErrors.rulebookAgreement = "You must agree to the Rulebook.";
@@ -2147,12 +2202,24 @@ function RegisterModal({
     }
   };
 
+  const goToAgreementsStep = () => {
+    if (validateStep("profile")) {
+      setStep("agreements");
+    }
+  };
+
   const submitRegistration = async () => {
     if (!isTournamentRegistrationOpen(selectedTournament)) {
       setSubmissionError(
         "This tournament is full or already in progress. We hope to see you in the next one."
       );
+      setSubmissionErrorSupportUrl(null);
       setStep("tournament");
+      return;
+    }
+
+    if (!validateStep("profile")) {
+      setStep("profile");
       return;
     }
 
@@ -2162,6 +2229,7 @@ function RegisterModal({
 
     setIsSubmitting(true);
     setSubmissionError("");
+    setSubmissionErrorSupportUrl(null);
 
     const result = await submitTournamentRegistration({
       tournamentId: selectedTournament.id,
@@ -2175,15 +2243,20 @@ function RegisterModal({
       playerParticipationAgreement: form.playerParticipationAgreement,
       adminFinalDecisionAgreement: form.adminFinalDecisionAgreement,
       ownershipConfirmation: form.ownershipConfirmation,
+      coh3PlayerCardUrl: needsCoh3ProfileUrlInput
+        ? coh3ProfileUrl.trim()
+        : undefined,
     });
 
     setIsSubmitting(false);
 
     if (!result.success) {
       setSubmissionError(result.message);
+      setSubmissionErrorSupportUrl(result.supportUrl ?? null);
       return;
     }
 
+    setSubmissionErrorSupportUrl(null);
     setStep("submitted");
     setSuccessMessage(result.message);
   };
@@ -2343,17 +2416,50 @@ function RegisterModal({
                 <RegistrationProfileValue label="Region" value={profile.region} />
                 <RegistrationProfileValue label="Timezone" value={profile.timezone} />
                 <RegistrationProfileValue label="Current ELO" value={String(profile.current_elo)} />
-                <RegistrationProfileValue label="CoH3 Player Card" value={profile.coh3_player_card_url} className="sm:col-span-2" />
+                {needsCoh3ProfileUrlInput ? (
+                  <label className="min-w-0 rounded-xl border border-orange-500/40 bg-orange-500/10 p-4 sm:col-span-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-orange-300">
+                      COH3 Stats Profile URL
+                    </span>
+                    <span className="mt-2 block text-sm leading-6 text-slate-200">
+                      Paste your COH3 Stats player profile URL. It will be used
+                      to verify your tournament ELO.
+                    </span>
+                    <input
+                      type="url"
+                      value={coh3ProfileUrl}
+                      onChange={(event) =>
+                        updateCoh3ProfileUrl(event.target.value)
+                      }
+                      required
+                      aria-invalid={Boolean(errors.coh3ProfileUrl)}
+                      className={classNames(
+                        "mt-3 w-full rounded-lg border bg-slate-950/80 px-3 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-600 focus:border-orange-300",
+                        errors.coh3ProfileUrl
+                          ? "border-orange-300"
+                          : "border-slate-700"
+                      )}
+                      placeholder="https://coh3stats.com/players/..."
+                    />
+                    <FieldError message={errors.coh3ProfileUrl} />
+                  </label>
+                ) : (
+                  <RegistrationProfileValue label="CoH3 Player Card" value={profile.coh3_player_card_url} className="sm:col-span-2" />
+                )}
               </div>
 
               <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/25 p-4">
                 <p className="text-sm font-black uppercase tracking-wider text-emerald-300">Profile Complete</p>
-                <p className="mt-2 text-sm leading-6 text-slate-200">Your saved profile identity will be attached to this registration. Final bracket placement and ELO verification remain subject to admin review.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-200">
+                  {eloVerificationEnabled
+                    ? "Your saved profile identity and COH3 Stats profile URL will be attached to this registration. ELO verification will be handled in a later review phase."
+                    : "Your saved profile identity will be attached to this registration. ELO Verification Checker is disabled, so no COH3 Stats check is required."}
+                </p>
               </div>
 
               <Link href="/profile" className="inline-flex text-sm font-bold text-orange-300 transition hover:text-orange-200">Update Player Profile</Link>
 
-              <ModalButtons onBack={() => setStep("tournament")} onNext={() => setStep("agreements")} />
+              <ModalButtons onBack={() => setStep("tournament")} onNext={goToAgreementsStep} />
             </div>
           )}
 
@@ -2372,8 +2478,11 @@ function RegisterModal({
               </div>
 
               {submissionError && (
-                <div className="rounded-xl border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
-                  {submissionError}
+                <div className="whitespace-pre-line rounded-xl border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
+                  <RegistrationSubmissionError
+                    message={submissionError}
+                    supportUrl={submissionErrorSupportUrl}
+                  />
                 </div>
               )}
 
@@ -2402,6 +2511,39 @@ function FieldError({ message }: { message?: string }) {
   if (!message) return null;
 
   return <p className="mt-2 break-words text-xs font-bold text-orange-300">{message}</p>;
+}
+
+function RegistrationSubmissionError({
+  message,
+  supportUrl,
+}: {
+  message: string;
+  supportUrl: string | null;
+}) {
+  const marker = "Discord server:";
+
+  if (!supportUrl || !message.includes(marker)) {
+    return <>{message}</>;
+  }
+
+  const [beforeMarker] = message.split(marker);
+
+  return (
+    <>
+      <span>{beforeMarker.trimEnd()}</span>
+      <span className="mt-3 block">
+        {marker}{" "}
+        <a
+          href={supportUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="break-all text-orange-100 underline decoration-orange-300/70 underline-offset-4 transition hover:text-white"
+        >
+          {supportUrl}
+        </a>
+      </span>
+    </>
+  );
 }
 
 function RegistrationProfileValue({
@@ -2453,6 +2595,8 @@ function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoadi
 
 function MainContent({
   activeTab,
+  activeOverviewPanel,
+  setActiveOverviewPanel,
   tournament,
   tournaments,
   viewer,
@@ -2460,6 +2604,8 @@ function MainContent({
   matchResultReportGroups,
 }: {
   activeTab: TabKey;
+  activeOverviewPanel: OverviewPanelKey;
+  setActiveOverviewPanel: (panel: OverviewPanelKey) => void;
   tournament: TournamentCard;
   tournaments: TournamentCard[];
   viewer: TournamentViewer;
@@ -2469,7 +2615,12 @@ function MainContent({
   return (
     <main className="px-5 py-6 lg:px-8">
       {activeTab === "overview" && (
-        <Overview tournament={tournament} tournaments={tournaments} />
+        <Overview
+          tournament={tournament}
+          tournaments={tournaments}
+          activePanel={activeOverviewPanel}
+          setActivePanel={setActiveOverviewPanel}
+        />
       )}
       {activeTab === "participants" && <Participants tournament={tournament} />}
       {activeTab === "brackets" && (
@@ -2606,20 +2757,31 @@ export default function TournamentsExperience({
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
+  eloVerificationEnabled,
 }: {
   tournaments: TournamentCard[];
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
+  eloVerificationEnabled: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
-  const [selectedTournamentId, setSelectedTournamentId] = useState(
-    tournaments[0].id
-  );
-  const selectedTournament =
-    tournaments.find(
-      (tournament) => tournament.id === selectedTournamentId
-    ) ?? tournaments[0];
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchParamString = searchParams.toString();
+  const rawTournamentParam = searchParams.get("tournament");
+  const rawTabParam = searchParams.get("tab");
+  const rawPanelParam = searchParams.get("panel");
+  const activeTab = getValidTab(rawTabParam);
+  const urlTournament = findTournamentFromUrl(tournaments, rawTournamentParam);
+  const selectedTournament = urlTournament ?? tournaments[0];
+  const requestedOverviewPanel = getValidOverviewPanel(rawPanelParam);
+  const activeOverviewPanel =
+    activeTab === "overview" &&
+    requestedOverviewPanel === "prizes" &&
+    !hasPrize(selectedTournament)
+      ? "details"
+      : requestedOverviewPanel;
   const selectedViewerRegistration =
     viewer.registrations.find(
       (registration) => registration.tournamentId === selectedTournament.id
@@ -2640,9 +2802,112 @@ export default function TournamentsExperience({
     return createAuthenticatedBrowserSupabaseClient(getToken);
   }, [getToken]);
 
+  const updateTournamentUrl = useCallback(
+    ({
+      tournament,
+      tab,
+      panel,
+    }: {
+      tournament: TournamentCard;
+      tab: TabKey;
+      panel: OverviewPanelKey;
+    },
+    mode: "push" | "replace" = "push") => {
+      const params = new URLSearchParams(searchParamString);
+      params.set("tournament", getTournamentUrlValue(tournament));
+      params.set("tab", tab);
+
+      if (tab === "overview") {
+        params.set("panel", panel);
+      } else {
+        params.delete("panel");
+      }
+
+      const nextQuery = params.toString();
+      const nextPath = nextQuery ? `${pathname}?${nextQuery}` : pathname;
+      const currentPath = searchParamString
+        ? `${pathname}?${searchParamString}`
+        : pathname;
+
+      if (nextPath !== currentPath) {
+        if (mode === "replace") {
+          router.replace(nextPath, { scroll: false });
+        } else {
+          router.push(nextPath, { scroll: false });
+        }
+      }
+    },
+    [pathname, router, searchParamString]
+  );
+
+  useEffect(() => {
+    const hasTournamentStateParam =
+      rawTournamentParam !== null ||
+      rawTabParam !== null ||
+      rawPanelParam !== null;
+
+    if (!hasTournamentStateParam) {
+      return;
+    }
+
+    const missingTournamentParam = rawTournamentParam === null;
+    const invalidTournamentParam =
+      rawTournamentParam !== null && urlTournament === null;
+    const invalidTabParam = rawTabParam !== null && rawTabParam !== activeTab;
+    const invalidPanelParam =
+      rawPanelParam !== null &&
+      (activeTab !== "overview" || rawPanelParam !== activeOverviewPanel);
+
+    if (
+      !missingTournamentParam &&
+      !invalidTournamentParam &&
+      !invalidTabParam &&
+      !invalidPanelParam
+    ) {
+      return;
+    }
+
+    updateTournamentUrl(
+      {
+        tournament: selectedTournament,
+        tab: activeTab,
+        panel: activeOverviewPanel,
+      },
+      "replace"
+    );
+  }, [
+    activeOverviewPanel,
+    activeTab,
+    rawPanelParam,
+    rawTabParam,
+    rawTournamentParam,
+    selectedTournament,
+    updateTournamentUrl,
+    urlTournament,
+  ]);
+
   const handleSelectTournament = (tournament: TournamentCard) => {
-    setSelectedTournamentId(tournament.id);
-    setActiveTab("overview");
+    updateTournamentUrl({
+      tournament,
+      tab: "overview",
+      panel: "details",
+    });
+  };
+
+  const handleSetActiveTab = (tab: TabKey) => {
+    updateTournamentUrl({
+      tournament: selectedTournament,
+      tab,
+      panel: activeOverviewPanel,
+    });
+  };
+
+  const handleSetActiveOverviewPanel = (panel: OverviewPanelKey) => {
+    updateTournamentUrl({
+      tournament: selectedTournament,
+      tab: "overview",
+      panel,
+    });
   };
 
   const handleRegisterClick = async () => {
@@ -2709,9 +2974,11 @@ export default function TournamentsExperience({
             viewerRegistration={selectedViewerRegistration}
             onRegisterClick={handleRegisterClick}
           />
-          <TopTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+          <TopTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
           <MainContent
             activeTab={activeTab}
+            activeOverviewPanel={activeOverviewPanel}
+            setActiveOverviewPanel={handleSetActiveOverviewPanel}
             tournament={selectedTournament}
             tournaments={tournaments}
             viewer={viewer}
@@ -2726,6 +2993,7 @@ export default function TournamentsExperience({
           profile={registrationProfile}
           tournaments={tournaments}
           initialTournamentId={selectedTournament.id}
+          eloVerificationEnabled={eloVerificationEnabled}
           onClose={() => setShowRegisterModal(false)}
         />
       )}
@@ -2747,7 +3015,7 @@ export default function TournamentsExperience({
         <div className="fixed inset-0 z-50 bg-black/70 lg:hidden">
           <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="ml-auto h-full w-80 bg-[#111827] p-4">
             <div className="flex items-center justify-between"><h3 className="font-black text-white">Tournament Menu</h3><button onClick={() => setShowMobilePanel(false)} className="rounded bg-slate-800 p-2"><X size={18} /></button></div>
-            <div className="mt-5 space-y-2">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.key} onClick={() => { setActiveTab(tab.key); setShowMobilePanel(false); }} className="flex w-full items-center gap-3 rounded-lg bg-slate-950/40 px-3 py-3 text-left font-semibold text-slate-200"><Icon size={17} />{tab.label}</button>; })}</div>
+            <div className="mt-5 space-y-2">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.key} onClick={() => { handleSetActiveTab(tab.key); setShowMobilePanel(false); }} className="flex w-full items-center gap-3 rounded-lg bg-slate-950/40 px-3 py-3 text-left font-semibold text-slate-200"><Icon size={17} />{tab.label}</button>; })}</div>
           </motion.div>
         </div>
       )}

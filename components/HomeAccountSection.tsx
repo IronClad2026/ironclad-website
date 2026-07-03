@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { UserRound } from "lucide-react";
 import Link from "next/link";
 import IronCladUserButton from "@/components/IronCladUserButton";
+import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import {
   isPlayerProfileComplete,
   type PlayerProfile,
@@ -98,7 +99,7 @@ export default async function HomeAccountSection() {
     >
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
         <PlayerAvatar
-          avatarUrl={profile.avatar_url}
+          avatarUrl={getPlayerAvatarDisplayUrl(profile)}
           displayName={profile.display_name}
         />
         <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-3">

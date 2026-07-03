@@ -1,7 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import TournamentsExperience from "@/components/TournamentsExperience";
+import { getEloVerificationSetting } from "@/lib/platform-settings";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
+  getTournamentBracketDisplayName,
   mapTournamentRow,
   type GeneratedTournamentBracket,
   type MatchResultReportGroup,
@@ -26,6 +28,7 @@ export default async function TournamentsPage() {
     capacityResult,
     registrationResult,
     generatedBracketResult,
+    eloVerificationSetting,
   ] = await Promise.all([
     supabase
       .from("tournaments")
@@ -46,6 +49,7 @@ export default async function TournamentsPage() {
       .select(
         "id, tournament_bracket_id, format, slot_count, generated_at, bracket_rounds(id, round_number, name, tournament_matches(id, match_number, series_best_of, status, player_one_slot, player_two_slot, player_one_registration_id, player_two_registration_id, player_one_score, player_two_score, winner_registration_id, official_result_submission_id, official_result_decided_by, official_result_decided_at)), tournament_standings(registration_id, wins, losses, points, rank)"
       ),
+    getEloVerificationSetting(),
   ]);
 
   if (tournamentResult.error) {
@@ -164,7 +168,7 @@ export default async function TournamentsPage() {
     tournamentRows.flatMap((tournament) =>
       (tournament.tournament_brackets ?? []).map((bracket) => [
         bracket.id,
-        `${bracket.name} Bracket`,
+        getTournamentBracketDisplayName(bracket.name),
       ])
     )
   );
@@ -279,6 +283,7 @@ export default async function TournamentsPage() {
       }}
       matchResultSubmissions={matchResultSubmissions}
       matchResultReportGroups={matchResultReportGroups}
+      eloVerificationEnabled={eloVerificationSetting.enabled}
     />
   );
 }
@@ -544,7 +549,7 @@ async function loadVisibleMatchResultReportGroups(
   viewerRegistrationIds: string[]
 ): Promise<MatchResultReportGroup[]> {
   const select =
-    "id, match_id, tournament_id, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_by, reviewed_at, review_notes, finalized_at, finalized_source, created_at";
+    "id, match_id, tournament_id, result_type, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_by, reviewed_at, review_notes, no_show_reported_by_registration_id, no_show_registration_id, no_show_status, no_show_note, no_show_resolved_at, no_show_resolved_by, finalized_at, finalized_source, created_at";
 
   const loadGroups = async () => {
     if (isAdmin) {
@@ -596,6 +601,7 @@ async function loadVisibleMatchResultReportGroups(
     id: string;
     match_id: string;
     tournament_id: string;
+    result_type: MatchResultReportGroup["resultType"] | null;
     submitted_by_clerk_user_id: string;
     submitted_by_registration_id: string;
     opponent_registration_id: string;
@@ -611,6 +617,12 @@ async function loadVisibleMatchResultReportGroups(
     reviewed_by: string | null;
     reviewed_at: string | null;
     review_notes: string | null;
+    no_show_reported_by_registration_id: string | null;
+    no_show_registration_id: string | null;
+    no_show_status: MatchResultReportGroup["noShowStatus"] | null;
+    no_show_note: string | null;
+    no_show_resolved_at: string | null;
+    no_show_resolved_by: string | null;
     finalized_at: string | null;
     finalized_source: string | null;
     created_at: string;
@@ -632,6 +644,7 @@ async function loadVisibleMatchResultReportGroups(
         id: reportGroup.id,
         matchId: reportGroup.match_id,
         tournamentId: reportGroup.tournament_id,
+        resultType: reportGroup.result_type ?? "normal",
         submittedByClerkUserId: reportGroup.submitted_by_clerk_user_id,
         submittedByRegistrationId: reportGroup.submitted_by_registration_id,
         opponentRegistrationId: reportGroup.opponent_registration_id,
@@ -662,6 +675,13 @@ async function loadVisibleMatchResultReportGroups(
         reviewedBy: reportGroup.reviewed_by,
         reviewedAt: reportGroup.reviewed_at,
         reviewNotes: reportGroup.review_notes,
+        noShowReportedByRegistrationId:
+          reportGroup.no_show_reported_by_registration_id,
+        noShowRegistrationId: reportGroup.no_show_registration_id,
+        noShowStatus: reportGroup.no_show_status,
+        noShowNote: reportGroup.no_show_note,
+        noShowResolvedAt: reportGroup.no_show_resolved_at,
+        noShowResolvedBy: reportGroup.no_show_resolved_by,
         finalizedAt: reportGroup.finalized_at,
         finalizedSource: reportGroup.finalized_source,
         createdAt: reportGroup.created_at,

@@ -1,18 +1,16 @@
-export default function RankingsPage() {
-  return (
-    <main className="min-h-screen bg-black text-white">
-      <section className="mx-auto max-w-5xl px-6 pt-32 pb-20">
-        <p className="text-sm uppercase tracking-[0.3em] text-zinc-400">
-          IronClad Competitive Ladder
-        </p>
+import LeaderboardExperience from "@/components/LeaderboardExperience";
+import { getPublicLeaderboardData } from "@/lib/leaderboard/public";
 
-        <h1 className="mt-4 text-5xl font-bold">Rankings</h1>
+export const dynamic = "force-dynamic";
 
-        <p className="mt-6 max-w-2xl text-zinc-300">
-          Player standings, tournament points, seasonal performance, and future
-          IronClad competitive rankings will be displayed here.
-        </p>
-      </section>
-    </main>
-  );
+export const metadata = {
+  title: "Leaderboard & Ranking | IronClad",
+  description:
+    "Track IronClad seasonal leaderboard standings, all-time rankings, bracket performance, and champion archives.",
+};
+
+export default async function RankingsPage() {
+  const data = await getPublicLeaderboardData();
+
+  return <LeaderboardExperience data={data} />;
 }

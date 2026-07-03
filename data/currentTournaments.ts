@@ -6,7 +6,7 @@ export type TournamentStatus =
 export type CurrentTournament = {
   title: string;
   format: "1v1" | "4v4";
-  bracket?: "Main Bracket" | "Challenger Bracket";
+  bracket?: "Academy Bracket" | "Challenge Bracket" | "Main / Elite Bracket";
   game: string;
 
   status: TournamentStatus;
@@ -19,9 +19,9 @@ export type CurrentTournament = {
 
 export const currentTournaments: CurrentTournament[] = [
   {
-    title: "IronClad 1v1 Main Bracket",
+    title: "IronClad 1v1 Main / Elite Bracket",
     format: "1v1",
-    bracket: "Main Bracket",
+    bracket: "Main / Elite Bracket",
     game: "Company of Heroes 3",
 
     status: "Ongoing",
@@ -31,9 +31,9 @@ export const currentTournaments: CurrentTournament[] = [
   },
 
   {
-    title: "IronClad 1v1 Challenger Bracket",
+    title: "IronClad 1v1 Challenge Bracket",
     format: "1v1",
-    bracket: "Challenger Bracket",
+    bracket: "Challenge Bracket",
     game: "Company of Heroes 3",
 
     status: "Ongoing",

@@ -22,8 +22,12 @@ import {
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-errors";
 import type {
+  TournamentBracketFieldPrefix,
   TournamentBracketRow,
   TournamentRow,
+} from "@/lib/tournaments";
+import {
+  TOURNAMENT_BRACKET_CONFIGS,
 } from "@/lib/tournaments";
 
 type CustomClaims = {
@@ -90,17 +94,23 @@ const emptyTournament: TournamentFormValues = {
   prizePool: "",
   rulesUrl: "",
   battlefyUrl: "",
-  main: {
+  academy: {
     id: null,
     enabled: false,
-    eloRules: "",
-    maxPlayers: 0,
+    eloRules: "Below 1100 ELO",
+    maxPlayers: 8,
   },
   challenge: {
     id: null,
     enabled: false,
-    eloRules: "",
-    maxPlayers: 0,
+    eloRules: "1100-1399 ELO",
+    maxPlayers: 8,
+  },
+  main: {
+    id: null,
+    enabled: false,
+    eloRules: "1400+ ELO",
+    maxPlayers: 8,
   },
 };
 
@@ -119,6 +129,7 @@ type TournamentFormValues = {
   prizePool: string;
   rulesUrl: string;
   battlefyUrl: string;
+  academy: BracketFormValues;
   main: BracketFormValues;
   challenge: BracketFormValues;
 };
@@ -601,19 +612,16 @@ function TournamentForm({
         />
       </div>
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-2">
-        <BracketFields
-          prefix="main"
-          label="Main"
-          values={values.main}
-          readOnly={!isEditing}
-        />
-        <BracketFields
-          prefix="challenge"
-          label="Challenge"
-          values={values.challenge}
-          readOnly={!isEditing}
-        />
+      <div className="mt-8 grid gap-5 lg:grid-cols-3">
+        {TOURNAMENT_BRACKET_CONFIGS.map((config) => (
+          <BracketFields
+            key={config.name}
+            prefix={config.fieldPrefix}
+            label={config.label}
+            values={values[config.fieldPrefix]}
+            readOnly={!isEditing}
+          />
+        ))}
       </div>
 
       {values.id && isEditing && (
@@ -625,22 +633,22 @@ function TournamentForm({
             round robin. Participants are never seeded or assigned
             automatically.
           </p>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            {[values.main, values.challenge].map((bracket, index) => {
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            {TOURNAMENT_BRACKET_CONFIGS.map((config) => {
+              const bracket = values[config.fieldPrefix];
               if (!bracket.id) {
                 return null;
               }
 
               const generated = generatedByBracket.get(bracket.id);
               const approved = approvedByBracket.get(bracket.id) ?? 0;
-              const label = index === 0 ? "Main" : "Challenge";
 
               return (
                 <div
                   key={bracket.id}
                   className="rounded-xl border border-white/10 bg-black/30 p-4"
                 >
-                  <p className="font-black text-white">{label} Bracket</p>
+                  <p className="font-black text-white">{config.label}</p>
                   <p className="mt-2 text-sm text-zinc-400">
                         Capacity {bracket.maxPlayers} - {approved} approved participant
                     {approved === 1 ? "" : "s"}
@@ -685,8 +693,10 @@ function TournamentForm({
 
       {values.id &&
         isEditing &&
-        [values.main, values.challenge].map((bracket) =>
-          bracket.id ? (
+        TOURNAMENT_BRACKET_CONFIGS.map((config) => {
+          const bracket = values[config.fieldPrefix];
+
+          return bracket.id ? (
             <form
               key={bracket.id}
               id={`generate-bracket-${bracket.id}`}
@@ -700,8 +710,8 @@ function TournamentForm({
               />
               <input type="hidden" name="bracketId" value={bracket.id} />
             </form>
-          ) : null
-        )}
+          ) : null;
+        })}
     </>
   );
 }
@@ -712,7 +722,7 @@ function BracketFields({
   values,
   readOnly,
 }: {
-  prefix: "main" | "challenge";
+  prefix: TournamentBracketFieldPrefix;
   label: string;
   values: BracketFormValues;
   readOnly: boolean;
@@ -727,7 +737,7 @@ function BracketFields({
           disabled={readOnly}
           className="h-4 w-4 accent-orange-500"
         />
-        {label} Bracket
+        {label}
       </label>
       <div className="mt-5 space-y-5">
         <Field
@@ -862,22 +872,26 @@ function toFormValues(tournament: TournamentRow): TournamentFormValues {
     prizePool: tournament.prize_pool,
     rulesUrl: tournament.rules_url ?? "",
     battlefyUrl: tournament.battlefy_url ?? "",
-    main: toBracketValues(brackets, "Main"),
+    academy: toBracketValues(brackets, "Academy"),
     challenge: toBracketValues(brackets, "Challenge"),
+    main: toBracketValues(brackets, "Main"),
   };
 }
 
 function toBracketValues(
   brackets: TournamentBracketRow[],
-  name: "Main" | "Challenge"
+  name: TournamentBracketRow["name"]
 ): BracketFormValues {
   const bracket = brackets.find((item) => item.name === name);
+  const config = TOURNAMENT_BRACKET_CONFIGS.find(
+    (item) => item.name === name
+  );
 
   return {
     id: bracket?.id ?? null,
     enabled: Boolean(bracket),
-    eloRules: bracket?.elo_rules ?? "",
-    maxPlayers: bracket?.max_players ?? 8,
+    eloRules: bracket?.elo_rules ?? config?.defaultEloRules ?? "",
+    maxPlayers: bracket?.max_players ?? config?.defaultMaxPlayers ?? 8,
   };
 }
 

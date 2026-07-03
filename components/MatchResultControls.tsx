@@ -154,8 +154,12 @@ export default function MatchResultControls({
               <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
                 {activeReportGroup.submittedByClerkUserId ===
                 viewerClerkUserId
-                  ? "Your result is awaiting opponent confirmation."
-                  : "Your opponent submitted a result. Confirm or dispute it from your dashboard notification."}
+                  ? activeReportGroup.resultType === "no_show"
+                    ? "Your no-show report is awaiting opponent confirmation."
+                    : "Your result is awaiting opponent confirmation."
+                  : activeReportGroup.resultType === "no_show"
+                    ? "Your opponent reported a no-show. Confirm or dispute it from your dashboard notification."
+                    : "Your opponent submitted a result. Confirm or dispute it from your dashboard notification."}
               </div>
             )}
 
@@ -518,13 +522,19 @@ export function ReportGroupReview({
     participantsById,
     reportGroup.winnerRegistrationId
   );
+  const isNoShow = reportGroup.resultType === "no_show";
   const loserRegistrationId =
     reportGroup.winnerRegistrationId === match.playerOneRegistrationId
       ? match.playerTwoRegistrationId
       : match.playerOneRegistrationId;
+  const noShowRegistrationId =
+    reportGroup.noShowRegistrationId ?? loserRegistrationId;
   const loser = loserRegistrationId
     ? participantName(participantsById, loserRegistrationId)
     : "Participant";
+  const missingPlayer = noShowRegistrationId
+    ? participantName(participantsById, noShowRegistrationId)
+    : loser;
   const actionable =
     reportGroup.finalizedAt === null &&
     ["pending_confirmation", "disputed", "under_review"].includes(
@@ -536,11 +546,13 @@ export function ReportGroupReview({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-wider text-sky-200">
-            Confirmation Package - {formatReportGroupStatus(reportGroup.status)}
+            {isNoShow ? "No-Show Report" : "Confirmation Package"} -{" "}
+            {formatReportGroupStatus(reportGroup.status)}
           </p>
           <p className="mt-2 text-sm text-white">
-            {reportGroup.playerOneScore}-{reportGroup.playerTwoScore}{" "}
-            reported for {winner}
+            {isNoShow
+              ? `${winner} reported ${missingPlayer} as a no-show`
+              : `${reportGroup.playerOneScore}-${reportGroup.playerTwoScore} reported for ${winner}`}
           </p>
         </div>
         <span className="text-[10px] text-slate-500">
@@ -555,8 +567,20 @@ export function ReportGroupReview({
         />
         <SummaryValue label="Reporting Player" value={reporter} />
         <SummaryValue label="Opponent" value={opponent} />
-        <SummaryValue label="Reported Winner" value={winner} />
-        <SummaryValue label="Reported Loser" value={loser} />
+        <SummaryValue
+          label={isNoShow ? "Forfeit Winner" : "Reported Winner"}
+          value={winner}
+        />
+        <SummaryValue
+          label={isNoShow ? "Missing Player" : "Reported Loser"}
+          value={isNoShow ? missingPlayer : loser}
+        />
+        {isNoShow && (
+          <SummaryValue
+            label="No-Show Status"
+            value={formatNoShowStatus(reportGroup.noShowStatus)}
+          />
+        )}
         <SummaryValue
           label="Confirmation Deadline"
           value={new Date(reportGroup.confirmationDeadlineAt).toLocaleString()}
@@ -580,6 +604,17 @@ export function ReportGroupReview({
         </div>
       )}
 
+      {reportGroup.noShowNote && (
+        <div className="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 p-3">
+          <p className="text-[10px] font-black uppercase tracking-wider text-red-200">
+            No-Show Note
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-red-100/80">
+            {reportGroup.noShowNote}
+          </p>
+        </div>
+      )}
+
       {reportGroup.reviewNotes && (
         <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
           <p className="text-[10px] font-black uppercase tracking-wider text-orange-300">
@@ -592,7 +627,11 @@ export function ReportGroupReview({
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {reportGroup.replayProofs.length > 0 ? (
+        {isNoShow ? (
+          <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-200">
+            No replay required for no-show report
+          </span>
+        ) : reportGroup.replayProofs.length > 0 ? (
           reportGroup.replayProofs.map((proof) =>
             proof.replayProofUrl ? (
               <a
@@ -634,7 +673,7 @@ export function ReportGroupReview({
           <div className="grid gap-2 sm:grid-cols-3">
             <ReportGroupReviewButton
               decision="approved"
-              label="Approve Result"
+              label={isNoShow ? "Approve No-Show" : "Approve Result"}
               disabled={pending}
               className="bg-emerald-600 hover:bg-emerald-500"
             />
@@ -646,7 +685,7 @@ export function ReportGroupReview({
             />
             <ReportGroupReviewButton
               decision="rejected"
-              label="Reject Result"
+              label={isNoShow ? "Reject No-Show" : "Reject Result"}
               disabled={pending}
               className="bg-red-700 hover:bg-red-600"
             />
@@ -980,6 +1019,19 @@ function formatReportGroupStatus(status: MatchResultReportGroup["status"]) {
     approved: "Approved",
     rejected: "Rejected",
     reset: "Reset",
+  }[status];
+}
+
+function formatNoShowStatus(status: MatchResultReportGroup["noShowStatus"]) {
+  if (!status) return "Not a no-show";
+
+  return {
+    pending: "Waiting for Opponent",
+    confirmed: "Confirmed",
+    disputed: "Disputed",
+    approved: "Approved by Admin",
+    rejected: "Rejected",
+    auto_confirmed: "Auto-Confirmed",
   }[status];
 }
 

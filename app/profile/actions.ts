@@ -6,8 +6,20 @@ import type {
   ProfileActionState,
   ProfileField,
 } from "@/lib/player-profile";
+import {
+  ALLOWED_AVATAR_MIME_TYPES,
+  getPlayerAvatarProxyUrl,
+  MAX_AVATAR_UPLOAD_SIZE_BYTES,
+  MAX_AVATAR_UPLOAD_SIZE_LABEL,
+} from "@/lib/avatar";
+import { parseCoh3StatsProfileUrl } from "@/lib/coh3-stats-profile";
+import {
+  checkCoh3ProfileOwnership,
+  COH3_PROFILE_LINKED_ACCOUNT_MISMATCH_MESSAGE,
+} from "@/lib/coh3-profile-ownership";
 import { isPlayerProfileComplete } from "@/lib/player-profile";
 import { supabaseUrl } from "@/lib/supabase-config";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 type ValidatedProfile = {
@@ -15,7 +27,7 @@ type ValidatedProfile = {
   in_game_name: string;
   discord_username: string;
   steam_username: string;
-  coh3_player_card_url: string;
+  coh3_player_card_url: string | null;
   country: string;
   region: string;
   timezone: string;
@@ -24,12 +36,7 @@ type ValidatedProfile = {
 };
 
 const AVATAR_BUCKET = "player-avatars";
-const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
-const ALLOWED_AVATAR_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
+const ALLOWED_AVATAR_TYPES = new Set<string>(ALLOWED_AVATAR_MIME_TYPES);
 
 export async function savePlayerProfile(
   _previousState: ProfileActionState,
@@ -58,7 +65,7 @@ export async function savePlayerProfile(
   const supabase = await createAuthenticatedSupabaseClient();
   const { data: existingProfile, error: existingProfileError } = await supabase
     .from("players")
-    .select("avatar_url")
+    .select("id, avatar_url, coh3_profile_id")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
@@ -74,10 +81,52 @@ export async function savePlayerProfile(
 
   const avatar = formData.get("avatar");
   let avatarUrl: string | undefined;
+  const playerId = existingProfile?.id ?? crypto.randomUUID();
+  const parsedCoh3Profile = parseCoh3StatsProfileUrl(
+    validation.data.coh3_player_card_url
+  );
+  const linkedCoh3ProfileId =
+    typeof existingProfile?.coh3_profile_id === "string"
+      ? existingProfile.coh3_profile_id
+      : null;
+
+  if (
+    linkedCoh3ProfileId &&
+    parsedCoh3Profile?.profileId !== linkedCoh3ProfileId
+  ) {
+    return {
+      status: "error",
+      message: "Review the highlighted profile fields.",
+      errors: {
+        coh3PlayerCardUrl: COH3_PROFILE_LINKED_ACCOUNT_MISMATCH_MESSAGE,
+      },
+    };
+  }
+
+  if (parsedCoh3Profile) {
+    const ownershipCheck = await checkCoh3ProfileOwnership({
+      supabase: createSupabaseAdminClient(),
+      profileId: parsedCoh3Profile.profileId,
+      playerId,
+      linkedProfileId: linkedCoh3ProfileId,
+    });
+
+    if (!ownershipCheck.ok) {
+      return {
+        status: "error",
+        message: "Review the highlighted profile fields.",
+        errors: {
+          coh3PlayerCardUrl: ownershipCheck.message,
+        },
+      };
+    }
+  }
 
   if (avatar instanceof File && avatar.size > 0) {
-    const avatarBytes = new Uint8Array(await avatar.arrayBuffer());
-    const avatarError = validateAvatar(avatar, avatarBytes);
+    const avatarSignature = new Uint8Array(
+      await avatar.slice(0, 12).arrayBuffer()
+    );
+    const avatarError = validateAvatar(avatar, avatarSignature);
 
     if (avatarError) {
       return {
@@ -111,7 +160,7 @@ export async function savePlayerProfile(
     try {
       const result = await supabase.storage
         .from(AVATAR_BUCKET)
-        .upload(avatarPath, avatarBytes, {
+        .upload(avatarPath, avatar, {
           cacheControl: "3600",
           contentType: avatar.type,
           upsert: true,
@@ -144,11 +193,7 @@ export async function savePlayerProfile(
       clerkUserId: userId,
     });
 
-    const { data } = supabase.storage
-      .from(AVATAR_BUCKET)
-      .getPublicUrl(avatarPath);
-
-    avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
+    avatarUrl = getPlayerAvatarProxyUrl(playerId, Date.now());
   }
 
   const finalAvatarUrl = avatarUrl ?? existingProfile?.avatar_url ?? null;
@@ -158,6 +203,7 @@ export async function savePlayerProfile(
   });
   const { error } = await supabase.from("players").upsert(
     {
+      id: playerId,
       clerk_user_id: userId,
       ...validation.data,
       profile_completed: profileCompleted,
@@ -261,8 +307,8 @@ function validateAvatar(file: File, bytes: Uint8Array) {
     return "Use a PNG, JPG, JPEG, or WEBP image.";
   }
 
-  if (file.size > MAX_AVATAR_SIZE) {
-    return "Avatar image must be 2 MB or smaller.";
+  if (file.size > MAX_AVATAR_UPLOAD_SIZE_BYTES) {
+    return `Avatar image must be ${MAX_AVATAR_UPLOAD_SIZE_LABEL} or smaller.`;
   }
 
   if (!hasValidImageSignature(file.type, bytes)) {
@@ -330,11 +376,10 @@ function validateProfile(formData: FormData): {
   requireText(errors, "region", values.region, "Region", 100);
   requireText(errors, "timezone", values.timezone, "Timezone", 100);
 
-  if (!values.coh3PlayerCardUrl) {
-    errors.coh3PlayerCardUrl = "CoH3 Player Card URL is required.";
-  } else if (
-    values.coh3PlayerCardUrl.length > 500 ||
-    !isHttpUrl(values.coh3PlayerCardUrl)
+  if (
+    values.coh3PlayerCardUrl &&
+    (values.coh3PlayerCardUrl.length > 500 ||
+      !isHttpUrl(values.coh3PlayerCardUrl))
   ) {
     errors.coh3PlayerCardUrl = "Enter a valid HTTP or HTTPS URL.";
   }
@@ -364,7 +409,7 @@ function validateProfile(formData: FormData): {
       in_game_name: values.inGameName,
       discord_username: values.discordUsername,
       steam_username: values.steamUsername,
-      coh3_player_card_url: values.coh3PlayerCardUrl,
+      coh3_player_card_url: values.coh3PlayerCardUrl || null,
       country: values.country,
       region: values.region,
       timezone: values.timezone,

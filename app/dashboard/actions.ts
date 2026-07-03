@@ -2,7 +2,10 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { notifyAdminsOfMatchDispute } from "@/lib/notification-events";
+import {
+  notifyAdminsOfMatchDispute,
+  notifyNoShowReporterOfResponse,
+} from "@/lib/notification-events";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -213,6 +216,12 @@ export async function confirmDashboardMatchResult(
     return actionErrorResult(error.message);
   }
 
+  await notifyNoShowReporterOfResponse(supabase, {
+    reportGroupId,
+    decision: "confirmed",
+    actorClerkUserId: userId,
+  });
+
   revalidateDashboardPaths();
   return {
     status: "success",
@@ -253,6 +262,11 @@ export async function disputeDashboardMatchResult(
   }
 
   await notifyAdminsOfMatchDispute(supabase, reportGroupId, userId);
+  await notifyNoShowReporterOfResponse(supabase, {
+    reportGroupId,
+    decision: "disputed",
+    actorClerkUserId: userId,
+  });
 
   revalidateDashboardPaths();
   return {

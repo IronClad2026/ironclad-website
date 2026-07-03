@@ -31,6 +31,23 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: clip;
+}
+
+.lenis [data-lenis-prevent],
+.lenis [data-lenis-prevent-wheel],
+.lenis [data-lenis-prevent-touch],
+.lenis [data-lenis-prevent-vertical],
+.lenis [data-lenis-prevent-horizontal] {
+  overscroll-behavior: contain;
+}
+
 @media (min-width: 1800px) {
   .max-w-7xl {
     max-width: min(92vw, 112rem);
