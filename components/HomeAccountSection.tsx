@@ -10,6 +10,15 @@ import {
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-errors";
 
+const primaryActionClass =
+  "inline-flex min-h-12 items-center justify-center border border-orange-400 bg-orange-500 px-5 py-3 text-center text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300";
+
+const secondaryActionClass =
+  "inline-flex min-h-12 items-center justify-center border border-white/15 bg-white/[0.04] px-5 py-3 text-center text-sm font-black text-white transition hover:border-orange-400/60 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300";
+
+const orangeGhostActionClass =
+  "inline-flex min-h-12 items-center justify-center border border-orange-400/45 bg-orange-500/10 px-5 py-3 text-center text-sm font-black text-orange-200 transition hover:border-orange-300/70 hover:bg-orange-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300";
+
 export default async function HomeAccountSection() {
   const { userId } = await auth();
 
@@ -21,16 +30,10 @@ export default async function HomeAccountSection() {
         description="Sign in or create an account, complete your player profile once, and use it for faster tournament registration."
       >
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/sign-in"
-            className="rounded-xl bg-orange-500 px-5 py-3 text-center font-bold text-white transition hover:bg-orange-400"
-          >
+          <Link href="/sign-in" className={primaryActionClass}>
             Sign In
           </Link>
-          <Link
-            href="/sign-up"
-            className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-center font-bold text-white transition hover:border-orange-500/60 hover:bg-orange-500/10"
-          >
+          <Link href="/sign-up" className={secondaryActionClass}>
             Create Account
           </Link>
         </div>
@@ -56,10 +59,7 @@ export default async function HomeAccountSection() {
         title="Profile status unavailable"
         description="Your account is signed in, but IronClad could not load your player profile. Refresh the page or open your profile to try again."
       >
-        <Link
-          href="/profile"
-          className="inline-flex rounded-xl border border-orange-500/40 bg-orange-500/10 px-5 py-3 font-bold text-orange-300 transition hover:bg-orange-500/20"
-        >
+        <Link href="/profile" className={orangeGhostActionClass}>
           Open Player Profile
         </Link>
       </AccountShell>
@@ -78,10 +78,7 @@ export default async function HomeAccountSection() {
         profileComplete={false}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Link
-            href="/profile"
-            className="rounded-xl bg-orange-500 px-5 py-3 text-center font-bold text-white transition hover:bg-orange-400"
-          >
+          <Link href="/profile" className={primaryActionClass}>
             Complete Player Profile
           </Link>
           <IronCladUserButton />
@@ -113,22 +110,13 @@ export default async function HomeAccountSection() {
       </div>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Link
-          href="/dashboard"
-          className="rounded-xl border border-orange-500/40 bg-orange-500/10 px-5 py-3 text-center font-bold text-orange-300 transition hover:bg-orange-500/20"
-        >
+        <Link href="/dashboard" className={orangeGhostActionClass}>
           Player Dashboard
         </Link>
-        <Link
-          href="/profile"
-          className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-center font-bold text-white transition hover:border-orange-500/60 hover:bg-orange-500/10"
-        >
+        <Link href="/profile" className={secondaryActionClass}>
           View/Edit Profile
         </Link>
-        <Link
-          href="/tournaments"
-          className="rounded-xl bg-orange-500 px-5 py-3 text-center font-bold text-white transition hover:bg-orange-400"
-        >
+        <Link href="/tournaments" className={primaryActionClass}>
           Go to Tournaments
         </Link>
         <IronCladUserButton />
@@ -171,39 +159,58 @@ function AccountShell({
   profileComplete?: boolean;
   children: React.ReactNode;
 }) {
+  const statusLabel =
+    profileComplete === undefined
+      ? null
+      : profileComplete
+        ? "Profile Completed"
+        : "Profile Incomplete";
+
   return (
-    <section className="relative z-10 mx-auto max-w-7xl px-6 py-24">
-      <div
-        className="relative overflow-hidden rounded-3xl border border-orange-500/30 bg-cover bg-center p-7 shadow-2xl md:p-10"
-        style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
-      >
-        <div className="absolute inset-0 bg-black/85" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-orange-950/40" />
+    <section
+      className="relative isolate overflow-hidden border-b border-white/10 bg-cover bg-center px-5 py-24 sm:px-8 lg:px-12"
+      style={{
+        backgroundImage: "url('/images/sfondi/7.jpg')",
+        backgroundPosition: "center 54%",
+      }}
+      aria-labelledby="home-account-heading"
+    >
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.91),rgba(0,0,0,0.84)),linear-gradient(112deg,rgba(0,0,0,0.9),rgba(249,115,22,0.12),rgba(0,0,0,0.94))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:64px_64px] opacity-25" />
+      <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(115deg,transparent,rgba(249,115,22,0.1))]" />
 
-        <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div className="relative z-10 mx-auto max-w-7xl border border-orange-500/28 bg-black/70 p-6 shadow-2xl shadow-black/30 backdrop-blur md:p-8 lg:p-10">
+        <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div className="max-w-3xl">
-            <div className="group/profile-heading relative w-fit">
-              <div className="relative w-fit">
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">
-                  {eyebrow}
-                </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm font-black uppercase text-orange-300">
+                {eyebrow}
+              </p>
 
-                {profileComplete !== undefined && (
-                  <span
-                    className={`pointer-events-none absolute top-1/2 left-full ml-3 -translate-y-1/2 whitespace-nowrap text-xs font-bold uppercase tracking-wider opacity-0 transition-opacity duration-300 group-hover/profile-heading:opacity-100 ${
-                      profileComplete ? "text-emerald-300" : "text-orange-300"
-                    }`}
-                  >
-                    {profileComplete
-                      ? "✓ Profile Completed"
-                      : "⚠ Profile Incomplete"}
-                  </span>
-                )}
-              </div>
-              <h2 className="mt-4 text-3xl font-bold md:text-4xl">{title}</h2>
+              {statusLabel && (
+                <span
+                  className={`border px-3 py-1 text-xs font-black uppercase ${
+                    profileComplete
+                      ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-200"
+                      : "border-orange-400/45 bg-orange-500/10 text-orange-200"
+                  }`}
+                >
+                  {statusLabel}
+                </span>
+              )}
             </div>
-            <p className="mt-4 leading-7 text-zinc-300">{description}</p>
+
+            <h2
+              id="home-account-heading"
+              className="mt-4 text-3xl font-black leading-tight text-white md:text-4xl"
+            >
+              {title}
+            </h2>
+            <p className="mt-4 max-w-3xl leading-7 text-zinc-300">
+              {description}
+            </p>
           </div>
+
           <div className="min-w-0 lg:min-w-[360px]">{children}</div>
         </div>
       </div>
@@ -213,9 +220,9 @@ function AccountShell({
 
 function ProfileValue({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-      <p className="text-xs uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-2 font-bold text-white">{value}</p>
+    <div className="min-w-0 border border-white/10 bg-black/42 p-4">
+      <p className="text-xs font-bold uppercase text-zinc-500">{label}</p>
+      <p className="mt-2 break-words font-black text-white">{value}</p>
     </div>
   );
 }

@@ -1,7 +1,14 @@
 import type { CurrentTournament } from "@/data/currentTournaments";
+import { ExternalLink, Radio, Trophy } from "lucide-react";
 
 type CurrentTournamentCardProps = {
   tournament: CurrentTournament;
+};
+
+const statusStyles: Record<CurrentTournament["status"], string> = {
+  Registration: "border-emerald-400/35 bg-emerald-500/10 text-emerald-200",
+  Ongoing: "border-sky-400/35 bg-sky-500/10 text-sky-200",
+  Completed: "border-zinc-500/45 bg-zinc-700/30 text-zinc-300",
 };
 
 export default function CurrentTournamentCard({
@@ -14,30 +21,50 @@ export default function CurrentTournamentCard({
       href={tournament.battlefyUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="block rounded-3xl border border-white/10 bg-white/5 p-7 transition hover:-translate-y-1 hover:border-white/30 hover:bg-white/10"
+      aria-label={`Open ${tournament.title} on Battlefy`}
+      className="group relative block min-h-72 overflow-hidden border border-white/12 bg-zinc-950/72 p-6 transition hover:-translate-y-1 hover:border-orange-400/50 hover:bg-zinc-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
     >
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">
-            {tournament.format}
-            {tournament.bracket ? ` · ${tournament.bracket}` : " · Bracket"}
-          </p>
+      <div className="absolute inset-x-0 top-0 h-1 bg-orange-500/75" />
+      <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(249,115,22,0.12),transparent_50%)]" />
+      </div>
 
-          <p className="mt-5 text-lg font-semibold text-white">
-            {tournament.game}
-          </p>
+      <div className="relative z-10 flex h-full min-h-60 flex-col">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase text-orange-300">
+              {tournament.format}
+              {tournament.bracket ? ` | ${tournament.bracket}` : " | Bracket"}
+            </p>
+            <h3 className="mt-4 text-2xl font-black leading-tight text-white">
+              {tournament.title}
+            </h3>
+          </div>
+
+          <span className="grid h-11 w-11 shrink-0 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
+            {status === "Registration" ? (
+              <Radio size={20} aria-hidden="true" />
+            ) : (
+              <Trophy size={20} aria-hidden="true" />
+            )}
+          </span>
         </div>
 
-        <div className="shrink-0">
-          <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-400">
-              Status
-            </span>
+        <p className="mt-5 text-sm leading-7 text-zinc-400">
+          {tournament.game}
+        </p>
 
-            <span className="text-sm font-semibold text-emerald-300">
-              {status}
-            </span>
-          </div>
+        <div className="mt-auto flex items-end justify-between gap-4 pt-8">
+          <span
+            className={`inline-flex border px-3 py-2 text-xs font-black uppercase ${statusStyles[status]}`}
+          >
+            {status}
+          </span>
+
+          <span className="inline-flex items-center gap-2 text-sm font-black text-orange-300 transition group-hover:text-orange-200">
+            Open Battlefy
+            <ExternalLink size={16} aria-hidden="true" />
+          </span>
         </div>
       </div>
     </a>

@@ -5,6 +5,7 @@ import "./globals.css";
 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ export default function RootLayout({
             <Navbar />
             {children}
             <Footer />
+            <SiteMusicPlayer />
           </SmoothScrollProvider>
         </body>
       </html>
