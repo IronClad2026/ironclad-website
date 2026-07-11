@@ -1,103 +1,276 @@
 import CurrentTournamentCard from "@/components/CurrentTournamentCard";
 import HomeAccountSection from "@/components/HomeAccountSection";
 import { currentTournaments } from "@/data/currentTournaments";
+import {
+  ArrowRight,
+  Crosshair,
+  ExternalLink,
+  Flag,
+  Radio,
+  ShieldCheck,
+  Trophy,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
+
+const discordUrl = "https://discord.gg/ZQSQjBNRm3";
+const battlefyUrl = "https://battlefy.com/ironclad-tournaments";
+
+const commandStats = [
+  {
+    label: "Active event paths",
+    value: String(currentTournaments.length).padStart(2, "0"),
+  },
+  {
+    label: "Competition formats",
+    value: "1v1 / 4v4",
+  },
+  {
+    label: "Integrity model",
+    value: "Verified",
+  },
+];
+
+const platformSignals = [
+  {
+    icon: ShieldCheck,
+    title: "Competitive integrity",
+    text: "Profile checks, admin review, and proof-backed results protect the tournament field.",
+  },
+  {
+    icon: Trophy,
+    title: "Structured tournaments",
+    text: "Current brackets and schedules remain visible through the approved tournament flow.",
+  },
+  {
+    icon: Users,
+    title: "Connected roster",
+    text: "Players can browse public profiles and contact opponents through Discord.",
+  },
+];
 
 export default function Home() {
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white">
-      <section
-        className="relative flex min-h-screen items-center justify-center bg-contain bg-center bg-no-repeat px-6 text-center"
-        style={{
-          backgroundImage: "url('/images/ironclad-background.jpg')",
-        }}
-      >
-        <div className="absolute inset-0 bg-black/70" />
+      <HeroSection />
+      <HomeAccountSection />
+      <PlayersSection />
+      <EventsSection />
+    </main>
+  );
+}
 
-        <div className="relative z-10 max-w-3xl">
-          <p className="text-sm uppercase tracking-[0.3em] text-zinc-300">
+function HeroSection() {
+  return (
+    <section
+      className="relative isolate flex min-h-[88svh] items-end overflow-hidden border-b border-orange-500/20 bg-cover bg-center px-5 pt-32 pb-12 sm:px-8 lg:min-h-[86svh] lg:px-12"
+      style={{
+        backgroundImage: "url('/images/ironclad-background.jpg')",
+        backgroundPosition: "center 52%",
+      }}
+      aria-labelledby="home-hero-title"
+    >
+      <TacticalBackdrop />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.3),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.18))]" />
+
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] lg:items-end">
+        <div className="max-w-5xl">
+          <p className="text-sm font-black uppercase text-orange-300">
             Competitive Company of Heroes 3 Events
           </p>
 
-          <h1 className="mt-6 text-6xl font-bold tracking-tight md:text-7xl">
+          <h1
+            id="home-hero-title"
+            className="mt-5 max-w-5xl text-5xl font-black leading-[0.96] text-white sm:text-6xl lg:text-8xl"
+          >
             IronClad Tournaments
           </h1>
 
-          <p className="mt-6 text-lg leading-8 text-zinc-200">
+          <p className="mt-7 max-w-2xl text-base leading-8 text-zinc-300 sm:text-lg">
             Join a structured competitive community built around fair play,
             seasonal tournaments, rankings, and tactical excellence.
           </p>
 
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <a
-              className="rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:scale-105"
-              href="https://discord.gg/ZQSQjBNRm3"
+              className="inline-flex min-h-12 items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+              href={discordUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
               Join the Frontline
+              <Flag size={17} aria-hidden="true" />
             </a>
 
             <a
-              className="rounded-xl border border-zinc-500 px-6 py-3 font-semibold text-white transition hover:bg-white/10"
-              href="https://battlefy.com/ironclad-tournaments"
+              className="inline-flex min-h-12 items-center justify-center gap-2 border border-white/18 bg-white/[0.035] px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+              href={battlefyUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
               View Current Events
+              <ExternalLink size={17} aria-hidden="true" />
             </a>
           </div>
+
+          <dl className="mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
+            {commandStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="border border-white/12 bg-black/45 px-4 py-4 backdrop-blur"
+              >
+                <dt className="text-xs font-bold uppercase text-zinc-500">
+                  {stat.label}
+                </dt>
+                <dd className="mt-2 text-xl font-black text-white">
+                  {stat.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
-      </section>
 
-      <HomeAccountSection />
+        <aside
+          className="hidden border border-white/12 bg-black/48 p-5 backdrop-blur lg:block"
+          aria-label="IronClad command brief"
+        >
+          <div className="relative min-h-[560px] overflow-hidden border border-orange-400/30 bg-[linear-gradient(145deg,rgba(249,115,22,0.12),rgba(8,13,24,0.92))] xl:min-h-[600px]">
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:40px_40px]" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(0,0,0,0.42))]" />
 
-      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-20">
-        <div className="group relative overflow-hidden rounded-3xl border border-orange-400/25 bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(249,115,22,0.07))] p-8 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-300/45 hover:shadow-[0_0_55px_rgba(249,115,22,0.16)] md:p-10">
-          <div className="absolute -top-24 right-0 h-56 w-56 rounded-full bg-orange-500/15 blur-3xl transition group-hover:bg-orange-400/20" />
-          <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-amber-400/10 blur-3xl" />
+            <div className="relative z-10 flex min-h-[560px] flex-col p-7 xl:min-h-[600px]">
+              <div className="flex items-center justify-between border-b border-white/12 pb-6 text-xs font-black uppercase text-orange-200">
+                <span>Operations Online</span>
+                <Radio size={16} aria-hidden="true" />
+              </div>
 
-          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">
-                IronClad Players
-              </p>
-              <h2 className="mt-4 text-4xl font-black text-white md:text-5xl">
-                Discover the Public Roster
-              </h2>
-              <p className="mt-5 text-lg leading-8 text-zinc-300">
-                Browse registered IronClad players, compare ELO, view public
-                profiles, and contact opponents through Discord.
+              <div className="mt-8 grid gap-6">
+                {platformSignals.map((signal) => {
+                  const Icon = signal.icon;
+
+                  return (
+                    <div
+                      key={signal.title}
+                      className="border border-white/10 bg-black/28 p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Icon
+                          size={19}
+                          className="mt-0.5 shrink-0 text-orange-300"
+                          aria-hidden="true"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-black leading-6 text-white">
+                            {signal.title}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-zinc-400">
+                            {signal.text}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-auto pt-8">
+                <div className="border-t border-orange-400/35 pt-6">
+                  <p className="text-4xl font-black leading-none">READY</p>
+                  <p className="mt-4 text-sm leading-6 text-zinc-300">
+                    Brackets, profiles, players, and rules connected for the
+                    next competitive deployment.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function PlayersSection() {
+  return (
+    <section
+      className="relative isolate overflow-hidden border-y border-white/10 bg-cover bg-center px-5 py-24 sm:px-8 lg:px-12"
+      style={{
+        backgroundImage: "url('/images/sfondi/4.jpg')",
+        backgroundPosition: "58% center",
+      }}
+      aria-labelledby="players-section-title"
+    >
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.82)),linear-gradient(115deg,rgba(0,0,0,0.86),rgba(249,115,22,0.12),rgba(0,0,0,0.92))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-25" />
+      <div className="absolute inset-y-0 right-0 w-px bg-orange-400/35" />
+      <TacticalBackdrop muted />
+
+      <div className="relative z-10 mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_340px] lg:items-center">
+        <SectionHeading
+          eyebrow="IronClad Players"
+          title="Discover the Public Roster"
+          text="Browse registered IronClad players, compare ELO, view public profiles, and contact opponents through Discord."
+          titleId="players-section-title"
+        />
+
+        <div className="border border-orange-400/30 bg-black/55 p-5 backdrop-blur">
+          <div className="flex items-center gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center border border-orange-400/35 bg-orange-500/10 text-orange-300">
+              <Crosshair size={23} aria-hidden="true" />
+            </span>
+            <div>
+              <p className="font-black text-white">Player intelligence</p>
+              <p className="mt-1 text-sm text-zinc-400">
+                Public profiles, ELO, region, and Discord contact routes.
               </p>
             </div>
+          </div>
 
-            <Link
-              href="/players"
-              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-orange-500 px-6 py-3 font-black text-white transition hover:scale-105 hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-            >
-              Browse Players
-            </Link>
+          <Link
+            href="/players"
+            className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+          >
+            Browse Players
+            <ArrowRight size={17} aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EventsSection() {
+  return (
+    <section
+      className="relative isolate overflow-hidden bg-cover bg-center px-5 py-28 sm:px-8 lg:px-12"
+      style={{
+        backgroundImage: "url('/images/sfondi/2.jpg')",
+        backgroundPosition: "center 48%",
+      }}
+      aria-labelledby="events-section-title"
+    >
+      <div className="absolute inset-x-0 top-0 h-px bg-orange-500/35" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.92),rgba(0,0,0,0.84)_42%,rgba(0,0,0,0.95)),linear-gradient(100deg,rgba(0,0,0,0.86),rgba(249,115,22,0.1),rgba(0,0,0,0.9))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:84px_84px]" />
+
+      <div className="relative z-10 mx-auto max-w-7xl">
+        <div className="mb-10 grid gap-8 lg:grid-cols-[0.78fr_1fr] lg:items-end">
+          <SectionHeading
+            eyebrow="Live Tournament Access"
+            title="Current IronClad Events"
+            text="Access active IronClad brackets, schedules, match progress, and tournament details directly through Battlefy."
+            titleId="events-section-title"
+          />
+
+          <div className="border-l border-orange-400/35 bg-black/35 py-4 pl-5 text-sm leading-7 text-zinc-400 backdrop-blur">
+            <p>
+              Battlefy remains the live destination for these brackets,
+              schedules, match progress, and tournament records.
+            </p>
           </div>
         </div>
-      </section>
 
-      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-24">
-        <div className="mb-10">
-          <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
-            Live Tournament Access
-          </p>
-
-          <h2 className="mt-4 text-4xl font-bold">
-            Current IronClad Events
-          </h2>
-
-          <p className="mt-5 max-w-3xl text-zinc-300">
-            Access active IronClad brackets, schedules, match progress, and
-            tournament details directly through Battlefy.
-          </p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           {currentTournaments.map((tournament) => (
             <CurrentTournamentCard
               key={tournament.title}
@@ -105,7 +278,49 @@ export default function Home() {
             />
           ))}
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
+  );
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  text,
+  titleId,
+}: {
+  eyebrow: string;
+  title: string;
+  text: string;
+  titleId: string;
+}) {
+  return (
+    <div className="max-w-4xl">
+      <p className="text-sm font-black uppercase text-orange-300">{eyebrow}</p>
+      <h2
+        id={titleId}
+        className="mt-4 text-4xl font-black leading-tight sm:text-5xl lg:text-6xl"
+      >
+        {title}
+      </h2>
+      <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function TacticalBackdrop({ muted = false }: { muted?: boolean }) {
+  return (
+    <>
+      <div
+        className={`absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:52px_52px] ${
+          muted ? "opacity-20" : "opacity-30"
+        }`}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(125deg,transparent_0%,transparent_43%,rgba(249,115,22,0.14)_43%,transparent_57%,transparent_100%)]" />
+      <div className="absolute top-1/4 right-8 hidden h-24 w-px bg-orange-400/50 lg:block" />
+      <div className="absolute bottom-1/4 left-8 hidden h-px w-36 bg-orange-400/45 lg:block" />
+    </>
   );
 }

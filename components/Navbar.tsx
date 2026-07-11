@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import Image from "next/image";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 
@@ -21,8 +22,14 @@ export default function Navbar() {
   return (
     <header className="absolute top-0 left-0 z-20 w-full border-b border-white/10 bg-black/20 backdrop-blur-md">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 text-white">
-        <Link href="/" className="text-lg font-bold tracking-wide">
-          IronClad
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/images/ironclad-logo.png"
+            alt="IronClad"
+            width={1365}
+            height={768}
+            className="h-14 w-auto sm:h-16"
+          />
         </Link>
 
         <div className="hidden items-center gap-8 text-sm font-medium text-zinc-300 md:flex">
