@@ -5,6 +5,7 @@ import "./globals.css";
 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import GlobalSmoke from "@/components/GlobalSmoke";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({
         <body className="bg-black text-white">
           <SmoothScrollProvider>
             <Navbar />
+            <GlobalSmoke />
             {children}
             <Footer />
           </SmoothScrollProvider>
