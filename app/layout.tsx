@@ -6,12 +6,8 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import SiteMusicPlayer from "@/components/SiteMusicPlayer";
+import GlobalSmoke from "@/components/GlobalSmoke";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
-
-export const metadata: Metadata = {
-  title: "IronClad Tournaments",
-  description: "Competitive Company of Heroes 3 tournaments and rankings.",
-};
 
 export default function RootLayout({
   children,
@@ -24,6 +20,7 @@ export default function RootLayout({
         <body className="bg-black text-white">
           <SmoothScrollProvider>
             <Navbar />
+            <GlobalSmoke />
             {children}
             <Footer />
             <SiteMusicPlayer />
