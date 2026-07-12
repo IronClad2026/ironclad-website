@@ -385,6 +385,15 @@ function RuleCategorySelector({
 }) {
   return (
     <section className="relative isolate overflow-hidden border-b border-white/10 bg-[linear-gradient(180deg,#050505,#090909)] px-5 py-9 sm:px-8 lg:px-12">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover bg-center opacity-[0.18]"
+        style={{ backgroundImage: "url('/images/sfondi/2.jpg')" }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.76),rgba(0,0,0,0.93)),linear-gradient(90deg,rgba(0,0,0,0.92),rgba(0,0,0,0.58),rgba(0,0,0,0.9))]"
+      />
       <TacticalBackdrop muted />
       <div className="relative z-10 mx-auto max-w-7xl">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -489,6 +498,18 @@ function RuleCategorySelector({
 function QuickBriefingSection({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-20 sm:px-8 lg:px-12">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover opacity-[0.16]"
+        style={{
+          backgroundImage: "url('/images/sfondi/6.jpg')",
+          backgroundPosition: "center 48%",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.7)_45%,rgba(0,0,0,0.94)),linear-gradient(100deg,rgba(0,0,0,0.9),rgba(0,0,0,0.58),rgba(0,0,0,0.86))]"
+      />
       <TacticalBackdrop muted />
       <div className="relative z-10 mx-auto max-w-7xl">
         <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
@@ -591,6 +612,18 @@ function RuleExplorerSection({
 
   return (
     <section className="relative isolate overflow-hidden border-b border-orange-500/15 bg-[linear-gradient(180deg,#050505,#0b0b0b)] px-5 py-20 sm:px-8 lg:px-12">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover opacity-[0.17]"
+        style={{
+          backgroundImage: "url('/images/sfondi/3.jpg')",
+          backgroundPosition: "58% center",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.84),rgba(0,0,0,0.7)_42%,rgba(0,0,0,0.96)),linear-gradient(110deg,rgba(0,0,0,0.95),rgba(0,0,0,0.66),rgba(37,18,8,0.92))]"
+      />
       <div className="absolute inset-y-0 left-0 w-px bg-orange-500/50" />
       <div className="relative z-10 mx-auto max-w-6xl">
         <div className="grid gap-8 lg:grid-cols-[0.78fr_1fr] lg:items-end">
@@ -703,6 +736,18 @@ function RuleExplorerSection({
 function OfficialDocumentsSection({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-20 sm:px-8 lg:px-12">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover opacity-[0.18]"
+        style={{
+          backgroundImage: "url('/images/sfondi/7.jpg')",
+          backgroundPosition: "center center",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.68)_48%,rgba(0,0,0,0.94)),linear-gradient(105deg,rgba(0,0,0,0.92),rgba(0,0,0,0.62),rgba(0,0,0,0.88))]"
+      />
       <TacticalBackdrop muted />
       <div className="relative z-10 mx-auto max-w-7xl">
         <div className="mb-12 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -772,6 +817,14 @@ function OfficialDocumentsSection({ reduceMotion }: { reduceMotion: boolean }) {
 function DisclaimerSection({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <section className="relative isolate overflow-hidden px-5 py-20 sm:px-8 lg:px-12">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover opacity-[0.18]"
+        style={{
+          backgroundImage: "url('/images/sfondi/8.jpg')",
+          backgroundPosition: "center 46%",
+        }}
+      />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.62),rgba(0,0,0,0.95)),linear-gradient(115deg,rgba(249,115,22,0.1),transparent_50%)]" />
       <TacticalBackdrop muted />
       <div className="relative z-10 mx-auto max-w-5xl">
