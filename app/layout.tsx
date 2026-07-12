@@ -20,8 +20,8 @@ export default function RootLayout({
         <body className="bg-black text-white">
           <SmoothScrollProvider>
             <Navbar />
-            <GlobalSmoke />
-            {children}
+<GlobalSmoke />
+<div className="pt-[83px] md:pt-[69px]">{children}</div>
             <Footer />
             <SiteMusicPlayer />
           </SmoothScrollProvider>
