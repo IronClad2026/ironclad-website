@@ -304,7 +304,7 @@ function HeroSection({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <section className="relative isolate flex min-h-[72svh] items-end overflow-hidden border-b border-orange-500/20 px-5 pt-28 pb-10 sm:min-h-[78vh] sm:px-8 sm:pt-32 sm:pb-14 lg:min-h-[88vh] lg:px-12">
       <div
-        className="absolute inset-0 bg-cover bg-center opacity-30"
+        className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
       />
       <TacticalBackdrop />
@@ -387,7 +387,7 @@ function RuleCategorySelector({
     <section className="relative isolate overflow-hidden border-b border-white/10 bg-[linear-gradient(180deg,#050505,#090909)] px-5 py-9 sm:px-8 lg:px-12">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-cover bg-center opacity-[0.18]"
+        className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/images/sfondi/2.jpg')" }}
       />
       <div
@@ -500,7 +500,7 @@ function QuickBriefingSection({ reduceMotion }: { reduceMotion: boolean }) {
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-20 sm:px-8 lg:px-12">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-cover opacity-[0.16]"
+        className="absolute inset-0 bg-cover"
         style={{
           backgroundImage: "url('/images/sfondi/6.jpg')",
           backgroundPosition: "center 48%",
@@ -614,7 +614,7 @@ function RuleExplorerSection({
     <section className="relative isolate overflow-hidden border-b border-orange-500/15 bg-[linear-gradient(180deg,#050505,#0b0b0b)] px-5 py-20 sm:px-8 lg:px-12">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-cover opacity-[0.17]"
+        className="absolute inset-0 bg-cover"
         style={{
           backgroundImage: "url('/images/sfondi/3.jpg')",
           backgroundPosition: "58% center",
@@ -738,7 +738,7 @@ function OfficialDocumentsSection({ reduceMotion }: { reduceMotion: boolean }) {
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-20 sm:px-8 lg:px-12">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-cover opacity-[0.18]"
+        className="absolute inset-0 bg-cover"
         style={{
           backgroundImage: "url('/images/sfondi/7.jpg')",
           backgroundPosition: "center center",
@@ -819,7 +819,7 @@ function DisclaimerSection({ reduceMotion }: { reduceMotion: boolean }) {
     <section className="relative isolate overflow-hidden px-5 py-20 sm:px-8 lg:px-12">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-cover opacity-[0.18]"
+        className="absolute inset-0 bg-cover"
         style={{
           backgroundImage: "url('/images/sfondi/8.jpg')",
           backgroundPosition: "center 46%",
