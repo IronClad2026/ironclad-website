@@ -117,7 +117,7 @@ function HeroSection() {
   return (
     <section className="relative isolate flex min-h-[92vh] items-end overflow-hidden border-b border-orange-500/20 px-5 pt-32 pb-12 sm:px-8 lg:px-12">
       <div
-        className="absolute inset-0 bg-cover bg-center opacity-28"
+        className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
       />
       <TacticalBackdrop />
@@ -188,7 +188,7 @@ function MissionSection() {
       background={{
         image: "/images/sfondi/1.jpg",
         position: "center 52%",
-        opacity: 0.2,
+        opacity: 1,
         overlay:
           "linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.78) 42%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.92),rgba(0,0,0,0.58),rgba(38,17,8,0.9))",
       }}
@@ -216,7 +216,7 @@ function TournamentStructureSection() {
       <SectionImageBackdrop
         image="/images/sfondi/2.jpg"
         position="center 48%"
-        opacity={0.18}
+        opacity={1}
         overlay="linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.8) 48%,rgba(0,0,0,0.94)),linear-gradient(105deg,rgba(0,0,0,0.9),rgba(0,0,0,0.56),rgba(249,115,22,0.1),rgba(0,0,0,0.92))"
       />
       <TacticalBackdrop muted />
@@ -263,7 +263,7 @@ function FairCompetitionSection() {
       <SectionImageBackdrop
         image="/images/sfondi/7.jpg"
         position="center 50%"
-        opacity={0.22}
+        opacity={1}
         overlay="linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.74) 45%,rgba(0,0,0,0.95)),linear-gradient(100deg,rgba(0,0,0,0.95),rgba(0,0,0,0.62),rgba(42,18,8,0.88))"
       />
       <div className="absolute inset-y-0 left-0 w-px bg-orange-500/40" />
@@ -311,7 +311,7 @@ function CommunitySection() {
       background={{
         image: "/images/sfondi/3.jpg",
         position: "58% center",
-        opacity: 0.18,
+        opacity: 1,
         overlay:
           "linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.76) 42%,rgba(0,0,0,0.94)),linear-gradient(112deg,rgba(0,0,0,0.92),rgba(0,0,0,0.58),rgba(249,115,22,0.09),rgba(0,0,0,0.9))",
       }}
@@ -343,7 +343,7 @@ function FutureVisionSection() {
       <SectionImageBackdrop
         image="/images/sfondi/8.jpg"
         position="center 46%"
-        opacity={0.26}
+        opacity={1}
         overlay="linear-gradient(180deg,rgba(0,0,0,0.82),rgba(0,0,0,0.72) 46%,rgba(0,0,0,0.96)),linear-gradient(115deg,rgba(0,0,0,0.94),rgba(0,0,0,0.6),rgba(249,115,22,0.12),rgba(0,0,0,0.9))"
       />
       <TacticalBackdrop />
@@ -473,7 +473,7 @@ function GlassPanel({ children }: { children: ReactNode }) {
 function SectionImageBackdrop({
   image,
   position = "center center",
-  opacity = 0.18,
+  opacity = 1,
   overlay = "linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.8) 45%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.9),rgba(0,0,0,0.58),rgba(0,0,0,0.9))",
 }: SectionBackground) {
   return (
