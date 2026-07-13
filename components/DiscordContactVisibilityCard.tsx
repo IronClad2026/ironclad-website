@@ -40,9 +40,9 @@ export default function DiscordContactVisibilityCard({
   };
 
   return (
-    <section className="rounded-2xl border border-orange-500/25 bg-[linear-gradient(135deg,rgba(249,115,22,0.09),rgba(255,255,255,0.03))] p-5 shadow-xl shadow-black/20 backdrop-blur">
+    <section className="border border-orange-500/25 bg-black/65 p-5 shadow-xl shadow-black/25 backdrop-blur">
       <div className="flex items-start justify-between gap-4">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
+        <span className="grid h-11 w-11 shrink-0 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
           <MessageCircle size={20} />
         </span>
 
@@ -68,7 +68,7 @@ export default function DiscordContactVisibilityCard({
       </div>
 
       {!hasDiscordUsername && (
-        <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80">
+        <div className="mt-4 border border-amber-400/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80">
           Add a Discord username to your player profile before this can appear
           publicly.
         </div>
@@ -80,7 +80,7 @@ export default function DiscordContactVisibilityCard({
         aria-checked={enabled}
         disabled={pending}
         onClick={toggleVisibility}
-        className="mt-5 flex w-full items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/35 p-2 text-left transition hover:border-orange-400/35 disabled:cursor-wait disabled:opacity-70"
+        className="mt-5 flex w-full items-center justify-between gap-4 border border-white/10 bg-black/45 p-2 text-left transition hover:border-orange-400/45 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
       >
         <span className="flex items-center gap-3 px-2 text-sm font-bold text-zinc-200">
           {enabled ? (
