@@ -12,6 +12,9 @@ const initialDeleteAccountState: DeleteAccountState = {
   message: "",
 };
 
+const dangerPanelOverlayClass =
+  "pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:56px_56px] opacity-10";
+
 export default function DeleteAccountSection() {
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -27,8 +30,13 @@ export default function DeleteAccountSection() {
   }, [state.status]);
 
   return (
-    <section className="mt-8 rounded-3xl border border-red-500/25 bg-red-950/10 p-6 backdrop-blur md:p-8">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+    <section className="group relative isolate mt-8 overflow-hidden border border-red-500/25 bg-[linear-gradient(145deg,rgba(127,29,29,0.16),rgba(8,8,8,0.86))] p-6 shadow-2xl shadow-black/30 backdrop-blur transition hover:border-red-400/35 md:p-8">
+      <div className={dangerPanelOverlayClass} />
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-0 transition group-hover:opacity-100">
+        <div className="absolute inset-x-0 top-0 h-px bg-red-300/45" />
+      </div>
+
+      <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-red-400">
             Danger Zone
@@ -43,7 +51,7 @@ export default function DeleteAccountSection() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-3 font-bold text-red-300 transition hover:border-red-400 hover:bg-red-500/20"
+          className="inline-flex shrink-0 items-center justify-center gap-2 border border-red-500/40 bg-red-500/10 px-5 py-3 font-bold text-red-300 transition hover:border-red-400 hover:bg-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-300"
         >
           <Trash2 size={18} />
           Delete Account
@@ -52,8 +60,10 @@ export default function DeleteAccountSection() {
 
       {open && (
         <div className="fixed inset-0 z-[80] grid place-items-center bg-black/85 px-4 py-6 backdrop-blur">
-          <div className="w-full max-w-lg rounded-3xl border border-red-500/35 bg-[#111318] p-6 shadow-2xl shadow-red-950/40">
-            <div className="flex items-start justify-between gap-4">
+          <div className="relative isolate w-full max-w-lg overflow-hidden border border-red-500/35 bg-[linear-gradient(145deg,rgba(127,29,29,0.16),rgba(8,8,8,0.94))] p-6 shadow-2xl shadow-red-950/40 backdrop-blur-xl">
+            <div className={dangerPanelOverlayClass} />
+
+            <div className="relative z-10 flex items-start justify-between gap-4">
               <div className="flex gap-3">
                 <AlertTriangle className="mt-1 shrink-0 text-red-400" />
                 <div>
@@ -73,19 +83,19 @@ export default function DeleteAccountSection() {
                   setConfirmation("");
                 }}
                 aria-label="Close delete account confirmation"
-                className="rounded-lg bg-zinc-800 p-2 text-zinc-300 transition hover:bg-zinc-700 hover:text-white disabled:opacity-50"
+                className="border border-white/10 bg-zinc-900/80 p-2 text-zinc-300 transition hover:border-red-400/45 hover:bg-red-500/10 hover:text-white disabled:opacity-50"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p className="mt-5 text-sm leading-6 text-zinc-300">
+            <p className="relative z-10 mt-5 text-sm leading-6 text-zinc-300">
               This cannot be undone. Your historical registrations will remain
               available to tournament administrators without your personal
               identity.
             </p>
 
-            <form action={formAction} className="mt-6">
+            <form action={formAction} className="relative z-10 mt-6">
               <label htmlFor="delete-confirmation" className="text-sm font-bold text-white">
                 Type DELETE to confirm
               </label>
@@ -96,14 +106,14 @@ export default function DeleteAccountSection() {
                 disabled={pending}
                 onChange={(event) => setConfirmation(event.target.value)}
                 autoComplete="off"
-                className="mt-3 w-full rounded-xl border border-red-500/30 bg-black/50 px-4 py-3 font-mono text-white outline-none transition placeholder:text-zinc-700 focus:border-red-400 disabled:opacity-60"
+                className="mt-3 w-full border border-red-500/30 bg-black/55 px-4 py-3 font-mono text-white shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-700 focus:border-red-400 focus:bg-black/70 disabled:opacity-60"
                 placeholder="DELETE"
               />
 
               {state.message && (
                 <div
                   aria-live="polite"
-                  className={`mt-4 rounded-xl border p-4 text-sm ${
+                  className={`mt-4 border p-4 text-sm shadow-xl shadow-black/20 ${
                     state.status === "success"
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                       : "border-red-500/30 bg-red-500/10 text-red-300"
@@ -121,14 +131,14 @@ export default function DeleteAccountSection() {
                     setOpen(false);
                     setConfirmation("");
                   }}
-                  className="rounded-xl border border-white/10 px-5 py-3 font-bold text-zinc-300 transition hover:border-white/25 hover:text-white disabled:opacity-50"
+                  className="border border-white/10 px-5 py-3 font-bold text-zinc-300 transition hover:border-white/25 hover:text-white disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending || confirmation !== "DELETE"}
-                  className="rounded-xl bg-red-600 px-5 py-3 font-bold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="border border-red-500 bg-red-600 px-5 py-3 font-bold text-white transition hover:border-red-400 hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {pending ? "Deleting Account..." : "Permanently Delete"}
                 </button>

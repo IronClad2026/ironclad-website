@@ -90,6 +90,18 @@ const timezones = [
   "Pacific/Kiritimati (UTC+14:00)",
 ];
 
+const profilePanelClass =
+  "group relative isolate border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-6 shadow-2xl shadow-black/30 backdrop-blur transition hover:border-orange-400/35 md:p-8";
+
+const profilePanelGridOverlayClass =
+  "pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:56px_56px] opacity-10";
+
+const profilePanelHoverOverlayClass =
+  "pointer-events-none absolute inset-0 z-0 opacity-0 transition group-hover:opacity-100";
+
+const profileInputClass =
+  "mt-3 w-full border bg-black/55 px-4 py-3 text-white shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-600 focus:border-orange-400 focus:bg-black/70 focus:shadow-[0_0_0_1px_rgba(251,146,60,0.24)]";
+
 export default function PlayerProfileForm({
   profile,
 }: PlayerProfileFormProps) {
@@ -120,8 +132,13 @@ export default function PlayerProfileForm({
 
   return (
     <form action={formAction} className="space-y-8">
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur md:p-8">
-        <div>
+      <section className={`${profilePanelClass} overflow-hidden`}>
+        <div className={profilePanelGridOverlayClass} />
+        <div className={profilePanelHoverOverlayClass}>
+          <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
+        </div>
+
+        <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
             Player Avatar
           </p>
@@ -134,11 +151,11 @@ export default function PlayerProfileForm({
           </p>
         </div>
 
-        <div className="mt-7 flex flex-col gap-6 sm:flex-row sm:items-center">
+        <div className="relative z-10 mt-7 flex flex-col gap-6 sm:flex-row sm:items-center">
           <div
             role="img"
             aria-label="Player avatar preview"
-            className="grid h-32 w-32 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-orange-500/50 bg-black/50 bg-cover bg-center shadow-[0_0_35px_rgba(249,115,22,0.18)]"
+            className="grid h-32 w-32 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-orange-500/50 bg-black/60 bg-cover bg-center shadow-[0_0_35px_rgba(249,115,22,0.2)]"
             style={
               avatarPreview
                 ? { backgroundImage: `url("${avatarPreview}")` }
@@ -149,7 +166,7 @@ export default function PlayerProfileForm({
           </div>
 
           <div className="min-w-0 flex-1">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-orange-500/40 bg-orange-500/10 px-5 py-3 text-sm font-bold text-orange-200 transition hover:border-orange-400 hover:bg-orange-500/20">
+            <label className="inline-flex cursor-pointer items-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-within:outline focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-orange-300">
               <Camera size={18} />
               {avatarPreview ? "Replace Avatar" : "Choose Avatar"}
               <input
@@ -202,8 +219,13 @@ export default function PlayerProfileForm({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur md:p-8">
-        <div>
+      <section className={`${profilePanelClass} overflow-hidden`}>
+        <div className={profilePanelGridOverlayClass} />
+        <div className={profilePanelHoverOverlayClass}>
+          <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
+        </div>
+
+        <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
             Player Identity
           </p>
@@ -216,7 +238,7 @@ export default function PlayerProfileForm({
           </p>
         </div>
 
-        <div className="mt-7 grid gap-5 md:grid-cols-2">
+        <div className="relative z-10 mt-7 grid gap-5 md:grid-cols-2">
           <ProfileInput
             label="Display Name"
             name="displayName"
@@ -257,8 +279,13 @@ export default function PlayerProfileForm({
         </div>
       </section>
 
-      <section className="relative z-30 overflow-visible rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur focus-within:z-[1300] md:p-8">
-        <div>
+      <section className={`${profilePanelClass} z-30 overflow-visible focus-within:z-[1300]`}>
+        <div className={profilePanelGridOverlayClass} />
+        <div className={profilePanelHoverOverlayClass}>
+          <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
+        </div>
+
+        <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
             Competitive Profile
           </p>
@@ -267,7 +294,7 @@ export default function PlayerProfileForm({
           </h2>
         </div>
 
-        <div className="mt-7 grid gap-5 md:grid-cols-2">
+        <div className="relative z-10 mt-7 grid gap-5 md:grid-cols-2">
           <SearchableProfileSelect
             label="Country"
             name="country"
@@ -277,6 +304,7 @@ export default function PlayerProfileForm({
             onSelect={(option) => setCountry(option.value)}
             error={state.errors.country}
             required
+            variant="ironclad"
           />
           <SearchableProfileSelect
             label="Region"
@@ -291,6 +319,7 @@ export default function PlayerProfileForm({
             error={state.errors.region}
             placeholder="Search regions"
             required
+            variant="ironclad"
           />
           <SearchableProfileSelect
             label="Timezone"
@@ -305,6 +334,7 @@ export default function PlayerProfileForm({
             error={state.errors.timezone}
             placeholder="Search by city, region, or UTC offset"
             required
+            variant="ironclad"
           />
           <SearchableProfileSelect
             label="Current ELO"
@@ -324,13 +354,19 @@ export default function PlayerProfileForm({
             description="Select an ELO range or type an exact numeric ELO."
             placeholder="Search ranges or enter exact ELO"
             required
+            variant="ironclad"
           />
         </div>
 
       </section>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur md:p-8">
-        <label htmlFor="bio" className="block">
+      <section className={`${profilePanelClass} overflow-hidden`}>
+        <div className={profilePanelGridOverlayClass} />
+        <div className={profilePanelHoverOverlayClass}>
+          <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
+        </div>
+
+        <label htmlFor="bio" className="relative z-10 block">
           <span className="text-sm font-bold text-white">Short Bio</span>
           <span className="ml-2 text-xs uppercase tracking-wider text-zinc-500">
             Optional
@@ -342,7 +378,7 @@ export default function PlayerProfileForm({
           maxLength={500}
           defaultValue={profile?.bio ?? ""}
           rows={5}
-          className={`mt-3 w-full rounded-xl border bg-black/40 px-4 py-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400 ${
+          className={`relative z-10 ${profileInputClass} ${
             state.errors.bio ? "border-red-500/70" : "border-white/10"
           }`}
           placeholder="Tell the IronClad community a little about your competitive background."
@@ -353,7 +389,7 @@ export default function PlayerProfileForm({
       {state.message && (
         <div
           aria-live="polite"
-          className={`rounded-2xl border p-4 text-sm ${
+          className={`border p-4 text-sm shadow-xl shadow-black/20 backdrop-blur ${
             state.status === "success"
               ? "border-green-500/30 bg-green-500/10 text-green-300"
               : "border-red-500/30 bg-red-500/10 text-red-300"
@@ -370,7 +406,7 @@ export default function PlayerProfileForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-xl bg-orange-500 px-6 py-3 font-bold text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className="border border-orange-400 bg-orange-500 px-6 py-3 font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
         >
           {pending
             ? "Saving Profile..."
@@ -415,7 +451,7 @@ function ProfileInput({
         name={name}
         defaultValue={defaultValue ?? ""}
         aria-invalid={Boolean(error)}
-        className={`mt-3 w-full rounded-xl border bg-black/40 px-4 py-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400 ${
+        className={`${profileInputClass} ${
           error ? "border-red-500/70" : "border-white/10"
         }`}
       />
@@ -429,5 +465,9 @@ function FieldError({ message }: { message?: string }) {
     return null;
   }
 
-  return <span className="mt-2 block text-xs text-red-300">{message}</span>;
+  return (
+    <span className="relative z-10 mt-2 block text-xs text-red-300">
+      {message}
+    </span>
+  );
 }
