@@ -15,6 +15,7 @@ import { redirect } from "next/navigation";
 import DashboardChampionHistory from "@/components/DashboardChampionHistory";
 import DashboardMatchHistory from "@/components/DashboardMatchHistory";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
+import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import { loadPlayerNotifications } from "@/lib/notifications";
@@ -61,7 +62,7 @@ export default async function PlayerDashboardPage() {
       supabase
         .from("players")
         .select(
-          "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, discord_public_enabled, created_at, updated_at"
+          "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, public_profile_enabled, discord_public_enabled, created_at, updated_at"
         )
         .eq("clerk_user_id", userId)
         .maybeSingle(),
@@ -208,10 +209,15 @@ export default async function PlayerDashboardPage() {
           />
 
           {profile && (
-            <DiscordContactVisibilityCard
-              initialEnabled={Boolean(profile.discord_public_enabled)}
-              hasDiscordUsername={Boolean(profile.discord_username?.trim())}
-            />
+            <div className="grid gap-5">
+              <PublicProfileVisibilityCard
+                initialEnabled={Boolean(profile.public_profile_enabled)}
+              />
+              <DiscordContactVisibilityCard
+                initialEnabled={Boolean(profile.discord_public_enabled)}
+                hasDiscordUsername={Boolean(profile.discord_username?.trim())}
+              />
+            </div>
           )}
         </div>
 

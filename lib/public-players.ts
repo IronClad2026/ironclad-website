@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { supabase } from "@/lib/supabase";
 
 export type PublicPlayerProfile = {
   id: string;
@@ -51,7 +51,6 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function getPublicPlayers(): Promise<PublicPlayerProfile[]> {
-  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("public_player_profiles")
     .select(PUBLIC_PLAYER_PROFILE_COLUMNS)
@@ -75,7 +74,6 @@ export async function getPublicPlayerById(
     return null;
   }
 
-  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("public_player_profiles")
     .select(PUBLIC_PLAYER_PROFILE_COLUMNS)
