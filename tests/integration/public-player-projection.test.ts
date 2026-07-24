@@ -4,9 +4,12 @@ import { createSupabaseQueryMock } from "@/tests/helpers/supabase-query-mock";
 const publicSupabaseClientMock = vi.hoisted(() => ({
   from: vi.fn(),
 }));
+const createNoStoreSupabaseClientMock = vi.hoisted(() =>
+  vi.fn(() => publicSupabaseClientMock)
+);
 
 vi.mock("@/lib/supabase", () => ({
-  supabase: publicSupabaseClientMock,
+  createNoStoreSupabaseClient: createNoStoreSupabaseClientMock,
 }));
 
 import {
@@ -34,6 +37,7 @@ const publicRow = {
 describe("public-player projection", () => {
   beforeEach(() => {
     publicSupabaseClientMock.from.mockReset();
+    createNoStoreSupabaseClientMock.mockClear();
   });
 
   it("queries the public view and maps only public-safe fields", async () => {
@@ -45,10 +49,15 @@ describe("public-player projection", () => {
     expect(publicSupabaseClientMock.from).toHaveBeenCalledWith(
       "public_player_profiles"
     );
+    expect(createNoStoreSupabaseClientMock).toHaveBeenCalledOnce();
     expect(supabase.calls.find((call) => call.method === "select")?.args[0])
       .toBe(
         "id, display_name, player_name, country, region, current_elo, public_profile_enabled, discord_public_enabled, discord_username, has_avatar, avatar_url, created_at"
       );
+    expect(supabase.calls).toContainEqual({
+      method: "eq",
+      args: ["public_profile_enabled", true],
+    });
     expect(players).toEqual([
       {
         id: publicRow.id,
@@ -92,9 +101,10 @@ describe("public-player projection", () => {
     ]);
   });
 
-  it("rejects an invalid player ID before creating a service-role client", async () => {
+  it("rejects an invalid player ID before creating a Supabase client", async () => {
     await expect(getPublicPlayerById("not-a-uuid")).resolves.toBeNull();
     expect(publicSupabaseClientMock.from).not.toHaveBeenCalled();
+    expect(createNoStoreSupabaseClientMock).not.toHaveBeenCalled();
   });
 
   it("loads a detail profile only through the filtered public view", async () => {
@@ -112,6 +122,10 @@ describe("public-player projection", () => {
     expect(supabase.calls).toContainEqual({
       method: "eq",
       args: ["id", publicRow.id],
+    });
+    expect(supabase.calls).toContainEqual({
+      method: "eq",
+      args: ["public_profile_enabled", true],
     });
   });
 

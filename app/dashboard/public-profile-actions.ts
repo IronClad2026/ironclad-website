@@ -32,15 +32,15 @@ export async function updatePublicProfileEnabled(
   }
 
   const supabase = await createAuthenticatedSupabaseClient();
-  const { data, error } = await supabase
+  const { data: updatedPlayer, error: updateError } = await supabase
     .from("players")
     .update({ public_profile_enabled: enabled })
     .eq("clerk_user_id", userId)
-    .select("id, public_profile_enabled")
+    .select("id")
     .maybeSingle();
 
-  if (error) {
-    console.error("Public profile visibility update failed:", error);
+  if (updateError) {
+    console.error("Public profile visibility update failed:", updateError);
     return {
       status: "error",
       message: "Public profile visibility could not be updated.",
@@ -48,7 +48,7 @@ export async function updatePublicProfileEnabled(
     };
   }
 
-  if (!data) {
+  if (!updatedPlayer) {
     return {
       status: "error",
       message: "Complete your player profile before changing this setting.",
@@ -56,15 +56,45 @@ export async function updatePublicProfileEnabled(
     };
   }
 
+  const { data: persistedPlayer, error: verificationError } = await supabase
+    .from("players")
+    .select("id, public_profile_enabled")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+
+  if (
+    verificationError ||
+    !persistedPlayer ||
+    persistedPlayer.id !== updatedPlayer.id ||
+    persistedPlayer.public_profile_enabled !== enabled
+  ) {
+    if (verificationError) {
+      console.error(
+        "Public profile visibility verification failed:",
+        verificationError
+      );
+    } else {
+      console.error(
+        "Public profile visibility verification returned an unexpected value."
+      );
+    }
+
+    return {
+      status: "error",
+      message: "Public profile visibility could not be verified.",
+      enabled: !enabled,
+    };
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/players");
-  revalidatePath(`/players/${data.id as string}`);
+  revalidatePath(`/players/${persistedPlayer.id as string}`);
 
   return {
     status: "success",
     message: enabled
       ? "Your player profile is now public."
       : "Your player profile is now private.",
-    enabled: Boolean(data.public_profile_enabled),
+    enabled: persistedPlayer.public_profile_enabled,
   };
 }

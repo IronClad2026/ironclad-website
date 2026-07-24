@@ -79,6 +79,7 @@ describe("public profile visibility action", () => {
       method: "eq",
       args: ["clerk_user_id", playerIdentity.userId],
     });
+    expect(supabase.from).toHaveBeenCalledTimes(2);
     expect(
       JSON.stringify(
         supabase.calls.find((call) => call.method === "update")?.args[0]
@@ -87,6 +88,47 @@ describe("public profile visibility action", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
     expect(revalidatePathMock).toHaveBeenCalledWith("/players");
     expect(revalidatePathMock).toHaveBeenCalledWith(`/players/${PLAYER_ID}`);
+  });
+
+  it("confirms a persisted opt-out before reporting success", async () => {
+    const supabase = createSupabaseQueryMock({
+      data: {
+        id: PLAYER_ID,
+        public_profile_enabled: false,
+      },
+    });
+    authMock.mockResolvedValue(playerIdentity);
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(supabase.client);
+
+    await expect(updatePublicProfileEnabled(false)).resolves.toEqual({
+      status: "success",
+      message: "Your player profile is now private.",
+      enabled: false,
+    });
+
+    expect(supabase.calls).toContainEqual({
+      method: "update",
+      args: [{ public_profile_enabled: false }],
+    });
+    expect(supabase.from).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not report success when read-back does not match the request", async () => {
+    const supabase = createSupabaseQueryMock({
+      data: {
+        id: PLAYER_ID,
+        public_profile_enabled: true,
+      },
+    });
+    authMock.mockResolvedValue(playerIdentity);
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(supabase.client);
+
+    await expect(updatePublicProfileEnabled(false)).resolves.toEqual({
+      status: "error",
+      message: "Public profile visibility could not be verified.",
+      enabled: true,
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it("fails closed when the authenticated player profile does not exist", async () => {
