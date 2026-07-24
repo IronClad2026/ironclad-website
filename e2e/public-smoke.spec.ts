@@ -25,8 +25,7 @@ for (const route of publicRoutes) {
   });
 }
 
-// Known issue: middleware.ts does not currently classify /players(.*) as public.
-test.fixme("anonymous visitors should reach the public players directory", async ({
+test("anonymous visitors should reach the public players directory", async ({
   page,
 }) => {
   const response = await page.goto("/players", {

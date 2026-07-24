@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSupabaseQueryMock } from "@/tests/helpers/supabase-query-mock";
 
-const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
+const publicSupabaseClientMock = vi.hoisted(() => ({
+  from: vi.fn(),
+}));
+const createNoStoreSupabaseClientMock = vi.hoisted(() =>
+  vi.fn(() => publicSupabaseClientMock)
+);
 
-vi.mock("@/lib/supabase-admin", () => ({
-  createSupabaseAdminClient: createSupabaseAdminClientMock,
+vi.mock("@/lib/supabase", () => ({
+  createNoStoreSupabaseClient: createNoStoreSupabaseClientMock,
 }));
 
 import {
@@ -31,20 +36,28 @@ const publicRow = {
 
 describe("public-player projection", () => {
   beforeEach(() => {
-    createSupabaseAdminClientMock.mockReset();
+    publicSupabaseClientMock.from.mockReset();
+    createNoStoreSupabaseClientMock.mockClear();
   });
 
   it("queries the public view and maps only public-safe fields", async () => {
     const supabase = createSupabaseQueryMock({ data: [publicRow] });
-    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
 
     const players = await getPublicPlayers();
 
-    expect(supabase.from).toHaveBeenCalledWith("public_player_profiles");
+    expect(publicSupabaseClientMock.from).toHaveBeenCalledWith(
+      "public_player_profiles"
+    );
+    expect(createNoStoreSupabaseClientMock).toHaveBeenCalledOnce();
     expect(supabase.calls.find((call) => call.method === "select")?.args[0])
       .toBe(
         "id, display_name, player_name, country, region, current_elo, public_profile_enabled, discord_public_enabled, discord_username, has_avatar, avatar_url, created_at"
       );
+    expect(supabase.calls).toContainEqual({
+      method: "eq",
+      args: ["public_profile_enabled", true],
+    });
     expect(players).toEqual([
       {
         id: publicRow.id,
@@ -77,7 +90,7 @@ describe("public-player projection", () => {
         },
       ],
     });
-    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
 
     await expect(getPublicPlayers()).resolves.toMatchObject([
       {
@@ -88,8 +101,38 @@ describe("public-player projection", () => {
     ]);
   });
 
-  it("rejects an invalid player ID before creating a service-role client", async () => {
+  it("rejects an invalid player ID before creating a Supabase client", async () => {
     await expect(getPublicPlayerById("not-a-uuid")).resolves.toBeNull();
-    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+    expect(publicSupabaseClientMock.from).not.toHaveBeenCalled();
+    expect(createNoStoreSupabaseClientMock).not.toHaveBeenCalled();
+  });
+
+  it("loads a detail profile only through the filtered public view", async () => {
+    const supabase = createSupabaseQueryMock({ data: publicRow });
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
+
+    await expect(getPublicPlayerById(publicRow.id)).resolves.toMatchObject({
+      id: publicRow.id,
+      discordUsername: null,
+      avatarUrl: `/players/${publicRow.id}/avatar`,
+    });
+    expect(publicSupabaseClientMock.from).toHaveBeenCalledWith(
+      "public_player_profiles"
+    );
+    expect(supabase.calls).toContainEqual({
+      method: "eq",
+      args: ["id", publicRow.id],
+    });
+    expect(supabase.calls).toContainEqual({
+      method: "eq",
+      args: ["public_profile_enabled", true],
+    });
+  });
+
+  it("returns null when the filtered public view has no matching row", async () => {
+    const supabase = createSupabaseQueryMock({ data: null });
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
+
+    await expect(getPublicPlayerById(publicRow.id)).resolves.toBeNull();
   });
 });

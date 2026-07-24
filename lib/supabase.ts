@@ -8,3 +8,15 @@ export const supabase = createClient(
   supabaseUrl,
   supabasePublishableKey
 );
+
+export function createNoStoreSupabaseClient() {
+  return createClient(supabaseUrl, supabasePublishableKey, {
+    global: {
+      fetch: (input, init) =>
+        fetch(input, {
+          ...init,
+          cache: "no-store",
+        }),
+    },
+  });
+}
