@@ -128,9 +128,9 @@ export type GeneratedTournamentMatch = {
   playerOneScore: number | null;
   playerTwoScore: number | null;
   winnerRegistrationId: string | null;
-  officialResultSubmissionId: string | null;
-  officialResultDecidedBy: string | null;
-  officialResultDecidedAt: string | null;
+  officialResultSubmissionId?: string | null;
+  officialResultDecidedBy?: string | null;
+  officialResultDecidedAt?: string | null;
 };
 
 export type MatchResultSubmission = {
