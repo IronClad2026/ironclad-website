@@ -46,6 +46,22 @@ describe("Next.js proxy authorization", () => {
   });
 
   it.each([
+    "/api/match-proofs",
+    "/api/match-proofs/",
+    "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
+    "/api/match-proofs/22222222-2222-4222-8222-222222222222/report-group/11111111-1111-4111-8111-111111111111/replay",
+  ])(
+    "lets the exact self-authenticated proof route %s reach its own auth boundary",
+    async (pathname) => {
+      const protect = vi.fn(async () => undefined);
+
+      await proxyHandler({ protect }, { nextUrl: { pathname } });
+
+      expect(protect).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
     "/dashboard",
     "/profile",
     "/admin",
@@ -53,6 +69,10 @@ describe("Next.js proxy authorization", () => {
     "/unknown",
     "/players-private",
     "/aboutness",
+    "/api/match-proof",
+    "/api/match-proofs-private",
+    "/api/match-proofs.example",
+    "/api/match-proofsx/submission/id/replay",
   ])("calls auth.protect for %s", async (pathname) => {
     const protect = vi.fn(async () => undefined);
 
@@ -74,6 +94,13 @@ describe("Next.js proxy authorization", () => {
         config,
         nextConfig: {},
         url: "/api/private.json",
+      })
+    ).toBe(true);
+    expect(
+      doesProxyMatch({
+        config,
+        nextConfig: {},
+        url: "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
       })
     ).toBe(true);
     expect(

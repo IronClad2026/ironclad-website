@@ -140,7 +140,7 @@ export async function submitMatchResult(
     );
   }
 
-  const uploadRoot = `${matchId}/${userId}/${crypto.randomUUID()}`;
+  const uploadRoot = `${match.id}/${crypto.randomUUID()}`;
   const uploadedPaths: string[] = [];
 
   try {
@@ -151,7 +151,9 @@ export async function submitMatchResult(
         await uploadProof(
           supabase,
           replay,
-          `${uploadRoot}/game-${index + 1}.${getExtension(replay.name)}`,
+          `${uploadRoot}/game-${index + 1}-${crypto.randomUUID()}.${getExtension(
+            replay.name
+          )}`,
           uploadedPaths
         )
       );
@@ -187,7 +189,6 @@ export async function submitMatchResult(
       type: "match.result_submitted",
       title: "Match Result Submitted",
       message: `${submitterName} submitted a result for Match #${match.match_number}.`,
-      actorClerkUserId: userId,
       actorDisplayName: submitterName,
       tournamentId: match.tournament_id,
       tournamentTitle: match.tournament_title,
@@ -212,16 +213,22 @@ export async function submitMatchResult(
     );
   } catch (error) {
     if (uploadedPaths.length > 0) {
-      await supabase.storage.from(MATCH_PROOF_BUCKET).remove(uploadedPaths);
+      const { error: cleanupError } = await supabase.storage
+        .from(MATCH_PROOF_BUCKET)
+        .remove(uploadedPaths);
+      if (cleanupError) {
+        logMatchResultFailure("proof-cleanup", cleanupError);
+      }
     }
 
-    console.error("Match result submission failed:", error);
+    logMatchResultFailure("submit-match-result", error);
     return errorState(
-      getDatabaseMessage(error) ??
+      getDatabaseMessage(
+        error,
         "The match result could not be submitted. Please try again."
+      )
     );
   }
-
 }
 
 export async function submitNoShowReport(
@@ -268,7 +275,7 @@ export async function submitNoShowReport(
     .in("id", participantRegistrationIds);
 
   if (registrationError) {
-    console.error("No-show participant lookup failed:", registrationError);
+    logMatchResultFailure("load-no-show-participants", registrationError);
     return errorState("The match participants could not be verified.");
   }
 
@@ -307,10 +314,12 @@ export async function submitNoShowReport(
   );
 
   if (error) {
-    console.error("No-show report submission failed:", error);
+    logMatchResultFailure("submit-no-show-report", error);
     return errorState(
-      getDatabaseMessage(error) ??
+      getDatabaseMessage(
+        error,
         "The no-show report could not be submitted. Please try again."
+      )
     );
   }
 
@@ -333,7 +342,6 @@ export async function submitNoShowReport(
       type: "match.no_show_reported",
       title: "No-Show Reported",
       message: `${submitterName} reported you as a no-show for Match #${match.match_number}. Confirm or dispute before the deadline.`,
-      actorClerkUserId: userId,
       actorDisplayName: submitterName,
       tournamentId: match.tournament_id,
       tournamentTitle: match.tournament_title,
@@ -382,14 +390,18 @@ export async function confirmMatchResultReportGroup(
   });
 
   if (error) {
-    console.error("Match result confirmation failed:", error);
-    return errorState(error.message);
+    logMatchResultFailure("confirm-match-result", error);
+    return errorState(
+      getDatabaseMessage(
+        error,
+        "The match result could not be confirmed. Please try again."
+      )
+    );
   }
 
   await notifyNoShowReporterOfResponse(supabase, {
     reportGroupId,
     decision: "confirmed",
-    actorClerkUserId: userId,
   });
 
   revalidateTournamentPaths();
@@ -425,15 +437,19 @@ export async function disputeMatchResultReportGroup(
   });
 
   if (error) {
-    console.error("Match result dispute failed:", error);
-    return errorState(error.message);
+    logMatchResultFailure("dispute-match-result", error);
+    return errorState(
+      getDatabaseMessage(
+        error,
+        "The match result could not be disputed. Please try again."
+      )
+    );
   }
 
   await notifyAdminsOfMatchDispute(supabase, reportGroupId, userId);
   await notifyNoShowReporterOfResponse(supabase, {
     reportGroupId,
     decision: "disputed",
-    actorClerkUserId: userId,
   });
 
   revalidateTournamentPaths();
@@ -475,14 +491,18 @@ export async function reviewMatchResultReportGroup(
   });
 
   if (error) {
-    console.error("Report-group review failed:", error);
-    return errorState(error.message);
+    logMatchResultFailure("review-report-group", error);
+    return errorState(
+      getDatabaseMessage(
+        error,
+        "The match result review could not be saved. Please try again."
+      )
+    );
   }
 
   await notifyPlayersOfReportGroupReview(supabase, {
     reportGroupId,
     decision,
-    reviewedBy: admin.userId,
   });
 
   revalidateTournamentPaths();
@@ -541,7 +561,10 @@ export async function saveAdminMatchResult(
       .maybeSingle();
 
   if (activeReportGroupError) {
-    console.error("Active report-group lookup failed:", activeReportGroupError);
+    logMatchResultFailure(
+      "load-active-report-group",
+      activeReportGroupError
+    );
     return errorState("The active match report could not be checked.");
   }
 
@@ -560,14 +583,18 @@ export async function saveAdminMatchResult(
     );
 
     if (error) {
-      console.error("Admin report-group override failed:", error);
-      return errorState(error.message);
+      logMatchResultFailure("override-report-group", error);
+      return errorState(
+        getDatabaseMessage(
+          error,
+          "The official result could not be saved. Please try again."
+        )
+      );
     }
 
     await notifyPlayersOfReportGroupReview(supabase, {
       reportGroupId: activeReportGroup.id,
       decision: "approved",
-      reviewedBy: admin.userId,
     });
 
     revalidateTournamentPaths();
@@ -583,11 +610,16 @@ export async function saveAdminMatchResult(
   });
 
   if (error) {
-    console.error("Admin match result save failed:", error);
-    return errorState(error.message);
+    logMatchResultFailure("save-admin-match-result", error);
+    return errorState(
+      getDatabaseMessage(
+        error,
+        "The official result could not be saved. Please try again."
+      )
+    );
   }
 
-  await notifyPlayersOfAdminOfficialMatchResult(supabase, match, admin.userId);
+  await notifyPlayersOfAdminOfficialMatchResult(supabase, match);
 
   revalidateTournamentPaths();
   return successState("Official result saved and winner advanced.");
@@ -634,8 +666,13 @@ export async function editAdminMatchParticipants(
   });
 
   if (error) {
-    console.error("Admin match participant edit failed:", error);
-    return errorState(error.message);
+    logMatchResultFailure("edit-match-participants", error);
+    return errorState(
+      getDatabaseMessage(
+        error,
+        "The match participants could not be updated. Please try again."
+      )
+    );
   }
 
   revalidateTournamentPaths();
@@ -670,8 +707,13 @@ export async function resetAdminMatch(
   });
 
   if (error) {
-    console.error("Admin match reset failed:", error);
-    return errorState(error.message);
+    logMatchResultFailure("reset-match", error);
+    return errorState(
+      getDatabaseMessage(
+        error,
+        "The match could not be reset. Please try again."
+      )
+    );
   }
 
   revalidateTournamentPaths();
@@ -721,14 +763,18 @@ export async function reviewMatchResult(
   });
 
   if (error) {
-    console.error("Match result review failed:", error);
-    return errorState(error.message);
+    logMatchResultFailure("review-legacy-result", error);
+    return errorState(
+      getDatabaseMessage(
+        error,
+        "The match result review could not be saved. Please try again."
+      )
+    );
   }
 
   await notifyPlayersOfLegacyMatchResultReview(supabase, {
     submissionId,
     decision,
-    reviewedBy: admin.userId,
   });
 
   revalidateTournamentPaths();
@@ -770,7 +816,7 @@ async function loadMatchForMutation(
     .maybeSingle();
 
   if (error || !data) {
-    console.error("Tournament match lookup failed:", error);
+    logMatchResultFailure("load-match-for-mutation", error);
     return null;
   }
 
@@ -838,8 +884,7 @@ function ownedRegistrationName(match: MatchMutationRow, registrationId: string) 
 
 async function notifyPlayersOfAdminOfficialMatchResult(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
-  match: MatchMutationRow,
-  reviewedBy: string
+  match: MatchMutationRow
 ) {
   const registrationIds = [
     match.player_one_registration_id,
@@ -854,7 +899,7 @@ async function notifyPlayersOfAdminOfficialMatchResult(
     .in("id", registrationIds);
 
   if (error) {
-    console.error("Official result notification lookup failed:", error.message);
+    logMatchResultFailure("load-official-result-recipients", error);
     return;
   }
 
@@ -867,7 +912,6 @@ async function notifyPlayersOfAdminOfficialMatchResult(
       type: "match.result_approved",
       title: "Match Result Approved",
       message: "Your submitted match result has been approved.",
-      actorClerkUserId: reviewedBy,
       actorDisplayName: "IronClad Admin",
       tournamentId: match.tournament_id,
       tournamentTitle: match.tournament_title,
@@ -947,9 +991,12 @@ async function uploadProof(
     });
 
   if (error) throw error;
-  const storedPath = data.path;
-  uploadedPaths.push(storedPath);
-  return storedPath;
+  if (data.path !== path) {
+    throw new Error("Proof upload could not be verified.");
+  }
+
+  uploadedPaths.push(path);
+  return path;
 }
 
 async function verifyUploadedProofs(
@@ -972,9 +1019,7 @@ async function verifyUploadedProofs(
       });
 
     if (error || !data.some((object) => object.name === fileName)) {
-      throw new Error(
-        `Proof upload verification failed for ${path}.`
-      );
+      throw new Error("Proof upload verification failed.");
     }
   }
 }
@@ -1045,19 +1090,252 @@ function getExtension(fileName: string) {
   return fileName.split(".").pop()?.toLowerCase() ?? "";
 }
 
-function getDatabaseMessage(error: unknown) {
-  if (
-    typeof error === "object" &&
+function getDatabaseMessage(error: unknown, fallback: string) {
+  const message = getErrorMessage(error).toLowerCase();
+  const safeMessages: Array<[string, string]> = [
+    [
+      "duplicate replay storage paths",
+      "Each completed game requires a unique replay file.",
+    ],
+    [
+      "duplicate replay payloads",
+      "Each completed game requires a unique replay file.",
+    ],
+    [
+      "replay proof paths must be unique",
+      "Each completed game requires a unique replay file.",
+    ],
+    [
+      "each game requires a unique replay file",
+      "Each completed game requires a unique replay file.",
+    ],
+    [
+      "match_result_report_groups_one_active_per_match",
+      "This match already has a result awaiting confirmation or review.",
+    ],
+    [
+      "already has an active result report group",
+      "This match already has a result awaiting confirmation or review.",
+    ],
+    [
+      "already has an official result",
+      "This match already has an official result.",
+    ],
+    [
+      "legacy pending reports awaiting administrator review",
+      "This match has a result awaiting administrator review.",
+    ],
+    [
+      "confirmation window has expired",
+      "The confirmation window has expired.",
+    ],
+    [
+      "only the opponent can confirm",
+      "Only the opposing player can confirm this result.",
+    ],
+    [
+      "only the opponent can dispute",
+      "Only the opposing player can dispute this result.",
+    ],
+    [
+      "not awaiting confirmation",
+      "This result is no longer awaiting confirmation.",
+    ],
+    [
+      "can no longer be finalized",
+      "This result can no longer be finalized.",
+    ],
+    [
+      "player is not a participant",
+      "You can only manage results for matches you are participating in.",
+    ],
+    [
+      "submitting registration is not a participant",
+      "The submitting player is not assigned to this match.",
+    ],
+    [
+      "opponent registration is not a participant",
+      "The opposing player is not assigned to this match.",
+    ],
+    [
+      "both match participants must be assigned",
+      "Both match participants must be assigned before recording a result.",
+    ],
+    [
+      "winner must be a participant",
+      "Select one of the assigned players as the winner.",
+    ],
+    [
+      "only the opposing player can be reported as a no-show",
+      "Only the opposing player can be reported as a no-show.",
+    ],
+    [
+      "valid non-tied",
+      "Enter a valid non-tied final score.",
+    ],
+    [
+      "score does not satisfy the match format",
+      "The reported score does not satisfy this match's series format.",
+    ],
+    [
+      "series requires the winner to finish",
+      "The reported score does not satisfy this match's series format.",
+    ],
+    [
+      "this score requires exactly",
+      "The number of replay files does not match the reported score.",
+    ],
+    [
+      "this final score requires exactly",
+      "The number of replay files does not match the reported score.",
+    ],
+    [
+      "replay file count",
+      "The replay files could not be verified. Please upload them again.",
+    ],
+    [
+      "at least one replay file is required",
+      "This result cannot be finalized because its replay proof is missing.",
+    ],
+    [
+      "replay proof is required",
+      "Upload the match replay files before submitting.",
+    ],
+    [
+      "every replay proof must use a .rec file",
+      "Each replay must be a valid .rec file.",
+    ],
+    [
+      "replay content hashes must be",
+      "The replay files could not be verified. Please upload them again.",
+    ],
+    [
+      "replay hash audit data is incomplete",
+      "The replay files could not be verified. Please upload them again.",
+    ],
+    [
+      "no-show notes must be",
+      "No-show notes must be 2000 characters or fewer.",
+    ],
+    [
+      "no-show reports cannot be score-overridden",
+      "Reject the no-show report before entering a normal result.",
+    ],
+    [
+      "completed match reset requires",
+      "Use the match reset workflow before changing a completed result.",
+    ],
+    [
+      "round-robin participant edits require",
+      "Round-robin participants must be changed through the bracket workflow.",
+    ],
+    [
+      "participant edits are blocked after",
+      "Participants cannot be changed after the match has started or received a result.",
+    ],
+    [
+      "participant edits are blocked because this match has result activity",
+      "Participants cannot be changed while this match has result activity.",
+    ],
+    [
+      "participant edits are blocked because one of these players",
+      "Participants cannot be changed because a selected player is already assigned elsewhere in this bracket.",
+    ],
+    [
+      "player 1 must be an approved registration",
+      "Player 1 must be an approved registration in this bracket.",
+    ],
+    [
+      "player 2 must be an approved registration",
+      "Player 2 must be an approved registration in this bracket.",
+    ],
+    [
+      "a player cannot occupy both match slots",
+      "A player cannot occupy both match slots.",
+    ],
+    [
+      "reset blocked because the downstream match",
+      "This match cannot be reset while the downstream match has result activity.",
+    ],
+    [
+      "reset blocked because the downstream player slot",
+      "This match cannot be reset because its downstream player assignment has changed.",
+    ],
+    [
+      "completed downstream match prevents changing this winner",
+      "A completed downstream match prevents changing this winner.",
+    ],
+    [
+      "winner correction blocked because the downstream match already has",
+      "This result cannot be finalized because a downstream match already has result activity. An administrator must resolve it first.",
+    ],
+    [
+      "generated downstream match not found",
+      "The downstream match could not be found.",
+    ],
+    [
+      "generated next-round match not found",
+      "The next-round match could not be found.",
+    ],
+    [
+      "pending ungrouped game report not found",
+      "The pending legacy result could not be found.",
+    ],
+    [
+      "active confirmation report group",
+      "Review the active confirmation report instead of the legacy result.",
+    ],
+    [
+      "conflicting player reports must be resolved",
+      "Conflicting player reports must be resolved before approval.",
+    ],
+    [
+      "reported games do not yet form a complete series result",
+      "The reported games do not yet form a complete series result.",
+    ],
+    [
+      "an administrator message is required",
+      "Add an administrator message before saving this decision.",
+    ],
+    ["match result report group not found", "The match result could not be found."],
+    ["tournament match not found", "The tournament match could not be found."],
+    [
+      "tournament could not be resolved for this match",
+      "The tournament for this match could not be found.",
+    ],
+  ];
+
+  return (
+    safeMessages.find(([fragment]) => message.includes(fragment))?.[1] ??
+    fallback
+  );
+}
+
+function getErrorMessage(error: unknown) {
+  return typeof error === "object" &&
     error !== null &&
     "message" in error &&
     typeof error.message === "string"
-  ) {
-    if (error.message.toLowerCase().includes("duplicate")) {
-      return "This match already has a result awaiting confirmation or review.";
-    }
-    return error.message;
-  }
-  return null;
+    ? error.message
+    : "";
+}
+
+function logMatchResultFailure(operation: string, error: unknown) {
+  const candidateCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : "";
+  const code = /^[A-Z0-9]{3,10}$/.test(candidateCode)
+    ? candidateCode
+    : "OPERATION_FAILED";
+
+  console.error("Match result operation failed.", {
+    operation,
+    code,
+  });
 }
 
 function formatDeadline(value: string) {

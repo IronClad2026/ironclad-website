@@ -28,7 +28,6 @@ export default function MatchResultControls({
   participantsById,
   isAdmin,
   canSubmit,
-  viewerClerkUserId,
   submissions,
   reportGroups,
   participantOptions,
@@ -39,7 +38,6 @@ export default function MatchResultControls({
   participantsById: Map<string, TournamentParticipant>;
   isAdmin: boolean;
   canSubmit: boolean;
-  viewerClerkUserId: string | null;
   submissions: MatchResultSubmission[];
   reportGroups: MatchResultReportGroup[];
   participantOptions?: TournamentParticipant[];
@@ -96,13 +94,13 @@ export default function MatchResultControls({
               <p className="mt-2 break-all">
                 Submission ID:{" "}
                 <span className="font-mono text-slate-200">
-                  {match.officialResultSubmissionId ?? "Direct admin entry"}
+                  {match.officialResultReference ?? "Direct admin entry"}
                 </span>
               </p>
               <p className="break-all">
                 Decided by:{" "}
                 <span className="font-mono text-slate-200">
-                  {match.officialResultDecidedBy ?? "Legacy result"}
+                  {match.officialResultDecisionLabel ?? "Legacy result"}
                 </span>
               </p>
               <p>
@@ -152,8 +150,7 @@ export default function MatchResultControls({
             activeReportGroup &&
             match.status !== "completed" && (
               <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
-                {activeReportGroup.submittedByClerkUserId ===
-                viewerClerkUserId
+                {activeReportGroup.submittedByViewer
                   ? activeReportGroup.resultType === "no_show"
                     ? "Your no-show report is awaiting opponent confirmation."
                     : "Your result is awaiting opponent confirmation."
@@ -633,10 +630,10 @@ export function ReportGroupReview({
           </span>
         ) : reportGroup.replayProofs.length > 0 ? (
           reportGroup.replayProofs.map((proof) =>
-            proof.replayProofUrl ? (
+            proof.replayAccessHref ? (
               <a
-                key={`${proof.gameNumber}:${proof.replayStoragePath}`}
-                href={proof.replayProofUrl}
+                key={proof.id}
+                href={proof.replayAccessHref}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
@@ -645,7 +642,7 @@ export function ReportGroupReview({
               </a>
             ) : (
               <span
-                key={`${proof.gameNumber}:${proof.replayStoragePath}`}
+                key={proof.id}
                 className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200"
               >
                 Game {proof.gameNumber} replay unavailable
@@ -748,7 +745,7 @@ function SubmissionReview({
   const reporter = submission.submittedByRegistrationId
     ? participantsById.get(submission.submittedByRegistrationId)?.name ??
       "Participant"
-    : submission.submittedByClerkUserId;
+    : "Participant";
 
   return (
     <div className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-5">
@@ -792,13 +789,13 @@ function SubmissionReview({
           <p className="break-all">
             Submitted by:{" "}
             <span className="font-mono text-slate-200">
-              {submission.submittedByClerkUserId}
+              {reporter}
             </span>
           </p>
           <p className="break-all">
             Reviewed by:{" "}
             <span className="font-mono text-slate-200">
-              {submission.reviewedBy ?? "Pending"}
+              {submission.reviewerLabel ?? "Pending"}
             </span>
           </p>
           <p>
@@ -827,9 +824,9 @@ function SubmissionReview({
         </div>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        {submission.replayProofUrl && (
+        {submission.replayAccessHref && (
           <a
-            href={submission.replayProofUrl}
+            href={submission.replayAccessHref}
             target="_blank"
             rel="noreferrer"
             className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
@@ -837,9 +834,9 @@ function SubmissionReview({
             Download Replay
           </a>
         )}
-        {submission.screenshotProofUrl && (
+        {submission.screenshotAccessHref && (
           <a
-            href={submission.screenshotProofUrl}
+            href={submission.screenshotAccessHref}
             target="_blank"
             rel="noreferrer"
             className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
@@ -851,49 +848,17 @@ function SubmissionReview({
       {isAdmin && (
         <div className="mt-3 rounded-lg border border-white/10 bg-slate-950/60 p-3 text-[10px] leading-5 text-slate-500">
           <p>
-            Storage bucket:{" "}
-            <span className="font-mono text-slate-300">match-proofs</span>
+            Replay proof:{" "}
+            <span className="text-slate-300">
+              {submission.hasReplay ? "Available" : "Unavailable"}
+            </span>
           </p>
-          {submission.replayStoragePath && (
-            <p className="break-all">
-              Replay path:{" "}
-              <span className="font-mono text-slate-300">
-                {submission.replayStoragePath}
-              </span>
-              {" · "}
-              <span
-                className={
-                  submission.replayProofExists
-                    ? "text-emerald-300"
-                    : "text-red-300"
-                }
-              >
-                {submission.replayProofExists
-                  ? "Object verified"
-                  : "Object missing"}
-              </span>
-            </p>
-          )}
-          {submission.screenshotStoragePath && (
-            <p className="break-all">
-              Screenshot path:{" "}
-              <span className="font-mono text-slate-300">
-                {submission.screenshotStoragePath}
-              </span>
-              {" · "}
-              <span
-                className={
-                  submission.screenshotProofExists
-                    ? "text-emerald-300"
-                    : "text-red-300"
-                }
-              >
-                {submission.screenshotProofExists
-                  ? "Object verified"
-                  : "Object missing"}
-              </span>
-            </p>
-          )}
+          <p>
+            Screenshot proof:{" "}
+            <span className="text-slate-300">
+              {submission.hasScreenshot ? "Available" : "Unavailable"}
+            </span>
+          </p>
         </div>
       )}
 

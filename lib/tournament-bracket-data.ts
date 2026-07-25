@@ -53,8 +53,8 @@ type TournamentMatchAuditRow = {
 export type TournamentMatchAudit = Omit<TournamentMatchAuditRow, "id">;
 
 export type GeneratedBracketPageMatchRow = PublicTournamentMatchRow & {
-  official_result_submission_id?: string | null;
-  official_result_decided_by?: string | null;
+  official_result_reference?: string | null;
+  official_result_decision_label?: "Administrator" | "Legacy result";
   official_result_decided_at?: string | null;
 };
 
@@ -143,7 +143,9 @@ export async function loadAdminTournamentMatchAudit(
     .in("id", uniqueMatchIds);
 
   if (error) {
-    console.error("Tournament match audit load failed:", error.message);
+    console.error("Tournament match audit load failed.", {
+      operation: "load-tournament-match-audit",
+    });
     return auditByMatchId;
   }
 
@@ -216,7 +218,7 @@ export function mapGeneratedBrackets(
           (round.tournament_matches ?? []).map((match) => {
             const hasAdminAudit = Object.hasOwn(
               match,
-              "official_result_submission_id"
+              "official_result_reference"
             );
 
             return {
@@ -235,10 +237,10 @@ export function mapGeneratedBrackets(
               winnerRegistrationId: match.winner_registration_id,
               ...(hasAdminAudit
                 ? {
-                    officialResultSubmissionId:
-                      match.official_result_submission_id ?? null,
-                    officialResultDecidedBy:
-                      match.official_result_decided_by ?? null,
+                    officialResultReference:
+                      match.official_result_reference ?? null,
+                    officialResultDecisionLabel:
+                      match.official_result_decision_label ?? "Legacy result",
                     officialResultDecidedAt:
                       match.official_result_decided_at ?? null,
                   }
@@ -325,7 +327,14 @@ function mergeAdminTournamentMatchAudit(
         return audit
           ? {
               ...match,
-              ...audit,
+              official_result_reference:
+                audit.official_result_submission_id,
+              official_result_decision_label:
+                audit.official_result_decided_by
+                  ? ("Administrator" as const)
+                  : ("Legacy result" as const),
+              official_result_decided_at:
+                audit.official_result_decided_at,
             }
           : match;
       }),

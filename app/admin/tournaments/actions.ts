@@ -512,7 +512,7 @@ export async function deleteTournament(formData: FormData) {
   });
 
   if (error || !data) {
-    console.error("Tournament database deletion failed:", error);
+    logStorageCleanupFailure("delete-tournament-data", error);
     redirect(
       `/admin/tournaments?selected=${tournamentId}&notice=delete-failed`
     );
@@ -537,12 +537,12 @@ export async function deleteTournament(formData: FormData) {
       throw jobCleanupError;
     }
   } catch (storageError) {
-    console.error("Tournament storage cleanup failed:", storageError);
+    logStorageCleanupFailure("initial-cleanup", storageError);
     await supabase
       .from("tournament_deletion_jobs")
       .update({
         status: "storage_failed",
-        error_message: getErrorMessage(storageError),
+        error_message: "Tournament storage cleanup could not be verified.",
       })
       .eq("id", deletion.job_id);
     revalidateTournamentDeletionPaths();
@@ -575,7 +575,7 @@ export async function retryTournamentStorageCleanup(formData: FormData) {
     .maybeSingle();
 
   if (error || !job) {
-    console.error("Tournament cleanup job lookup failed:", error);
+    logStorageCleanupFailure("load-cleanup-job", error);
     redirect("/admin/tournaments?notice=cleanup-failed");
   }
 
@@ -592,10 +592,12 @@ export async function retryTournamentStorageCleanup(formData: FormData) {
 
     if (cleanupError) throw cleanupError;
   } catch (storageError) {
-    console.error("Tournament storage cleanup retry failed:", storageError);
+    logStorageCleanupFailure("retry-cleanup", storageError);
     await supabase
       .from("tournament_deletion_jobs")
-      .update({ error_message: getErrorMessage(storageError) })
+      .update({
+        error_message: "Tournament storage cleanup could not be verified.",
+      })
       .eq("id", job.id);
     redirect("/admin/tournaments?notice=cleanup-failed");
   }
@@ -650,9 +652,7 @@ async function removeStorageObjects(
 
     if (error) throw error;
     if (data.some((object) => object.name === fileName)) {
-      throw new Error(
-        `${bucket} object still exists after deletion: ${path}`
-      );
+      throw new Error("Storage cleanup verification failed.");
     }
   }
 }
@@ -665,8 +665,19 @@ function revalidateTournamentDeletionPaths() {
   revalidatePath("/tournaments");
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message.slice(0, 2000) : String(error);
+function logStorageCleanupFailure(operation: string, error: unknown) {
+  const candidateCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : "";
+  const code = /^[A-Z0-9]{3,10}$/.test(candidateCode)
+    ? candidateCode
+    : "CLEANUP_FAILED";
+
+  console.error("Tournament storage cleanup failed.", { operation, code });
 }
 
 function readBracket(

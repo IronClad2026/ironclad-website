@@ -1,8 +1,14 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
-import { isPublicPathname } from "@/lib/route-access";
+import {
+  isPublicPathname,
+  isSelfAuthenticatedApiPathname,
+} from "@/lib/route-access";
 
 export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicPathname(request.nextUrl.pathname)) {
+  if (
+    !isPublicPathname(request.nextUrl.pathname) &&
+    !isSelfAuthenticatedApiPathname(request.nextUrl.pathname)
+  ) {
     await auth.protect();
   }
 });

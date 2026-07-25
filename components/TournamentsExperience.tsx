@@ -1091,7 +1091,6 @@ function BracketMatchResultsWorkspace({
                               match={match}
                               participantsById={participantsById}
                               isAdmin={viewer.isAdmin}
-                              viewerClerkUserId={viewer.clerkUserId}
                               canSubmit={viewer.registrationIds.some(
                                 (registrationId) =>
                                   registrationId ===
@@ -2731,7 +2730,6 @@ function RegistrationGatePrompt({
 
 type TournamentViewer = {
   isAdmin: boolean;
-  clerkUserId: string | null;
   registrationIds: string[];
   registrations: TournamentViewerRegistration[];
 };

@@ -6,7 +6,6 @@ export type NotificationScope = "player" | "admin";
 
 export type InAppNotification = {
   id: string;
-  recipientClerkUserId: string | null;
   recipientRole: NotificationScope | null;
   type: string;
   title: string;
@@ -17,7 +16,6 @@ export type InAppNotification = {
   registrationId: string | null;
   matchId: string | null;
   reportGroupId: string | null;
-  metadata: Record<string, unknown>;
   readAt: string | null;
   createdAt: string;
   href: string | null;
@@ -48,7 +46,6 @@ export type NotificationCreateInput = {
 
 type NotificationRow = {
   id: string;
-  recipient_clerk_user_id: string | null;
   recipient_role: NotificationScope | null;
   type: string;
   title: string;
@@ -59,13 +56,12 @@ type NotificationRow = {
   registration_id: string | null;
   match_id: string | null;
   report_group_id: string | null;
-  metadata: Record<string, unknown> | null;
   read_at: string | null;
   created_at: string;
 };
 
 const NOTIFICATION_SELECT =
-  "id, recipient_clerk_user_id, recipient_role, type, title, message, actor_display_name, tournament_id, tournament_title, registration_id, match_id, report_group_id, metadata, read_at, created_at";
+  "id, recipient_role, type, title, message, actor_display_name, tournament_id, tournament_title, registration_id, match_id, report_group_id, read_at, created_at";
 
 export async function createInAppNotification(
   input: NotificationCreateInput
@@ -95,7 +91,7 @@ export async function createInAppNotification(
   });
 
   if (error) {
-    console.error("Notification creation failed:", error.message);
+    logNotificationFailure("create-one", error);
     return false;
   }
 
@@ -133,7 +129,7 @@ export async function createInAppNotifications(
   const { error } = await supabase.from("notifications").insert(rows);
 
   if (error) {
-    console.error("Bulk notification creation failed:", error.message);
+    logNotificationFailure("create-many", error);
     return false;
   }
 
@@ -164,13 +160,16 @@ export async function loadPlayerNotifications(
   ]);
 
   if (notificationResult.error || totalResult.error || unreadResult.error) {
-    const error =
-      notificationResult.error?.message ??
-      totalResult.error?.message ??
-      unreadResult.error?.message ??
-      "Notifications could not be loaded.";
-    console.error("Player notifications load failed:", error);
-    return { notifications: [], totalCount: 0, unreadCount: 0, error };
+    logNotificationFailure(
+      "load-player",
+      notificationResult.error ?? totalResult.error ?? unreadResult.error
+    );
+    return {
+      notifications: [],
+      totalCount: 0,
+      unreadCount: 0,
+      error: "Notifications could not be loaded.",
+    };
   }
 
   return {
@@ -206,13 +205,16 @@ export async function loadAdminNotifications(
   ]);
 
   if (notificationResult.error || totalResult.error || unreadResult.error) {
-    const error =
-      notificationResult.error?.message ??
-      totalResult.error?.message ??
-      unreadResult.error?.message ??
-      "Notifications could not be loaded.";
-    console.error("Admin notifications load failed:", error);
-    return { notifications: [], totalCount: 0, unreadCount: 0, error };
+    logNotificationFailure(
+      "load-admin",
+      notificationResult.error ?? totalResult.error ?? unreadResult.error
+    );
+    return {
+      notifications: [],
+      totalCount: 0,
+      unreadCount: 0,
+      error: "Notifications could not be loaded.",
+    };
   }
 
   return {
@@ -250,7 +252,7 @@ export async function markNotificationRead({
   const { error } = await query;
 
   if (error) {
-    console.error("Notification mark-read failed:", error.message);
+    logNotificationFailure("mark-one-read", error);
     return false;
   }
 
@@ -288,7 +290,7 @@ export async function markNotificationsRead({
   const { error } = await query;
 
   if (error) {
-    console.error("Notification mark-all-read failed:", error.message);
+    logNotificationFailure("mark-many-read", error);
     return false;
   }
 
@@ -317,7 +319,7 @@ export async function markAllNotificationsRead({
   const { error } = await query;
 
   if (error) {
-    console.error("Notification mark-all-read failed:", error.message);
+    logNotificationFailure("mark-all-read", error);
     return false;
   }
 
@@ -351,7 +353,7 @@ export async function deleteNotifications({
   const { error } = await query;
 
   if (error) {
-    console.error("Notification delete failed:", error.message);
+    logNotificationFailure("delete", error);
     return false;
   }
 
@@ -364,7 +366,6 @@ function mapNotification(
 ): InAppNotification {
   return {
     id: row.id,
-    recipientClerkUserId: row.recipient_clerk_user_id,
     recipientRole: row.recipient_role,
     type: row.type,
     title: row.title,
@@ -375,11 +376,25 @@ function mapNotification(
     registrationId: row.registration_id,
     matchId: row.match_id,
     reportGroupId: row.report_group_id,
-    metadata: row.metadata ?? {},
     readAt: row.read_at,
     createdAt: row.created_at,
     href: buildNotificationHref(row, scope),
   };
+}
+
+function logNotificationFailure(operation: string, error: unknown) {
+  const candidateCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : "";
+  const code = /^[A-Z0-9]{3,10}$/.test(candidateCode)
+    ? candidateCode
+    : "NOTIFY_FAILED";
+
+  console.error("Notification operation failed.", { operation, code });
 }
 
 function buildNotificationHref(

@@ -114,7 +114,7 @@ export type TournamentParticipant = {
   bracketName: string;
 };
 
-export type GeneratedTournamentMatch = {
+export type PublicTournamentMatch = {
   id: string;
   seriesBestOf: number;
   roundName: string;
@@ -128,8 +128,17 @@ export type GeneratedTournamentMatch = {
   playerOneScore: number | null;
   playerTwoScore: number | null;
   winnerRegistrationId: string | null;
-  officialResultSubmissionId?: string | null;
-  officialResultDecidedBy?: string | null;
+};
+
+export type AdminTournamentMatchPresentation = PublicTournamentMatch & {
+  officialResultReference: string | null;
+  officialResultDecisionLabel: "Administrator" | "Legacy result";
+  officialResultDecidedAt: string | null;
+};
+
+export type GeneratedTournamentMatch = PublicTournamentMatch & {
+  officialResultReference?: string | null;
+  officialResultDecisionLabel?: "Administrator" | "Legacy result";
   officialResultDecidedAt?: string | null;
 };
 
@@ -138,17 +147,15 @@ export type MatchResultSubmission = {
   submissionNumber: number;
   gameNumber: number;
   matchId: string;
-  submittedByClerkUserId: string;
   submittedByRegistrationId: string | null;
+  submittedByViewer: boolean;
   claimedWinnerRegistrationId: string;
   playerOneScore: number;
   playerTwoScore: number;
-  replayStoragePath: string | null;
-  screenshotStoragePath: string | null;
-  replayProofUrl: string | null;
-  screenshotProofUrl: string | null;
-  replayProofExists: boolean;
-  screenshotProofExists: boolean;
+  hasReplay: boolean;
+  hasScreenshot: boolean;
+  replayAccessHref: string | null;
+  screenshotAccessHref: string | null;
   notes: string | null;
   status:
     | "pending"
@@ -156,10 +163,13 @@ export type MatchResultSubmission = {
     | "rejected"
     | "resubmission_requested";
   reviewNotes: string | null;
-  reviewedBy: string | null;
+  reviewerLabel: "Administrator" | null;
   reviewedAt: string | null;
   createdAt: string;
 };
+
+export type ParticipantMatchResultSubmission = MatchResultSubmission;
+export type AdminMatchResultSubmissionPresentation = MatchResultSubmission;
 
 export type MatchResultReportGroupStatus =
   | "pending_confirmation"
@@ -186,27 +196,26 @@ export type MatchResultReportGroup = {
   matchId: string;
   tournamentId: string;
   resultType: MatchResultReportGroupResultType;
-  submittedByClerkUserId: string;
   submittedByRegistrationId: string;
+  submittedByViewer: boolean;
   opponentRegistrationId: string;
   winnerRegistrationId: string;
   playerOneScore: number;
   playerTwoScore: number;
-  replayStoragePath: string | null;
-  replayProofUrl: string | null;
-  replayProofExists: boolean;
+  hasReplay: boolean;
+  replayAccessHref: string | null;
   replayProofs: {
+    id: string;
     gameNumber: number;
-    replayStoragePath: string;
-    replayProofUrl: string | null;
-    replayProofExists: boolean;
+    proofAvailable: boolean;
+    replayAccessHref: string | null;
   }[];
   status: MatchResultReportGroupStatus;
   confirmationDeadlineAt: string;
   confirmedAt: string | null;
   disputedAt: string | null;
   disputeNotes: string | null;
-  reviewedBy: string | null;
+  reviewerLabel: "Administrator" | null;
   reviewedAt: string | null;
   reviewNotes: string | null;
   noShowReportedByRegistrationId: string | null;
@@ -214,11 +223,14 @@ export type MatchResultReportGroup = {
   noShowStatus: MatchResultReportGroupNoShowStatus | null;
   noShowNote: string | null;
   noShowResolvedAt: string | null;
-  noShowResolvedBy: string | null;
+  noShowResolverLabel: "Administrator" | null;
   finalizedAt: string | null;
   finalizedSource: string | null;
   createdAt: string;
 };
+
+export type ParticipantMatchResultReportGroup = MatchResultReportGroup;
+export type AdminMatchResultReportGroupPresentation = MatchResultReportGroup;
 
 export type TournamentStanding = {
   registrationId: string;
