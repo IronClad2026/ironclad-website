@@ -93,7 +93,7 @@ export async function dismissDashboardNotifications(
 
   const lookupError = submissionResult.error ?? reportGroupResult.error;
   if (lookupError) {
-    console.error("Notification lookup failed:", lookupError);
+    logDashboardResultFailure("load-notifications", lookupError);
     return errorResult("Your notifications could not be updated.");
   }
 
@@ -171,7 +171,7 @@ export async function dismissDashboardNotifications(
   const dismissalError =
     submissionDismissalResult.error ?? groupDismissalResult.error;
   if (dismissalError) {
-    console.error("Notification dismissal failed:", dismissalError);
+    logDashboardResultFailure("dismiss-notifications", dismissalError);
     return errorResult("Your notifications could not be deleted.");
   }
 
@@ -212,14 +212,18 @@ export async function confirmDashboardMatchResult(
   });
 
   if (error) {
-    console.error("Dashboard match result confirmation failed:", error);
-    return actionErrorResult(error.message);
+    logDashboardResultFailure("confirm-match-result", error);
+    return actionErrorResult(
+      getDashboardResultMessage(
+        error,
+        "The match result could not be confirmed. Please try again."
+      )
+    );
   }
 
   await notifyNoShowReporterOfResponse(supabase, {
     reportGroupId,
     decision: "confirmed",
-    actorClerkUserId: userId,
   });
 
   revalidateDashboardPaths();
@@ -257,15 +261,19 @@ export async function disputeDashboardMatchResult(
   });
 
   if (error) {
-    console.error("Dashboard match result dispute failed:", error);
-    return actionErrorResult(error.message);
+    logDashboardResultFailure("dispute-match-result", error);
+    return actionErrorResult(
+      getDashboardResultMessage(
+        error,
+        "The match result could not be disputed. Please try again."
+      )
+    );
   }
 
   await notifyAdminsOfMatchDispute(supabase, reportGroupId, userId);
   await notifyNoShowReporterOfResponse(supabase, {
     reportGroupId,
     decision: "disputed",
-    actorClerkUserId: userId,
   });
 
   revalidateDashboardPaths();
@@ -337,7 +345,10 @@ async function loadViewerMatchIds(
     .eq("clerk_user_id", userId);
 
   if (registrationError) {
-    console.error("Notification registration lookup failed:", registrationError);
+    logDashboardResultFailure(
+      "load-notification-registrations",
+      registrationError
+    );
     return null;
   }
 
@@ -362,7 +373,7 @@ async function loadViewerMatchIds(
 
   const matchError = playerOneMatches.error ?? playerTwoMatches.error;
   if (matchError) {
-    console.error("Notification match lookup failed:", matchError);
+    logDashboardResultFailure("load-notification-matches", matchError);
     return null;
   }
 
@@ -458,7 +469,10 @@ async function filterAlreadyDismissed(
 
   const dismissalError = submissionDismissals.error ?? groupDismissals.error;
   if (dismissalError) {
-    console.error("Existing notification dismissal lookup failed:", dismissalError);
+    logDashboardResultFailure(
+      "load-existing-notification-dismissals",
+      dismissalError
+    );
     return null;
   }
 
@@ -551,4 +565,108 @@ function actionErrorResult(message: string): NotificationActionResult {
     status: "error",
     message,
   };
+}
+
+function getDashboardResultMessage(error: unknown, fallback: string) {
+  const message =
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+      ? error.message.toLowerCase()
+      : "";
+  const safeMessages: Array<[string, string]> = [
+    [
+      "confirmation window has expired",
+      "The confirmation window has expired.",
+    ],
+    [
+      "only the opponent can confirm",
+      "Only the opposing player can confirm this result.",
+    ],
+    [
+      "only the opponent can dispute",
+      "Only the opposing player can dispute this result.",
+    ],
+    [
+      "not awaiting confirmation",
+      "This result is no longer awaiting confirmation.",
+    ],
+    [
+      "can no longer be finalized",
+      "This result can no longer be finalized.",
+    ],
+    [
+      "already has an official result",
+      "This match already has an official result.",
+    ],
+    [
+      "player is not a participant",
+      "You can only manage results for matches you are participating in.",
+    ],
+    [
+      "both match participants must be assigned",
+      "Both match participants must be assigned before recording a result.",
+    ],
+    [
+      "score does not satisfy the match format",
+      "The reported score does not satisfy this match's series format.",
+    ],
+    [
+      "this final score requires exactly",
+      "The number of replay files does not match the reported score.",
+    ],
+    [
+      "at least one replay file is required",
+      "This result cannot be finalized because its replay proof is missing.",
+    ],
+    [
+      "duplicate replay storage paths",
+      "Each completed game requires a unique replay file.",
+    ],
+    [
+      "duplicate replay payloads",
+      "Each completed game requires a unique replay file.",
+    ],
+    [
+      "replay hash audit data is incomplete",
+      "The replay files could not be verified.",
+    ],
+    [
+      "completed downstream match prevents changing this winner",
+      "A completed downstream match prevents changing this winner.",
+    ],
+    [
+      "winner correction blocked because the downstream match already has",
+      "This result cannot be finalized because a downstream match already has result activity. An administrator must resolve it first.",
+    ],
+    [
+      "match result report group not found",
+      "The match result could not be found.",
+    ],
+    ["tournament match not found", "The tournament match could not be found."],
+  ];
+
+  return (
+    safeMessages.find(([fragment]) => message.includes(fragment))?.[1] ??
+    fallback
+  );
+}
+
+function logDashboardResultFailure(operation: string, error: unknown) {
+  const candidateCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : "";
+  const code = /^[A-Z0-9]{3,10}$/.test(candidateCode)
+    ? candidateCode
+    : "RESULT_FAILED";
+
+  console.error("Dashboard match result operation failed.", {
+    operation,
+    code,
+  });
 }

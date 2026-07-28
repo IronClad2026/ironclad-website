@@ -64,7 +64,6 @@ export async function notifyAdminsOfMatchDispute(
     message: `${actorName} opened a ${
       isNoShow ? "no-show dispute" : "dispute"
     } for Match #${context.matchNumber ?? "?"}.`,
-    actorClerkUserId,
     actorDisplayName: actorName,
     tournamentId: context.tournamentId,
     tournamentTitle: context.tournamentTitle,
@@ -85,11 +84,9 @@ export async function notifyNoShowReporterOfResponse(
   {
     reportGroupId,
     decision,
-    actorClerkUserId,
   }: {
     reportGroupId: string;
     decision: "confirmed" | "disputed";
-    actorClerkUserId: string;
   }
 ) {
   const context = await loadReportGroupNotificationContext(
@@ -120,7 +117,6 @@ export async function notifyNoShowReporterOfResponse(
       decision === "confirmed"
         ? `Your no-show report for Match #${context.matchNumber ?? "?"} was confirmed.`
         : `Your no-show report for Match #${context.matchNumber ?? "?"} was disputed and now requires administrator review.`,
-    actorClerkUserId,
     actorDisplayName: context.opponentName,
     tournamentId: context.tournamentId,
     tournamentTitle: context.tournamentTitle,
@@ -141,11 +137,9 @@ export async function notifyPlayersOfReportGroupReview(
   {
     reportGroupId,
     decision,
-    reviewedBy,
   }: {
     reportGroupId: string;
     decision: string;
-    reviewedBy: string;
   }
 ) {
   const context = await loadReportGroupNotificationContext(
@@ -166,7 +160,6 @@ export async function notifyPlayersOfReportGroupReview(
     buildMatchReviewNotification({
       recipientClerkUserId,
       decision,
-      reviewedBy,
       tournamentId: context.tournamentId,
       tournamentTitle: context.tournamentTitle,
       matchId: context.matchId,
@@ -192,11 +185,9 @@ export async function notifyPlayersOfLegacyMatchResultReview(
   {
     submissionId,
     decision,
-    reviewedBy,
   }: {
     submissionId: string;
     decision: string;
-    reviewedBy: string;
   }
 ) {
   const context = await loadLegacySubmissionNotificationContext(
@@ -210,7 +201,6 @@ export async function notifyPlayersOfLegacyMatchResultReview(
     buildMatchReviewNotification({
       recipientClerkUserId: context.submittedByClerkUserId,
       decision,
-      reviewedBy,
       tournamentId: context.tournamentId,
       tournamentTitle: context.tournamentTitle,
       matchId: context.matchId,
@@ -237,7 +227,7 @@ async function loadReportGroupNotificationContext(
     .maybeSingle();
 
   if (error || !reportGroup) {
-    console.error("Report-group notification lookup failed:", error?.message);
+    logNotificationFailure("report-group-context", error);
     return null;
   }
 
@@ -282,7 +272,7 @@ async function loadLegacySubmissionNotificationContext(
     .maybeSingle();
 
   if (error || !submission) {
-    console.error("Legacy submission notification lookup failed:", error?.message);
+    logNotificationFailure("legacy-submission-context", error);
     return null;
   }
 
@@ -322,7 +312,7 @@ async function loadTournamentTitle(
     .maybeSingle();
 
   if (error) {
-    console.error("Notification tournament lookup failed:", error.message);
+    logNotificationFailure("tournament-context", error);
     return null;
   }
 
@@ -339,7 +329,7 @@ async function loadMatchLabel(supabase: SupabaseAdminClient, matchId: string) {
     .maybeSingle();
 
   if (error || !data) {
-    console.error("Notification match lookup failed:", error?.message);
+    logNotificationFailure("match-context", error);
     return null;
   }
 
@@ -395,7 +385,7 @@ async function loadRegistrationNames(
     .in("id", ids);
 
   if (error) {
-    console.error("Notification registration lookup failed:", error.message);
+    logNotificationFailure("registration-context", error);
     return registrations;
   }
 
@@ -412,7 +402,6 @@ async function loadRegistrationNames(
 function buildMatchReviewNotification({
   recipientClerkUserId,
   decision,
-  reviewedBy,
   tournamentId,
   tournamentTitle,
   matchId,
@@ -422,7 +411,6 @@ function buildMatchReviewNotification({
 }: {
   recipientClerkUserId: string;
   decision: string;
-  reviewedBy: string;
   tournamentId: string | null;
   tournamentTitle: string | null;
   matchId: string;
@@ -464,7 +452,6 @@ function buildMatchReviewNotification({
       : approved
         ? "Your submitted match result has been approved."
         : "Your submitted match result requires further review.",
-    actorClerkUserId: reviewedBy,
     actorDisplayName: "IronClad Admin",
     tournamentId,
     tournamentTitle,
@@ -475,6 +462,21 @@ function buildMatchReviewNotification({
       decision,
     },
   };
+}
+
+function logNotificationFailure(operation: string, error: unknown) {
+  const candidateCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : "";
+  const code = /^[A-Z0-9]{3,10}$/.test(candidateCode)
+    ? candidateCode
+    : "NOTIFY_FAILED";
+
+  console.error("Notification operation failed.", { operation, code });
 }
 
 function first<T>(value: T | T[] | null | undefined): T | undefined {

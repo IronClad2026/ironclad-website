@@ -191,10 +191,7 @@ export default async function AdminTournamentsPage({
         );
 
         if (previewError) {
-          logSupabaseError(
-            "Tournament deletion preview load failed:",
-            previewError
-          );
+          logCleanupLoadFailure("deletion-preview", previewError);
         }
 
         return [
@@ -206,7 +203,7 @@ export default async function AdminTournamentsPage({
     supabase
       .from("tournament_deletion_jobs")
       .select(
-        "id, tournament_title, proof_paths, banner_paths, error_message, created_at"
+        "id, tournament_title, proof_paths, banner_paths, created_at"
       )
       .eq("status", "storage_failed")
       .order("created_at", { ascending: true }),
@@ -215,10 +212,7 @@ export default async function AdminTournamentsPage({
   const pendingCleanupJobs = pendingCleanupResult.data ?? [];
 
   if (pendingCleanupResult.error) {
-    logSupabaseError(
-      "Tournament cleanup jobs load failed:",
-      pendingCleanupResult.error
-    );
+    logCleanupLoadFailure("pending-cleanup-jobs", pendingCleanupResult.error);
   }
   const generatedByBracket = new Map(
     (
@@ -401,6 +395,24 @@ export default async function AdminTournamentsPage({
       </section>
     </main>
   );
+}
+
+function logCleanupLoadFailure(operation: string, error: unknown) {
+  const candidateCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : "";
+  const code = /^[A-Z0-9]{3,10}$/.test(candidateCode)
+    ? candidateCode
+    : "CLEANUP_FAILED";
+
+  console.error("Tournament storage cleanup load failed.", {
+    operation,
+    code,
+  });
 }
 
 function TournamentForm({

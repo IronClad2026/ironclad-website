@@ -5,6 +5,11 @@ import {
   playerIdentity,
 } from "@/tests/fixtures/auth";
 import { createSupabaseQueryMock } from "@/tests/helpers/supabase-query-mock";
+import {
+  expectExactShape,
+  expectNoSensitiveBrowserData,
+  type ExactShape,
+} from "@/tests/helpers/privacy-assertions";
 import type { TournamentRow } from "@/lib/tournaments";
 
 const authMock = vi.hoisted(() => vi.fn());
@@ -78,6 +83,57 @@ const tournamentRows = [
   },
 ] as TournamentRow[];
 
+const publicMatchShape = {
+  object: {
+    id: "value",
+    seriesBestOf: "value",
+    roundName: "value",
+    roundNumber: "value",
+    matchNumber: "value",
+    status: "value",
+    playerOneRegistrationId: "value",
+    playerTwoRegistrationId: "value",
+    playerOneSlot: "value",
+    playerTwoSlot: "value",
+    playerOneScore: "value",
+    playerTwoScore: "value",
+    winnerRegistrationId: "value",
+  },
+} satisfies ExactShape;
+
+const adminMatchPresentationShape = {
+  object: {
+    ...publicMatchShape.object,
+    officialResultReference: "value",
+    officialResultDecisionLabel: "value",
+    officialResultDecidedAt: "value",
+  },
+} satisfies ExactShape;
+
+const standingShape = {
+  object: {
+    registrationId: "value",
+    wins: "value",
+    losses: "value",
+    points: "value",
+    rank: "value",
+  },
+} satisfies ExactShape;
+
+function bracketShape(matchShape: ExactShape): ExactShape {
+  return {
+    object: {
+      id: "value",
+      tournamentBracketId: "value",
+      format: "value",
+      slotCount: "value",
+      generatedAt: "value",
+      matches: { array: matchShape },
+      standings: { array: standingShape },
+    },
+  };
+}
+
 describe("public tournament bracket data boundary", () => {
   beforeEach(() => {
     authMock.mockReset();
@@ -126,6 +182,14 @@ describe("public tournament bracket data boundary", () => {
         },
       ],
     });
+    expectExactShape(
+      mapped.get("tournament-1")?.[0],
+      bracketShape(publicMatchShape)
+    );
+    expectNoSensitiveBrowserData(mapped.get("tournament-1")?.[0], [
+      "submission_must_not_leak",
+      "synthetic-private-admin",
+    ]);
     expect(publicPayload).not.toContain("generated_by");
     expect(publicPayload).not.toContain("officialResult");
     expect(publicPayload).not.toContain("submission_must_not_leak");
@@ -149,7 +213,7 @@ describe("public tournament bracket data boundary", () => {
     }
   );
 
-  it("loads and serializes audit identifiers only for a re-authorized administrator", async () => {
+  it("loads raw audit server-side but serializes only a safe admin presentation", async () => {
     const publicQuery = createSupabaseQueryMock({
       data: [generatedBracketRow],
     });
@@ -186,10 +250,17 @@ describe("public tournament bracket data boundary", () => {
       args: ["id", ["match-1"]],
     });
     expect(adminMatch).toMatchObject({
-      officialResultSubmissionId: "submission_admin_only",
-      officialResultDecidedBy: "synthetic-authorized-admin",
+      officialResultReference: "submission_admin_only",
+      officialResultDecisionLabel: "Administrator",
       officialResultDecidedAt: "2026-07-03T00:00:00.000Z",
     });
+    expectExactShape(adminMatch, adminMatchPresentationShape);
+    expectNoSensitiveBrowserData(adminMatch, [
+      "synthetic-authorized-admin",
+    ]);
+    expect(JSON.stringify(adminMatch)).not.toContain(
+      "synthetic-authorized-admin"
+    );
   });
 
   it("fails closed to the public projection when the admin audit query fails", async () => {
@@ -218,8 +289,10 @@ describe("public tournament bracket data boundary", () => {
     expect(payload).not.toContain("officialResult");
     expect(payload).not.toContain("submission_must_not_leak");
     expect(consoleError).toHaveBeenCalledWith(
-      "Tournament match audit load failed:",
-      "audit unavailable"
+      "Tournament match audit load failed.",
+      {
+        operation: "load-tournament-match-audit",
+      }
     );
   });
 

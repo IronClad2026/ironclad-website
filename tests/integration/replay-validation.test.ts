@@ -59,7 +59,11 @@ function createQuery(result: { data: unknown; error: unknown }) {
   return query;
 }
 
-function createMatchClient() {
+function createMatchClient({
+  listError = null,
+}: {
+  listError?: { code: string; message: string } | null;
+} = {}) {
   const match = {
     id: "match-1",
     generated_bracket_id: "generated-bracket-1",
@@ -91,12 +95,15 @@ function createMatchClient() {
   }));
   const list = vi.fn(
     async (_folder: string, options: { search: string }) => ({
-      data: [{ name: options.search }],
-      error: null,
+      data: listError ? [] : [{ name: options.search }],
+      error: listError,
     })
   );
   const remove = vi.fn(async () => ({ data: [], error: null }));
-  const storageBucket = { list, remove, upload };
+  const createSignedUrl = vi.fn(() => {
+    throw new Error("Signed proof URLs must never be created.");
+  });
+  const storageBucket = { createSignedUrl, list, remove, upload };
   const from = vi.fn((table: string) => {
     if (table === "tournament_matches") {
       return matchQuery;
@@ -126,6 +133,7 @@ function createMatchClient() {
     },
     from,
     list,
+    remove,
     rpc,
     upload,
   };
@@ -234,19 +242,41 @@ describe("replay validation through submitMatchResult", () => {
     createSupabaseAdminClientMock.mockReturnValue(matchClient.client);
     createInAppNotificationMock.mockResolvedValue(true);
 
-    await expect(
-      submitMatchResult(
-        idleState,
-        createMatchResultFormData({
-          replays: [
-            createReplayFile({ contents: "game-one", name: "game-one.REC" }),
-            createReplayFile({ contents: "game-two", name: "game-two.rec" }),
-          ],
-        })
-      )
-    ).resolves.toMatchObject({
+    const result = await submitMatchResult(
+      idleState,
+      createMatchResultFormData({
+        replays: [
+          createReplayFile({
+            contents: "game-one",
+            name: "user_test_player-original-one.REC",
+          }),
+          createReplayFile({
+            contents: "game-two",
+            name: "user_test_player-original-two.rec",
+          }),
+        ],
+      })
+    );
+
+    expect(result).toMatchObject({
       status: "success",
     });
+
+    const uploadedPaths = matchClient.upload.mock.calls.map(
+      ([path]) => path as string
+    );
+    expect(uploadedPaths).toHaveLength(2);
+    expect(uploadedPaths[0]).toMatch(
+      /^match-1\/[0-9a-f-]{36}\/game-1-[0-9a-f-]{36}\.rec$/
+    );
+    expect(uploadedPaths[1]).toMatch(
+      /^match-1\/[0-9a-f-]{36}\/game-2-[0-9a-f-]{36}\.rec$/
+    );
+    expect(uploadedPaths[0].split("/")[1]).toBe(
+      uploadedPaths[1].split("/")[1]
+    );
+    expect(uploadedPaths.join(" ")).not.toContain(playerIdentity.userId);
+    expect(uploadedPaths.join(" ")).not.toContain("original");
 
     expect(matchClient.upload).toHaveBeenCalledTimes(2);
     expect(matchClient.list).toHaveBeenCalledTimes(2);
@@ -257,8 +287,45 @@ describe("replay validation through submitMatchResult", () => {
           expect.stringMatching(/^[0-9a-f]{64}$/),
           expect.stringMatching(/^[0-9a-f]{64}$/),
         ],
-        p_replay_storage_paths: expect.any(Array),
+        p_replay_storage_paths: uploadedPaths,
       })
     );
+  });
+
+  it("does not expose an identity-bearing proof path when verification fails", async () => {
+    const secretPath =
+      "match-1/user_secret_clerk/game-1-private-object.rec";
+    const matchClient = createMatchClient({
+      listError: {
+        code: "storage_failure",
+        message: `Object missing at ${secretPath}`,
+      },
+    });
+    const consoleError = vi.mocked(console.error);
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(matchClient.client);
+
+    const result = await submitMatchResult(
+      idleState,
+      createMatchResultFormData({
+        replays: [
+          createReplayFile({ contents: "game-one", name: "game-one.rec" }),
+          createReplayFile({ contents: "game-two", name: "game-two.rec" }),
+        ],
+      })
+    );
+
+    const visibleOutput = JSON.stringify({
+      result,
+      logs: consoleError.mock.calls,
+    });
+    expect(result).toEqual({
+      status: "error",
+      message: "The match result could not be submitted. Please try again.",
+    });
+    expect(matchClient.rpc).not.toHaveBeenCalled();
+    expect(matchClient.remove).toHaveBeenCalledOnce();
+    expect(visibleOutput).not.toContain(secretPath);
+    expect(visibleOutput).not.toContain("user_secret_clerk");
   });
 });

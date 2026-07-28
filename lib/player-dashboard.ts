@@ -139,13 +139,11 @@ type ReportGroupRow = {
   match_id: string;
   tournament_id: string;
   result_type: "normal" | "no_show" | null;
-  submitted_by_clerk_user_id: string;
   submitted_by_registration_id: string;
   opponent_registration_id: string;
   winner_registration_id: string;
   player_one_score: number;
   player_two_score: number;
-  replay_storage_path: string | null;
   status: DashboardNotification["status"];
   confirmation_deadline_at: string;
   confirmed_at: string | null;
@@ -224,7 +222,7 @@ export async function loadPlayerCareerDashboard(
     .eq("clerk_user_id", clerkUserId);
 
   if (registrationError) {
-    console.error("Dashboard career registrations load error:", registrationError);
+    logDashboardCareerFailure("load-registrations");
     return {
       ...emptyCareer,
       error: "Your competitive history could not be loaded.",
@@ -269,10 +267,7 @@ export async function loadPlayerCareerDashboard(
   ]);
 
   if (playerOneMatchesResult.error || playerTwoMatchesResult.error) {
-    console.error(
-      "Dashboard career matches load error:",
-      playerOneMatchesResult.error ?? playerTwoMatchesResult.error
-    );
+    logDashboardCareerFailure("load-matches");
     return {
       ...emptyCareer,
       statistics: {
@@ -336,7 +331,7 @@ export async function loadPlayerCareerDashboard(
     supabase
       .from("match_result_report_groups")
       .select(
-        "id, match_id, tournament_id, result_type, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_at, review_notes, no_show_registration_id, no_show_status, finalized_at, finalized_source, created_at"
+        "id, match_id, tournament_id, result_type, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_at, review_notes, no_show_registration_id, no_show_status, finalized_at, finalized_source, created_at"
       )
       .in("match_id", matchIds)
       .order("created_at", { ascending: false }),
@@ -370,7 +365,7 @@ export async function loadPlayerCareerDashboard(
     standingsResult.error;
 
   if (metadataError) {
-    console.error("Dashboard career metadata load error:", metadataError);
+    logDashboardCareerFailure("load-result-metadata");
     return {
       ...emptyCareer,
       statistics: {
@@ -395,10 +390,7 @@ export async function loadPlayerCareerDashboard(
       : { data: [], error: null };
 
   if (roundRobinMatchesResult.error) {
-    console.error(
-      "Dashboard round-robin completion load error:",
-      roundRobinMatchesResult.error
-    );
+    logDashboardCareerFailure("load-round-robin-status");
   }
 
   const bracketIds = [
@@ -412,7 +404,7 @@ export async function loadPlayerCareerDashboard(
     .in("id", bracketIds);
 
   if (bracketError) {
-    console.error("Dashboard tournament bracket load error:", bracketError);
+    logDashboardCareerFailure("load-brackets");
     return {
       ...emptyCareer,
       statistics: {
@@ -436,7 +428,7 @@ export async function loadPlayerCareerDashboard(
     .in("id", tournamentIds);
 
   if (tournamentError) {
-    console.error("Dashboard tournaments load error:", tournamentError);
+    logDashboardCareerFailure("load-tournaments");
   }
 
   const submissionRows = (submissionsResult.data ?? []) as SubmissionRow[];
@@ -473,13 +465,10 @@ export async function loadPlayerCareerDashboard(
   } = reportGroupDismissalResult;
 
   if (dismissalError) {
-    console.error("Dashboard notification dismissals load error:", dismissalError);
+    logDashboardCareerFailure("load-submission-dismissals");
   }
   if (reportGroupDismissalError) {
-    console.error(
-      "Dashboard report-group notification dismissals load error:",
-      reportGroupDismissalError
-    );
+    logDashboardCareerFailure("load-report-group-dismissals");
   }
 
   const dismissedSubmissionNotifications = new Set(
@@ -727,7 +716,7 @@ function buildCareerDashboard({
       const loserId =
         winnerId === participantOneId ? participantTwoId : participantOneId;
       const submittedByViewer =
-        reportGroup.submitted_by_clerk_user_id === clerkUserId;
+        viewerRegistrationIds.has(reportGroup.submitted_by_registration_id);
       const opponentId = submittedByViewer
         ? reportGroup.opponent_registration_id
         : reportGroup.submitted_by_registration_id;
@@ -972,4 +961,11 @@ function registrationName(
   }
 
   return registrationsById.get(registrationId)?.player_name || "Opponent";
+}
+
+function logDashboardCareerFailure(operation: string) {
+  console.error("Dashboard career load failed.", {
+    operation,
+    code: "UPSTREAM_UNAVAILABLE",
+  });
 }

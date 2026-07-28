@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import TournamentsExperience from "@/components/TournamentsExperience";
+import { loadMatchResultData } from "@/lib/match-result-data";
 import { getEloVerificationSetting } from "@/lib/platform-settings";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
@@ -10,8 +11,6 @@ import {
 import {
   getTournamentBracketDisplayName,
   mapTournamentRow,
-  type MatchResultReportGroup,
-  type MatchResultSubmission,
   type TournamentParticipant,
   type TournamentRow,
 } from "@/lib/tournaments";
@@ -248,17 +247,7 @@ export default async function TournamentsPage() {
     return tournament;
   });
   tournaments.sort(compareTournamentCards);
-  const matchResultSubmissions = userId
-    ? await loadVisibleMatchResultSubmissions(supabase, userId, isAdmin)
-    : [];
-  const matchResultReportGroups = userId
-    ? await loadVisibleMatchResultReportGroups(
-        supabase,
-        userId,
-        isAdmin,
-        viewerRegistrationIds
-      )
-    : [];
+  const matchResultData = await loadMatchResultData();
 
   if (tournaments.length === 0) {
     return (
@@ -279,12 +268,11 @@ export default async function TournamentsPage() {
       tournaments={tournaments}
       viewer={{
         isAdmin,
-        clerkUserId: userId,
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
       }}
-      matchResultSubmissions={matchResultSubmissions}
-      matchResultReportGroups={matchResultReportGroups}
+      matchResultSubmissions={matchResultData.submissions}
+      matchResultReportGroups={matchResultData.reportGroups}
       eloVerificationEnabled={eloVerificationSetting.enabled}
     />
   );
@@ -329,336 +317,6 @@ function buildWaitlistPositionMap(
   }
 
   return positions;
-}
-
-async function loadVisibleMatchResultSubmissions(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  userId: string,
-  isAdmin: boolean
-): Promise<MatchResultSubmission[]> {
-  let query = supabase
-    .from("match_result_submissions")
-    .select(
-      "id, submission_number, game_number, match_id, submitted_by_clerk_user_id, submitted_by_registration_id, claimed_winner_registration_id, player_one_score, player_two_score, replay_storage_path, screenshot_storage_path, notes, status, review_notes, reviewed_by, reviewed_at, created_at"
-    )
-    .is("report_group_id", null)
-    .order("created_at", { ascending: false });
-
-  if (!isAdmin) {
-    query = query.eq("submitted_by_clerk_user_id", userId);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Match result submissions load failed:", error);
-    return [];
-  }
-
-  return Promise.all(
-    (
-      (data ?? []) as {
-        id: string;
-        submission_number: number;
-        game_number: number;
-        match_id: string;
-        submitted_by_clerk_user_id: string;
-        submitted_by_registration_id: string | null;
-        claimed_winner_registration_id: string;
-        player_one_score: number;
-        player_two_score: number;
-        replay_storage_path: string | null;
-        screenshot_storage_path: string | null;
-        notes: string | null;
-        status: MatchResultSubmission["status"];
-        review_notes: string | null;
-        reviewed_by: string | null;
-        reviewed_at: string | null;
-        created_at: string;
-      }[]
-    ).map(async (submission) => {
-      const [replayProof, screenshotProof] = await Promise.all([
-        createProofAccess(supabase, submission.replay_storage_path),
-        createProofAccess(supabase, submission.screenshot_storage_path),
-      ]);
-
-      return {
-        id: submission.id,
-        submissionNumber: submission.submission_number,
-        gameNumber: submission.game_number,
-        matchId: submission.match_id,
-        submittedByClerkUserId: submission.submitted_by_clerk_user_id,
-        submittedByRegistrationId:
-          submission.submitted_by_registration_id,
-        claimedWinnerRegistrationId:
-          submission.claimed_winner_registration_id,
-        playerOneScore: submission.player_one_score,
-        playerTwoScore: submission.player_two_score,
-        replayStoragePath: submission.replay_storage_path,
-        screenshotStoragePath: submission.screenshot_storage_path,
-        replayProofUrl: replayProof.url,
-        screenshotProofUrl: screenshotProof.url,
-        replayProofExists: replayProof.exists,
-        screenshotProofExists: screenshotProof.exists,
-        notes: submission.notes,
-        status: submission.status,
-        reviewNotes: submission.review_notes,
-        reviewedBy: submission.reviewed_by,
-        reviewedAt: submission.reviewed_at,
-        createdAt: submission.created_at,
-      };
-    })
-  );
-}
-
-async function loadVisibleMatchResultReportGroups(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  userId: string,
-  isAdmin: boolean,
-  viewerRegistrationIds: string[]
-): Promise<MatchResultReportGroup[]> {
-  const select =
-    "id, match_id, tournament_id, result_type, submitted_by_clerk_user_id, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_by, reviewed_at, review_notes, no_show_reported_by_registration_id, no_show_registration_id, no_show_status, no_show_note, no_show_resolved_at, no_show_resolved_by, finalized_at, finalized_source, created_at";
-
-  const loadGroups = async () => {
-    if (isAdmin) {
-      return supabase
-        .from("match_result_report_groups")
-        .select(select)
-        .order("created_at", { ascending: false });
-    }
-
-    const submitterQuery = supabase
-      .from("match_result_report_groups")
-      .select(select)
-      .eq("submitted_by_clerk_user_id", userId)
-      .order("created_at", { ascending: false });
-
-    if (viewerRegistrationIds.length === 0) {
-      return submitterQuery;
-    }
-
-    const [submitted, opponent] = await Promise.all([
-      submitterQuery,
-      supabase
-        .from("match_result_report_groups")
-        .select(select)
-        .in("opponent_registration_id", viewerRegistrationIds)
-        .order("created_at", { ascending: false }),
-    ]);
-
-    return {
-      data: [
-        ...new Map(
-          [...(submitted.data ?? []), ...(opponent.data ?? [])].map(
-            (group) => [group.id as string, group]
-          )
-        ).values(),
-      ],
-      error: submitted.error ?? opponent.error,
-    };
-  };
-
-  const { data, error } = await loadGroups();
-
-  if (error) {
-    console.error("Match result report groups load failed:", error);
-    return [];
-  }
-
-  const reportGroupRows = (data ?? []) as {
-    id: string;
-    match_id: string;
-    tournament_id: string;
-    result_type: MatchResultReportGroup["resultType"] | null;
-    submitted_by_clerk_user_id: string;
-    submitted_by_registration_id: string;
-    opponent_registration_id: string;
-    winner_registration_id: string;
-    player_one_score: number;
-    player_two_score: number;
-    replay_storage_path: string | null;
-    status: MatchResultReportGroup["status"];
-    confirmation_deadline_at: string;
-    confirmed_at: string | null;
-    disputed_at: string | null;
-    dispute_notes: string | null;
-    reviewed_by: string | null;
-    reviewed_at: string | null;
-    review_notes: string | null;
-    no_show_reported_by_registration_id: string | null;
-    no_show_registration_id: string | null;
-    no_show_status: MatchResultReportGroup["noShowStatus"] | null;
-    no_show_note: string | null;
-    no_show_resolved_at: string | null;
-    no_show_resolved_by: string | null;
-    finalized_at: string | null;
-    finalized_source: string | null;
-    created_at: string;
-  }[];
-  const replayProofsByGroup = await loadReportGroupReplayProofs(
-    supabase,
-    reportGroupRows.map((reportGroup) => reportGroup.id)
-  );
-
-  return Promise.all(
-    reportGroupRows.map(async (reportGroup) => {
-      const replayProof = await createProofAccess(
-        supabase,
-        reportGroup.replay_storage_path
-      );
-      const replayProofs = replayProofsByGroup.get(reportGroup.id) ?? [];
-
-      return {
-        id: reportGroup.id,
-        matchId: reportGroup.match_id,
-        tournamentId: reportGroup.tournament_id,
-        resultType: reportGroup.result_type ?? "normal",
-        submittedByClerkUserId: reportGroup.submitted_by_clerk_user_id,
-        submittedByRegistrationId: reportGroup.submitted_by_registration_id,
-        opponentRegistrationId: reportGroup.opponent_registration_id,
-        winnerRegistrationId: reportGroup.winner_registration_id,
-        playerOneScore: reportGroup.player_one_score,
-        playerTwoScore: reportGroup.player_two_score,
-        replayStoragePath: reportGroup.replay_storage_path,
-        replayProofUrl: replayProof.url,
-        replayProofExists: replayProof.exists,
-        replayProofs:
-          replayProofs.length > 0
-            ? replayProofs
-            : replayProof.url && reportGroup.replay_storage_path
-              ? [
-                  {
-                    gameNumber: 1,
-                    replayStoragePath: reportGroup.replay_storage_path,
-                    replayProofUrl: replayProof.url,
-                    replayProofExists: replayProof.exists,
-                  },
-                ]
-              : [],
-        status: reportGroup.status,
-        confirmationDeadlineAt: reportGroup.confirmation_deadline_at,
-        confirmedAt: reportGroup.confirmed_at,
-        disputedAt: reportGroup.disputed_at,
-        disputeNotes: reportGroup.dispute_notes,
-        reviewedBy: reportGroup.reviewed_by,
-        reviewedAt: reportGroup.reviewed_at,
-        reviewNotes: reportGroup.review_notes,
-        noShowReportedByRegistrationId:
-          reportGroup.no_show_reported_by_registration_id,
-        noShowRegistrationId: reportGroup.no_show_registration_id,
-        noShowStatus: reportGroup.no_show_status,
-        noShowNote: reportGroup.no_show_note,
-        noShowResolvedAt: reportGroup.no_show_resolved_at,
-        noShowResolvedBy: reportGroup.no_show_resolved_by,
-        finalizedAt: reportGroup.finalized_at,
-        finalizedSource: reportGroup.finalized_source,
-        createdAt: reportGroup.created_at,
-      };
-    })
-  );
-}
-
-async function loadReportGroupReplayProofs(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  reportGroupIds: string[]
-) {
-  const replayProofsByGroup = new Map<
-    string,
-    MatchResultReportGroup["replayProofs"]
-  >();
-
-  if (reportGroupIds.length === 0) {
-    return replayProofsByGroup;
-  }
-
-  const { data, error } = await supabase
-    .from("match_result_submissions")
-    .select("report_group_id, game_number, replay_storage_path")
-    .in("report_group_id", reportGroupIds)
-    .not("replay_storage_path", "is", null)
-    .order("game_number", { ascending: true });
-
-  if (error) {
-    console.error("Report group replay proofs load failed:", error);
-    return replayProofsByGroup;
-  }
-
-  await Promise.all(
-    (
-      (data ?? []) as {
-        report_group_id: string;
-        game_number: number;
-        replay_storage_path: string;
-      }[]
-    ).map(async (proof) => {
-      const replayProof = await createProofAccess(
-        supabase,
-        proof.replay_storage_path
-      );
-      const groupProofs =
-        replayProofsByGroup.get(proof.report_group_id) ?? [];
-
-      groupProofs.push({
-        gameNumber: proof.game_number,
-        replayStoragePath: proof.replay_storage_path,
-        replayProofUrl: replayProof.url,
-        replayProofExists: replayProof.exists,
-      });
-      replayProofsByGroup.set(proof.report_group_id, groupProofs);
-    })
-  );
-
-  return replayProofsByGroup;
-}
-
-async function createProofAccess(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  path: string | null
-) {
-  if (!path) return { exists: false, url: null };
-
-  const exists = await proofObjectExists(supabase, path);
-
-  if (!exists) {
-    console.error("Match proof object is missing:", path);
-    return { exists: false, url: null };
-  }
-
-  const { data, error } = await supabase.storage
-    .from("match-proofs")
-    .createSignedUrl(path, 60 * 30);
-
-  if (error) {
-    console.error("Match proof URL signing failed:", error);
-    return { exists: true, url: null };
-  }
-
-  return { exists: true, url: data.signedUrl };
-}
-
-async function proofObjectExists(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  path: string
-) {
-  const parts = path.split("/");
-  const fileName = parts.pop();
-
-  if (!fileName) return false;
-
-  const { data, error } = await supabase.storage
-    .from("match-proofs")
-    .list(parts.join("/"), {
-      limit: 1,
-      search: fileName,
-    });
-
-  if (error) {
-    console.error("Match proof existence check failed:", error);
-    return false;
-  }
-
-  return data.some((object) => object.name === fileName);
 }
 
 function compareTournamentCards(
