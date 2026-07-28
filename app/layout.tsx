@@ -18,14 +18,15 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body className="bg-black text-white">
-          <SmoothScrollProvider>
-            <Navbar />
-<GlobalSmoke />
-<div className="pt-[83px] md:pt-[69px]">{children}</div>
-            <Footer />
-            <SiteMusicPlayer />
-          </SmoothScrollProvider>
-        </body>
+  <GlobalSmoke />
+
+  <SmoothScrollProvider>
+    <Navbar />
+    <div className="pt-[83px] md:pt-[69px]">{children}</div>
+    <Footer />
+    <SiteMusicPlayer />
+  </SmoothScrollProvider>
+</body>
       </html>
     </ClerkProvider>
   );
