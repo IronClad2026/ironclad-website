@@ -14,6 +14,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import DashboardChampionHistory from "@/components/DashboardChampionHistory";
 import DashboardMatchHistory from "@/components/DashboardMatchHistory";
+import DashboardNotifications from "@/components/DashboardNotifications";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
 import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
@@ -192,9 +193,6 @@ export default async function PlayerDashboardPage() {
                 (notification) =>
                   `${notification.id}:${notification.readAt ?? ""}`
               ),
-              ...career.notifications.map(
-                (notification) => `${notification.id}:${notification.status}`
-              ),
             ].join("|")}
             scope="player"
             title="Notifications"
@@ -205,7 +203,6 @@ export default async function PlayerDashboardPage() {
             unreadCount={playerNotifications.unreadCount}
             error={playerNotifications.error}
             className="max-w-2xl lg:max-w-none"
-            matchNotifications={career.notifications}
           />
 
           {profile && (
@@ -220,6 +217,13 @@ export default async function PlayerDashboardPage() {
             </div>
           )}
         </div>
+
+        <DashboardNotifications
+          key={career.notifications
+            .map((notification) => `${notification.id}:${notification.status}`)
+            .join("|")}
+          notifications={career.notifications}
+        />
 
         {career.error && (
           <div className="mt-6">
