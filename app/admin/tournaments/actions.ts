@@ -5,6 +5,18 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  MAX_TOURNAMENT_BANNER_BYTES,
+  TOURNAMENT_BANNER_BUCKET,
+  TOURNAMENT_BANNER_MIME_TYPES,
+  buildTournamentBannerPublicUrl,
+  createTournamentBannerPath,
+  getTournamentBannerExtension,
+  hasTournamentBannerSignature,
+  parseTournamentBannerPath,
+  parseTournamentBannerPublicUrl,
+  type TournamentBannerAsset,
+} from "@/lib/tournament-banner-storage";
 import type {
   TournamentBracketFieldPrefix,
   TournamentBracketName,
@@ -42,19 +54,6 @@ const validConfirmationWindows = new Set([
   720,
   1440,
 ]);
-const TOURNAMENT_BANNER_BUCKET = "tournament-banners";
-const MAX_TOURNAMENT_BANNER_BYTES = 100 * 1024 * 1024;
-const TOURNAMENT_BANNER_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-];
-const bannerExtensionsByMimeType = new Map([
-  ["image/jpeg", "jpg"],
-  ["image/png", "png"],
-  ["image/webp", "webp"],
-]);
-
 export type TournamentSaveState = {
   error: string | null;
 };
@@ -63,7 +62,6 @@ export async function createTournamentBannerUpload(input: {
   fileName: string;
   contentType: string;
   size: number;
-  tournamentId?: string | null;
 }) {
   const { userId, sessionClaims } = await auth();
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
@@ -72,91 +70,104 @@ export async function createTournamentBannerUpload(input: {
     throw new Error("Unauthorized");
   }
 
-  const extension = bannerExtensionsByMimeType.get(input.contentType);
-  const suppliedExtension = input.fileName.split(".").pop()?.toLowerCase();
-  const validExtensions =
-    input.contentType === "image/jpeg" ? ["jpg", "jpeg"] : [extension];
-
-  if (
-    !extension ||
-    !suppliedExtension ||
-    !validExtensions.includes(suppliedExtension) ||
-    !Number.isFinite(input.size) ||
-    input.size <= 0 ||
-    input.size > MAX_TOURNAMENT_BANNER_BYTES
-  ) {
+  const extension = getTournamentBannerExtension(input);
+  if (!extension) {
     throw new Error(
-      "Banner must be a JPG, JPEG, PNG, or WEBP image no larger than 100 MB."
+      "Banner must be a JPG, JPEG, PNG, or WEBP image no larger than 10 MiB."
     );
   }
 
-  const folder = input.tournamentId ?? `drafts/${userId}`;
-  const path = `${folder}/${randomUUID()}.${extension}`;
+  const path = createTournamentBannerPath(extension);
   const supabase = createSupabaseAdminClient();
-  await ensureTournamentBannerBucket(supabase);
+  await verifyTournamentBannerBucket(supabase);
 
   const { data, error } = await supabase.storage
     .from(TOURNAMENT_BANNER_BUCKET)
-    .createSignedUploadUrl(path);
+    .createSignedUploadUrl(path, { upsert: false });
 
-  if (error || !data) {
-    console.error("Tournament banner upload authorization failed:", error);
-    throw new Error(
-      `Unable to prepare the banner upload${
-        error?.message ? `: ${error.message}` : "."
-      }`
-    );
+  if (
+    error ||
+    !data ||
+    data.path !== path ||
+    typeof data.token !== "string" ||
+    data.token.length === 0
+  ) {
+    console.error("Tournament banner upload authorization failed.");
+    throw new Error("Unable to prepare the banner upload. Try again.");
   }
 
   const { data: publicUrl } = supabase.storage
     .from(TOURNAMENT_BANNER_BUCKET)
     .getPublicUrl(path);
+  const parsedPublicUrl = parseTournamentBannerPublicUrl(publicUrl.publicUrl);
+
+  if (!parsedPublicUrl || parsedPublicUrl.path !== path) {
+    console.error("Tournament banner public URL generation failed.");
+    throw new Error("Unable to prepare the banner upload. Try again.");
+  }
 
   return {
     bucket: TOURNAMENT_BANNER_BUCKET,
     path,
     token: data.token,
-    publicUrl: publicUrl.publicUrl,
+    publicUrl: parsedPublicUrl.publicUrl,
   };
 }
 
-async function ensureTournamentBannerBucket(
+async function verifyTournamentBannerBucket(
   supabase: ReturnType<typeof createSupabaseAdminClient>
 ) {
-  const { data: bucket, error: lookupError } = await supabase.storage.getBucket(
-    TOURNAMENT_BANNER_BUCKET
-  );
-
-  if (bucket) return;
-
-  if (lookupError && !isMissingStorageBucketError(lookupError.message)) {
-    console.error("Tournament banner bucket lookup failed:", lookupError);
-    throw new Error("Unable to verify tournament banner storage.");
-  }
-
-  const { error: createError } = await supabase.storage.createBucket(
-    TOURNAMENT_BANNER_BUCKET,
-    {
-      public: true,
-      fileSizeLimit: null,
-      allowedMimeTypes: TOURNAMENT_BANNER_MIME_TYPES,
-    }
-  );
-
-  if (
-    createError &&
-    !createError.message.toLowerCase().includes("already exists")
-  ) {
-    console.error("Tournament banner bucket creation failed:", createError);
-    throw new Error(
-      "Tournament banner storage is not configured. Apply the tournament banner storage migration."
+  try {
+    const { data: bucket, error } = await supabase.storage.getBucket(
+      TOURNAMENT_BANNER_BUCKET
     );
-  }
+    const allowedMimeTypes = new Set(bucket?.allowed_mime_types ?? []);
+    const hasExpectedMimeTypes =
+      allowedMimeTypes.size === TOURNAMENT_BANNER_MIME_TYPES.length &&
+      TOURNAMENT_BANNER_MIME_TYPES.every((mimeType) =>
+        allowedMimeTypes.has(mimeType)
+      );
+
+    if (
+      !error &&
+      bucket?.id === TOURNAMENT_BANNER_BUCKET &&
+      bucket.public &&
+      Number(bucket.file_size_limit) === MAX_TOURNAMENT_BANNER_BYTES &&
+      hasExpectedMimeTypes
+    ) {
+      return;
+    }
+  } catch {}
+  console.error("Tournament banner storage configuration is invalid.");
+  throw new Error("Tournament banner storage is not configured.");
 }
 
-function isMissingStorageBucketError(message: string) {
-  const normalized = message.toLowerCase();
-  return normalized.includes("not found") || normalized.includes("does not exist");
+export async function discardTournamentBannerUpload(publicUrl: string) {
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+
+  if (!userId || role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  const banner = parseTournamentBannerPublicUrl(publicUrl);
+  if (!banner) {
+    return { deleted: false };
+  }
+
+  const supabase = createSupabaseAdminClient();
+  try {
+    if (await isTournamentBannerReferenced(supabase, banner.publicUrl)) {
+      return { deleted: false };
+    }
+    await removeStorageObjects(supabase, TOURNAMENT_BANNER_BUCKET, [
+      banner.path,
+    ]);
+    return { deleted: true };
+  } catch {
+    console.error("Tournament banner discard failed.");
+    return { deleted: false };
+  }
 }
 
 export async function saveTournament(
@@ -224,25 +235,55 @@ export async function saveTournament(
     return { error: validationError };
   }
 
+  const banner = parseTournamentBannerPublicUrl(bannerImageUrl);
+  if (!banner) {
+    return { error: "Upload a valid IronClad tournament banner." };
+  }
+
   const supabase = createSupabaseAdminClient();
+  let previousBannerUrl: string | null = null;
   try {
-    slug = tournamentId
-      ? await getExistingTournamentSlug(supabase, tournamentId)
-      : await getAvailableTournamentSlug(supabase, slug);
-  } catch (slugError) {
-    console.error("Tournament slug generation failed:", slugError);
+    if (tournamentId) {
+      const existingTournament = await getExistingTournamentDetails(
+        supabase,
+        tournamentId
+      );
+      slug = existingTournament.slug;
+      previousBannerUrl = existingTournament.bannerImageUrl;
+    } else {
+      slug = await getAvailableTournamentSlug(supabase, slug);
+    }
+  } catch {
+    console.error("Tournament slug generation failed.");
     return {
       error:
         "Unable to preserve or generate the tournament URL. Rename the tournament or try again.",
     };
   }
 
-  if (
-    bannerImageUrl.includes(
-      `/storage/v1/object/public/${TOURNAMENT_BANNER_BUCKET}/`
-    ) &&
-    !(await isVerifiedTournamentBanner(supabase, bannerImageUrl))
-  ) {
+  try {
+    if (
+      await isTournamentBannerReferenced(
+        supabase,
+        banner.publicUrl,
+        tournamentId
+      )
+    ) {
+      return {
+        error: "That banner is already assigned to another tournament.",
+      };
+    }
+  } catch {
+    console.error("Tournament banner reference validation failed.");
+    return { error: "The uploaded banner could not be verified. Try again." };
+  }
+
+  if (!(await isVerifiedTournamentBanner(supabase, banner))) {
+    await cleanupFailedTournamentBanner(
+      supabase,
+      banner,
+      previousBannerUrl
+    );
     return {
       error:
         "The uploaded banner could not be verified. Re-upload a valid JPG, PNG, or WEBP image.",
@@ -273,7 +314,7 @@ export async function saveTournament(
   });
 
   if (error || !data) {
-    console.error("Tournament save failed:", error);
+    console.error("Tournament save failed.");
     return { error: getDatabaseSaveError(error?.message) };
   }
 
@@ -305,15 +346,37 @@ export async function saveTournament(
     savedTournament.battlefy_url !== battlefyUrl ||
     savedTournament.registration_enabled !== registrationEnabled
   ) {
-    console.error("Tournament save verification failed:", {
-      verificationError,
-      savedTournament,
-    });
+    console.error("Tournament save verification failed.");
     return {
-      error: verificationError?.message
-        ? `Tournament saved but verification failed: ${verificationError.message}`
-        : "Tournament save could not be verified. No confirmation was received from the database.",
+      error:
+        "Tournament save could not be verified. No confirmation was received from the database.",
     };
+  }
+
+  const previousBanner = previousBannerUrl
+    ? parseTournamentBannerPublicUrl(previousBannerUrl)
+    : null;
+  if (previousBanner && previousBanner.path !== banner.path) {
+    try {
+      if (
+        !(await isTournamentBannerReferenced(
+          supabase,
+          previousBanner.publicUrl
+        ))
+      ) {
+        await removeStorageObjects(supabase, TOURNAMENT_BANNER_BUCKET, [
+          previousBanner.path,
+        ]);
+      }
+    } catch {
+      console.error("Tournament banner replacement cleanup failed.");
+      revalidatePath("/admin/tournaments", "page");
+      revalidatePath("/tournaments");
+      return {
+        error:
+          "The tournament was saved, but previous banner cleanup requires administrator review.",
+      };
+    }
   }
 
   revalidatePath("/admin/tournaments", "page");
@@ -506,6 +569,22 @@ export async function deleteTournament(formData: FormData) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const { data: targetTournament, error: targetError } = await supabase
+    .from("tournaments")
+    .select("banner_image_url")
+    .eq("id", tournamentId)
+    .maybeSingle();
+  const expectedBanner = targetTournament
+    ? parseTournamentBannerPublicUrl(targetTournament.banner_image_url)
+    : null;
+
+  if (targetError || !expectedBanner) {
+    logStorageCleanupFailure("validate-tournament-banner", targetError);
+    redirect(
+      `/admin/tournaments?selected=${tournamentId}&notice=delete-failed`
+    );
+  }
+
   const { data, error } = await supabase.rpc("delete_tournament_data", {
     p_tournament_id: tournamentId,
     p_deleted_by: userId,
@@ -524,9 +603,15 @@ export async function deleteTournament(formData: FormData) {
     banner_paths?: string[];
   };
   const proofPaths = getStoragePaths(deletion.proof_paths);
-  const bannerPaths = getStoragePaths(deletion.banner_paths);
 
   try {
+    const bannerPaths = getTournamentBannerPaths(deletion.banner_paths);
+    if (
+      bannerPaths.length !== 1 ||
+      bannerPaths[0] !== expectedBanner.path
+    ) {
+      throw new Error("Invalid tournament banner cleanup manifest.");
+    }
     await removeTournamentStorage(supabase, proofPaths, bannerPaths);
     const { error: jobCleanupError } = await supabase
       .from("tournament_deletion_jobs")
@@ -583,7 +668,7 @@ export async function retryTournamentStorageCleanup(formData: FormData) {
     await removeTournamentStorage(
       supabase,
       getStoragePaths(job.proof_paths),
-      getStoragePaths(job.banner_paths)
+      getTournamentBannerPaths(job.banner_paths)
     );
     const { error: cleanupError } = await supabase
       .from("tournament_deletion_jobs")
@@ -614,16 +699,41 @@ function getStoragePaths(paths: unknown) {
     : [];
 }
 
+function getTournamentBannerPaths(paths: unknown) {
+  const bannerPaths = getStoragePaths(paths);
+  if (
+    !Array.isArray(paths) ||
+    bannerPaths.length !== paths.length ||
+    bannerPaths.some((path) => !parseTournamentBannerPath(path))
+  ) {
+    throw new Error("Invalid tournament banner cleanup manifest.");
+  }
+  return bannerPaths;
+}
+
 async function removeTournamentStorage(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   proofPaths: string[],
   bannerPaths: string[]
 ) {
+  const verifiedBannerPaths = getTournamentBannerPaths(bannerPaths);
+  const unreferencedBannerPaths: string[] = [];
+
+  for (const path of verifiedBannerPaths) {
+    const publicUrl = buildTournamentBannerPublicUrl(path);
+    if (!publicUrl) {
+      throw new Error("Invalid tournament banner cleanup manifest.");
+    }
+    if (!(await isTournamentBannerReferenced(supabase, publicUrl))) {
+      unreferencedBannerPaths.push(path);
+    }
+  }
+
   await removeStorageObjects(supabase, "match-proofs", proofPaths);
   await removeStorageObjects(
     supabase,
     TOURNAMENT_BANNER_BUCKET,
-    bannerPaths
+    unreferencedBannerPaths
   );
 }
 
@@ -758,13 +868,13 @@ async function getAvailableTournamentSlug(
   return `${baseSlug}-${randomUUID().slice(0, 8)}`;
 }
 
-async function getExistingTournamentSlug(
+async function getExistingTournamentDetails(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   tournamentId: string
 ) {
   const { data, error } = await supabase
     .from("tournaments")
-    .select("slug")
+    .select("slug, banner_image_url")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -772,11 +882,54 @@ async function getExistingTournamentSlug(
     throw error;
   }
 
-  if (!data?.slug) {
+  if (!data?.slug || !data.banner_image_url) {
     throw new Error("Tournament not found.");
   }
 
-  return data.slug;
+  return {
+    bannerImageUrl: data.banner_image_url,
+    slug: data.slug,
+  };
+}
+
+async function isTournamentBannerReferenced(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  publicUrl: string,
+  excludedTournamentId?: string | null
+) {
+  let query = supabase
+    .from("tournaments")
+    .select("id")
+    .eq("banner_image_url", publicUrl)
+    .limit(1);
+
+  if (excludedTournamentId) {
+    query = query.neq("id", excludedTournamentId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return Boolean(data?.length);
+}
+
+async function cleanupFailedTournamentBanner(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  banner: TournamentBannerAsset,
+  previousBannerUrl: string | null
+) {
+  const previousBanner = previousBannerUrl
+    ? parseTournamentBannerPublicUrl(previousBannerUrl)
+    : null;
+  if (previousBanner?.path === banner.path) return;
+
+  try {
+    if (await isTournamentBannerReferenced(supabase, banner.publicUrl)) return;
+    await removeStorageObjects(supabase, TOURNAMENT_BANNER_BUCKET, [
+      banner.path,
+    ]);
+  } catch {
+    console.error("Tournament banner verification cleanup failed.");
+  }
 }
 
 function getInteger(formData: FormData, field: string) {
@@ -818,8 +971,8 @@ function getTournamentValidationError(input: {
     return "Tournament description must be 5,000 characters or fewer.";
   }
   if (!input.bannerImageUrl) return "A tournament banner image is required.";
-  if (!isAssetUrl(input.bannerImageUrl)) {
-    return "Banner image must be an uploaded banner, a site-relative path, or a valid HTTP/HTTPS URL.";
+  if (!parseTournamentBannerPublicUrl(input.bannerImageUrl)) {
+    return "Upload a valid IronClad tournament banner.";
   }
   if (!validStatuses.includes(input.status)) {
     return "Select a valid tournament status.";
@@ -872,7 +1025,7 @@ function getDatabaseSaveError(message?: string) {
     return "A tournament with this generated URL already exists. Rename the tournament or try again.";
   }
   if (normalized.includes("permission") || normalized.includes("policy")) {
-    return `Database permission denied: ${message}`;
+    return "Database permission denied while saving the tournament.";
   }
   if (normalized.includes("function") && normalized.includes("not exist")) {
     return "The tournament save database function is missing. Apply the latest Supabase migrations.";
@@ -886,20 +1039,20 @@ function getDatabaseSaveError(message?: string) {
     normalized.includes("cannot remove the") &&
     normalized.includes("normal tournament edit")
   ) {
-    return message;
+    return "A populated tournament bracket cannot be removed during a normal edit.";
   }
   if (
     normalized.includes("required when registration is open")
   ) {
-    return message;
+    return "Registration dates are required while registration is open.";
   }
   if (
     normalized.includes("cannot change elo rules for the") ||
     normalized.includes("cannot reduce the")
   ) {
-    return message;
+    return "Active tournament bracket settings cannot be changed that way.";
   }
-  return `Database error: ${message}`;
+  return "The database did not accept the tournament. Try again.";
 }
 
 function parseDateTime(formData: FormData, field: string) {
@@ -922,24 +1075,14 @@ function toTimestamp(value: string | null) {
 
 async function isVerifiedTournamentBanner(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
-  publicUrl: string
+  banner: TournamentBannerAsset
 ) {
   try {
-    const url = new URL(publicUrl);
-    const marker = `/storage/v1/object/public/${TOURNAMENT_BANNER_BUCKET}/`;
-    const markerIndex = url.pathname.indexOf(marker);
-    if (markerIndex === -1) return false;
-
-    const path = decodeURIComponent(
-      url.pathname.slice(markerIndex + marker.length)
-    );
-    const pathParts = path.split("/");
-    const fileName = pathParts.pop();
-    if (!fileName || pathParts.length === 0) return false;
+    const fileName = banner.path.slice("banners/".length);
 
     const { data, error } = await supabase.storage
       .from(TOURNAMENT_BANNER_BUCKET)
-      .list(pathParts.join("/"), { limit: 1, search: fileName });
+      .list("banners", { limit: 1, search: fileName });
     const object = data?.find((item) => item.name === fileName);
     const size = Number(object?.metadata?.size);
     const mimeType = String(object?.metadata?.mimetype ?? "");
@@ -947,7 +1090,7 @@ async function isVerifiedTournamentBanner(
     if (
       error ||
       !object ||
-      !bannerExtensionsByMimeType.has(mimeType) ||
+      mimeType !== banner.mimeType ||
       !Number.isFinite(size) ||
       size <= 0 ||
       size > MAX_TOURNAMENT_BANNER_BYTES
@@ -955,17 +1098,21 @@ async function isVerifiedTournamentBanner(
       return false;
     }
 
+    const publicUrl = buildTournamentBannerPublicUrl(banner.path);
+    if (!publicUrl || publicUrl !== banner.publicUrl) return false;
+
     const response = await fetch(publicUrl, {
       headers: { Range: "bytes=0-15" },
       cache: "no-store",
+      redirect: "error",
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) return false;
 
     const bytes = await readImageHeader(response);
-    return hasImageSignature(bytes, mimeType);
-  } catch (error) {
-    console.error("Tournament banner verification failed:", error);
+    return hasTournamentBannerSignature(bytes, banner.mimeType);
+  } catch {
+    console.error("Tournament banner verification failed.");
     return false;
   }
 }
@@ -984,34 +1131,6 @@ async function readImageHeader(response: Response) {
   return Uint8Array.from(chunks);
 }
 
-function hasImageSignature(bytes: Uint8Array, mimeType: string) {
-  if (mimeType === "image/jpeg") {
-    return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  }
-
-  if (mimeType === "image/png") {
-    return (
-      bytes[0] === 0x89 &&
-      bytes[1] === 0x50 &&
-      bytes[2] === 0x4e &&
-      bytes[3] === 0x47 &&
-      bytes[4] === 0x0d &&
-      bytes[5] === 0x0a &&
-      bytes[6] === 0x1a &&
-      bytes[7] === 0x0a
-    );
-  }
-
-  if (mimeType === "image/webp") {
-    return (
-      String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
-      String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
-    );
-  }
-
-  return false;
-}
-
 function isHttpUrl(value: string) {
   try {
     const url = new URL(value);
@@ -1019,8 +1138,4 @@ function isHttpUrl(value: string) {
   } catch {
     return false;
   }
-}
-
-function isAssetUrl(value: string) {
-  return value.startsWith("/") || isHttpUrl(value);
 }
