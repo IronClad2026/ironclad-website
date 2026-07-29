@@ -15,20 +15,22 @@ export default function PublicPlayerProfileHeader({
     typeof player.currentElo === "number" ? String(player.currentElo) : "Unrated";
 
   return (
-    <section
-      className="relative overflow-hidden border-b border-orange-500/20 bg-cover bg-center px-6 pt-32 pb-12"
-      style={{
-        backgroundImage: "url('/images/ironclad-background.jpg')",
-      }}
-    >
-      <div className="absolute inset-0 bg-black/82" />
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-black/90 to-orange-950/40" />
+    <section className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-12">
+      <div
+        className="absolute inset-0 bg-cover bg-center opacity-55"
+        style={{
+          backgroundImage: "url('/images/ironclad-background.jpg')",
+        }}
+      />
+      <div className="absolute inset-0 bg-black/68" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.16))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
 
       <div className="relative z-10 mx-auto max-w-7xl">
         <Link
           href="/players"
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-zinc-300 transition hover:border-orange-400/45 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/45 px-4 py-2 text-sm font-bold text-zinc-300 shadow-xl shadow-black/10 backdrop-blur transition hover:border-orange-400/45 hover:bg-orange-500/10 hover:text-white"
         >
           <ArrowLeft size={16} />
           Back to Players
@@ -38,7 +40,7 @@ export default function PublicPlayerProfileHeader({
           <div
             role="img"
             aria-label={`${displayName} avatar`}
-            className="grid h-36 w-36 place-items-center overflow-hidden rounded-3xl border-2 border-orange-400/45 bg-black/60 bg-cover bg-center shadow-[0_0_45px_rgba(249,115,22,0.22)]"
+            className="grid h-36 w-36 place-items-center overflow-hidden rounded-3xl border border-orange-400/35 bg-black/55 bg-cover bg-center shadow-[0_0_24px_rgba(249,115,22,0.16)]"
             style={
               player.avatarUrl
                 ? { backgroundImage: `url("${player.avatarUrl}")` }
@@ -51,7 +53,7 @@ export default function PublicPlayerProfileHeader({
           </div>
 
           <div className="min-w-0">
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
+            <p className="text-sm font-black uppercase tracking-[0.35em] text-orange-300">
               Public Player Profile
             </p>
             <h1 className="mt-4 break-words text-5xl font-black tracking-tight text-white md:text-7xl">
@@ -99,7 +101,7 @@ function Pill({
       className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold ${
         tone === "orange"
           ? "border-orange-400/35 bg-orange-500/10 text-orange-200"
-          : "border-white/10 bg-white/5 text-zinc-300"
+          : "border-white/12 bg-black/45 text-zinc-300"
       }`}
     >
       <Icon size={16} />

@@ -184,7 +184,7 @@ export default function RulesPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white">
       <section
-        className="relative flex min-h-screen items-center justify-center bg-contain bg-center bg-no-repeat px-6 text-center"
+        className="relative flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat px-6 text-center"
         style={{
           backgroundImage: "url('/images/ironclad-background.jpg')",
         }}
@@ -231,8 +231,14 @@ export default function RulesPage() {
         </motion.div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="mb-12 max-w-3xl">
+      <section
+        className="relative mx-auto max-w-7xl border-y border-white/10 bg-cover bg-center px-6 py-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.72),rgba(0,0,0,0.95)),linear-gradient(100deg,rgba(0,0,0,0.9),rgba(0,0,0,0.58),rgba(0,0,0,0.88)),url('/images/sfondi/6.jpg')",
+        }}
+      >
+        <div className="relative z-10 mb-12 max-w-3xl">
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
             Quick Overview
           </p>
@@ -247,7 +253,7 @@ export default function RulesPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="relative z-10 grid gap-6 md:grid-cols-2">
           {quickRules.map((card) => {
             const Icon = card.icon;
 
@@ -279,8 +285,15 @@ export default function RulesPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <div className="mb-10 text-center">
+      <section
+        className="relative mx-auto max-w-6xl border-b border-orange-500/15 bg-cover px-6 py-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg,rgba(0,0,0,0.86),rgba(0,0,0,0.72),rgba(0,0,0,0.96)),linear-gradient(110deg,rgba(0,0,0,0.95),rgba(0,0,0,0.66),rgba(37,18,8,0.92)),url('/images/sfondi/3.jpg')",
+          backgroundPosition: "58% center",
+        }}
+      >
+        <div className="relative z-10 mb-10 text-center">
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
             Interactive Rules
           </p>
@@ -288,7 +301,7 @@ export default function RulesPage() {
           <h2 className="mt-4 text-4xl font-bold">Rule Categories</h2>
         </div>
 
-        <div className="mb-10 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 md:flex-row">
+        <div className="relative z-10 mb-10 flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/65 p-3 backdrop-blur md:flex-row">
           {tabs.map((tab) => (
             <button
               key={tab}
@@ -314,7 +327,7 @@ export default function RulesPage() {
           ))}
         </div>
 
-        <div className="space-y-4">
+        <div className="relative z-10 space-y-4">
           {ruleSections[activeTab].map(([title, text], index) => (
             <motion.div
               key={title}
@@ -358,8 +371,14 @@ export default function RulesPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="mb-12 text-center">
+      <section
+        className="relative mx-auto max-w-7xl border-b border-white/10 bg-cover bg-center px-6 py-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.7),rgba(0,0,0,0.95)),linear-gradient(105deg,rgba(0,0,0,0.92),rgba(0,0,0,0.62),rgba(0,0,0,0.9)),url('/images/sfondi/7.jpg')",
+        }}
+      >
+        <div className="relative z-10 mb-12 text-center">
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
             Official Documents
           </p>
@@ -367,7 +386,7 @@ export default function RulesPage() {
           <h2 className="mt-4 text-4xl font-bold">Download Full PDFs</h2>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="relative z-10 grid gap-6 md:grid-cols-3">
           {downloads.map((document) => {
             const Icon = document.icon;
 
@@ -403,13 +422,20 @@ export default function RulesPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-6 pb-28 text-center">
+      <section
+        className="relative mx-auto max-w-5xl bg-cover px-6 py-20 text-center"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg,rgba(0,0,0,0.72),rgba(0,0,0,0.95)),linear-gradient(115deg,rgba(249,115,22,0.1),transparent_50%),url('/images/sfondi/8.jpg')",
+          backgroundPosition: "center 46%",
+        }}
+      >
         <motion.div
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeUp}
-          className="rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-8"
+          className="relative z-10 rounded-2xl border border-yellow-400/20 bg-black/65 p-8 backdrop-blur"
         >
           <AlertTriangle className="mx-auto mb-5 h-10 w-10 text-yellow-300" />
 

@@ -26,9 +26,9 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
   ];
 
   return (
-    <section className="mx-auto max-w-7xl px-6 py-12">
+    <section className="relative z-10 mx-auto max-w-7xl px-6 py-12">
       <div>
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
+        <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-orange-300">
           <Swords size={15} />
           Competitive Record
         </p>
@@ -39,17 +39,22 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
         {stats.map((stat) => (
           <div
             key={stat.label}
-            className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/20 backdrop-blur"
+            className="group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-6 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1"
           >
-            <div className="flex items-center gap-3 text-orange-300">
-              <stat.icon size={20} />
-              <p className="text-[10px] font-black uppercase tracking-[0.22em]">
-                {stat.label}
+            <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
+              <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
+            </div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 text-orange-300">
+                <stat.icon size={20} />
+                <p className="text-[10px] font-black uppercase tracking-[0.22em]">
+                  {stat.label}
+                </p>
+              </div>
+              <p className="mt-4 break-words text-3xl font-black text-white">
+                {stat.value}
               </p>
             </div>
-            <p className="mt-4 break-words text-3xl font-black text-white">
-              {stat.value}
-            </p>
           </div>
         ))}
       </div>
@@ -80,12 +85,17 @@ function PlaceholderCard({
   description: string;
 }) {
   return (
-    <div className="rounded-3xl border border-dashed border-orange-400/25 bg-orange-500/[0.035] p-6">
-      <div className="flex items-center gap-3 text-orange-300">
-        <Icon size={20} />
-        <h3 className="text-lg font-black text-white">{title}</h3>
+    <div className="group relative overflow-hidden border border-dashed border-orange-400/25 bg-[linear-gradient(145deg,rgba(249,115,22,0.08),rgba(0,0,0,0.72))] p-6 shadow-2xl shadow-black/20 backdrop-blur transition hover:-translate-y-1">
+      <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
+        <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
       </div>
-      <p className="mt-3 text-sm leading-6 text-zinc-500">{description}</p>
+      <div className="relative z-10">
+        <div className="flex items-center gap-3 text-orange-300">
+          <Icon size={20} />
+          <h3 className="text-lg font-black text-white">{title}</h3>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-zinc-500">{description}</p>
+      </div>
     </div>
   );
 }

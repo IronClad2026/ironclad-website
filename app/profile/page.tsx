@@ -32,14 +32,27 @@ export default async function ProfilePage() {
   const profileComplete = isPlayerProfileComplete(profile);
 
   return (
-    <main className="min-h-screen bg-black px-6 pt-32 pb-20 text-white">
-      <section className="mx-auto max-w-5xl">
+    <main
+      className="min-h-screen bg-black bg-cover bg-center px-6 pt-32 pb-20 text-white"
+      style={{
+        backgroundImage:
+          "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/8.jpg')",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      }}
+    >
+      <section className="relative z-10 mx-auto max-w-5xl">
         <div
-          className="relative overflow-hidden rounded-3xl border border-orange-500/30 bg-cover bg-center p-8 shadow-2xl md:p-10"
-          style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
+          className="relative overflow-hidden border border-orange-500/25 bg-black/70 p-8 shadow-[0_0_45px_rgba(0,0,0,0.55)] backdrop-blur md:p-10"
         >
-          <div className="absolute inset-0 bg-black/80" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-orange-950/40" />
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-55"
+            style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
+          />
+          <div className="absolute inset-0 bg-black/68" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.86)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.58),rgba(249,115,22,0.15),rgba(0,0,0,0.9))]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:52px_52px] opacity-25" />
 
           <div className="relative z-10 max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
@@ -62,7 +75,7 @@ export default async function ProfilePage() {
         </div>
 
         {error ? (
-          <div className="mt-8 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-red-300">
+          <div className="mt-8 border border-red-500/30 bg-red-500/10 p-5 text-red-300 shadow-2xl shadow-black/30 backdrop-blur">
             Your player profile could not be loaded. Refresh the page and try
             again.
           </div>

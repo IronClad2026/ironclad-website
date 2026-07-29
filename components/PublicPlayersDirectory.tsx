@@ -52,80 +52,95 @@ export default function PublicPlayersDirectory({
   }, [countryFilter, eloFilter, players, searchTerm]);
 
   return (
-    <section className="mx-auto max-w-7xl px-6 py-12 sm:py-16">
-      <div className="relative z-30 overflow-visible rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/20 backdrop-blur focus-within:z-[1300] md:p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-400">
-              <UsersRound size={16} />
-              Public Commanders
-            </p>
-            <h2 className="mt-3 text-3xl font-black text-white">
-              {players.length} {players.length === 1 ? "Player" : "Players"}
-            </h2>
-            <p className="mt-2 text-sm text-zinc-400">
-              Directory data is limited to public-safe player profile fields.
-            </p>
-          </div>
+    <section className="relative isolate py-12 sm:py-16">
+      <div
+        className="absolute inset-0 bg-cover bg-center opacity-55"
+        style={{
+          backgroundImage: "url('/images/sfondi/6.jpg')",
+          backgroundPosition: "center",
+          backgroundSize: "cover",
+        }}
+      />
+      <div className="absolute inset-0 bg-black/68" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.16))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
 
-          <div className="grid gap-3 md:grid-cols-3 xl:min-w-[780px]">
-            <label className="relative block min-w-0">
-              <span className="text-sm font-bold text-white">
-                Search Player
-              </span>
-              <Search
-                size={18}
-                className="pointer-events-none absolute bottom-3.5 left-4 text-zinc-500"
+      <div className="relative z-10 mx-auto max-w-7xl px-6">
+        <div className="relative z-30 overflow-visible border border-orange-500/20 bg-black/70 p-5 shadow-[0_0_45px_rgba(0,0,0,0.48)] backdrop-blur focus-within:z-[1300] md:p-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-400">
+                <UsersRound size={16} />
+                Public Commanders
+              </p>
+              <h2 className="mt-3 text-3xl font-black text-white">
+                {players.length} {players.length === 1 ? "Player" : "Players"}
+              </h2>
+              <p className="mt-2 text-sm text-zinc-400">
+                Directory data is limited to public-safe player profile fields.
+              </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3 xl:min-w-[780px]">
+              <label className="relative block min-w-0">
+                <span className="text-sm font-bold text-white">
+                  Search Player
+                </span>
+                <Search
+                  size={18}
+                  className="pointer-events-none absolute bottom-3.5 left-4 text-zinc-500"
+                />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search by player name"
+                  className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-black/40 pr-4 pl-11 text-sm font-bold text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400"
+                />
+              </label>
+
+              <SearchableProfileSelect
+                label="ELO"
+                value={eloFilterLabel}
+                submittedValue={eloFilter}
+                options={eloFilterOptions}
+                onSelect={(option) => {
+                  setEloFilter(option.value);
+                  setEloFilterLabel(option.label);
+                }}
+                placeholder="Filter by ELO"
+                showSavedValueHint={false}
               />
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search by player name"
-                className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-black/40 pr-4 pl-11 text-sm font-bold text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400"
+
+              <SearchableProfileSelect
+                label="Country"
+                value={countryFilterLabel}
+                submittedValue={countryFilter}
+                options={countryFilterOptions}
+                onSelect={(option) => {
+                  setCountryFilter(option.value);
+                  setCountryFilterLabel(option.label);
+                }}
+                placeholder="Search countries"
+                showSavedValueHint={false}
               />
-            </label>
-
-            <SearchableProfileSelect
-              label="ELO"
-              value={eloFilterLabel}
-              submittedValue={eloFilter}
-              options={eloFilterOptions}
-              onSelect={(option) => {
-                setEloFilter(option.value);
-                setEloFilterLabel(option.label);
-              }}
-              placeholder="Filter by ELO"
-              showSavedValueHint={false}
-            />
-
-            <SearchableProfileSelect
-              label="Country"
-              value={countryFilterLabel}
-              submittedValue={countryFilter}
-              options={countryFilterOptions}
-              onSelect={(option) => {
-                setCountryFilter(option.value);
-                setCountryFilterLabel(option.label);
-              }}
-              placeholder="Search countries"
-              showSavedValueHint={false}
-            />
+            </div>
           </div>
         </div>
+
+        {players.length === 0 ? (
+          <EmptyState message="No public players available yet." />
+        ) : filteredPlayers.length === 0 ? (
+          <EmptyState message="No public players match those filters." />
+        ) : (
+          <div className="relative z-0 mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {filteredPlayers.map((player) => (
+              <PublicPlayerCard key={player.id} player={player} />
+            ))}
+          </div>
+        )}
       </div>
-
-      {players.length === 0 ? (
-        <EmptyState message="No public players available yet." />
-      ) : filteredPlayers.length === 0 ? (
-        <EmptyState message="No public players match those filters." />
-      ) : (
-        <div className="relative z-0 mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filteredPlayers.map((player) => (
-            <PublicPlayerCard key={player.id} player={player} />
-          ))}
-        </div>
-      )}
     </section>
   );
 }

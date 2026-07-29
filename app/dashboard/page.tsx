@@ -95,14 +95,22 @@ export default async function PlayerDashboardPage() {
   const profileComplete = isPlayerProfileComplete(profile);
 
   return (
-    <main className="min-h-screen bg-black px-6 pt-32 pb-20 text-white">
-      <div className="mx-auto max-w-7xl">
+    <main
+      className="min-h-screen bg-black bg-cover bg-center px-6 pt-32 pb-20 text-white"
+      style={{
+        backgroundImage:
+          "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/7.jpg')",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      }}
+    >
+      <div className="relative z-10 mx-auto max-w-7xl">
         <header
-          className="relative overflow-hidden rounded-3xl border border-orange-500/30 bg-cover bg-center p-8 shadow-2xl md:p-10"
-          style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
+          className="relative overflow-hidden border border-orange-500/25 bg-black/70 p-8 shadow-[0_0_45px_rgba(0,0,0,0.55)] backdrop-blur md:p-10"
         >
-          <div className="absolute inset-0 bg-black/80" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-orange-950/40" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:52px_52px] opacity-25" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(0,0,0,0.82)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(249,115,22,0.13),rgba(0,0,0,0.9))]" />
 
           <div className="relative z-10">
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
@@ -118,7 +126,7 @@ export default async function PlayerDashboardPage() {
           </div>
         </header>
 
-        <section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur md:p-8">
+        <section className="mt-8 border border-orange-500/20 bg-black/65 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl md:p-8">
           {profileResult.error ? (
             <DashboardError message="Your player profile could not be loaded." />
           ) : profile ? (
@@ -153,13 +161,13 @@ export default async function PlayerDashboardPage() {
               <div className="flex flex-col gap-3">
                 <Link
                   href="/profile"
-                  className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-center font-bold text-white transition hover:border-orange-500/60 hover:bg-orange-500/10"
+                  className="border border-white/15 bg-white/[0.04] px-5 py-3 text-center font-bold text-white transition hover:border-orange-400/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
                 >
                   View/Edit Profile
                 </Link>
                 <Link
                   href="/tournaments"
-                  className="rounded-xl bg-orange-500 px-5 py-3 text-center font-bold text-white transition hover:bg-orange-400"
+                  className="border border-orange-400 bg-orange-500 px-5 py-3 text-center font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
                 >
                   Go to Tournaments
                 </Link>
@@ -177,7 +185,7 @@ export default async function PlayerDashboardPage() {
               </div>
               <Link
                 href="/profile"
-                className="rounded-xl bg-orange-500 px-5 py-3 text-center font-bold text-white transition hover:bg-orange-400"
+                className="border border-orange-400 bg-orange-500 px-5 py-3 text-center font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
               >
                 Complete Player Profile
               </Link>
@@ -202,7 +210,7 @@ export default async function PlayerDashboardPage() {
             totalCount={playerNotifications.totalCount}
             unreadCount={playerNotifications.unreadCount}
             error={playerNotifications.error}
-            className="max-w-2xl lg:max-w-none"
+            className="max-w-2xl !rounded-none !border-orange-500/20 !bg-black/65 !shadow-2xl !shadow-black/30 [&_button]:rounded-none [&_div]:rounded-none lg:max-w-none"
           />
 
           {profile && (
@@ -301,7 +309,7 @@ function PlayerStatisticsSection({
         {values.map((item) => (
           <div
             key={item.label}
-            className="rounded-2xl border border-white/10 bg-white/[0.04] p-5"
+            className="border border-white/12 bg-black/55 p-5 shadow-xl shadow-black/15 backdrop-blur"
           >
             <p className="text-2xl font-black text-white">{item.value}</p>
             <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
@@ -377,7 +385,7 @@ function ProfileValue({
   value: string | null;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+    <div className="border border-white/12 bg-black/45 p-4 shadow-inner shadow-black/20">
       <p className="text-xs uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-2 break-words font-bold text-white">{value || "N/A"}</p>
     </div>
@@ -390,7 +398,7 @@ function RegistrationCard({
   registration: PlayerRegistration;
 }) {
   return (
-    <article className="rounded-2xl border border-white/10 bg-[#111318] p-6 shadow-2xl shadow-black/20 transition hover:border-orange-500/30">
+    <article className="border border-orange-500/20 bg-black/70 p-6 shadow-2xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/80">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-orange-300">
@@ -479,7 +487,7 @@ function RegistrationDecision({
     Boolean(registration.admin_notes?.trim());
 
   return (
-    <div className={`mt-4 rounded-xl border p-4 ${content.className}`}>
+    <div className={`mt-4 border p-4 ${content.className}`}>
       <p className="text-sm font-black uppercase tracking-wider">
         {content.title}
       </p>
@@ -552,7 +560,7 @@ function RegistrationValue({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+    <div className="border border-white/12 bg-black/45 p-4 shadow-inner shadow-black/20">
       <p className="text-xs uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-2 break-words text-sm font-bold text-white">{value}</p>
     </div>
@@ -561,7 +569,7 @@ function RegistrationValue({
 
 function EmptyRegistrations() {
   return (
-    <div className="mt-6 rounded-3xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-16 text-center">
+    <div className="mt-6 border border-dashed border-orange-400/25 bg-black/60 px-6 py-16 text-center shadow-2xl shadow-black/25 backdrop-blur">
       <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-300">
         <CalendarDays size={25} />
       </div>
@@ -574,7 +582,7 @@ function EmptyRegistrations() {
       </p>
       <Link
         href="/tournaments"
-        className="mt-6 inline-flex rounded-xl bg-orange-500 px-5 py-3 font-bold text-white transition hover:bg-orange-400"
+        className="mt-6 inline-flex border border-orange-400 bg-orange-500 px-5 py-3 font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
       >
         Explore Tournaments
       </Link>
@@ -584,7 +592,7 @@ function EmptyRegistrations() {
 
 function DashboardError({ message }: { message: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-red-300">
+    <div className="flex items-center gap-3 border border-red-500/35 bg-red-500/10 p-5 text-red-300 shadow-xl shadow-black/20 backdrop-blur">
       <MapPin size={20} className="shrink-0" />
       <p>{message}</p>
     </div>
