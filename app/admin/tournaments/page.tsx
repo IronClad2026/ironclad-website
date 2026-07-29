@@ -528,7 +528,6 @@ function TournamentForm({
         />
         <TournamentBannerPicker
           defaultValue={values.bannerImageUrl}
-          tournamentId={values.id}
           readOnly={!isEditing}
         />
         <label className="md:col-span-2">

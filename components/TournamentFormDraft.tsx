@@ -27,6 +27,10 @@ export default function TournamentFormDraft({
     if (savedDraft) {
       try {
         const draft = JSON.parse(savedDraft) as Record<string, string | boolean>;
+        if ("bannerImageUrl" in draft) {
+          delete draft.bannerImageUrl;
+          sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        }
         for (const [name, value] of Object.entries(draft)) {
           const field = form.elements.namedItem(name);
           if (
@@ -60,6 +64,7 @@ export default function TournamentFormDraft({
             field instanceof HTMLSelectElement
           ) ||
           !field.name ||
+          field.name === "bannerImageUrl" ||
           field.type === "file"
         ) {
           continue;
