@@ -7,6 +7,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    "_recovery_backup_*/**",
+    "_worktrees/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
