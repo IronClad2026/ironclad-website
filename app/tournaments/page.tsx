@@ -277,6 +277,7 @@ export default async function TournamentsPage() {
     <TournamentsExperience
       tournaments={tournaments}
       viewer={{
+        clerkUserId: userId,
         isAdmin,
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
@@ -348,3 +349,4 @@ function getTournamentSortTime(tournament: ReturnType<typeof mapTournamentRow>) 
   const timestamp = new Date(dateValue).getTime();
 
   return Number.isFinite(timestamp) ? timestamp : 0;
+}

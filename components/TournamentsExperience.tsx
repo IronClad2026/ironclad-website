@@ -1124,7 +1124,6 @@ function BracketMatchResultsWorkspace({
                               match={match}
                               participantsById={participantsById}
                               isAdmin={viewer.isAdmin}
-                              viewerClerkUserId={viewer.clerkUserId}
                               canSubmit={viewer.registrationIds.some(
                                 (registrationId) =>
                                   registrationId ===

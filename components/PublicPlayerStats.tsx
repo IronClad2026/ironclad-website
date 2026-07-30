@@ -11,7 +11,9 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
     {
       label: "Current ELO",
       value:
-        typeof player.currentElo === "number" ? String(player.currentElo) : "Unrated",
+        typeof player.currentElo === "number"
+          ? String(player.currentElo)
+          : "Unrated",
       icon: Shield,
     },
     {
@@ -27,40 +29,6 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
   ];
 
   return (
-<<<<<<< HEAD
-    <section className="mx-auto max-w-7xl px-6 py-12">
-      <div>
-        <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-orange-300">
-          <Swords size={15} />
-          Competitive Record
-        </p>
-        <h2 className="mt-3 text-3xl font-black text-white">Public Stats</h2>
-      </div>
-
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-6 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1"
-          >
-            <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
-              <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
-            </div>
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 text-orange-300">
-                <stat.icon size={20} />
-                <p className="text-[10px] font-black uppercase tracking-[0.22em]">
-                  {stat.label}
-                </p>
-              </div>
-              <p className="mt-4 break-words text-3xl font-black text-white">
-                {stat.value}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-=======
     <section className="relative z-10 mx-auto max-w-7xl px-6 py-12">
       <ScrollReveal>
         <div>
@@ -94,7 +62,6 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
             </div>
           ))}
         </div>
->>>>>>> master
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <PlaceholderCard
