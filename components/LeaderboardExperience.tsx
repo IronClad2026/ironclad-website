@@ -20,6 +20,7 @@ import type {
   PublicLeaderboardStanding,
   PublicSeasonChampion,
 } from "@/lib/leaderboard/public";
+import ScrollReveal from "@/components/ScrollReveal";
 
 type LeaderboardExperienceProps = {
   data: PublicLeaderboardData;
@@ -103,68 +104,72 @@ export default function LeaderboardExperience({
           </div>
         )}
 
-        <LeaderboardPodium rows={podiumRows} />
+        <ScrollReveal>
+          <LeaderboardPodium rows={podiumRows} />
+        </ScrollReveal>
 
-        <section
-          className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-4 shadow-[0_0_45px_rgba(0,0,0,0.48)] backdrop-blur sm:p-6"
-          style={{
-            backgroundImage:
-              "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.78) 48%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.9),rgba(249,115,22,0.1),rgba(0,0,0,0.9)),url('/images/sfondi/4.jpg')",
-          }}
-        >
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
-                <BarChart3 size={16} />
-                Dynamic Standings
-              </p>
-              <h2 className="mt-3 text-3xl font-black text-white">
-                Player Ranking
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300">
-                Switch between seasonal and all-time standings, then filter by
-                bracket. All rows come from public-safe leaderboard views.
-              </p>
+        <ScrollReveal>
+          <section
+            className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-4 shadow-[0_0_45px_rgba(0,0,0,0.48)] backdrop-blur sm:p-6"
+            style={{
+              backgroundImage:
+                "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.78) 48%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.9),rgba(249,115,22,0.1),rgba(0,0,0,0.9)),url('/images/sfondi/4.jpg')",
+            }}
+          >
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
+                  <BarChart3 size={16} />
+                  Dynamic Standings
+                </p>
+                <h2 className="mt-3 text-3xl font-black text-white">
+                  Player Ranking
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300">
+                  Switch between seasonal and all-time standings, then filter by
+                  bracket. All rows come from public-safe leaderboard views.
+                </p>
+              </div>
+
+              <div className="grid gap-3 lg:min-w-[720px] lg:grid-cols-[0.85fr_1.15fr]">
+                <SegmentedControl
+                  label="Ranking Scope"
+                  options={scopeOptions}
+                  value={scope}
+                  onChange={setScope}
+                />
+                <SegmentedControl
+                  label="Bracket"
+                  options={bracketOptions}
+                  value={bracketType}
+                  onChange={setBracketType}
+                />
+              </div>
             </div>
 
-            <div className="grid gap-3 lg:min-w-[720px] lg:grid-cols-[0.85fr_1.15fr]">
-              <SegmentedControl
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <MetricCard label="Visible Players" value={activeRows.length} />
+              <MetricCard
                 label="Ranking Scope"
-                options={scopeOptions}
-                value={scope}
-                onChange={setScope}
+                value={scope === "season" ? "Season" : "All Time"}
               />
-              <SegmentedControl
+              <MetricCard
                 label="Bracket"
-                options={bracketOptions}
-                value={bracketType}
-                onChange={setBracketType}
+                value={
+                  bracketOptions.find((option) => option.value === bracketType)
+                    ?.label ?? "Overall"
+                }
               />
             </div>
-          </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <MetricCard label="Visible Players" value={activeRows.length} />
-            <MetricCard
-              label="Ranking Scope"
-              value={scope === "season" ? "Season" : "All Time"}
-            />
-            <MetricCard
-              label="Bracket"
-              value={
-                bracketOptions.find((option) => option.value === bracketType)
-                  ?.label ?? "Overall"
-              }
-            />
-          </div>
+            <LeaderboardTable rows={activeRows} scope={scope} />
+          </section>
+        </ScrollReveal>
 
-          <LeaderboardTable rows={activeRows} scope={scope} />
-        </section>
-
-        <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+        <ScrollReveal className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
           <TournamentHistoryLeaderboard items={historyItems} />
           <SeasonChampionsArchive champions={data.seasonChampions} />
-        </div>
+        </ScrollReveal>
       </section>
     </main>
   );
@@ -194,7 +199,7 @@ function LeaderboardHero({
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
 
-      <div className="relative z-10 mx-auto grid max-w-[1800px] gap-10 xl:grid-cols-[1.05fr_0.95fr] xl:items-end">
+      <ScrollReveal className="relative z-10 mx-auto grid max-w-[1800px] gap-10 xl:grid-cols-[1.05fr_0.95fr] xl:items-end">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.36em] text-orange-300">
             IronClad Competitive Command
@@ -254,7 +259,7 @@ function LeaderboardHero({
             <HeroStat label="Reset" value="2 / Year" />
           </div>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import { ArrowLeft, Globe2, MapPin, Shield, UserRound } from "lucide-react";
 import Link from "next/link";
 import DiscordContactButton from "@/components/DiscordContactButton";
+import ScrollReveal from "@/components/ScrollReveal";
 import type { PublicPlayerProfile } from "@/lib/public-players";
 
 type PublicPlayerProfileHeaderProps = {
@@ -27,7 +28,7 @@ export default function PublicPlayerProfileHeader({
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
 
-      <div className="relative z-10 mx-auto max-w-7xl">
+      <ScrollReveal className="relative z-10 mx-auto max-w-7xl">
         <Link
           href="/players"
           className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/45 px-4 py-2 text-sm font-bold text-zinc-300 shadow-xl shadow-black/10 backdrop-blur transition hover:border-orange-400/45 hover:bg-orange-500/10 hover:text-white"
@@ -82,7 +83,7 @@ export default function PublicPlayerProfileHeader({
             discordUsername={player.discordUsername}
           />
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }

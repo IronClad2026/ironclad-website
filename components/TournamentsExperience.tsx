@@ -15,6 +15,7 @@ import MatchResultControls, {
   ResultEntryForm,
 } from "@/components/MatchResultControls";
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
+import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import {
   getEligibleBracketNames,
@@ -306,7 +307,7 @@ function Hero({
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
       <div className="relative z-10 px-5 py-8 lg:px-8 lg:py-10">
         <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
-          <div>
+          <ScrollReveal>
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
                 tone={
@@ -329,7 +330,7 @@ function Hero({
               <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.time}</span>
               <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {tournament.players}/{tournament.maxPlayers} approved slots</span>
             </div>
-          </div>
+          </ScrollReveal>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
             {registrationState ? (
               <RegistrationStateCard state={registrationState} />

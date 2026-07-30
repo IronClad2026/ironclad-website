@@ -1,5 +1,6 @@
 import CurrentTournamentCard from "@/components/CurrentTournamentCard";
 import HomeAccountSection from "@/components/HomeAccountSection";
+import ScrollReveal from "@/components/ScrollReveal";
 import { currentTournaments } from "@/data/currentTournaments";
 import {
   ArrowRight,
@@ -75,7 +76,7 @@ function HeroSection() {
       />
 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] lg:items-end">
-        <div className="max-w-5xl">
+        <ScrollReveal className="max-w-5xl">
           <p className="text-sm font-black uppercase text-orange-300">
             Competitive Company of Heroes 3 Events
           </p>
@@ -127,7 +128,7 @@ function HeroSection() {
               </div>
             ))}
           </dl>
-        </div>
+        </ScrollReveal>
 
         <aside
           className="hidden border border-white/15 bg-black/55 p-5 backdrop-blur lg:block"
@@ -219,7 +220,7 @@ function PlayersSection() {
       />
       <TacticalBackdrop muted />
 
-      <div className="relative z-10 mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_340px] lg:items-center">
+      <ScrollReveal className="relative z-10 mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_340px] lg:items-center">
         <SectionHeading
           eyebrow="IronClad Players"
           title="Discover the Public Roster"
@@ -248,7 +249,7 @@ function PlayersSection() {
             <ArrowRight size={17} aria-hidden="true" />
           </Link>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }
@@ -276,7 +277,7 @@ function EventsSection() {
         className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:84px_84px]"
       />
 
-      <div className="relative z-10 mx-auto max-w-7xl">
+      <ScrollReveal className="relative z-10 mx-auto max-w-7xl">
         <div className="mb-10">
           <SectionHeading
             eyebrow="Live Tournament Access"
@@ -294,7 +295,7 @@ function EventsSection() {
             />
           ))}
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }
