@@ -64,6 +64,13 @@ const visionItems = [
   "Professional tournament experiences",
 ];
 
+type SectionBackground = {
+  image: string;
+  position?: string;
+  opacity?: number;
+  overlay?: string;
+};
+
 export default function AboutPage() {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef<HTMLElement | null>(null);
@@ -110,7 +117,7 @@ function HeroSection() {
   return (
     <section className="relative isolate flex min-h-[92vh] items-end overflow-hidden border-b border-orange-500/20 px-5 pt-32 pb-12 sm:px-8 lg:px-12">
       <div
-        className="absolute inset-0 bg-cover bg-center opacity-28"
+        className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
       />
       <TacticalBackdrop />
@@ -178,6 +185,13 @@ function MissionSection() {
       eyebrow="Mission"
       title="A Competitive Home for CoH3 Players"
       text="IronClad exists to support the Company of Heroes 3 competitive scene with organised tournaments, clear rules, fair brackets, seasonal rankings, and a serious community environment."
+      background={{
+        image: "/images/sfondi/1.jpg",
+        position: "center 52%",
+        opacity: 1,
+        overlay:
+          "linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.78) 42%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.92),rgba(0,0,0,0.58),rgba(38,17,8,0.9))",
+      }}
       visual={
         <div className="grid gap-3 sm:grid-cols-3">
           {[
@@ -199,6 +213,12 @@ function MissionSection() {
 function TournamentStructureSection() {
   return (
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-24 sm:px-8 lg:px-12">
+      <SectionImageBackdrop
+        image="/images/sfondi/2.jpg"
+        position="center 48%"
+        opacity={1}
+        overlay="linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.8) 48%,rgba(0,0,0,0.94)),linear-gradient(105deg,rgba(0,0,0,0.9),rgba(0,0,0,0.56),rgba(249,115,22,0.1),rgba(0,0,0,0.92))"
+      />
       <TacticalBackdrop muted />
       <div className="relative z-10 mx-auto max-w-7xl">
         <SectionHeading
@@ -240,6 +260,12 @@ function TournamentStructureSection() {
 function FairCompetitionSection() {
   return (
     <section className="relative isolate overflow-hidden border-b border-orange-500/15 bg-[linear-gradient(180deg,#050505,#0b0b0b)] px-5 py-24 sm:px-8 lg:px-12">
+      <SectionImageBackdrop
+        image="/images/sfondi/7.jpg"
+        position="center 50%"
+        opacity={1}
+        overlay="linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.74) 45%,rgba(0,0,0,0.95)),linear-gradient(100deg,rgba(0,0,0,0.95),rgba(0,0,0,0.62),rgba(42,18,8,0.88))"
+      />
       <div className="absolute inset-y-0 left-0 w-px bg-orange-500/40" />
       <div className="relative z-10 mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
         <SectionHeading
@@ -282,6 +308,13 @@ function CommunitySection() {
       eyebrow="Community"
       title="Built by the Community. For the Community."
       text="IronClad is built around players, admins, casters, and the wider Company of Heroes 3 community. The goal is to create a competitive environment where players can improve, compete, and be recognised."
+      background={{
+        image: "/images/sfondi/3.jpg",
+        position: "58% center",
+        opacity: 1,
+        overlay:
+          "linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.76) 42%,rgba(0,0,0,0.94)),linear-gradient(112deg,rgba(0,0,0,0.92),rgba(0,0,0,0.58),rgba(249,115,22,0.09),rgba(0,0,0,0.9))",
+      }}
       visual={
         <div className="grid gap-4 sm:grid-cols-2">
           <GlassPanel>
@@ -307,6 +340,12 @@ function CommunitySection() {
 function FutureVisionSection() {
   return (
     <section className="relative isolate min-h-[88vh] overflow-hidden px-5 py-24 sm:px-8 lg:px-12">
+      <SectionImageBackdrop
+        image="/images/sfondi/8.jpg"
+        position="center 46%"
+        opacity={1}
+        overlay="linear-gradient(180deg,rgba(0,0,0,0.82),rgba(0,0,0,0.72) 46%,rgba(0,0,0,0.96)),linear-gradient(115deg,rgba(0,0,0,0.94),rgba(0,0,0,0.6),rgba(249,115,22,0.12),rgba(0,0,0,0.9))"
+      />
       <TacticalBackdrop />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.72),rgba(0,0,0,0.94)),linear-gradient(115deg,rgba(249,115,22,0.12),transparent_50%)]" />
       <div className="relative z-10 mx-auto flex min-h-[68vh] max-w-7xl flex-col justify-end">
@@ -367,14 +406,17 @@ function CinematicSection({
   title,
   text,
   visual,
+  background,
 }: {
   eyebrow: string;
   title: string;
   text: string;
   visual: ReactNode;
+  background?: SectionBackground;
 }) {
   return (
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-24 sm:px-8 lg:px-12">
+      {background && <SectionImageBackdrop {...background} />}
       <div className="relative z-10 mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
         <SectionHeading eyebrow={eyebrow} title={title} text={text} />
         <motion.div
@@ -425,6 +467,32 @@ function GlassPanel({ children }: { children: ReactNode }) {
     <div className="border border-white/12 bg-white/[0.045] p-5 shadow-2xl shadow-black/25 backdrop-blur">
       {children}
     </div>
+  );
+}
+
+function SectionImageBackdrop({
+  image,
+  position = "center center",
+  opacity = 1,
+  overlay = "linear-gradient(180deg,rgba(0,0,0,0.88),rgba(0,0,0,0.8) 45%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.9),rgba(0,0,0,0.58),rgba(0,0,0,0.9))",
+}: SectionBackground) {
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover"
+        style={{
+          backgroundImage: `url('${image}')`,
+          backgroundPosition: position,
+          opacity,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0"
+        style={{ background: overlay }}
+      />
+    </>
   );
 }
 

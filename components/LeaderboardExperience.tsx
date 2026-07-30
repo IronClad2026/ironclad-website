@@ -86,7 +86,7 @@ export default function LeaderboardExperience({
   );
 
   return (
-    <main className="min-h-screen overflow-hidden bg-black text-white">
+    <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#030303,#080808_42%,#030303)] text-white">
       <LeaderboardHero
         currentSeason={data.currentSeason}
         seasonProgress={data.currentSeasonProgress}
@@ -95,9 +95,9 @@ export default function LeaderboardExperience({
         ).length}
       />
 
-      <section className="mx-auto max-w-[1800px] space-y-10 px-4 py-10 sm:px-6 lg:px-8 xl:px-10">
+      <section className="relative z-10 mx-auto max-w-[1800px] space-y-10 px-4 py-10 sm:px-6 lg:px-8 xl:px-10">
         {data.errors.length > 0 && (
-          <div className="rounded-3xl border border-amber-400/25 bg-amber-500/10 p-5 text-sm font-semibold leading-6 text-amber-100">
+          <div className="border border-amber-300/30 bg-[linear-gradient(135deg,rgba(245,158,11,0.18),rgba(0,0,0,0.82))] p-5 text-sm font-semibold leading-6 text-amber-100 shadow-2xl shadow-black/30 backdrop-blur">
             Some leaderboard data could not be loaded. The public page is
             showing every safe dataset currently available.
           </div>
@@ -105,17 +105,23 @@ export default function LeaderboardExperience({
 
         <LeaderboardPodium rows={podiumRows} />
 
-        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/25 backdrop-blur sm:p-6">
+        <section
+          className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-4 shadow-[0_0_45px_rgba(0,0,0,0.48)] backdrop-blur sm:p-6"
+          style={{
+            backgroundImage:
+              "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.78) 48%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.9),rgba(249,115,22,0.1),rgba(0,0,0,0.9)),url('/images/sfondi/4.jpg')",
+          }}
+        >
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-400">
+              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
                 <BarChart3 size={16} />
                 Dynamic Standings
               </p>
               <h2 className="mt-3 text-3xl font-black text-white">
                 Player Ranking
               </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300">
                 Switch between seasonal and all-time standings, then filter by
                 bracket. All rows come from public-safe leaderboard views.
               </p>
@@ -180,12 +186,12 @@ function LeaderboardHero({
       <div
         className="absolute inset-0 bg-cover bg-center opacity-55"
         style={{
-          backgroundImage:
-            "url('/images/leaderboard/ironclad-leaderboard-bg.png')",
+          backgroundImage: "url('/images/ironclad-background.jpg')",
         }}
       />
-      <div className="absolute inset-0 bg-black/70" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.28),transparent_34%),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.76),rgba(67,20,7,0.74))]" />
+      <div className="absolute inset-0 bg-black/68" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.16))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
 
       <div className="relative z-10 mx-auto grid max-w-[1800px] gap-10 xl:grid-cols-[1.05fr_0.95fr] xl:items-end">
@@ -203,7 +209,7 @@ function LeaderboardHero({
           </p>
         </div>
 
-        <div className="rounded-3xl border border-orange-400/25 bg-black/55 p-5 shadow-2xl shadow-orange-950/20 backdrop-blur md:p-6">
+        <div className="border border-orange-400/30 bg-black/60 p-5 shadow-[0_0_38px_rgba(0,0,0,0.45)] backdrop-blur md:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
@@ -221,7 +227,7 @@ function LeaderboardHero({
               </p>
             </div>
 
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
+            <div className="grid h-16 w-16 shrink-0 place-items-center border border-orange-400/35 bg-orange-500/10 text-orange-300 shadow-[0_0_24px_rgba(249,115,22,0.14)]">
               <Trophy size={28} />
             </div>
           </div>
@@ -231,7 +237,7 @@ function LeaderboardHero({
               <span>Season Progress</span>
               <span>{Math.round(progress)}%</span>
             </div>
-            <div className="mt-3 h-3 overflow-hidden rounded-full border border-white/10 bg-zinc-900">
+            <div className="mt-3 h-3 overflow-hidden rounded-full border border-orange-400/15 bg-black/70">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-300 shadow-[0_0_18px_rgba(249,115,22,0.55)]"
                 style={{ width: `${progress}%` }}
@@ -255,7 +261,7 @@ function LeaderboardHero({
 
 function HeroStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="border border-white/12 bg-white/[0.055] p-4 backdrop-blur">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>
@@ -281,12 +287,12 @@ function LeaderboardPodium({ rows }: { rows: PublicLeaderboardStanding[] }) {
     <section>
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-400">
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
             Current Season Leaders
           </p>
           <h2 className="mt-2 text-3xl font-black text-white">Top 3 Podium</h2>
         </div>
-        <p className="max-w-2xl text-sm text-zinc-500">
+        <p className="max-w-2xl text-sm text-zinc-400">
           Overall bracket leaders from the active season standings.
         </p>
       </div>
@@ -314,14 +320,14 @@ function PodiumCard({
   return (
     <Link
       href={`/players/${row.playerId}`}
-      className={`group relative block overflow-hidden rounded-3xl border p-5 shadow-2xl shadow-black/25 backdrop-blur transition hover:-translate-y-1 ${
+      className={`group relative block overflow-hidden border p-5 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${
         prominent
-          ? "border-orange-300/50 bg-[linear-gradient(145deg,rgba(249,115,22,0.2),rgba(255,255,255,0.06))] lg:min-h-[380px]"
-          : "border-white/10 bg-white/[0.04] lg:min-h-[330px]"
+          ? "border-orange-300/55 bg-[linear-gradient(145deg,rgba(249,115,22,0.24),rgba(20,12,7,0.9),rgba(255,255,255,0.055))] shadow-orange-950/25 lg:min-h-[380px]"
+          : "border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] lg:min-h-[330px]"
       }`}
     >
       <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
-        <div className="absolute -top-20 right-0 h-44 w-44 rounded-full bg-orange-500/20 blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
       </div>
       <div className="relative z-10">
         <div className="flex items-center justify-between">
@@ -371,10 +377,10 @@ function LeaderboardTable({
   }
 
   return (
-    <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+    <div className="mt-6 overflow-hidden border border-orange-500/20 shadow-2xl shadow-black/25">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
-          <thead className="bg-black/45 text-xs uppercase tracking-wider text-zinc-500">
+          <thead className="bg-black/72 text-xs uppercase tracking-wider text-orange-200/70">
             <tr>
               <th className="px-4 py-4">Rank</th>
               <th className="px-4 py-4">Player</th>
@@ -389,11 +395,11 @@ function LeaderboardTable({
               <th className="px-4 py-4">Movement</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10 bg-white/[0.02]">
+          <tbody className="divide-y divide-white/10 bg-black/30">
             {rows.map((row) => (
               <tr
                 key={`${scope}-${row.bracketType}-${row.playerId}`}
-                className="transition hover:bg-orange-500/10"
+                className="transition hover:bg-orange-500/12"
               >
                 <td className="px-4 py-4 text-lg font-black text-orange-300">
                   #{row.rank ?? "-"}
@@ -409,7 +415,7 @@ function LeaderboardTable({
                         {row.playerName}
                       </p>
                       {row.region && (
-                        <p className="truncate text-xs text-zinc-500">
+                        <p className="truncate text-xs text-zinc-400">
                           {row.region}
                         </p>
                       )}
@@ -465,11 +471,11 @@ function SegmentedControl<T extends string>({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">
+      <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-400">
         {label}
       </p>
       <div
-        className={`grid gap-2 rounded-2xl border border-white/10 bg-black/25 p-2 ${
+        className={`grid gap-2 border border-orange-500/20 bg-black/55 p-2 shadow-inner shadow-black/30 ${
           options.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"
         }`}
       >
@@ -483,8 +489,8 @@ function SegmentedControl<T extends string>({
               onClick={() => onChange(option.value)}
               className={`rounded-xl px-3 py-2 text-left text-xs font-black uppercase tracking-wider transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 ${
                 active
-                  ? "border border-orange-400/50 bg-orange-500/20 text-orange-100"
-                  : "border border-transparent text-zinc-400 hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
+                  ? "border border-orange-300/55 bg-orange-500/20 text-orange-100 shadow-[0_0_18px_rgba(249,115,22,0.12)]"
+                  : "border border-transparent text-zinc-400 hover:border-orange-300/25 hover:bg-white/[0.055] hover:text-white"
               }`}
             >
               {option.label}
@@ -502,8 +508,14 @@ function TournamentHistoryLeaderboard({
   items: TournamentHistoryItem[];
 }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
-      <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-400">
+    <section
+      className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-6 shadow-2xl shadow-black/25 backdrop-blur"
+      style={{
+        backgroundImage:
+          "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.77) 48%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.9),rgba(249,115,22,0.08),rgba(0,0,0,0.88)),url('/images/sfondi/2.jpg')",
+      }}
+    >
+      <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
         <CalendarDays size={16} />
         Tournament History
       </p>
@@ -512,7 +524,7 @@ function TournamentHistoryLeaderboard({
       </h2>
 
       {items.length === 0 ? (
-        <p className="mt-5 rounded-2xl border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-5 text-sm leading-6 text-zinc-400">
+        <p className="mt-5 border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-5 text-sm leading-6 text-zinc-400">
           Tournament history will appear here after leaderboard recalculations
           are published.
         </p>
@@ -521,7 +533,7 @@ function TournamentHistoryLeaderboard({
           {items.slice(0, 6).map((item) => (
             <div
               key={`${item.tournamentId}-${item.bracketType}`}
-              className="rounded-2xl border border-white/10 bg-black/25 p-4"
+              className="border border-white/12 bg-black/45 p-4 shadow-xl shadow-black/10"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -534,7 +546,7 @@ function TournamentHistoryLeaderboard({
                   {item.points} pts
                 </span>
               </div>
-              <p className="mt-3 text-sm text-zinc-400">
+              <p className="mt-3 text-sm text-zinc-300">
                 Top published scorer:{" "}
                 <span className="font-bold text-zinc-200">
                   {item.playerName}
@@ -554,8 +566,14 @@ function SeasonChampionsArchive({
   champions: PublicSeasonChampion[];
 }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
-      <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-400">
+    <section
+      className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-6 shadow-2xl shadow-black/25 backdrop-blur"
+      style={{
+        backgroundImage:
+          "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.78) 48%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.92),rgba(249,115,22,0.08),rgba(0,0,0,0.9)),url('/images/sfondi/3.jpg')",
+      }}
+    >
+      <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
         <Award size={16} />
         Season Champions Archive
       </p>
@@ -564,7 +582,7 @@ function SeasonChampionsArchive({
       </h2>
 
       {champions.length === 0 ? (
-        <p className="mt-5 rounded-2xl border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-5 text-sm leading-6 text-zinc-400">
+        <p className="mt-5 border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-5 text-sm leading-6 text-zinc-400">
           Season champions will appear here when a season closes.
         </p>
       ) : (
@@ -573,10 +591,10 @@ function SeasonChampionsArchive({
             <Link
               key={champion.id}
               href={`/players/${champion.playerId}`}
-              className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-orange-400/40 hover:bg-orange-500/10"
+              className="flex items-center gap-4 border border-white/12 bg-black/45 p-4 transition hover:border-orange-400/45 hover:bg-orange-500/12 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
             >
               <div
-                className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-orange-400/30 bg-black/45 bg-cover bg-center"
+                className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-orange-400/35 bg-black/55 bg-cover bg-center shadow-[0_0_20px_rgba(249,115,22,0.12)]"
                 style={
                   champion.avatarUrl
                     ? { backgroundImage: `url("${champion.avatarUrl}")` }
@@ -682,7 +700,7 @@ function RankMovement({ row }: { row: PublicLeaderboardStanding }) {
 
 function MetricCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+    <div className="border border-white/12 bg-black/45 p-4 shadow-xl shadow-black/10">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>
@@ -693,7 +711,7 @@ function MetricCard({ label, value }: { label: string; value: string | number })
 
 function MiniStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/30 p-3 text-center">
+    <div className="border border-white/12 bg-black/45 p-3 text-center">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>
@@ -715,9 +733,9 @@ function EmptyPanel({
 }) {
   return (
     <section
-      className={`rounded-3xl border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-8 text-center ${className}`}
+      className={`border border-dashed border-orange-400/30 bg-[linear-gradient(145deg,rgba(249,115,22,0.08),rgba(0,0,0,0.72))] p-8 text-center shadow-2xl shadow-black/20 backdrop-blur ${className}`}
     >
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-orange-400/25 bg-orange-500/10 text-orange-300">
+      <div className="mx-auto grid h-14 w-14 place-items-center border border-orange-400/25 bg-orange-500/10 text-orange-300">
         <Icon size={24} />
       </div>
       <h2 className="mt-5 text-2xl font-black text-white">{title}</h2>

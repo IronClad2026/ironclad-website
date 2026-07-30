@@ -251,8 +251,17 @@ export default async function TournamentsPage() {
 
   if (tournaments.length === 0) {
     return (
-      <main className="min-h-screen bg-black px-6 pt-32 text-white">
-        <div className="mx-auto max-w-3xl rounded-3xl border border-orange-500/30 bg-zinc-950 p-10 text-center">
+      <main
+        className="min-h-screen bg-black bg-cover bg-center px-6 pt-32 text-white"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover",
+        }}
+      >
+        <div className="relative z-10 mx-auto max-w-3xl border border-orange-500/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-10 text-center shadow-2xl shadow-black/30 backdrop-blur">
           <h1 className="text-3xl font-black">No Tournaments Published</h1>
           <p className="mt-4 text-zinc-400">
             Tournament data will appear here after an administrator publishes

@@ -174,13 +174,20 @@ function classNames(...classes: Array<string | false | undefined | null>) {
 
 const interactiveHover = "transform-gpu transition-all duration-300 ease-out hover:scale-[1.03] hover:border-orange-500/70 hover:shadow-lg hover:shadow-orange-950/20 active:scale-[0.99]";
 
-function StatusPill({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "green" | "red" | "amber" | "gray" }) {
+const tournamentCardClass =
+  "group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100";
+const tournamentInsetCardClass =
+  "border border-white/12 bg-black/45 shadow-xl shadow-black/10 transition hover:border-orange-400/35";
+const tournamentTableClass =
+  "overflow-hidden border border-white/12 shadow-2xl shadow-black/25 transition hover:border-orange-400/35";
+
+function StatusPill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "green" | "red" | "amber" | "gray" }) {
   const tones = {
-    blue: "border-sky-400/40 bg-sky-500/10 text-sky-200",
+    neutral: "border-white/12 bg-black/45 text-zinc-300",
     green: "border-emerald-400/40 bg-emerald-500/10 text-emerald-200",
     red: "border-orange-400/40 bg-orange-500/10 text-orange-200",
     amber: "border-amber-400/40 bg-amber-500/10 text-amber-200",
-    gray: "border-slate-500/50 bg-slate-700/30 text-slate-300",
+    gray: "border-slate-500/50 bg-slate-700/30 text-zinc-300",
   };
 
   return <span className={classNames("inline-flex items-center rounded border px-2 py-1 text-xs font-semibold uppercase tracking-wide", tones[tone])}>{children}</span>;
@@ -206,34 +213,34 @@ function Sidebar({
   ).map(([month, events]) => ({ month, events }));
 
   return (
-    <aside className="hidden w-72 shrink-0 border-r border-slate-800 bg-[#111827] lg:block">
+    <aside className="hidden w-72 shrink-0 border-r border-orange-500/20 bg-black/70 shadow-2xl shadow-black/30 backdrop-blur-xl lg:block">
       <div className="sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto">
-        <div className="border-b border-slate-800 p-5">
-          <div className="h-32 rounded-xl border border-slate-700 bg-center bg-no-repeat" style={{ backgroundImage: "linear-gradient(135deg,rgba(15,23,42,0.42),rgba(2,6,23,0.84)),url(/images/ironclad-background.jpg)", backgroundSize: "100% auto" }} />
+        <div className="border-b border-orange-500/15 p-5">
+          <div className="h-32 border border-white/12 bg-center bg-no-repeat shadow-xl shadow-black/20" style={{ backgroundImage: "linear-gradient(135deg,rgba(0,0,0,0.42),rgba(0,0,0,0.84)),url(/images/ironclad-background.jpg)", backgroundSize: "100% auto" }} />
           <div className="mt-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Organizer</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Organizer</p>
             <h2 className="mt-1 text-lg font-black text-white">IronClad Tournaments</h2>
-            <p className="mt-1 text-sm text-slate-400">Company of Heroes 3 Events</p>
+            <p className="mt-1 text-sm text-zinc-400">Company of Heroes 3 Events</p>
           </div>
         </div>
 
         <nav className="p-3">
           <button
             onClick={() => setEventsOpen((current) => !current)}
-            className={classNames("group mb-1 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold text-slate-400 hover:bg-slate-800/80 hover:text-white", interactiveHover)}
+            className={classNames("group mb-1 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold text-zinc-400 hover:bg-orange-500/10 hover:text-white", interactiveHover)}
           >
             <span className="flex items-center gap-3">
               <CalendarDays size={17} className="text-orange-400" />
               Events
             </span>
-            <ChevronDown size={14} className={classNames("text-slate-500 transition", eventsOpen && "rotate-180")} />
+            <ChevronDown size={14} className={classNames("text-zinc-500 transition", eventsOpen && "rotate-180")} />
           </button>
 
           {eventsOpen && (
-            <div className="mt-2 space-y-4 rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+            <div className="mt-2 space-y-4 border border-white/12 bg-black/45 p-3 shadow-inner shadow-black/20">
               {eventsByMonth.map((group) => (
                 <div key={group.month}>
-                  <p className="mb-2 text-xs font-black uppercase tracking-wider text-slate-500">{group.month}</p>
+                  <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">{group.month}</p>
                   <div className="space-y-2">
                     {group.events.map((event) => {
                       const selected = selectedTournament.title === event.title;
@@ -241,11 +248,11 @@ function Sidebar({
                         <button
                           key={event.title}
                           onClick={() => onSelectTournament(event)}
-                          className={classNames("block w-full rounded-lg bg-cover bg-center p-3 text-left transform-gpu transition-all duration-300 ease-out hover:scale-[1.03] hover:brightness-110 active:scale-[0.99]", selected && "ring-2 ring-orange-500")}
-                          style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,6,23,0.74)),url(${event.image})` }}
+                          className={classNames("relative block w-full overflow-hidden border border-white/12 bg-cover bg-center p-3 text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100", selected && "ring-2 ring-orange-500")}
+                          style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
                         >
                           <p className="break-words text-sm font-black text-white">{event.title}</p>
-                          <p className="mt-1 text-xs text-slate-300">{event.format} - {event.status}</p>
+                          <p className="mt-1 text-xs text-zinc-300">{event.format} - {event.status}</p>
                         </button>
                       );
                     })}
@@ -284,23 +291,20 @@ function Hero({
     : null;
 
   return (
-    <section className="relative overflow-hidden border-b border-slate-800 bg-black">
+    <section className="relative overflow-hidden border-b border-orange-500/20 bg-black">
       <motion.div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-75"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-55"
         style={{
           backgroundImage: `url(${tournament.image})`,
         }}
         animate={{ backgroundPositionY: ["0%", "100%", "0%"] }}
         transition={{ duration: 36, repeat: Infinity, ease: "easeInOut" }}
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/20" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-      <div className="absolute inset-0 opacity-35">
-        <div className="absolute left-1/3 top-0 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl" />
-        <div className="absolute right-10 top-16 h-72 w-72 rounded-full bg-orange-500/20 blur-3xl" />
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(15,23,42,0.3),rgba(2,6,23,0.96)),repeating-linear-gradient(90deg,rgba(148,163,184,0.04)_0,rgba(148,163,184,0.04)_1px,transparent_1px,transparent_80px)]" />
-      </div>
-      <div className="relative px-5 py-8 lg:px-8 lg:py-10">
+      <div className="absolute inset-0 bg-black/68" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.24),rgba(0,0,0,0.92)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.62),rgba(249,115,22,0.16))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
+      <div className="relative z-10 px-5 py-8 lg:px-8 lg:py-10">
         <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -314,16 +318,16 @@ function Hero({
               >
                 {publicStatus}
               </StatusPill>
-              <StatusPill tone="blue">{tournament.format}</StatusPill>
+              <StatusPill tone="neutral">{tournament.format}</StatusPill>
               <StatusPill tone="amber">{tournament.ruleFormatLabel}</StatusPill>
               <StatusPill tone="gray">{tournament.region}</StatusPill>
             </div>
             <h1 className="mt-5 max-w-4xl text-3xl font-black tracking-tight text-white sm:text-5xl">{tournament.title}</h1>
-            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-300">
-              <span className="flex items-center gap-2"><Gamepad2 size={16} className="text-sky-300" /> {tournament.game}</span>
-              <span className="flex items-center gap-2"><CalendarDays size={16} className="text-sky-300" /> {tournament.month} Tournament</span>
-              <span className="flex items-center gap-2"><Clock3 size={16} className="text-sky-300" /> {tournament.time}</span>
-              <span className="flex items-center gap-2"><Users size={16} className="text-sky-300" /> {tournament.players}/{tournament.maxPlayers} approved slots</span>
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-zinc-300">
+              <span className="flex items-center gap-2"><Gamepad2 size={16} className="text-orange-300" /> {tournament.game}</span>
+              <span className="flex items-center gap-2"><CalendarDays size={16} className="text-orange-300" /> {tournament.month} Tournament</span>
+              <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.time}</span>
+              <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {tournament.players}/{tournament.maxPlayers} approved slots</span>
             </div>
           </div>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
@@ -353,7 +357,7 @@ function Hero({
 type ViewerRegistrationDisplay = {
   title: string;
   description: string;
-  tone: "green" | "amber" | "red" | "blue";
+  tone: "green" | "amber" | "red" | "neutral";
   icon: ElementType;
   details: string[];
 };
@@ -363,14 +367,14 @@ function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) 
     green: "border-emerald-400/45 bg-emerald-500/10 text-emerald-100",
     amber: "border-amber-400/45 bg-amber-500/10 text-amber-100",
     red: "border-red-400/45 bg-red-500/10 text-red-100",
-    blue: "border-sky-400/45 bg-sky-500/10 text-sky-100",
+    neutral: "border-white/12 bg-black/45 text-zinc-200",
   };
   const Icon = state.icon;
 
   return (
     <div
       className={classNames(
-        "min-h-[104px] w-full min-w-0 overflow-hidden rounded-xl border p-4 text-left shadow-xl shadow-black/10 backdrop-blur",
+        "min-h-[104px] w-full min-w-0 overflow-hidden border p-4 text-left shadow-xl shadow-black/20 backdrop-blur transition hover:border-orange-400/35",
         tones[state.tone]
       )}
     >
@@ -446,7 +450,7 @@ function getViewerRegistrationDisplay(
       title: "Registration Under Manual Review",
       description:
         "Tournament administration is reviewing your registration details.",
-      tone: "blue",
+      tone: "neutral",
       icon: Info,
       details,
     };
@@ -456,7 +460,7 @@ function getViewerRegistrationDisplay(
     title: "Registration Submitted - Awaiting Review",
     description:
       "Your tournament registration has been submitted and is awaiting administrator review.",
-    tone: "blue",
+    tone: "neutral",
     icon: Clock3,
     details,
   };
@@ -470,17 +474,17 @@ function formatRegistrationStatus(status: TournamentViewerRegistration["status"]
 
 function ActionCard({ label, description, icon: Icon, onClick }: { label: string; description: string; icon: ElementType; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/50 p-4 text-left shadow-xl shadow-black/10 backdrop-blur hover:bg-orange-500/10", interactiveHover)}>
+    <button type="button" onClick={onClick} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-4 text-left shadow-xl shadow-black/20 backdrop-blur hover:bg-orange-500/10", interactiveHover)}>
       <Icon size={18} className="shrink-0 text-orange-300" />
       <p className="mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider text-white">{label}</p>
-      <p className="mt-1 break-words text-xs font-semibold leading-5 text-slate-400">{description}</p>
+      <p className="mt-1 break-words text-xs font-semibold leading-5 text-zinc-400">{description}</p>
     </button>
   );
 }
 
 function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab: (tab: TabKey) => void }) {
   return (
-    <div className="overflow-visible border-b border-slate-800 bg-[#0f1724] px-5 py-2 lg:px-8">
+    <div className="overflow-visible border-b border-orange-500/20 bg-black/70 px-5 py-2 shadow-xl shadow-black/20 backdrop-blur-xl lg:px-8">
       <div className="flex gap-8 overflow-x-auto overflow-y-visible px-1 py-2">
         {tabs.map((tab) => {
           const selected = activeTab === tab.key;
@@ -490,7 +494,7 @@ function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab:
               onClick={() => setActiveTab(tab.key)}
               className={classNames(
                 "relative shrink-0 transform-gpu rounded-md px-1 py-4 text-xs font-black uppercase tracking-wider transition-all duration-300 ease-out hover:scale-[1.04] active:scale-[0.99]",
-                selected ? "text-white" : "text-slate-500 hover:text-slate-200"
+                selected ? "text-white" : "text-zinc-500 hover:text-zinc-200"
               )}
             >
               {tab.label}
@@ -527,10 +531,10 @@ function Overview({
       <div className="space-y-6">
         <Card>
           <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-500/15 text-sky-300"><Info size={20} /></div>
+            <div className="grid h-10 w-10 shrink-0 place-items-center border border-orange-400/25 bg-orange-500/10 text-orange-300"><Info size={20} /></div>
             <div>
               <h2 className="text-xl font-black text-white">IronClad Company of Heroes 3 Tournaments</h2>
-              <p className="mt-2 leading-7 text-slate-300">{tournament.details}</p>
+              <p className="mt-2 leading-7 text-zinc-300">{tournament.details}</p>
             </div>
           </div>
         </Card>
@@ -541,7 +545,7 @@ function Overview({
               <button
                 key={item.key}
                 onClick={() => setActivePanel(item.key)}
-                className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, visiblePanel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-slate-400 hover:text-white")}
+                className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, visiblePanel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-zinc-400 hover:text-white")}
               >
                 {item.label}
               </button>
@@ -562,19 +566,19 @@ function Overview({
         </Card>
         <Card>
           <h3 className="text-sm font-black uppercase tracking-wider text-white">Tournament Archive</h3>
-          <p className="mt-2 text-xs leading-5 text-slate-400">
+          <p className="mt-2 text-xs leading-5 text-zinc-400">
             Battlefy remains the historical reference for events held before the new IronClad platform launch.
           </p>
           <div className="mt-4 space-y-3">
             {archiveEvents.map((item) => (
-              <a key={item.title} href={item.battlefy} target="_blank" rel="noreferrer" className="block rounded-lg bg-cover bg-center p-4 transition hover:brightness-110" style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,6,23,0.76)),url(${item.image})` }}>
+              <a key={item.title} href={item.battlefy} target="_blank" rel="noreferrer" className="group relative block overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100" style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${item.image})` }}>
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-white">{item.title}</p>
-                    {item.description && <p className="mt-1 text-xs leading-5 text-slate-300">{item.description}</p>}
-                    <p className="mt-3 text-xs font-black uppercase tracking-wider text-sky-300">View on Battlefy</p>
+                    {item.description && <p className="mt-1 text-xs leading-5 text-zinc-300">{item.description}</p>}
+                    <p className="mt-3 text-xs font-black uppercase tracking-wider text-orange-300">View on Battlefy</p>
                   </div>
-                  <MessageCircle size={16} className="mt-1 shrink-0 text-sky-300" />
+                  <MessageCircle size={16} className="mt-1 shrink-0 text-orange-300" />
                 </div>
               </a>
             ))}
@@ -587,21 +591,21 @@ function Overview({
 
 function TournamentLinkCard({ item }: { item: TournamentCard }) {
   return (
-    <div className="block rounded-lg bg-slate-900/80 p-3">
+    <div className={classNames("block p-3", tournamentCardClass)}>
       <div className="flex items-center gap-3">
-        <div className="h-12 w-16 shrink-0 rounded bg-cover bg-center" style={{ backgroundImage: `url(${item.image})` }} />
+        <div className="h-12 w-16 shrink-0 bg-cover bg-center" style={{ backgroundImage: `url(${item.image})` }} />
         <div className="min-w-0 flex-1">
           <p className="font-bold text-white">{item.title}</p>
-                  <p className="text-xs text-slate-500">{item.month} - {item.format} - {item.status}</p>
+                  <p className="text-xs text-zinc-500">{item.month} - {item.format} - {item.status}</p>
         </div>
       </div>
-      <p className="mt-3 text-xs leading-5 text-slate-400">{item.description}</p>
+      <p className="mt-3 text-xs leading-5 text-zinc-400">{item.description}</p>
     </div>
   );
 }
 
 function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard) {
-  const shared = "leading-7 text-slate-300";
+  const shared = "leading-7 text-zinc-300";
   if (panel === "rules") {
     return (
       <div className="space-y-4">
@@ -612,7 +616,7 @@ function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard
   }
   if (panel === "prizes") {
     return (
-      <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-5">
+      <div className={classNames("p-5", tournamentInsetCardClass)}>
         <Trophy className="text-amber-300" size={24} />
         <p className="mt-4 text-sm font-black uppercase tracking-wider text-amber-200">
           Prizes
@@ -647,11 +651,11 @@ function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4"><p className="text-xs font-black uppercase tracking-wider text-slate-500">{label}</p><p className="mt-1 break-words font-bold text-slate-100">{value}</p></div>;
+  return <div className={classNames("p-4", tournamentInsetCardClass)}><p className="text-xs font-black uppercase tracking-wider text-zinc-500">{label}</p><p className="mt-1 break-words font-bold text-zinc-100">{value}</p></div>;
 }
 
 function Timeline({ tournament }: { tournament: TournamentCard }) {
-  return <div className="space-y-3">{tournament.schedule.map((item, index) => <div key={item} className="flex items-center gap-3 rounded-lg bg-slate-950/40 p-4"><div className="grid h-8 w-8 shrink-0 place-items-center rounded bg-sky-500/15 text-xs font-black text-sky-200">{index + 1}</div><span className="break-words font-semibold text-slate-200">{item}</span></div>)}</div>;
+  return <div className="space-y-3">{tournament.schedule.map((item, index) => <div key={item} className={classNames("flex items-center gap-3 p-4", tournamentInsetCardClass)}><div className="grid h-8 w-8 shrink-0 place-items-center border border-orange-400/25 bg-orange-500/10 text-xs font-black text-orange-200">{index + 1}</div><span className="break-words font-semibold text-zinc-200">{item}</span></div>)}</div>;
 }
 
 function Participants({ tournament }: { tournament: TournamentCard }) {
@@ -689,11 +693,11 @@ function Participants({ tournament }: { tournament: TournamentCard }) {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-black text-white">{tournament.title} Entries</h2>
-          <p className="mt-1 text-sm text-slate-400">Approved participants separated by their ELO-eligible bracket.</p>
+          <p className="mt-1 text-sm text-zinc-400">Approved participants separated by their ELO-eligible bracket.</p>
         </div>
         <div className="relative w-full md:w-80">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search entries" className="w-full rounded border border-slate-700 bg-slate-950 py-2 pl-10 pr-3 text-sm text-white outline-none focus:border-sky-500" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search entries" className="w-full rounded border border-white/12 bg-black/55 py-2 pl-10 pr-3 text-sm text-white outline-none transition focus:border-orange-400" />
         </div>
       </div>
       {filteredByBracket.map((section) => (
@@ -725,20 +729,20 @@ function ParticipantSection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-black text-white">{title}</h3>
-          <p className="mt-1 text-sm text-slate-500">{requirement}</p>
+          <p className="mt-1 text-sm text-zinc-500">{requirement}</p>
         </div>
-        <StatusPill tone="blue">
+        <StatusPill tone="neutral">
           {totalCount} Approved
         </StatusPill>
       </div>
-      <div className="mt-5 overflow-hidden rounded-xl border border-slate-800">
+      <div className={classNames("mt-5", tournamentTableClass)}>
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-slate-950 text-xs uppercase tracking-wider text-slate-500">
+          <thead className="bg-black/72 text-xs uppercase tracking-wider text-zinc-500">
             <tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Player</th><th className="px-4 py-3">Country</th><th className="px-4 py-3">ELO</th><th className="px-4 py-3">Status</th></tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
-            {participants.map((participant, index) => <tr key={participant.registrationId} className="bg-slate-900/40 hover:bg-slate-800/60"><td className="px-4 py-3 font-mono text-slate-400">#{index + 1}</td><td className="px-4 py-3 font-bold text-white">{participant.name}</td><td className="px-4 py-3 text-slate-300">{participant.country}</td><td className="px-4 py-3 text-slate-300">{participant.elo}</td><td className="px-4 py-3"><StatusPill tone="green">Approved</StatusPill></td></tr>)}
-            {participants.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-500">No approved participants in this bracket.</td></tr>}
+          <tbody className="divide-y divide-white/10 bg-black/30">
+            {participants.map((participant, index) => <tr key={participant.registrationId} className="transition hover:bg-orange-500/12"><td className="px-4 py-3 font-mono text-zinc-400">#{index + 1}</td><td className="px-4 py-3 font-bold text-white">{participant.name}</td><td className="px-4 py-3 text-zinc-300">{participant.country}</td><td className="px-4 py-3 text-zinc-300">{participant.elo}</td><td className="px-4 py-3"><StatusPill tone="green">Approved</StatusPill></td></tr>)}
+            {participants.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-zinc-500">No approved participants in this bracket.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -777,7 +781,7 @@ function Brackets({
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-black text-white">{tournament.title} Brackets</h2>
-          <p className="mt-1 text-sm text-slate-400">{tournament.brackets.map((bracket) => `${bracket.name}: ${bracket.requirement}`).join(" - ")}</p>
+          <p className="mt-1 text-sm text-zinc-400">{tournament.brackets.map((bracket) => `${bracket.name}: ${bracket.requirement}`).join(" - ")}</p>
         </div>
         <StatusPill tone={tournament.generatedBrackets.length > 0 ? "green" : "amber"}>
           {tournament.generatedBrackets.length > 0
@@ -837,14 +841,14 @@ function Brackets({
                     />
                   )}
                 </div>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-zinc-400">
                   {generated
                       ? `${formatCompetitionFormat(generated.format)} - ${generated.slotCount} empty player slots`
                       : `${approvedCount} approved - at least 2 required`}
                 </p>
               </div>
               {generated && (
-                <span className="text-xs uppercase tracking-wider text-slate-500">
+                <span className="text-xs uppercase tracking-wider text-zinc-500">
                   Generated {formatDateTime(generated.generatedAt)}
                 </span>
               )}
@@ -856,7 +860,7 @@ function Brackets({
               />
             )}
             {!generated ? (
-              <p className="mt-6 rounded-xl border border-dashed border-slate-700 p-8 text-center text-slate-500">
+              <p className="mt-6 border border-white/12 p-8 text-center text-zinc-500">
                 The empty bracket structure will generate automatically when
                 this bracket has at least two approved participants.
               </p>
@@ -1009,7 +1013,7 @@ function BracketMatchResultsWorkspace({
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.97, y: 12 }}
                   transition={{ duration: 0.22 }}
-                  className="relative flex h-[78vh] w-[94vw] flex-col overflow-hidden rounded-3xl border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(15,23,42,0.98),rgba(3,7,18,0.99))] shadow-[0_0_90px_rgba(249,115,22,0.18)] lg:w-[70vw] xl:w-[66vw]"
+                  className="relative flex h-[78vh] w-[94vw] flex-col overflow-hidden border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-[0_0_90px_rgba(0,0,0,0.68)] lg:w-[70vw] xl:w-[66vw]"
                 >
                   <header className="relative shrink-0 border-b border-white/10 px-6 py-5 sm:px-8 sm:py-6">
                     <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.9)]" />
@@ -1024,7 +1028,7 @@ function BracketMatchResultsWorkspace({
                         >
                           {bracketName} Match Results
                         </h2>
-                        <p className="mt-2 text-sm text-slate-400">
+                        <p className="mt-2 text-sm text-zinc-400">
                           Review scores, proof files, player notes, and official
                           decisions without crowding the public bracket.
                         </p>
@@ -1032,13 +1036,13 @@ function BracketMatchResultsWorkspace({
                       <button
                         type="button"
                         onClick={() => setOpen(false)}
-                        className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-slate-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
+                        className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
                         aria-label="Close match result workspace"
                       >
                         <X size={20} />
                       </button>
                     </div>
-                    <div className="mt-5 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+                    <div className="mt-5 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wider text-zinc-400">
                       <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
                         {visibleMatches.length} matches
                       </span>
@@ -1064,7 +1068,7 @@ function BracketMatchResultsWorkspace({
                         return (
                           <article
                             key={match.id}
-                            className="rounded-3xl border border-white/10 bg-black/30 p-5 shadow-xl shadow-black/20 sm:p-7"
+                            className="border border-white/12 bg-black/45 p-5 shadow-xl shadow-black/20 sm:p-7"
                           >
                             <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
                               <div>
@@ -1203,7 +1207,7 @@ function AdminMatchManagementModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 12 }}
           transition={{ duration: 0.2 }}
-          className="relative flex max-h-[88vh] w-[94vw] max-w-5xl flex-col overflow-hidden rounded-3xl border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(15,23,42,0.98),rgba(3,7,18,0.99))] shadow-[0_0_90px_rgba(249,115,22,0.18)]"
+          className="relative flex max-h-[88vh] w-[94vw] max-w-5xl flex-col overflow-hidden border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-[0_0_90px_rgba(0,0,0,0.68)]"
         >
           <header className="relative shrink-0 border-b border-white/10 px-5 py-5 sm:px-7">
             <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.9)]" />
@@ -1218,14 +1222,14 @@ function AdminMatchManagementModal({
                 >
                   {tournament.title}
                 </h2>
-                <p className="mt-2 text-sm text-slate-400">
+                <p className="mt-2 text-sm text-zinc-400">
                   {match.roundName} - Match {match.matchNumber}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-slate-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
+                className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
                 aria-label="Close match management"
               >
                 <X size={20} />
@@ -1235,9 +1239,9 @@ function AdminMatchManagementModal({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7">
             <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-              <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+              <div className="border border-white/12 bg-black/45 p-5 shadow-xl shadow-black/20">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  <p className="text-xs font-black uppercase tracking-wider text-zinc-400">
                     Match Snapshot
                   </p>
                   <MatchStatus status={displayMatch.status} />
@@ -1264,8 +1268,8 @@ function AdminMatchManagementModal({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-5 text-xs leading-5 text-slate-300">
-                <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+              <div className="border border-white/12 bg-black/45 p-5 text-xs leading-5 text-zinc-300 shadow-xl shadow-black/20">
+                <p className="text-xs font-black uppercase tracking-wider text-zinc-400">
                   Review State
                 </p>
                 <div className="mt-4 space-y-3">
@@ -1321,7 +1325,7 @@ function AdminMatchManagementModal({
                     />
                   )}
                   {reportGroups.length === 0 && submissions.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-white/10 p-4 text-slate-500">
+                    <p className="border border-white/12 p-4 text-zinc-500">
                       No player reports or confirmation packages are attached to
                       this match.
                     </p>
@@ -1331,7 +1335,7 @@ function AdminMatchManagementModal({
             </div>
 
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-orange-400/20 bg-orange-500/[0.04] p-5">
+              <div className="border border-white/12 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20">
                 {canEnterOfficialResult ? (
                   <ResultEntryForm
                     match={match}
@@ -1343,7 +1347,7 @@ function AdminMatchManagementModal({
                     <p className="text-xs font-black uppercase tracking-wider text-white">
                       Official Result Entry
                     </p>
-                    <p className="mt-3 text-xs leading-5 text-slate-400">
+                    <p className="mt-3 text-xs leading-5 text-zinc-400">
                       {!hasParticipants
                         ? "Both participants must be assigned before an official result can be entered."
                         : "Resolve the active review package or pending legacy submission before entering a direct official result."}
@@ -1380,14 +1384,14 @@ function MatchManagementRow({
   return (
     <div
       className={classNames(
-        "flex items-center justify-between gap-4 rounded-xl border px-4 py-3",
+        "flex items-center justify-between gap-4 border px-4 py-3",
         winner
-          ? "border-orange-400/35 bg-orange-500/10 text-white"
-          : "border-white/10 bg-white/[0.03] text-slate-300"
+          ? "border-white/12 bg-orange-500/10 text-white"
+          : "border-white/12 bg-white/[0.03] text-zinc-300"
       )}
     >
       <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+        <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
           {label}
         </p>
         <p className="mt-1 truncate text-sm font-black">{value}</p>
@@ -1405,8 +1409,8 @@ function MatchManagementRow({
 function SummaryLine({ label, value }: { label: string; value: string }) {
   return (
     <p className="flex justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-bold capitalize text-slate-100">
+      <span className="text-zinc-500">{label}</span>
+      <span className="text-right font-bold capitalize text-zinc-100">
         {value}
       </span>
     </p>
@@ -1430,10 +1434,10 @@ function ChampionPresentation({
     <motion.section
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="relative isolate mt-6 overflow-visible rounded-2xl border border-orange-300/50 bg-[radial-gradient(circle_at_50%_0%,rgba(251,146,60,0.28),transparent_42%),linear-gradient(135deg,rgba(28,15,8,0.98),rgba(2,6,23,0.98)_62%,rgba(67,20,7,0.92))] px-6 py-9 text-center shadow-[0_0_55px_rgba(249,115,22,0.24),inset_0_1px_0_rgba(255,255,255,0.12)]"
+      className="relative isolate mt-6 overflow-visible border border-white/12 bg-[radial-gradient(circle_at_50%_0%,rgba(251,146,60,0.28),transparent_42%),linear-gradient(135deg,rgba(28,15,8,0.98),rgba(2,6,23,0.98)_62%,rgba(67,20,7,0.92))] px-6 py-9 text-center shadow-[0_0_55px_rgba(249,115,22,0.24),inset_0_1px_0_rgba(255,255,255,0.12)]"
     >
       <div className="pointer-events-none absolute -inset-8 -z-10 bg-[radial-gradient(circle,rgba(249,115,22,0.18),transparent_62%)] blur-xl" />
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {sparks.map((spark, index) => (
           <motion.span
             key={index}
@@ -1480,7 +1484,7 @@ function ChampionPresentation({
         Victorious Commander
       </p>
       <div className="mx-auto mt-5 h-px max-w-md bg-gradient-to-r from-transparent via-orange-300/80 to-transparent" />
-      <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-400">
+      <p className="mt-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
         {bracketName} Champion
       </p>
     </motion.section>
@@ -1573,17 +1577,17 @@ function SingleEliminationBracket({
   );
 
   return (
-    <div className="relative mt-6 overflow-x-auto rounded-2xl border border-orange-500/15 bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.10),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <div className={classNames("relative mt-6 overflow-x-auto p-5", tournamentInsetCardClass)}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
             Live Bracket
           </p>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-zinc-400">
             Winners advance from left to right toward the Grand Final.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+        <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
           <span className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.8)]" />
             Active Round
@@ -1613,13 +1617,13 @@ function SingleEliminationBracket({
             >
               <div
                 className={classNames(
-                  "rounded-xl border px-4 py-3 backdrop-blur",
+                  "border px-4 py-3 backdrop-blur",
                   isActive
-                    ? "border-orange-400/50 bg-orange-500/10 shadow-[0_0_24px_rgba(249,115,22,0.12)]"
-                    : "border-white/10 bg-white/[0.03]"
+                    ? "border-white/12 bg-orange-500/10 shadow-xl shadow-black/10"
+                    : "border-white/12 bg-black/45 shadow-xl shadow-black/10"
                 )}
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">
                   Round {round.number}
                 </p>
                 <div className="mt-1 flex items-center justify-between gap-3">
@@ -1678,7 +1682,7 @@ function ModernBracketMatch({
   const card = (
     <div
       className={classNames(
-        "overflow-hidden rounded-xl border bg-slate-950/70 text-left shadow-2xl backdrop-blur-xl transition",
+        "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1",
         onAdminSelect && "cursor-pointer hover:border-orange-300/80",
         live
           ? "border-orange-400/80 shadow-[0_0_28px_rgba(249,115,22,0.22)]"
@@ -1692,7 +1696,7 @@ function ModernBracketMatch({
       )}
     >
       <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
           Match {match.id}
         </span>
         <div className="flex items-center gap-2">
@@ -1711,7 +1715,7 @@ function ModernBracketMatch({
 
   return (
     <motion.div
-      whileHover={{ y: -3, scale: 1.015 }}
+      whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
       className="relative my-3"
     >
@@ -1746,7 +1750,7 @@ function ModernBracketMatch({
 
 function MatchStatus({ status }: { status: Match["status"] }) {
   const styles = {
-    upcoming: "text-slate-400",
+    upcoming: "text-zinc-400",
     live: "text-orange-300",
     pending_review: "text-amber-300",
     complete: "text-emerald-300",
@@ -1785,13 +1789,13 @@ function BroadcastTeamRow({ team }: { team: MatchTeam }) {
           : "bg-transparent"
       )}
     >
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/10 bg-black/40 font-mono text-[10px] text-slate-500">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/10 bg-black/40 font-mono text-[10px] text-zinc-500">
         {team.seed > 0 ? team.seed : "—"}
       </span>
       <span
         className={classNames(
           "min-w-0 flex-1 truncate text-sm",
-          team.winner ? "font-black text-white" : "font-bold text-slate-300"
+          team.winner ? "font-black text-white" : "font-bold text-zinc-300"
         )}
       >
         {team.name}
@@ -1837,7 +1841,7 @@ function RoundRobinBracket({
           />
         ))}
       </div>
-      <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+      <div className={classNames("p-4", tournamentInsetCardClass)}>
         <h4 className="font-black text-white">Standings</h4>
         <div className="mt-4 space-y-2">
           {standings
@@ -1850,22 +1854,22 @@ function RoundRobinBracket({
             .map((standing, index) => (
               <div
                 key={standing.registrationId}
-                className="grid grid-cols-[32px_1fr_auto] gap-3 rounded-lg bg-slate-900 p-3 text-sm"
+                className={classNames("grid grid-cols-[32px_1fr_auto] gap-3 p-3 text-sm", tournamentInsetCardClass)}
               >
-                <span className="font-mono text-slate-500">
+                <span className="font-mono text-zinc-500">
                   {standing.rank ?? index + 1}
                 </span>
                 <span className="font-bold text-white">
                   {participantsById.get(standing.registrationId)?.name ??
                     "Participant"}
                 </span>
-                <span className="text-slate-400">
+                <span className="text-zinc-400">
                       {standing.wins}W {standing.losses}L - {standing.points} pts
                 </span>
               </div>
             ))}
           {standings.length === 0 && (
-            <p className="rounded-lg border border-dashed border-slate-800 p-4 text-sm text-slate-500">
+            <p className="border border-white/12 p-4 text-sm text-zinc-500">
               Standings will appear after admins assign players and results are recorded.
             </p>
           )}
@@ -1968,7 +1972,7 @@ function MatchCard({
   const card = (
     <div
       className={classNames(
-        "overflow-hidden rounded-xl border bg-slate-950/70 text-left shadow-xl backdrop-blur",
+        "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1",
         onAdminSelect && "cursor-pointer transition hover:border-orange-300/80",
         match.status === "live"
           ? "border-orange-400/70 shadow-[0_0_24px_rgba(249,115,22,0.18)]"
@@ -1978,7 +1982,7 @@ function MatchCard({
       )}
     >
       <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Match {match.id}</span>
+        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">Match {match.id}</span>
         <div className="flex items-center gap-2">
           {onAdminSelect && (
             <span className="rounded border border-orange-400/25 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">
@@ -1995,8 +1999,8 @@ function MatchCard({
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      className="rounded-xl"
+      whileHover={{ y: -4 }}
+      className=""
     >
       {onAdminSelect ? (
         <button
@@ -2014,7 +2018,7 @@ function MatchCard({
 }
 
 function TeamRow({ team }: { team: MatchTeam }) {
-  return <div className={classNames("flex items-center gap-2 border-b border-white/5 px-3 py-3 text-sm last:border-0", team.winner ? "bg-orange-500/10 text-white" : "text-slate-300")}><span className="w-7 font-mono text-xs text-slate-500">{team.seed > 0 ? `#${team.seed}` : "—"}</span><span className={classNames("min-w-0 flex-1 truncate", team.winner && "font-bold text-orange-100")}>{team.name}</span><span className="grid h-7 w-8 place-items-center rounded border border-white/10 bg-black/40 font-mono text-xs text-white">{team.score ?? "-"}</span></div>;
+  return <div className={classNames("flex items-center gap-2 border-b border-white/5 px-3 py-3 text-sm last:border-0", team.winner ? "bg-orange-500/10 text-white" : "text-zinc-300")}><span className="w-7 font-mono text-xs text-zinc-500">{team.seed > 0 ? `#${team.seed}` : "—"}</span><span className={classNames("min-w-0 flex-1 truncate", team.winner && "font-bold text-orange-100")}>{team.name}</span><span className="grid h-7 w-8 place-items-center rounded border border-white/10 bg-black/40 font-mono text-xs text-white">{team.score ?? "-"}</span></div>;
 }
 
 function Media({ tournament }: { tournament: TournamentCard }) {
@@ -2027,7 +2031,7 @@ function Media({ tournament }: { tournament: TournamentCard }) {
       : null,
   ].filter((link) => link !== null);
 
-  return <Card><h2 className="text-xl font-black text-white">{tournament.title} Resources</h2>{links.length > 0 ? <div className="mt-5 grid gap-4 md:grid-cols-2">{links.map((link) => <a key={link.label} href={link.url} target="_blank" rel="noreferrer" className="group aspect-video rounded-xl border border-slate-700 bg-cover bg-center p-4 transition hover:border-orange-500" style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.88),rgba(2,6,23,0.45)),url(${tournament.image})` }}><PlayCircle className="text-white opacity-90" /><p className="mt-20 text-sm font-bold text-white">{link.label}</p><p className="text-xs text-slate-300">Open tournament resource</p></a>)}</div> : <p className="mt-5 rounded-xl border border-dashed border-slate-700 p-8 text-center text-slate-500">No tournament resources have been published.</p>}</Card>;
+  return <Card><h2 className="text-xl font-black text-white">{tournament.title} Resources</h2>{links.length > 0 ? <div className="mt-5 grid gap-4 md:grid-cols-2">{links.map((link) => <a key={link.label} href={link.url} target="_blank" rel="noreferrer" className="group relative aspect-video overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100" style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${tournament.image})` }}><PlayCircle className="text-white opacity-90" /><p className="mt-20 text-sm font-bold text-white">{link.label}</p><p className="text-xs text-zinc-300">Open tournament resource</p></a>)}</div> : <p className="mt-5 border border-white/12 p-8 text-center text-zinc-500">No tournament resources have been published.</p>}</Card>;
 }
 
 function Announcements({ tournament }: { tournament: TournamentCard }) {
@@ -2036,11 +2040,11 @@ function Announcements({ tournament }: { tournament: TournamentCard }) {
     `Grand Final: ${formatOptionalDateTime(tournament.grandFinalAt, "TBA")}.`,
     `${tournament.players} approved participants are currently listed across ${tournament.brackets.length} bracket${tournament.brackets.length === 1 ? "" : "s"}. Full brackets and brackets with an existing queue accept waitlist registrations while registration remains open.`,
   ];
-  return <div className="space-y-4">{messages.map((text, index) => <Card key={text}><div className="flex gap-3"><Radio size={18} className="mt-1 text-orange-300" /><div><p className="text-xs font-black uppercase tracking-wider text-slate-500">IronClad Update {index + 1}</p><p className="mt-1 text-slate-200">{text}</p></div></div></Card>)}</div>;
+  return <div className="space-y-4">{messages.map((text, index) => <Card key={text}><div className="flex gap-3"><Radio size={18} className="mt-1 text-orange-300" /><div><p className="text-xs font-black uppercase tracking-wider text-zinc-500">IronClad Update {index + 1}</p><p className="mt-1 text-zinc-200">{text}</p></div></div></Card>)}</div>;
 }
 
 function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={classNames("rounded-2xl border border-slate-800 bg-[#111827]/90 p-5 shadow-2xl shadow-black/20", className)}>{children}</section>;
+  return <section className={classNames("p-5", tournamentCardClass, className)}>{children}</section>;
 }
 
 type RegistrationStep =
@@ -2270,19 +2274,19 @@ function RegisterModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 px-4 py-6">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#111827] shadow-2xl shadow-black/50">
-        <div className="sticky top-0 z-10 border-b border-slate-800 bg-[#111827]/95 p-5 backdrop-blur">
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto border border-orange-500/25 bg-[linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-2xl shadow-black/50">
+        <div className="sticky top-0 z-10 border-b border-white/10 bg-black/90 p-5 backdrop-blur">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-300">IronClad Registration</p>
               <h3 className="mt-1 break-words text-2xl font-black text-white">Esports Player Registration</h3>
             </div>
-            <button onClick={onClose} className="shrink-0 rounded bg-slate-800 p-2 text-slate-200 transition hover:bg-slate-700">
+            <button onClick={onClose} className="shrink-0 rounded bg-slate-800 p-2 text-zinc-200 transition hover:bg-slate-700">
               <X size={18} />
             </button>
           </div>
 
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
             <div className="h-full rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.min((currentStepNumber / steps.length) * 100, 100)}%` }} />
           </div>
         </div>
@@ -2292,7 +2296,7 @@ function RegisterModal({
             <div className="space-y-5">
               <div>
                 <h4 className="text-xl font-black text-white">Tournament Selection</h4>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Select the tournament and bracket/event type you want to join.</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-300">Select the tournament and bracket/event type you want to join.</p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
@@ -2305,12 +2309,12 @@ function RegisterModal({
                       key={event.title}
                       disabled={!registrationAvailable}
                       onClick={() => selectTournament(event)}
-                      className={classNames("overflow-hidden rounded-xl border bg-cover bg-center p-4 text-left transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100", selected ? "border-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.24)]" : "border-slate-700 hover:border-orange-500/70")}
-                      style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.94),rgba(2,6,23,0.68)),url(${event.image})` }}
+                      className={classNames("relative overflow-hidden border bg-cover bg-center p-4 text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100", selected ? "border-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.24)]" : "border-white/12 hover:border-orange-400/35")}
+                      style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
                     >
                       <p className="break-words text-lg font-black text-white">{event.title}</p>
                       <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{event.month} - {event.format} - {event.status}</p>
-                      <p className="mt-3 break-words text-sm leading-6 text-slate-300">{event.description}</p>
+                      <p className="mt-3 break-words text-sm leading-6 text-zinc-300">{event.description}</p>
                       {!registrationAvailable && (
                         <p className="mt-3 text-xs font-black uppercase tracking-wider text-red-300">
                           Registration unavailable
@@ -2322,19 +2326,19 @@ function RegisterModal({
               </div>
               {errors.tournamentTitle && <FieldError message={errors.tournamentTitle} />}
 
-              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+              <div className={classNames("p-4", tournamentInsetCardClass)}>
                 <div className="grid gap-4 md:grid-cols-[180px_1fr]">
-                  <div className="h-32 rounded-lg bg-cover bg-center" style={{ backgroundImage: `linear-gradient(135deg,rgba(15,23,42,0.25),rgba(2,6,23,0.55)),url(${selectedTournament.image})` }} />
+                  <div className="h-32 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(135deg,rgba(0,0,0,0.25),rgba(0,0,0,0.55)),url(${selectedTournament.image})` }} />
                   <div className="min-w-0">
                     <h5 className="break-words text-lg font-black text-white">{selectedTournament.title}</h5>
-                    <div className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
-                      <p><span className="font-bold text-slate-500">Format:</span> {selectedTournament.format}</p>
-                      <p><span className="font-bold text-slate-500">Rule Format:</span> {selectedTournament.ruleFormatLabel}</p>
-                      <p><span className="font-bold text-slate-500">Status:</span> {selectedTournament.status}</p>
+                    <div className="mt-3 grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
+                      <p><span className="font-bold text-zinc-500">Format:</span> {selectedTournament.format}</p>
+                      <p><span className="font-bold text-zinc-500">Rule Format:</span> {selectedTournament.ruleFormatLabel}</p>
+                      <p><span className="font-bold text-zinc-500">Status:</span> {selectedTournament.status}</p>
                       {hasPrize(selectedTournament) && (
-                        <p><span className="font-bold text-slate-500">Prize Pool:</span> {selectedTournament.prizePool}</p>
+                        <p><span className="font-bold text-zinc-500">Prize Pool:</span> {selectedTournament.prizePool}</p>
                       )}
-                      <p><span className="font-bold text-slate-500">Grand Final:</span> {formatOptionalDateTime(selectedTournament.grandFinalAt, "TBA")}</p>
+                      <p><span className="font-bold text-zinc-500">Grand Final:</span> {formatOptionalDateTime(selectedTournament.grandFinalAt, "TBA")}</p>
                     </div>
                   </div>
                 </div>
@@ -2352,14 +2356,14 @@ function RegisterModal({
                         disabled={!eligible}
                         onClick={() => updateField("bracketName", bracket.name)}
                         className={classNames(
-                          "rounded-lg border p-4 text-left transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100",
+                          "border p-4 text-left shadow-xl shadow-black/20 transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100",
                           selected
                             ? "border-orange-500 bg-orange-500/10"
-                            : "border-slate-700 bg-slate-950/40 hover:border-orange-500/70"
+                            : "border-white/12 bg-black/45 hover:border-orange-500/70"
                         )}
                       >
                         <p className="break-words font-black text-white">{bracket.name}</p>
-                        <p className="mt-1 break-words text-xs text-slate-400">
+                        <p className="mt-1 break-words text-xs text-zinc-400">
                           {bracket.requirement} - {bracket.registeredPlayers} approved - {bracket.maxPlayers}
                         </p>
                         <p className="mt-2 break-words text-sm font-bold text-orange-300">
@@ -2383,7 +2387,7 @@ function RegisterModal({
                     );
                   })}
                 </div>
-                <p className="mt-3 text-sm text-slate-400">
+                <p className="mt-3 text-sm text-zinc-400">
                   Your saved ELO is {currentElo}. You are eligible for the{" "}
                   <span className="font-bold text-orange-300">
                     {eligibleBracketNames.length > 0
@@ -2403,7 +2407,7 @@ function RegisterModal({
             <div className="space-y-5">
               <div>
                 <h4 className="text-xl font-black text-white">Player Profile Confirmation</h4>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Registration uses your saved IronClad player profile. Update your profile before continuing if any information is outdated.</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-300">Registration uses your saved IronClad player profile. Update your profile before continuing if any information is outdated.</p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -2416,11 +2420,11 @@ function RegisterModal({
                 <RegistrationProfileValue label="Timezone" value={profile.timezone} />
                 <RegistrationProfileValue label="Current ELO" value={String(profile.current_elo)} />
                 {needsCoh3ProfileUrlInput ? (
-                  <label className="min-w-0 rounded-xl border border-orange-500/40 bg-orange-500/10 p-4 sm:col-span-2">
+                  <label className="min-w-0 border border-orange-500/40 bg-orange-500/10 p-4 sm:col-span-2">
                     <span className="text-xs font-black uppercase tracking-wider text-orange-300">
                       COH3 Stats Profile URL
                     </span>
-                    <span className="mt-2 block text-sm leading-6 text-slate-200">
+                    <span className="mt-2 block text-sm leading-6 text-zinc-200">
                       Paste your COH3 Stats player profile URL. It will be used
                       to verify your tournament ELO.
                     </span>
@@ -2433,7 +2437,7 @@ function RegisterModal({
                       required
                       aria-invalid={Boolean(errors.coh3ProfileUrl)}
                       className={classNames(
-                        "mt-3 w-full rounded-lg border bg-slate-950/80 px-3 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-600 focus:border-orange-300",
+                        "mt-3 w-full border bg-black/70 px-3 py-3 text-sm font-bold text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-300",
                         errors.coh3ProfileUrl
                           ? "border-orange-300"
                           : "border-slate-700"
@@ -2447,9 +2451,9 @@ function RegisterModal({
                 )}
               </div>
 
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/25 p-4">
+              <div className="border border-emerald-500/40 bg-emerald-950/25 p-4">
                 <p className="text-sm font-black uppercase tracking-wider text-emerald-300">Profile Complete</p>
-                <p className="mt-2 text-sm leading-6 text-slate-200">
+                <p className="mt-2 text-sm leading-6 text-zinc-200">
                   {eloVerificationEnabled
                     ? "Your saved profile identity and COH3 Stats profile URL will be attached to this registration. ELO verification will be handled in a later review phase."
                     : "Your saved profile identity will be attached to this registration. ELO Verification Checker is disabled, so no COH3 Stats check is required."}
@@ -2466,7 +2470,7 @@ function RegisterModal({
             <div className="space-y-5">
               <div>
                 <h4 className="text-xl font-black text-white">Rules & Agreements</h4>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Confirm all required agreements before submitting your registration.</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-300">Confirm all required agreements before submitting your registration.</p>
               </div>
 
               <div className="space-y-3">
@@ -2477,7 +2481,7 @@ function RegisterModal({
               </div>
 
               {submissionError && (
-                <div className="whitespace-pre-line rounded-xl border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
+                <div className="whitespace-pre-line border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
                   <RegistrationSubmissionError
                     message={submissionError}
                     supportUrl={submissionErrorSupportUrl}
@@ -2496,7 +2500,7 @@ function RegisterModal({
               </div>
               <h4 className="mt-5 text-2xl font-black text-white">Registration Submitted</h4>
               <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">{successMessage}</p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">Registrations are reviewed within 24 hours.</p>
+              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-300">Registrations are reviewed within 24 hours.</p>
               <button onClick={onClose} className="mt-6 rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400">Close</button>
             </div>
           )}
@@ -2555,8 +2559,8 @@ function RegistrationProfileValue({
   className?: string;
 }) {
   return (
-    <div className={classNames("min-w-0 rounded-xl border border-slate-700 bg-slate-950/50 p-4", className)}>
-      <p className="text-xs font-black uppercase tracking-wider text-slate-500">{label}</p>
+    <div className={classNames("min-w-0 p-4", tournamentInsetCardClass, className)}>
+      <p className="text-xs font-black uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-2 break-words text-sm font-bold text-white">{value || "N/A"}</p>
     </div>
   );
@@ -2565,7 +2569,7 @@ function RegistrationProfileValue({
 function AgreementCheckbox({ label, checked, onChange, error }: { label: string; checked: boolean; onChange: (checked: boolean) => void; error?: string }) {
   return (
     <div>
-      <label className={classNames("flex cursor-pointer items-start gap-3 rounded-xl border bg-slate-950/40 p-4 transition hover:border-orange-500/70 hover:bg-orange-500/10", error ? "border-orange-400/80" : "border-slate-700")}>
+      <label className={classNames("flex cursor-pointer items-start gap-3 border bg-black/45 p-4 transition hover:border-orange-500/70 hover:bg-orange-500/10", error ? "border-orange-400/80" : "border-white/12")}>
         <input
           type="checkbox"
           checked={checked}
@@ -2573,7 +2577,7 @@ function AgreementCheckbox({ label, checked, onChange, error }: { label: string;
           className="mt-1 h-4 w-4 shrink-0 accent-orange-500"
           aria-invalid={Boolean(error)}
         />
-        <span className="break-words text-sm font-bold text-slate-200">{label}</span>
+        <span className="break-words text-sm font-bold text-zinc-200">{label}</span>
       </label>
       <FieldError message={error} />
     </div>
@@ -2584,8 +2588,8 @@ function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoadi
   return (
     <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-between">
       <div>
-        {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Back</button>}
-        {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Cancel</button>}
+        {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Back</button>}
+        {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Cancel</button>}
       </div>
       <button disabled={isLoading} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? "Submitting..." : nextLabel}</button>
     </div>
@@ -2612,7 +2616,7 @@ function MainContent({
   matchResultReportGroups: MatchResultReportGroup[];
 }) {
   return (
-    <main className="px-5 py-6 lg:px-8">
+    <main className="relative z-10 px-5 py-6 lg:px-8">
       {activeTab === "overview" && (
         <Overview
           tournament={tournament}
@@ -2674,7 +2678,7 @@ function RegistrationGatePrompt({
 
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-black/85 px-4 py-6 backdrop-blur">
-      <div className="w-full max-w-lg rounded-3xl border border-orange-500/30 bg-[#111827] p-6 shadow-2xl shadow-orange-950/40">
+      <div className="w-full max-w-lg border border-orange-500/30 bg-[linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] p-6 shadow-2xl shadow-black/50">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
@@ -2687,21 +2691,21 @@ function RegistrationGatePrompt({
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg bg-slate-800 p-2 text-slate-300 transition hover:bg-slate-700 hover:text-white"
+            className="shrink-0 rounded-lg bg-slate-800 p-2 text-zinc-300 transition hover:bg-slate-700 hover:text-white"
             aria-label="Close registration prompt"
           >
             <X size={18} />
           </button>
         </div>
 
-        <p className="mt-4 leading-7 text-slate-300">{content.description}</p>
+        <p className="mt-4 leading-7 text-zinc-300">{content.description}</p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {type === "account" && (
             <>
               <Link
                 href="/sign-in"
-                className="rounded-xl border border-slate-700 bg-slate-950/50 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:border-orange-500"
+                className="rounded-xl border border-white/12 bg-black/45 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:border-orange-500"
               >
                 Sign In
               </Link>
@@ -2959,7 +2963,16 @@ export default function TournamentsExperience({
   };
 
   return (
-    <div className="min-h-screen bg-black pt-20 text-slate-100">
+    <div
+      className="min-h-screen bg-black bg-cover bg-center pt-20 text-zinc-100"
+      style={{
+        backgroundImage:
+          "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      }}
+    >
       <div className="mx-auto flex max-w-[1600px]">
         <Sidebar
           selectedTournament={selectedTournament}
@@ -3011,9 +3024,9 @@ export default function TournamentsExperience({
       <button onClick={() => setShowMobilePanel(true)} className="fixed bottom-5 right-5 z-40 rounded-full bg-orange-500 p-4 text-white shadow-2xl shadow-orange-950/40 lg:hidden"><Menu size={22} /></button>
       {showMobilePanel && (
         <div className="fixed inset-0 z-50 bg-black/70 lg:hidden">
-          <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="ml-auto h-full w-80 bg-[#111827] p-4">
+          <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="ml-auto h-full w-80 border-l border-orange-500/20 bg-black/90 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl">
             <div className="flex items-center justify-between"><h3 className="font-black text-white">Tournament Menu</h3><button onClick={() => setShowMobilePanel(false)} className="rounded bg-slate-800 p-2"><X size={18} /></button></div>
-            <div className="mt-5 space-y-2">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.key} onClick={() => { handleSetActiveTab(tab.key); setShowMobilePanel(false); }} className="flex w-full items-center gap-3 rounded-lg bg-slate-950/40 px-3 py-3 text-left font-semibold text-slate-200"><Icon size={17} />{tab.label}</button>; })}</div>
+            <div className="mt-5 space-y-2">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.key} onClick={() => { handleSetActiveTab(tab.key); setShowMobilePanel(false); }} className="flex w-full items-center gap-3 rounded-lg border border-white/12 bg-black/45 px-3 py-3 text-left font-semibold text-zinc-200 transition hover:border-orange-400/45 hover:bg-orange-500/10"><Icon size={17} />{tab.label}</button>; })}</div>
           </motion.div>
         </div>
       )}

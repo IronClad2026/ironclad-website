@@ -31,7 +31,7 @@ export default function DashboardChampionHistory({
       </div>
 
       {champions.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-orange-400/20 bg-orange-500/[0.03] p-6 text-sm text-zinc-500">
+        <div className="mt-5 border border-dashed border-orange-400/25 bg-black/55 p-6 text-sm text-zinc-500 shadow-xl shadow-black/15 backdrop-blur">
           Tournament victories will be permanently displayed here.
         </div>
       ) : (
@@ -42,19 +42,17 @@ export default function DashboardChampionHistory({
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               whileHover={{ y: -3, scale: 1.005 }}
-              className="group relative min-h-72 overflow-hidden rounded-3xl border border-orange-300/45 bg-[#130b06] bg-cover bg-center shadow-[0_0_35px_rgba(249,115,22,0.22),inset_0_0_45px_rgba(249,115,22,0.05)]"
+              className="group relative min-h-72 overflow-hidden border border-orange-300/45 bg-[linear-gradient(145deg,rgba(249,115,22,0.16),rgba(19,11,6,0.94),rgba(0,0,0,0.88))] bg-cover bg-center shadow-[0_0_35px_rgba(249,115,22,0.18),inset_0_0_45px_rgba(249,115,22,0.05)] backdrop-blur"
               style={
                 champion.bannerImageUrl
                   ? {
-                      backgroundImage: `linear-gradient(90deg, rgba(0,0,0,0.96), rgba(0,0,0,0.58)), url(${JSON.stringify(
-                        champion.bannerImageUrl
-                      )})`,
+                      backgroundImage: `linear-gradient(90deg, rgba(0,0,0,0.96), rgba(0,0,0,0.58)), url(${JSON.stringify(champion.bannerImageUrl)})`,
                     }
                   : undefined
               }
             >
               <motion.div
-                className="absolute -inset-1 rounded-[28px] bg-[conic-gradient(from_90deg,transparent,rgba(249,115,22,0.7),transparent,rgba(251,191,36,0.45),transparent)] opacity-55 blur-xl"
+                className="absolute -inset-1 bg-[conic-gradient(from_90deg,transparent,rgba(249,115,22,0.7),transparent,rgba(251,191,36,0.45),transparent)] opacity-55 blur-xl"
                 animate={reduceMotion ? undefined : { rotate: 360 }}
                 transition={
                   reduceMotion

@@ -23,6 +23,7 @@ type SearchableProfileSelectProps = {
   required?: boolean;
   className?: string;
   showSavedValueHint?: boolean;
+  variant?: "default" | "ironclad";
 };
 
 export default function SearchableProfileSelect({
@@ -39,6 +40,7 @@ export default function SearchableProfileSelect({
   required = false,
   className = "",
   showSavedValueHint = true,
+  variant = "default",
 }: SearchableProfileSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,6 +54,17 @@ export default function SearchableProfileSelect({
     )
   );
   const visibleValue = open ? searchQuery : value;
+  const ironcladVariant = variant === "ironclad";
+  const inputClassName = ironcladVariant
+    ? `h-12 w-full border bg-black/55 py-3 pr-11 pl-4 text-white shadow-inner shadow-black/20 outline-none transition placeholder:text-zinc-600 focus:border-orange-400 focus:bg-black/70 focus:shadow-[0_0_0_1px_rgba(251,146,60,0.24)] ${
+        error ? "border-red-500/70" : "border-white/12"
+      }`
+    : `h-12 w-full rounded-xl border bg-black/40 py-3 pr-11 pl-4 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400 ${
+        error ? "border-red-500/70" : "border-white/10"
+      }`;
+  const menuClassName = ironcladVariant
+    ? "absolute top-[calc(100%+0.5rem)] left-0 z-[1000] max-h-60 w-full overflow-y-auto border border-white/12 bg-[#080808]/95 p-2 shadow-2xl shadow-black/60 backdrop-blur-xl"
+    : "absolute top-[calc(100%+0.5rem)] left-0 z-[1000] max-h-60 w-full overflow-y-auto rounded-xl border border-white/10 bg-[#111318] p-2 shadow-2xl shadow-black/60";
 
   return (
     <div className={`relative z-0 min-w-0 focus-within:z-[1200] ${className}`}>
@@ -97,9 +110,7 @@ export default function SearchableProfileSelect({
           aria-controls={listboxId}
           aria-expanded={open}
           aria-invalid={Boolean(error)}
-          className={`h-12 w-full rounded-xl border bg-black/40 py-3 pr-11 pl-4 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400 ${
-            error ? "border-red-500/70" : "border-white/10"
-          }`}
+          className={inputClassName}
         />
         <ChevronDown
           size={18}
@@ -113,7 +124,7 @@ export default function SearchableProfileSelect({
           <div
             id={listboxId}
             role="listbox"
-            className="absolute top-[calc(100%+0.5rem)] left-0 z-[1000] max-h-60 w-full overflow-y-auto rounded-xl border border-white/10 bg-[#111318] p-2 shadow-2xl shadow-black/60"
+            className={menuClassName}
           >
             {filteredOptions.length > 0 ? (
               filteredOptions.map((option) => (
@@ -128,7 +139,13 @@ export default function SearchableProfileSelect({
                     setSearchQuery("");
                     setOpen(false);
                   }}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-zinc-300 transition hover:bg-orange-500/10 hover:text-white"
+                  className={`w-full px-3 py-2 text-left text-sm font-semibold text-zinc-300 transition hover:bg-orange-500/10 hover:text-white ${
+                    ironcladVariant
+                      ? selectedValue === option.value
+                        ? "border border-orange-400/30 bg-orange-500/10 text-white"
+                        : "border border-transparent hover:border-orange-400/25"
+                      : "rounded-lg"
+                  }`}
                 >
                   <span>{option.label}</span>
                   {showSavedValueHint && option.value !== option.label && (

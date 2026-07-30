@@ -35,10 +35,10 @@ export default function DashboardMatchHistory({
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
-        className="flex w-full items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.05),rgba(249,115,22,0.05))] p-5 text-left shadow-xl shadow-black/20 transition hover:border-orange-400/35"
+        className="flex w-full items-center justify-between gap-4 border border-orange-500/20 bg-black/65 p-5 text-left shadow-xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
       >
         <span className="flex min-w-0 items-center gap-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-orange-400/25 bg-orange-500/10 text-orange-300">
+          <span className="grid h-11 w-11 shrink-0 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
             <Swords size={20} />
           </span>
           <span className="min-w-0">
@@ -68,7 +68,7 @@ export default function DashboardMatchHistory({
             initial={{ opacity: 0, height: 0, y: -8 }}
             animate={{ opacity: 1, height: "auto", y: 0 }}
             exit={{ opacity: 0, height: 0, y: -8 }}
-            className="relative z-10 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#0b0d12]/95 shadow-2xl shadow-black/50 backdrop-blur-xl"
+            className="relative z-10 mt-2 overflow-hidden border border-orange-500/20 bg-[#07090d]/95 shadow-2xl shadow-black/50 backdrop-blur-xl"
           >
             {matches.length === 0 ? (
               <p className="p-5 text-sm text-zinc-500">
@@ -81,7 +81,7 @@ export default function DashboardMatchHistory({
                     key={match.id}
                     type="button"
                     onClick={() => setSelected(match)}
-                    className="grid w-full grid-cols-[1fr_auto] gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-white/5"
+                    className="grid w-full grid-cols-[1fr_auto] gap-3 px-3 py-3 text-left transition hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-bold text-white">
@@ -150,7 +150,7 @@ function MatchHistoryModal({
         initial={{ opacity: 0, scale: 0.96, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 12 }}
-        className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.16),transparent_35%),linear-gradient(145deg,#111827,#030712)] shadow-[0_0_80px_rgba(249,115,22,0.16)]"
+        className="relative w-full max-w-2xl overflow-hidden border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.16),transparent_35%),linear-gradient(145deg,#111827,#030712)] shadow-[0_0_80px_rgba(249,115,22,0.16)]"
       >
         <header className="flex items-start justify-between gap-5 border-b border-white/10 p-6 sm:p-8">
           <div>
@@ -171,7 +171,7 @@ function MatchHistoryModal({
             type="button"
             onClick={onClose}
             aria-label="Close match history details"
-            className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-2.5 text-zinc-400 transition hover:border-orange-400/40 hover:text-white"
+            className="shrink-0 border border-white/10 bg-white/5 p-2.5 text-zinc-400 transition hover:border-orange-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
           >
             <X size={19} />
           </button>
@@ -196,7 +196,7 @@ function MatchHistoryModal({
         </div>
 
         {(match.replayAvailable || match.screenshotAvailable) && (
-          <div className="mx-6 mb-6 flex items-center gap-3 rounded-2xl border border-sky-400/20 bg-sky-500/5 p-4 text-sm text-sky-200 sm:mx-8 sm:mb-8">
+          <div className="mx-6 mb-6 flex items-center gap-3 border border-sky-400/20 bg-sky-500/5 p-4 text-sm text-sky-200 sm:mx-8 sm:mb-8">
             <FileCheck2 size={18} className="shrink-0" />
             Official proof is retained with the match result audit record.
           </div>
@@ -208,7 +208,7 @@ function MatchHistoryModal({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/25 p-4">
+    <div className="border border-white/10 bg-black/30 p-4">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>

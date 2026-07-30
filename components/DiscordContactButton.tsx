@@ -28,21 +28,29 @@ export default function DiscordContactButton({
 
   if (!canContact) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
-        <div className="flex items-center gap-3 text-zinc-400">
-          <ShieldAlert size={18} />
-          <p className="text-sm font-bold">Discord contact not available.</p>
+      <div className="group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-5 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1">
+        <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
+          <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
         </div>
-        <p className="mt-3 text-xs leading-5 text-zinc-500">
-          This player has not opted into public Discord contact.
-        </p>
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 text-zinc-400">
+            <ShieldAlert size={18} />
+            <p className="text-sm font-bold">Discord contact not available.</p>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-zinc-500">
+            This player has not opted into public Discord contact.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-sky-400/25 bg-sky-500/10 p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="group relative overflow-hidden border border-sky-400/25 bg-[linear-gradient(145deg,rgba(14,165,233,0.12),rgba(8,8,8,0.86))] p-5 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1">
+      <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
+        <div className="absolute inset-x-0 top-0 h-px bg-sky-300/55" />
+      </div>
+      <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="flex items-center gap-2 text-sm font-black text-sky-200">
             <MessageCircle size={18} />
@@ -64,7 +72,7 @@ export default function DiscordContactButton({
       </div>
 
       {status !== "idle" && (
-        <div className="mt-4 rounded-xl border border-white/10 bg-black/35 p-3">
+        <div className="relative z-10 mt-4 border border-white/12 bg-black/45 p-3">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">
             Discord Username
           </p>

@@ -5,6 +5,8 @@ import "./globals.css";
 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import GlobalSmoke from "@/components/GlobalSmoke";
+import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 
 export const metadata: Metadata = {
@@ -20,11 +22,13 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body className="bg-black text-white">
+        <body className="min-h-screen overflow-x-hidden bg-black text-white">
+          <GlobalSmoke />
           <SmoothScrollProvider>
             <Navbar />
-            {children}
+            <div className="pt-[69px] sm:pt-[77px]">{children}</div>
             <Footer />
+            <SiteMusicPlayer />
           </SmoothScrollProvider>
         </body>
       </html>
