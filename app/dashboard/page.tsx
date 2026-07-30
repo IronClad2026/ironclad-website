@@ -14,7 +14,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import DashboardChampionHistory from "@/components/DashboardChampionHistory";
 import DashboardMatchHistory from "@/components/DashboardMatchHistory";
+import DashboardNotifications from "@/components/DashboardNotifications";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
+import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import { loadPlayerNotifications } from "@/lib/notifications";
@@ -61,7 +63,7 @@ export default async function PlayerDashboardPage() {
       supabase
         .from("players")
         .select(
-          "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, discord_public_enabled, created_at, updated_at"
+          "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, public_profile_enabled, discord_public_enabled, created_at, updated_at"
         )
         .eq("clerk_user_id", userId)
         .maybeSingle(),
@@ -104,7 +106,7 @@ export default async function PlayerDashboardPage() {
         backgroundSize: "cover",
       }}
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="relative z-10 mx-auto max-w-7xl">
         <header
           className="relative overflow-hidden border border-orange-500/25 bg-black/70 p-8 shadow-[0_0_45px_rgba(0,0,0,0.55)] backdrop-blur md:p-10"
         >
@@ -200,9 +202,6 @@ export default async function PlayerDashboardPage() {
                 (notification) =>
                   `${notification.id}:${notification.readAt ?? ""}`
               ),
-              ...career.notifications.map(
-                (notification) => `${notification.id}:${notification.status}`
-              ),
             ].join("|")}
             scope="player"
             title="Notifications"
@@ -217,12 +216,24 @@ export default async function PlayerDashboardPage() {
           />
 
           {profile && (
-            <DiscordContactVisibilityCard
-              initialEnabled={Boolean(profile.discord_public_enabled)}
-              hasDiscordUsername={Boolean(profile.discord_username?.trim())}
-            />
+            <div className="grid gap-5">
+              <PublicProfileVisibilityCard
+                initialEnabled={Boolean(profile.public_profile_enabled)}
+              />
+              <DiscordContactVisibilityCard
+                initialEnabled={Boolean(profile.discord_public_enabled)}
+                hasDiscordUsername={Boolean(profile.discord_username?.trim())}
+              />
+            </div>
           )}
         </div>
+
+        <DashboardNotifications
+          key={career.notifications
+            .map((notification) => `${notification.id}:${notification.status}`)
+            .join("|")}
+          notifications={career.notifications}
+        />
 
         {career.error && (
           <div className="mt-6">

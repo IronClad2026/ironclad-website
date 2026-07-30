@@ -3,6 +3,7 @@
 import { Search, UsersRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import PublicPlayerCard from "@/components/PublicPlayerCard";
+import ScrollReveal from "@/components/ScrollReveal";
 import SearchableProfileSelect from "@/components/SearchableProfileSelect";
 import {
   allCountriesFilterOption,
@@ -23,13 +24,19 @@ export default function PublicPlayersDirectory({
   players,
 }: PublicPlayersDirectoryProps) {
   const [searchTerm, setSearchTerm] = useState("");
+
   const [countryFilter, setCountryFilter] = useState(
     allCountriesFilterOption.value
   );
+
   const [countryFilterLabel, setCountryFilterLabel] = useState(
     allCountriesFilterOption.label
   );
-  const [eloFilter, setEloFilter] = useState(allEloFilterOption.value);
+
+  const [eloFilter, setEloFilter] = useState(
+    allEloFilterOption.value
+  );
+
   const [eloFilterLabel, setEloFilterLabel] = useState(
     allEloFilterOption.label
   );
@@ -42,10 +49,15 @@ export default function PublicPlayersDirectory({
         normalizedSearch.length === 0 ||
         player.playerName.toLowerCase().includes(normalizedSearch) ||
         player.displayName.toLowerCase().includes(normalizedSearch);
+
       const matchesCountry =
         countryFilter === allCountriesFilterOption.value ||
         player.country === countryFilter;
-      const matchesElo = isEloInRange(player.currentElo, eloFilter);
+
+      const matchesElo = isEloInRange(
+        player.currentElo,
+        eloFilter
+      );
 
       return matchesSearch && matchesCountry && matchesElo;
     });
@@ -62,9 +74,13 @@ export default function PublicPlayersDirectory({
           backgroundSize: "cover",
         }}
       />
+
       <div className="absolute inset-0 bg-black/68" />
+
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.16))]" />
+
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
+
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-6">
@@ -75,9 +91,12 @@ export default function PublicPlayersDirectory({
                 <UsersRound size={16} />
                 Public Commanders
               </p>
+
               <h2 className="mt-3 text-3xl font-black text-white">
-                {players.length} {players.length === 1 ? "Player" : "Players"}
+                {players.length}{" "}
+                {players.length === 1 ? "Player" : "Players"}
               </h2>
+
               <p className="mt-2 text-sm text-zinc-400">
                 Directory data is limited to public-safe player profile fields.
               </p>
@@ -88,14 +107,18 @@ export default function PublicPlayersDirectory({
                 <span className="text-sm font-bold text-white">
                   Search Player
                 </span>
+
                 <Search
                   size={18}
                   className="pointer-events-none absolute bottom-3.5 left-4 text-zinc-500"
                 />
+
                 <input
                   type="search"
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) =>
+                    setSearchTerm(event.target.value)
+                  }
                   placeholder="Search by player name"
                   className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-black/40 pr-4 pl-11 text-sm font-bold text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400"
                 />
@@ -130,29 +153,42 @@ export default function PublicPlayersDirectory({
           </div>
         </div>
 
-        {players.length === 0 ? (
-          <EmptyState message="No public players available yet." />
-        ) : filteredPlayers.length === 0 ? (
-          <EmptyState message="No public players match those filters." />
-        ) : (
-          <div className="relative z-0 mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredPlayers.map((player) => (
-              <PublicPlayerCard key={player.id} player={player} />
-            ))}
-          </div>
-        )}
+        <ScrollReveal>
+          {players.length === 0 ? (
+            <EmptyState message="No public players available yet." />
+          ) : filteredPlayers.length === 0 ? (
+            <EmptyState message="No public players match those filters." />
+          ) : (
+            <div className="relative z-0 mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {filteredPlayers.map((player) => (
+                <PublicPlayerCard
+                  key={player.id}
+                  player={player}
+                />
+              ))}
+            </div>
+          )}
+        </ScrollReveal>
       </div>
     </section>
   );
 }
 
-function EmptyState({ message }: { message: string }) {
+function EmptyState({
+  message,
+}: {
+  message: string;
+}) {
   return (
     <div className="mt-8 rounded-3xl border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-10 text-center">
       <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-orange-400/25 bg-orange-500/10 text-orange-300">
         <UsersRound size={24} />
       </div>
-      <h2 className="mt-5 text-2xl font-black text-white">{message}</h2>
+
+      <h2 className="mt-5 text-2xl font-black text-white">
+        {message}
+      </h2>
+
       <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-zinc-500">
         Public player cards will appear here once eligible IronClad profiles are
         available through the public profile boundary.

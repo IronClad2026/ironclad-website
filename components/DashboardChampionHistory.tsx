@@ -25,6 +25,7 @@ export default function DashboardChampionHistory({
           <Crown size={15} />
           Victory Archive
         </p>
+
         <h2 className="mt-3 text-3xl font-bold text-white">
           Tournament Champions
         </h2>
@@ -42,7 +43,16 @@ export default function DashboardChampionHistory({
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               whileHover={{ y: -3, scale: 1.005 }}
-              className="group relative min-h-72 overflow-hidden border border-orange-300/45 bg-[linear-gradient(145deg,rgba(249,115,22,0.16),rgba(19,11,6,0.94),rgba(0,0,0,0.88))] shadow-[0_0_35px_rgba(249,115,22,0.18),inset_0_0_45px_rgba(249,115,22,0.05)] backdrop-blur"
+              className="group relative min-h-72 overflow-hidden border border-orange-300/45 bg-[linear-gradient(145deg,rgba(249,115,22,0.16),rgba(19,11,6,0.94),rgba(0,0,0,0.88))] bg-cover bg-center shadow-[0_0_35px_rgba(249,115,22,0.18),inset_0_0_45px_rgba(249,115,22,0.05)] backdrop-blur"
+              style={
+                champion.bannerImageUrl
+                  ? {
+                      backgroundImage: `linear-gradient(90deg, rgba(0,0,0,0.96), rgba(0,0,0,0.58)), url(${JSON.stringify(
+                        champion.bannerImageUrl
+                      )})`,
+                    }
+                  : undefined
+              }
             >
               <motion.div
                 className="absolute -inset-1 bg-[conic-gradient(from_90deg,transparent,rgba(249,115,22,0.7),transparent,rgba(251,191,36,0.45),transparent)] opacity-55 blur-xl"
@@ -57,7 +67,9 @@ export default function DashboardChampionHistory({
                       }
                 }
               />
+
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(251,146,60,0.28),transparent_25%),radial-gradient(circle_at_15%_100%,rgba(194,65,12,0.32),transparent_35%)]" />
+
               <motion.div
                 className="absolute inset-y-0 left-[-35%] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-orange-200/15 to-transparent blur-md"
                 animate={reduceMotion ? undefined : { x: ["0%", "430%"] }}
@@ -107,6 +119,7 @@ export default function DashboardChampionHistory({
               </div>
 
               <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-orange-950/40 to-transparent" />
+
               <div className="relative z-10 flex min-h-72 flex-col justify-end p-7 sm:p-8">
                 <motion.span
                   className="mb-auto grid h-14 w-14 place-items-center rounded-full border border-orange-200/50 bg-orange-500/15 text-orange-100 shadow-[0_0_35px_rgba(249,115,22,0.4)] backdrop-blur"
@@ -136,12 +149,15 @@ export default function DashboardChampionHistory({
                 <p className="text-xs font-black uppercase tracking-[0.34em] text-orange-300 drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
                   Tournament Champion
                 </p>
+
                 <h3 className="mt-3 text-3xl font-black text-white drop-shadow-[0_3px_12px_rgba(0,0,0,1)]">
                   {champion.winnerName}
                 </h3>
+
                 <p className="mt-2 text-xl font-black text-orange-100 drop-shadow-[0_3px_12px_rgba(0,0,0,1)]">
                   {champion.tournamentName}
                 </p>
+
                 <p className="mt-3 text-xs font-bold uppercase tracking-wider text-zinc-300 drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
                   {champion.bracketName} Bracket · Won{" "}
                   {formatDate(champion.wonAt)}

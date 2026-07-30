@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { UserRound } from "lucide-react";
 import Link from "next/link";
 import IronCladUserButton from "@/components/IronCladUserButton";
+import ScrollReveal from "@/components/ScrollReveal";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import {
   isPlayerProfileComplete,
@@ -175,11 +176,20 @@ function AccountShell({
       }}
       aria-labelledby="home-account-heading"
     >
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.91),rgba(0,0,0,0.84)),linear-gradient(112deg,rgba(0,0,0,0.9),rgba(249,115,22,0.12),rgba(0,0,0,0.94))]" />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:64px_64px] opacity-25" />
-      <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(115deg,transparent,rgba(249,115,22,0.1))]" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.91),rgba(0,0,0,0.84)),linear-gradient(112deg,rgba(0,0,0,0.9),rgba(249,115,22,0.12),rgba(0,0,0,0.94))]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:64px_64px] opacity-25"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(115deg,transparent,rgba(249,115,22,0.1))]"
+      />
 
-      <div className="relative z-10 mx-auto max-w-7xl border border-orange-500/28 bg-black/70 p-6 shadow-2xl shadow-black/30 backdrop-blur md:p-8 lg:p-10">
+      <ScrollReveal className="relative z-10 mx-auto max-w-7xl border border-orange-500/28 bg-black/70 p-6 shadow-2xl shadow-black/30 backdrop-blur md:p-8 lg:p-10">
         <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-3">
@@ -213,7 +223,7 @@ function AccountShell({
 
           <div className="min-w-0 lg:min-w-[360px]">{children}</div>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }

@@ -15,6 +15,7 @@ import MatchResultControls, {
   ResultEntryForm,
 } from "@/components/MatchResultControls";
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
+import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import {
   getEligibleBracketNames,
@@ -225,7 +226,7 @@ function Sidebar({
         <nav className="p-3">
           <button
             onClick={() => setEventsOpen((current) => !current)}
-            className={classNames("group mb-1 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold text-zinc-400 hover:bg-slate-800/80 hover:text-white", interactiveHover)}
+            className={classNames("group mb-1 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold text-zinc-400 hover:bg-orange-500/10 hover:text-white", interactiveHover)}
           >
             <span className="flex items-center gap-3">
               <CalendarDays size={17} className="text-orange-400" />
@@ -293,7 +294,7 @@ function Hero({
       <motion.div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-55"
         style={{
-          backgroundImage: "url('/images/ironclad-background.jpg')",
+          backgroundImage: `url(${tournament.image})`,
         }}
         animate={{ backgroundPositionY: ["0%", "100%", "0%"] }}
         transition={{ duration: 36, repeat: Infinity, ease: "easeInOut" }}
@@ -302,9 +303,9 @@ function Hero({
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.24),rgba(0,0,0,0.92)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.62),rgba(249,115,22,0.16))]" />
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
-      <div className="relative px-5 py-8 lg:px-8 lg:py-10">
+      <div className="relative z-10 px-5 py-8 lg:px-8 lg:py-10">
         <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
-          <div>
+          <ScrollReveal>
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
                 tone={
@@ -357,7 +358,7 @@ function Hero({
               <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.time}</span>
               <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {tournament.players}/{tournament.maxPlayers} approved slots</span>
             </div>
-          </div>
+          </ScrollReveal>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
             {registrationState ? (
               <RegistrationStateCard state={registrationState} />
@@ -1708,9 +1709,17 @@ function ModernBracketMatch({
   const card = (
     <div
       className={classNames(
-        "overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35",
-        onAdminSelect && "cursor-pointer",
-        isActiveRound && "border-white/12"
+        "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1",
+        onAdminSelect && "cursor-pointer hover:border-orange-300/80",
+        match.status === "live"
+          ? "border-orange-400/80 shadow-[0_0_28px_rgba(249,115,22,0.22)]"
+          : match.status === "pending_review"
+            ? "border-amber-400/50 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
+            : match.status === "complete"
+              ? "border-emerald-500/30 shadow-black/30"
+              : isActiveRound
+                ? "border-orange-500/35 shadow-[0_0_18px_rgba(249,115,22,0.10)]"
+                : "border-white/10 shadow-black/30"
       )}
     >
       <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
@@ -1808,7 +1817,7 @@ function BroadcastTeamRow({ team }: { team: MatchTeam }) {
       )}
     >
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/10 bg-black/40 font-mono text-[10px] text-zinc-500">
-        {team.seed > 0 ? team.seed : "—"}
+        {team.seed > 0 ? team.seed : "ÔÇö"}
       </span>
       <span
         className={classNames(
@@ -1990,8 +1999,13 @@ function MatchCard({
   const card = (
     <div
       className={classNames(
-        "overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35",
-        onAdminSelect && "cursor-pointer"
+        "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1",
+        onAdminSelect && "cursor-pointer transition hover:border-orange-300/80",
+        match.status === "live"
+          ? "border-orange-400/70 shadow-[0_0_24px_rgba(249,115,22,0.18)]"
+          : match.status === "complete"
+            ? "border-emerald-500/25"
+            : "border-white/10"
       )}
     >
       <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
@@ -2031,7 +2045,7 @@ function MatchCard({
 }
 
 function TeamRow({ team }: { team: MatchTeam }) {
-  return <div className={classNames("flex items-center gap-2 border-b border-white/5 px-3 py-3 text-sm last:border-0", team.winner ? "bg-orange-500/10 text-white" : "text-zinc-300")}><span className="w-7 font-mono text-xs text-zinc-500">{team.seed > 0 ? `#${team.seed}` : "—"}</span><span className={classNames("min-w-0 flex-1 truncate", team.winner && "font-bold text-orange-100")}>{team.name}</span><span className="grid h-7 w-8 place-items-center rounded border border-white/10 bg-black/40 font-mono text-xs text-white">{team.score ?? "-"}</span></div>;
+  return <div className={classNames("flex items-center gap-2 border-b border-white/5 px-3 py-3 text-sm last:border-0", team.winner ? "bg-orange-500/10 text-white" : "text-zinc-300")}><span className="w-7 font-mono text-xs text-zinc-500">{team.seed > 0 ? `#${team.seed}` : "ÔÇö"}</span><span className={classNames("min-w-0 flex-1 truncate", team.winner && "font-bold text-orange-100")}>{team.name}</span><span className="grid h-7 w-8 place-items-center rounded border border-white/10 bg-black/40 font-mono text-xs text-white">{team.score ?? "-"}</span></div>;
 }
 
 function Media({ tournament }: { tournament: TournamentCard }) {

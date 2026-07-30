@@ -2,18 +2,20 @@
 
 import { ImageIcon, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { createTournamentBannerUpload } from "@/app/admin/tournaments/actions";
+import {
+  createTournamentBannerUpload,
+  discardTournamentBannerUpload,
+} from "@/app/admin/tournaments/actions";
 import { supabase } from "@/lib/supabase";
 
 const acceptedImageTypes = "image/jpeg,image/png,image/webp";
+const maxTournamentBannerBytes = 10 * 1024 * 1024;
 
 export default function TournamentBannerPicker({
   defaultValue,
-  tournamentId,
   readOnly,
 }: {
   defaultValue: string;
-  tournamentId: string | null;
   readOnly: boolean;
 }) {
   const [bannerUrl, setBannerUrl] = useState(defaultValue);
@@ -21,6 +23,7 @@ export default function TournamentBannerPicker({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const objectUrlRef = useRef<string | null>(null);
+  const pendingUploadUrlRef = useRef<string | null>(null);
 
   useEffect(
     () => () => {
@@ -32,6 +35,16 @@ export default function TournamentBannerPicker({
   const selectBanner = async (file: File | undefined) => {
     if (!file) return;
 
+    if (file.size <= 0 || file.size > maxTournamentBannerBytes) {
+      setError(
+        "Banner must be a JPG, JPEG, PNG, or WEBP image no larger than 10 MiB."
+      );
+      return;
+    }
+
+    const previousPendingUpload = pendingUploadUrlRef.current;
+    const fallbackUrl = previousPendingUpload ?? defaultValue;
+
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     objectUrlRef.current = URL.createObjectURL(file);
     setPreviewUrl(objectUrlRef.current);
@@ -39,31 +52,42 @@ export default function TournamentBannerPicker({
     setError("");
     setUploading(true);
 
+    let uploadedPublicUrl: string | null = null;
     try {
       const upload = await createTournamentBannerUpload({
         fileName: file.name,
         contentType: file.type,
         size: file.size,
-        tournamentId,
       });
+      uploadedPublicUrl = upload.publicUrl;
       const { error: uploadError } = await supabase.storage
         .from(upload.bucket)
         .uploadToSignedUrl(upload.path, upload.token, file, {
           contentType: file.type,
-        });
+      });
 
       if (uploadError) throw uploadError;
+      pendingUploadUrlRef.current = upload.publicUrl;
       setBannerUrl(upload.publicUrl);
       setPreviewUrl(upload.publicUrl);
-    } catch (uploadError) {
-      console.error("Tournament banner upload failed:", uploadError);
-      setBannerUrl(defaultValue);
-      setPreviewUrl(defaultValue);
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "Banner upload failed."
-      );
+
+      if (
+        previousPendingUpload &&
+        previousPendingUpload !== upload.publicUrl
+      ) {
+        await discardTournamentBannerUpload(previousPendingUpload).catch(
+          () => undefined
+        );
+      }
+    } catch {
+      if (uploadedPublicUrl) {
+        await discardTournamentBannerUpload(uploadedPublicUrl).catch(
+          () => undefined
+        );
+      }
+      setBannerUrl(fallbackUrl);
+      setPreviewUrl(fallbackUrl);
+      setError("Banner upload failed. Try again.");
     } finally {
       setUploading(false);
     }
@@ -96,14 +120,9 @@ export default function TournamentBannerPicker({
           <input
             name="bannerImageUrl"
             value={bannerUrl}
-            onChange={(event) => {
-              setBannerUrl(event.target.value);
-              setPreviewUrl(event.target.value);
-              setError("");
-            }}
             required
-            readOnly={readOnly || uploading}
-            placeholder="Upload an image or enter an image URL"
+            readOnly
+            placeholder="Upload an image"
             className={`w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none transition focus:border-orange-400 ${
               readOnly ? "cursor-default border-white/5 bg-black/20 text-zinc-300" : ""
             }`}
@@ -126,7 +145,7 @@ export default function TournamentBannerPicker({
                 />
               </label>
               <p className="text-xs leading-5 text-zinc-500">
-                JPG, JPEG, PNG, or WEBP. High-resolution artwork up to 100 MB.
+                JPG, JPEG, PNG, or WEBP. High-resolution artwork up to 10 MiB.
               </p>
             </div>
           )}

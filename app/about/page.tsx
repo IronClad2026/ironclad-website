@@ -20,15 +20,12 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import revealStyles from "@/components/ScrollReveal.module.css";
+import { sectionReveal } from "@/lib/animations";
 
 gsap.registerPlugin(useGSAP);
 
 const discordUrl = "https://discord.gg/ZQSQjBNRm3";
-
-const sectionReveal = {
-  hidden: { opacity: 0, y: 48 },
-  visible: { opacity: 1, y: 0 },
-};
 
 const tournamentBrackets = [
   {
@@ -129,7 +126,7 @@ function HeroSection() {
           animate="visible"
           variants={sectionReveal}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="max-w-5xl"
+          className={`${revealStyles.reveal} max-w-5xl`}
         >
           <p className="text-sm font-black uppercase text-orange-300">
             Built for Competitive Company of Heroes 3
@@ -155,7 +152,7 @@ function HeroSection() {
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.18, ease: "easeOut" }}
-          className="hidden border border-white/12 bg-black/45 p-5 backdrop-blur lg:block"
+          className={`${revealStyles.reveal} hidden border border-white/12 bg-black/45 p-5 backdrop-blur lg:block`}
         >
           <div className="relative aspect-[4/5] overflow-hidden border border-orange-400/30 bg-[linear-gradient(145deg,rgba(249,115,22,0.12),rgba(8,13,24,0.92))]">
             <div className="about-scanline absolute inset-y-0 left-[-30%] w-1/2 skew-x-[-14deg] bg-[linear-gradient(90deg,transparent,rgba(249,115,22,0.22),transparent)]" />
@@ -236,7 +233,7 @@ function TournamentStructureSection() {
               viewport={{ once: true, margin: "-80px" }}
               variants={sectionReveal}
               transition={{ duration: 0.55, delay: index * 0.08 }}
-              className="group relative min-h-72 overflow-hidden border border-white/12 bg-zinc-950/70 p-6 transition hover:border-orange-400/50 hover:bg-zinc-950"
+              className={`${revealStyles.reveal} group relative min-h-72 overflow-hidden border border-white/12 bg-zinc-950/70 p-6 transition hover:border-orange-400/50 hover:bg-zinc-950`}
             >
               <div className="absolute inset-x-0 top-0 h-1 bg-orange-500 opacity-70" />
               <p className="text-sm font-black uppercase text-orange-300">
@@ -280,7 +277,7 @@ function FairCompetitionSection() {
           viewport={{ once: true, margin: "-80px" }}
           variants={sectionReveal}
           transition={{ duration: 0.6 }}
-          className="grid gap-3 sm:grid-cols-2"
+          className={`${revealStyles.reveal} grid gap-3 sm:grid-cols-2`}
         >
           {integrityHighlights.map((item) => {
             const Icon = item.icon;
@@ -355,7 +352,7 @@ function FutureVisionSection() {
           viewport={{ once: true, margin: "-80px" }}
           variants={sectionReveal}
           transition={{ duration: 0.65 }}
-          className="max-w-5xl"
+          className={`${revealStyles.reveal} max-w-5xl`}
         >
           <p className="text-sm font-black uppercase text-orange-300">
             Future Vision
@@ -425,6 +422,7 @@ function CinematicSection({
           viewport={{ once: true, margin: "-80px" }}
           variants={sectionReveal}
           transition={{ duration: 0.6 }}
+          className={revealStyles.reveal}
         >
           {visual}
         </motion.div>
@@ -449,7 +447,7 @@ function SectionHeading({
       viewport={{ once: true, margin: "-80px" }}
       variants={sectionReveal}
       transition={{ duration: 0.6 }}
-      className="max-w-4xl"
+      className={`${revealStyles.reveal} max-w-4xl`}
     >
       <p className="text-sm font-black uppercase text-orange-300">{eyebrow}</p>
       <h2 className="mt-4 text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">

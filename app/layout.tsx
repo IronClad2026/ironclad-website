@@ -5,8 +5,13 @@ import "./globals.css";
 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+<<<<<<< HEAD
 import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import GlobalSmoke from "@/components/GlobalSmoke";
+=======
+import GlobalSmoke from "@/components/GlobalSmoke";
+import SiteMusicPlayer from "@/components/SiteMusicPlayer";
+>>>>>>> master
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 
 export default function RootLayout({
@@ -17,16 +22,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body className="bg-black text-white">
-  <GlobalSmoke />
 
-  <SmoothScrollProvider>
-    <Navbar />
-    <div className="pt-[83px] md:pt-[69px]">{children}</div>
-    <Footer />
-    <SiteMusicPlayer />
-  </SmoothScrollProvider>
-</body>
       </html>
     </ClerkProvider>
   );

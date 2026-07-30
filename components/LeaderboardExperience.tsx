@@ -20,6 +20,7 @@ import type {
   PublicLeaderboardStanding,
   PublicSeasonChampion,
 } from "@/lib/leaderboard/public";
+import ScrollReveal from "@/components/ScrollReveal";
 
 type LeaderboardExperienceProps = {
   data: PublicLeaderboardData;
@@ -63,14 +64,17 @@ export default function LeaderboardExperience({
   const [scope, setScope] = useState<LeaderboardScope>("season");
   const [bracketType, setBracketType] =
     useState<LeaderboardBracketType>("overall");
+
   const activeRows = useMemo(() => {
     const source =
       scope === "season" ? data.seasonStandings : data.allTimeStandings;
+
     return source
       .filter((row) => row.bracketType === bracketType)
       .slice()
       .sort(compareRows);
   }, [bracketType, data.allTimeStandings, data.seasonStandings, scope]);
+
   const podiumRows = useMemo(
     () =>
       data.seasonStandings
@@ -80,6 +84,7 @@ export default function LeaderboardExperience({
         .slice(0, 3),
     [data.seasonStandings]
   );
+
   const historyItems = useMemo(
     () => buildTournamentHistory(data.seasonStandings),
     [data.seasonStandings]
@@ -90,12 +95,14 @@ export default function LeaderboardExperience({
       <LeaderboardHero
         currentSeason={data.currentSeason}
         seasonProgress={data.currentSeasonProgress}
-        playerCount={data.seasonStandings.filter(
-          (row) => row.bracketType === "overall"
-        ).length}
+        playerCount={
+          data.seasonStandings.filter(
+            (row) => row.bracketType === "overall"
+          ).length
+        }
       />
 
-      <section className="relative mx-auto max-w-[1800px] space-y-10 px-4 py-10 sm:px-6 lg:px-8 xl:px-10">
+      <section className="relative z-10 mx-auto max-w-[1800px] space-y-10 px-4 py-10 sm:px-6 lg:px-8 xl:px-10">
         {data.errors.length > 0 && (
           <div className="border border-amber-300/30 bg-[linear-gradient(135deg,rgba(245,158,11,0.18),rgba(0,0,0,0.82))] p-5 text-sm font-semibold leading-6 text-amber-100 shadow-2xl shadow-black/30 backdrop-blur">
             Some leaderboard data could not be loaded. The public page is
@@ -103,68 +110,78 @@ export default function LeaderboardExperience({
           </div>
         )}
 
-        <LeaderboardPodium rows={podiumRows} />
+        <ScrollReveal>
+          <LeaderboardPodium rows={podiumRows} />
+        </ScrollReveal>
 
-        <section
-          className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-4 shadow-[0_0_45px_rgba(0,0,0,0.48)] backdrop-blur sm:p-6"
-          style={{
-            backgroundImage:
-              "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.78) 48%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.9),rgba(249,115,22,0.1),rgba(0,0,0,0.9)),url('/images/sfondi/4.jpg')",
-          }}
-        >
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
-                <BarChart3 size={16} />
-                Dynamic Standings
-              </p>
-              <h2 className="mt-3 text-3xl font-black text-white">
-                Player Ranking
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300">
-                Switch between seasonal and all-time standings, then filter by
-                bracket. All rows come from public-safe leaderboard views.
-              </p>
+        <ScrollReveal>
+          <section
+            className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-4 shadow-[0_0_45px_rgba(0,0,0,0.48)] backdrop-blur sm:p-6"
+            style={{
+              backgroundImage:
+                "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.78) 48%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.9),rgba(249,115,22,0.1),rgba(0,0,0,0.9)),url('/images/sfondi/4.jpg')",
+            }}
+          >
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
+                  <BarChart3 size={16} />
+                  Dynamic Standings
+                </p>
+
+                <h2 className="mt-3 text-3xl font-black text-white">
+                  Player Ranking
+                </h2>
+
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300">
+                  Switch between seasonal and all-time standings, then filter by
+                  bracket. All rows come from public-safe leaderboard views.
+                </p>
+              </div>
+
+              <div className="grid gap-3 lg:min-w-[720px] lg:grid-cols-[0.85fr_1.15fr]">
+                <SegmentedControl
+                  label="Ranking Scope"
+                  options={scopeOptions}
+                  value={scope}
+                  onChange={setScope}
+                />
+
+                <SegmentedControl
+                  label="Bracket"
+                  options={bracketOptions}
+                  value={bracketType}
+                  onChange={setBracketType}
+                />
+              </div>
             </div>
 
-            <div className="grid gap-3 lg:min-w-[720px] lg:grid-cols-[0.85fr_1.15fr]">
-              <SegmentedControl
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <MetricCard label="Visible Players" value={activeRows.length} />
+
+              <MetricCard
                 label="Ranking Scope"
-                options={scopeOptions}
-                value={scope}
-                onChange={setScope}
+                value={scope === "season" ? "Season" : "All Time"}
               />
-              <SegmentedControl
+
+              <MetricCard
                 label="Bracket"
-                options={bracketOptions}
-                value={bracketType}
-                onChange={setBracketType}
+                value={
+                  bracketOptions.find(
+                    (option) => option.value === bracketType
+                  )?.label ?? "Overall"
+                }
               />
             </div>
-          </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <MetricCard label="Visible Players" value={activeRows.length} />
-            <MetricCard
-              label="Ranking Scope"
-              value={scope === "season" ? "Season" : "All Time"}
-            />
-            <MetricCard
-              label="Bracket"
-              value={
-                bracketOptions.find((option) => option.value === bracketType)
-                  ?.label ?? "Overall"
-              }
-            />
-          </div>
+            <LeaderboardTable rows={activeRows} scope={scope} />
+          </section>
+        </ScrollReveal>
 
-          <LeaderboardTable rows={activeRows} scope={scope} />
-        </section>
-
-        <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+        <ScrollReveal className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
           <TournamentHistoryLeaderboard items={historyItems} />
           <SeasonChampionsArchive champions={data.seasonChampions} />
-        </div>
+        </ScrollReveal>
       </section>
     </main>
   );
@@ -189,19 +206,25 @@ function LeaderboardHero({
           backgroundImage: "url('/images/ironclad-background.jpg')",
         }}
       />
+
       <div className="absolute inset-0 bg-black/68" />
+
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.16))]" />
+
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
+
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
 
-      <div className="relative z-10 mx-auto grid max-w-[1800px] gap-10 xl:grid-cols-[1.05fr_0.95fr] xl:items-end">
+      <ScrollReveal className="relative z-10 mx-auto grid max-w-[1800px] gap-10 xl:grid-cols-[1.05fr_0.95fr] xl:items-end">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.36em] text-orange-300">
             IronClad Competitive Command
           </p>
+
           <h1 className="mt-5 max-w-5xl text-5xl font-black tracking-tight md:text-7xl xl:text-8xl">
             Leaderboard & Ranking
           </h1>
+
           <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300 md:text-lg">
             Track IronClad seasonal performance across Academy, Challenge, and
             Main / Elite brackets. Points reset between seasons while all-time
@@ -215,9 +238,11 @@ function LeaderboardHero({
               <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
                 Current Season
               </p>
+
               <h2 className="mt-2 text-2xl font-black text-white">
                 {currentSeason?.name ?? "Season Pending"}
               </h2>
+
               <p className="mt-2 text-sm text-zinc-400">
                 {currentSeason
                   ? `${formatDate(currentSeason.startDate)} - ${formatDate(
@@ -237,6 +262,7 @@ function LeaderboardHero({
               <span>Season Progress</span>
               <span>{Math.round(progress)}%</span>
             </div>
+
             <div className="mt-3 h-3 overflow-hidden rounded-full border border-orange-400/15 bg-black/70">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-300 shadow-[0_0_18px_rgba(249,115,22,0.55)]"
@@ -247,30 +273,43 @@ function LeaderboardHero({
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <HeroStat label="Players" value={playerCount} />
+
             <HeroStat
               label="Season"
               value={currentSeason ? `S${currentSeason.seasonNumber}` : "TBA"}
             />
+
             <HeroStat label="Reset" value="2 / Year" />
           </div>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: string | number }) {
+function HeroStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
   return (
     <div className="border border-white/12 bg-white/[0.055] p-4 backdrop-blur">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>
+
       <p className="mt-2 text-xl font-black text-white">{value}</p>
     </div>
   );
 }
 
-function LeaderboardPodium({ rows }: { rows: PublicLeaderboardStanding[] }) {
+function LeaderboardPodium({
+  rows,
+}: {
+  rows: PublicLeaderboardStanding[];
+}) {
   if (rows.length === 0) {
     return (
       <EmptyPanel
@@ -290,8 +329,12 @@ function LeaderboardPodium({ rows }: { rows: PublicLeaderboardStanding[] }) {
           <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
             Current Season Leaders
           </p>
-          <h2 className="mt-2 text-3xl font-black text-white">Top 3 Podium</h2>
+
+          <h2 className="mt-2 text-3xl font-black text-white">
+            Top 3 Podium
+          </h2>
         </div>
+
         <p className="max-w-2xl text-sm text-zinc-400">
           Overall bracket leaders from the active season standings.
         </p>
@@ -329,20 +372,24 @@ function PodiumCard({
       <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
         <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
       </div>
+
       <div className="relative z-10">
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-orange-200">
             <Medal size={15} />
             Rank #{row.rank ?? "-"}
           </span>
+
           <RankMovement row={row} />
         </div>
 
         <div className="mt-7 flex flex-col items-center text-center">
           <Avatar standing={row} size={prominent ? "large" : "medium"} />
+
           <h3 className="mt-5 max-w-full truncate text-2xl font-black text-white">
             {row.playerName}
           </h3>
+
           <p className="mt-1 text-sm font-semibold text-zinc-400">
             {row.country || "Unknown"} - ELO {formatElo(row.currentElo)}
           </p>
@@ -395,6 +442,7 @@ function LeaderboardTable({
               <th className="px-4 py-4">Movement</th>
             </tr>
           </thead>
+
           <tbody className="divide-y divide-white/10 bg-black/30">
             {rows.map((row) => (
               <tr
@@ -404,16 +452,19 @@ function LeaderboardTable({
                 <td className="px-4 py-4 text-lg font-black text-orange-300">
                   #{row.rank ?? "-"}
                 </td>
+
                 <td className="px-4 py-4">
                   <Link
                     href={`/players/${row.playerId}`}
                     className="flex min-w-0 items-center gap-3"
                   >
                     <Avatar standing={row} size="small" />
+
                     <div className="min-w-0">
                       <p className="truncate font-black text-white">
                         {row.playerName}
                       </p>
+
                       {row.region && (
                         <p className="truncate text-xs text-zinc-400">
                           {row.region}
@@ -422,30 +473,39 @@ function LeaderboardTable({
                     </div>
                   </Link>
                 </td>
+
                 <td className="px-4 py-4 text-zinc-300">
                   {row.country || "Unknown"}
                 </td>
+
                 <td className="px-4 py-4 font-bold text-zinc-200">
                   {formatElo(row.currentElo)}
                 </td>
+
                 <td className="px-4 py-4 text-lg font-black text-white">
                   {row.totalPoints}
                 </td>
+
                 <td className="px-4 py-4 text-zinc-300">
                   {row.tournamentsPlayed}
                 </td>
+
                 <td className="px-4 py-4 text-zinc-300">
                   {row.roundsPassed}
                 </td>
+
                 <td className="px-4 py-4 text-zinc-300">
                   {row.tournamentWins}
                 </td>
+
                 <td className="px-4 py-4 text-zinc-300">
                   {formatNumber(row.winRate)}%
                 </td>
+
                 <td className="px-4 py-4 text-zinc-300">
                   {scope === "season" ? row.lastTournamentPoints : "-"}
                 </td>
+
                 <td className="px-4 py-4">
                   {scope === "season" ? <RankMovement row={row} /> : "-"}
                 </td>
@@ -465,7 +525,11 @@ function SegmentedControl<T extends string>({
   onChange,
 }: {
   label: string;
-  options: Array<{ value: T; label: string; description?: string }>;
+  options: Array<{
+    value: T;
+    label: string;
+    description?: string;
+  }>;
   value: T;
   onChange: (value: T) => void;
 }) {
@@ -474,6 +538,7 @@ function SegmentedControl<T extends string>({
       <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-400">
         {label}
       </p>
+
       <div
         className={`grid gap-2 border border-orange-500/20 bg-black/55 p-2 shadow-inner shadow-black/30 ${
           options.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"
@@ -481,6 +546,7 @@ function SegmentedControl<T extends string>({
       >
         {options.map((option) => {
           const active = option.value === value;
+
           return (
             <button
               key={option.value}
@@ -519,6 +585,7 @@ function TournamentHistoryLeaderboard({
         <CalendarDays size={16} />
         Tournament History
       </p>
+
       <h2 className="mt-3 text-2xl font-black text-white">
         Published Tournament Impact
       </h2>
@@ -538,14 +605,17 @@ function TournamentHistoryLeaderboard({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="font-black text-white">{item.title}</p>
+
                   <p className="mt-1 text-xs uppercase tracking-wider text-zinc-500">
                     {formatBracketLabel(item.bracketType)} - Date TBA
                   </p>
                 </div>
+
                 <span className="rounded-full border border-orange-400/25 bg-orange-500/10 px-3 py-1 text-xs font-black text-orange-200">
                   {item.points} pts
                 </span>
               </div>
+
               <p className="mt-3 text-sm text-zinc-300">
                 Top published scorer:{" "}
                 <span className="font-bold text-zinc-200">
@@ -577,6 +647,7 @@ function SeasonChampionsArchive({
         <Award size={16} />
         Season Champions Archive
       </p>
+
       <h2 className="mt-3 text-2xl font-black text-white">
         Champion Records
       </h2>
@@ -597,7 +668,9 @@ function SeasonChampionsArchive({
                 className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-orange-400/35 bg-black/55 bg-cover bg-center shadow-[0_0_20px_rgba(249,115,22,0.12)]"
                 style={
                   champion.avatarUrl
-                    ? { backgroundImage: `url("${champion.avatarUrl}")` }
+                    ? {
+                        backgroundImage: `url("${champion.avatarUrl}")`,
+                      }
                     : undefined
                 }
               >
@@ -605,19 +678,23 @@ function SeasonChampionsArchive({
                   <UserRound size={22} className="text-zinc-600" />
                 )}
               </div>
+
               <div className="min-w-0 flex-1">
                 <p className="truncate font-black text-white">
                   {champion.playerName}
                 </p>
+
                 <p className="mt-1 text-xs text-zinc-500">
                   {champion.seasonName} -{" "}
                   {formatBracketLabel(champion.bracketType)}
                 </p>
               </div>
+
               <div className="text-right">
                 <p className="text-xs font-black uppercase tracking-wider text-orange-300">
                   Rank #{champion.finalRank}
                 </p>
+
                 <p className="mt-1 text-sm font-black text-white">
                   {champion.finalPoints} pts
                 </p>
@@ -649,7 +726,9 @@ function Avatar({
       className={`grid shrink-0 place-items-center overflow-hidden border border-orange-400/35 bg-black/55 bg-cover bg-center shadow-[0_0_24px_rgba(249,115,22,0.16)] ${className}`}
       style={
         standing.avatarUrl
-          ? { backgroundImage: `url("${standing.avatarUrl}")` }
+          ? {
+              backgroundImage: `url("${standing.avatarUrl}")`,
+            }
           : undefined
       }
     >
@@ -663,7 +742,11 @@ function Avatar({
   );
 }
 
-function RankMovement({ row }: { row: PublicLeaderboardStanding }) {
+function RankMovement({
+  row,
+}: {
+  row: PublicLeaderboardStanding;
+}) {
   if (row.previousRank === null) {
     return (
       <span className="rounded-full border border-sky-400/25 bg-sky-500/10 px-2.5 py-1 text-xs font-black text-sky-200">
@@ -677,6 +760,7 @@ function RankMovement({ row }: { row: PublicLeaderboardStanding }) {
   }
 
   const movedUp = row.rankMovement > 0;
+
   return (
     <span
       className={`rounded-full border px-2.5 py-1 text-xs font-black ${
@@ -698,23 +782,37 @@ function RankMovement({ row }: { row: PublicLeaderboardStanding }) {
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string | number }) {
+function MetricCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
   return (
     <div className="border border-white/12 bg-black/45 p-4 shadow-xl shadow-black/10">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>
+
       <p className="mt-2 text-xl font-black text-white">{value}</p>
     </div>
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string | number }) {
+function MiniStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
   return (
     <div className="border border-white/12 bg-black/45 p-3 text-center">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>
+
       <p className="mt-2 text-lg font-black text-white">{value}</p>
     </div>
   );
@@ -738,7 +836,9 @@ function EmptyPanel({
       <div className="mx-auto grid h-14 w-14 place-items-center border border-orange-400/25 bg-orange-500/10 text-orange-300">
         <Icon size={24} />
       </div>
+
       <h2 className="mt-5 text-2xl font-black text-white">{title}</h2>
+
       <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
         {message}
       </p>
@@ -754,15 +854,22 @@ type TournamentHistoryItem = {
   points: number;
 };
 
-function buildTournamentHistory(rows: PublicLeaderboardStanding[]) {
+function buildTournamentHistory(
+  rows: PublicLeaderboardStanding[]
+): TournamentHistoryItem[] {
   const items = new Map<string, TournamentHistoryItem>();
 
   for (const row of rows) {
-    if (!row.lastTournamentId || !row.lastTournamentTitle) continue;
+    if (!row.lastTournamentId || !row.lastTournamentTitle) {
+      continue;
+    }
 
     const key = `${row.lastTournamentId}:${row.bracketType}`;
     const existing = items.get(key);
-    if (existing && existing.points >= row.lastTournamentPoints) continue;
+
+    if (existing && existing.points >= row.lastTournamentPoints) {
+      continue;
+    }
 
     items.set(key, {
       tournamentId: row.lastTournamentId,
@@ -773,7 +880,9 @@ function buildTournamentHistory(rows: PublicLeaderboardStanding[]) {
     });
   }
 
-  return [...items.values()].sort((left, right) => right.points - left.points);
+  return [...items.values()].sort(
+    (left, right) => right.points - left.points
+  );
 }
 
 function compareRows(
@@ -815,9 +924,20 @@ function formatElo(value: number | null) {
   return typeof value === "number" ? String(value) : "Unrated";
 }
 
-function formatBracketLabel(bracketType: LeaderboardBracketType) {
-  if (bracketType === "academy") return "Academy Bracket";
-  if (bracketType === "main") return "Main / Elite Bracket";
-  if (bracketType === "challenge") return "Challenge Bracket";
+function formatBracketLabel(
+  bracketType: LeaderboardBracketType
+) {
+  if (bracketType === "academy") {
+    return "Academy Bracket";
+  }
+
+  if (bracketType === "main") {
+    return "Main / Elite Bracket";
+  }
+
+  if (bracketType === "challenge") {
+    return "Challenge Bracket";
+  }
+
   return "Overall";
 }

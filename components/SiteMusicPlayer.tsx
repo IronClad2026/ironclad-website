@@ -16,8 +16,10 @@ export default function SiteMusicPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasActivePointerRef = useRef(false);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [playbackError, setPlaybackError] = useState(false);
 
   const clearInactivityTimer = useCallback(() => {
     if (inactivityTimerRef.current) {
@@ -52,18 +54,28 @@ export default function SiteMusicPlayer() {
   useEffect(() => {
     const audio = audioRef.current;
 
-    if (!audio) return;
+    if (!audio) {
+      return;
+    }
 
     const handlePlay = () => {
+      setPlaybackError(false);
       setIsPlaying(true);
       resetInactivityTimer();
     };
-    const handlePause = () => setIsPlaying(false);
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
     const handleEnded = () => {
       setIsPlaying(false);
     };
+
     const handleError = () => {
       setIsPlaying(false);
+      setPlaybackError(true);
+
       console.error("IronClad theme audio failed to load.", {
         src: audio.currentSrc || audioSource,
         networkState: audio.networkState,
@@ -89,7 +101,9 @@ export default function SiteMusicPlayer() {
   useEffect(() => {
     const audio = audioRef.current;
 
-    if (!audio) return;
+    if (!audio) {
+      return;
+    }
 
     audio.volume = defaultVolume;
     audio.muted = false;
@@ -98,13 +112,19 @@ export default function SiteMusicPlayer() {
   const startPlayback = async () => {
     const audio = audioRef.current;
 
-    if (!audio) return false;
+    if (!audio) {
+      return false;
+    }
+
+    setPlaybackError(false);
 
     try {
       await audio.play();
       return true;
     } catch {
       setIsPlaying(false);
+      setPlaybackError(true);
+
       console.error("IronClad theme playback failed.", {
         src: audio.currentSrc || audioSource,
         networkState: audio.networkState,
@@ -112,6 +132,7 @@ export default function SiteMusicPlayer() {
         mediaErrorCode: audio.error?.code ?? null,
         mediaErrorMessage: audio.error?.message ?? null,
       });
+
       return false;
     }
   };
@@ -119,7 +140,9 @@ export default function SiteMusicPlayer() {
   const togglePlayback = async () => {
     const audio = audioRef.current;
 
-    if (!audio) return;
+    if (!audio) {
+      return;
+    }
 
     resetInactivityTimer();
 
@@ -165,12 +188,18 @@ export default function SiteMusicPlayer() {
       }
       {...(!isCollapsed ? interactionHandlers : {})}
     >
-      <audio ref={audioRef} src={audioSource} preload="metadata" loop />
+      <audio
+        ref={audioRef}
+        src={audioSource}
+        preload="metadata"
+        loop
+      />
 
       <button
         type="button"
         onClick={togglePlayback}
         aria-label={isPlaying ? "Pause IronClad theme" : "Play IronClad theme"}
+        aria-pressed={isPlaying}
         className="grid h-12 w-12 place-items-center border border-orange-400/45 bg-orange-500/10 text-orange-200 transition hover:border-orange-300/70 hover:bg-orange-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:h-11 sm:w-11"
       >
         {isPlaying ? (
@@ -179,6 +208,16 @@ export default function SiteMusicPlayer() {
           <Play size={19} aria-hidden="true" />
         )}
       </button>
+
+      {playbackError && (
+        <span
+          role="status"
+          aria-live="polite"
+          className="mt-2 max-w-28 text-center text-xs leading-5 text-amber-200"
+        >
+          Music unavailable
+        </span>
+      )}
     </aside>
   );
 }

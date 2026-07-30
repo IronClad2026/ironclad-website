@@ -296,6 +296,7 @@ export default function RulesPage() {
       />
       <OfficialDocumentsSection reduceMotion={reduceMotion} />
       <DisclaimerSection reduceMotion={reduceMotion} />
+
     </main>
   );
 }

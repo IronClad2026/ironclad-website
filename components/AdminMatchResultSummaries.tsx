@@ -226,14 +226,14 @@ function EvidenceSummary({
         Reported by {reporterName(submission, participantsById)}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {submission.replayProofUrl ? (
-          <ProofLink href={submission.replayProofUrl} label="Replay Proof" />
+        {submission.replayAccessHref ? (
+          <ProofLink href={submission.replayAccessHref} label="Replay Proof" />
         ) : (
           <MissingProof label="Replay Proof" />
         )}
-        {submission.screenshotProofUrl ? (
+        {submission.screenshotAccessHref ? (
           <ProofLink
-            href={submission.screenshotProofUrl}
+            href={submission.screenshotAccessHref}
             label="Screenshot Proof"
           />
         ) : (
@@ -411,7 +411,7 @@ function reporterName(
 ) {
   return submission.submittedByRegistrationId
     ? participantName(participantsById, submission.submittedByRegistrationId)
-    : submission.submittedByClerkUserId;
+    : "Participant";
 }
 
 function participantName(

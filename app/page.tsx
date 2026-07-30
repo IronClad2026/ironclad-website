@@ -1,20 +1,22 @@
 import CurrentTournamentCard from "@/components/CurrentTournamentCard";
 import HomeAccountSection from "@/components/HomeAccountSection";
+import ScrollReveal from "@/components/ScrollReveal";
 import { currentTournaments } from "@/data/currentTournaments";
 import {
   ArrowRight,
   Crosshair,
-  ExternalLink,
+
   Flag,
   Radio,
   ShieldCheck,
   Trophy,
-  Users,
+
+  UserRoundCheck,
+
 } from "lucide-react";
 import Link from "next/link";
 
 const discordUrl = "https://discord.gg/ZQSQjBNRm3";
-const battlefyUrl = "https://battlefy.com/ironclad-tournaments";
 
 const commandStats = [
   {
@@ -22,12 +24,14 @@ const commandStats = [
     value: String(currentTournaments.length).padStart(2, "0"),
   },
   {
-    label: "Competition formats",
-    value: "1v1 / 4v4",
+
+    label: "Competition focus",
+    value: "CoH3",
   },
   {
     label: "Integrity model",
-    value: "Verified",
+    value: "Fair play",
+
   },
 ];
 
@@ -35,17 +39,21 @@ const platformSignals = [
   {
     icon: ShieldCheck,
     title: "Competitive integrity",
-    text: "Profile checks, admin review, and proof-backed results protect the tournament field.",
+
+    text: "Clear rules and admin review support fair, structured competition.",
+
   },
   {
     icon: Trophy,
     title: "Structured tournaments",
-    text: "Current brackets and schedules remain visible through the approved tournament flow.",
+
+    text: "Brackets, schedules, and tournament updates remain easy to follow.",
   },
   {
-    icon: Users,
-    title: "Connected roster",
-    text: "Players can browse public profiles and contact opponents through Discord.",
+    icon: UserRoundCheck,
+    title: "Player choice",
+    text: "Public profiles and Discord contact appear only when players choose to share them.",
+
   },
 ];
 
@@ -71,10 +79,15 @@ function HeroSection() {
       aria-labelledby="home-hero-title"
     >
       <TacticalBackdrop />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.3),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.18))]" />
+
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.3),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.18))]"
+      />
 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] lg:items-end">
-        <div className="max-w-5xl">
+        <ScrollReveal className="max-w-5xl">
+
           <p className="text-sm font-black uppercase text-orange-300">
             Competitive Company of Heroes 3 Events
           </p>
@@ -102,22 +115,20 @@ function HeroSection() {
               <Flag size={17} aria-hidden="true" />
             </a>
 
-            <a
-              className="inline-flex min-h-12 items-center justify-center gap-2 border border-white/18 bg-white/[0.035] px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-              href={battlefyUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              className="inline-flex min-h-12 items-center justify-center gap-2 border border-white/20 bg-white/[0.035] px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+              href="/tournaments"
             >
               View Current Events
-              <ExternalLink size={17} aria-hidden="true" />
-            </a>
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
           </div>
 
           <dl className="mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
             {commandStats.map((stat) => (
               <div
                 key={stat.label}
-                className="border border-white/12 bg-black/45 px-4 py-4 backdrop-blur"
+                className="border border-white/15 bg-black/50 px-4 py-4 backdrop-blur"
               >
                 <dt className="text-xs font-bold uppercase text-zinc-500">
                   {stat.label}
@@ -128,18 +139,24 @@ function HeroSection() {
               </div>
             ))}
           </dl>
-        </div>
+        </ScrollReveal>
 
         <aside
-          className="hidden border border-white/12 bg-black/48 p-5 backdrop-blur lg:block"
+          className="hidden border border-white/15 bg-black/55 p-5 backdrop-blur lg:block"
           aria-label="IronClad command brief"
         >
           <div className="relative min-h-[560px] overflow-hidden border border-orange-400/30 bg-[linear-gradient(145deg,rgba(249,115,22,0.12),rgba(8,13,24,0.92))] xl:min-h-[600px]">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:40px_40px]" />
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(0,0,0,0.42))]" />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:40px_40px]"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(0,0,0,0.42))]"
+            />
 
             <div className="relative z-10 flex min-h-[560px] flex-col p-7 xl:min-h-[600px]">
-              <div className="flex items-center justify-between border-b border-white/12 pb-6 text-xs font-black uppercase text-orange-200">
+              <div className="flex items-center justify-between border-b border-white/15 pb-6 text-xs font-black uppercase text-orange-200">
                 <span>Operations Online</span>
                 <Radio size={16} aria-hidden="true" />
               </div>
@@ -151,7 +168,7 @@ function HeroSection() {
                   return (
                     <div
                       key={signal.title}
-                      className="border border-white/10 bg-black/28 p-4"
+                      className="border border-white/10 bg-black/30 p-4"
                     >
                       <div className="flex items-start gap-3">
                         <Icon
@@ -177,8 +194,8 @@ function HeroSection() {
                 <div className="border-t border-orange-400/35 pt-6">
                   <p className="text-4xl font-black leading-none">READY</p>
                   <p className="mt-4 text-sm leading-6 text-zinc-300">
-                    Brackets, profiles, players, and rules connected for the
-                    next competitive deployment.
+                    Tournaments, profiles, players, and rules connected for the
+                    next competitive event.
                   </p>
                 </div>
               </div>
@@ -200,16 +217,25 @@ function PlayersSection() {
       }}
       aria-labelledby="players-section-title"
     >
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.82)),linear-gradient(115deg,rgba(0,0,0,0.86),rgba(249,115,22,0.12),rgba(0,0,0,0.92))]" />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-25" />
-      <div className="absolute inset-y-0 right-0 w-px bg-orange-400/35" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.82)),linear-gradient(115deg,rgba(0,0,0,0.86),rgba(249,115,22,0.12),rgba(0,0,0,0.92))]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-25"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 right-0 w-px bg-orange-400/35"
+      />
       <TacticalBackdrop muted />
 
-      <div className="relative z-10 mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_340px] lg:items-center">
+      <ScrollReveal className="relative z-10 mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_340px] lg:items-center">
         <SectionHeading
           eyebrow="IronClad Players"
           title="Discover the Public Roster"
-          text="Browse registered IronClad players, compare ELO, view public profiles, and contact opponents through Discord."
+          text="Browse players who choose to appear publicly, compare ELO, view public profiles, and use Discord contact where a player has opted in."
           titleId="players-section-title"
         />
 
@@ -219,9 +245,9 @@ function PlayersSection() {
               <Crosshair size={23} aria-hidden="true" />
             </span>
             <div>
-              <p className="font-black text-white">Player intelligence</p>
+              <p className="font-black text-white">Player directory</p>
               <p className="mt-1 text-sm text-zinc-400">
-                Public profiles, ELO, region, and Discord contact routes.
+                Public profile details are limited to player-approved fields.
               </p>
             </div>
           </div>
@@ -234,7 +260,7 @@ function PlayersSection() {
             <ArrowRight size={17} aria-hidden="true" />
           </Link>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }
@@ -249,25 +275,27 @@ function EventsSection() {
       }}
       aria-labelledby="events-section-title"
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-orange-500/35" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.92),rgba(0,0,0,0.84)_42%,rgba(0,0,0,0.95)),linear-gradient(100deg,rgba(0,0,0,0.86),rgba(249,115,22,0.1),rgba(0,0,0,0.9))]" />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:84px_84px]" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-orange-500/35"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.92),rgba(0,0,0,0.84)_42%,rgba(0,0,0,0.95)),linear-gradient(100deg,rgba(0,0,0,0.86),rgba(249,115,22,0.1),rgba(0,0,0,0.9))]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:84px_84px]"
+      />
 
-      <div className="relative z-10 mx-auto max-w-7xl">
-        <div className="mb-10 grid gap-8 lg:grid-cols-[0.78fr_1fr] lg:items-end">
+      <ScrollReveal className="relative z-10 mx-auto max-w-7xl">
+        <div className="mb-10">
           <SectionHeading
             eyebrow="Live Tournament Access"
             title="Current IronClad Events"
-            text="Access active IronClad brackets, schedules, match progress, and tournament details directly through Battlefy."
+            text="Access active IronClad brackets, schedules, match progress, and tournament details through the current tournament experience."
             titleId="events-section-title"
           />
-
-          <div className="border-l border-orange-400/35 bg-black/35 py-4 pl-5 text-sm leading-7 text-zinc-400 backdrop-blur">
-            <p>
-              Battlefy remains the live destination for these brackets,
-              schedules, match progress, and tournament records.
-            </p>
-          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -278,7 +306,9 @@ function EventsSection() {
             />
           ))}
         </div>
-      </div>
+
+      </ScrollReveal>
+
     </section>
   );
 }
@@ -314,13 +344,27 @@ function TacticalBackdrop({ muted = false }: { muted?: boolean }) {
   return (
     <>
       <div
+
+        aria-hidden="true"
+
         className={`absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:52px_52px] ${
           muted ? "opacity-20" : "opacity-30"
         }`}
       />
-      <div className="absolute inset-0 bg-[linear-gradient(125deg,transparent_0%,transparent_43%,rgba(249,115,22,0.14)_43%,transparent_57%,transparent_100%)]" />
-      <div className="absolute top-1/4 right-8 hidden h-24 w-px bg-orange-400/50 lg:block" />
-      <div className="absolute bottom-1/4 left-8 hidden h-px w-36 bg-orange-400/45 lg:block" />
+
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(125deg,transparent_0%,transparent_43%,rgba(249,115,22,0.14)_43%,transparent_57%,transparent_100%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute top-1/4 right-8 hidden h-24 w-px bg-orange-400/50 lg:block"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute bottom-1/4 left-8 hidden h-px w-36 bg-orange-400/45 lg:block"
+      />
+
     </>
   );
 }

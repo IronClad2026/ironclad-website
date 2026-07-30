@@ -1,4 +1,5 @@
 import PublicPlayersDirectory from "@/components/PublicPlayersDirectory";
+import ScrollReveal from "@/components/ScrollReveal";
 import { getPublicPlayers } from "@/lib/public-players";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +25,7 @@ export default async function PlayersPage() {
         backgroundSize: "cover",
       }}
     >
-      <section
-        className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-20"
-      >
+      <section className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-20">
         <div
           className="absolute inset-0 bg-cover bg-center opacity-55"
           style={{
@@ -38,7 +37,7 @@ export default async function PlayersPage() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
         <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
 
-        <div className="relative z-10 mx-auto max-w-7xl">
+        <ScrollReveal className="relative z-10 mx-auto max-w-7xl">
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
             IronClad Roster
           </p>
@@ -49,7 +48,7 @@ export default async function PlayersPage() {
             Browse public IronClad commanders, competitive ELO ratings, regions,
             and opt-in Discord availability.
           </p>
-        </div>
+        </ScrollReveal>
       </section>
 
       <PublicPlayersDirectory players={players} />

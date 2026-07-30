@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 const AVATAR_BUCKET = "player-avatars";
+const AVATAR_CACHE_CONTROL = "private, no-store, max-age=0";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type CustomClaims = {
@@ -66,7 +67,7 @@ export async function GET(
   }
 
   if (!canReadAvatar) {
-    return createFallbackAvatarResponse("private, no-store");
+    return createFallbackAvatarResponse();
   }
 
   const { data: avatar, error: avatarError } = await supabase.storage
@@ -79,21 +80,19 @@ export async function GET(
 
   return new Response(avatar, {
     headers: {
-      "Cache-Control": player.public_profile_enabled
-        ? "public, max-age=300, stale-while-revalidate=86400"
-        : "private, max-age=300",
+      "Cache-Control": AVATAR_CACHE_CONTROL,
       "Content-Type": avatar.type || "application/octet-stream",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
 
-function createFallbackAvatarResponse(
-  cacheControl = "public, max-age=3600, stale-while-revalidate=86400"
-) {
+function createFallbackAvatarResponse() {
   return new Response(FALLBACK_AVATAR_SVG, {
     headers: {
-      "Cache-Control": cacheControl,
+      "Cache-Control": AVATAR_CACHE_CONTROL,
       "Content-Type": "image/svg+xml; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
