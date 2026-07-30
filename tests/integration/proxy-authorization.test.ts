@@ -66,6 +66,8 @@ describe("Next.js proxy authorization", () => {
     "/profile",
     "/admin",
     "/api/elo-verification/verify",
+    "/api/steam/connect",
+    "/api/steam/callback",
     "/unknown",
     "/players-private",
     "/aboutness",

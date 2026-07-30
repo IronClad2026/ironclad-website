@@ -2,19 +2,56 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import PlayerProfileForm from "@/components/PlayerProfileForm";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
+import SteamConnectionCard from "@/components/SteamConnectionCard";
 import {
   isPlayerProfileComplete,
   type PlayerProfile,
 } from "@/lib/player-profile";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
-export default async function ProfilePage() {
+type SteamConnectionResult =
+  | "connected"
+  | "cancelled"
+  | "already-connected"
+  | "duplicate"
+  | "failed";
+
+type ProfilePageProps = {
+  searchParams: Promise<{
+    steam?: string | string[];
+  }>;
+};
+
+const steamConnectionResults = new Set<SteamConnectionResult>([
+  "connected",
+  "cancelled",
+  "already-connected",
+  "duplicate",
+  "failed",
+]);
+
+function getSteamConnectionResult(
+  value: string | string[] | undefined
+): SteamConnectionResult | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  return steamConnectionResults.has(value as SteamConnectionResult)
+    ? (value as SteamConnectionResult)
+    : null;
+}
+
+export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const { userId } = await auth();
 
   if (!userId) {
     redirect("/sign-in");
   }
 
+  const { steam } = await searchParams;
+  const steamConnectionResult = getSteamConnectionResult(steam);
   const supabase = await createAuthenticatedSupabaseClient();
   const { data, error } = await supabase
     .from("players")
@@ -29,6 +66,32 @@ export default async function ProfilePage() {
   }
 
   const profile = (data ?? null) as PlayerProfile | null;
+  let steamConnected = false;
+  let steamStatusAvailable = true;
+
+  if (profile) {
+    try {
+      const { data: steamIdentity, error: steamIdentityError } =
+        await createSupabaseAdminClient()
+          .from("players")
+          .select("steam_id64")
+          .eq("clerk_user_id", userId)
+          .maybeSingle();
+
+      if (steamIdentityError) {
+        steamStatusAvailable = false;
+        console.error("Steam connection status lookup failed.");
+      } else {
+        steamConnected =
+          typeof steamIdentity?.steam_id64 === "string" &&
+          steamIdentity.steam_id64.length > 0;
+      }
+    } catch {
+      steamStatusAvailable = false;
+      console.error("Steam connection status is not configured.");
+    }
+  }
+
   const profileComplete = isPlayerProfileComplete(profile);
 
   return (
@@ -82,6 +145,12 @@ export default async function ProfilePage() {
         ) : (
           <div className="mt-8">
             <PlayerProfileForm profile={profile} />
+            <SteamConnectionCard
+              connected={steamConnected}
+              hasPlayer={Boolean(profile)}
+              result={steamConnectionResult}
+              statusAvailable={steamStatusAvailable}
+            />
             <DeleteAccountSection />
           </div>
         )}
