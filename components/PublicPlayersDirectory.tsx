@@ -3,6 +3,7 @@
 import { Search, UsersRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import PublicPlayerCard from "@/components/PublicPlayerCard";
+import ScrollReveal from "@/components/ScrollReveal";
 import SearchableProfileSelect from "@/components/SearchableProfileSelect";
 import {
   allCountriesFilterOption,
@@ -129,17 +130,19 @@ export default function PublicPlayersDirectory({
           </div>
         </div>
 
-        {players.length === 0 ? (
-          <EmptyState message="No public players available yet." />
-        ) : filteredPlayers.length === 0 ? (
-          <EmptyState message="No public players match those filters." />
-        ) : (
-          <div className="relative z-0 mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredPlayers.map((player) => (
-              <PublicPlayerCard key={player.id} player={player} />
-            ))}
-          </div>
-        )}
+        <ScrollReveal>
+          {players.length === 0 ? (
+            <EmptyState message="No public players available yet." />
+          ) : filteredPlayers.length === 0 ? (
+            <EmptyState message="No public players match those filters." />
+          ) : (
+            <div className="relative z-0 mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {filteredPlayers.map((player) => (
+                <PublicPlayerCard key={player.id} player={player} />
+              ))}
+            </div>
+          )}
+        </ScrollReveal>
       </div>
     </section>
   );

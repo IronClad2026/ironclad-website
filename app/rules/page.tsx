@@ -20,6 +20,7 @@ const PDF_4V4 = "/documents-rules-ppa/4v4 rulebook.pdf";
 const PDF_PPA = "/documents-rules-ppa/ict ppa.pdf";
 
 import { fadeUp } from "@/lib/animations";
+import revealStyles from "@/components/ScrollReveal.module.css";
 
 type TabName = "1v1 Rules" | "4v4 Rules" | "PPA & Conduct";
 
@@ -196,7 +197,7 @@ export default function RulesPage() {
           animate="visible"
           variants={fadeUp}
           transition={{ duration: 0.7 }}
-          className="relative z-10 max-w-5xl"
+          className={`${revealStyles.reveal} relative z-10 max-w-5xl`}
         >
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-300">
             Official Rules Hub
@@ -265,7 +266,7 @@ export default function RulesPage() {
                 viewport={{ once: true }}
                 variants={fadeUp}
                 transition={{ duration: 0.5 }}
-                className="rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur"
+                className={`${revealStyles.reveal} rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur`}
               >
                 <Icon className="mb-5 h-11 w-11 text-zinc-200" />
 
@@ -335,7 +336,7 @@ export default function RulesPage() {
               whileInView="visible"
               viewport={{ once: true }}
               variants={fadeUp}
-              className="overflow-hidden rounded-2xl border border-white/10 bg-white/5"
+              className={`${revealStyles.reveal} overflow-hidden rounded-2xl border border-white/10 bg-white/5`}
             >
               <button
                 onClick={() =>
@@ -398,7 +399,7 @@ export default function RulesPage() {
                 viewport={{ once: true }}
                 variants={fadeUp}
                 transition={{ duration: 0.5 }}
-                className="flex min-h-[170px] flex-col rounded-2xl border border-white/10 bg-white/5 p-7"
+                className={`${revealStyles.reveal} flex min-h-[170px] flex-col rounded-2xl border border-white/10 bg-white/5 p-7`}
               >
                 <Icon className="mb-5 h-11 w-11 text-zinc-200" />
 
@@ -435,7 +436,7 @@ export default function RulesPage() {
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeUp}
-          className="relative z-10 rounded-2xl border border-yellow-400/20 bg-black/65 p-8 backdrop-blur"
+          className={`${revealStyles.reveal} relative z-10 rounded-2xl border border-yellow-400/20 bg-black/65 p-8 backdrop-blur`}
         >
           <AlertTriangle className="mx-auto mb-5 h-10 w-10 text-yellow-300" />
 
