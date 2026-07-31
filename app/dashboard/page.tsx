@@ -212,7 +212,6 @@ export default async function PlayerDashboardPage() {
             unreadCount={playerNotifications.unreadCount}
             error={playerNotifications.error}
             className="max-w-2xl !rounded-none !border-orange-500/20 !bg-black/65 !shadow-2xl !shadow-black/30 [&_button]:rounded-none [&_div]:rounded-none lg:max-w-none"
-            matchNotifications={career.notifications}
           />
 
           {profile && (
