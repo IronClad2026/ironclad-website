@@ -2760,7 +2760,6 @@ function RegistrationGatePrompt({
 
 type TournamentViewer = {
   isAdmin: boolean;
-  clerkUserId: string | null;
   registrationIds: string[];
   registrations: TournamentViewerRegistration[];
 };

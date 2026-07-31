@@ -277,8 +277,7 @@ export default async function TournamentsPage() {
     <TournamentsExperience
       tournaments={tournaments}
       viewer={{
-        clerkUserId: userId,
-        isAdmin,
+                isAdmin,
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
       }}
