@@ -11,7 +11,9 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
     {
       label: "Current ELO",
       value:
-        typeof player.currentElo === "number" ? String(player.currentElo) : "Unrated",
+        typeof player.currentElo === "number"
+          ? String(player.currentElo)
+          : "Unrated",
       icon: Shield,
     },
     {

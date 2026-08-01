@@ -40,7 +40,6 @@ import {
   ChevronDown,
   Clock3,
   Crown,
-  Gamepad2,
   Info,
   LayoutDashboard,
   Menu,
@@ -174,7 +173,6 @@ function classNames(...classes: Array<string | false | undefined | null>) {
 }
 
 const interactiveHover = "transform-gpu transition-all duration-300 ease-out hover:scale-[1.03] hover:border-orange-500/70 hover:shadow-lg hover:shadow-orange-950/20 active:scale-[0.99]";
-
 const tournamentCardClass =
   "group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100";
 const tournamentInsetCardClass =
@@ -325,7 +323,37 @@ function Hero({
             </div>
             <h1 className="mt-5 max-w-4xl text-3xl font-black tracking-tight text-white sm:text-5xl">{tournament.title}</h1>
             <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-zinc-300">
-              <span className="flex items-center gap-2"><Gamepad2 size={16} className="text-orange-300" /> {tournament.game}</span>
+              <span className="flex items-center gap-2">
+                <svg
+                  aria-hidden="true"
+                  className="text-orange-300"
+                  fill="none"
+                  height={16}
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  viewBox="0 0 24 24"
+                  width={16}
+                >
+                  <rect x="2.5" y="4.5" width="11.5" height="8.5" />
+                  <circle cx="11.9" cy="10.8" r="0.55" />
+                  <path d="M8.25 13v2.15" />
+                  <path d="M5.9 15.15h4.7" />
+                  <path d="M3.25 18.1h11.2l1.05 2.1H2.2z" />
+                  <path d="M5.9 18.7v0.8" />
+                  <path d="M8.75 18.55v1.05" />
+                  <path d="M11.6 18.7v0.8" />
+                  <rect x="17" y="4.5" width="4.4" height="15.7" />
+                  <path d="M18.15 6.7h2.1" />
+                  <path d="M18.15 8.45h2.1" />
+                  <circle cx="19.2" cy="12" r="1.05" />
+                  <circle cx="19.2" cy="15" r="0.45" />
+                  <path d="M18.05 17.65h0.9" />
+                  <path d="M19.75 17.65h0.9" />
+                </svg>
+                {tournament.game}
+              </span>
               <span className="flex items-center gap-2"><CalendarDays size={16} className="text-orange-300" /> {tournament.month} Tournament</span>
               <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.time}</span>
               <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {tournament.players}/{tournament.maxPlayers} approved slots</span>
@@ -1677,23 +1705,20 @@ function ModernBracketMatch({
   connectorDirection: "up" | "down";
   onAdminSelect?: () => void;
 }) {
-  const completed = match.status === "complete";
-  const live = match.status === "live";
-  const pendingReview = match.status === "pending_review";
   const card = (
     <div
       className={classNames(
         "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1",
         onAdminSelect && "cursor-pointer hover:border-orange-300/80",
-        live
+        match.status === "live"
           ? "border-orange-400/80 shadow-[0_0_28px_rgba(249,115,22,0.22)]"
-          : pendingReview
+          : match.status === "pending_review"
             ? "border-amber-400/50 shadow-[0_0_22px_rgba(251,191,36,0.12)]"
-          : completed
-            ? "border-emerald-500/30 shadow-black/30"
-            : isActiveRound
-              ? "border-orange-500/35 shadow-[0_0_18px_rgba(249,115,22,0.10)]"
-              : "border-white/10 shadow-black/30"
+            : match.status === "complete"
+              ? "border-emerald-500/30 shadow-black/30"
+              : isActiveRound
+                ? "border-orange-500/35 shadow-[0_0_18px_rgba(249,115,22,0.10)]"
+                : "border-white/10 shadow-black/30"
       )}
     >
       <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
@@ -2965,10 +2990,11 @@ export default function TournamentsExperience({
 
   return (
     <div
-      className="min-h-screen bg-black bg-cover bg-center pt-20 text-zinc-100"
+      className="min-h-screen bg-black bg-cover bg-center bg-fixed pt-20 text-zinc-100"
       style={{
         backgroundImage:
           "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
+        backgroundAttachment: "fixed",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundSize: "cover",

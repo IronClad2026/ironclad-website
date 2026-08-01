@@ -189,7 +189,7 @@ function AccountShell({
         className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(115deg,transparent,rgba(249,115,22,0.1))]"
       />
 
-      <ScrollReveal className="relative z-10 mx-auto max-w-7xl border border-orange-500/30 bg-black/70 p-6 shadow-2xl shadow-black/30 backdrop-blur md:p-8 lg:p-10">
+      <ScrollReveal className="relative z-10 mx-auto max-w-7xl border border-orange-500/28 bg-black/70 p-6 shadow-2xl shadow-black/30 backdrop-blur md:p-8 lg:p-10">
         <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-3">
@@ -230,7 +230,7 @@ function AccountShell({
 
 function ProfileValue({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 border border-white/10 bg-black/45 p-4">
+    <div className="min-w-0 border border-white/10 bg-black/42 p-4">
       <p className="text-xs font-bold uppercase text-zinc-500">{label}</p>
       <p className="mt-2 break-words font-black text-white">{value}</p>
     </div>

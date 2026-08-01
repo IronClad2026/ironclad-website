@@ -73,22 +73,25 @@ export default function Navbar() {
 
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
   const isAdmin = role === "admin";
+
   const navItems: NavItem[] = [
     ...baseNavItems,
     ...(isSignedIn ? [{ href: "/dashboard", label: "Dashboard" }] : []),
-    ...(isAdmin ? [{ href: "/admin", label: "Admin", emphasis: true }] : []),
+    ...(isAdmin
+      ? [{ href: "/admin", label: "Admin", emphasis: true }]
+      : []),
   ];
 
   return (
-    <header className="fixed top-0 left-0 z-40 w-full border-b border-white/10 bg-black/80 backdrop-blur-md">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2.5 text-white">
+    <header className="fixed top-0 left-0 z-[90] w-full border-b border-white/10 bg-black/20 backdrop-blur-md">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 text-white">
         <Link href="/" className="flex items-center">
           <Image
             src="/images/ironclad-logo.png"
             alt="IronClad"
             width={1365}
             height={768}
-            className="h-12 w-auto sm:h-14"
+            className="h-14 w-auto sm:h-16"
           />
         </Link>
 
@@ -112,7 +115,7 @@ export default function Navbar() {
         <button
           type="button"
           className="rounded-xl border border-white/10 bg-white/[0.04] p-2 text-zinc-200 transition hover:border-orange-400/40 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 md:hidden"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setIsOpen((current) => !current)}
           aria-label="Toggle navigation menu"
           aria-expanded={isOpen}
         >

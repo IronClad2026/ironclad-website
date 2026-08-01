@@ -5,11 +5,14 @@ import { currentTournaments } from "@/data/currentTournaments";
 import {
   ArrowRight,
   Crosshair,
+
   Flag,
   Radio,
   ShieldCheck,
   Trophy,
+
   UserRoundCheck,
+
 } from "lucide-react";
 import Link from "next/link";
 
@@ -21,12 +24,14 @@ const commandStats = [
     value: String(currentTournaments.length).padStart(2, "0"),
   },
   {
+
     label: "Competition focus",
     value: "CoH3",
   },
   {
     label: "Integrity model",
     value: "Fair play",
+
   },
 ];
 
@@ -34,17 +39,21 @@ const platformSignals = [
   {
     icon: ShieldCheck,
     title: "Competitive integrity",
+
     text: "Clear rules and admin review support fair, structured competition.",
+
   },
   {
     icon: Trophy,
     title: "Structured tournaments",
+
     text: "Brackets, schedules, and tournament updates remain easy to follow.",
   },
   {
     icon: UserRoundCheck,
     title: "Player choice",
     text: "Public profiles and Discord contact appear only when players choose to share them.",
+
   },
 ];
 
@@ -70,6 +79,7 @@ function HeroSection() {
       aria-labelledby="home-hero-title"
     >
       <TacticalBackdrop />
+
       <div
         aria-hidden="true"
         className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.3),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.18))]"
@@ -77,6 +87,7 @@ function HeroSection() {
 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] lg:items-end">
         <ScrollReveal className="max-w-5xl">
+
           <p className="text-sm font-black uppercase text-orange-300">
             Competitive Company of Heroes 3 Events
           </p>
@@ -295,7 +306,9 @@ function EventsSection() {
             />
           ))}
         </div>
+
       </ScrollReveal>
+
     </section>
   );
 }
@@ -331,11 +344,14 @@ function TacticalBackdrop({ muted = false }: { muted?: boolean }) {
   return (
     <>
       <div
+
         aria-hidden="true"
+
         className={`absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:52px_52px] ${
           muted ? "opacity-20" : "opacity-30"
         }`}
       />
+
       <div
         aria-hidden="true"
         className="absolute inset-0 bg-[linear-gradient(125deg,transparent_0%,transparent_43%,rgba(249,115,22,0.14)_43%,transparent_57%,transparent_100%)]"
@@ -348,6 +364,7 @@ function TacticalBackdrop({ muted = false }: { muted?: boolean }) {
         aria-hidden="true"
         className="absolute bottom-1/4 left-8 hidden h-px w-36 bg-orange-400/45 lg:block"
       />
+
     </>
   );
 }

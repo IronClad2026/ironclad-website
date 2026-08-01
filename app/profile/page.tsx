@@ -53,6 +53,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const { steam } = await searchParams;
   const steamConnectionResult = getSteamConnectionResult(steam);
   const supabase = await createAuthenticatedSupabaseClient();
+
   const { data, error } = await supabase
     .from("players")
     .select(
@@ -96,19 +97,18 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
   return (
     <main
-      className="min-h-screen bg-black bg-cover bg-center px-6 pt-32 pb-20 text-white"
+      className="min-h-screen bg-black bg-cover bg-center bg-fixed px-6 pt-32 pb-20 text-white"
       style={{
         backgroundImage:
           "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/8.jpg')",
+        backgroundAttachment: "fixed",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundSize: "cover",
       }}
     >
       <section className="relative z-10 mx-auto max-w-5xl">
-        <div
-          className="relative overflow-hidden border border-orange-500/25 bg-black/70 p-8 shadow-[0_0_45px_rgba(0,0,0,0.55)] backdrop-blur md:p-10"
-        >
+        <div className="relative overflow-hidden border border-orange-500/25 bg-black/70 p-8 shadow-[0_0_45px_rgba(0,0,0,0.55)] backdrop-blur md:p-10">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-55"
             style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
@@ -121,9 +121,11 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
               IronClad Player Account
             </p>
+
             <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">
               {profile ? "Manage Player Profile" : "Complete Player Profile"}
             </h1>
+
             <p className="mt-5 leading-7 text-zinc-300">
               Store your competitive identity once so future IronClad
               tournament registrations can be faster and more consistent.
@@ -145,12 +147,14 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
         ) : (
           <div className="mt-8">
             <PlayerProfileForm profile={profile} />
+
             <SteamConnectionCard
               connected={steamConnected}
               hasPlayer={Boolean(profile)}
               result={steamConnectionResult}
               statusAvailable={steamStatusAvailable}
             />
+
             <DeleteAccountSection />
           </div>
         )}

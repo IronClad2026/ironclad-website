@@ -15,18 +15,17 @@ export default async function PlayersPage() {
 
   return (
     <main
-      className="min-h-screen bg-black bg-cover bg-center text-white"
+      className="min-h-screen bg-black bg-cover bg-center bg-fixed text-white"
       style={{
         backgroundImage:
           "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/6.jpg')",
+        backgroundAttachment: "fixed",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundSize: "cover",
       }}
     >
-      <section
-        className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-20"
-      >
+      <section className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-20">
         <div
           className="absolute inset-0 bg-cover bg-center opacity-55"
           style={{
