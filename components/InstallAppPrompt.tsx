@@ -8,10 +8,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  CheckCircle2,
   Download,
+  Ellipsis,
   MoreVertical,
   PlusSquare,
   Share,
+  SquarePlus,
   X,
 } from "lucide-react";
 
@@ -235,24 +238,31 @@ export default function InstallAppPrompt({
               ) : isIos ? (
                 <ol className="mt-6 space-y-4">
                   <Instruction
-                    icon={Share}
+                    icon={Ellipsis}
                     number="1"
-                    title="Open the Share menu"
-                    description="Tap the Share button in Safari."
+                    title="Open the menu"
+                    description="Tap the ⋯ (More) button in Safari."
                   />
 
                   <Instruction
-                    icon={PlusSquare}
+                    icon={Share}
                     number="2"
-                    title="Add to Home Screen"
-                    description='Scroll down and select “Add to Home Screen”.'
+                    title="Share"
+                    description="Tap Share."
                   />
 
                   <Instruction
-                    icon={Download}
+                    icon={SquarePlus}
                     number="3"
-                    title="Confirm installation"
-                    description='Tap “Add” in the top-right corner.'
+                    title="Add to Home Screen"
+                    description={'Select "Add to Home Screen". If you don\'t see it, tap "More" and look for it in the list.'}
+                  />
+
+                  <Instruction
+                    icon={CheckCircle2}
+                    number="4"
+                    title="Install"
+                    description={'Tap "Add".'}
                   />
                 </ol>
               ) : (
