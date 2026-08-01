@@ -1816,7 +1816,7 @@ function BroadcastTeamRow({ team }: { team: MatchTeam }) {
       )}
     >
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/10 bg-black/40 font-mono text-[10px] text-zinc-500">
-        {team.seed > 0 ? team.seed : "ÔÇö"}
+        {team.seed > 0 ? team.seed : "—"}
       </span>
       <span
         className={classNames(
@@ -2044,7 +2044,7 @@ function MatchCard({
 }
 
 function TeamRow({ team }: { team: MatchTeam }) {
-  return <div className={classNames("flex items-center gap-2 border-b border-white/5 px-3 py-3 text-sm last:border-0", team.winner ? "bg-orange-500/10 text-white" : "text-zinc-300")}><span className="w-7 font-mono text-xs text-zinc-500">{team.seed > 0 ? `#${team.seed}` : "ÔÇö"}</span><span className={classNames("min-w-0 flex-1 truncate", team.winner && "font-bold text-orange-100")}>{team.name}</span><span className="grid h-7 w-8 place-items-center rounded border border-white/10 bg-black/40 font-mono text-xs text-white">{team.score ?? "-"}</span></div>;
+  return <div className={classNames("flex items-center gap-2 border-b border-white/5 px-3 py-3 text-sm last:border-0", team.winner ? "bg-orange-500/10 text-white" : "text-zinc-300")}><span className="w-7 font-mono text-xs text-zinc-500">{team.seed > 0 ? `#${team.seed}` : "—"}</span><span className={classNames("min-w-0 flex-1 truncate", team.winner && "font-bold text-orange-100")}>{team.name}</span><span className="grid h-7 w-8 place-items-center rounded border border-white/10 bg-black/40 font-mono text-xs text-white">{team.score ?? "-"}</span></div>;
 }
 
 function Media({ tournament }: { tournament: TournamentCard }) {

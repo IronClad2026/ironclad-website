@@ -29,7 +29,7 @@ export default function RootLayout({
             <GlobalSmoke />
             <Navbar />
 
-            <main>{children}</main>
+            <div>{children}</div>
 
             <Footer />
             <SiteMusicPlayer />
