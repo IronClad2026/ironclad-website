@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { useReducedMotion } from "framer-motion";
 
 const subscribe = () => () => {};
@@ -11,24 +16,86 @@ export default function GlobalSmoke() {
   const isHydrated = useSyncExternalStore(
     subscribe,
     () => true,
-    () => false,
+    () => false
   );
 
   const reduceMotion = useReducedMotion();
 
-  useEffect(() => {
+  const resumePlayback = useCallback(async () => {
     const video = videoRef.current;
 
-    if (!video || !isHydrated || reduceMotion !== false) {
+    if (
+      !video ||
+      document.visibilityState === "hidden" ||
+      reduceMotion !== false
+    ) {
       return;
     }
 
     video.muted = true;
+    video.defaultMuted = true;
 
-    void video.play().catch((error) => {
+    try {
+      await video.play();
+    } catch (error) {
       console.error("Smoke video playback failed:", error);
-    });
-  }, [isHydrated, reduceMotion]);
+    }
+  }, [reduceMotion]);
+
+  const restartLoop = useCallback(() => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    video.currentTime = 0;
+    void resumePlayback();
+  }, [resumePlayback]);
+
+  useEffect(() => {
+    if (!isHydrated || reduceMotion !== false) {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      window.setTimeout(() => {
+        void resumePlayback();
+      }, 150);
+    };
+
+    const handlePageShow = () => {
+      window.setTimeout(() => {
+        void resumePlayback();
+      }, 150);
+    };
+
+    const handleWindowFocus = () => {
+      void resumePlayback();
+    };
+
+    void resumePlayback();
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [isHydrated, reduceMotion, resumePlayback]);
 
   if (!isHydrated || reduceMotion !== false) {
     return null;
@@ -37,7 +104,7 @@ export default function GlobalSmoke() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-[5] h-[100dvh] w-screen overflow-hidden opacity-[0.16] motion-reduce:hidden"
+      className="pointer-events-none fixed inset-0 z-[5] h-[100dvh] w-screen overflow-hidden opacity-[0.38] mix-blend-screen motion-reduce:hidden md:opacity-[0.16] md:mix-blend-normal"
     >
       <video
         ref={videoRef}
@@ -46,7 +113,16 @@ export default function GlobalSmoke() {
         loop
         playsInline
         preload="auto"
-        className="absolute inset-0 block h-full w-full object-cover object-center"
+        disablePictureInPicture
+        onEnded={restartLoop}
+        onPause={() => {
+          if (document.visibilityState === "visible") {
+            window.setTimeout(() => {
+              void resumePlayback();
+            }, 150);
+          }
+        }}
+        className="absolute inset-0 block h-full w-full object-cover object-center contrast-125 brightness-110 md:contrast-100 md:brightness-100"
       >
         <source src="/effects/smoke.webm" type="video/webm" />
       </video>
