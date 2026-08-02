@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, ElementType } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
@@ -42,7 +42,6 @@ import {
   Crown,
   Info,
   LayoutDashboard,
-  Menu,
   MessageCircle,
   PlayCircle,
   Radio,
@@ -263,6 +262,151 @@ function Sidebar({
         </nav>
       </div>
     </aside>
+  );
+}
+
+function MobileTournamentDrawer({
+  open,
+  selectedTournament,
+  tournaments,
+  onClose,
+  onSelectTournament,
+}: {
+  open: boolean;
+  selectedTournament: TournamentCard;
+  tournaments: TournamentCard[];
+  onClose: () => void;
+  onSelectTournament: (tournament: TournamentCard) => void;
+}) {
+  const eventsByMonth = Array.from(
+    tournaments.reduce((groups, tournament) => {
+      const group = groups.get(tournament.month) ?? [];
+      group.push(tournament);
+      groups.set(tournament.month, group);
+      return groups;
+    }, new Map<string, TournamentCard[]>())
+  ).map(([month, events]) => ({ month, events }));
+
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose, open]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[80] lg:hidden">
+          <motion.button
+            type="button"
+            aria-label="Close tournament menu"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="absolute inset-0 z-0 h-full w-full cursor-default bg-black/80 backdrop-blur-sm"
+          />
+          <motion.aside
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-tournament-menu-title"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 360, damping: 36 }}
+            className="fixed bottom-0 right-0 top-[104px] z-10 flex h-auto w-[min(88vw,380px)] max-w-[380px] flex-col border-l border-orange-400/30 bg-[linear-gradient(145deg,rgba(14,14,14,0.98),rgba(0,0,0,0.99))] p-4 text-zinc-100 shadow-[0_0_80px_rgba(0,0,0,0.78)] backdrop-blur-2xl"
+            style={{
+              paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+              paddingRight: "max(1rem, env(safe-area-inset-right))",
+            }}
+          >
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 pb-4">
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
+                  IronClad
+                </p>
+                <h2
+                  id="mobile-tournament-menu-title"
+                  className="mt-1 break-words text-xl font-black text-white"
+                >
+                  Tournament Menu
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/12 bg-white/10 text-zinc-200 shadow-xl shadow-black/25 transition hover:border-orange-300/55 hover:bg-orange-500/15 hover:text-white"
+                aria-label="Close tournament menu"
+              >
+                <X size={20} />
+              </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto pt-5">
+              <nav aria-label="Tournament navigation">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-zinc-500">
+                  Tournaments
+                </p>
+                <div className="mt-3 space-y-5">
+                  {eventsByMonth.map((group) => (
+                    <div key={group.month}>
+                      <p className="mb-2 text-[11px] font-black uppercase tracking-[0.22em] text-orange-300">
+                        {group.month}
+                      </p>
+                      <div className="space-y-2">
+                        {group.events.map((event) => {
+                          const selected = event.id === selectedTournament.id;
+                          return (
+                            <button
+                              key={event.id}
+                              type="button"
+                              onClick={() => {
+                                onSelectTournament(event);
+                                onClose();
+                              }}
+                              className={classNames(
+                                "flex min-h-11 w-full min-w-0 items-center gap-3 rounded-lg border px-3 py-3 text-left shadow-lg shadow-black/15 transition",
+                                selected
+                                  ? "border-orange-400/70 bg-orange-500/15 text-white"
+                                  : "border-white/12 bg-white/[0.06] text-zinc-300 hover:border-orange-400/45 hover:bg-orange-500/10 hover:text-white"
+                              )}
+                            >
+                              <CalendarDays
+                                size={16}
+                                className="shrink-0 text-orange-300"
+                              />
+                              <span className="min-w-0">
+                                <span className="block break-words text-sm font-black">
+                                  {event.title}
+                                </span>
+                                <span className="mt-1 block break-words text-xs text-zinc-500">
+                                  {event.format} - {event.status}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </nav>
+            </div>
+          </motion.aside>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -2622,6 +2766,977 @@ function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoadi
   );
 }
 
+function MobileCard({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={classNames(
+        "w-full max-w-full min-w-0 p-4",
+        tournamentCardClass,
+        className
+      )}
+    >
+      {children}
+    </section>
+  );
+}
+
+function MobileHero({
+  tournament,
+  viewerRegistration,
+  onRegisterClick,
+}: {
+  tournament: TournamentCard;
+  viewerRegistration: TournamentViewerRegistration | null;
+  onRegisterClick: () => void;
+}) {
+  const registrationOpen = isTournamentRegistrationOpen(tournament);
+  const publicStatus = getPublicTournamentStatus(tournament);
+  const allBracketsWaitlistOnly = tournament.brackets.every(
+    (bracket) => bracket.isWaitlistOnly
+  );
+  const actionLabel = registrationOpen
+    ? allBracketsWaitlistOnly
+      ? "Join Waitlist"
+      : "Register"
+    : publicStatus;
+  const registrationState = viewerRegistration
+    ? getViewerRegistrationDisplay(tournament, viewerRegistration)
+    : null;
+  const metadata = [
+    {
+      icon: null,
+      label: tournament.game,
+    },
+    {
+      icon: CalendarDays,
+      label: `${tournament.month} Tournament`,
+    },
+    {
+      icon: Clock3,
+      label: tournament.time,
+    },
+    {
+      icon: Users,
+      label: `${tournament.players}/${tournament.maxPlayers} approved slots`,
+    },
+  ];
+
+  return (
+    <section className="relative isolate w-full max-w-full min-w-0 overflow-hidden border-b border-orange-500/20 bg-black px-4 pb-6 pt-6 sm:px-5">
+      <motion.div
+        className="absolute inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-45"
+        style={{
+          backgroundImage: `url(${tournament.image})`,
+        }}
+        animate={{ backgroundPositionY: ["0%", "100%", "0%"] }}
+        transition={{ duration: 36, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <div className="absolute inset-0 -z-10 bg-black/72" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(128deg,rgba(0,0,0,0.92),rgba(0,0,0,0.64),rgba(249,115,22,0.18))]" />
+
+      <div className="space-y-5">
+        <div className="flex max-w-full flex-wrap items-center gap-2">
+          <StatusPill
+            tone={
+              publicStatus === "Open" || publicStatus === "In Progress"
+                ? "green"
+                : "gray"
+            }
+          >
+            {publicStatus}
+          </StatusPill>
+          <StatusPill tone="neutral">{tournament.format}</StatusPill>
+          <StatusPill tone="amber">{tournament.ruleFormatLabel}</StatusPill>
+          <StatusPill tone="gray">{tournament.region}</StatusPill>
+        </div>
+
+        <div>
+          <h1 className="max-w-full break-words text-3xl font-black leading-tight tracking-tight text-white">
+            {tournament.title}
+          </h1>
+          <div className="mt-4 grid gap-3 text-sm text-zinc-300">
+            {metadata.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.label}
+                  className="flex min-w-0 items-start gap-2"
+                >
+                  {Icon ? (
+                    <Icon size={16} className="mt-0.5 shrink-0 text-orange-300" />
+                  ) : (
+                    <svg
+                      aria-hidden="true"
+                      className="mt-0.5 shrink-0 text-orange-300"
+                      fill="none"
+                      height={16}
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      viewBox="0 0 24 24"
+                      width={16}
+                    >
+                      <rect x="2.5" y="4.5" width="11.5" height="8.5" />
+                      <circle cx="11.9" cy="10.8" r="0.55" />
+                      <path d="M8.25 13v2.15" />
+                      <path d="M5.9 15.15h4.7" />
+                      <path d="M3.25 18.1h11.2l1.05 2.1H2.2z" />
+                      <path d="M5.9 18.7v0.8" />
+                      <path d="M8.75 18.55v1.05" />
+                      <path d="M11.6 18.7v0.8" />
+                      <rect x="17" y="4.5" width="4.4" height="15.7" />
+                      <path d="M18.15 6.7h2.1" />
+                      <path d="M18.15 8.45h2.1" />
+                      <circle cx="19.2" cy="12" r="1.05" />
+                      <circle cx="19.2" cy="15" r="0.45" />
+                      <path d="M18.05 17.65h0.9" />
+                      <path d="M19.75 17.65h0.9" />
+                    </svg>
+                  )}
+                  <span className="min-w-0 break-words">{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="w-full max-w-full min-w-0">
+          {registrationState ? (
+            <RegistrationStateCard state={registrationState} />
+          ) : (
+            <ActionCard
+              label={actionLabel}
+              description={
+                registrationOpen
+                  ? allBracketsWaitlistOnly
+                    ? "Waitlist open"
+                    : "Open events"
+                  : "Check the tournament schedule"
+              }
+              icon={registrationOpen ? CheckCircle2 : Clock3}
+              onClick={onRegisterClick}
+            />
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MobileTournamentMenuButton({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="w-full max-w-full min-w-0 px-4 py-4 sm:px-5">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-h-11 w-full max-w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-orange-300/35 bg-black/70 px-4 py-3 text-left text-sm font-black uppercase tracking-wide text-orange-100 shadow-[0_14px_40px_rgba(0,0,0,0.38),0_0_22px_rgba(249,115,22,0.18)] backdrop-blur-xl transition hover:border-orange-200/70 hover:bg-orange-500/20 hover:text-white"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <CalendarDays size={18} className="shrink-0 text-orange-300" />
+          <span className="min-w-0 break-words">Tournament Menu</span>
+        </span>
+        <ChevronDown size={17} className="-rotate-90 shrink-0 text-orange-300" />
+      </button>
+    </div>
+  );
+}
+
+function MobileTabs({
+  activeTab,
+  setActiveTab,
+}: {
+  activeTab: TabKey;
+  setActiveTab: (tab: TabKey) => void;
+}) {
+  return (
+    <nav
+      aria-label="Tournament sections"
+      className="w-full max-w-full min-w-0 border-y border-orange-500/20 bg-black/72 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl sm:px-5"
+    >
+      <div className="grid w-full max-w-full min-w-0 grid-cols-6 gap-2">
+        {tabs.map((tab) => {
+          const selected = activeTab === tab.key;
+          const Icon = tab.icon;
+          const spanClass =
+            tab.key === "media" || tab.key === "announcements"
+              ? "col-span-3"
+              : "col-span-2";
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={classNames(
+                spanClass,
+                "flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-center text-[10px] font-black uppercase leading-tight tracking-[0.04em] transition",
+                selected
+                  ? "border-orange-400/70 bg-orange-500/15 text-white"
+                  : "border-white/12 bg-black/45 text-zinc-400 hover:border-orange-400/45 hover:text-white"
+              )}
+            >
+              <Icon size={15} className="shrink-0 text-orange-300" />
+              <span className="min-w-0 max-w-full break-words">
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function MobileOverview({
+  tournament,
+  tournaments,
+  activePanel,
+  setActivePanel,
+}: {
+  tournament: TournamentCard;
+  tournaments: TournamentCard[];
+  activePanel: OverviewPanelKey;
+  setActivePanel: (panel: OverviewPanelKey) => void;
+}) {
+  const panels = overviewPanels.filter(
+    (item) => item.key !== "prizes" || hasPrize(tournament)
+  );
+  const visiblePanel =
+    activePanel === "prizes" && !hasPrize(tournament)
+      ? "details"
+      : activePanel;
+  const panelGridClass =
+    panels.length === 5
+      ? "grid-cols-6"
+      : panels.length === 4
+        ? "grid-cols-2"
+        : "grid-cols-3";
+
+  return (
+    <div className="space-y-5">
+      <MobileCard>
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center border border-orange-400/25 bg-orange-500/10 text-orange-300">
+            <Info size={20} />
+          </div>
+          <div className="min-w-0">
+            <h2 className="break-words text-xl font-black text-white">
+              IronClad Company of Heroes 3 Tournaments
+            </h2>
+            <p className="mt-2 break-words leading-7 text-zinc-300">
+              {tournament.details}
+            </p>
+          </div>
+        </div>
+      </MobileCard>
+
+      <MobileCard>
+        <div
+          className={classNames(
+            "grid w-full max-w-full min-w-0 gap-2 border-b border-slate-800 pb-3",
+            panelGridClass
+          )}
+        >
+          {panels.map((item, index) => {
+            const spanClass =
+              panels.length === 5
+                ? index < 3
+                  ? "col-span-2"
+                  : "col-span-3"
+                : "";
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setActivePanel(item.key)}
+                className={classNames(
+                  spanClass,
+                  "min-h-11 min-w-0 rounded border px-2 py-2 text-center text-[11px] font-black uppercase leading-tight tracking-wide transition",
+                  visiblePanel === item.key
+                    ? "border-orange-500 bg-orange-500/10 text-white"
+                    : "border-slate-700 text-zinc-400 hover:text-white"
+                )}
+              >
+                <span className="block min-w-0 break-words">
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-5">{renderMobileOverviewPanel(visiblePanel, tournament)}</div>
+      </MobileCard>
+
+      <MobileCard>
+        <h3 className="text-sm font-black uppercase tracking-wider text-white">
+          Live Tournament
+        </h3>
+        <div className="mt-4 space-y-3">
+          {tournaments.map((item) => (
+            <MobileTournamentLinkCard key={item.title} item={item} />
+          ))}
+        </div>
+      </MobileCard>
+
+      <MobileCard>
+        <h3 className="text-sm font-black uppercase tracking-wider text-white">
+          Tournament Archive
+        </h3>
+        <p className="mt-2 break-words text-xs leading-5 text-zinc-400">
+          Battlefy remains the historical reference for events held before the
+          new IronClad platform launch.
+        </p>
+        <div className="mt-4 space-y-3">
+          {archiveEvents.map((item) => (
+            <a
+              key={item.title}
+              href={item.battlefy}
+              target="_blank"
+              rel="noreferrer"
+              className="group relative block w-full max-w-full overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:border-orange-400/35"
+              style={{
+                backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${item.image})`,
+              }}
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-bold text-white">{item.title}</p>
+                  {item.description && (
+                    <p className="mt-1 break-words text-xs leading-5 text-zinc-300">
+                      {item.description}
+                    </p>
+                  )}
+                  <p className="mt-3 text-xs font-black uppercase tracking-wider text-orange-300">
+                    View on Battlefy
+                  </p>
+                </div>
+                <MessageCircle size={16} className="mt-1 shrink-0 text-orange-300" />
+              </div>
+            </a>
+          ))}
+        </div>
+      </MobileCard>
+    </div>
+  );
+}
+
+function MobileTournamentLinkCard({ item }: { item: TournamentCard }) {
+  return (
+    <div className={classNames("w-full max-w-full min-w-0 p-3", tournamentInsetCardClass)}>
+      <div className="flex min-w-0 items-center gap-3">
+        <div
+          className="h-12 w-16 shrink-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${item.image})` }}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-bold text-white">{item.title}</p>
+          <p className="break-words text-xs text-zinc-500">
+            {item.month} - {item.format} - {item.status}
+          </p>
+        </div>
+      </div>
+      <p className="mt-3 break-words text-xs leading-5 text-zinc-400">
+        {item.description}
+      </p>
+    </div>
+  );
+}
+
+function renderMobileOverviewPanel(
+  panel: OverviewPanelKey,
+  tournament: TournamentCard
+) {
+  const shared = "break-words leading-7 text-zinc-300";
+
+  if (panel === "rules") {
+    return (
+      <div className="space-y-4">
+        <MobileDetail
+          label="Tournament Rule Format"
+          value={tournament.ruleFormatLabel}
+        />
+        <p className={shared}>{tournament.rules}</p>
+      </div>
+    );
+  }
+
+  if (panel === "prizes") {
+    return (
+      <div className={classNames("w-full max-w-full min-w-0 p-5", tournamentInsetCardClass)}>
+        <Trophy className="text-amber-300" size={24} />
+        <p className="mt-4 text-sm font-black uppercase tracking-wider text-amber-200">
+          Prizes
+        </p>
+        <p className="mt-3 whitespace-pre-line break-words text-lg font-bold leading-8 text-white">
+          {tournament.prizePool}
+        </p>
+      </div>
+    );
+  }
+
+  if (panel === "schedule") {
+    return (
+      <div className="space-y-3">
+        {tournament.schedule.map((item, index) => (
+          <div
+            key={item}
+            className={classNames("flex min-w-0 items-start gap-3 p-4", tournamentInsetCardClass)}
+          >
+            <div className="grid h-8 w-8 shrink-0 place-items-center border border-orange-400/25 bg-orange-500/10 text-xs font-black text-orange-200">
+              {index + 1}
+            </div>
+            <span className="min-w-0 break-words font-semibold text-zinc-200">
+              {item}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (panel === "contact") {
+    return <div className={shared}>{tournament.contact}</div>;
+  }
+
+  return (
+    <div className="grid gap-3">
+      <MobileDetail label="Event" value={tournament.title} />
+      <MobileDetail label="Format" value={tournament.format} />
+      <MobileDetail label="Rule Format" value={tournament.ruleFormatLabel} />
+      <MobileDetail
+        label="Registration Status"
+        value={getPublicTournamentStatus(tournament)}
+      />
+      <MobileDetail
+        label="Registration Opens"
+        value={formatOptionalDateTime(
+          tournament.registrationOpenAt,
+          "When status is Open"
+        )}
+      />
+      <MobileDetail
+        label="Grand Final"
+        value={formatOptionalDateTime(
+          tournament.grandFinalAt,
+          "Grand Final TBA"
+        )}
+      />
+      {hasPrize(tournament) && (
+        <MobileDetail label="Prize Pool" value={tournament.prizePool} />
+      )}
+      <MobileDetail
+        label="Approved Participants"
+        value={`${tournament.players} / ${tournament.maxPlayers}`}
+      />
+      {tournament.brackets.map((bracket) => (
+        <MobileDetail
+          key={bracket.name}
+          label={bracket.name}
+          value={`${bracket.requirement} - ${bracket.registeredPlayers} / ${bracket.maxPlayers.replace("Max ", "")} approved${bracket.isWaitlistOnly ? " - waitlist only" : ""}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MobileDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={classNames("w-full max-w-full min-w-0 p-4", tournamentInsetCardClass)}>
+      <p className="break-words text-xs font-black uppercase tracking-wider text-zinc-500">
+        {label}
+      </p>
+      <p className="mt-1 break-words font-bold text-zinc-100">{value}</p>
+    </div>
+  );
+}
+
+function MobileParticipants({ tournament }: { tournament: TournamentCard }) {
+  const [query, setQuery] = useState("");
+  const participantSections = useMemo(
+    () =>
+      tournament.brackets
+        .map((bracket) => ({
+          bracket,
+          participants: tournament.participants.filter(
+            (participant) => participant.bracketId === bracket.id
+          ),
+        }))
+        .map((section) => ({
+          ...section,
+          totalCount: section.participants.length,
+        })),
+    [tournament.brackets, tournament.participants]
+  );
+  const filteredByBracket = useMemo(() => {
+    const normalizedQuery = query.toLowerCase();
+    const matchesQuery = (participant: TournamentParticipant) =>
+      `${participant.name} ${participant.country} ${participant.elo}`
+        .toLowerCase()
+        .includes(normalizedQuery);
+
+    return participantSections.map((section) => ({
+      ...section,
+      participants: section.participants.filter(matchesQuery),
+    }));
+  }, [participantSections, query]);
+
+  return (
+    <div className="space-y-5">
+      <div className="space-y-4">
+        <div>
+          <h2 className="break-words text-xl font-black text-white">
+            {tournament.title} Entries
+          </h2>
+          <p className="mt-1 break-words text-sm text-zinc-400">
+            Approved participants separated by their ELO-eligible bracket.
+          </p>
+        </div>
+        <div className="relative w-full max-w-full">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
+          />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search entries"
+            className="min-h-11 w-full rounded border border-white/12 bg-black/55 py-2.5 pl-10 pr-3 text-sm text-white outline-none transition focus:border-orange-400"
+          />
+        </div>
+      </div>
+
+      {filteredByBracket.map((section) => (
+        <MobileParticipantSection
+          key={section.bracket.id}
+          title={`${section.bracket.name} Participants`}
+          requirement={section.bracket.requirement}
+          participants={section.participants}
+          totalCount={section.totalCount}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MobileParticipantSection({
+  title,
+  requirement,
+  participants,
+  totalCount,
+}: {
+  title: string;
+  requirement: string;
+  participants: TournamentParticipant[];
+  totalCount: number;
+}) {
+  return (
+    <MobileCard>
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="break-words text-lg font-black text-white">{title}</h3>
+          <p className="mt-1 break-words text-sm text-zinc-500">{requirement}</p>
+        </div>
+        <StatusPill tone="neutral">{totalCount} Approved</StatusPill>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {participants.map((participant, index) => (
+          <article
+            key={participant.registrationId}
+            className={classNames("w-full max-w-full min-w-0 p-4", tournamentInsetCardClass)}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-mono text-xs text-zinc-500">#{index + 1}</p>
+                <h4 className="mt-1 break-words text-base font-black text-white">
+                  {participant.name}
+                </h4>
+              </div>
+              <StatusPill tone="green">Approved</StatusPill>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                  Country
+                </p>
+                <p className="mt-1 break-words font-bold text-zinc-200">
+                  {participant.country}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                  ELO
+                </p>
+                <p className="mt-1 break-words font-bold text-zinc-200">
+                  {participant.elo}
+                </p>
+              </div>
+            </div>
+          </article>
+        ))}
+        {participants.length === 0 && (
+          <p className="border border-white/12 bg-black/30 p-6 text-center text-sm text-zinc-500">
+            No approved participants in this bracket.
+          </p>
+        )}
+      </div>
+    </MobileCard>
+  );
+}
+
+function MobileBrackets({
+  tournament,
+  viewer,
+  matchResultSubmissions,
+  matchResultReportGroups,
+}: {
+  tournament: TournamentCard;
+  viewer: TournamentViewer;
+  matchResultSubmissions: MatchResultSubmission[];
+  matchResultReportGroups: MatchResultReportGroup[];
+}) {
+  const participantsById = new Map(
+    tournament.bracketParticipants.map((participant) => [
+      participant.registrationId,
+      participant,
+    ])
+  );
+  const [selectedAdminMatchId, setSelectedAdminMatchId] =
+    useState<string | null>(null);
+  const selectedAdminMatch =
+    selectedAdminMatchId === null
+      ? null
+      : tournament.generatedBrackets
+          .flatMap((generated) => generated.matches)
+          .find((match) => match.id === selectedAdminMatchId) ?? null;
+
+  return (
+    <div className="w-full max-w-full min-w-0 space-y-5">
+      <div className="min-w-0">
+        <h2 className="break-words text-2xl font-black text-white">
+          {tournament.title} Brackets
+        </h2>
+        <p className="mt-1 break-words text-sm text-zinc-400">
+          {tournament.brackets
+            .map((bracket) => `${bracket.name}: ${bracket.requirement}`)
+            .join(" - ")}
+        </p>
+      </div>
+
+      {tournament.brackets.map((bracket) => {
+        const generated = tournament.generatedBrackets.find(
+          (item) => item.tournamentBracketId === bracket.id
+        );
+        const approvedCount = tournament.participants.filter(
+          (participant) => participant.bracketId === bracket.id
+        ).length;
+        const champion = generated
+          ? getBracketChampion(generated, participantsById)
+          : null;
+        const canOpenResults = Boolean(
+          generated &&
+            !viewer.isAdmin &&
+            (generated.matches.some(
+              (match) =>
+                viewer.registrationIds.includes(
+                  match.playerOneRegistrationId ?? ""
+                ) ||
+                viewer.registrationIds.includes(
+                  match.playerTwoRegistrationId ?? ""
+                )
+            ) ||
+              matchResultSubmissions.some((submission) =>
+                generated.matches.some(
+                  (match) => match.id === submission.matchId
+                )
+              ) ||
+              matchResultReportGroups.some((reportGroup) =>
+                generated.matches.some(
+                  (match) => match.id === reportGroup.matchId
+                )
+              ))
+        );
+
+        return (
+          <MobileCard key={bracket.id} className="overflow-visible">
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
+                  <h3 className="break-words text-lg font-black text-white">
+                    {bracket.name}
+                  </h3>
+                  {generated && canOpenResults && (
+                    <BracketMatchResultsWorkspace
+                      bracketName={bracket.name}
+                      matches={generated.matches}
+                      participantsById={participantsById}
+                      viewer={viewer}
+                      matchResultSubmissions={matchResultSubmissions}
+                      matchResultReportGroups={matchResultReportGroups}
+                    />
+                  )}
+                </div>
+                <p className="mt-1 break-words text-sm text-zinc-400">
+                  {generated
+                    ? `${formatCompetitionFormat(generated.format)} - ${generated.slotCount} empty player slots`
+                    : `${approvedCount} approved - at least 2 required`}
+                </p>
+              </div>
+              {generated && (
+                <span className="break-words text-xs uppercase tracking-wider text-zinc-500">
+                  Generated {formatDateTime(generated.generatedAt)}
+                </span>
+              )}
+            </div>
+
+            {champion && (
+              <ChampionPresentation
+                bracketName={bracket.name}
+                champion={champion}
+              />
+            )}
+
+            {!generated ? (
+              <p className="mt-6 border border-white/12 p-6 text-center text-zinc-500">
+                The empty bracket structure will generate automatically when
+                this bracket has at least two approved participants.
+              </p>
+            ) : generated.format === "round_robin" ? (
+              <MobileRoundRobinBracket
+                matches={generated.matches}
+                standings={generated.standings}
+                participantsById={participantsById}
+                onAdminMatchSelect={
+                  viewer.isAdmin
+                    ? (match) => setSelectedAdminMatchId(match.id)
+                    : undefined
+                }
+              />
+            ) : (
+              <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
+                <SingleEliminationBracket
+                  matches={generated.matches}
+                  participantsById={participantsById}
+                  onAdminMatchSelect={
+                    viewer.isAdmin
+                      ? (match) => setSelectedAdminMatchId(match.id)
+                      : undefined
+                  }
+                />
+              </div>
+            )}
+          </MobileCard>
+        );
+      })}
+
+      {viewer.isAdmin && selectedAdminMatch && (
+        <AdminMatchManagementModal
+          tournament={tournament}
+          match={selectedAdminMatch}
+          participantsById={participantsById}
+          viewer={viewer}
+          submissions={matchResultSubmissions.filter(
+            (submission) => submission.matchId === selectedAdminMatch.id
+          )}
+          reportGroups={matchResultReportGroups.filter(
+            (reportGroup) => reportGroup.matchId === selectedAdminMatch.id
+          )}
+          onClose={() => setSelectedAdminMatchId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function MobileRoundRobinBracket({
+  matches,
+  standings,
+  participantsById,
+  onAdminMatchSelect,
+}: {
+  matches: GeneratedTournamentMatch[];
+  standings: TournamentCard["generatedBrackets"][number]["standings"];
+  participantsById: Map<string, TournamentParticipant>;
+  onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
+}) {
+  return (
+    <div className="mt-6 grid w-full max-w-full min-w-0 gap-5">
+      <div className="grid gap-4">
+        {matches.map((match) => (
+          <MatchCard
+            key={match.id}
+            match={toDisplayMatch(match, participantsById)}
+            onAdminSelect={
+              onAdminMatchSelect ? () => onAdminMatchSelect(match) : undefined
+            }
+          />
+        ))}
+      </div>
+      <div className={classNames("w-full max-w-full min-w-0 p-4", tournamentInsetCardClass)}>
+        <h4 className="font-black text-white">Standings</h4>
+        <div className="mt-4 space-y-2">
+          {standings
+            .slice()
+            .sort(
+              (left, right) =>
+                (left.rank ?? Number.MAX_SAFE_INTEGER) -
+                  (right.rank ?? Number.MAX_SAFE_INTEGER) ||
+                right.points - left.points ||
+                right.wins - left.wins
+            )
+            .map((standing, index) => (
+              <div
+                key={standing.registrationId}
+                className={classNames("grid grid-cols-[32px_minmax(0,1fr)] gap-3 p-3 text-sm", tournamentInsetCardClass)}
+              >
+                <span className="font-mono text-zinc-500">
+                  {standing.rank ?? index + 1}
+                </span>
+                <span className="min-w-0 break-words font-bold text-white">
+                  {participantsById.get(standing.registrationId)?.name ??
+                    "Participant"}
+                </span>
+                <span className="col-start-2 text-zinc-400">
+                  {standing.wins}W {standing.losses}L - {standing.points} pts
+                </span>
+              </div>
+            ))}
+          {standings.length === 0 && (
+            <p className="border border-white/12 p-4 text-sm text-zinc-500">
+              Standings will appear after admins assign players and results are recorded.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileMedia({ tournament }: { tournament: TournamentCard }) {
+  const links = [
+    tournament.rulesUrl
+      ? { label: "Official Rules", url: tournament.rulesUrl }
+      : null,
+    tournament.battlefyUrl
+      ? { label: "Battlefy Event", url: tournament.battlefyUrl }
+      : null,
+  ].filter((link) => link !== null);
+
+  return (
+    <MobileCard>
+      <h2 className="break-words text-xl font-black text-white">
+        {tournament.title} Resources
+      </h2>
+      {links.length > 0 ? (
+        <div className="mt-5 grid w-full max-w-full min-w-0 gap-4">
+          {links.map((link) => (
+            <a
+              key={link.label}
+              href={link.url}
+              target="_blank"
+              rel="noreferrer"
+              className="group relative aspect-video w-full max-w-full overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:border-orange-400/35"
+              style={{
+                backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${tournament.image})`,
+              }}
+            >
+              <PlayCircle className="text-white opacity-90" />
+              <p className="mt-20 break-words text-sm font-bold text-white">
+                {link.label}
+              </p>
+              <p className="break-words text-xs text-zinc-300">
+                Open tournament resource
+              </p>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-5 border border-white/12 p-8 text-center text-zinc-500">
+          No tournament resources have been published.
+        </p>
+      )}
+    </MobileCard>
+  );
+}
+
+function MobileAnnouncements({ tournament }: { tournament: TournamentCard }) {
+  const messages = [
+    `${tournament.title} is currently ${tournament.status.toLowerCase()}.`,
+    `Grand Final: ${formatOptionalDateTime(tournament.grandFinalAt, "TBA")}.`,
+    `${tournament.players} approved participants are currently listed across ${tournament.brackets.length} bracket${tournament.brackets.length === 1 ? "" : "s"}. Full brackets and brackets with an existing queue accept waitlist registrations while registration remains open.`,
+  ];
+
+  return (
+    <div className="space-y-4">
+      {messages.map((text, index) => (
+        <MobileCard key={text}>
+          <div className="flex min-w-0 gap-3">
+            <Radio size={18} className="mt-1 shrink-0 text-orange-300" />
+            <div className="min-w-0">
+              <p className="break-words text-xs font-black uppercase tracking-wider text-zinc-500">
+                IronClad Update {index + 1}
+              </p>
+              <p className="mt-1 break-words text-zinc-200">{text}</p>
+            </div>
+          </div>
+        </MobileCard>
+      ))}
+    </div>
+  );
+}
+
+function MobileMainContent({
+  activeTab,
+  activeOverviewPanel,
+  setActiveOverviewPanel,
+  tournament,
+  tournaments,
+  viewer,
+  matchResultSubmissions,
+  matchResultReportGroups,
+}: {
+  activeTab: TabKey;
+  activeOverviewPanel: OverviewPanelKey;
+  setActiveOverviewPanel: (panel: OverviewPanelKey) => void;
+  tournament: TournamentCard;
+  tournaments: TournamentCard[];
+  viewer: TournamentViewer;
+  matchResultSubmissions: MatchResultSubmission[];
+  matchResultReportGroups: MatchResultReportGroup[];
+}) {
+  return (
+    <main className="relative z-10 w-full max-w-full min-w-0 px-4 py-5 sm:px-5">
+      {activeTab === "overview" && (
+        <MobileOverview
+          tournament={tournament}
+          tournaments={tournaments}
+          activePanel={activeOverviewPanel}
+          setActivePanel={setActiveOverviewPanel}
+        />
+      )}
+      {activeTab === "participants" && <MobileParticipants tournament={tournament} />}
+      {activeTab === "brackets" && (
+        <MobileBrackets
+          tournament={tournament}
+          viewer={viewer}
+          matchResultSubmissions={matchResultSubmissions}
+          matchResultReportGroups={matchResultReportGroups}
+        />
+      )}
+      {activeTab === "media" && <MobileMedia tournament={tournament} />}
+      {activeTab === "announcements" && (
+        <MobileAnnouncements tournament={tournament} />
+      )}
+    </main>
+  );
+}
+
 function MainContent({
   activeTab,
   activeOverviewPanel,
@@ -2815,6 +3930,7 @@ export default function TournamentsExperience({
       (registration) => registration.tournamentId === selectedTournament.id
     ) ?? null;
   const [showMobilePanel, setShowMobilePanel] = useState(false);
+  const mobileHeroStartRef = useRef<HTMLDivElement | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [registrationProfile, setRegistrationProfile] =
     useState<PlayerProfile | null>(null);
@@ -2868,6 +3984,19 @@ export default function TournamentsExperience({
     [pathname, router, searchParamString]
   );
 
+  const scrollMobileHeroIntoView = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        mobileHeroStartRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    });
+  }, []);
+
   useEffect(() => {
     const hasTournamentStateParam =
       rawTournamentParam !== null ||
@@ -2920,6 +4049,11 @@ export default function TournamentsExperience({
       tab: "overview",
       panel: "details",
     });
+  };
+
+  const handleMobileSelectTournament = (tournament: TournamentCard) => {
+    handleSelectTournament(tournament);
+    scrollMobileHeroIntoView();
   };
 
   const handleSetActiveTab = (tab: TabKey) => {
@@ -2989,41 +4123,79 @@ export default function TournamentsExperience({
   };
 
   return (
-    <div
-      className="min-h-screen bg-black bg-cover bg-center bg-fixed pt-20 text-zinc-100"
-      style={{
-        backgroundImage:
-          "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
-        backgroundAttachment: "fixed",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        backgroundSize: "cover",
-      }}
-    >
-      <div className="mx-auto flex max-w-[1600px]">
-        <Sidebar
-          selectedTournament={selectedTournament}
-          tournaments={tournaments}
-          onSelectTournament={handleSelectTournament}
-        />
-        <div className="min-w-0 flex-1">
-          <Hero
-            tournament={selectedTournament}
-            viewerRegistration={selectedViewerRegistration}
-            onRegisterClick={handleRegisterClick}
-          />
-          <TopTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
-          <MainContent
-            activeTab={activeTab}
-            activeOverviewPanel={activeOverviewPanel}
-            setActiveOverviewPanel={handleSetActiveOverviewPanel}
-            tournament={selectedTournament}
+    <>
+      <div
+        className="hidden min-h-screen bg-black bg-cover bg-center bg-fixed pt-20 text-zinc-100 lg:block"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
+          backgroundAttachment: "fixed",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover",
+        }}
+      >
+        <div className="mx-auto flex max-w-[1600px]">
+          <Sidebar
+            selectedTournament={selectedTournament}
             tournaments={tournaments}
-            viewer={viewer}
-            matchResultSubmissions={matchResultSubmissions}
-            matchResultReportGroups={matchResultReportGroups}
+            onSelectTournament={handleSelectTournament}
           />
+          <div className="min-w-0 flex-1">
+            <Hero
+              tournament={selectedTournament}
+              viewerRegistration={selectedViewerRegistration}
+              onRegisterClick={handleRegisterClick}
+            />
+            <TopTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
+            <MainContent
+              activeTab={activeTab}
+              activeOverviewPanel={activeOverviewPanel}
+              setActiveOverviewPanel={handleSetActiveOverviewPanel}
+              tournament={selectedTournament}
+              tournaments={tournaments}
+              viewer={viewer}
+              matchResultSubmissions={matchResultSubmissions}
+              matchResultReportGroups={matchResultReportGroups}
+            />
+          </div>
         </div>
+      </div>
+
+      <div
+        className="min-h-screen w-full max-w-full min-w-0 bg-black bg-cover bg-center pt-20 text-zinc-100 lg:hidden"
+        style={{
+          backgroundImage:
+            "linear-gradient(180deg,rgba(0,0,0,0.92),rgba(0,0,0,0.78) 44%,rgba(0,0,0,0.96)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.66),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover",
+        }}
+      >
+        <div
+          ref={mobileHeroStartRef}
+          className="scroll-mt-24"
+          style={{ scrollMarginTop: "calc(5rem + env(safe-area-inset-top))" }}
+        />
+        <MobileHero
+          tournament={selectedTournament}
+          viewerRegistration={selectedViewerRegistration}
+          onRegisterClick={handleRegisterClick}
+        />
+        <MobileTournamentMenuButton
+          onClick={() => setShowMobilePanel(true)}
+        />
+        <MobileTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
+        <MobileMainContent
+          activeTab={activeTab}
+          activeOverviewPanel={activeOverviewPanel}
+          setActiveOverviewPanel={handleSetActiveOverviewPanel}
+          tournament={selectedTournament}
+          tournaments={tournaments}
+          viewer={viewer}
+          matchResultSubmissions={matchResultSubmissions}
+          matchResultReportGroups={matchResultReportGroups}
+        />
       </div>
 
       {showRegisterModal && registrationProfile && (
@@ -3048,16 +4220,14 @@ export default function TournamentsExperience({
         </div>
       )}
 
-      <button onClick={() => setShowMobilePanel(true)} className="fixed bottom-5 right-5 z-40 rounded-full bg-orange-500 p-4 text-white shadow-2xl shadow-orange-950/40 lg:hidden"><Menu size={22} /></button>
-      {showMobilePanel && (
-        <div className="fixed inset-0 z-50 bg-black/70 lg:hidden">
-          <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="ml-auto h-full w-80 border-l border-orange-500/20 bg-black/90 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl">
-            <div className="flex items-center justify-between"><h3 className="font-black text-white">Tournament Menu</h3><button onClick={() => setShowMobilePanel(false)} className="rounded bg-slate-800 p-2"><X size={18} /></button></div>
-            <div className="mt-5 space-y-2">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.key} onClick={() => { handleSetActiveTab(tab.key); setShowMobilePanel(false); }} className="flex w-full items-center gap-3 rounded-lg border border-white/12 bg-black/45 px-3 py-3 text-left font-semibold text-zinc-200 transition hover:border-orange-400/45 hover:bg-orange-500/10"><Icon size={17} />{tab.label}</button>; })}</div>
-          </motion.div>
-        </div>
-      )}
-    </div>
+      <MobileTournamentDrawer
+        open={showMobilePanel}
+        selectedTournament={selectedTournament}
+        tournaments={tournaments}
+        onClose={() => setShowMobilePanel(false)}
+        onSelectTournament={handleMobileSelectTournament}
+      />
+    </>
   );
 }
 
