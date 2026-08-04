@@ -82,7 +82,7 @@ describe("profile save Steam identity regression", () => {
     checkCoh3ProfileOwnershipMock.mockResolvedValue({ ok: true });
   });
 
-  it("keeps the existing profile save successful without writing SteamID64", async () => {
+  it("keeps the existing profile save successful without writing protected verification fields", async () => {
     const fixture = createProfileClient();
     createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
 
@@ -109,7 +109,17 @@ describe("profile save Steam identity regression", () => {
       id: "player-existing",
       steam_username: "display-only-steam-name",
     });
-    expect(profileUpdate).not.toHaveProperty("steam_id64");
+    for (const protectedField of [
+      "steam_id64",
+      "relic_verified_elo",
+      "relic_verified_faction",
+      "relic_verified_division",
+      "relic_elo_calculation_version",
+      "relic_elo_verified_at",
+      "relic_elo_last_attempt_at",
+    ]) {
+      expect(profileUpdate).not.toHaveProperty(protectedField);
+    }
     expect(options).toEqual({ onConflict: "clerk_user_id" });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith("/profile");

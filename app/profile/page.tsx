@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import PlayerProfileForm from "@/components/PlayerProfileForm";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
+import RelicEloVerificationCard from "@/components/RelicEloVerificationCard";
 import SteamConnectionCard from "@/components/SteamConnectionCard";
 import {
   isPlayerProfileComplete,
@@ -23,6 +24,33 @@ type ProfilePageProps = {
   }>;
 };
 
+type ProtectedProfileData = {
+  steam_id64: unknown;
+  relic_verified_elo: unknown;
+  relic_verified_faction: unknown;
+  relic_verified_division: unknown;
+  relic_elo_calculation_version: unknown;
+  relic_elo_verified_at: unknown;
+  relic_elo_last_attempt_at: unknown;
+};
+
+type RelicVerification = {
+  elo: number;
+  faction: string;
+  division: string;
+  calculationVersion: string;
+  verifiedAt: string;
+};
+
+const relicFactions = new Set([
+  "US Forces",
+  "British Forces",
+  "Deutsches Afrikakorps",
+  "Wehrmacht",
+]);
+const relicDivisions = new Set(["Academy", "Challenge", "Main / Pro"]);
+const relicRefreshCooldownMilliseconds = 15 * 60 * 1000;
+
 const steamConnectionResults = new Set<SteamConnectionResult>([
   "connected",
   "cancelled",
@@ -41,6 +69,64 @@ function getSteamConnectionResult(
   return steamConnectionResults.has(value as SteamConnectionResult)
     ? (value as SteamConnectionResult)
     : null;
+}
+
+function getRelicVerification(
+  protectedProfile: ProtectedProfileData | null
+): RelicVerification | null {
+  const elo = parseRelicElo(protectedProfile?.relic_verified_elo);
+
+  if (
+    !protectedProfile ||
+    elo === null ||
+    typeof protectedProfile.relic_verified_faction !== "string" ||
+    !relicFactions.has(protectedProfile.relic_verified_faction) ||
+    typeof protectedProfile.relic_verified_division !== "string" ||
+    !relicDivisions.has(protectedProfile.relic_verified_division) ||
+    typeof protectedProfile.relic_elo_calculation_version !== "string" ||
+    protectedProfile.relic_elo_calculation_version.trim().length === 0 ||
+    typeof protectedProfile.relic_elo_verified_at !== "string" ||
+    !Number.isFinite(Date.parse(protectedProfile.relic_elo_verified_at))
+  ) {
+    return null;
+  }
+
+  return {
+    elo,
+    faction: protectedProfile.relic_verified_faction,
+    division: protectedProfile.relic_verified_division,
+    calculationVersion: protectedProfile.relic_elo_calculation_version,
+    verifiedAt: protectedProfile.relic_elo_verified_at,
+  };
+}
+
+function parseRelicElo(value: unknown): number | null {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^\d+$/.test(value)
+        ? Number(value)
+        : Number.NaN;
+
+  return Number.isSafeInteger(numericValue) && numericValue >= 0
+    ? numericValue
+    : null;
+}
+
+function getRefreshAvailableAt(lastAttemptAt: unknown): string | null {
+  if (typeof lastAttemptAt !== "string") {
+    return null;
+  }
+
+  const lastAttemptTimestamp = Date.parse(lastAttemptAt);
+
+  if (!Number.isFinite(lastAttemptTimestamp)) {
+    return null;
+  }
+
+  return new Date(
+    lastAttemptTimestamp + relicRefreshCooldownMilliseconds
+  ).toISOString();
 }
 
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
@@ -69,27 +155,38 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const profile = (data ?? null) as PlayerProfile | null;
   let steamConnected = false;
   let steamStatusAvailable = true;
+  let initialVerification: RelicVerification | null = null;
+  let initialRefreshAvailableAt: string | null = null;
 
   if (profile) {
     try {
-      const { data: steamIdentity, error: steamIdentityError } =
+      const { data: protectedProfileData, error: protectedProfileError } =
         await createSupabaseAdminClient()
           .from("players")
-          .select("steam_id64")
+          .select(
+            "steam_id64, relic_verified_elo, relic_verified_faction, relic_verified_division, relic_elo_calculation_version, relic_elo_verified_at, relic_elo_last_attempt_at"
+          )
           .eq("clerk_user_id", userId)
           .maybeSingle();
 
-      if (steamIdentityError) {
+      if (protectedProfileError) {
         steamStatusAvailable = false;
-        console.error("Steam connection status lookup failed.");
+        console.error("Protected profile status lookup failed.");
       } else {
+        const protectedProfile =
+          (protectedProfileData as ProtectedProfileData | null) ?? null;
+
         steamConnected =
-          typeof steamIdentity?.steam_id64 === "string" &&
-          steamIdentity.steam_id64.length > 0;
+          typeof protectedProfile?.steam_id64 === "string" &&
+          protectedProfile.steam_id64.length > 0;
+        initialVerification = getRelicVerification(protectedProfile);
+        initialRefreshAvailableAt = getRefreshAvailableAt(
+          protectedProfile?.relic_elo_last_attempt_at ?? null
+        );
       }
     } catch {
       steamStatusAvailable = false;
-      console.error("Steam connection status is not configured.");
+      console.error("Protected profile status is not configured.");
     }
   }
 
@@ -153,6 +250,14 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               hasPlayer={Boolean(profile)}
               result={steamConnectionResult}
               statusAvailable={steamStatusAvailable}
+            />
+
+            <RelicEloVerificationCard
+              hasPlayer={Boolean(profile)}
+              steamConnected={steamConnected}
+              statusAvailable={steamStatusAvailable}
+              initialVerification={initialVerification}
+              initialRefreshAvailableAt={initialRefreshAvailableAt}
             />
 
             <DeleteAccountSection />
