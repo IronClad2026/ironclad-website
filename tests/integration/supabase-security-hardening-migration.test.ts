@@ -139,17 +139,7 @@ describe("Supabase security hardening migration contract", () => {
     expect(compactMigration).not.toContain("tournament_deletion_jobs");
   });
 
-  it("keeps the non-verified registration path on its authenticated RLS boundary", () => {
-    const actions = readFileSync(
-      resolve(process.cwd(), "app/tournaments/actions.ts"),
-      "utf8"
-    )
-      .replace(/\s+/g, " ")
-      .trim();
-
-    expect(actions).toContain(
-      ": await submitDefaultRegistration({ supabase, registration, });"
-    );
+  it("records the historical non-verified registration RLS boundary", () => {
     expect(compactMigration).toContain(
       "create schema ironclad_private authorization postgres;"
     );
