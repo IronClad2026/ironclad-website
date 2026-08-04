@@ -171,6 +171,23 @@ describe("Relic tournament registration migration contract", () => {
     );
   });
 
+  it("assigns and compares the strict Relic division without an inline CASE predicate", () => {
+    const rpc = extractFunctionBody("submit_verified_player_registration(");
+    const strictDivisionAssignment =
+      "v_expected_division := case when p_relic_elo < 1100 then 'academy' when p_relic_elo < 1400 then 'challenge' else 'main / pro' end;";
+    const strictDivisionComparison =
+      "if p_relic_division is distinct from v_expected_division then raise exception 'registration verification data is invalid'; end if;";
+
+    expect(rpc).toContain("p_relic_elo < 0");
+    expect(rpc).toContain("p_relic_elo > 9007199254740991");
+    expect(rpc).toContain(strictDivisionAssignment);
+    expect(rpc).toContain(strictDivisionComparison);
+    expect(rpc).not.toContain("p_relic_division is distinct from case");
+    expect(rpc.indexOf(strictDivisionAssignment)).toBeLessThan(
+      rpc.indexOf(strictDivisionComparison)
+    );
+  });
+
   it("enforces duplicate safety and the canonical strict bracket mapping", () => {
     const rpc = extractFunctionBody("submit_verified_player_registration(");
 

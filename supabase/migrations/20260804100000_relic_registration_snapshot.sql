@@ -410,21 +410,30 @@ begin
 
   if p_relic_elo is null
     or p_relic_elo < 0
-    or p_relic_elo > 9007199254740991
-    or p_relic_faction is null
+    or p_relic_elo > 9007199254740991 then
+    raise exception 'Registration verification data is invalid';
+  end if;
+
+  if p_relic_faction is null
     or p_relic_faction not in (
       'US Forces',
       'British Forces',
       'Deutsches Afrikakorps',
       'Wehrmacht'
     )
+    or p_relic_division is null
     or p_relic_division not in ('Academy', 'Challenge', 'Main / Pro')
-    or p_relic_division is distinct from case
-      when p_relic_elo < 1100 then 'Academy'
-      when p_relic_elo < 1400 then 'Challenge'
-      else 'Main / Pro'
-    end
     or v_calculation_version is null then
+    raise exception 'Registration verification data is invalid';
+  end if;
+
+  v_expected_division := case
+    when p_relic_elo < 1100 then 'Academy'
+    when p_relic_elo < 1400 then 'Challenge'
+    else 'Main / Pro'
+  end;
+
+  if p_relic_division is distinct from v_expected_division then
     raise exception 'Registration verification data is invalid';
   end if;
 
