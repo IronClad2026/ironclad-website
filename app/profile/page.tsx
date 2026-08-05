@@ -4,6 +4,8 @@ import PlayerProfileForm from "@/components/PlayerProfileForm";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
 import RelicEloVerificationCard from "@/components/RelicEloVerificationCard";
 import SteamConnectionCard from "@/components/SteamConnectionCard";
+import { getOwnActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
+import { getIronCladDivision } from "@/lib/elo-verification/divisions";
 import {
   isPlayerProfileComplete,
   type PlayerProfile,
@@ -23,6 +25,11 @@ type ProfilePageProps = {
     steam?: string | string[];
   }>;
 };
+
+type ProfilePagePlayer = Omit<
+  PlayerProfile,
+  "coh3_player_card_url" | "current_elo"
+>;
 
 type ProtectedProfileData = {
   steam_id64: unknown;
@@ -48,7 +55,6 @@ const relicFactions = new Set([
   "Deutsches Afrikakorps",
   "Wehrmacht",
 ]);
-const relicDivisions = new Set(["Academy", "Challenge", "Main / Pro"]);
 const relicRefreshCooldownMilliseconds = 15 * 60 * 1000;
 
 const steamConnectionResults = new Set<SteamConnectionResult>([
@@ -76,13 +82,20 @@ function getRelicVerification(
 ): RelicVerification | null {
   const elo = parseRelicElo(protectedProfile?.relic_verified_elo);
 
+  if (!protectedProfile || elo === null) {
+    return null;
+  }
+
+  const expectedDivision = getIronCladDivision(elo);
+
   if (
-    !protectedProfile ||
-    elo === null ||
+    !expectedDivision.ok ||
+    typeof protectedProfile.steam_id64 !== "string" ||
+    protectedProfile.steam_id64.length === 0 ||
     typeof protectedProfile.relic_verified_faction !== "string" ||
     !relicFactions.has(protectedProfile.relic_verified_faction) ||
     typeof protectedProfile.relic_verified_division !== "string" ||
-    !relicDivisions.has(protectedProfile.relic_verified_division) ||
+    protectedProfile.relic_verified_division !== expectedDivision.division ||
     typeof protectedProfile.relic_elo_calculation_version !== "string" ||
     protectedProfile.relic_elo_calculation_version.trim().length === 0 ||
     typeof protectedProfile.relic_elo_verified_at !== "string" ||
@@ -108,7 +121,11 @@ function parseRelicElo(value: unknown): number | null {
         ? Number(value)
         : Number.NaN;
 
-  return Number.isSafeInteger(numericValue) && numericValue >= 0
+  return (
+    Number.isSafeInteger(numericValue) &&
+    numericValue >= 0 &&
+    numericValue <= 5000
+  )
     ? numericValue
     : null;
 }
@@ -143,7 +160,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const { data, error } = await supabase
     .from("players")
     .select(
-      "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, created_at, updated_at"
+      "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, country, region, timezone, avatar_url, bio, profile_completed, created_at, updated_at"
     )
     .eq("clerk_user_id", userId)
     .maybeSingle();
@@ -152,13 +169,19 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
     console.error("Player profile load error:", error);
   }
 
-  const profile = (data ?? null) as PlayerProfile | null;
+  const profile = (data ?? null) as ProfilePagePlayer | null;
   let steamConnected = false;
   let steamStatusAvailable = true;
   let initialVerification: RelicVerification | null = null;
   let initialRefreshAvailableAt: string | null = null;
+  let activeTournamentEloSnapshots: Awaited<
+    ReturnType<typeof getOwnActiveTournamentEloSnapshots>
+  > = [];
 
   if (profile) {
+    activeTournamentEloSnapshots =
+      await getOwnActiveTournamentEloSnapshots(supabase, userId);
+
     try {
       const { data: protectedProfileData, error: protectedProfileError } =
         await createSupabaseAdminClient()
@@ -243,7 +266,11 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
         ) : (
           <div className="mt-8">
-            <PlayerProfileForm profile={profile} />
+            <PlayerProfileForm
+              profile={profile}
+              verifiedCurrentElo={initialVerification?.elo ?? null}
+              activeTournamentEloSnapshots={activeTournamentEloSnapshots}
+            />
 
             <SteamConnectionCard
               connected={steamConnected}

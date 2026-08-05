@@ -3,6 +3,9 @@
 import { useActionState, useEffect, useState } from "react";
 import { Camera, UserRound } from "lucide-react";
 import { savePlayerProfile } from "@/app/profile/actions";
+import ActiveTournamentEloSnapshotIndicator, {
+  type ActiveTournamentEloSnapshot,
+} from "@/components/ActiveTournamentEloSnapshotIndicator";
 import SearchableProfileSelect from "@/components/SearchableProfileSelect";
 import {
   ALLOWED_AVATAR_MIME_TYPES,
@@ -11,15 +14,21 @@ import {
   MAX_AVATAR_UPLOAD_SIZE_LABEL,
 } from "@/lib/avatar";
 import { countrySelectOptions } from "@/lib/countries";
-import { eloRanges } from "@/lib/elo-options";
 import {
   initialProfileActionState,
   type PlayerProfile,
   type ProfileField,
 } from "@/lib/player-profile";
 
+type PlayerProfileFormProfile = Omit<
+  PlayerProfile,
+  "coh3_player_card_url" | "current_elo"
+>;
+
 type PlayerProfileFormProps = {
-  profile: PlayerProfile | null;
+  profile: PlayerProfileFormProfile | null;
+  verifiedCurrentElo: number | null;
+  activeTournamentEloSnapshots: ActiveTournamentEloSnapshot[];
 };
 
 const regions = [
@@ -104,19 +113,16 @@ const profileInputClass =
 
 export default function PlayerProfileForm({
   profile,
+  verifiedCurrentElo,
+  activeTournamentEloSnapshots,
 }: PlayerProfileFormProps) {
   const [state, formAction, pending] = useActionState(
     savePlayerProfile,
     initialProfileActionState
   );
-  const initialElo = profile?.current_elo?.toString() ?? "";
   const [country, setCountry] = useState(profile?.country ?? "");
   const [region, setRegion] = useState(profile?.region ?? "");
   const [timezone, setTimezone] = useState(profile?.timezone ?? "");
-  const [currentElo, setCurrentElo] = useState(initialElo);
-  const [eloSearch, setEloSearch] = useState(
-    eloRanges.find((range) => range.value === initialElo)?.label ?? initialElo
-  );
   const [avatarPreview, setAvatarPreview] = useState(
     getPlayerAvatarDisplayUrl(profile) ?? ""
   );
@@ -267,15 +273,6 @@ export default function PlayerProfileForm({
             error={state.errors.steamUsername}
             required
           />
-          <ProfileInput
-            label="CoH3 Player Card URL"
-            name="coh3PlayerCardUrl"
-            type="url"
-            defaultValue={profile?.coh3_player_card_url}
-            error={state.errors.coh3PlayerCardUrl}
-            description="Optional unless ELO Verification Checker is enabled for tournament registration."
-            className="md:col-span-2"
-          />
         </div>
       </section>
 
@@ -336,28 +333,24 @@ export default function PlayerProfileForm({
             required
             variant="ironclad"
           />
-          <SearchableProfileSelect
-            label="Current ELO"
-            name="currentElo"
-            value={eloSearch}
-            submittedValue={currentElo}
-            options={eloRanges}
-            onCustomValueChange={(value) => {
-              setEloSearch(value);
-              setCurrentElo(/^\d+$/.test(value) ? value : "");
-            }}
-            onSelect={(option) => {
-              setEloSearch(option.label);
-              setCurrentElo(option.value);
-            }}
-            error={state.errors.currentElo}
-            description="Select an ELO range or type an exact numeric ELO."
-            placeholder="Search ranges or enter exact ELO"
-            required
-            variant="ironclad"
-          />
+          <div className="relative">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">Current ELO</span>
+              <ActiveTournamentEloSnapshotIndicator
+                snapshots={activeTournamentEloSnapshots}
+              />
+            </div>
+            <output
+              aria-label="Current ELO"
+              className={`${profileInputClass} block border-white/10 text-zinc-200`}
+            >
+              {verifiedCurrentElo ?? "N/A"}
+            </output>
+            <span className="mt-1 block text-xs leading-5 text-zinc-500">
+              Updated only after successful Relic ELO verification.
+            </span>
+          </div>
         </div>
-
       </section>
 
       <section className={`${profilePanelClass} overflow-hidden`}>

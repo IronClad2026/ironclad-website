@@ -5,7 +5,9 @@ import { playerIdentity } from "@/tests/fixtures/auth";
 const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
+const getOwnActiveTournamentEloSnapshotsMock = vi.hoisted(() => vi.fn());
 const redirectMock = vi.hoisted(() => vi.fn());
+const playerProfileFormMock = vi.hoisted(() => vi.fn());
 const relicEloVerificationCardMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -21,7 +23,7 @@ vi.mock("@/components/DeleteAccountSection", () => ({
 }));
 
 vi.mock("@/components/PlayerProfileForm", () => ({
-  default: vi.fn(),
+  default: playerProfileFormMock,
 }));
 
 vi.mock("@/components/RelicEloVerificationCard", () => ({
@@ -41,12 +43,24 @@ vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
 }));
 
+vi.mock("@/lib/active-tournament-elo-snapshots", () => ({
+  getOwnActiveTournamentEloSnapshots:
+    getOwnActiveTournamentEloSnapshotsMock,
+}));
+
 import ProfilePage from "@/app/profile/page";
 
 const PLAYER_ID = "11111111-1111-4111-8111-111111111111";
 const STEAM_ID64 = "76561198012345678";
 const VERIFIED_AT = "2026-08-03T23:55:00.000Z";
 const LAST_ATTEMPT_AT = "2026-08-04T00:00:00.000Z";
+const activeTournamentEloSnapshots = [
+  {
+    tournamentTitle: "IronClad August Open",
+    elo: 1325,
+    division: "Challenge",
+  },
+];
 
 const profileRow = {
   id: PLAYER_ID,
@@ -69,7 +83,7 @@ const profileRow = {
 
 const protectedProfileRow = {
   steam_id64: STEAM_ID64,
-  relic_verified_elo: "1675",
+  relic_verified_elo: "1375",
   relic_verified_faction: "British Forces",
   relic_verified_division: "Challenge",
   relic_elo_calculation_version: "relic-1v1-v1",
@@ -134,6 +148,10 @@ function findElementByType(
 describe("profile Relic ELO protected load", () => {
   beforeEach(() => {
     authMock.mockResolvedValue(playerIdentity);
+    getOwnActiveTournamentEloSnapshotsMock.mockReset();
+    getOwnActiveTournamentEloSnapshotsMock.mockResolvedValue(
+      activeTournamentEloSnapshots
+    );
   });
 
   it("loads protected fields with the admin client and passes only normalized safe props", async () => {
@@ -143,8 +161,10 @@ describe("profile Relic ELO protected load", () => {
     createSupabaseAdminClientMock.mockReturnValue(protectedProfile.client);
 
     const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    const form = findElementByType(page, playerProfileFormMock);
     const card = findElementByType(page, relicEloVerificationCardMock);
 
+    expect(form).not.toBeNull();
     expect(card).not.toBeNull();
     expect(profile.from).toHaveBeenCalledWith("players");
     expect(profile.eq).toHaveBeenCalledWith(
@@ -155,6 +175,8 @@ describe("profile Relic ELO protected load", () => {
     const authenticatedSelection = profile.select.mock.calls[0][0];
     expect(authenticatedSelection).not.toContain("steam_id64");
     expect(authenticatedSelection).not.toContain("relic_verified_elo");
+    expect(authenticatedSelection).not.toContain("coh3_player_card_url");
+    expect(authenticatedSelection).not.toContain("current_elo");
 
     expect(protectedProfile.from).toHaveBeenCalledWith("players");
     expect(protectedProfile.select).toHaveBeenCalledWith(
@@ -170,7 +192,7 @@ describe("profile Relic ELO protected load", () => {
       steamConnected: true,
       statusAvailable: true,
       initialVerification: {
-        elo: 1675,
+        elo: 1375,
         faction: "British Forces",
         division: "Challenge",
         calculationVersion: "relic-1v1-v1",
@@ -178,9 +200,28 @@ describe("profile Relic ELO protected load", () => {
       },
       initialRefreshAvailableAt: "2026-08-04T00:15:00.000Z",
     });
+    expect(form?.props).toMatchObject({
+      profile: profileRow,
+      verifiedCurrentElo: 1375,
+      activeTournamentEloSnapshots,
+    });
+    expect(getOwnActiveTournamentEloSnapshotsMock).toHaveBeenCalledWith(
+      profile.client,
+      playerIdentity.userId
+    );
+    expect(form?.props.verifiedCurrentElo).not.toBe(profileRow.current_elo);
     expect(JSON.stringify(card?.props)).not.toContain(STEAM_ID64);
     expect(JSON.stringify(card?.props)).not.toContain(PLAYER_ID);
     expect(JSON.stringify(card?.props)).not.toContain(playerIdentity.userId);
+    expect(JSON.stringify(form?.props.activeTournamentEloSnapshots)).not.toContain(
+      PLAYER_ID
+    );
+    expect(JSON.stringify(form?.props.activeTournamentEloSnapshots)).not.toContain(
+      playerIdentity.userId
+    );
+    expect(JSON.stringify(form?.props.activeTournamentEloSnapshots)).not.toContain(
+      STEAM_ID64
+    );
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
@@ -195,8 +236,10 @@ describe("profile Relic ELO protected load", () => {
     createSupabaseAdminClientMock.mockReturnValue(protectedProfile.client);
 
     const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    const form = findElementByType(page, playerProfileFormMock);
     const card = findElementByType(page, relicEloVerificationCardMock);
 
+    expect(form?.props).toMatchObject({ verifiedCurrentElo: null });
     expect(card?.props).toMatchObject({
       initialVerification: null,
       initialRefreshAvailableAt: null,

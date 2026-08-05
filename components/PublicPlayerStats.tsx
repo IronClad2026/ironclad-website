@@ -1,12 +1,19 @@
 import { Globe2, MapPin, Shield, Swords, Trophy, UsersRound } from "lucide-react";
+import ActiveTournamentEloSnapshotIndicator, {
+  type ActiveTournamentEloSnapshot,
+} from "@/components/ActiveTournamentEloSnapshotIndicator";
 import ScrollReveal from "@/components/ScrollReveal";
 import type { PublicPlayerProfile } from "@/lib/public-players";
 
 type PublicPlayerStatsProps = {
   player: PublicPlayerProfile;
+  activeTournamentEloSnapshots: ActiveTournamentEloSnapshot[];
 };
 
-export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
+export default function PublicPlayerStats({
+  player,
+  activeTournamentEloSnapshots,
+}: PublicPlayerStatsProps) {
   const stats = [
     {
       label: "Current ELO",
@@ -15,16 +22,19 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
           ? String(player.currentElo)
           : "Unrated",
       icon: Shield,
+      showsSnapshotIndicator: true,
     },
     {
       label: "Country",
       value: player.country?.trim() || "Unknown",
       icon: Globe2,
+      showsSnapshotIndicator: false,
     },
     {
       label: "Region",
       value: player.region?.trim() || "Region unknown",
       icon: MapPin,
+      showsSnapshotIndicator: false,
     },
   ];
 
@@ -43,7 +53,11 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
           {stats.map((stat) => (
             <div
               key={stat.label}
-              className="group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-6 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1"
+              className={`group relative border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-6 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 ${
+                stat.showsSnapshotIndicator
+                  ? "z-20 overflow-visible focus-within:z-30"
+                  : "overflow-hidden"
+              }`}
             >
               <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
                 <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
@@ -54,6 +68,11 @@ export default function PublicPlayerStats({ player }: PublicPlayerStatsProps) {
                   <p className="text-[10px] font-black uppercase tracking-[0.22em]">
                     {stat.label}
                   </p>
+                  {stat.showsSnapshotIndicator ? (
+                    <ActiveTournamentEloSnapshotIndicator
+                      snapshots={activeTournamentEloSnapshots}
+                    />
+                  ) : null}
                 </div>
                 <p className="mt-4 break-words text-3xl font-black text-white">
                   {stat.value}

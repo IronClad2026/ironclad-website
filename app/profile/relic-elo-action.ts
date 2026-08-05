@@ -17,13 +17,6 @@ const PLAYER_SELECT = [
   "clerk_user_id",
   "steam_id64",
 ].join(", ");
-const SNAPSHOT_SELECT = [
-  "relic_verified_elo",
-  "relic_verified_faction",
-  "relic_verified_division",
-  "relic_elo_calculation_version",
-  "relic_elo_verified_at",
-].join(", ");
 
 export type RelicEloSnapshot = {
   elo: number;
@@ -187,25 +180,22 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     return mapRelicFailure(relicResult, refreshAvailableAt);
   }
 
-  const verifiedAt = new Date().toISOString();
   let snapshotUpdate: { data: unknown; error: unknown };
 
   try {
-    snapshotUpdate = await supabase
-      .from("players")
-      .update({
-        relic_verified_elo: relicResult.elo,
-        relic_verified_faction: relicResult.faction,
-        relic_verified_division: relicResult.division,
-        relic_elo_calculation_version: relicResult.calculationVersion,
-        relic_elo_verified_at: verifiedAt,
-      })
-      .eq("id", player.id)
-      .eq("clerk_user_id", userId)
-      .eq("steam_id64", steamId64)
-      .eq("relic_elo_last_attempt_at", claim.claimedAt)
-      .select(SNAPSHOT_SELECT)
-      .maybeSingle();
+    snapshotUpdate = await supabase.rpc(
+      "save_relic_profile_elo_snapshot",
+      {
+        p_player_id: player.id,
+        p_clerk_user_id: userId,
+        p_steam_id64: steamId64,
+        p_claimed_at: claim.claimedAt,
+        p_relic_elo: relicResult.elo,
+        p_relic_faction: relicResult.faction,
+        p_relic_division: relicResult.division,
+        p_relic_calculation_version: relicResult.calculationVersion,
+      }
+    );
   } catch {
     console.error("Relic ELO result save failed unexpectedly.");
     return errorResult(
@@ -224,15 +214,14 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     );
   }
 
-  const snapshot = parseSnapshot(rawSnapshot);
+  const snapshot = parseSnapshotResult(rawSnapshot);
 
   if (
     !snapshot ||
     snapshot.elo !== relicResult.elo ||
     snapshot.faction !== relicResult.faction ||
     snapshot.division !== relicResult.division ||
-    snapshot.calculationVersion !== relicResult.calculationVersion ||
-    Date.parse(snapshot.verifiedAt) !== Date.parse(verifiedAt)
+    snapshot.calculationVersion !== relicResult.calculationVersion.trim()
   ) {
     console.error("Relic ELO result save returned an invalid result.");
     return errorResult(
@@ -416,11 +405,14 @@ function parseSnapshot(value: unknown): RelicEloSnapshot | null {
     return null;
   }
 
+  const currentElo = parseSafeInteger(value.current_elo);
   const elo = parseSafeInteger(value.relic_verified_elo);
   const verifiedAt = parseTimestamp(value.relic_elo_verified_at);
 
   if (
+    currentElo === null ||
     elo === null ||
+    currentElo !== elo ||
     !isRelicFaction(value.relic_verified_faction) ||
     !isIronCladDivision(value.relic_verified_division) ||
     typeof value.relic_elo_calculation_version !== "string" ||
@@ -437,6 +429,14 @@ function parseSnapshot(value: unknown): RelicEloSnapshot | null {
     calculationVersion: value.relic_elo_calculation_version,
     verifiedAt,
   };
+}
+
+function parseSnapshotResult(value: unknown): RelicEloSnapshot | null {
+  if (Array.isArray(value)) {
+    return value.length === 1 ? parseSnapshot(value[0]) : null;
+  }
+
+  return parseSnapshot(value);
 }
 
 function parseTimestamp(value: unknown): string | null {

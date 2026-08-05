@@ -7,6 +7,7 @@ import {
 const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
 const createNoStoreSupabaseClientMock = vi.hoisted(() => vi.fn());
+const getPublicActiveTournamentEloSnapshotsMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 const notFoundMock = vi.hoisted(() =>
   vi.fn(() => {
@@ -25,6 +26,11 @@ vi.mock("@/lib/supabase-server", () => ({
 
 vi.mock("@/lib/supabase", () => ({
   createNoStoreSupabaseClient: createNoStoreSupabaseClientMock,
+}));
+
+vi.mock("@/lib/active-tournament-elo-snapshots", () => ({
+  getPublicActiveTournamentEloSnapshots:
+    getPublicActiveTournamentEloSnapshotsMock,
 }));
 
 vi.mock("next/cache", () => ({
@@ -170,6 +176,7 @@ describe("public profile opt-out flow", () => {
     authMock.mockReset();
     createAuthenticatedSupabaseClientMock.mockReset();
     createNoStoreSupabaseClientMock.mockReset();
+    getPublicActiveTournamentEloSnapshotsMock.mockReset();
     revalidatePathMock.mockReset();
     notFoundMock.mockClear();
   });
@@ -210,6 +217,7 @@ describe("public profile opt-out flow", () => {
     await expect(getPublicPlayers()).resolves.toEqual([]);
 
     expect(notFoundMock).toHaveBeenCalledOnce();
+    expect(getPublicActiveTournamentEloSnapshotsMock).not.toHaveBeenCalled();
     expect(createNoStoreSupabaseClientMock).toHaveBeenCalledTimes(5);
   });
 });

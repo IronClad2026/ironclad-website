@@ -12,14 +12,8 @@ import {
   MAX_AVATAR_UPLOAD_SIZE_BYTES,
   MAX_AVATAR_UPLOAD_SIZE_LABEL,
 } from "@/lib/avatar";
-import { parseCoh3StatsProfileUrl } from "@/lib/coh3-stats-profile";
-import {
-  checkCoh3ProfileOwnership,
-  COH3_PROFILE_LINKED_ACCOUNT_MISMATCH_MESSAGE,
-} from "@/lib/coh3-profile-ownership";
 import { isPlayerProfileComplete } from "@/lib/player-profile";
 import { supabaseUrl } from "@/lib/supabase-config";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 type ValidatedProfile = {
@@ -27,11 +21,9 @@ type ValidatedProfile = {
   in_game_name: string;
   discord_username: string;
   steam_username: string;
-  coh3_player_card_url: string | null;
   country: string;
   region: string;
   timezone: string;
-  current_elo: number;
   bio: string | null;
 };
 
@@ -65,7 +57,7 @@ export async function savePlayerProfile(
   const supabase = await createAuthenticatedSupabaseClient();
   const { data: existingProfile, error: existingProfileError } = await supabase
     .from("players")
-    .select("id, avatar_url, coh3_profile_id")
+    .select("id, avatar_url")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
@@ -82,45 +74,6 @@ export async function savePlayerProfile(
   const avatar = formData.get("avatar");
   let avatarUrl: string | undefined;
   const playerId = existingProfile?.id ?? crypto.randomUUID();
-  const parsedCoh3Profile = parseCoh3StatsProfileUrl(
-    validation.data.coh3_player_card_url
-  );
-  const linkedCoh3ProfileId =
-    typeof existingProfile?.coh3_profile_id === "string"
-      ? existingProfile.coh3_profile_id
-      : null;
-
-  if (
-    linkedCoh3ProfileId &&
-    parsedCoh3Profile?.profileId !== linkedCoh3ProfileId
-  ) {
-    return {
-      status: "error",
-      message: "Review the highlighted profile fields.",
-      errors: {
-        coh3PlayerCardUrl: COH3_PROFILE_LINKED_ACCOUNT_MISMATCH_MESSAGE,
-      },
-    };
-  }
-
-  if (parsedCoh3Profile) {
-    const ownershipCheck = await checkCoh3ProfileOwnership({
-      supabase: createSupabaseAdminClient(),
-      profileId: parsedCoh3Profile.profileId,
-      playerId,
-      linkedProfileId: linkedCoh3ProfileId,
-    });
-
-    if (!ownershipCheck.ok) {
-      return {
-        status: "error",
-        message: "Review the highlighted profile fields.",
-        errors: {
-          coh3PlayerCardUrl: ownershipCheck.message,
-        },
-      };
-    }
-  }
 
   if (avatar instanceof File && avatar.size > 0) {
     const avatarSignature = new Uint8Array(
@@ -347,11 +300,9 @@ function validateProfile(formData: FormData): {
     inGameName: getValue(formData, "inGameName"),
     discordUsername: getValue(formData, "discordUsername"),
     steamUsername: getValue(formData, "steamUsername"),
-    coh3PlayerCardUrl: getValue(formData, "coh3PlayerCardUrl"),
     country: getValue(formData, "country"),
     region: getValue(formData, "region"),
     timezone: getValue(formData, "timezone"),
-    currentElo: getValue(formData, "currentElo"),
     bio: getValue(formData, "bio"),
   };
   const errors: Partial<Record<ProfileField, string>> = {};
@@ -376,25 +327,6 @@ function validateProfile(formData: FormData): {
   requireText(errors, "region", values.region, "Region", 100);
   requireText(errors, "timezone", values.timezone, "Timezone", 100);
 
-  if (
-    values.coh3PlayerCardUrl &&
-    (values.coh3PlayerCardUrl.length > 500 ||
-      !isHttpUrl(values.coh3PlayerCardUrl))
-  ) {
-    errors.coh3PlayerCardUrl = "Enter a valid HTTP or HTTPS URL.";
-  }
-
-  const currentElo = Number(values.currentElo);
-
-  if (
-    !values.currentElo ||
-    !Number.isInteger(currentElo) ||
-    currentElo < 0 ||
-    currentElo > 5000
-  ) {
-    errors.currentElo = "Current ELO must be a whole number from 0 to 5000.";
-  }
-
   if (values.bio.length > 500) {
     errors.bio = "Bio must be 500 characters or fewer.";
   }
@@ -409,11 +341,9 @@ function validateProfile(formData: FormData): {
       in_game_name: values.inGameName,
       discord_username: values.discordUsername,
       steam_username: values.steamUsername,
-      coh3_player_card_url: values.coh3PlayerCardUrl || null,
       country: values.country,
       region: values.region,
       timezone: values.timezone,
-      current_elo: currentElo,
       bio: values.bio || null,
     },
     errors,
@@ -435,14 +365,5 @@ function requireText(
     errors[field] = `${label} is required.`;
   } else if (value.length > maxLength) {
     errors[field] = `${label} must be ${maxLength} characters or fewer.`;
-  }
-}
-
-function isHttpUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
   }
 }

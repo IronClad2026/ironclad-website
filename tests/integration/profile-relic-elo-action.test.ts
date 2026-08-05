@@ -41,6 +41,7 @@ type PlayerState = {
   id: string;
   clerk_user_id: string;
   steam_id64: string | null;
+  current_elo: number | null;
   relic_verified_elo: number | null;
   relic_verified_faction: string | null;
   relic_verified_division: string | null;
@@ -50,9 +51,7 @@ type PlayerState = {
 };
 
 type QueryRecord = {
-  kind: "select" | "update";
-  columns: string | null;
-  payload: Record<string, unknown> | null;
+  columns: string;
   filters: Array<[string, unknown]>;
 };
 
@@ -60,10 +59,11 @@ type VerificationClientOptions = {
   player?: PlayerState | null;
   claimedAt?: string;
   claimShape?: "array" | "row";
+  saveShape?: "array" | "row";
   claimError?: boolean;
   loadError?: boolean;
-  updateError?: boolean;
-  conflictOnUpdate?: boolean;
+  saveError?: boolean;
+  conflictOnSave?: boolean;
   serializeEloAsString?: boolean;
 };
 
@@ -74,6 +74,7 @@ function createPlayer(
     id: PLAYER_ID,
     clerk_user_id: CLERK_USER_ID,
     steam_id64: STEAM_ID64,
+    current_elo: null,
     relic_verified_elo: null,
     relic_verified_faction: null,
     relic_verified_division: null,
@@ -88,6 +89,7 @@ function createVerifiedPlayer(
   overrides: Partial<PlayerState> = {}
 ): PlayerState {
   return createPlayer({
+    current_elo: 1_200,
     relic_verified_elo: 1_200,
     relic_verified_faction: "US Forces",
     relic_verified_division: "Challenge",
@@ -105,60 +107,27 @@ function createVerificationClient(
     options.player === undefined ? createPlayer() : options.player;
   const claimedAt = options.claimedAt ?? CLAIMED_AT;
   const queries: QueryRecord[] = [];
-  const updatePayloads: Record<string, unknown>[] = [];
+  const savePayloads: Record<string, unknown>[] = [];
 
   const maybeSingle = async (query: QueryRecord) => {
-    if (query.kind === "select") {
-      if (options.loadError) {
-        return { data: null, error: { code: "select_failed" } };
-      }
-
-      if (!player || !matchesFilters(player, query.filters)) {
-        return { data: null, error: null };
-      }
-
-      return { data: { ...player }, error: null };
+    if (options.loadError) {
+      return { data: null, error: { code: "select_failed" } };
     }
 
-    if (options.updateError) {
-      return { data: null, error: { code: "update_failed" } };
-    }
-
-    if (
-      !player ||
-      options.conflictOnUpdate ||
-      !matchesFilters(player, query.filters)
-    ) {
+    if (!player || !matchesFilters(player, query.filters)) {
       return { data: null, error: null };
     }
 
-    player = { ...player, ...query.payload } as PlayerState;
-    return {
-      data: {
-        ...player,
-        ...(options.serializeEloAsString && player.relic_verified_elo !== null
-          ? { relic_verified_elo: String(player.relic_verified_elo) }
-          : {}),
-      },
-      error: null,
-    };
+    return { data: { ...player }, error: null };
   };
 
-  const createQuery = (
-    kind: QueryRecord["kind"],
-    columns: string | null,
-    payload: Record<string, unknown> | null
-  ) => {
-    const record: QueryRecord = { kind, columns, payload, filters: [] };
+  const createQuery = (columns: string) => {
+    const record: QueryRecord = { columns, filters: [] };
     queries.push(record);
 
     const query = {
       eq: vi.fn((column: string, value: unknown) => {
         record.filters.push([column, value]);
-        return query;
-      }),
-      select: vi.fn((selectedColumns: string) => {
-        record.columns = selectedColumns;
         return query;
       }),
       maybeSingle: vi.fn(() => maybeSingle(record)),
@@ -173,45 +142,87 @@ function createVerificationClient(
     }
 
     return {
-      select: vi.fn((columns: string) =>
-        createQuery("select", columns, null)
-      ),
-      update: vi.fn((payload: Record<string, unknown>) => {
-        updatePayloads.push(payload);
-        return createQuery("update", null, payload);
-      }),
+      select: vi.fn((columns: string) => createQuery(columns)),
     };
   });
 
   const rpc = vi.fn(
     async (name: string, args: Record<string, unknown>) => {
-      if (name !== "claim_relic_elo_verification_attempt") {
-        throw new Error(`Unexpected RPC: ${name}`);
+      if (name === "claim_relic_elo_verification_attempt") {
+        if (options.claimError) {
+          return { data: null, error: { code: "claim_failed" } };
+        }
+
+        if (
+          !player ||
+          args.p_player_id !== player.id ||
+          args.p_clerk_user_id !== player.clerk_user_id ||
+          args.p_steam_id64 !== player.steam_id64 ||
+          !canClaim(player.relic_elo_last_attempt_at, claimedAt)
+        ) {
+          return { data: [], error: null };
+        }
+
+        player = {
+          ...player,
+          relic_elo_last_attempt_at: claimedAt,
+        };
+        const row = { claimed_at: claimedAt };
+        return {
+          data: options.claimShape === "row" ? row : [row],
+          error: null,
+        };
       }
 
-      if (options.claimError) {
-        return { data: null, error: { code: "claim_failed" } };
+      if (name === "save_relic_profile_elo_snapshot") {
+        savePayloads.push(args);
+
+        if (options.saveError) {
+          return { data: null, error: { code: "save_failed" } };
+        }
+
+        if (
+          !player ||
+          options.conflictOnSave ||
+          args.p_player_id !== player.id ||
+          args.p_clerk_user_id !== player.clerk_user_id ||
+          args.p_steam_id64 !== player.steam_id64 ||
+          args.p_claimed_at !== player.relic_elo_last_attempt_at
+        ) {
+          return { data: [], error: null };
+        }
+
+        player = {
+          ...player,
+          current_elo: args.p_relic_elo as number,
+          relic_verified_elo: args.p_relic_elo as number,
+          relic_verified_faction: args.p_relic_faction as string,
+          relic_verified_division: args.p_relic_division as string,
+          relic_elo_calculation_version: String(
+            args.p_relic_calculation_version
+          ).trim(),
+          relic_elo_verified_at: VERIFIED_AT,
+        };
+        const row = {
+          current_elo: options.serializeEloAsString
+            ? String(player.current_elo)
+            : player.current_elo,
+          relic_verified_elo: options.serializeEloAsString
+            ? String(player.relic_verified_elo)
+            : player.relic_verified_elo,
+          relic_verified_faction: player.relic_verified_faction,
+          relic_verified_division: player.relic_verified_division,
+          relic_elo_calculation_version:
+            player.relic_elo_calculation_version,
+          relic_elo_verified_at: player.relic_elo_verified_at,
+        };
+        return {
+          data: options.saveShape === "row" ? row : [row],
+          error: null,
+        };
       }
 
-      if (
-        !player ||
-        args.p_player_id !== player.id ||
-        args.p_clerk_user_id !== player.clerk_user_id ||
-        args.p_steam_id64 !== player.steam_id64 ||
-        !canClaim(player.relic_elo_last_attempt_at, claimedAt)
-      ) {
-        return { data: [], error: null };
-      }
-
-      player = {
-        ...player,
-        relic_elo_last_attempt_at: claimedAt,
-      };
-      const row = { claimed_at: claimedAt };
-      return {
-        data: options.claimShape === "row" ? row : [row],
-        error: null,
-      };
+      throw new Error(`Unexpected RPC: ${name}`);
     }
   );
 
@@ -220,7 +231,7 @@ function createVerificationClient(
     from,
     rpc,
     queries,
-    updatePayloads,
+    savePayloads,
     getPlayer: () => player,
   };
 }
@@ -318,7 +329,8 @@ describe("profile Relic ELO verification action", () => {
 
     const result = await verifyRelicProfileElo();
 
-    expect(fixture.rpc).toHaveBeenCalledExactlyOnceWith(
+    expect(fixture.rpc).toHaveBeenNthCalledWith(
+      1,
       "claim_relic_elo_verification_attempt",
       {
         p_player_id: PLAYER_ID,
@@ -327,15 +339,20 @@ describe("profile Relic ELO verification action", () => {
       }
     );
     expect(getRelic1v1EloMock).toHaveBeenCalledExactlyOnceWith(STEAM_ID64);
-    expect(fixture.updatePayloads).toEqual([
+    expect(fixture.rpc).toHaveBeenNthCalledWith(
+      2,
+      "save_relic_profile_elo_snapshot",
       {
-        relic_verified_elo: 1_450,
-        relic_verified_faction: "Wehrmacht",
-        relic_verified_division: "Main / Pro",
-        relic_elo_calculation_version: CALCULATION_VERSION,
-        relic_elo_verified_at: VERIFIED_AT,
-      },
-    ]);
+        p_player_id: PLAYER_ID,
+        p_clerk_user_id: CLERK_USER_ID,
+        p_steam_id64: STEAM_ID64,
+        p_claimed_at: CLAIMED_AT,
+        p_relic_elo: 1_450,
+        p_relic_faction: "Wehrmacht",
+        p_relic_division: "Main / Pro",
+        p_relic_calculation_version: CALCULATION_VERSION,
+      }
+    );
     expect(result).toEqual({
       status: "success",
       message: "Your Relic ELO has been verified.",
@@ -358,8 +375,11 @@ describe("profile Relic ELO verification action", () => {
 
   it("refreshes an existing snapshot after the cooldown using a single-row RPC result", async () => {
     const fixture = createVerificationClient({
-      player: createVerifiedPlayer(),
+      player: createVerifiedPlayer({
+        relic_elo_calculation_version: "legacy-calculation-version",
+      }),
       claimShape: "row",
+      saveShape: "row",
     });
     createSupabaseAdminClientMock.mockReturnValue(fixture.client);
     getRelic1v1EloMock.mockResolvedValue(
@@ -382,9 +402,11 @@ describe("profile Relic ELO verification action", () => {
       },
     });
     expect(fixture.getPlayer()).toMatchObject({
+      current_elo: 1_380,
       relic_verified_elo: 1_380,
       relic_verified_faction: "British Forces",
       relic_verified_division: "Challenge",
+      relic_elo_calculation_version: CALCULATION_VERSION,
       relic_elo_verified_at: VERIFIED_AT,
     });
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
@@ -405,7 +427,6 @@ describe("profile Relic ELO verification action", () => {
     });
     expect(fixture.queries).toHaveLength(2);
     expect(fixture.queries[1]).toMatchObject({
-      kind: "select",
       columns: "relic_elo_last_attempt_at",
       filters: [
         ["id", PLAYER_ID],
@@ -414,7 +435,7 @@ describe("profile Relic ELO verification action", () => {
       ],
     });
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
-    expect(fixture.updatePayloads).toHaveLength(0);
+    expect(fixture.savePayloads).toHaveLength(0);
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
@@ -432,9 +453,9 @@ describe("profile Relic ELO verification action", () => {
       "cooldown",
       "success",
     ]);
-    expect(fixture.rpc).toHaveBeenCalledTimes(2);
+    expect(fixture.rpc).toHaveBeenCalledTimes(3);
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
-    expect(fixture.updatePayloads).toHaveLength(1);
+    expect(fixture.savePayloads).toHaveLength(1);
   });
 
   it.each([
@@ -485,8 +506,9 @@ describe("profile Relic ELO verification action", () => {
         refreshAvailableAt: REFRESH_AVAILABLE_AT,
       });
       expect(JSON.stringify(result)).not.toContain(relicStatus);
-      expect(fixture.updatePayloads).toHaveLength(0);
+      expect(fixture.savePayloads).toHaveLength(0);
       expect(fixture.getPlayer()).toMatchObject({
+        current_elo: originalPlayer.current_elo,
         relic_verified_elo: originalPlayer.relic_verified_elo,
         relic_verified_faction: originalPlayer.relic_verified_faction,
         relic_verified_division: originalPlayer.relic_verified_division,
@@ -503,7 +525,7 @@ describe("profile Relic ELO verification action", () => {
     const originalPlayer = createVerifiedPlayer();
     const fixture = createVerificationClient({
       player: originalPlayer,
-      conflictOnUpdate: true,
+      conflictOnSave: true,
     });
     createSupabaseAdminClientMock.mockReturnValue(fixture.client);
     getRelic1v1EloMock.mockResolvedValue(ratedResult());
@@ -514,22 +536,50 @@ describe("profile Relic ELO verification action", () => {
       status: "error",
       refreshAvailableAt: REFRESH_AVAILABLE_AT,
     });
-    const saveQuery = fixture.queries.find(
-      (query) => query.kind === "update"
-    );
-    expect(saveQuery?.filters).toEqual([
-      ["id", PLAYER_ID],
-      ["clerk_user_id", CLERK_USER_ID],
-      ["steam_id64", STEAM_ID64],
-      ["relic_elo_last_attempt_at", CLAIMED_AT],
+    expect(fixture.savePayloads).toEqual([
+      expect.objectContaining({
+        p_player_id: PLAYER_ID,
+        p_clerk_user_id: CLERK_USER_ID,
+        p_steam_id64: STEAM_ID64,
+        p_claimed_at: CLAIMED_AT,
+      }),
     ]);
     expect(fixture.getPlayer()).toMatchObject({
+      current_elo: originalPlayer.current_elo,
       relic_verified_elo: originalPlayer.relic_verified_elo,
       relic_verified_faction: originalPlayer.relic_verified_faction,
       relic_verified_division: originalPlayer.relic_verified_division,
       relic_elo_calculation_version:
         originalPlayer.relic_elo_calculation_version,
       relic_elo_verified_at: originalPlayer.relic_elo_verified_at,
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves all six successful values when the finalize RPC fails", async () => {
+    const originalPlayer = createVerifiedPlayer();
+    const fixture = createVerificationClient({
+      player: originalPlayer,
+      saveError: true,
+    });
+    createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+    getRelic1v1EloMock.mockResolvedValue(ratedResult());
+
+    const result = await verifyRelicProfileElo();
+
+    expect(result).toMatchObject({
+      status: "error",
+      refreshAvailableAt: REFRESH_AVAILABLE_AT,
+    });
+    expect(fixture.getPlayer()).toMatchObject({
+      current_elo: originalPlayer.current_elo,
+      relic_verified_elo: originalPlayer.relic_verified_elo,
+      relic_verified_faction: originalPlayer.relic_verified_faction,
+      relic_verified_division: originalPlayer.relic_verified_division,
+      relic_elo_calculation_version:
+        originalPlayer.relic_elo_calculation_version,
+      relic_elo_verified_at: originalPlayer.relic_elo_verified_at,
+      relic_elo_last_attempt_at: CLAIMED_AT,
     });
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
@@ -542,7 +592,7 @@ describe("profile Relic ELO verification action", () => {
 
     expect(result).toMatchObject({ status: "error" });
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
-    expect(fixture.updatePayloads).toHaveLength(0);
+    expect(fixture.savePayloads).toHaveLength(0);
   });
 
   it("maps a thrown database lookup to a safe result without logging details", async () => {
@@ -587,7 +637,7 @@ describe("profile Relic ELO verification action", () => {
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
       rawMarker
     );
-    expect(fixture.updatePayloads).toHaveLength(0);
+    expect(fixture.savePayloads).toHaveLength(0);
   });
 
   it("rejects a claim that does not contain exactly one timestamp row", async () => {

@@ -27,11 +27,9 @@ export type PlayerProfileCompletionData = Pick<
   | "in_game_name"
   | "discord_username"
   | "steam_username"
-  | "coh3_player_card_url"
   | "country"
   | "region"
   | "timezone"
-  | "current_elo"
 >;
 
 export function isPlayerProfileComplete(
@@ -48,10 +46,7 @@ export function isPlayerProfileComplete(
       hasText(profile.steam_username) &&
       hasText(profile.country) &&
       hasText(profile.region) &&
-      hasText(profile.timezone) &&
-      Number.isInteger(profile.current_elo) &&
-      Number(profile.current_elo) >= 0 &&
-      Number(profile.current_elo) <= 5000
+      hasText(profile.timezone)
   );
 }
 
@@ -59,10 +54,8 @@ export function isPlayerProfileTournamentReady(
   profile: Partial<PlayerProfileCompletionData> | null | undefined,
   eloVerificationEnabled: boolean
 ) {
-  return Boolean(
-    isPlayerProfileComplete(profile) &&
-      (!eloVerificationEnabled || hasText(profile?.coh3_player_card_url))
-  );
+  void eloVerificationEnabled;
+  return isPlayerProfileComplete(profile);
 }
 
 function hasText(value: string | null | undefined) {
@@ -75,11 +68,9 @@ export type ProfileField =
   | "inGameName"
   | "discordUsername"
   | "steamUsername"
-  | "coh3PlayerCardUrl"
   | "country"
   | "region"
   | "timezone"
-  | "currentElo"
   | "bio";
 
 export type ProfileActionState = {

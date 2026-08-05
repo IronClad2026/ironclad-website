@@ -217,6 +217,7 @@ describe("public leaderboard projection", () => {
         scope: "season",
         playerId: "player-1",
         rank: 1,
+        currentElo: 1500,
         avatarUrl: "/players/player-1/avatar",
       },
     ]);
@@ -225,6 +226,7 @@ describe("public leaderboard projection", () => {
         scope: "all_time",
         playerId: "player-1",
         rank: 1,
+        currentElo: 1500,
         avatarUrl: "/players/player-1/avatar",
       },
     ]);
