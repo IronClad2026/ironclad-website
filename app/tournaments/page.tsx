@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import TournamentsExperience from "@/components/TournamentsExperience";
 import { loadMatchResultData } from "@/lib/match-result-data";
-import { getEloVerificationSetting } from "@/lib/platform-settings";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   getGeneratedBracketRegistrationIds,
@@ -17,6 +16,18 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type RelicVerifiedDivision = "Academy" | "Challenge" | "Main / Pro";
+
+function normalizeRelicVerifiedDivision(
+  value: unknown
+): RelicVerifiedDivision | null {
+  return value === "Academy" ||
+    value === "Challenge" ||
+    value === "Main / Pro"
+    ? value
+    : null;
+}
+
 export default async function TournamentsPage() {
   const { userId, sessionClaims } = await auth();
   const isAdmin =
@@ -26,12 +37,19 @@ export default async function TournamentsPage() {
       } | null
     )?.metadata?.role === "admin";
   const supabase = createSupabaseAdminClient();
+  const viewerDivisionRequest = userId
+    ? supabase
+        .from("players")
+        .select("relic_verified_division")
+        .eq("clerk_user_id", userId)
+        .maybeSingle()
+    : Promise.resolve({ data: null, error: null });
   const [
     tournamentResult,
     capacityResult,
     registrationResult,
     generatedBracketResult,
-    eloVerificationSetting,
+    viewerDivisionResult,
   ] = await Promise.all([
     supabase
       .from("tournaments")
@@ -43,15 +61,29 @@ export default async function TournamentsPage() {
     supabase
       .from("registrations")
       .select(
-        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, registration_status, admin_notes, created_at"
+        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, elo_verified_elo, elo_verification_source, registration_status, admin_notes, created_at"
       )
       .not("tournament_id", "is", null)
       .not("tournament_bracket_id", "is", null),
     loadGeneratedBracketPageRows({
       includeAdminAudit: isAdmin,
     }),
-    getEloVerificationSetting(),
+    viewerDivisionRequest,
   ]);
+
+  if (viewerDivisionResult.error) {
+    console.error("Tournament verified division load failed.");
+  }
+
+  const relicVerifiedDivision = viewerDivisionResult.error
+    ? null
+    : normalizeRelicVerifiedDivision(
+        (
+          viewerDivisionResult.data as {
+            relic_verified_division?: unknown;
+          } | null
+        )?.relic_verified_division
+      );
 
   if (tournamentResult.error) {
     console.error(
@@ -89,6 +121,8 @@ export default async function TournamentsPage() {
     player_name: string;
     country: string | null;
     submitted_elo: number | null;
+    elo_verified_elo: number | null;
+    elo_verification_source: string | null;
     registration_status:
       | "pending"
       | "manual_review"
@@ -210,7 +244,12 @@ export default async function TournamentsPage() {
       registrationId: registration.id,
       name: player?.in_game_name || registration.player_name,
       country: player?.country || registration.country || "N/A",
-      elo: player?.current_elo ?? registration.submitted_elo ?? 0,
+      elo:
+        registration.elo_verification_source === "relic"
+          ? (registration.elo_verified_elo ??
+            registration.submitted_elo ??
+            0)
+          : (player?.current_elo ?? registration.submitted_elo ?? 0),
       status: registration.registration_status,
       bracketId: registration.tournament_bracket_id,
       bracketName:
@@ -277,13 +316,14 @@ export default async function TournamentsPage() {
     <TournamentsExperience
       tournaments={tournaments}
       viewer={{
-                isAdmin,
+        isAdmin,
+        relicVerifiedDivision,
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
       }}
       matchResultSubmissions={matchResultData.submissions}
       matchResultReportGroups={matchResultData.reportGroups}
-      eloVerificationEnabled={eloVerificationSetting.enabled}
+      eloVerificationEnabled={true}
     />
   );
 }

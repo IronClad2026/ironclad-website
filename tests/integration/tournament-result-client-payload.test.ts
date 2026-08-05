@@ -219,6 +219,7 @@ const clientPropsShape = {
     viewer: {
       object: {
         isAdmin: "value",
+        relicVerifiedDivision: "value",
         registrationIds: { array: "value" },
         registrations: { array: viewerRegistrationShape },
       },
@@ -234,7 +235,9 @@ type QueryResult = {
   error: { message: string } | null;
 };
 type Query = PromiseLike<QueryResult> & {
+  eq: (...args: unknown[]) => Query;
   in: (...args: unknown[]) => Query;
+  maybeSingle: () => Promise<QueryResult>;
   not: (...args: unknown[]) => Query;
   order: (...args: unknown[]) => Query;
   select: (...args: unknown[]) => Query;
@@ -242,15 +245,21 @@ type Query = PromiseLike<QueryResult> & {
 
 function createQuery(result: QueryResult) {
   const query = {} as Query;
-  for (const method of ["in", "not", "order", "select"] as const) {
+  for (const method of ["eq", "in", "not", "order", "select"] as const) {
     query[method] = vi.fn(() => query);
   }
+  query.maybeSingle = vi.fn(async () => result);
   query.then = (resolve, reject) =>
     Promise.resolve(result).then(resolve, reject);
   return query;
 }
 
-function createPageClient(viewerClerkUserId: string) {
+function createPageClient(
+  viewerClerkUserId: string,
+  verifiedDivision: unknown = "Challenge",
+  verifiedDivisionError: QueryResult["error"] = null,
+  participantCurrentElo = 1500
+) {
   const rawTournament = {
     id: TOURNAMENT_ID,
     slug: "synthetic-tournament",
@@ -296,14 +305,27 @@ function createPageClient(viewerClerkUserId: string) {
     clerk_user_id: registration.clerk_user_id,
     in_game_name: registration.player_name,
     country: registration.country,
-    current_elo: registration.submitted_elo,
+    current_elo: participantCurrentElo,
   }));
   const results: Record<string, QueryResult> = {
     tournaments: { data: [rawTournament], error: null },
     registrations: { data: registrations, error: null },
     players: { data: players, error: null },
   };
+  const viewerDivisionQuery = createQuery({
+    data: { relic_verified_division: verifiedDivision },
+    error: verifiedDivisionError,
+  });
+  const participantPlayersQuery = createQuery(results.players);
+  let playerQueryCount = 0;
   const from = vi.fn((table: string) => {
+    if (table === "players") {
+      playerQueryCount += 1;
+      return playerQueryCount === 1
+        ? viewerDivisionQuery
+        : participantPlayersQuery;
+    }
+
     const result = results[table];
 
     if (!result) {
@@ -315,6 +337,7 @@ function createPageClient(viewerClerkUserId: string) {
 
   return {
     from,
+    participantPlayersQuery,
     rpc: vi.fn(async () => ({
       data: [
         {
@@ -325,22 +348,33 @@ function createPageClient(viewerClerkUserId: string) {
       ],
       error: null,
     })),
+    viewerDivisionQuery,
   };
 }
 
 async function loadClientProps({
   admin,
+  participantCurrentElo,
+  verifiedDivision,
+  verifiedDivisionError,
 }: {
   admin: boolean;
+  participantCurrentElo?: number;
+  verifiedDivision?: unknown;
+  verifiedDivisionError?: QueryResult["error"];
 }) {
   const viewerClerkUserId = admin ? SECRET_ADMIN_ID : SECRET_PLAYER_ID;
   authMock.mockResolvedValue({
     ...(admin ? adminIdentity : playerIdentity),
     userId: viewerClerkUserId,
   });
-  createSupabaseAdminClientMock.mockReturnValue(
-    createPageClient(viewerClerkUserId)
+  const client = createPageClient(
+    viewerClerkUserId,
+    verifiedDivision,
+    verifiedDivisionError,
+    participantCurrentElo
   );
+  createSupabaseAdminClientMock.mockReturnValue(client);
 
   const element = await TournamentsPage();
   expect(isValidElement(element)).toBe(true);
@@ -349,7 +383,10 @@ async function loadClientProps({
     throw new Error("TournamentsPage did not return a React element.");
   }
 
-  return element.props as Record<string, unknown>;
+  return {
+    client,
+    props: element.props as Record<string, unknown>,
+  };
 }
 
 describe("tournament Client Component result payload", () => {
@@ -412,7 +449,7 @@ describe("tournament Client Component result payload", () => {
   ])(
     "serializes only allowlisted same-origin result props for an %s",
     async (_name, admin) => {
-      const props = await loadClientProps({ admin });
+      const { props } = await loadClientProps({ admin });
 
       expectExactShape(props, clientPropsShape);
       expectNoSensitiveBrowserData(props, [
@@ -437,4 +474,71 @@ describe("tournament Client Component result payload", () => {
       expect(loadMatchResultDataMock).toHaveBeenCalledOnce();
     }
   );
+
+  it("loads only the authenticated player's private verified division", async () => {
+    const { client, props } = await loadClientProps({
+      admin: false,
+      participantCurrentElo: 500,
+      verifiedDivision: "Main / Pro",
+    });
+    const viewer = props.viewer as {
+      relicVerifiedDivision: string | null;
+    };
+
+    expect(client.viewerDivisionQuery.select).toHaveBeenCalledWith(
+      "relic_verified_division"
+    );
+    expect(client.viewerDivisionQuery.eq).toHaveBeenCalledWith(
+      "clerk_user_id",
+      SECRET_PLAYER_ID
+    );
+    expect(client.viewerDivisionQuery.maybeSingle).toHaveBeenCalledOnce();
+    expect(viewer.relicVerifiedDivision).toBe("Main / Pro");
+  });
+
+  it.each([
+    ["Academy", "Academy"],
+    ["Challenge", "Challenge"],
+    ["Main / Pro", "Main / Pro"],
+    ["Main", null],
+    ["", null],
+    [null, null],
+  ])(
+    "normalizes the private verified division %j to %j",
+    async (verifiedDivision, expected) => {
+      const { props } = await loadClientProps({
+        admin: false,
+        verifiedDivision,
+      });
+      const viewer = props.viewer as {
+        relicVerifiedDivision: string | null;
+      };
+
+      expect(viewer.relicVerifiedDivision).toBe(expected);
+    }
+  );
+
+  it("returns a safe null division when the private lookup fails", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const { props } = await loadClientProps({
+      admin: false,
+      verifiedDivision: "Challenge",
+      verifiedDivisionError: {
+        message: `${SECRET_PLAYER_ID} private database detail`,
+      },
+    });
+    const viewer = props.viewer as {
+      relicVerifiedDivision: string | null;
+    };
+
+    expect(viewer.relicVerifiedDivision).toBeNull();
+    expect(consoleError).toHaveBeenCalledWith(
+      "Tournament verified division load failed."
+    );
+    expect(serializePrivacyValue(consoleError.mock.calls)).not.toContain(
+      SECRET_PLAYER_ID
+    );
+  });
 });

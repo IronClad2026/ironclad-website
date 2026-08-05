@@ -17,15 +17,8 @@ import MatchResultControls, {
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
-import {
-  getEligibleBracketNames,
-  isEligibleForBracket,
-} from "@/lib/tournaments";
-import { isValidCoh3StatsProfileUrl } from "@/lib/coh3-stats-profile";
-import {
-  isPlayerProfileComplete,
-  type PlayerProfile,
-} from "@/lib/player-profile";
+import type { PlayerProfile } from "@/lib/player-profile";
+import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 import type {
   GeneratedTournamentBracket,
   GeneratedTournamentMatch,
@@ -2223,6 +2216,35 @@ type RegistrationStep =
   | "agreements"
   | "submitted";
 
+export type RelicVerifiedDivision =
+  | "Academy"
+  | "Challenge"
+  | "Main / Pro";
+
+const MISSING_VERIFIED_DIVISION_MESSAGE =
+  "Verify your ELO from the Profile page before registering.";
+
+export function getVerifiedDivisionBracketName(
+  verifiedDivision: RelicVerifiedDivision | null
+) {
+  if (!verifiedDivision) {
+    return "";
+  }
+
+  return getTournamentBracketDisplayName(
+    verifiedDivision === "Main / Pro" ? "Main" : verifiedDivision
+  );
+}
+
+export function isVerifiedDivisionBracket(
+  bracketName: string,
+  verifiedDivision: RelicVerifiedDivision | null
+) {
+  const verifiedBracketName =
+    getVerifiedDivisionBracketName(verifiedDivision);
+  return verifiedBracketName.length > 0 && bracketName === verifiedBracketName;
+}
+
 type RegistrationFormState = {
   tournamentTitle: string;
   bracketName: string;
@@ -2233,61 +2255,57 @@ type RegistrationFormState = {
 };
 
 type RegistrationErrors = Partial<
-  Record<keyof RegistrationFormState | "agreements" | "coh3ProfileUrl", string>
+  Record<keyof RegistrationFormState | "agreements", string>
 >;
 
-function RegisterModal({
+type RegistrationPlayerProfile = Pick<
+  PlayerProfile,
+  | "display_name"
+  | "in_game_name"
+  | "discord_username"
+  | "steam_username"
+  | "country"
+  | "region"
+  | "timezone"
+  | "profile_completed"
+>;
+
+export function RegisterModal({
   onClose,
   profile,
   tournaments,
   initialTournamentId,
-  eloVerificationEnabled,
+  verifiedDivision,
 }: {
   onClose: () => void;
-  profile: PlayerProfile;
+  profile: RegistrationPlayerProfile;
   tournaments: TournamentCard[];
   initialTournamentId: string;
-  eloVerificationEnabled: boolean;
+  verifiedDivision: RelicVerifiedDivision | null;
 }) {
+  const router = useRouter();
   const initialTournament =
     tournaments.find((tournament) => tournament.id === initialTournamentId) ??
     tournaments[0];
-  const currentElo = Number(profile.current_elo);
-  const getDefaultBracket = (tournament: TournamentCard) =>
-    tournament.brackets.find(
-      (bracket) =>
-        !bracket.isWaitlistOnly &&
-        isEligibleForBracket(currentElo, bracket.requirement)
-    )?.name ??
-    tournament.brackets.find((bracket) =>
-      isEligibleForBracket(currentElo, bracket.requirement)
-    )?.name ??
-    "";
+  const getVerifiedBracket = (tournament: TournamentCard) => {
+    const verifiedBracketName =
+      getVerifiedDivisionBracketName(verifiedDivision);
+    return tournament.brackets.some(
+      (bracket) => bracket.name === verifiedBracketName
+    )
+      ? verifiedBracketName
+      : "";
+  };
   const [step, setStep] = useState<RegistrationStep>("tournament");
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
-  const [submissionErrorSupportUrl, setSubmissionErrorSupportUrl] = useState<
-    string | null
-  >(null);
   const [successMessage, setSuccessMessage] = useState("Registration submitted.");
-  const [coh3ProfileUrl, setCoh3ProfileUrl] = useState(
-    profile.coh3_player_card_url ?? ""
-  );
   const [selectedTournament, setSelectedTournament] =
     useState<TournamentCard>(initialTournament);
-  const savedCoh3ProfileUrlIsValid = isValidCoh3StatsProfileUrl(
-    profile.coh3_player_card_url
-  );
-  const needsCoh3ProfileUrlInput =
-    eloVerificationEnabled && !savedCoh3ProfileUrlIsValid;
-  const eligibleBracketNames = getEligibleBracketNames(
-    currentElo,
-    selectedTournament.brackets
-  );
   const [form, setForm] = useState<RegistrationFormState>({
     tournamentTitle: initialTournament.title,
-    bracketName: getDefaultBracket(initialTournament),
+    bracketName: getVerifiedBracket(initialTournament),
     rulebookAgreement: false,
     playerParticipationAgreement: false,
     adminFinalDecisionAgreement: false,
@@ -2299,9 +2317,12 @@ function RegisterModal({
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const updateCoh3ProfileUrl = (value: string) => {
-    setCoh3ProfileUrl(value);
-    setErrors((current) => ({ ...current, coh3ProfileUrl: undefined }));
+  const selectBracket = (bracketName: string) => {
+    if (!isVerifiedDivisionBracket(bracketName, verifiedDivision)) {
+      return;
+    }
+
+    updateField("bracketName", bracketName);
   };
 
   const selectTournament = (event: TournamentCard) => {
@@ -2309,7 +2330,7 @@ function RegisterModal({
     setForm((current) => ({
       ...current,
       tournamentTitle: event.title,
-      bracketName: getDefaultBracket(event),
+      bracketName: getVerifiedBracket(event),
     }));
     setErrors((current) => ({ ...current, tournamentTitle: undefined, bracketName: undefined }));
   };
@@ -2329,21 +2350,15 @@ function RegisterModal({
         (bracket) => bracket.name === form.bracketName
       );
 
-      if (!form.bracketName.trim() || !selectedBracket) {
-        nextErrors.bracketName = "Please select a bracket or event type.";
+      if (!verifiedDivision) {
+        nextErrors.bracketName = MISSING_VERIFIED_DIVISION_MESSAGE;
       } else if (
-        !isEligibleForBracket(currentElo, selectedBracket.requirement)
+        !form.bracketName.trim() ||
+        !selectedBracket ||
+        !isVerifiedDivisionBracket(form.bracketName, verifiedDivision)
       ) {
-        nextErrors.bracketName = `Your saved ELO of ${currentElo} does not satisfy this bracket requirement: ${selectedBracket.requirement}.`;
-      }
-    }
-
-    if (targetStep === "profile" && needsCoh3ProfileUrlInput) {
-      if (!coh3ProfileUrl.trim()) {
-        nextErrors.coh3ProfileUrl =
-          "Please enter a valid coh3stats profile URL.";
-      } else if (!isValidCoh3StatsProfileUrl(coh3ProfileUrl)) {
-        nextErrors.coh3ProfileUrl = "Please enter a valid coh3stats profile URL.";
+        nextErrors.bracketName =
+          "Your verified division is not available for this tournament.";
       }
     }
 
@@ -2386,7 +2401,11 @@ function RegisterModal({
       setSubmissionError(
         "This tournament is full or already in progress. We hope to see you in the next one."
       );
-      setSubmissionErrorSupportUrl(null);
+      setStep("tournament");
+      return;
+    }
+
+    if (!validateStep("tournament")) {
       setStep("tournament");
       return;
     }
@@ -2402,7 +2421,6 @@ function RegisterModal({
 
     setIsSubmitting(true);
     setSubmissionError("");
-    setSubmissionErrorSupportUrl(null);
 
     const result = await submitTournamentRegistration({
       tournamentId: selectedTournament.id,
@@ -2416,20 +2434,16 @@ function RegisterModal({
       playerParticipationAgreement: form.playerParticipationAgreement,
       adminFinalDecisionAgreement: form.adminFinalDecisionAgreement,
       ownershipConfirmation: form.ownershipConfirmation,
-      coh3PlayerCardUrl: needsCoh3ProfileUrlInput
-        ? coh3ProfileUrl.trim()
-        : undefined,
     });
 
     setIsSubmitting(false);
 
     if (!result.success) {
       setSubmissionError(result.message);
-      setSubmissionErrorSupportUrl(result.supportUrl ?? null);
       return;
     }
 
-    setSubmissionErrorSupportUrl(null);
+    router.refresh();
     setStep("submitted");
     setSuccessMessage(result.message);
   };
@@ -2441,6 +2455,9 @@ function RegisterModal({
     "submitted",
   ];
   const currentStepNumber = Math.max(1, steps.indexOf(step) + 1);
+  const verifiedBracketAvailable = selectedTournament.brackets.some((bracket) =>
+    isVerifiedDivisionBracket(bracket.name, verifiedDivision)
+  );
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 px-4 py-6">
@@ -2515,28 +2532,45 @@ function RegisterModal({
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {selectedTournament.brackets.map((bracket) => {
-                    const selected = form.bracketName === bracket.name;
-                    const eligible = isEligibleForBracket(
-                      currentElo,
-                      bracket.requirement
+                    const selectable = isVerifiedDivisionBracket(
+                      bracket.name,
+                      verifiedDivision
                     );
+                    const selected = form.bracketName === bracket.name;
                     return (
                       <button
+                        type="button"
                         key={bracket.name}
-                        disabled={!eligible}
-                        onClick={() => updateField("bracketName", bracket.name)}
+                        disabled={!selectable}
+                        aria-disabled={!selectable}
+                        aria-pressed={selected}
+                        onClick={() => selectBracket(bracket.name)}
                         className={classNames(
-                          "border p-4 text-left shadow-xl shadow-black/20 transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100",
-                          selected
+                          "border p-4 text-left shadow-xl shadow-black/20 transition-all duration-300 hover:scale-[1.02]",
+                          !selectable
+                            ? "cursor-not-allowed border-zinc-800 bg-zinc-950/70 opacity-45 grayscale hover:scale-100"
+                            : selected
                             ? "border-orange-500 bg-orange-500/10"
                             : "border-white/12 bg-black/45 hover:border-orange-500/70"
                         )}
                       >
-                        <p className="break-words font-black text-white">{bracket.name}</p>
+                        <p
+                          className={classNames(
+                            "break-words font-black",
+                            selectable ? "text-white" : "text-zinc-500"
+                          )}
+                        >
+                          {bracket.name}
+                        </p>
                         <p className="mt-1 break-words text-xs text-zinc-400">
                           {bracket.requirement} - {bracket.registeredPlayers} approved - {bracket.maxPlayers}
                         </p>
-                        <p className="mt-2 break-words text-sm font-bold text-orange-300">
+                        <p
+                          className={classNames(
+                            "mt-2 break-words text-sm font-bold",
+                            selectable ? "text-orange-300" : "text-zinc-600"
+                          )}
+                        >
                           {bracket.isWaitlistOnly
                             ? bracket.isFull
                               ? "Approved roster full - waitlist only"
@@ -2548,28 +2582,50 @@ function RegisterModal({
                             Waitlist Only
                           </p>
                         )}
-                        {!eligible && (
-                          <p className="mt-2 text-xs font-black uppercase tracking-wider text-amber-300">
-                            Requires {bracket.requirement}
-                          </p>
-                        )}
+                        <p
+                          className={classNames(
+                            "mt-2 text-xs font-black uppercase tracking-wider",
+                            selectable ? "text-emerald-300" : "text-zinc-600"
+                          )}
+                        >
+                          {selectable
+                            ? "Your verified division"
+                            : "Unavailable for your verified division"}
+                        </p>
                       </button>
                     );
                   })}
                 </div>
-                <p className="mt-3 text-sm text-zinc-400">
-                  Your saved ELO is {currentElo}. You are eligible for the{" "}
-                  <span className="font-bold text-orange-300">
-                    {eligibleBracketNames.length > 0
-                      ? eligibleBracketNames.join(" or ")
-                      : "no configured bracket"}
-                  </span>
-                  .
+                {!verifiedDivision && (
+                  <div
+                    role="alert"
+                    className="mt-4 border border-orange-500/40 bg-orange-500/10 p-4"
+                  >
+                    <p className="text-sm font-bold text-orange-200">
+                      {MISSING_VERIFIED_DIVISION_MESSAGE}
+                    </p>
+                    <Link
+                      href="/profile"
+                      className="mt-3 inline-flex text-sm font-bold text-orange-300 transition hover:text-orange-200"
+                    >
+                      Open Profile
+                    </Link>
+                  </div>
+                )}
+                <p className="mt-3 text-sm leading-6 text-zinc-400">
+                  Your verified profile division determines the selectable
+                  bracket. On submission, IronClad still performs one fresh
+                  Relic 1v1 ELO lookup, and the server accepts only the division
+                  that matches that fresh result.
                 </p>
                 {errors.bracketName && <FieldError message={errors.bracketName} />}
               </div>
 
-              <ModalButtons onClose={onClose} onNext={goToProfileStep} />
+              <ModalButtons
+                onClose={onClose}
+                onNext={goToProfileStep}
+                isDisabled={!verifiedBracketAvailable}
+              />
             </div>
           )}
 
@@ -2588,45 +2644,20 @@ function RegisterModal({
                 <RegistrationProfileValue label="Country" value={profile.country} />
                 <RegistrationProfileValue label="Region" value={profile.region} />
                 <RegistrationProfileValue label="Timezone" value={profile.timezone} />
-                <RegistrationProfileValue label="Current ELO" value={String(profile.current_elo)} />
-                {needsCoh3ProfileUrlInput ? (
-                  <label className="min-w-0 border border-orange-500/40 bg-orange-500/10 p-4 sm:col-span-2">
-                    <span className="text-xs font-black uppercase tracking-wider text-orange-300">
-                      COH3 Stats Profile URL
-                    </span>
-                    <span className="mt-2 block text-sm leading-6 text-zinc-200">
-                      Paste your COH3 Stats player profile URL. It will be used
-                      to verify your tournament ELO.
-                    </span>
-                    <input
-                      type="url"
-                      value={coh3ProfileUrl}
-                      onChange={(event) =>
-                        updateCoh3ProfileUrl(event.target.value)
-                      }
-                      required
-                      aria-invalid={Boolean(errors.coh3ProfileUrl)}
-                      className={classNames(
-                        "mt-3 w-full border bg-black/70 px-3 py-3 text-sm font-bold text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-300",
-                        errors.coh3ProfileUrl
-                          ? "border-orange-300"
-                          : "border-slate-700"
-                      )}
-                      placeholder="https://coh3stats.com/players/..."
-                    />
-                    <FieldError message={errors.coh3ProfileUrl} />
-                  </label>
-                ) : (
-                  <RegistrationProfileValue label="CoH3 Player Card" value={profile.coh3_player_card_url} className="sm:col-span-2" />
-                )}
+                <RegistrationProfileValue
+                  label="Intended Division"
+                  value={form.bracketName || "Not selected"}
+                />
               </div>
 
               <div className="border border-emerald-500/40 bg-emerald-950/25 p-4">
-                <p className="text-sm font-black uppercase tracking-wider text-emerald-300">Profile Complete</p>
+                <p className="text-sm font-black uppercase tracking-wider text-emerald-300">Fresh Relic 1v1 Verification</p>
                 <p className="mt-2 text-sm leading-6 text-zinc-200">
-                  {eloVerificationEnabled
-                    ? "Your saved profile identity and COH3 Stats profile URL will be attached to this registration. ELO verification will be handled in a later review phase."
-                    : "Your saved profile identity will be attached to this registration. ELO Verification Checker is disabled, so no COH3 Stats check is required."}
+                  Submitting securely loads your connected Steam identity and
+                  checks your current Relic 1v1 ELO. The server calculates your
+                  division, verifies it matches your intended division, and
+                  saves the tournament ELO snapshot. Saved profile ELO and
+                  earlier profile checks are not used for eligibility.
                 </p>
               </div>
 
@@ -2652,10 +2683,7 @@ function RegisterModal({
 
               {submissionError && (
                 <div className="whitespace-pre-line border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
-                  <RegistrationSubmissionError
-                    message={submissionError}
-                    supportUrl={submissionErrorSupportUrl}
-                  />
+                  {submissionError}
                 </div>
               )}
 
@@ -2684,39 +2712,6 @@ function FieldError({ message }: { message?: string }) {
   if (!message) return null;
 
   return <p className="mt-2 break-words text-xs font-bold text-orange-300">{message}</p>;
-}
-
-function RegistrationSubmissionError({
-  message,
-  supportUrl,
-}: {
-  message: string;
-  supportUrl: string | null;
-}) {
-  const marker = "Discord server:";
-
-  if (!supportUrl || !message.includes(marker)) {
-    return <>{message}</>;
-  }
-
-  const [beforeMarker] = message.split(marker);
-
-  return (
-    <>
-      <span>{beforeMarker.trimEnd()}</span>
-      <span className="mt-3 block">
-        {marker}{" "}
-        <a
-          href={supportUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="break-all text-orange-100 underline decoration-orange-300/70 underline-offset-4 transition hover:text-white"
-        >
-          {supportUrl}
-        </a>
-      </span>
-    </>
-  );
 }
 
 function RegistrationProfileValue({
@@ -2754,14 +2749,14 @@ function AgreementCheckbox({ label, checked, onChange, error }: { label: string;
   );
 }
 
-function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoading = false }: { onClose?: () => void; onBack?: () => void; onNext: () => void | Promise<void>; nextLabel?: string; isLoading?: boolean }) {
+function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoading = false, isDisabled = false }: { onClose?: () => void; onBack?: () => void; onNext: () => void | Promise<void>; nextLabel?: string; isLoading?: boolean; isDisabled?: boolean }) {
   return (
     <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-between">
       <div>
         {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Back</button>}
         {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Cancel</button>}
       </div>
-      <button disabled={isLoading} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? "Submitting..." : nextLabel}</button>
+      <button disabled={isLoading || isDisabled} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? "Submitting..." : nextLabel}</button>
     </div>
   );
 }
@@ -3875,6 +3870,7 @@ function RegistrationGatePrompt({
 
 type TournamentViewer = {
   isAdmin: boolean;
+  relicVerifiedDivision: RelicVerifiedDivision | null;
   registrationIds: string[];
   registrations: TournamentViewerRegistration[];
 };
@@ -3900,7 +3896,6 @@ export default function TournamentsExperience({
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
-  eloVerificationEnabled,
 }: {
   tournaments: TournamentCard[];
   viewer: TournamentViewer;
@@ -3933,7 +3928,7 @@ export default function TournamentsExperience({
   const mobileHeroStartRef = useRef<HTMLDivElement | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [registrationProfile, setRegistrationProfile] =
-    useState<PlayerProfile | null>(null);
+    useState<RegistrationPlayerProfile | null>(null);
   const [registrationGate, setRegistrationGate] =
     useState<RegistrationGate | null>(null);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
@@ -4095,31 +4090,37 @@ export default function TournamentsExperience({
       return;
     }
 
-    const { data, error } = await authenticatedSupabase
-      .from("players")
-      .select(
-        "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, created_at, updated_at"
-      )
-      .eq("clerk_user_id", userId)
-      .maybeSingle();
+    try {
+      const { data, error } = await authenticatedSupabase
+        .from("players")
+        .select(
+          "display_name, in_game_name, discord_username, steam_username, country, region, timezone, profile_completed"
+        )
+        .eq("clerk_user_id", userId)
+        .maybeSingle();
 
-    setIsCheckingProfile(false);
+      setIsCheckingProfile(false);
 
-    if (error) {
-      console.error("Tournament profile eligibility check failed:", error);
+      if (error) {
+        console.error("Tournament profile eligibility check failed.");
+        setRegistrationGate("error");
+        return;
+      }
+
+      const profile = (data ?? null) as RegistrationPlayerProfile | null;
+
+      if (!profile || profile.profile_completed !== true) {
+        setRegistrationGate("profile");
+        return;
+      }
+
+      setRegistrationProfile(profile);
+      setShowRegisterModal(true);
+    } catch {
+      setIsCheckingProfile(false);
+      console.error("Tournament profile eligibility check failed unexpectedly.");
       setRegistrationGate("error");
-      return;
     }
-
-    const profile = (data ?? null) as PlayerProfile | null;
-
-    if (!isPlayerProfileComplete(profile)) {
-      setRegistrationGate("profile");
-      return;
-    }
-
-    setRegistrationProfile(profile);
-    setShowRegisterModal(true);
   };
 
   return (
@@ -4203,7 +4204,7 @@ export default function TournamentsExperience({
           profile={registrationProfile}
           tournaments={tournaments}
           initialTournamentId={selectedTournament.id}
-          eloVerificationEnabled={eloVerificationEnabled}
+          verifiedDivision={viewer.relicVerifiedDivision}
           onClose={() => setShowRegisterModal(false)}
         />
       )}

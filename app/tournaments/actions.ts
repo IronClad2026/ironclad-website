@@ -3,28 +3,40 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
-  parseCoh3StatsProfileUrl,
-  type Coh3StatsProfileParseResult,
-} from "@/lib/coh3-stats-profile";
+  getIronCladDivision,
+  type IronCladDivision,
+} from "@/lib/elo-verification/divisions";
 import {
-  checkCoh3ProfileOwnership,
-  COH3_PROFILE_ALREADY_LINKED_MESSAGE,
-  isCoh3ProfileAlreadyLinkedError,
-} from "@/lib/coh3-profile-ownership";
-import { verifyRegistrationEloIdentity } from "@/lib/elo-verification/registration";
-import {
-  getEloVerificationSetting,
-  getEloVerificationSupportLinkSetting,
-} from "@/lib/platform-settings";
-import { isEligibleForBracket } from "@/lib/tournaments";
-import {
-  isPlayerProfileComplete,
-  isPlayerProfileTournamentReady,
-  type PlayerProfile,
-} from "@/lib/player-profile";
+  getRelic1v1Elo,
+  type RelicEloResult,
+} from "@/lib/elo-verification/relic";
 import { createInAppNotification } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
+
+const REGISTRATION_UNAVAILABLE_MESSAGE =
+  "This tournament is full or already in progress. We hope to see you in the next one.";
+const REGISTRATION_FAILED_MESSAGE =
+  "Registration could not be submitted. Please try again or contact an admin.";
+const DUPLICATE_REGISTRATION_MESSAGE =
+  "You are already registered for this tournament.";
+const WRONG_DIVISION_MESSAGE =
+  "Your ELO division has changed. Refresh your verified ELO from the Profile page and try again.";
+const PLAYER_SELECT = [
+  "id",
+  "clerk_user_id",
+  "in_game_name",
+  "steam_id64",
+  "profile_completed",
+].join(", ");
+const TOURNAMENT_SELECT = [
+  "id",
+  "title",
+  "status",
+  "registration_open_at",
+  "registration_close_at",
+  "registration_enabled",
+  "tournament_brackets!inner(id, name)",
+].join(", ");
 
 type TournamentRegistrationInput = {
   tournamentId: string;
@@ -35,166 +47,80 @@ type TournamentRegistrationInput = {
   playerParticipationAgreement: boolean;
   adminFinalDecisionAgreement: boolean;
   ownershipConfirmation: boolean;
-  coh3PlayerCardUrl?: string;
 };
 
 export type TournamentRegistrationResult = {
   success: boolean;
   message: string;
   requiresProfile?: boolean;
-  supportUrl?: string;
 };
 
-type AuthenticatedSupabaseClient = Awaited<
-  ReturnType<typeof createAuthenticatedSupabaseClient>
->;
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
-type RegistrationError = { code?: string; message: string };
+type RegistrationIdentity = {
+  id: string;
+  inGameName: string;
+  steamId64: string | null;
+  profileCompleted: boolean;
+};
+type RegistrationTournament = {
+  id: string;
+  title: string;
+  status: string;
+  registrationOpenAt: string | null;
+  registrationCloseAt: string | null;
+  registrationEnabled: boolean;
+  bracket: {
+    id: string;
+    name: string;
+    division: IronCladDivision;
+  };
+};
 type SavedRegistration = {
   id: string;
-  tournament_bracket_id: string | null;
-  registration_status: "pending" | "waitlisted" | string;
+  tournamentId: string;
+  tournamentBracketId: string;
+  registrationStatus: "pending" | "waitlisted";
+  submittedElo: number;
 };
-type SuccessfulEloVerification = Extract<
-  Awaited<ReturnType<typeof verifyRegistrationEloIdentity>>,
-  { ok: true }
->;
 
 export async function submitTournamentRegistration(
   input: TournamentRegistrationInput
 ): Promise<TournamentRegistrationResult> {
-  const { userId } = await auth();
+  let userId: string | null;
+
+  try {
+    ({ userId } = await auth());
+  } catch {
+    console.error("Tournament registration authentication failed.");
+    return failure("Your session could not be verified. Sign in again.");
+  }
 
   if (!userId) {
-    return {
-      success: false,
-      message: "Sign in before registering for a tournament.",
-    };
+    return failure("Sign in before registering for a tournament.");
   }
 
-  if (
-    !input.tournamentId.trim() ||
-    !input.bracketId.trim() ||
-    !input.tournamentTitle.trim() ||
-    !input.bracketName.trim() ||
-    !input.rulebookAgreement ||
-    !input.playerParticipationAgreement ||
-    !input.adminFinalDecisionAgreement ||
-    !input.ownershipConfirmation
-  ) {
-    return {
-      success: false,
-      message: "Complete the tournament selection and required agreements.",
-    };
-  }
-
-  const supabase = await createAuthenticatedSupabaseClient();
-  let tournamentTitle = input.tournamentTitle.trim();
-  let bracketName = input.bracketName.trim();
-  let tournamentId: string | null = null;
-  let tournamentBracketId: string | null = null;
-
-  const { data: tournament, error: tournamentError } = await supabase
-    .from("tournaments")
-    .select(
-      "id, title, status, format, registration_open_at, tournament_brackets!inner(id, name, elo_rules, max_players)"
-    )
-    .eq("id", input.tournamentId)
-    .eq("tournament_brackets.id", input.bracketId)
-    .maybeSingle();
-
-  if (tournamentError || !tournament) {
-    console.error(
-      "Tournament registration tournament lookup failed:",
-      tournamentError
+  if (!isValidRegistrationInput(input)) {
+    return failure(
+      "Complete the tournament selection and required agreements."
     );
-
-    return {
-      success: false,
-      message: "The selected tournament or bracket is no longer available.",
-    };
   }
 
-  const selectedBracket = tournament.tournament_brackets?.find(
-    (bracket) => bracket.id === input.bracketId
-  );
-  const now = Date.now();
-  const registrationOpens = getOptionalTimestamp(
-    tournament.registration_open_at
-  );
+  let supabase: SupabaseAdminClient;
 
-  if (
-    tournament.status !== "registration_open" ||
-    registrationOpens === "invalid" ||
-    (registrationOpens !== null && now < registrationOpens)
-  ) {
-    return {
-      success: false,
-      message:
-        "This tournament is full or already in progress. We hope to see you in the next one.",
-    };
+  try {
+    supabase = createSupabaseAdminClient();
+  } catch {
+    console.error("Tournament registration service configuration failed.");
+    return failure(REGISTRATION_FAILED_MESSAGE);
   }
 
-  if (!selectedBracket) {
-    return {
-      success: false,
-      message: "The selected bracket is no longer available.",
-    };
+  const identity = await loadRegistrationIdentity(supabase, userId);
+
+  if (identity.status === "error") {
+    return failure("IronClad could not verify your player profile.");
   }
 
-  const adminSupabase = createSupabaseAdminClient();
-  const { data: capacityRows, error: capacityError } = await adminSupabase
-    .from("registrations")
-    .select("registration_status")
-    .eq("tournament_bracket_id", selectedBracket.id)
-    .in("registration_status", ["approved", "waitlisted"]);
-
-  if (capacityError) {
-    console.error(
-      "Tournament registration capacity lookup failed:",
-      capacityError
-    );
-
-    return {
-      success: false,
-      message: "IronClad could not verify bracket capacity.",
-    };
-  }
-
-  const approvedCount = (capacityRows ?? []).filter(
-    (registration) => registration.registration_status === "approved"
-  ).length;
-  const waitlistedCount = (capacityRows ?? []).filter(
-    (registration) => registration.registration_status === "waitlisted"
-  ).length;
-  const waitlistOnly =
-    approvedCount >= selectedBracket.max_players || waitlistedCount > 0;
-
-  tournamentId = tournament.id;
-  tournamentBracketId = selectedBracket.id;
-  tournamentTitle = tournament.title;
-  bracketName = `${selectedBracket.name} Bracket`;
-
-  const { data, error: profileError } = await supabase
-    .from("players")
-    .select(
-      "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, coh3_profile_id, country, region, timezone, current_elo, avatar_url, bio, profile_completed, created_at, updated_at"
-    )
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("Tournament registration profile lookup failed:", profileError);
-
-    return {
-      success: false,
-      message: "IronClad could not verify your player profile.",
-    };
-  }
-
-  let profile = (data ?? null) as PlayerProfile | null;
-
-  if (!profile || !isPlayerProfileComplete(profile)) {
+  if (identity.status === "missing") {
     return {
       success: false,
       message: "Complete your player profile before registering.",
@@ -202,238 +128,151 @@ export async function submitTournamentRegistration(
     };
   }
 
-  const eloVerificationSetting = await getEloVerificationSetting();
-  const eloVerificationSupportLinkSetting = eloVerificationSetting.enabled
-    ? await getEloVerificationSupportLinkSetting()
-    : null;
-  const savedCoh3Profile = parseCoh3StatsProfileUrl(
-    profile.coh3_player_card_url
+  if (!identity.player.steamId64) {
+    return failure(
+      "Connect your Steam account before registering for a tournament."
+    );
+  }
+
+  const duplicateCheck = await hasExistingRegistration(
+    supabase,
+    userId,
+    input.tournamentId
   );
-  const submittedCoh3Profile = parseCoh3StatsProfileUrl(
-    input.coh3PlayerCardUrl
+
+  if (duplicateCheck === "error") {
+    return failure(REGISTRATION_FAILED_MESSAGE);
+  }
+
+  if (duplicateCheck) {
+    return failure(DUPLICATE_REGISTRATION_MESSAGE);
+  }
+
+  const tournamentResult = await loadRegistrationTournament(
+    supabase,
+    input.tournamentId,
+    input.bracketId
   );
-  const linkedCoh3ProfileId = profile.coh3_profile_id ?? null;
-  const effectiveCoh3Profile = eloVerificationSetting.enabled
-    ? getEffectiveCoh3Profile({
-        linkedProfileId: linkedCoh3ProfileId,
-        savedProfile: savedCoh3Profile,
-        submittedProfile: submittedCoh3Profile,
-      })
-    : null;
-  const effectiveCoh3ProfileUrl = eloVerificationSetting.enabled
-    ? effectiveCoh3Profile?.normalizedUrl ?? null
-    : profile.coh3_player_card_url;
-  const shouldSaveCanonicalCoh3ProfileUrl =
-    eloVerificationSetting.enabled &&
-    Boolean(effectiveCoh3ProfileUrl) &&
-    profile.coh3_player_card_url !== effectiveCoh3ProfileUrl;
-  const registrationProfile = {
-    ...profile,
-    coh3_player_card_url: effectiveCoh3ProfileUrl,
-  };
+
+  if (tournamentResult.status === "error") {
+    return failure(
+      "The selected tournament or bracket is no longer available."
+    );
+  }
+
+  if (tournamentResult.status === "missing") {
+    return failure(
+      "The selected tournament or bracket is no longer available."
+    );
+  }
+
+  const tournament = tournamentResult.tournament;
+
+  if (!isTournamentRegistrationOpen(tournament)) {
+    return failure(REGISTRATION_UNAVAILABLE_MESSAGE);
+  }
+
+  let relicResult: RelicEloResult;
+
+  try {
+    relicResult = await getRelic1v1Elo(identity.player.steamId64);
+  } catch {
+    console.error("Tournament registration Relic request failed unexpectedly.");
+    return failure(
+      "Relic is temporarily unavailable. Please try registering again later."
+    );
+  }
+
+  if (relicResult.status !== "rated") {
+    return mapRelicFailure(relicResult);
+  }
+
+  const calculatedDivision = getIronCladDivision(relicResult.elo);
 
   if (
-    !isPlayerProfileTournamentReady(
-      registrationProfile,
-      eloVerificationSetting.enabled
-    )
+    !calculatedDivision.ok ||
+    calculatedDivision.division !== relicResult.division ||
+    calculatedDivision.division !== tournament.bracket.division
   ) {
-    return {
-      success: false,
-      message: "Please enter a valid coh3stats profile URL.",
-    };
+    return failure(WRONG_DIVISION_MESSAGE);
   }
 
-  if (eloVerificationSetting.enabled && effectiveCoh3Profile) {
-    const ownershipCheck = await checkCoh3ProfileOwnership({
-      supabase: adminSupabase,
-      profileId: effectiveCoh3Profile.profileId,
-      playerId: profile.id,
-      linkedProfileId: linkedCoh3ProfileId,
-    });
+  let registrationResult: { data: unknown; error: unknown };
 
-    if (!ownershipCheck.ok) {
-      return {
-        success: false,
-        message: ownershipCheck.message,
-      };
-    }
-  }
-
-  const currentElo = Number(profile.current_elo);
-
-  if (!isEligibleForBracket(currentElo, selectedBracket.elo_rules)) {
-    return {
-      success: false,
-      message: `Your saved ELO of ${currentElo} does not satisfy the ${selectedBracket.name} Bracket requirement: ${selectedBracket.elo_rules}.`,
-    };
-  }
-
-  const verifiedEloResult = eloVerificationSetting.enabled
-    ? await verifyRegistrationEloIdentity({
-        ign: profile.in_game_name,
-        enteredElo: currentElo,
-        coh3statsProfileUrl: effectiveCoh3ProfileUrl,
-        mode: tournament.format,
-        supportUrl: eloVerificationSupportLinkSetting?.url,
-      })
-    : null;
-
-  if (verifiedEloResult && !verifiedEloResult.ok) {
-    return {
-      success: false,
-      message: verifiedEloResult.message,
-      supportUrl: verifiedEloResult.supportUrl,
-    };
-  }
-
-  const profileUpdates: {
-    coh3_player_card_url?: string;
-    coh3_profile_id?: string;
-    profile_completed?: boolean;
-  } = {};
-
-  if (shouldSaveCanonicalCoh3ProfileUrl && effectiveCoh3ProfileUrl) {
-    profileUpdates.coh3_player_card_url = effectiveCoh3ProfileUrl;
-  }
-
-  if (
-    eloVerificationSetting.enabled &&
-    verifiedEloResult?.ok &&
-    linkedCoh3ProfileId !== verifiedEloResult.profileId
-  ) {
-    profileUpdates.coh3_profile_id = verifiedEloResult.profileId;
-  }
-
-  if (!profile.profile_completed) {
-    profileUpdates.profile_completed = true;
-  }
-
-  if (Object.keys(profileUpdates).length > 0) {
-    const { error: profileUpdateError } = await adminSupabase
-      .from("players")
-      .update(profileUpdates)
-      .eq("id", profile.id)
-      .eq("clerk_user_id", userId);
-
-    if (profileUpdateError) {
-      console.error(
-        "Tournament registration profile update failed:",
-        profileUpdateError
-      );
-
-      if (isCoh3ProfileAlreadyLinkedError(profileUpdateError)) {
-        return {
-          success: false,
-          message: COH3_PROFILE_ALREADY_LINKED_MESSAGE,
-        };
+  try {
+    registrationResult = await supabase.rpc(
+      "submit_verified_player_registration",
+      {
+        p_profile_id: identity.player.id,
+        p_clerk_user_id: userId,
+        p_steam_id64: identity.player.steamId64,
+        p_tournament_id: tournament.id,
+        p_tournament_bracket_id: tournament.bracket.id,
+        p_relic_elo: relicResult.elo,
+        p_relic_faction: relicResult.faction,
+        p_relic_division: relicResult.division,
+        p_relic_calculation_version: relicResult.calculationVersion,
       }
-
-      return {
-        success: false,
-        message:
-          "IronClad could not update your player profile for registration.",
-      };
-    }
-
-    profile = {
-      ...profile,
-      ...profileUpdates,
-    };
+    );
+  } catch {
+    console.error("Tournament registration transaction failed unexpectedly.");
+    return failure(REGISTRATION_FAILED_MESSAGE);
   }
 
-  const registration = {
-    profile_id: profile.id,
-    player_name: profile.in_game_name,
-    discord_username: profile.discord_username,
-    steam_name: profile.steam_username,
-    country: profile.country,
-    region: profile.region,
-    timezone: profile.timezone,
-    submitted_elo: profile.current_elo,
-    registration_status: waitlistOnly ? "waitlisted" : "pending",
-    elo_status: "pending",
-    admin_notes: "",
-    tournament_title: tournamentTitle,
-    bracket_name: bracketName,
-    coh3_player_card_url: effectiveCoh3ProfileUrl,
-    clerk_user_id: userId,
-    tournament_id: tournamentId,
-    tournament_bracket_id: tournamentBracketId,
-  };
-
-  const registrationStatus = waitlistOnly ? "waitlisted" : "pending";
-  const savedRegistrationResult = eloVerificationSetting.enabled
-    ? await submitVerifiedRegistration({
-        adminSupabase,
-        profile,
-        userId,
-        tournamentId,
-        tournamentBracketId,
-        registrationStatus,
-        coh3ProfileUrl: effectiveCoh3ProfileUrl,
-        coh3ProfileId: verifiedEloResult?.profileId ?? null,
-        verifiedEloResult,
-      })
-    : await submitDefaultRegistration({
-        supabase,
-        registration,
-      });
-  const { data: savedRegistration, error: registrationError } =
-    savedRegistrationResult;
-
-  if (registrationError) {
-    console.error("IronClad registration submission failed:", registrationError);
-
-    return {
-      success: false,
-      message: getRegistrationErrorMessage(registrationError),
-    };
+  if (registrationResult.error) {
+    console.error("Tournament registration transaction failed.");
+    return failure(getRegistrationErrorMessage(registrationResult.error));
   }
+
+  const savedRegistration = parseSavedRegistration(
+    registrationResult.data,
+    tournament.id,
+    tournament.bracket.id,
+    relicResult.elo
+  );
 
   if (!savedRegistration) {
-    return {
-      success: false,
-      message:
-        "Registration could not be submitted. Please try again or contact an admin.",
-    };
+    console.error("Tournament registration transaction returned an invalid result.");
+    return failure(REGISTRATION_FAILED_MESSAGE);
   }
 
-  revalidatePath("/admin");
-  revalidatePath("/tournaments");
+  revalidateRegistrationPaths();
 
   const waitlistPosition =
-    savedRegistration?.registration_status === "waitlisted" &&
-    savedRegistration.tournament_bracket_id
+    savedRegistration.registrationStatus === "waitlisted"
       ? await loadWaitlistPosition(
-          adminSupabase,
-          savedRegistration.tournament_bracket_id,
+          supabase,
+          savedRegistration.tournamentBracketId,
           savedRegistration.id
         )
       : null;
 
-  await createInAppNotification({
-    recipientRole: "admin",
-    type: "registration.submitted",
-    title: "New Tournament Registration",
-    message: `${profile.in_game_name} registered for ${tournamentTitle}.`,
-    actorClerkUserId: userId,
-    actorDisplayName: profile.in_game_name,
-    tournamentId,
-    tournamentTitle,
-    registrationId: savedRegistration.id,
-    metadata: {
-      bracketId: tournamentBracketId,
-      bracketName,
-      registrationStatus: savedRegistration.registration_status,
-      waitlistPosition,
-    },
-  });
+  try {
+    await createInAppNotification({
+      recipientRole: "admin",
+      type: "registration.submitted",
+      title: "New Tournament Registration",
+      message: `${identity.player.inGameName} registered for ${tournament.title}.`,
+      actorClerkUserId: userId,
+      actorDisplayName: identity.player.inGameName,
+      tournamentId: tournament.id,
+      tournamentTitle: tournament.title,
+      registrationId: savedRegistration.id,
+      metadata: {
+        bracketId: savedRegistration.tournamentBracketId,
+        bracketName: tournament.bracket.name,
+        registrationStatus: savedRegistration.registrationStatus,
+        waitlistPosition,
+      },
+    });
+  } catch {
+    console.error("Tournament registration notification failed unexpectedly.");
+  }
 
   return {
     success: true,
     message:
-      savedRegistration.registration_status === "waitlisted"
+      savedRegistration.registrationStatus === "waitlisted"
         ? `Registration submitted to waitlist${
             waitlistPosition ? ` position #${waitlistPosition}` : ""
           }.`
@@ -441,230 +280,432 @@ export async function submitTournamentRegistration(
   };
 }
 
-function getOptionalTimestamp(value: string | null) {
-  if (!value) return null;
+async function loadRegistrationIdentity(
+  supabase: SupabaseAdminClient,
+  userId: string
+): Promise<
+  | { status: "loaded"; player: RegistrationIdentity }
+  | { status: "missing" }
+  | { status: "error" }
+> {
+  let result: { data: unknown; error: unknown };
 
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? timestamp : "invalid";
+  try {
+    result = await supabase
+      .from("players")
+      .select(PLAYER_SELECT)
+      .eq("clerk_user_id", userId)
+      .maybeSingle();
+  } catch {
+    console.error("Tournament registration player lookup failed unexpectedly.");
+    return { status: "error" };
+  }
+
+  if (result.error) {
+    console.error("Tournament registration player lookup failed.");
+    return { status: "error" };
+  }
+
+  const player = parseRegistrationIdentity(result.data, userId);
+
+  if (!player || !player.profileCompleted) {
+    return { status: "missing" };
+  }
+
+  return { status: "loaded", player };
 }
 
-function getEffectiveCoh3Profile({
-  linkedProfileId,
-  savedProfile,
-  submittedProfile,
-}: {
-  linkedProfileId: string | null;
-  savedProfile: Coh3StatsProfileParseResult | null;
-  submittedProfile: Coh3StatsProfileParseResult | null;
-}) {
+async function hasExistingRegistration(
+  supabase: SupabaseAdminClient,
+  userId: string,
+  tournamentId: string
+): Promise<boolean | "error"> {
+  let result: { data: unknown; error: unknown };
+
+  try {
+    result = await supabase
+      .from("registrations")
+      .select("id")
+      .eq("clerk_user_id", userId)
+      .eq("tournament_id", tournamentId)
+      .maybeSingle();
+  } catch {
+    console.error(
+      "Tournament registration duplicate check failed unexpectedly."
+    );
+    return "error";
+  }
+
+  if (result.error) {
+    console.error("Tournament registration duplicate check failed.");
+    return "error";
+  }
+
+  if (result.data === null) {
+    return false;
+  }
+
+  if (!isRecord(result.data) || !isUuid(result.data.id)) {
+    console.error("Tournament registration duplicate check was invalid.");
+    return "error";
+  }
+
+  return true;
+}
+
+async function loadRegistrationTournament(
+  supabase: SupabaseAdminClient,
+  tournamentId: string,
+  bracketId: string
+): Promise<
+  | { status: "loaded"; tournament: RegistrationTournament }
+  | { status: "missing" }
+  | { status: "error" }
+> {
+  let result: { data: unknown; error: unknown };
+
+  try {
+    result = await supabase
+      .from("tournaments")
+      .select(TOURNAMENT_SELECT)
+      .eq("id", tournamentId)
+      .eq("tournament_brackets.id", bracketId)
+      .maybeSingle();
+  } catch {
+    console.error("Tournament registration tournament lookup failed unexpectedly.");
+    return { status: "error" };
+  }
+
+  if (result.error) {
+    console.error("Tournament registration tournament lookup failed.");
+    return { status: "error" };
+  }
+
+  if (result.data === null) {
+    return { status: "missing" };
+  }
+
+  const tournament = parseRegistrationTournament(
+    result.data,
+    tournamentId,
+    bracketId
+  );
+
+  if (!tournament) {
+    console.error("Tournament registration tournament lookup was invalid.");
+    return { status: "error" };
+  }
+
+  return { status: "loaded", tournament };
+}
+
+async function loadWaitlistPosition(
+  supabase: SupabaseAdminClient,
+  tournamentBracketId: string,
+  registrationId: string
+) {
+  let result: { data: unknown; error: unknown };
+
+  try {
+    result = await supabase
+      .from("registrations")
+      .select("id")
+      .eq("tournament_bracket_id", tournamentBracketId)
+      .eq("registration_status", "waitlisted")
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+  } catch {
+    console.error("Tournament registration waitlist lookup failed unexpectedly.");
+    return null;
+  }
+
+  if (result.error || !Array.isArray(result.data)) {
+    console.error("Tournament registration waitlist lookup failed.");
+    return null;
+  }
+
+  const index = result.data.findIndex(
+    (registration) =>
+      isRecord(registration) && registration.id === registrationId
+  );
+  return index >= 0 ? index + 1 : null;
+}
+
+function isValidRegistrationInput(
+  value: unknown
+): value is TournamentRegistrationInput {
+  return Boolean(
+    isRecord(value) &&
+      isUuid(value.tournamentId) &&
+      isUuid(value.bracketId) &&
+      isBoundedText(value.tournamentTitle) &&
+      isBoundedText(value.bracketName) &&
+      value.rulebookAgreement === true &&
+      value.playerParticipationAgreement === true &&
+      value.adminFinalDecisionAgreement === true &&
+      value.ownershipConfirmation === true
+  );
+}
+
+function parseRegistrationIdentity(
+  value: unknown,
+  userId: string
+): RegistrationIdentity | null {
   if (
-    linkedProfileId &&
-    submittedProfile?.profileId === linkedProfileId &&
-    savedProfile?.profileId !== linkedProfileId
+    !isRecord(value) ||
+    !isUuid(value.id) ||
+    value.clerk_user_id !== userId ||
+    !isBoundedText(value.in_game_name) ||
+    typeof value.profile_completed !== "boolean" ||
+    !(
+      value.steam_id64 === null ||
+      (typeof value.steam_id64 === "string" &&
+        value.steam_id64.length > 0 &&
+        value.steam_id64.length <= 20)
+    )
   ) {
-    return submittedProfile;
+    return null;
   }
 
-  return savedProfile ?? submittedProfile;
+  return {
+    id: value.id,
+    inGameName: value.in_game_name,
+    steamId64: value.steam_id64,
+    profileCompleted: value.profile_completed,
+  };
 }
 
-function getRegistrationErrorMessage(error: {
-  code?: string;
-  message: string;
-}) {
-  const message = error.message.toLowerCase();
-
-  if (error.code === "23505") {
-    return "You are already registered for this tournament.";
+function parseRegistrationTournament(
+  value: unknown,
+  expectedTournamentId: string,
+  expectedBracketId: string
+): RegistrationTournament | null {
+  if (
+    !isRecord(value) ||
+    value.id !== expectedTournamentId ||
+    !isBoundedText(value.title) ||
+    typeof value.status !== "string" ||
+    !isNullableTimestamp(value.registration_open_at) ||
+    !isNullableTimestamp(value.registration_close_at) ||
+    typeof value.registration_enabled !== "boolean" ||
+    !Array.isArray(value.tournament_brackets)
+  ) {
+    return null;
   }
 
-  if (message.includes("full")) {
-    return "The selected bracket is full for approved players. Waitlist registration may still be available while registration is open.";
+  const bracket = value.tournament_brackets.find(
+    (candidate) => isRecord(candidate) && candidate.id === expectedBracketId
+  );
+
+  if (
+    !isRecord(bracket) ||
+    bracket.id !== expectedBracketId ||
+    typeof bracket.name !== "string"
+  ) {
+    return null;
+  }
+
+  const division = getBracketDivision(bracket.name);
+
+  if (!division) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    title: value.title,
+    status: value.status,
+    registrationOpenAt: value.registration_open_at,
+    registrationCloseAt: value.registration_close_at,
+    registrationEnabled: value.registration_enabled,
+    bracket: {
+      id: bracket.id,
+      name: bracket.name,
+      division,
+    },
+  };
+}
+
+function parseSavedRegistration(
+  value: unknown,
+  expectedTournamentId: string,
+  expectedBracketId: string,
+  expectedElo: number
+): SavedRegistration | null {
+  const candidate = Array.isArray(value)
+    ? value.length === 1
+      ? value[0]
+      : null
+    : value;
+
+  if (
+    !isRecord(candidate) ||
+    !isUuid(candidate.id) ||
+    candidate.tournament_id !== expectedTournamentId ||
+    candidate.tournament_bracket_id !== expectedBracketId ||
+    (candidate.registration_status !== "pending" &&
+      candidate.registration_status !== "waitlisted")
+  ) {
+    return null;
+  }
+
+  const submittedElo = parseSafeInteger(candidate.submitted_elo);
+
+  if (submittedElo === null || submittedElo !== expectedElo) {
+    return null;
+  }
+
+  return {
+    id: candidate.id,
+    tournamentId: candidate.tournament_id,
+    tournamentBracketId: candidate.tournament_bracket_id,
+    registrationStatus: candidate.registration_status,
+    submittedElo,
+  };
+}
+
+function isTournamentRegistrationOpen(tournament: RegistrationTournament) {
+  if (
+    tournament.status !== "registration_open" ||
+    !tournament.registrationEnabled
+  ) {
+    return false;
+  }
+
+  const now = Date.now();
+  const opensAt = parseTimestamp(tournament.registrationOpenAt);
+  const closesAt = parseTimestamp(tournament.registrationCloseAt);
+
+  return (
+    opensAt !== "invalid" &&
+    closesAt !== "invalid" &&
+    (opensAt === null || now >= opensAt) &&
+    (closesAt === null || now <= closesAt)
+  );
+}
+
+function getBracketDivision(name: string): IronCladDivision | null {
+  if (name === "Academy") return "Academy";
+  if (name === "Challenge") return "Challenge";
+  if (name === "Main") return "Main / Pro";
+  return null;
+}
+
+function mapRelicFailure(
+  result: Exclude<RelicEloResult, { status: "rated" }>
+): TournamentRegistrationResult {
+  switch (result.status) {
+    case "invalid_steam_input":
+      return failure("Your connected Steam identity could not be verified.");
+    case "profile_not_found":
+      return failure(
+        "No Company of Heroes 3 profile was found for your connected Steam account."
+      );
+    case "steam_identity_mismatch":
+      return failure("Relic could not confirm your connected game identity.");
+    case "unranked":
+      return failure("No rated 1v1 ELO is currently available.");
+    case "invalid_relic_response":
+    case "relic_integration_error":
+      return failure("ELO verification could not be completed right now.");
+    case "external_relic_unavailable":
+      return failure(
+        "Relic is temporarily unavailable. Please try registering again later."
+      );
+  }
+}
+
+function getRegistrationErrorMessage(error: unknown) {
+  const code = getErrorField(error, "code").toUpperCase();
+  const message = getErrorField(error, "message").toLowerCase();
+
+  if (code === "23505" || message.includes("already registered")) {
+    return DUPLICATE_REGISTRATION_MESSAGE;
+  }
+
+  if (message.includes("verified elo does not match")) {
+    return WRONG_DIVISION_MESSAGE;
+  }
+
+  if (
+    message.includes("registration is not available") ||
+    message.includes("roster is locked") ||
+    message.includes("bracket generation")
+  ) {
+    return REGISTRATION_UNAVAILABLE_MESSAGE;
   }
 
   if (message.includes("older waitlisted")) {
     return "This bracket already has a waitlist. New registrations are added behind existing queued players.";
   }
 
-  if (message.includes("registration is not available")) {
-    return "This tournament is full or already in progress. We hope to see you in the next one.";
+  if (message.includes("full")) {
+    return "The selected bracket cannot accept another registration right now.";
   }
 
-  if (message.includes("coh3stats profile is already linked")) {
-    return COH3_PROFILE_ALREADY_LINKED_MESSAGE;
-  }
-
-  if (
-    message.includes("does not satisfy") ||
-    message.includes("invalid elo rule")
-  ) {
-    return error.message;
-  }
-
-  return "Registration could not be submitted. Please try again or contact an admin.";
+  return REGISTRATION_FAILED_MESSAGE;
 }
 
-async function loadWaitlistPosition(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  tournamentBracketId: string,
-  registrationId: string
-) {
-  const { data, error } = await supabase
-    .from("registrations")
-    .select("id")
-    .eq("tournament_bracket_id", tournamentBracketId)
-    .eq("registration_status", "waitlisted")
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true });
-
-  if (error) {
-    console.error("Waitlist position lookup failed:", error);
-    return null;
-  }
-
-  const index = (data ?? []).findIndex(
-    (registration) => registration.id === registrationId
-  );
-  return index >= 0 ? index + 1 : null;
+function getErrorField(error: unknown, field: string) {
+  return isRecord(error) && typeof error[field] === "string"
+    ? error[field]
+    : "";
 }
 
-async function submitDefaultRegistration({
-  supabase,
-  registration,
-}: {
-  supabase: AuthenticatedSupabaseClient;
-  registration: Record<string, unknown>;
-}): Promise<{ data: SavedRegistration | null; error: RegistrationError | null }> {
-  const { data, error } = await supabase
-    .from("registrations")
-    .insert(registration)
-    .select("id, tournament_bracket_id, registration_status")
-    .single();
-
-  return {
-    data: (data ?? null) as SavedRegistration | null,
-    error,
-  };
+function failure(message: string): TournamentRegistrationResult {
+  return { success: false, message };
 }
 
-async function submitVerifiedRegistration({
-  adminSupabase,
-  profile,
-  userId,
-  tournamentId,
-  tournamentBracketId,
-  registrationStatus,
-  coh3ProfileUrl,
-  coh3ProfileId,
-  verifiedEloResult,
-}: {
-  adminSupabase: SupabaseAdminClient;
-  profile: PlayerProfile;
-  userId: string;
-  tournamentId: string | null;
-  tournamentBracketId: string | null;
-  registrationStatus: "pending" | "waitlisted";
-  coh3ProfileUrl: string | null;
-  coh3ProfileId: string | null;
-  verifiedEloResult: SuccessfulEloVerification | null;
-}): Promise<{ data: SavedRegistration | null; error: RegistrationError | null }> {
-  if (
-    !tournamentId ||
-    !tournamentBracketId ||
-    !coh3ProfileUrl ||
-    !coh3ProfileId ||
-    !verifiedEloResult
-  ) {
-    return {
-      data: null,
-      error: {
-        message: "Please enter a valid coh3stats profile URL.",
-      },
-    };
-  }
-
-  const { data, error } = await adminSupabase.rpc(
-    "submit_verified_player_registration",
-    {
-      p_profile_id: profile.id,
-      p_clerk_user_id: userId,
-      p_player_name: profile.in_game_name,
-      p_submitted_elo: profile.current_elo,
-      p_coh3_player_card_url: coh3ProfileUrl,
-      p_coh3_profile_id: coh3ProfileId,
-      p_tournament_id: tournamentId,
-      p_tournament_bracket_id: tournamentBracketId,
-      p_registration_status: registrationStatus,
+function revalidateRegistrationPaths() {
+  for (const path of ["/admin", "/tournaments"]) {
+    try {
+      revalidatePath(path);
+    } catch {
+      console.error("Tournament registration cache invalidation failed.");
     }
+  }
+}
+
+function parseTimestamp(value: string | null) {
+  if (value === null) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : "invalid";
+}
+
+function parseSafeInteger(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+
+  if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function isNullableTimestamp(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isBoundedText(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    value.length <= 500
   );
+}
 
-  if (error) {
-    return { data: null, error };
-  }
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    )
+  );
+}
 
-  const savedRegistration = (
-    Array.isArray(data) ? data[0] : data
-  ) as SavedRegistration | null;
-
-  if (!savedRegistration?.id) {
-    return {
-      data: null,
-      error: {
-        message: "Registration could not be submitted.",
-      },
-    };
-  }
-
-  const { error: verificationUpdateError } = await adminSupabase
-    .from("registrations")
-    .update({
-      elo_status: "verified",
-      elo_verified_elo: verifiedEloResult.coh3statsElo,
-      elo_difference: verifiedEloResult.difference,
-      elo_highest_faction: verifiedEloResult.highestFaction,
-      elo_checked_mode: verifiedEloResult.mode,
-      elo_checked_at: verifiedEloResult.checkedAt,
-      elo_verification_source: "coh3stats",
-      elo_verification_error: null,
-      elo_verification_payload: {
-        profileId: verifiedEloResult.profileId,
-        websiteIgn: profile.in_game_name,
-        enteredElo: profile.current_elo,
-        coh3statsName: verifiedEloResult.coh3statsName,
-        coh3statsElo: verifiedEloResult.coh3statsElo,
-        highestFaction: verifiedEloResult.highestFaction,
-        factionElos: verifiedEloResult.factionElos,
-        mode: verifiedEloResult.mode,
-        difference: verifiedEloResult.difference,
-        tolerance: verifiedEloResult.tolerance,
-        withinTolerance:
-          verifiedEloResult.difference <= verifiedEloResult.tolerance,
-      },
-      elo_verified_player_name: verifiedEloResult.coh3statsName,
-      elo_identity_status: "matched",
-      elo_identity_error: null,
-    })
-    .eq("id", savedRegistration.id);
-
-  if (verificationUpdateError) {
-    console.error(
-      "Registration ELO verification metadata update failed:",
-      verificationUpdateError
-    );
-
-    return {
-      data: null,
-      error: {
-        message:
-          "Registration was created, but ELO verification metadata could not be saved. Please contact an admin.",
-      },
-    };
-  }
-
-  return {
-    data: {
-      ...savedRegistration,
-    },
-    error: null,
-  };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
