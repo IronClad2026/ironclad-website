@@ -367,6 +367,27 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(client.rpc).not.toHaveBeenCalled();
   });
 
+  it("accepts waitlist intake at the exact inclusive closing instant", async () => {
+    const client = createRegistrationClient({
+      tournament: createTournament("Challenge", {
+        registration_close_at: NOW,
+      }),
+      rpcHandler: (_name, args) =>
+        successfulRpcResult(args, "waitlisted"),
+      waitlistRows: [{ id: REGISTRATION_ID }],
+    });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+    const result = await submitTournamentRegistration(registrationInput());
+
+    expect(result).toEqual({
+      success: true,
+      message: "Registration submitted to waitlist position #1.",
+    });
+    expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
+    expect(client.rpc).toHaveBeenCalledOnce();
+  });
+
   it("honors the authoritative registration-enabled state before calling Relic", async () => {
     const client = createRegistrationClient({
       tournament: createTournament("Challenge", {
@@ -691,6 +712,16 @@ describe("Relic-authoritative tournament registration action", () => {
         },
       })
     );
+    const waitlistQuery = client.queries.find((query) =>
+      query.filters.some(
+        ([column, value]) =>
+          column === "registration_status" && value === "waitlisted"
+      )
+    );
+    expect(waitlistQuery?.orders).toEqual([
+      ["created_at", { ascending: true }],
+      ["id", { ascending: true }],
+    ]);
   });
 
   it("reports success after commit when cache invalidation fails", async () => {

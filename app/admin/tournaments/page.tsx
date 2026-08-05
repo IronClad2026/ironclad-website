@@ -86,6 +86,7 @@ const emptyTournament: TournamentFormValues = {
   description: "",
   bannerImageUrl: "",
   registrationOpenAt: "",
+  registrationCloseAt: "",
   grandFinalAt: "",
   status: "upcoming",
   format: "1v1",
@@ -121,6 +122,7 @@ type TournamentFormValues = {
   description: string;
   bannerImageUrl: string;
   registrationOpenAt: string;
+  registrationCloseAt: string;
   grandFinalAt: string;
   status: string;
   format: string;
@@ -595,6 +597,12 @@ function TournamentForm({
           readOnly={!isEditing}
         />
         <DateField
+          label="Registration Closes"
+          name="registrationCloseAt"
+          defaultValue={values.registrationCloseAt}
+          readOnly={!isEditing}
+        />
+        <DateField
           label="Grand Final Date/Time"
           name="grandFinalAt"
           defaultValue={values.grandFinalAt}
@@ -761,7 +769,7 @@ function BracketFields({
           label="Maximum Players"
           name={`${prefix}MaxPlayers`}
           type="number"
-          min={2}
+          min={8}
           max={1024}
           defaultValue={String(values.maxPlayers)}
           readOnly={readOnly}
@@ -870,6 +878,9 @@ function toFormValues(tournament: TournamentRow): TournamentFormValues {
     bannerImageUrl: tournament.banner_image_url,
     registrationOpenAt: tournament.registration_open_at
       ? toDateTimeLocal(tournament.registration_open_at)
+      : "",
+    registrationCloseAt: tournament.registration_close_at
+      ? toDateTimeLocal(tournament.registration_close_at)
       : "",
     grandFinalAt: tournament.grand_final_at
       ? toDateTimeLocal(tournament.grand_final_at)

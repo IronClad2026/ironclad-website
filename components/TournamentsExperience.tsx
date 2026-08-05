@@ -18,7 +18,10 @@ import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { PlayerProfile } from "@/lib/player-profile";
-import { getTournamentBracketDisplayName } from "@/lib/tournaments";
+import {
+  getTournamentBracketDisplayName,
+  isTournamentRegistrationOpen,
+} from "@/lib/tournaments";
 import type {
   GeneratedTournamentBracket,
   GeneratedTournamentMatch,
@@ -406,19 +409,22 @@ function MobileTournamentDrawer({
 function Hero({
   tournament,
   viewerRegistration,
+  verifiedDivision,
   onRegisterClick,
 }: {
   tournament: TournamentCard;
   viewerRegistration: TournamentViewerRegistration | null;
+  verifiedDivision: RelicVerifiedDivision | null;
   onRegisterClick: () => void;
 }) {
   const registrationOpen = isTournamentRegistrationOpen(tournament);
   const publicStatus = getPublicTournamentStatus(tournament);
-  const allBracketsWaitlistOnly = tournament.brackets.every(
-    (bracket) => bracket.isWaitlistOnly
+  const registrationIsWaitlistOnly = isRegistrationWaitlistOnlyForDivision(
+    tournament,
+    verifiedDivision
   );
   const actionLabel = registrationOpen
-    ? allBracketsWaitlistOnly
+    ? registrationIsWaitlistOnly
       ? "Join Waitlist"
       : "Register"
     : publicStatus;
@@ -504,7 +510,7 @@ function Hero({
                 label={actionLabel}
                 description={
                   registrationOpen
-                    ? allBracketsWaitlistOnly
+                    ? registrationIsWaitlistOnly
                       ? "Waitlist open"
                       : "Open events"
                     : "Check the tournament schedule"
@@ -806,11 +812,12 @@ function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard
       <Detail label="Rule Format" value={tournament.ruleFormatLabel} />
       <Detail label="Registration Status" value={getPublicTournamentStatus(tournament)} />
       <Detail label="Registration Opens" value={formatOptionalDateTime(tournament.registrationOpenAt, "When status is Open")} />
+      <Detail label="Registration Closes" value={formatOptionalDateTime(tournament.registrationCloseAt, "Until closed by an administrator")} />
       <Detail label="Grand Final" value={formatOptionalDateTime(tournament.grandFinalAt, "Grand Final TBA")} />
       {hasPrize(tournament) && <Detail label="Prize Pool" value={tournament.prizePool} />}
       <Detail label="Approved Participants" value={`${tournament.players} / ${tournament.maxPlayers}`} />
       {tournament.brackets.map((bracket) => (
-        <Detail key={bracket.name} label={bracket.name} value={`${bracket.requirement} - ${bracket.registeredPlayers} / ${bracket.maxPlayers.replace("Max ", "")} approved${bracket.isWaitlistOnly ? " - waitlist only" : ""}`} />
+        <Detail key={bracket.name} label={bracket.name} value={`${bracket.requirement} - active review cohort ${bracket.activeCohortPlayers} / ${bracket.activeCohortSize} - ${bracket.registeredPlayers} approved - ${bracket.waitlistedPlayers} waitlisted`} />
       ))}
     </div>
   );
@@ -2245,6 +2252,21 @@ export function isVerifiedDivisionBracket(
   return verifiedBracketName.length > 0 && bracketName === verifiedBracketName;
 }
 
+export function isRegistrationWaitlistOnlyForDivision(
+  tournament: TournamentCard,
+  verifiedDivision: RelicVerifiedDivision | null
+) {
+  const verifiedBracketName = getVerifiedDivisionBracketName(verifiedDivision);
+  const verifiedBracket = tournament.brackets.find(
+    (bracket) => bracket.name === verifiedBracketName
+  );
+
+  return (
+    verifiedBracket?.isWaitlistOnly ??
+    tournament.brackets.every((bracket) => bracket.isWaitlistOnly)
+  );
+}
+
 type RegistrationFormState = {
   tournamentTitle: string;
   bracketName: string;
@@ -2563,7 +2585,7 @@ export function RegisterModal({
                           {bracket.name}
                         </p>
                         <p className="mt-1 break-words text-xs text-zinc-400">
-                          {bracket.requirement} - {bracket.registeredPlayers} approved - {bracket.maxPlayers}
+                          {bracket.requirement} - active review cohort {bracket.activeCohortPlayers}/{bracket.activeCohortSize} - {bracket.waitlistedPlayers} waitlisted
                         </p>
                         <p
                           className={classNames(
@@ -2573,7 +2595,7 @@ export function RegisterModal({
                         >
                           {bracket.isWaitlistOnly
                             ? bracket.isFull
-                              ? "Approved roster full - waitlist only"
+                              ? "Active review cohort full - waitlist only"
                               : "Waitlist active - queued registrations first"
                             : bracket.prize}
                         </p>
@@ -2784,19 +2806,22 @@ function MobileCard({
 function MobileHero({
   tournament,
   viewerRegistration,
+  verifiedDivision,
   onRegisterClick,
 }: {
   tournament: TournamentCard;
   viewerRegistration: TournamentViewerRegistration | null;
+  verifiedDivision: RelicVerifiedDivision | null;
   onRegisterClick: () => void;
 }) {
   const registrationOpen = isTournamentRegistrationOpen(tournament);
   const publicStatus = getPublicTournamentStatus(tournament);
-  const allBracketsWaitlistOnly = tournament.brackets.every(
-    (bracket) => bracket.isWaitlistOnly
+  const registrationIsWaitlistOnly = isRegistrationWaitlistOnlyForDivision(
+    tournament,
+    verifiedDivision
   );
   const actionLabel = registrationOpen
-    ? allBracketsWaitlistOnly
+    ? registrationIsWaitlistOnly
       ? "Join Waitlist"
       : "Register"
     : publicStatus;
@@ -2910,7 +2935,7 @@ function MobileHero({
               label={actionLabel}
               description={
                 registrationOpen
-                  ? allBracketsWaitlistOnly
+                  ? registrationIsWaitlistOnly
                     ? "Waitlist open"
                     : "Open events"
                   : "Check the tournament schedule"
@@ -3216,6 +3241,13 @@ function renderMobileOverviewPanel(
         )}
       />
       <MobileDetail
+        label="Registration Closes"
+        value={formatOptionalDateTime(
+          tournament.registrationCloseAt,
+          "Until closed by an administrator"
+        )}
+      />
+      <MobileDetail
         label="Grand Final"
         value={formatOptionalDateTime(
           tournament.grandFinalAt,
@@ -3233,7 +3265,7 @@ function renderMobileOverviewPanel(
         <MobileDetail
           key={bracket.name}
           label={bracket.name}
-          value={`${bracket.requirement} - ${bracket.registeredPlayers} / ${bracket.maxPlayers.replace("Max ", "")} approved${bracket.isWaitlistOnly ? " - waitlist only" : ""}`}
+          value={`${bracket.requirement} - active review cohort ${bracket.activeCohortPlayers} / ${bracket.activeCohortSize} - ${bracket.registeredPlayers} approved - ${bracket.waitlistedPlayers} waitlisted`}
         />
       ))}
     </div>
@@ -4146,6 +4178,7 @@ export default function TournamentsExperience({
             <Hero
               tournament={selectedTournament}
               viewerRegistration={selectedViewerRegistration}
+              verifiedDivision={viewer.relicVerifiedDivision}
               onRegisterClick={handleRegisterClick}
             />
             <TopTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
@@ -4181,6 +4214,7 @@ export default function TournamentsExperience({
         <MobileHero
           tournament={selectedTournament}
           viewerRegistration={selectedViewerRegistration}
+          verifiedDivision={viewer.relicVerifiedDivision}
           onRegisterClick={handleRegisterClick}
         />
         <MobileTournamentMenuButton
@@ -4230,26 +4264,6 @@ export default function TournamentsExperience({
       />
     </>
   );
-}
-
-function isTournamentRegistrationOpen(tournament: TournamentCard) {
-  const now = Date.now();
-  const registrationOpens = getOptionalTimestamp(
-    tournament.registrationOpenAt
-  );
-
-  return (
-    tournament.statusValue === "registration_open" &&
-    registrationOpens !== "invalid" &&
-    (registrationOpens === null || now >= registrationOpens)
-  );
-}
-
-function getOptionalTimestamp(value: string) {
-  if (!value) return null;
-
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? timestamp : "invalid";
 }
 
 function getPublicTournamentStatus(tournament: TournamentCard) {

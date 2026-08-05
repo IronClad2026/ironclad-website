@@ -248,6 +248,7 @@ describe("tournament storage cleanup privacy", () => {
         description: "Description",
         banner_image_url: bannerUrl,
         registration_open_at: null,
+        registration_close_at: "2026-08-10T00:00:00.000Z",
         grand_final_at: null,
         status: "upcoming",
         format: "1v1",
@@ -312,6 +313,7 @@ describe("tournament storage cleanup privacy", () => {
     formData.set("description", "Description");
     formData.set("bannerImageUrl", bannerUrl);
     formData.set("status", "upcoming");
+    formData.set("registrationCloseAt", "2026-08-10T00:00");
     formData.set("format", "1v1");
     formData.set("ruleFormat", "format_a");
     formData.set("resultConfirmationWindowMinutes", "30");
@@ -326,8 +328,93 @@ describe("tournament storage cleanup privacy", () => {
       "NEXT_REDIRECT:/admin/tournaments?selected=tournament-1&notice=saved"
     );
     expect(referenceQueries).toBe(2);
+    expect(client.rpc).toHaveBeenCalledWith(
+      "save_tournament",
+      expect.objectContaining({
+        p_registration_close_at: "2026-08-10T00:00:00.000Z",
+      })
+    );
     expect(storageBucket.remove).toHaveBeenCalledWith([previousPath]);
     expect(storageBucket.remove).not.toHaveBeenCalledWith([bannerPath]);
+  });
+
+  it("passes and verifies a cleared registration closing time", async () => {
+    const existingQuery = createQuery({
+      data: { slug: "privacy-cup", banner_image_url: bannerUrl },
+      error: null,
+    });
+    const unreferencedQuery = createQuery({ data: [], error: null });
+    const savedQuery = createQuery({
+      data: {
+        id: "tournament-1",
+        title: "Privacy Cup",
+        slug: "privacy-cup",
+        description: "Description",
+        banner_image_url: bannerUrl,
+        registration_open_at: null,
+        registration_close_at: null,
+        grand_final_at: null,
+        status: "upcoming",
+        format: "1v1",
+        rule_format: "format_a",
+        result_confirmation_window_minutes: 30,
+        prize_pool: "",
+        rules_url: null,
+        battlefy_url: null,
+        registration_enabled: false,
+      },
+      error: null,
+    });
+    const tournamentTable = {
+      select: vi.fn((columns: string) => {
+        if (columns === "slug, banner_image_url") return existingQuery;
+        if (columns === "id") return unreferencedQuery;
+        return savedQuery;
+      }),
+    };
+    const storageBucket = {
+      list: vi.fn(async () => ({
+        data: [
+          {
+            name: bannerPath.slice("banners/".length),
+            metadata: { mimetype: "image/png", size: 1024 },
+          },
+        ],
+        error: null,
+      })),
+      remove: vi.fn(),
+    };
+    const client = {
+      from: vi.fn(() => tournamentTable),
+      rpc: vi.fn(async () => ({ data: "tournament-1", error: null })),
+      storage: { from: vi.fn(() => storageBucket) },
+    };
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(client);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          Uint8Array.from([
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+          ]),
+          { status: 206 }
+        )
+      )
+    );
+
+    await expect(
+      saveTournament(
+        { error: null },
+        createTournamentFormData(bannerUrl)
+      )
+    ).rejects.toThrow(
+      "NEXT_REDIRECT:/admin/tournaments?selected=tournament-1&notice=saved"
+    );
+    expect(client.rpc).toHaveBeenCalledWith(
+      "save_tournament",
+      expect.objectContaining({ p_registration_close_at: null })
+    );
   });
 
   it("removes only a new banner that fails uploaded-object verification", async () => {

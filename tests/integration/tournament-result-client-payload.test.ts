@@ -49,6 +49,8 @@ vi.mock("@/lib/tournament-bracket-data", () => ({
 
 vi.mock("@/lib/tournaments", () => ({
   getTournamentBracketDisplayName: (name: string) => name,
+  isTournamentBracketPublic: (status: string) =>
+    status === "in_progress" || status === "completed",
   mapTournamentRow: mapTournamentRowMock,
 }));
 
@@ -258,13 +260,17 @@ function createPageClient(
   viewerClerkUserId: string,
   verifiedDivision: unknown = "Challenge",
   verifiedDivisionError: QueryResult["error"] = null,
-  participantCurrentElo = 1500
+  participantCurrentElo = 1500,
+  tournamentStatus = "in_progress",
+  activeRegistrationCount = 2,
+  includeWaitlistedRegistration = false
 ) {
   const rawTournament = {
     id: TOURNAMENT_ID,
     slug: "synthetic-tournament",
     title: "Synthetic Tournament",
     created_at: "2026-07-25T00:00:00.000Z",
+    status: tournamentStatus,
     tournament_brackets: [
       {
         id: BRACKET_ID,
@@ -275,7 +281,25 @@ function createPageClient(
       },
     ],
   };
-  const registrations = [
+  const registrations: Array<{
+    id: string;
+    clerk_user_id: string;
+    tournament_id: string;
+    tournament_bracket_id: string;
+    player_name: string;
+    country: string | null;
+    submitted_elo: number;
+    elo_verified_elo: number;
+    elo_verification_source: string;
+    registration_status:
+      | "pending"
+      | "manual_review"
+      | "approved"
+      | "rejected"
+      | "waitlisted";
+    admin_notes: string | null;
+    created_at: string;
+  }> = [
     {
       id: VIEWER_REGISTRATION_ID,
       clerk_user_id: viewerClerkUserId,
@@ -305,6 +329,38 @@ function createPageClient(
       created_at: "2026-07-25T00:00:00.000Z",
     },
   ];
+  for (let index = registrations.length; index < activeRegistrationCount; index += 1) {
+    registrations.push({
+      id: `99999999-9999-4999-8999-${String(index).padStart(12, "0")}`,
+      clerk_user_id: `user_synthetic_pending_${index}`,
+      tournament_id: TOURNAMENT_ID,
+      tournament_bracket_id: BRACKET_ID,
+      player_name: `Pending Player ${index}`,
+      country: null,
+      submitted_elo: 1400 - index,
+      elo_verified_elo: 1400 - index,
+      elo_verification_source: "relic",
+      registration_status: "pending",
+      admin_notes: null,
+      created_at: `2026-07-25T00:00:0${index}.000Z`,
+    });
+  }
+  if (includeWaitlistedRegistration) {
+    registrations.push({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      clerk_user_id: "user_synthetic_waitlisted",
+      tournament_id: TOURNAMENT_ID,
+      tournament_bracket_id: BRACKET_ID,
+      player_name: "Waitlisted Player",
+      country: null,
+      submitted_elo: 1300,
+      elo_verified_elo: 1300,
+      elo_verification_source: "relic",
+      registration_status: "waitlisted",
+      admin_notes: null,
+      created_at: "2026-07-25T00:00:08.000Z",
+    });
+  }
   const players = registrations.map((registration) => ({
     clerk_user_id: registration.clerk_user_id,
     in_game_name: registration.player_name,
@@ -346,8 +402,9 @@ function createPageClient(
       data: [
         {
           bracket_id: BRACKET_ID,
+          tournament_id: TOURNAMENT_ID,
           registered_players: 2,
-          waitlisted_players: 0,
+          max_players: 32,
         },
       ],
       error: null,
@@ -361,11 +418,17 @@ async function loadClientProps({
   participantCurrentElo,
   verifiedDivision,
   verifiedDivisionError,
+  tournamentStatus,
+  activeRegistrationCount,
+  includeWaitlistedRegistration,
 }: {
   admin: boolean;
   participantCurrentElo?: number;
   verifiedDivision?: unknown;
   verifiedDivisionError?: QueryResult["error"];
+  tournamentStatus?: string;
+  activeRegistrationCount?: number;
+  includeWaitlistedRegistration?: boolean;
 }) {
   const viewerClerkUserId = admin ? SECRET_ADMIN_ID : SECRET_PLAYER_ID;
   authMock.mockResolvedValue({
@@ -376,7 +439,10 @@ async function loadClientProps({
     viewerClerkUserId,
     verifiedDivision,
     verifiedDivisionError,
-    participantCurrentElo
+    participantCurrentElo,
+    tournamentStatus,
+    activeRegistrationCount,
+    includeWaitlistedRegistration
   );
   createSupabaseAdminClientMock.mockReturnValue(client);
 
@@ -408,8 +474,11 @@ describe("tournament Client Component result payload", () => {
       enabled: true,
       error: null,
     });
-    getGeneratedBracketRegistrationIdsMock.mockReturnValue(
-      new Set([VIEWER_REGISTRATION_ID, OPPONENT_REGISTRATION_ID])
+    getGeneratedBracketRegistrationIdsMock.mockImplementation(
+      (rows: unknown[]) =>
+        rows.length > 0
+          ? new Set([VIEWER_REGISTRATION_ID, OPPONENT_REGISTRATION_ID])
+          : new Set()
     );
     loadGeneratedBracketPageRowsMock.mockResolvedValue({
       data: [
@@ -429,8 +498,10 @@ describe("tournament Client Component result payload", () => {
       reportGroups: [safeReportGroup],
       viewerRole: "participant",
     });
-    mapGeneratedBracketsMock.mockReturnValue(
-      new Map([[TOURNAMENT_ID, [safeGeneratedBracket]]])
+    mapGeneratedBracketsMock.mockImplementation((rows: unknown[]) =>
+      rows.length > 0
+        ? new Map([[TOURNAMENT_ID, [safeGeneratedBracket]]])
+        : new Map()
     );
     mapTournamentRowMock.mockImplementation(
       (row: { created_at: string; id: string; title: string }) => ({
@@ -517,6 +588,43 @@ describe("tournament Client Component result payload", () => {
     expect(
       tournament.bracketParticipants.map((participant) => participant.elo)
     ).toEqual([1500, 1450]);
+  });
+
+  it("excludes generated brackets from the prelaunch public payload", async () => {
+    const { props } = await loadClientProps({
+      admin: false,
+      tournamentStatus: "registration_open",
+    });
+    const [tournament] = props.tournaments as Array<{
+      generatedBrackets: unknown[];
+    }>;
+
+    expect(getGeneratedBracketRegistrationIdsMock).toHaveBeenCalledWith([]);
+    expect(mapGeneratedBracketsMock).toHaveBeenCalledWith(
+      [],
+      expect.any(Array)
+    );
+    expect(tournament.generatedBrackets).toEqual([]);
+  });
+
+  it("derives the waitlist count from registrations when the capacity RPC omits it", async () => {
+    await loadClientProps({
+      admin: false,
+      activeRegistrationCount: 7,
+      includeWaitlistedRegistration: true,
+    });
+
+    expect(mapTournamentRowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tournament_brackets: [
+          expect.objectContaining({
+            active_cohort_players: 7,
+            registered_players: 2,
+            waitlisted_players: 1,
+          }),
+        ],
+      })
+    );
   });
 
   it.each([

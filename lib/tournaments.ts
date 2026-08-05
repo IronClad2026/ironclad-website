@@ -1,3 +1,5 @@
+import { PHASE_FOUR_ACTIVE_COHORT_SIZE } from "@/lib/tournament-registration-cohort";
+
 export type TournamentStatus =
   | "upcoming"
   | "registration_open"
@@ -79,6 +81,8 @@ export type TournamentCard = {
     requirement: string;
     maxPlayers: string;
     registeredPlayers: number;
+    activeCohortPlayers: number;
+    activeCohortSize: number;
     waitlistedPlayers: number;
     isFull: boolean;
     isWaitlistOnly: boolean;
@@ -88,7 +92,9 @@ export type TournamentCard = {
   rules: string;
   schedule: string[];
   contact: string;
+  registrationEnabled: boolean;
   registrationOpenAt: string;
+  registrationCloseAt: string;
   grandFinalAt: string | null;
   createdAt: string;
   resultConfirmationWindowMinutes: number;
@@ -281,6 +287,7 @@ export type TournamentBracketRow = {
   elo_rules: string;
   max_players: number;
   registered_players?: number;
+  active_cohort_players?: number;
   waitlisted_players?: number;
   created_at: string;
   updated_at: string;
@@ -355,10 +362,15 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
       requirement: bracket.elo_rules,
       maxPlayers: `Max ${bracket.max_players} players`,
       registeredPlayers: bracket.registered_players ?? 0,
+      activeCohortPlayers: bracket.active_cohort_players ?? 0,
+      activeCohortSize: PHASE_FOUR_ACTIVE_COHORT_SIZE,
       waitlistedPlayers: bracket.waitlisted_players ?? 0,
-      isFull: (bracket.registered_players ?? 0) >= bracket.max_players,
+      isFull:
+        (bracket.active_cohort_players ?? 0) >=
+        PHASE_FOUR_ACTIVE_COHORT_SIZE,
       isWaitlistOnly:
-        (bracket.registered_players ?? 0) >= bracket.max_players ||
+        (bracket.active_cohort_players ?? 0) >=
+          PHASE_FOUR_ACTIVE_COHORT_SIZE ||
         (bracket.waitlisted_players ?? 0) > 0,
       prize: "Included in tournament prize pool",
     })),
@@ -369,7 +381,9 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
     schedule: buildTournamentSchedule(row, dateTimeFormatter),
     contact:
       "Use the IronClad website and official community channels for registration, match details, and tournament updates.",
+    registrationEnabled: row.registration_enabled,
     registrationOpenAt: row.registration_open_at ?? "",
+    registrationCloseAt: row.registration_close_at ?? "",
     grandFinalAt: row.grand_final_at,
     createdAt: row.created_at,
     resultConfirmationWindowMinutes:
@@ -380,6 +394,44 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
     bracketParticipants: [],
     generatedBrackets: [],
   };
+}
+
+export function isTournamentRegistrationOpen(
+  tournament: Pick<
+    TournamentCard,
+    | "statusValue"
+    | "registrationEnabled"
+    | "registrationOpenAt"
+    | "registrationCloseAt"
+  >,
+  now = Date.now()
+) {
+  const registrationOpens = getOptionalTimestamp(
+    tournament.registrationOpenAt
+  );
+  const registrationCloses = getOptionalTimestamp(
+    tournament.registrationCloseAt
+  );
+
+  return (
+    tournament.statusValue === "registration_open" &&
+    tournament.registrationEnabled &&
+    registrationOpens !== "invalid" &&
+    registrationCloses !== "invalid" &&
+    (registrationOpens === null || now >= registrationOpens) &&
+    (registrationCloses === null || now <= registrationCloses)
+  );
+}
+
+export function isTournamentBracketPublic(status: TournamentStatus) {
+  return status === "in_progress" || status === "completed";
+}
+
+function getOptionalTimestamp(value: string) {
+  if (!value) return null;
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : "invalid";
 }
 
 type EloEligibilityRule = {
