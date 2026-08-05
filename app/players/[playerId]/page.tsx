@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import PublicPlayerProfileHeader from "@/components/PublicPlayerProfileHeader";
 import PublicPlayerStats from "@/components/PublicPlayerStats";
+import { getPublicActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
 import { getPublicPlayerById } from "@/lib/public-players";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,9 @@ export default async function PublicPlayerProfilePage({
     notFound();
   }
 
+  const activeTournamentEloSnapshots =
+    await getPublicActiveTournamentEloSnapshots(player.id);
+
   return (
     <main
       className="min-h-screen bg-black bg-cover bg-center bg-fixed text-white"
@@ -50,7 +54,10 @@ export default async function PublicPlayerProfilePage({
       }}
     >
       <PublicPlayerProfileHeader player={player} />
-      <PublicPlayerStats player={player} />
+      <PublicPlayerStats
+        player={player}
+        activeTournamentEloSnapshots={activeTournamentEloSnapshots}
+      />
     </main>
   );
 }

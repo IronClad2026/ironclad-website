@@ -284,6 +284,8 @@ function createPageClient(
       player_name: "Safe Viewer",
       country: "Australia",
       submitted_elo: 1500,
+      elo_verified_elo: 1500,
+      elo_verification_source: "relic",
       registration_status: "approved",
       admin_notes: `${SECRET_RESULT_PATH} ${SECRET_SUPABASE_URL}`,
       created_at: "2026-07-25T00:00:00.000Z",
@@ -296,6 +298,8 @@ function createPageClient(
       player_name: "Safe Opponent",
       country: "New Zealand",
       submitted_elo: 1450,
+      elo_verified_elo: 1450,
+      elo_verification_source: "relic",
       registration_status: "approved",
       admin_notes: SECRET_ADMIN_ID,
       created_at: "2026-07-25T00:00:00.000Z",
@@ -494,6 +498,25 @@ describe("tournament Client Component result payload", () => {
     );
     expect(client.viewerDivisionQuery.maybeSingle).toHaveBeenCalledOnce();
     expect(viewer.relicVerifiedDivision).toBe("Main / Pro");
+  });
+
+  it("keeps Relic registration ELO snapshots frozen when profile Current ELO changes", async () => {
+    const { props } = await loadClientProps({
+      admin: false,
+      participantCurrentElo: 500,
+    });
+    const [tournament] = props.tournaments as Array<{
+      bracketParticipants: Array<{ elo: number }>;
+      participants: Array<{ elo: number }>;
+    }>;
+
+    expect(tournament.participants.map((participant) => participant.elo)).toEqual([
+      1500,
+      1450,
+    ]);
+    expect(
+      tournament.bracketParticipants.map((participant) => participant.elo)
+    ).toEqual([1500, 1450]);
   });
 
   it.each([

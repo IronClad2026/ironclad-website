@@ -2,9 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { playerIdentity } from "@/tests/fixtures/auth";
 
 const authMock = vi.hoisted(() => vi.fn());
-const checkCoh3ProfileOwnershipMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
-const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -15,18 +13,8 @@ vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
 }));
 
-vi.mock("@/lib/coh3-profile-ownership", () => ({
-  COH3_PROFILE_LINKED_ACCOUNT_MISMATCH_MESSAGE:
-    "Use the coh3stats profile linked to your IronClad account.",
-  checkCoh3ProfileOwnership: checkCoh3ProfileOwnershipMock,
-}));
-
 vi.mock("@/lib/supabase-server", () => ({
   createAuthenticatedSupabaseClient: createAuthenticatedSupabaseClientMock,
-}));
-
-vi.mock("@/lib/supabase-admin", () => ({
-  createSupabaseAdminClient: createSupabaseAdminClientMock,
 }));
 
 import { savePlayerProfile } from "@/app/profile/actions";
@@ -35,7 +23,6 @@ function createProfileClient() {
   const maybeSingle = vi.fn(async () => ({
     data: {
       avatar_url: null,
-      coh3_profile_id: null,
       id: "player-existing",
     },
     error: null,
@@ -67,11 +54,14 @@ function createValidProfileForm() {
   formData.set("inGameName", "Test IGN");
   formData.set("discordUsername", "test-discord");
   formData.set("steamUsername", "display-only-steam-name");
-  formData.set("coh3PlayerCardUrl", "");
+  formData.set(
+    "coh3PlayerCardUrl",
+    "https://coh3stats.com/players/forged-legacy-value"
+  );
   formData.set("country", "Test Country");
   formData.set("region", "Test Region");
   formData.set("timezone", "UTC");
-  formData.set("currentElo", "1000");
+  formData.set("currentElo", "4999");
   formData.set("bio", "");
   return formData;
 }
@@ -79,10 +69,9 @@ function createValidProfileForm() {
 describe("profile save Steam identity regression", () => {
   beforeEach(() => {
     authMock.mockResolvedValue(playerIdentity);
-    checkCoh3ProfileOwnershipMock.mockResolvedValue({ ok: true });
   });
 
-  it("keeps the existing profile save successful without writing protected verification fields", async () => {
+  it("ignores forged legacy URL and ELO fields while saving unrelated profile fields", async () => {
     const fixture = createProfileClient();
     createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
 
@@ -110,6 +99,8 @@ describe("profile save Steam identity regression", () => {
       steam_username: "display-only-steam-name",
     });
     for (const protectedField of [
+      "current_elo",
+      "coh3_player_card_url",
       "steam_id64",
       "relic_verified_elo",
       "relic_verified_faction",
@@ -121,7 +112,6 @@ describe("profile save Steam identity regression", () => {
       expect(profileUpdate).not.toHaveProperty(protectedField);
     }
     expect(options).toEqual({ onConflict: "clerk_user_id" });
-    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
   });
 });
