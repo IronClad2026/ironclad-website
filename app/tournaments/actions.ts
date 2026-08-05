@@ -20,7 +20,7 @@ const REGISTRATION_FAILED_MESSAGE =
 const DUPLICATE_REGISTRATION_MESSAGE =
   "You are already registered for this tournament.";
 const WRONG_DIVISION_MESSAGE =
-  "Your fresh Relic ELO does not match the selected tournament division. Choose the matching division and try again.";
+  "Your ELO division has changed. Refresh your verified ELO from the Profile page and try again.";
 const PLAYER_SELECT = [
   "id",
   "clerk_user_id",

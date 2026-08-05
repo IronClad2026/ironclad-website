@@ -16,6 +16,18 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type RelicVerifiedDivision = "Academy" | "Challenge" | "Main / Pro";
+
+function normalizeRelicVerifiedDivision(
+  value: unknown
+): RelicVerifiedDivision | null {
+  return value === "Academy" ||
+    value === "Challenge" ||
+    value === "Main / Pro"
+    ? value
+    : null;
+}
+
 export default async function TournamentsPage() {
   const { userId, sessionClaims } = await auth();
   const isAdmin =
@@ -25,11 +37,19 @@ export default async function TournamentsPage() {
       } | null
     )?.metadata?.role === "admin";
   const supabase = createSupabaseAdminClient();
+  const viewerDivisionRequest = userId
+    ? supabase
+        .from("players")
+        .select("relic_verified_division")
+        .eq("clerk_user_id", userId)
+        .maybeSingle()
+    : Promise.resolve({ data: null, error: null });
   const [
     tournamentResult,
     capacityResult,
     registrationResult,
     generatedBracketResult,
+    viewerDivisionResult,
   ] = await Promise.all([
     supabase
       .from("tournaments")
@@ -48,7 +68,22 @@ export default async function TournamentsPage() {
     loadGeneratedBracketPageRows({
       includeAdminAudit: isAdmin,
     }),
+    viewerDivisionRequest,
   ]);
+
+  if (viewerDivisionResult.error) {
+    console.error("Tournament verified division load failed.");
+  }
+
+  const relicVerifiedDivision = viewerDivisionResult.error
+    ? null
+    : normalizeRelicVerifiedDivision(
+        (
+          viewerDivisionResult.data as {
+            relic_verified_division?: unknown;
+          } | null
+        )?.relic_verified_division
+      );
 
   if (tournamentResult.error) {
     console.error(
@@ -281,7 +316,8 @@ export default async function TournamentsPage() {
     <TournamentsExperience
       tournaments={tournaments}
       viewer={{
-                isAdmin,
+        isAdmin,
+        relicVerifiedDivision,
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
       }}

@@ -18,6 +18,7 @@ import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { PlayerProfile } from "@/lib/player-profile";
+import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 import type {
   GeneratedTournamentBracket,
   GeneratedTournamentMatch,
@@ -2215,6 +2216,35 @@ type RegistrationStep =
   | "agreements"
   | "submitted";
 
+export type RelicVerifiedDivision =
+  | "Academy"
+  | "Challenge"
+  | "Main / Pro";
+
+const MISSING_VERIFIED_DIVISION_MESSAGE =
+  "Verify your ELO from the Profile page before registering.";
+
+export function getVerifiedDivisionBracketName(
+  verifiedDivision: RelicVerifiedDivision | null
+) {
+  if (!verifiedDivision) {
+    return "";
+  }
+
+  return getTournamentBracketDisplayName(
+    verifiedDivision === "Main / Pro" ? "Main" : verifiedDivision
+  );
+}
+
+export function isVerifiedDivisionBracket(
+  bracketName: string,
+  verifiedDivision: RelicVerifiedDivision | null
+) {
+  const verifiedBracketName =
+    getVerifiedDivisionBracketName(verifiedDivision);
+  return verifiedBracketName.length > 0 && bracketName === verifiedBracketName;
+}
+
 type RegistrationFormState = {
   tournamentTitle: string;
   bracketName: string;
@@ -2240,25 +2270,32 @@ type RegistrationPlayerProfile = Pick<
   | "profile_completed"
 >;
 
-function RegisterModal({
+export function RegisterModal({
   onClose,
   profile,
   tournaments,
   initialTournamentId,
+  verifiedDivision,
 }: {
   onClose: () => void;
   profile: RegistrationPlayerProfile;
   tournaments: TournamentCard[];
   initialTournamentId: string;
+  verifiedDivision: RelicVerifiedDivision | null;
 }) {
   const router = useRouter();
   const initialTournament =
     tournaments.find((tournament) => tournament.id === initialTournamentId) ??
     tournaments[0];
-  const getDefaultBracket = (tournament: TournamentCard) =>
-    tournament.brackets.find((bracket) => !bracket.isWaitlistOnly)?.name ??
-    tournament.brackets[0]?.name ??
-    "";
+  const getVerifiedBracket = (tournament: TournamentCard) => {
+    const verifiedBracketName =
+      getVerifiedDivisionBracketName(verifiedDivision);
+    return tournament.brackets.some(
+      (bracket) => bracket.name === verifiedBracketName
+    )
+      ? verifiedBracketName
+      : "";
+  };
   const [step, setStep] = useState<RegistrationStep>("tournament");
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2268,7 +2305,7 @@ function RegisterModal({
     useState<TournamentCard>(initialTournament);
   const [form, setForm] = useState<RegistrationFormState>({
     tournamentTitle: initialTournament.title,
-    bracketName: getDefaultBracket(initialTournament),
+    bracketName: getVerifiedBracket(initialTournament),
     rulebookAgreement: false,
     playerParticipationAgreement: false,
     adminFinalDecisionAgreement: false,
@@ -2280,12 +2317,20 @@ function RegisterModal({
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
+  const selectBracket = (bracketName: string) => {
+    if (!isVerifiedDivisionBracket(bracketName, verifiedDivision)) {
+      return;
+    }
+
+    updateField("bracketName", bracketName);
+  };
+
   const selectTournament = (event: TournamentCard) => {
     setSelectedTournament(event);
     setForm((current) => ({
       ...current,
       tournamentTitle: event.title,
-      bracketName: getDefaultBracket(event),
+      bracketName: getVerifiedBracket(event),
     }));
     setErrors((current) => ({ ...current, tournamentTitle: undefined, bracketName: undefined }));
   };
@@ -2305,8 +2350,15 @@ function RegisterModal({
         (bracket) => bracket.name === form.bracketName
       );
 
-      if (!form.bracketName.trim() || !selectedBracket) {
-        nextErrors.bracketName = "Please select a bracket or event type.";
+      if (!verifiedDivision) {
+        nextErrors.bracketName = MISSING_VERIFIED_DIVISION_MESSAGE;
+      } else if (
+        !form.bracketName.trim() ||
+        !selectedBracket ||
+        !isVerifiedDivisionBracket(form.bracketName, verifiedDivision)
+      ) {
+        nextErrors.bracketName =
+          "Your verified division is not available for this tournament.";
       }
     }
 
@@ -2349,6 +2401,11 @@ function RegisterModal({
       setSubmissionError(
         "This tournament is full or already in progress. We hope to see you in the next one."
       );
+      setStep("tournament");
+      return;
+    }
+
+    if (!validateStep("tournament")) {
       setStep("tournament");
       return;
     }
@@ -2398,6 +2455,9 @@ function RegisterModal({
     "submitted",
   ];
   const currentStepNumber = Math.max(1, steps.indexOf(step) + 1);
+  const verifiedBracketAvailable = selectedTournament.brackets.some((bracket) =>
+    isVerifiedDivisionBracket(bracket.name, verifiedDivision)
+  );
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 px-4 py-6">
@@ -2472,23 +2532,45 @@ function RegisterModal({
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {selectedTournament.brackets.map((bracket) => {
+                    const selectable = isVerifiedDivisionBracket(
+                      bracket.name,
+                      verifiedDivision
+                    );
                     const selected = form.bracketName === bracket.name;
                     return (
                       <button
+                        type="button"
                         key={bracket.name}
-                        onClick={() => updateField("bracketName", bracket.name)}
+                        disabled={!selectable}
+                        aria-disabled={!selectable}
+                        aria-pressed={selected}
+                        onClick={() => selectBracket(bracket.name)}
                         className={classNames(
                           "border p-4 text-left shadow-xl shadow-black/20 transition-all duration-300 hover:scale-[1.02]",
-                          selected
+                          !selectable
+                            ? "cursor-not-allowed border-zinc-800 bg-zinc-950/70 opacity-45 grayscale hover:scale-100"
+                            : selected
                             ? "border-orange-500 bg-orange-500/10"
                             : "border-white/12 bg-black/45 hover:border-orange-500/70"
                         )}
                       >
-                        <p className="break-words font-black text-white">{bracket.name}</p>
+                        <p
+                          className={classNames(
+                            "break-words font-black",
+                            selectable ? "text-white" : "text-zinc-500"
+                          )}
+                        >
+                          {bracket.name}
+                        </p>
                         <p className="mt-1 break-words text-xs text-zinc-400">
                           {bracket.requirement} - {bracket.registeredPlayers} approved - {bracket.maxPlayers}
                         </p>
-                        <p className="mt-2 break-words text-sm font-bold text-orange-300">
+                        <p
+                          className={classNames(
+                            "mt-2 break-words text-sm font-bold",
+                            selectable ? "text-orange-300" : "text-zinc-600"
+                          )}
+                        >
                           {bracket.isWaitlistOnly
                             ? bracket.isFull
                               ? "Approved roster full - waitlist only"
@@ -2500,19 +2582,50 @@ function RegisterModal({
                             Waitlist Only
                           </p>
                         )}
+                        <p
+                          className={classNames(
+                            "mt-2 text-xs font-black uppercase tracking-wider",
+                            selectable ? "text-emerald-300" : "text-zinc-600"
+                          )}
+                        >
+                          {selectable
+                            ? "Your verified division"
+                            : "Unavailable for your verified division"}
+                        </p>
                       </button>
                     );
                   })}
                 </div>
+                {!verifiedDivision && (
+                  <div
+                    role="alert"
+                    className="mt-4 border border-orange-500/40 bg-orange-500/10 p-4"
+                  >
+                    <p className="text-sm font-bold text-orange-200">
+                      {MISSING_VERIFIED_DIVISION_MESSAGE}
+                    </p>
+                    <Link
+                      href="/profile"
+                      className="mt-3 inline-flex text-sm font-bold text-orange-300 transition hover:text-orange-200"
+                    >
+                      Open Profile
+                    </Link>
+                  </div>
+                )}
                 <p className="mt-3 text-sm leading-6 text-zinc-400">
-                  Choose the division you intend to enter. On submission,
-                  IronClad performs one fresh Relic 1v1 ELO lookup, and the
-                  server accepts only the division that matches that result.
+                  Your verified profile division determines the selectable
+                  bracket. On submission, IronClad still performs one fresh
+                  Relic 1v1 ELO lookup, and the server accepts only the division
+                  that matches that fresh result.
                 </p>
                 {errors.bracketName && <FieldError message={errors.bracketName} />}
               </div>
 
-              <ModalButtons onClose={onClose} onNext={goToProfileStep} />
+              <ModalButtons
+                onClose={onClose}
+                onNext={goToProfileStep}
+                isDisabled={!verifiedBracketAvailable}
+              />
             </div>
           )}
 
@@ -2636,14 +2749,14 @@ function AgreementCheckbox({ label, checked, onChange, error }: { label: string;
   );
 }
 
-function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoading = false }: { onClose?: () => void; onBack?: () => void; onNext: () => void | Promise<void>; nextLabel?: string; isLoading?: boolean }) {
+function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoading = false, isDisabled = false }: { onClose?: () => void; onBack?: () => void; onNext: () => void | Promise<void>; nextLabel?: string; isLoading?: boolean; isDisabled?: boolean }) {
   return (
     <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-between">
       <div>
         {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Back</button>}
         {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Cancel</button>}
       </div>
-      <button disabled={isLoading} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? "Submitting..." : nextLabel}</button>
+      <button disabled={isLoading || isDisabled} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? "Submitting..." : nextLabel}</button>
     </div>
   );
 }
@@ -3757,6 +3870,7 @@ function RegistrationGatePrompt({
 
 type TournamentViewer = {
   isAdmin: boolean;
+  relicVerifiedDivision: RelicVerifiedDivision | null;
   registrationIds: string[];
   registrations: TournamentViewerRegistration[];
 };
@@ -4090,6 +4204,7 @@ export default function TournamentsExperience({
           profile={registrationProfile}
           tournaments={tournaments}
           initialTournamentId={selectedTournament.id}
+          verifiedDivision={viewer.relicVerifiedDivision}
           onClose={() => setShowRegisterModal(false)}
         />
       )}

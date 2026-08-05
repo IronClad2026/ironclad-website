@@ -544,7 +544,7 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(result).toEqual({
       success: false,
       message:
-        "Your fresh Relic ELO does not match the selected tournament division. Choose the matching division and try again.",
+        "Your ELO division has changed. Refresh your verified ELO from the Profile page and try again.",
     });
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
     expect(client.rpc).not.toHaveBeenCalled();
@@ -564,7 +564,7 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(result).toEqual({
       success: false,
       message:
-        "Your fresh Relic ELO does not match the selected tournament division. Choose the matching division and try again.",
+        "Your ELO division has changed. Refresh your verified ELO from the Profile page and try again.",
     });
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
     expect(client.rpc).not.toHaveBeenCalled();
