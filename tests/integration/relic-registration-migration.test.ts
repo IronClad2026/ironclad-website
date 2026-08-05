@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,6 +11,27 @@ const migration = readFileSync(
   "utf8"
 );
 const compactMigration = migration.toLowerCase().replace(/\s+/g, " ").trim();
+const correctionMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260805124000_drop_obsolete_registration_rpc.sql"
+  ),
+  "utf8"
+);
+const compactCorrectionMigration = correctionMigration
+  .toLowerCase()
+  .replace(/\s+/g, " ")
+  .trim();
+const registrationAction = readFileSync(
+  resolve(process.cwd(), "app/tournaments/actions.ts"),
+  "utf8"
+);
+
+function normalizedSha256(value: string) {
+  return createHash("sha256")
+    .update(value.replace(/\r\n/g, "\n"))
+    .digest("hex");
+}
 
 function extractFunctionBody(functionName: string) {
   const start = compactMigration.indexOf(
@@ -25,6 +47,57 @@ function extractFunctionBody(functionName: string) {
 }
 
 describe("Relic tournament registration migration contract", () => {
+  it("drops only the obsolete five-argument RPC without changing the approved contract", () => {
+    expect(compactCorrectionMigration).toBe(
+      "begin; drop function if exists public.submit_verified_player_registration( uuid, text, uuid, uuid, text ); commit;"
+    );
+    expect(compactCorrectionMigration).toContain("drop function if exists");
+    expect(compactCorrectionMigration).not.toContain("cascade");
+
+    for (const forbiddenStatement of [
+      "insert ",
+      "update ",
+      "delete ",
+      "alter table",
+      "create table",
+      "create policy",
+      "alter policy",
+      "drop policy",
+    ]) {
+      expect(compactCorrectionMigration).not.toContain(forbiddenStatement);
+    }
+
+    expect(compactCorrectionMigration).not.toContain(
+      "submit_verified_player_registration( uuid, text, text, uuid, uuid, bigint, text, text, text )"
+    );
+    expect(normalizedSha256(migration)).toBe(
+      "5532ec5acd6d63505274482ee5e5662f4d713565037682c064fc09db8e92a278"
+    );
+
+    const rpcCalls = [
+      ...registrationAction.matchAll(
+        /\.rpc\(\s*"submit_verified_player_registration"\s*,\s*\{([\s\S]*?)\}\s*\)/g
+      ),
+    ];
+
+    expect(rpcCalls).toHaveLength(1);
+    expect(
+      [...rpcCalls[0][1].matchAll(/\b(p_[a-z0-9_]+)\s*:/g)].map(
+        (match) => match[1]
+      )
+    ).toEqual([
+      "p_profile_id",
+      "p_clerk_user_id",
+      "p_steam_id64",
+      "p_tournament_id",
+      "p_tournament_bracket_id",
+      "p_relic_elo",
+      "p_relic_faction",
+      "p_relic_division",
+      "p_relic_calculation_version",
+    ]);
+  });
+
   it("widens the existing ELO snapshot fields and adds only division and calculation version", () => {
     const policyDrop = compactMigration.indexOf(
       'drop policy if exists "players can submit registrations" on public.registrations;'
