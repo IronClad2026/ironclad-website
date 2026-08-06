@@ -60,7 +60,7 @@ export default function AdminBracketManagement({
           <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-400">
             Tournament Operations
           </p>
-          <h2 className="mt-1 text-xl font-bold">
+          <h2 className="mt-1 break-words text-xl font-bold">
             Manual Bracket Placement
           </h2>
           <p className="mt-1 text-sm leading-5 text-zinc-400">
@@ -98,7 +98,7 @@ export default function AdminBracketManagement({
               <select
                 value={selectedTournament?.id ?? ""}
                 onChange={(event) => selectTournament(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-orange-400"
+                className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-orange-400"
               >
                 {tournaments.map((tournament) => (
                   <option key={tournament.id} value={tournament.id}>
@@ -115,7 +115,7 @@ export default function AdminBracketManagement({
               <select
                 value={selectedBracket?.bracketId ?? ""}
                 onChange={(event) => setBracketId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-orange-400"
+                className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-orange-400"
               >
                 {(selectedTournament?.brackets ?? []).map((bracket) => (
                   <option key={bracket.bracketId} value={bracket.bracketId}>
@@ -142,15 +142,15 @@ export default function AdminBracketManagement({
                   </p>
                   <Link
                     href={`/admin/tournaments?selected=${selectedTournament.id}`}
-                    className="mt-2 inline-flex font-black text-amber-200 underline underline-offset-4"
+                    className="mt-2 inline-flex min-h-11 items-center font-black text-amber-200 underline underline-offset-4"
                   >
                     Open Tournament Structure
                   </Link>
                 </div>
               )}
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-black text-white">
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-black text-white">
                     {selectedTournament.title} - {selectedBracket.bracketName}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">
@@ -160,7 +160,7 @@ export default function AdminBracketManagement({
                 </div>
                 <Link
                   href="/tournaments"
-                  className="text-sm font-black text-sky-300 transition hover:text-sky-200"
+                  className="inline-flex min-h-11 shrink-0 items-center text-sm font-black text-sky-300 transition hover:text-sky-200"
                 >
                   View Current Bracket
                 </Link>

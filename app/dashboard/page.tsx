@@ -46,7 +46,6 @@ type PlayerRegistration = {
   registration_status: RegistrationStatus;
   elo_status: string;
   submitted_elo: number | null;
-  admin_notes: string | null;
   created_at: string;
 };
 
@@ -70,7 +69,7 @@ export default async function PlayerDashboardPage() {
       supabase
         .from("registrations")
         .select(
-          "id, tournament_title, bracket_name, registration_status, elo_status, submitted_elo, admin_notes, created_at"
+          "id, tournament_title, bracket_name, registration_status, elo_status, submitted_elo, created_at"
         )
         .eq("clerk_user_id", userId)
         .order("created_at", { ascending: false }),
@@ -453,8 +452,7 @@ function RegistrationDecision({
     },
     rejected: {
       title: "Registration rejected",
-      message:
-        "Your registration was not approved for this event. Review the admin note below when available.",
+      message: "Your registration was not approved for this event.",
       className: "border-red-500/30 bg-red-500/10 text-red-200",
     },
     manual_review: {
@@ -482,28 +480,12 @@ function RegistrationDecision({
     message: "Your registration status will be updated after admin review.",
     className: "border-white/10 bg-white/[0.04] text-zinc-300",
   };
-  const showAdminNote =
-    (registration.registration_status === "rejected" ||
-      registration.registration_status === "manual_review") &&
-    Boolean(registration.admin_notes?.trim());
-
   return (
     <div className={`mt-4 border p-4 ${content.className}`}>
       <p className="text-sm font-black uppercase tracking-wider">
         {content.title}
       </p>
       <p className="mt-2 text-sm leading-6 opacity-90">{content.message}</p>
-
-      {showAdminNote && (
-        <div className="mt-3 border-t border-current/20 pt-3">
-          <p className="text-xs font-black uppercase tracking-wider opacity-70">
-            Admin Note
-          </p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
-            {registration.admin_notes}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

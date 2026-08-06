@@ -262,14 +262,14 @@ export default async function AdminTournamentsPage({
     params?.notice === "save-failed";
 
   return (
-    <main className="min-h-screen bg-black px-6 pt-32 pb-20 text-white">
+    <main className="min-h-screen min-w-0 bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32">
       <section className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-5 rounded-3xl border border-orange-500/30 bg-gradient-to-br from-zinc-950 to-orange-950/30 p-8 md:flex-row md:items-end md:justify-between">
-          <div>
+        <div className="flex flex-col gap-5 rounded-3xl border border-orange-500/30 bg-gradient-to-br from-zinc-950 to-orange-950/30 p-5 sm:p-8 md:flex-row md:items-end md:justify-between">
+          <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-400">
               Tournament Administration
             </p>
-            <h1 className="mt-4 text-4xl font-black md:text-5xl">
+            <h1 className="mt-4 break-words text-4xl font-black md:text-5xl">
               Create And Manage Tournaments
             </h1>
             <p className="mt-4 max-w-3xl leading-7 text-zinc-300">
@@ -279,7 +279,7 @@ export default async function AdminTournamentsPage({
           </div>
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-3 font-bold text-zinc-200 transition hover:border-orange-400/60 hover:text-white"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 py-3 font-bold text-zinc-200 transition hover:border-orange-400/60 hover:text-white"
           >
             <ChevronLeft size={18} />
             Admin Dashboard
@@ -318,7 +318,7 @@ export default async function AdminTournamentsPage({
                       pending
                     </p>
                   </div>
-                  <button className="rounded-lg bg-red-600 px-4 py-2 text-sm font-black text-white transition hover:bg-red-500">
+                  <button className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-black text-white transition hover:bg-red-500 sm:w-auto">
                     Retry Storage Cleanup
                   </button>
                 </form>
@@ -328,7 +328,7 @@ export default async function AdminTournamentsPage({
         )}
 
         <div className="mt-8 grid gap-8 xl:grid-cols-[360px_1fr]">
-          <aside className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+          <aside className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 sm:p-5">
             <Link
               href="/admin/tournaments"
               className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 font-black text-white transition hover:bg-orange-400"
@@ -447,14 +447,14 @@ function TournamentForm({
     <>
       <TournamentFormShell
         id={formId}
-        className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8"
+        className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 sm:p-6 md:p-8"
       >
       {values.id && (
         <input type="hidden" name="tournamentId" value={values.id} />
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-400">
             {values.id
               ? isEditing
@@ -462,7 +462,7 @@ function TournamentForm({
                 : "Tournament Details"
               : "Create Tournament"}
           </p>
-          <h2 className="mt-3 text-3xl font-black text-white">
+          <h2 className="mt-3 break-words text-3xl font-black text-white">
             {values.id ? values.title : "New Tournament"}
           </h2>
         </div>
@@ -678,7 +678,7 @@ function TournamentForm({
                   <button
                     type="submit"
                     form={`generate-bracket-${bracket.id}`}
-                    className="mt-4 rounded-lg border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-sm font-black text-sky-200 transition hover:bg-sky-500/20"
+                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-center text-sm font-black text-sky-200 transition hover:bg-sky-500/20"
                   >
                     {generated
                       ? "Repair Missing Match Records"
@@ -748,13 +748,13 @@ function BracketFields({
 }) {
   return (
     <fieldset className="rounded-2xl border border-orange-500/20 bg-black/30 p-5">
-      <label className="flex items-center gap-3 font-black text-white">
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 font-black text-white">
         <input
           type="checkbox"
           name={`${prefix}Enabled`}
           defaultChecked={values.enabled}
           disabled={readOnly}
-          className="h-4 w-4 accent-orange-500"
+          className="h-5 w-5 shrink-0 accent-orange-500"
         />
         {label}
       </label>

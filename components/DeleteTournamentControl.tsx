@@ -93,7 +93,7 @@ export default function DeleteTournamentControl({
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((current) => !current)}
-          className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-black/60 text-zinc-400 shadow-lg backdrop-blur-md transition hover:border-orange-400/60 hover:bg-orange-500/10 hover:text-orange-300"
+          className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-black/60 text-zinc-400 shadow-lg backdrop-blur-md transition hover:border-orange-400/60 hover:bg-orange-500/10 hover:text-orange-300"
         >
           <MoreVertical size={18} />
         </button>
@@ -106,13 +106,13 @@ export default function DeleteTournamentControl({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: -4 }}
               transition={{ duration: 0.15 }}
-              className="absolute top-11 right-0 w-52 overflow-hidden rounded-xl border border-white/15 bg-zinc-950/95 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl"
+              className="absolute top-12 right-0 w-52 overflow-hidden rounded-xl border border-white/15 bg-zinc-950/95 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl"
             >
               <Link
                 href={`${editHref}&edit=1`}
                 role="menuitem"
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-zinc-200 transition hover:bg-orange-500/15 hover:text-orange-200"
+                className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-zinc-200 transition hover:bg-orange-500/15 hover:text-orange-200"
               >
                 <Pencil size={15} />
                 Edit Tournament
@@ -124,7 +124,7 @@ export default function DeleteTournamentControl({
                   setMenuOpen(false);
                   setOpen(true);
                 }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/15 hover:text-red-200"
+                className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/15 hover:text-red-200"
               >
                 <Trash2 size={15} />
                 Delete Tournament
@@ -155,22 +155,22 @@ export default function DeleteTournamentControl({
                   initial={{ opacity: 0, scale: 0.96, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.97, y: 12 }}
-                  className="relative max-h-[90vh] w-full overflow-y-auto rounded-3xl border border-red-500/40 bg-[radial-gradient(circle_at_top_right,rgba(239,68,68,0.18),transparent_36%),linear-gradient(145deg,rgba(24,8,8,0.99),rgba(3,7,18,0.99))] shadow-[0_0_110px_rgba(239,68,68,0.22)] sm:w-[calc(100vw-4rem)] md:min-w-[720px] lg:w-[65vw] lg:max-w-5xl"
+                  className="relative max-h-[calc(100dvh-2rem)] w-full max-w-5xl overflow-y-auto rounded-3xl border border-red-500/40 bg-[radial-gradient(circle_at_top_right,rgba(239,68,68,0.18),transparent_36%),linear-gradient(145deg,rgba(24,8,8,0.99),rgba(3,7,18,0.99))] shadow-[0_0_110px_rgba(239,68,68,0.22)] sm:max-h-[90dvh] sm:w-[calc(100vw-4rem)] lg:w-[65vw]"
                 >
                   <div className="absolute inset-y-0 left-0 w-1 bg-red-500 shadow-[0_0_24px_rgba(239,68,68,0.9)]" />
-                  <div className="p-6 sm:p-9 lg:p-10">
+                  <div className="p-5 sm:p-9 lg:p-10">
                     <div className="flex items-start justify-between gap-5">
-                      <div className="flex items-start gap-4">
-                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-red-400/40 bg-red-500/15 text-red-300">
+                      <div className="flex min-w-0 items-start gap-4">
+                        <div className="hidden h-12 w-12 shrink-0 place-items-center rounded-xl border border-red-400/40 bg-red-500/15 text-red-300 sm:grid">
                           <AlertTriangle size={24} />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs font-black uppercase tracking-[0.32em] text-red-300">
                             Warning
                           </p>
                           <h2
                             id={`delete-tournament-${tournamentId}`}
-                            className="mt-2 text-2xl font-black text-white sm:text-3xl"
+                            className="mt-2 break-words text-2xl font-black text-white sm:text-3xl"
                           >
                             Permanently Delete Tournament
                           </h2>
@@ -179,7 +179,7 @@ export default function DeleteTournamentControl({
                       <button
                         type="button"
                         onClick={closeModal}
-                        className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-400 transition hover:border-red-400/50 hover:text-white"
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-red-400/50 hover:text-white"
                         aria-label="Close deletion modal"
                       >
                         <X size={18} />

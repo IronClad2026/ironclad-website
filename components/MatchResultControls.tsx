@@ -223,7 +223,9 @@ export default function MatchResultControls({
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[10px] font-black uppercase tracking-[0.18em] text-orange-300 transition hover:bg-orange-500/10"
+        className={`flex w-full items-center justify-between gap-3 px-3 text-left text-[10px] font-black uppercase tracking-[0.18em] text-orange-300 transition hover:bg-orange-500/10 ${
+          isAdmin ? "min-h-11 py-3" : "py-2"
+        }`}
       >
         <span>
           {isAdmin
@@ -541,12 +543,16 @@ export function ReportGroupReview({
   return (
     <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className={isAdmin ? "min-w-0" : undefined}>
           <p className="text-xs font-black uppercase tracking-wider text-sky-200">
             {isNoShow ? "No-Show Report" : "Confirmation Package"} -{" "}
             {formatReportGroupStatus(reportGroup.status)}
           </p>
-          <p className="mt-2 text-sm text-white">
+          <p
+            className={`mt-2 text-sm text-white ${
+              isAdmin ? "break-words" : ""
+            }`}
+          >
             {isNoShow
               ? `${winner} reported ${missingPlayer} as a no-show`
               : `${reportGroup.playerOneScore}-${reportGroup.playerTwoScore} reported for ${winner}`}
@@ -636,7 +642,11 @@ export function ReportGroupReview({
                 href={proof.replayAccessHref}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
+                className={`rounded-md border border-sky-400/30 bg-sky-500/10 text-[10px] font-black uppercase tracking-wider text-sky-200 ${
+                  isAdmin
+                    ? "inline-flex min-h-11 items-center justify-center px-3 py-2"
+                    : "px-2 py-1"
+                }`}
               >
                 Game {proof.gameNumber} Replay
               </a>
@@ -710,7 +720,7 @@ function ReportGroupReviewButton({
       name="decision"
       value={decision}
       disabled={disabled}
-      className={`rounded-lg px-2 py-2 text-[10px] font-black uppercase tracking-wider text-white transition disabled:opacity-50 ${className}`}
+      className={`min-h-11 rounded-lg px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition disabled:opacity-50 ${className}`}
     >
       {label}
     </button>
@@ -829,7 +839,11 @@ function SubmissionReview({
             href={submission.replayAccessHref}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
+            className={`rounded-md border border-sky-400/30 bg-sky-500/10 text-[10px] font-black uppercase tracking-wider text-sky-200 ${
+              isAdmin
+                ? "inline-flex min-h-11 items-center justify-center px-3 py-2"
+                : "px-2 py-1"
+            }`}
           >
             Download Replay
           </a>
@@ -839,7 +853,11 @@ function SubmissionReview({
             href={submission.screenshotAccessHref}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
+            className={`rounded-md border border-sky-400/30 bg-sky-500/10 text-[10px] font-black uppercase tracking-wider text-sky-200 ${
+              isAdmin
+                ? "inline-flex min-h-11 items-center justify-center px-3 py-2"
+                : "px-2 py-1"
+            }`}
           >
             View Screenshot
           </a>
@@ -916,7 +934,7 @@ function ReviewButton({
       name="decision"
       value={decision}
       disabled={disabled}
-      className={`rounded-lg px-2 py-2 text-[10px] font-black uppercase tracking-wider text-white transition disabled:opacity-50 ${className}`}
+      className={`min-h-11 rounded-lg px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition disabled:opacity-50 ${className}`}
     >
       {label}
     </button>

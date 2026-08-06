@@ -63,7 +63,7 @@ export default async function TournamentsPage() {
     supabase
       .from("registrations")
       .select(
-        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, elo_verified_elo, elo_verification_source, registration_status, admin_notes, created_at"
+        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, elo_verified_elo, elo_verification_source, registration_status, created_at"
       )
       .not("tournament_id", "is", null)
       .not("tournament_bracket_id", "is", null),
@@ -144,7 +144,6 @@ export default async function TournamentsPage() {
       | "approved"
       | "rejected"
       | "waitlisted";
-    admin_notes: string | null;
     created_at: string | null;
   }[];
   const referencedRegistrationIds = getGeneratedBracketRegistrationIds(
@@ -252,10 +251,6 @@ export default async function TournamentsPage() {
             bracketNames.get(registration.tournament_bracket_id) ??
             "Tournament Bracket",
           status: registration.registration_status,
-          adminNotes:
-            registration.registration_status === "rejected"
-              ? registration.admin_notes
-              : null,
           createdAt: registration.created_at,
           waitlistPosition:
             registration.registration_status === "waitlisted"
