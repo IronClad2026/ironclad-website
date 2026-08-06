@@ -50,7 +50,6 @@ type AdminNotice =
   | "saved"
   | "save-failed"
   | "bracket-generated"
-  | "bracket-repaired"
   | "generation-pending"
   | "generation-failed"
   | "generation-blocked"
@@ -97,18 +96,21 @@ const emptyTournament: TournamentFormValues = {
   battlefyUrl: "",
   academy: {
     id: null,
+    launchedAt: null,
     enabled: false,
     eloRules: "Below 1100 ELO",
     maxPlayers: 8,
   },
   challenge: {
     id: null,
+    launchedAt: null,
     enabled: false,
     eloRules: "1100-1399 ELO",
     maxPlayers: 8,
   },
   main: {
     id: null,
+    launchedAt: null,
     enabled: false,
     eloRules: "1400+ ELO",
     maxPlayers: 8,
@@ -138,6 +140,7 @@ type TournamentFormValues = {
 
 type BracketFormValues = {
   id: string | null;
+  launchedAt: string | null;
   enabled: boolean;
   eloRules: string;
   maxPlayers: number;
@@ -158,7 +161,7 @@ export default async function AdminTournamentsPage({
   const { data, error } = await supabase
     .from("tournaments")
     .select(
-      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
+      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, created_at, updated_at)"
     )
     .order("grand_final_at", { ascending: false, nullsFirst: false });
 
@@ -251,6 +254,45 @@ export default async function AdminTournamentsPage({
       (approvedByBracket.get(registration.tournament_bracket_id) ?? 0) + 1
     );
   }
+  const readinessResults = await Promise.all(
+    tournaments.flatMap((tournament) =>
+      (tournament.tournament_brackets ?? []).map(async (bracket) => {
+        const { data: readinessData, error: readinessError } =
+          await supabase.rpc("get_tournament_bracket_readiness", {
+            p_tournament_bracket_id: bracket.id,
+          });
+
+        if (readinessError) {
+          logSupabaseError(
+            "Tournament bracket readiness load failed:",
+            readinessError
+          );
+          return null;
+        }
+
+        const readiness = Array.isArray(readinessData)
+          ? readinessData[0]
+          : readinessData;
+        return readiness
+          ? {
+              bracketId: bracket.id,
+              approvedCount: Number(readiness.approved_count),
+              requiredCount: Number(readiness.required_count),
+              isReady: readiness.is_ready === true,
+              launchedAt:
+                typeof readiness.launched_at === "string"
+                  ? readiness.launched_at
+                  : bracket.launched_at,
+            }
+          : null;
+      })
+    )
+  );
+  const readinessByBracket = new Map(
+    readinessResults
+      .filter((result) => result !== null)
+      .map((result) => [result.bracketId, result])
+  );
   const selected = tournaments.find(
     (tournament) => tournament.id === params?.selected
   );
@@ -390,6 +432,7 @@ export default async function AdminTournamentsPage({
             notice={params?.notice}
             generatedByBracket={generatedByBracket}
             approvedByBracket={approvedByBracket}
+            readinessByBracket={readinessByBracket}
             isEditing={isEditing}
             errorMessage={params?.error}
           />
@@ -422,6 +465,7 @@ function TournamentForm({
   notice,
   generatedByBracket,
   approvedByBracket,
+  readinessByBracket,
   isEditing,
   errorMessage,
 }: {
@@ -438,6 +482,16 @@ function TournamentForm({
     }
   >;
   approvedByBracket: Map<string, number>;
+  readinessByBracket: Map<
+    string,
+    {
+      bracketId: string;
+      approvedCount: number;
+      requiredCount: number;
+      isReady: boolean;
+      launchedAt: string | null;
+    }
+  >;
   isEditing: boolean;
   errorMessage?: string;
 }) {
@@ -474,7 +528,6 @@ function TournamentForm({
           className={`mt-6 rounded-xl border p-4 text-sm ${
             notice === "saved" ||
             notice === "bracket-generated" ||
-            notice === "bracket-repaired" ||
             notice === "generation-pending" ||
             notice === "deleted" ||
             notice === "cleanup-completed"
@@ -489,18 +542,16 @@ function TournamentForm({
             : notice === "cleanup-completed"
               ? "The retained tournament proof cleanup completed successfully."
             : notice === "bracket-generated"
-              ? "Empty tournament bracket structure regenerated from the approved-player count."
-              : notice === "bracket-repaired"
-                ? "Missing bracket rounds or match records were recreated without deleting the generated bracket or existing assignments."
+              ? "Private bracket structure generated from the exact approved roster. Regeneration resets the unlaunched draft and requires reseeding."
               : notice === "generation-pending"
-                ? "At least two approved participants are required before a bracket structure can be generated."
+                ? "The private bracket structure was not generated. Confirm the division is unlaunched and exactly ready."
             : notice === "invalid"
               ? errorMessage ??
                 "Review the fields, dates, URLs, and enabled bracket settings."
               : notice === "generation-failed"
                 ? "Bracket generation failed. Confirm the competition migration is applied."
                 : notice === "generation-blocked"
-                  ? "Bracket regeneration was blocked because assignments or competition data already exist. Existing matches, submissions, standings, and results were preserved. Use an explicit administrator reset before rebuilding it."
+                  ? "Bracket generation was blocked because the division is launched or protected competition activity exists. Existing matches, submissions, standings, and results were preserved."
                 : notice === "delete-invalid"
                   ? "Tournament deletion was not confirmed. Type DELETE exactly."
                   : notice === "delete-storage-failed"
@@ -549,12 +600,7 @@ function TournamentForm({
           name="status"
           defaultValue={values.status}
           disabled={!isEditing}
-          options={[
-            ["upcoming", "Closed"],
-            ["registration_open", "Open"],
-            ["in_progress", "In Progress"],
-            ["completed", "Completed"],
-          ]}
+          options={getEditableTournamentStatusOptions(values.status)}
         />
         <SelectField
           label="Format"
@@ -647,10 +693,9 @@ function TournamentForm({
         <div className="mt-8 rounded-2xl border border-sky-500/20 bg-sky-950/20 p-5">
           <h3 className="text-lg font-black text-white">Bracket Generation</h3>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
-            Empty structures use the current approved-player count. Any
-            power-of-two count uses single elimination; every other count uses
-            round robin. Participants are never seeded or assigned
-            automatically.
+            Each eight-player division requires exactly 8/8 approved players.
+            Generation creates a private structure only; seeding and an explicit
+            Launch Division action remain separate.
           </p>
           <div className="mt-5 grid gap-4 md:grid-cols-3">
             {TOURNAMENT_BRACKET_CONFIGS.map((config) => {
@@ -661,6 +706,11 @@ function TournamentForm({
 
               const generated = generatedByBracket.get(bracket.id);
               const approved = approvedByBracket.get(bracket.id) ?? 0;
+              const readiness = readinessByBracket.get(bracket.id);
+              const approvedCount = readiness?.approvedCount ?? approved;
+              const requiredCount = readiness?.requiredCount ?? 8;
+              const launchedAt = readiness?.launchedAt ?? bracket.launchedAt;
+              const isReady = readiness?.isReady ?? false;
 
               return (
                 <div
@@ -669,20 +719,39 @@ function TournamentForm({
                 >
                   <p className="font-black text-white">{config.label}</p>
                   <p className="mt-2 text-sm text-zinc-400">
-                        Capacity {bracket.maxPlayers} - {approved} approved participant
-                    {approved === 1 ? "" : "s"}
+                    {approvedCount}/{requiredCount} approved
                     {generated
-                          ? ` - ${formatLabel(generated.format)} structure ready`
-                          : " - not generated"}
+                      ? ` — ${formatLabel(generated.format)} private structure ready`
+                      : " — not generated"}
+                  </p>
+                  <p
+                    className={`mt-2 text-xs font-black uppercase tracking-wider ${
+                      launchedAt
+                        ? "text-sky-300"
+                        : isReady
+                          ? "text-emerald-300"
+                          : "text-amber-300"
+                    }`}
+                  >
+                    {launchedAt
+                      ? `Launched ${new Date(launchedAt).toLocaleString()}`
+                      : isReady
+                        ? `${approvedCount}/${requiredCount} approved — ready for private bracket preparation`
+                        : `${approvedCount}/${requiredCount} approved — review incomplete`}
                   </p>
                   <button
                     type="submit"
                     form={`generate-bracket-${bracket.id}`}
-                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-center text-sm font-black text-sky-200 transition hover:bg-sky-500/20"
+                    disabled={Boolean(launchedAt) || !isReady}
+                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-center text-sm font-black text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:border-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-500"
                   >
-                    {generated
-                      ? "Repair Missing Match Records"
-                      : "Generate Empty Structure"}
+                    {launchedAt
+                      ? "Division Launched"
+                      : !isReady
+                        ? `Requires ${requiredCount}/${requiredCount} Approved`
+                      : generated
+                        ? "Regenerate Private Structure"
+                        : "Generate Private Structure"}
                   </button>
                 </div>
               );
@@ -911,6 +980,7 @@ function toBracketValues(
 
   return {
     id: bracket?.id ?? null,
+    launchedAt: bracket?.launched_at ?? null,
     enabled: Boolean(bracket),
     eloRules: bracket?.elo_rules ?? config?.defaultEloRules ?? "",
     maxPlayers: bracket?.max_players ?? config?.defaultMaxPlayers ?? 8,
@@ -931,6 +1001,23 @@ function formatLabel(value: string) {
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getEditableTournamentStatusOptions(
+  currentStatus: string
+): Array<[string, string]> {
+  if (currentStatus === "in_progress") {
+    return [["in_progress", "In Progress — managed by division launch"]];
+  }
+
+  if (currentStatus === "completed") {
+    return [["completed", "Completed — managed by match lifecycle"]];
+  }
+
+  return [
+    ["upcoming", "Closed"],
+    ["registration_open", "Open"],
+  ];
 }
 
 const emptyDeletionPreview: TournamentDeletionPreview = {

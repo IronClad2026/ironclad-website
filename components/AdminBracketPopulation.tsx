@@ -257,7 +257,7 @@ function AdminBracketPopulationWorkspace({
                         id="bracket-workspace-title"
                         className="mt-1 break-words text-xl font-black text-white sm:text-2xl"
                       >
-                        Populate {bracket.bracketName}
+                        Private seeding for {bracket.bracketName}
                       </h2>
                       <p className="mt-1 break-words text-sm text-slate-400">
                         {tournamentTitle}
@@ -557,7 +557,8 @@ function AdminBracketPopulationWorkspace({
                   <div>
                     <SectionLabel>Save / Reset Controls</SectionLabel>
                     <p className="mt-1 text-xs text-slate-600">
-                      Unsaved changes are discarded when this workspace closes.
+                      Saving keeps this draft private. Only Launch Division
+                      publishes and locks it.
                     </p>
                   </div>
                   <div className="flex flex-col-reverse gap-3 sm:flex-row">
@@ -589,7 +590,7 @@ function AdminBracketPopulationWorkspace({
                         type="submit"
                         className="min-h-11 w-full rounded-xl bg-orange-500 px-6 py-3 text-sm font-black text-white transition hover:bg-orange-400"
                       >
-                        Save Bracket Assignments
+                        Save Private Bracket Assignments
                       </button>
                     </form>
                   </div>

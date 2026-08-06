@@ -13,6 +13,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentCard } from "@/lib/tournaments";
+import { WAITLIST_DISCLOSURE_MESSAGE } from "@/lib/tournaments";
 
 const refreshMock = vi.hoisted(() => vi.fn());
 const submitTournamentRegistrationMock = vi.hoisted(() => vi.fn());
@@ -48,9 +49,12 @@ vi.mock("@/app/tournaments/actions", () => ({
 
 import {
   RegisterModal,
+  getRegistrationDivisionAvailability,
+  getViewerRegistrationDisplay,
   getVerifiedDivisionBracketName,
   isRegistrationWaitlistOnlyForDivision,
   type RelicVerifiedDivision,
+  type TournamentViewerRegistration,
 } from "@/components/TournamentsExperience";
 
 const TOURNAMENT_ID = "11111111-1111-4111-8111-111111111111";
@@ -78,6 +82,7 @@ const brackets = [
     waitlistedPlayers: 0,
     isFull: false,
     isWaitlistOnly: false,
+    launchedAt: null,
     prize: "Academy division",
   },
   {
@@ -91,6 +96,7 @@ const brackets = [
     waitlistedPlayers: 0,
     isFull: false,
     isWaitlistOnly: false,
+    launchedAt: null,
     prize: "Challenge division",
   },
   {
@@ -104,6 +110,7 @@ const brackets = [
     waitlistedPlayers: 0,
     isFull: false,
     isWaitlistOnly: false,
+    launchedAt: null,
     prize: "Main division",
   },
 ] satisfies TournamentCard["brackets"];
@@ -145,12 +152,26 @@ const tournament: TournamentCard = {
   generatedBrackets: [],
 };
 
-function renderModal(verifiedDivision: RelicVerifiedDivision | null) {
+const waitlistedRegistration: TournamentViewerRegistration = {
+  id: "33333333-3333-4333-8333-333333333333",
+  tournamentId: TOURNAMENT_ID,
+  tournamentBracketId: brackets[1].id,
+  bracketName: "Challenge Bracket",
+  status: "waitlisted",
+  createdAt: "2026-08-05T10:00:00.000Z",
+  waitlistPosition: 1,
+  waitlistOfferStatus: null,
+};
+
+function renderModal(
+  verifiedDivision: RelicVerifiedDivision | null,
+  selectedTournament = tournament
+) {
   return render(
     <RegisterModal
       profile={profile}
-      tournaments={[tournament]}
-      initialTournamentId={TOURNAMENT_ID}
+      tournaments={[selectedTournament]}
+      initialTournamentId={selectedTournament.id}
       verifiedDivision={verifiedDivision}
       onClose={vi.fn()}
     />
@@ -161,6 +182,19 @@ function getBracketButton(name: string) {
   return screen.getByRole("button", {
     name: new RegExp(`^${name.replace("/", "\\/")}`),
   });
+}
+
+function advanceToAgreements() {
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  for (const agreement of [
+    "Rulebook Agreement",
+    "Player Participation Agreement",
+    "Admin Final Decision Agreement",
+    "Ownership Confirmation",
+  ]) {
+    fireEvent.click(screen.getByRole("checkbox", { name: agreement }));
+  }
 }
 
 describe("Relic verified-division registration UI", () => {
@@ -200,6 +234,70 @@ describe("Relic verified-division registration UI", () => {
       isRegistrationWaitlistOnlyForDivision(divisionTournament, null)
     ).toBe(false);
   });
+
+  it("keeps sibling divisions open after one division launches", () => {
+    const partiallyLaunched: TournamentCard = {
+      ...tournament,
+      status: "In Progress",
+      statusValue: "in_progress",
+      brackets: tournament.brackets.map((bracket) => ({
+        ...bracket,
+        launchedAt:
+          bracket.name === "Challenge Bracket"
+            ? "2026-08-06T02:00:00.000Z"
+            : null,
+      })),
+    };
+
+    expect(
+      getRegistrationDivisionAvailability(partiallyLaunched, "Challenge")
+    ).toBe("launched");
+    expect(
+      getRegistrationDivisionAvailability(partiallyLaunched, "Academy")
+    ).toBe("open");
+  });
+
+  it("shows a closed state for never-offered waitlist history after division launch", () => {
+    const launchedTournament: TournamentCard = {
+      ...tournament,
+      brackets: tournament.brackets.map((bracket) => ({
+        ...bracket,
+        launchedAt:
+          bracket.id === waitlistedRegistration.tournamentBracketId
+            ? "2026-08-06T02:00:00.000Z"
+            : null,
+      })),
+    };
+
+    expect(
+      getViewerRegistrationDisplay(
+        launchedTournament,
+        waitlistedRegistration
+      )
+    ).toMatchObject({
+      title: "Waitlist Closed",
+      tone: "neutral",
+    });
+  });
+
+  it.each([
+    ["declined", "Waitlist Offer Declined"],
+    ["expired", "Waitlist Offer Expired"],
+    ["cancelled", "Waitlist Offer Cancelled"],
+  ] as const)(
+    "shows terminal %s offer history instead of an active waitlist state",
+    (waitlistOfferStatus, title) => {
+      const display = getViewerRegistrationDisplay(tournament, {
+        ...waitlistedRegistration,
+        waitlistOfferStatus,
+      });
+
+      expect(display).toMatchObject({ title, tone: "neutral" });
+      expect(display.description).not.toContain(
+        "currently on the waitlist"
+      );
+    }
+  );
 
   it.each([
     ["Academy", "Academy Bracket"],
@@ -285,21 +383,7 @@ describe("Relic verified-division registration UI", () => {
 
   it("preserves the successful flow for the verified bracket", async () => {
     renderModal("Challenge");
-
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(
-      screen.getByRole("heading", { name: "Player Profile Confirmation" })
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    for (const agreement of [
-      "Rulebook Agreement",
-      "Player Participation Agreement",
-      "Admin Final Decision Agreement",
-      "Ownership Confirmation",
-    ]) {
-      fireEvent.click(screen.getByRole("checkbox", { name: agreement }));
-    }
+    advanceToAgreements();
     fireEvent.click(
       screen.getByRole("button", { name: "Submit Registration" })
     );
@@ -310,7 +394,73 @@ describe("Relic verified-division registration UI", () => {
           bracketId: brackets[1].id,
           bracketName: "Challenge Bracket",
           tournamentId: TOURNAMENT_ID,
+          waitlistConfirmed: false,
         })
+      );
+    });
+    expect(refreshMock).toHaveBeenCalledOnce();
+  });
+
+  it("shows the complete warning and waitlist-specific final action", async () => {
+    const waitlistTournament: TournamentCard = {
+      ...tournament,
+      brackets: tournament.brackets.map((bracket) =>
+        bracket.name === "Challenge Bracket"
+          ? {
+              ...bracket,
+              activeCohortPlayers: 8,
+              isFull: true,
+              isWaitlistOnly: true,
+            }
+          : bracket
+      ),
+    };
+    renderModal("Challenge", waitlistTournament);
+    advanceToAgreements();
+
+    expect(screen.getByText(WAITLIST_DISCLOSURE_MESSAGE)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Join Waitlist" }));
+
+    await waitFor(() => {
+      expect(submitTournamentRegistrationMock).toHaveBeenCalledWith(
+        expect.objectContaining({ waitlistConfirmed: true })
+      );
+    });
+  });
+
+  it("requires a second deliberate action when a capacity race creates a waitlist", async () => {
+    submitTournamentRegistrationMock
+      .mockResolvedValueOnce({
+        success: false,
+        message: `${WAITLIST_DISCLOSURE_MESSAGE} Review this notice, then press Join Waitlist to continue.`,
+        requiresWaitlistConfirmation: true,
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: "Registration submitted to waitlist position #1.",
+      });
+    renderModal("Challenge");
+    advanceToAgreements();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Submit Registration" })
+    );
+
+    await waitFor(() => {
+      expect(submitTournamentRegistrationMock).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ waitlistConfirmed: false })
+      );
+    });
+    expect(refreshMock).not.toHaveBeenCalled();
+    expect(screen.getByText(WAITLIST_DISCLOSURE_MESSAGE)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Join Waitlist" }));
+
+    await waitFor(() => {
+      expect(submitTournamentRegistrationMock).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ waitlistConfirmed: true })
       );
     });
     expect(refreshMock).toHaveBeenCalledOnce();

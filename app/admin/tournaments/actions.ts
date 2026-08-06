@@ -207,7 +207,7 @@ export async function saveTournament(
   const prizePool = getText(formData, "prizePool");
   const rulesUrl = getOptionalText(formData, "rulesUrl");
   const battlefyUrl = getOptionalText(formData, "battlefyUrl");
-  const registrationEnabled = status === "registration_open";
+  let registrationEnabled = status === "registration_open";
   const bracketInputs = TOURNAMENT_BRACKET_CONFIGS.map((config) => ({
     config,
     enabled: formData.get(`${config.fieldPrefix}Enabled`) === "on",
@@ -240,6 +240,17 @@ export async function saveTournament(
     return { error: validationError };
   }
 
+  if (
+    !tournamentId &&
+    status !== "upcoming" &&
+    status !== "registration_open"
+  ) {
+    return {
+      error:
+        "New tournaments must begin Closed or Open. Use Launch Division to enter active competition.",
+    };
+  }
+
   const banner = parseTournamentBannerPublicUrl(bannerImageUrl);
   if (!banner) {
     return { error: "Upload a valid IronClad tournament banner." };
@@ -255,6 +266,25 @@ export async function saveTournament(
       );
       slug = existingTournament.slug;
       previousBannerUrl = existingTournament.bannerImageUrl;
+      const lifecycleManagedStatus =
+        status === "in_progress" || status === "completed";
+      const existingLifecycleManagedStatus =
+        existingTournament.status === "in_progress" ||
+        existingTournament.status === "completed";
+
+      if (
+        (lifecycleManagedStatus && status !== existingTournament.status) ||
+        (existingLifecycleManagedStatus && status !== existingTournament.status)
+      ) {
+        return {
+          error:
+            "Tournament lifecycle status is managed by Launch Division and match completion; it cannot be started or reopened here.",
+        };
+      }
+
+      if (existingLifecycleManagedStatus) {
+        registrationEnabled = existingTournament.registrationEnabled;
+      }
     } else {
       slug = await getAvailableTournamentSlug(supabase, slug);
     }
@@ -402,41 +432,24 @@ export async function generateTournamentBracket(formData: FormData) {
   const tournamentId = getText(formData, "tournamentId");
   const bracketId = getText(formData, "bracketId");
 
-  if (!tournamentId || !bracketId) {
+  if (!isUuid(tournamentId) || !isUuid(bracketId)) {
     redirect(
       `/admin/tournaments?selected=${tournamentId}&notice=generation-failed`
     );
   }
 
   const supabase = createSupabaseAdminClient();
-  const { data: existingGenerated, error: lookupError } = await supabase
-    .from("generated_brackets")
-    .select("id")
-    .eq("tournament_bracket_id", bracketId)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("Generated bracket lookup failed:", lookupError);
-    redirect(
-      `/admin/tournaments?selected=${tournamentId}&notice=generation-failed`
-    );
-  }
-
-  const { data, error } = existingGenerated
-    ? await supabase.rpc("repair_generated_bracket_matches", {
-        p_generated_bracket_id: existingGenerated.id,
-        p_repaired_by: userId,
-      })
-    : await supabase.rpc("generate_tournament_bracket", {
-        p_tournament_bracket_id: bracketId,
-        p_generated_by: userId,
-      });
+  const { data, error } = await supabase.rpc("generate_tournament_bracket", {
+    p_tournament_bracket_id: bracketId,
+    p_generated_by: userId,
+  });
 
   if (error) {
     console.error("Tournament bracket generation failed:", error);
     redirect(
       `/admin/tournaments?selected=${tournamentId}&notice=${
-        error.message.includes("Bracket regeneration blocked")
+        error.message.toLowerCase().includes("regenerat") ||
+        error.message.toLowerCase().includes("launched")
           ? "generation-blocked"
           : "generation-failed"
       }`
@@ -444,14 +457,11 @@ export async function generateTournamentBracket(formData: FormData) {
   }
 
   revalidatePath("/admin/tournaments", "page");
+  revalidatePath("/admin");
   revalidatePath("/tournaments");
   redirect(
     `/admin/tournaments?selected=${tournamentId}&notice=${
-      existingGenerated
-        ? "bracket-repaired"
-        : data
-          ? "bracket-generated"
-          : "generation-pending"
+      data ? "bracket-generated" : "generation-pending"
     }`
   );
 }
@@ -478,8 +488,8 @@ export async function saveBracketAssignments(formData: FormData) {
   }
 
   if (
-    !tournamentId ||
-    !generatedBracketId ||
+    !isUuid(tournamentId) ||
+    !isUuid(generatedBracketId) ||
     !Array.isArray(assignments) ||
     assignments.length > 1024
   ) {
@@ -556,6 +566,52 @@ export async function saveBracketAssignments(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/tournaments");
   redirect("/admin?bracketNotice=population-saved");
+}
+
+export async function launchTournamentDivision(formData: FormData) {
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+
+  if (!userId || role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  const tournamentBracketId = getText(formData, "tournamentBracketId");
+
+  if (!isUuid(tournamentBracketId)) {
+    redirect("/admin?bracketNotice=division-launch-failed");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("launch_tournament_division", {
+    p_tournament_bracket_id: tournamentBracketId,
+    p_actor_clerk_user_id: userId,
+  });
+
+  if (error) {
+    console.error("Tournament division launch failed:", error.message);
+    redirect("/admin?bracketNotice=division-launch-failed");
+  }
+
+  const launchResult = Array.isArray(data) ? data[0] : data;
+
+  if (!launchResult || typeof launchResult.launched_at !== "string") {
+    console.error("Tournament division launch returned no verified state.");
+    redirect("/admin?bracketNotice=division-launch-failed");
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/tournaments", "page");
+  revalidatePath("/dashboard");
+  revalidatePath("/tournaments");
+  redirect(
+    `/admin?bracketNotice=${
+      launchResult.already_launched === true
+        ? "division-already-launched"
+        : "division-launched"
+    }`
+  );
 }
 
 export async function deleteTournament(formData: FormData) {
@@ -830,6 +886,12 @@ function getText(formData: FormData, field: string) {
   return String(formData.get(field) ?? "").trim();
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
 function getOptionalText(formData: FormData, field: string) {
   return getText(formData, field) || null;
 }
@@ -881,7 +943,7 @@ async function getExistingTournamentDetails(
 ) {
   const { data, error } = await supabase
     .from("tournaments")
-    .select("slug, banner_image_url")
+    .select("slug, banner_image_url, status, registration_enabled")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -889,13 +951,20 @@ async function getExistingTournamentDetails(
     throw error;
   }
 
-  if (!data?.slug || !data.banner_image_url) {
+  if (
+    !data?.slug ||
+    !data.banner_image_url ||
+    !validStatuses.includes(data.status as TournamentStatus) ||
+    typeof data.registration_enabled !== "boolean"
+  ) {
     throw new Error("Tournament not found.");
   }
 
   return {
     bannerImageUrl: data.banner_image_url,
+    registrationEnabled: data.registration_enabled,
     slug: data.slug,
+    status: data.status as TournamentStatus,
   };
 }
 

@@ -236,7 +236,12 @@ describe("tournament storage cleanup privacy", () => {
       `http://127.0.0.1:54321/storage/v1/object/public/` +
       `tournament-banners/${previousPath}`;
     const existingQuery = createQuery({
-      data: { slug: "privacy-cup", banner_image_url: previousUrl },
+      data: {
+        slug: "privacy-cup",
+        banner_image_url: previousUrl,
+        status: "upcoming",
+        registration_enabled: false,
+      },
       error: null,
     });
     const unreferencedQuery = createQuery({ data: [], error: null });
@@ -264,7 +269,10 @@ describe("tournament storage cleanup privacy", () => {
     let referenceQueries = 0;
     const tournamentTable = {
       select: vi.fn((columns: string) => {
-        if (columns === "slug, banner_image_url") return existingQuery;
+        if (
+          columns ===
+          "slug, banner_image_url, status, registration_enabled"
+        ) return existingQuery;
         if (columns === "id") {
           referenceQueries += 1;
           return unreferencedQuery;
@@ -340,7 +348,12 @@ describe("tournament storage cleanup privacy", () => {
 
   it("passes and verifies a cleared registration closing time", async () => {
     const existingQuery = createQuery({
-      data: { slug: "privacy-cup", banner_image_url: bannerUrl },
+      data: {
+        slug: "privacy-cup",
+        banner_image_url: bannerUrl,
+        status: "upcoming",
+        registration_enabled: false,
+      },
       error: null,
     });
     const unreferencedQuery = createQuery({ data: [], error: null });
@@ -367,7 +380,10 @@ describe("tournament storage cleanup privacy", () => {
     });
     const tournamentTable = {
       select: vi.fn((columns: string) => {
-        if (columns === "slug, banner_image_url") return existingQuery;
+        if (
+          columns ===
+          "slug, banner_image_url, status, registration_enabled"
+        ) return existingQuery;
         if (columns === "id") return unreferencedQuery;
         return savedQuery;
       }),
@@ -426,13 +442,18 @@ describe("tournament storage cleanup privacy", () => {
     const unrelatedPath =
       "banners/323e4567-e89b-42d3-a456-426614174000.png";
     const existingQuery = createQuery({
-      data: { slug: "privacy-cup", banner_image_url: previousUrl },
+      data: {
+        slug: "privacy-cup",
+        banner_image_url: previousUrl,
+        status: "upcoming",
+        registration_enabled: false,
+      },
       error: null,
     });
     const unreferencedQuery = createQuery({ data: [], error: null });
     const tournamentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url"
+        columns === "slug, banner_image_url, status, registration_enabled"
           ? existingQuery
           : unreferencedQuery
       ),
@@ -484,13 +505,18 @@ describe("tournament storage cleanup privacy", () => {
 
   it("preserves an unchanged or separately referenced banner after failed verification", async () => {
     const currentQuery = createQuery({
-      data: { slug: "privacy-cup", banner_image_url: bannerUrl },
+      data: {
+        slug: "privacy-cup",
+        banner_image_url: bannerUrl,
+        status: "upcoming",
+        registration_enabled: false,
+      },
       error: null,
     });
     const unreferencedQuery = createQuery({ data: [], error: null });
     const currentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url"
+        columns === "slug, banner_image_url, status, registration_enabled"
           ? currentQuery
           : unreferencedQuery
       ),
@@ -530,7 +556,12 @@ describe("tournament storage cleanup privacy", () => {
       "223e4567-e89b-42d3-a456-426614174000"
     );
     const existingQuery = createQuery({
-      data: { slug: "privacy-cup", banner_image_url: previousUrl },
+      data: {
+        slug: "privacy-cup",
+        banner_image_url: previousUrl,
+        status: "upcoming",
+        registration_enabled: false,
+      },
       error: null,
     });
     const referencedQuery = createQuery({
@@ -540,7 +571,10 @@ describe("tournament storage cleanup privacy", () => {
     let referenceQueryCount = 0;
     const referencedTable = {
       select: vi.fn((columns: string) => {
-        if (columns === "slug, banner_image_url") return existingQuery;
+        if (
+          columns ===
+          "slug, banner_image_url, status, registration_enabled"
+        ) return existingQuery;
         referenceQueryCount += 1;
         return referenceQueryCount === 1
           ? unreferencedQuery
@@ -581,13 +615,18 @@ describe("tournament storage cleanup privacy", () => {
       "223e4567-e89b-42d3-a456-426614174000"
     );
     const existingQuery = createQuery({
-      data: { slug: "privacy-cup", banner_image_url: previousUrl },
+      data: {
+        slug: "privacy-cup",
+        banner_image_url: previousUrl,
+        status: "upcoming",
+        registration_enabled: false,
+      },
       error: null,
     });
     const unreferencedQuery = createQuery({ data: [], error: null });
     const tournamentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url"
+        columns === "slug, banner_image_url, status, registration_enabled"
           ? existingQuery
           : unreferencedQuery
       ),

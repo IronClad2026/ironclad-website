@@ -2,7 +2,6 @@
 
 import { useActionState, useState } from "react";
 import {
-  editAdminMatchParticipants,
   resetAdminMatch,
   saveAdminMatchResult,
   reviewMatchResult,
@@ -30,7 +29,6 @@ export default function MatchResultControls({
   canSubmit,
   submissions,
   reportGroups,
-  participantOptions,
   showDirectAdminControls = false,
   presentation = "inline",
 }: {
@@ -40,7 +38,6 @@ export default function MatchResultControls({
   canSubmit: boolean;
   submissions: MatchResultSubmission[];
   reportGroups: MatchResultReportGroup[];
-  participantOptions?: TournamentParticipant[];
   showDirectAdminControls?: boolean;
   presentation?: "inline" | "workspace";
 }) {
@@ -62,8 +59,6 @@ export default function MatchResultControls({
         reportGroup.status
       )
   );
-  const availableParticipantOptions =
-    participantOptions ?? Array.from(participantsById.values());
   const canOpenForReportGroups = reportGroups.length > 0;
   const canSubmitNewReport =
     canSubmit &&
@@ -127,11 +122,7 @@ export default function MatchResultControls({
           )}
 
           {isAdmin && showDirectAdminControls && (
-            <div className="grid gap-4 xl:col-span-2 lg:grid-cols-2">
-              <AdminParticipantEditForm
-                match={match}
-                participantOptions={availableParticipantOptions}
-              />
+            <div className="xl:col-span-2">
               <AdminResetMatchForm match={match} />
             </div>
           )}
@@ -342,96 +333,6 @@ export function ResultEntryForm({
         className="w-full rounded-xl bg-orange-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400 disabled:opacity-50"
       >
         {pending ? "Saving..." : "Complete Match & Advance Winner"}
-      </button>
-    </form>
-  );
-}
-
-export function AdminParticipantEditForm({
-  match,
-  participantOptions,
-}: {
-  match: GeneratedTournamentMatch;
-  participantOptions: TournamentParticipant[];
-}) {
-  const [state, formAction, pending] = useActionState(
-    editAdminMatchParticipants,
-    initialState
-  );
-  const uniqueOptions = Array.from(
-    new Map(
-      participantOptions.map((participant) => [
-        participant.registrationId,
-        participant,
-      ])
-    ).values()
-  ).sort((left, right) => left.name.localeCompare(right.name));
-
-  return (
-    <form
-      action={formAction}
-      className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5"
-    >
-      <input type="hidden" name="matchId" value={match.id} />
-      <div>
-        <p className="text-xs font-black uppercase tracking-wider text-white">
-          Edit Participants
-        </p>
-        <p className="mt-1 text-[11px] leading-5 text-slate-500">
-          Allowed only before reports, official results, or dependent bracket
-          activity exist.
-        </p>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-xs font-bold text-slate-300">Player 1</span>
-          <select
-            name="playerOneRegistrationId"
-            defaultValue={match.playerOneRegistrationId ?? ""}
-            className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-xs text-white outline-none focus:border-orange-400"
-          >
-            <option value="">TBD / Empty slot</option>
-            {uniqueOptions.map((participant) => (
-              <option
-                key={`p1-${participant.registrationId}`}
-                value={participant.registrationId}
-              >
-                {participant.name} ({formatSubmissionStatusLabel(participant.status)})
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-bold text-slate-300">Player 2</span>
-          <select
-            name="playerTwoRegistrationId"
-            defaultValue={match.playerTwoRegistrationId ?? ""}
-            className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-xs text-white outline-none focus:border-orange-400"
-          >
-            <option value="">TBD / Empty slot</option>
-            {uniqueOptions.map((participant) => (
-              <option
-                key={`p2-${participant.registrationId}`}
-                value={participant.registrationId}
-              >
-                {participant.name} ({formatSubmissionStatusLabel(participant.status)})
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="mt-4">
-        <ActionMessage state={state} />
-      </div>
-      <button
-        type="submit"
-        disabled={pending}
-        className="mt-3 w-full rounded-xl border border-sky-400/30 bg-sky-500/15 px-4 py-3 text-xs font-black uppercase tracking-wider text-sky-100 transition hover:border-sky-300 hover:bg-sky-500/25 disabled:opacity-50"
-      >
-        {pending ? "Saving..." : "Save Participants"}
       </button>
     </form>
   );
@@ -979,16 +880,6 @@ function formatSubmissionStatus(status: MatchResultSubmission["status"]) {
     approved: "Approved",
     rejected: "Rejected",
     resubmission_requested: "Resubmission Requested",
-  }[status];
-}
-
-function formatSubmissionStatusLabel(status: TournamentParticipant["status"]) {
-  return {
-    pending: "Pending",
-    manual_review: "Manual Review",
-    approved: "Approved",
-    rejected: "Rejected",
-    waitlisted: "Waitlisted",
   }[status];
 }
 

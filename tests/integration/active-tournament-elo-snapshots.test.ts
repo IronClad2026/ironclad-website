@@ -41,7 +41,44 @@ const activeRows = [
     elo_verified_elo: null,
     elo_verified_division: null,
     registration_status: "waitlisted",
+    waitlist_offer_status: null,
+    tournament_bracket: { launched_at: null },
     tournament: { title: "IronClad Academy", status: "upcoming" },
+  },
+  {
+    submitted_elo: 1111,
+    elo_verified_elo: null,
+    elo_verified_division: "Challenge",
+    registration_status: "waitlisted",
+    waitlist_offer_status: "offered",
+    tournament_bracket: { launched_at: null },
+    tournament: { title: "IronClad Reserve", status: "registration_open" },
+  },
+  ...(["declined", "expired", "cancelled"] as const).map(
+    (waitlistOfferStatus) => ({
+      submitted_elo: 1000,
+      elo_verified_elo: null,
+      elo_verified_division: "Academy",
+      registration_status: "waitlisted",
+      waitlist_offer_status: waitlistOfferStatus,
+      tournament_bracket: { launched_at: null },
+      tournament: {
+        title: `Terminal ${waitlistOfferStatus}`,
+        status: "registration_open",
+      },
+    })
+  ),
+  {
+    submitted_elo: 1000,
+    elo_verified_elo: null,
+    elo_verified_division: "Academy",
+    registration_status: "waitlisted",
+    waitlist_offer_status: null,
+    tournament_bracket: { launched_at: "2026-08-06T02:00:00.000Z" },
+    tournament: {
+      title: "Launched Waitlist History",
+      status: "in_progress",
+    },
   },
   {
     submitted_elo: 1200,
@@ -93,7 +130,7 @@ describe("active tournament ELO snapshot loading", () => {
     expect(supabase.calls).toContainEqual({
       method: "select",
       args: [
-        "submitted_elo, elo_verified_elo, elo_verified_division, registration_status, tournament:tournaments!inner(title, status)",
+        "submitted_elo, elo_verified_elo, elo_verified_division, registration_status, waitlist_offer_status, tournament_bracket:tournament_brackets(launched_at), tournament:tournaments!inner(title, status)",
       ],
     });
     expect(supabase.calls).toContainEqual({
@@ -120,6 +157,11 @@ describe("active tournament ELO snapshot loading", () => {
       {
         tournamentTitle: "IronClad Malformed Snapshot",
         elo: null,
+        division: "Challenge",
+      },
+      {
+        tournamentTitle: "IronClad Reserve",
+        elo: 1111,
         division: "Challenge",
       },
     ]);
@@ -162,7 +204,7 @@ describe("active tournament ELO snapshot loading", () => {
     expect(supabase.calls).toContainEqual({
       method: "select",
       args: [
-        "submitted_elo, elo_verified_elo, elo_verified_division, registration_status, tournament:tournaments!inner(title, status), profile:players!registrations_profile_id_fkey!inner(public_profile_enabled)",
+        "submitted_elo, elo_verified_elo, elo_verified_division, registration_status, waitlist_offer_status, tournament_bracket:tournament_brackets(launched_at), tournament:tournaments!inner(title, status), profile:players!registrations_profile_id_fkey!inner(public_profile_enabled)",
       ],
     });
     expectActiveFilters(supabase.calls);

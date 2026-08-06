@@ -415,6 +415,14 @@ function buildNotificationHref(
     return "/admin";
   }
 
+  if (
+    row.registration_id &&
+    (row.type === "registration.waitlist_offer" ||
+      row.type === "registration.waitlist_closed")
+  ) {
+    return `/dashboard#registration-${encodeURIComponent(row.registration_id)}`;
+  }
+
   if (row.tournament_id || row.match_id || row.report_group_id) {
     return "/tournaments";
   }

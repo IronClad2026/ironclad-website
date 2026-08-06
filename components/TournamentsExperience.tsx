@@ -9,7 +9,6 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { submitTournamentRegistration } from "@/app/tournaments/actions";
 import MatchResultControls, {
-  AdminParticipantEditForm,
   AdminResetMatchForm,
   ReportGroupReview,
   ResultEntryForm,
@@ -21,6 +20,7 @@ import type { PlayerProfile } from "@/lib/player-profile";
 import {
   getTournamentBracketDisplayName,
   isTournamentRegistrationOpen,
+  WAITLIST_DISCLOSURE_MESSAGE,
 } from "@/lib/tournaments";
 import type {
   GeneratedTournamentBracket,
@@ -417,14 +417,20 @@ function Hero({
   verifiedDivision: RelicVerifiedDivision | null;
   onRegisterClick: () => void;
 }) {
-  const registrationOpen = isTournamentRegistrationOpen(tournament);
-  const publicStatus = getPublicTournamentStatus(tournament);
-  const registrationIsWaitlistOnly = isRegistrationWaitlistOnlyForDivision(
+  const registrationAvailability = getRegistrationDivisionAvailability(
     tournament,
     verifiedDivision
   );
-  const actionLabel = registrationOpen
-    ? registrationIsWaitlistOnly
+  const registrationOpen =
+    registrationAvailability === "open" ||
+    registrationAvailability === "waitlist";
+  const divisionLaunched = registrationAvailability === "launched";
+  const publicStatus = getPublicTournamentStatus(tournament);
+  const registrationIsWaitlistOnly = registrationAvailability === "waitlist";
+  const actionLabel = divisionLaunched
+    ? "Registration closed — this division has started."
+    : registrationOpen
+      ? registrationIsWaitlistOnly
       ? "Join Waitlist"
       : "Register"
     : publicStatus;
@@ -509,7 +515,9 @@ function Hero({
               <ActionCard
                 label={actionLabel}
                 description={
-                  registrationOpen
+                  divisionLaunched
+                    ? "Division in progress"
+                    : registrationOpen
                     ? registrationIsWaitlistOnly
                       ? "Waitlist open"
                       : "Open events"
@@ -517,6 +525,7 @@ function Hero({
                 }
                 icon={registrationOpen ? CheckCircle2 : Clock3}
                 onClick={onRegisterClick}
+                disabled={divisionLaunched}
               />
             )}
           </div>
@@ -526,7 +535,7 @@ function Hero({
   );
 }
 
-type ViewerRegistrationDisplay = {
+export type ViewerRegistrationDisplay = {
   title: string;
   description: string;
   tone: "green" | "amber" | "red" | "neutral";
@@ -568,7 +577,7 @@ function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) 
   );
 }
 
-function getViewerRegistrationDisplay(
+export function getViewerRegistrationDisplay(
   tournament: TournamentCard,
   registration: TournamentViewerRegistration
 ): ViewerRegistrationDisplay {
@@ -591,14 +600,78 @@ function getViewerRegistrationDisplay(
   }
 
   if (registration.status === "waitlisted") {
+    const divisionLaunched = tournament.brackets.some(
+      (bracket) =>
+        bracket.id === registration.tournamentBracketId &&
+        Boolean(bracket.launchedAt)
+    );
+
+    if (divisionLaunched) {
+      return {
+        title: "Waitlist Closed",
+        description:
+          "This division launched before a place became available. Your waitlist registration is now closed.",
+        tone: "neutral",
+        icon: X,
+        details,
+      };
+    }
+
+    if (
+      registration.waitlistOfferStatus === "declined" ||
+      registration.waitlistOfferStatus === "expired" ||
+      registration.waitlistOfferStatus === "cancelled"
+    ) {
+      const terminalOfferCopy = {
+        declined: {
+          title: "Waitlist Offer Declined",
+          description:
+            "You declined the available place. This waitlist registration is now closed.",
+        },
+        expired: {
+          title: "Waitlist Offer Expired",
+          description:
+            "The deadline to accept the available place has passed. This waitlist registration is now closed.",
+        },
+        cancelled: {
+          title: "Waitlist Offer Cancelled",
+          description:
+            "The available place was cancelled. This waitlist registration is now closed.",
+        },
+      }[registration.waitlistOfferStatus];
+
+      return {
+        ...terminalOfferCopy,
+        tone: "neutral",
+        icon: X,
+        details,
+      };
+    }
+
+    if (registration.waitlistOfferStatus === "accepted") {
+      return {
+        title: "Waitlist Offer Accepted",
+        description:
+          "Your accepted place is awaiting tournament administrator review.",
+        tone: "neutral",
+        icon: Info,
+        details,
+      };
+    }
+
+    const offerAvailable = registration.waitlistOfferStatus === "offered";
     return {
-      title: `Waitlisted - ${tournament.title}`,
-      description: `You are currently on the waitlist for ${tournament.title}.`,
+      title: offerAvailable
+        ? `Spot Available - ${tournament.title}`
+        : `Waitlisted - ${tournament.title}`,
+      description: offerAvailable
+        ? "A tournament place is available. Open your dashboard before the offer deadline to accept or decline."
+        : `You are currently on the waitlist for ${tournament.title}.`,
       tone: "amber",
       icon: Clock3,
       details: [
         ...details,
-        registration.waitlistPosition
+        registration.waitlistPosition !== null
           ? `Waitlist Position: #${registration.waitlistPosition}`
           : null,
       ].filter((detail) => detail !== null),
@@ -611,6 +684,17 @@ function getViewerRegistrationDisplay(
       description:
         "This registration was not approved by tournament administration.",
       tone: "red",
+      icon: X,
+      details,
+    };
+  }
+
+  if (registration.status === "withdrawn") {
+    return {
+      title: "Registration Withdrawn",
+      description:
+        "You withdrew from this tournament. This registration is final and cannot be reopened.",
+      tone: "neutral",
       icon: X,
       details,
     };
@@ -643,11 +727,11 @@ function formatRegistrationStatus(status: TournamentViewerRegistration["status"]
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function ActionCard({ label, description, icon: Icon, onClick }: { label: string; description: string; icon: ElementType; onClick: () => void }) {
+function ActionCard({ label, description, icon: Icon, onClick, disabled = false }: { label: string; description: string; icon: ElementType; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-4 text-left shadow-xl shadow-black/20 backdrop-blur hover:bg-orange-500/10", interactiveHover)}>
-      <Icon size={18} className="shrink-0 text-orange-300" />
-      <p className="mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider text-white">{label}</p>
+    <button type="button" onClick={onClick} disabled={disabled} aria-disabled={disabled} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden border p-4 text-left shadow-xl shadow-black/20 backdrop-blur", disabled ? "cursor-not-allowed border-zinc-700 bg-zinc-900/80 text-zinc-500" : classNames("border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] hover:bg-orange-500/10", interactiveHover))}>
+      <Icon size={18} className={classNames("shrink-0", disabled ? "text-zinc-500" : "text-orange-300")} />
+      <p className={classNames("mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider", disabled ? "text-zinc-400" : "text-white")}>{label}</p>
       <p className="mt-1 break-words text-xs font-semibold leading-5 text-zinc-400">{description}</p>
     </button>
   );
@@ -1528,10 +1612,6 @@ function AdminMatchManagementModal({
                 )}
               </div>
 
-              <AdminParticipantEditForm
-                match={match}
-                participantOptions={tournament.bracketParticipants}
-              />
               <AdminResetMatchForm match={match} />
             </div>
           </div>
@@ -2266,6 +2346,46 @@ export function isRegistrationWaitlistOnlyForDivision(
   );
 }
 
+export type RegistrationDivisionAvailability =
+  | "open"
+  | "waitlist"
+  | "launched"
+  | "closed";
+
+export function getRegistrationDivisionAvailability(
+  tournament: TournamentCard,
+  verifiedDivision: RelicVerifiedDivision | null,
+  now = Date.now()
+): RegistrationDivisionAvailability {
+  const verifiedBracketName = getVerifiedDivisionBracketName(verifiedDivision);
+  const verifiedBracket = tournament.brackets.find(
+    (bracket) => bracket.name === verifiedBracketName
+  );
+
+  if (verifiedBracket?.launchedAt) {
+    return "launched";
+  }
+
+  if (
+    !verifiedDivision &&
+    tournament.brackets.length > 0 &&
+    tournament.brackets.every((bracket) => bracket.launchedAt !== null)
+  ) {
+    return "launched";
+  }
+
+  if (
+    !isTournamentRegistrationOpen(tournament, now) ||
+    (verifiedDivision !== null && !verifiedBracket)
+  ) {
+    return "closed";
+  }
+
+  return isRegistrationWaitlistOnlyForDivision(tournament, verifiedDivision)
+    ? "waitlist"
+    : "open";
+}
+
 type RegistrationFormState = {
   tournamentTitle: string;
   bracketName: string;
@@ -2321,6 +2441,8 @@ export function RegisterModal({
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
+  const [waitlistConfirmationRequired, setWaitlistConfirmationRequired] =
+    useState(false);
   const [successMessage, setSuccessMessage] = useState("Registration submitted.");
   const [selectedTournament, setSelectedTournament] =
     useState<TournamentCard>(initialTournament);
@@ -2339,7 +2461,15 @@ export function RegisterModal({
   };
 
   const selectBracket = (bracketName: string) => {
-    if (!isVerifiedDivisionBracket(bracketName, verifiedDivision)) {
+    const bracket = selectedTournament.brackets.find(
+      (candidate) => candidate.name === bracketName
+    );
+
+    if (
+      !isVerifiedDivisionBracket(bracketName, verifiedDivision) ||
+      !bracket ||
+      bracket.launchedAt !== null
+    ) {
       return;
     }
 
@@ -2348,6 +2478,8 @@ export function RegisterModal({
 
   const selectTournament = (event: TournamentCard) => {
     setSelectedTournament(event);
+    setWaitlistConfirmationRequired(false);
+    setSubmissionError("");
     setForm((current) => ({
       ...current,
       tournamentTitle: event.title,
@@ -2360,9 +2492,17 @@ export function RegisterModal({
     const nextErrors: RegistrationErrors = {};
 
     if (targetStep === "tournament") {
-      if (!isTournamentRegistrationOpen(selectedTournament)) {
+      const availability = getRegistrationDivisionAvailability(
+        selectedTournament,
+        verifiedDivision
+      );
+
+      if (availability === "launched") {
         nextErrors.tournamentTitle =
-          "This tournament is full or already in progress. We hope to see you in the next one.";
+          "Registration closed — this division has started.";
+      } else if (availability === "closed") {
+        nextErrors.tournamentTitle =
+          "Registration is not currently available for this division.";
       } else if (!form.tournamentTitle.trim()) {
         nextErrors.tournamentTitle = "Please select a tournament.";
       }
@@ -2418,9 +2558,19 @@ export function RegisterModal({
   };
 
   const submitRegistration = async () => {
-    if (!isTournamentRegistrationOpen(selectedTournament)) {
+    const registrationAvailability = getRegistrationDivisionAvailability(
+      selectedTournament,
+      verifiedDivision
+    );
+
+    if (
+      registrationAvailability === "closed" ||
+      registrationAvailability === "launched"
+    ) {
       setSubmissionError(
-        "This tournament is full or already in progress. We hope to see you in the next one."
+        registrationAvailability === "launched"
+          ? "Registration closed — this division has started."
+          : "Registration is not currently available for this division."
       );
       setStep("tournament");
       return;
@@ -2455,12 +2605,18 @@ export function RegisterModal({
       playerParticipationAgreement: form.playerParticipationAgreement,
       adminFinalDecisionAgreement: form.adminFinalDecisionAgreement,
       ownershipConfirmation: form.ownershipConfirmation,
+      waitlistConfirmed:
+        registrationAvailability === "waitlist" ||
+        waitlistConfirmationRequired,
     });
 
     setIsSubmitting(false);
 
     if (!result.success) {
       setSubmissionError(result.message);
+      if (result.requiresWaitlistConfirmation) {
+        setWaitlistConfirmationRequired(true);
+      }
       return;
     }
 
@@ -2479,6 +2635,12 @@ export function RegisterModal({
   const verifiedBracketAvailable = selectedTournament.brackets.some((bracket) =>
     isVerifiedDivisionBracket(bracket.name, verifiedDivision)
   );
+  const registrationAvailability = getRegistrationDivisionAvailability(
+    selectedTournament,
+    verifiedDivision
+  );
+  const waitlistSubmission =
+    registrationAvailability === "waitlist" || waitlistConfirmationRequired;
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 px-4 py-6">
@@ -2511,7 +2673,14 @@ export function RegisterModal({
                 {tournaments.map((event) => {
                   const selected = selectedTournament.title === event.title;
                   const registrationAvailable =
-                    isTournamentRegistrationOpen(event);
+                    getRegistrationDivisionAvailability(
+                      event,
+                      verifiedDivision
+                    ) === "open" ||
+                    getRegistrationDivisionAvailability(
+                      event,
+                      verifiedDivision
+                    ) === "waitlist";
                   return (
                     <button
                       key={event.title}
@@ -2556,7 +2725,7 @@ export function RegisterModal({
                     const selectable = isVerifiedDivisionBracket(
                       bracket.name,
                       verifiedDivision
-                    );
+                    ) && bracket.launchedAt === null;
                     const selected = form.bracketName === bracket.name;
                     return (
                       <button
@@ -2603,6 +2772,11 @@ export function RegisterModal({
                             Waitlist Only
                           </p>
                         )}
+                        {bracket.launchedAt && (
+                          <p className="mt-2 text-xs font-black uppercase tracking-wider text-zinc-400">
+                            Registration closed — this division has started.
+                          </p>
+                        )}
                         <p
                           className={classNames(
                             "mt-2 text-xs font-black uppercase tracking-wider",
@@ -2645,7 +2819,11 @@ export function RegisterModal({
               <ModalButtons
                 onClose={onClose}
                 onNext={goToProfileStep}
-                isDisabled={!verifiedBracketAvailable}
+                isDisabled={
+                  !verifiedBracketAvailable ||
+                  registrationAvailability === "closed" ||
+                  registrationAvailability === "launched"
+                }
               />
             </div>
           )}
@@ -2702,13 +2880,27 @@ export function RegisterModal({
                 <AgreementCheckbox label="Ownership Confirmation" checked={form.ownershipConfirmation} onChange={(checked) => updateField("ownershipConfirmation", checked)} error={errors.ownershipConfirmation} />
               </div>
 
+              {waitlistSubmission && (
+                <div
+                  role="alert"
+                  className="border border-amber-400/45 bg-amber-500/10 p-4"
+                >
+                  <p className="text-sm font-black uppercase tracking-wider text-amber-200">
+                    Join Waitlist
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-amber-100">
+                    {WAITLIST_DISCLOSURE_MESSAGE}
+                  </p>
+                </div>
+              )}
+
               {submissionError && (
                 <div className="whitespace-pre-line border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
                   {submissionError}
                 </div>
               )}
 
-              <ModalButtons onBack={() => setStep("profile")} onNext={submitRegistration} nextLabel="Submit Registration" isLoading={isSubmitting} />
+              <ModalButtons onBack={() => setStep("profile")} onNext={submitRegistration} nextLabel={waitlistSubmission ? "Join Waitlist" : "Submit Registration"} isLoading={isSubmitting} />
             </div>
           )}
 
@@ -2813,14 +3005,20 @@ function MobileHero({
   verifiedDivision: RelicVerifiedDivision | null;
   onRegisterClick: () => void;
 }) {
-  const registrationOpen = isTournamentRegistrationOpen(tournament);
-  const publicStatus = getPublicTournamentStatus(tournament);
-  const registrationIsWaitlistOnly = isRegistrationWaitlistOnlyForDivision(
+  const registrationAvailability = getRegistrationDivisionAvailability(
     tournament,
     verifiedDivision
   );
-  const actionLabel = registrationOpen
-    ? registrationIsWaitlistOnly
+  const registrationOpen =
+    registrationAvailability === "open" ||
+    registrationAvailability === "waitlist";
+  const divisionLaunched = registrationAvailability === "launched";
+  const publicStatus = getPublicTournamentStatus(tournament);
+  const registrationIsWaitlistOnly = registrationAvailability === "waitlist";
+  const actionLabel = divisionLaunched
+    ? "Registration closed — this division has started."
+    : registrationOpen
+      ? registrationIsWaitlistOnly
       ? "Join Waitlist"
       : "Register"
     : publicStatus;
@@ -2933,7 +3131,9 @@ function MobileHero({
             <ActionCard
               label={actionLabel}
               description={
-                registrationOpen
+                divisionLaunched
+                  ? "Division in progress"
+                  : registrationOpen
                   ? registrationIsWaitlistOnly
                     ? "Waitlist open"
                     : "Open events"
@@ -2941,6 +3141,7 @@ function MobileHero({
               }
               icon={registrationOpen ? CheckCircle2 : Clock3}
               onClick={onRegisterClick}
+              disabled={divisionLaunched}
             />
           )}
         </div>
@@ -3906,7 +4107,7 @@ type TournamentViewer = {
   registrations: TournamentViewerRegistration[];
 };
 
-type TournamentViewerRegistration = {
+export type TournamentViewerRegistration = {
   id: string;
   tournamentId: string;
   tournamentBracketId: string;
@@ -3916,9 +4117,17 @@ type TournamentViewerRegistration = {
     | "manual_review"
     | "approved"
     | "rejected"
-    | "waitlisted";
+    | "waitlisted"
+    | "withdrawn";
   createdAt: string | null;
   waitlistPosition: number | null;
+  waitlistOfferStatus:
+    | "offered"
+    | "accepted"
+    | "declined"
+    | "expired"
+    | "cancelled"
+    | null;
 };
 
 export default function TournamentsExperience({
@@ -4102,7 +4311,15 @@ export default function TournamentsExperience({
       return;
     }
 
-    if (!isTournamentRegistrationOpen(selectedTournament)) {
+    const registrationAvailability = getRegistrationDivisionAvailability(
+      selectedTournament,
+      viewer.relicVerifiedDivision
+    );
+
+    if (
+      registrationAvailability === "closed" ||
+      registrationAvailability === "launched"
+    ) {
       setRegistrationGate("closed");
       return;
     }

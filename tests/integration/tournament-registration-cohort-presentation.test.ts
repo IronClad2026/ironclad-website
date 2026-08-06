@@ -46,6 +46,7 @@ function createTournamentRow(): TournamentRow {
         registered_players: 2,
         active_cohort_players: 7,
         waitlisted_players: 0,
+        launched_at: null,
         created_at: "2026-08-01T00:00:00.000Z",
         updated_at: "2026-08-01T00:00:00.000Z",
       },
@@ -58,6 +59,7 @@ function createTournamentRow(): TournamentRow {
         registered_players: 5,
         active_cohort_players: 8,
         waitlisted_players: 2,
+        launched_at: null,
         created_at: "2026-08-01T00:00:00.000Z",
         updated_at: "2026-08-01T00:00:00.000Z",
       },
@@ -70,6 +72,7 @@ function createTournamentRow(): TournamentRow {
         registered_players: 1,
         active_cohort_players: 3,
         waitlisted_players: 1,
+        launched_at: null,
         created_at: "2026-08-01T00:00:00.000Z",
         updated_at: "2026-08-01T00:00:00.000Z",
       },
@@ -120,10 +123,11 @@ describe("registration cohort presentation", () => {
     );
   });
 
-  it("keeps generated competition private before the tournament is active", () => {
-    expect(isTournamentBracketPublic("registration_open")).toBe(false);
-    expect(isTournamentBracketPublic("in_progress")).toBe(true);
-    expect(isTournamentBracketPublic("completed")).toBe(true);
+  it("keeps generated competition private until its division launches", () => {
+    expect(isTournamentBracketPublic(null)).toBe(false);
+    expect(
+      isTournamentBracketPublic("2026-08-06T02:00:00.000Z")
+    ).toBe(true);
 
     const pageSource = readNormalizedSource("app/tournaments/page.tsx");
     const filteredRowsIndex = pageSource.indexOf(
@@ -142,7 +146,7 @@ describe("registration cohort presentation", () => {
     expect(mappedRowsIndex).toBeGreaterThan(referencedRowsIndex);
   });
 
-  it("exposes one administrator closing-time control and derived cohort labels", () => {
+  it("exposes one administrator closing-time control and division readiness labels", () => {
     const adminPageSource = readNormalizedSource("app/admin/page.tsx");
     const tournamentFormSource = readNormalizedSource(
       "app/admin/tournaments/page.tsx"
@@ -154,9 +158,12 @@ describe("registration cohort presentation", () => {
       "components/TournamentsExperience.tsx"
     );
 
-    expect(adminPageSource).toContain("Minimum Reached / Admin Review");
-    expect(adminPageSource).toContain("Below Minimum");
-    expect(adminPageSource).toContain("Waitlist:");
+    expect(adminPageSource).toContain(
+      "approved — ready for private bracket preparation"
+    );
+    expect(adminPageSource).toContain("approved — review incomplete");
+    expect(adminPageSource).toContain("Division launched — roster locked");
+    expect(adminPageSource).toContain("Waiting for a FIFO spot offer");
     expect(tournamentFormSource).toContain('label="Registration Closes"');
     expect(tournamentFormSource).toContain('name="registrationCloseAt"');
     expect(tournamentActionSource).toContain(

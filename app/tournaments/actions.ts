@@ -12,6 +12,7 @@ import {
 } from "@/lib/elo-verification/relic";
 import { createInAppNotification } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { WAITLIST_DISCLOSURE_MESSAGE } from "@/lib/tournaments";
 
 const REGISTRATION_UNAVAILABLE_MESSAGE =
   "This tournament is full or already in progress. We hope to see you in the next one.";
@@ -21,6 +22,7 @@ const DUPLICATE_REGISTRATION_MESSAGE =
   "You are already registered for this tournament.";
 const WRONG_DIVISION_MESSAGE =
   "Your ELO division has changed. Refresh your verified ELO from the Profile page and try again.";
+const WAITLIST_CONFIRMATION_REQUIRED_MESSAGE = `${WAITLIST_DISCLOSURE_MESSAGE} Review this notice, then press Join Waitlist to continue.`;
 const PLAYER_SELECT = [
   "id",
   "clerk_user_id",
@@ -35,7 +37,7 @@ const TOURNAMENT_SELECT = [
   "registration_open_at",
   "registration_close_at",
   "registration_enabled",
-  "tournament_brackets!inner(id, name)",
+  "tournament_brackets!inner(id, name, launched_at)",
 ].join(", ");
 
 type TournamentRegistrationInput = {
@@ -47,12 +49,14 @@ type TournamentRegistrationInput = {
   playerParticipationAgreement: boolean;
   adminFinalDecisionAgreement: boolean;
   ownershipConfirmation: boolean;
+  waitlistConfirmed: boolean;
 };
 
 export type TournamentRegistrationResult = {
   success: boolean;
   message: string;
   requiresProfile?: boolean;
+  requiresWaitlistConfirmation?: boolean;
 };
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
@@ -73,6 +77,7 @@ type RegistrationTournament = {
     id: string;
     name: string;
     division: IronCladDivision;
+    launchedAt: string | null;
   };
 };
 type SavedRegistration = {
@@ -82,6 +87,12 @@ type SavedRegistration = {
   registrationStatus: "pending" | "waitlisted";
   submittedElo: number;
 };
+type RegistrationTransactionResult =
+  | { waitlistConfirmationRequired: true }
+  | {
+      waitlistConfirmationRequired: false;
+      registration: SavedRegistration;
+    };
 
 export async function submitTournamentRegistration(
   input: TournamentRegistrationInput
@@ -212,6 +223,7 @@ export async function submitTournamentRegistration(
         p_relic_faction: relicResult.faction,
         p_relic_division: relicResult.division,
         p_relic_calculation_version: relicResult.calculationVersion,
+        p_waitlist_confirmed: input.waitlistConfirmed,
       }
     );
   } catch {
@@ -224,17 +236,27 @@ export async function submitTournamentRegistration(
     return failure(getRegistrationErrorMessage(registrationResult.error));
   }
 
-  const savedRegistration = parseSavedRegistration(
+  const transactionResult = parseRegistrationTransactionResult(
     registrationResult.data,
     tournament.id,
     tournament.bracket.id,
     relicResult.elo
   );
 
-  if (!savedRegistration) {
+  if (!transactionResult) {
     console.error("Tournament registration transaction returned an invalid result.");
     return failure(REGISTRATION_FAILED_MESSAGE);
   }
+
+  if (transactionResult.waitlistConfirmationRequired) {
+    return {
+      success: false,
+      message: WAITLIST_CONFIRMATION_REQUIRED_MESSAGE,
+      requiresWaitlistConfirmation: true,
+    };
+  }
+
+  const savedRegistration = transactionResult.registration;
 
   revalidateRegistrationPaths();
 
@@ -412,6 +434,7 @@ async function loadWaitlistPosition(
       .select("id")
       .eq("tournament_bracket_id", tournamentBracketId)
       .eq("registration_status", "waitlisted")
+      .is("waitlist_offer_status", null)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true });
   } catch {
@@ -443,7 +466,8 @@ function isValidRegistrationInput(
       value.rulebookAgreement === true &&
       value.playerParticipationAgreement === true &&
       value.adminFinalDecisionAgreement === true &&
-      value.ownershipConfirmation === true
+      value.ownershipConfirmation === true &&
+      typeof value.waitlistConfirmed === "boolean"
   );
 }
 
@@ -500,7 +524,8 @@ function parseRegistrationTournament(
   if (
     !isRecord(bracket) ||
     bracket.id !== expectedBracketId ||
-    typeof bracket.name !== "string"
+    typeof bracket.name !== "string" ||
+    !isNullableTimestamp(bracket.launched_at)
   ) {
     return null;
   }
@@ -522,16 +547,17 @@ function parseRegistrationTournament(
       id: bracket.id,
       name: bracket.name,
       division,
+      launchedAt: bracket.launched_at,
     },
   };
 }
 
-function parseSavedRegistration(
+function parseRegistrationTransactionResult(
   value: unknown,
   expectedTournamentId: string,
   expectedBracketId: string,
   expectedElo: number
-): SavedRegistration | null {
+): RegistrationTransactionResult | null {
   const candidate = Array.isArray(value)
     ? value.length === 1
       ? value[0]
@@ -539,7 +565,17 @@ function parseSavedRegistration(
     : value;
 
   if (
+    isRecord(candidate) &&
+    candidate.waitlist_confirmation_required === true &&
+    candidate.id === null &&
+    candidate.registration_status === null
+  ) {
+    return { waitlistConfirmationRequired: true };
+  }
+
+  if (
     !isRecord(candidate) ||
+    candidate.waitlist_confirmation_required !== false ||
     !isUuid(candidate.id) ||
     candidate.tournament_id !== expectedTournamentId ||
     candidate.tournament_bracket_id !== expectedBracketId ||
@@ -556,17 +592,22 @@ function parseSavedRegistration(
   }
 
   return {
-    id: candidate.id,
-    tournamentId: candidate.tournament_id,
-    tournamentBracketId: candidate.tournament_bracket_id,
-    registrationStatus: candidate.registration_status,
-    submittedElo,
+    waitlistConfirmationRequired: false,
+    registration: {
+      id: candidate.id,
+      tournamentId: candidate.tournament_id,
+      tournamentBracketId: candidate.tournament_bracket_id,
+      registrationStatus: candidate.registration_status,
+      submittedElo,
+    },
   };
 }
 
 function isTournamentRegistrationOpen(tournament: RegistrationTournament) {
   if (
-    tournament.status !== "registration_open" ||
+    (tournament.status !== "registration_open" &&
+      tournament.status !== "in_progress") ||
+    tournament.bracket.launchedAt !== null ||
     !tournament.registrationEnabled
   ) {
     return false;
@@ -657,7 +698,7 @@ function failure(message: string): TournamentRegistrationResult {
 }
 
 function revalidateRegistrationPaths() {
-  for (const path of ["/admin", "/tournaments"]) {
+  for (const path of ["/admin", "/dashboard", "/tournaments"]) {
     try {
       revalidatePath(path);
     } catch {

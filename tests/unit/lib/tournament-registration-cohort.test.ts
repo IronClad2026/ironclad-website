@@ -74,12 +74,18 @@ describe("Phase 4 registration cohort presentation contract", () => {
         Date.parse("2026-08-05T01:30:00.000Z")
       )
     ).toBe(false);
+    expect(
+      isTournamentRegistrationOpen(
+        { ...tournament, statusValue: "in_progress" },
+        Date.parse("2026-08-05T01:30:00.000Z")
+      )
+    ).toBe(true);
   });
 
   it("keeps prelaunch generated brackets private", () => {
-    expect(isTournamentBracketPublic("upcoming")).toBe(false);
-    expect(isTournamentBracketPublic("registration_open")).toBe(false);
-    expect(isTournamentBracketPublic("in_progress")).toBe(true);
-    expect(isTournamentBracketPublic("completed")).toBe(true);
+    expect(isTournamentBracketPublic(null)).toBe(false);
+    expect(
+      isTournamentBracketPublic("2026-08-06T02:00:00.000Z")
+    ).toBe(true);
   });
 });

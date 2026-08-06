@@ -625,60 +625,6 @@ export async function saveAdminMatchResult(
   return successState("Official result saved and winner advanced.");
 }
 
-export async function editAdminMatchParticipants(
-  _previousState: MatchResultActionState,
-  formData: FormData
-): Promise<MatchResultActionState> {
-  const admin = await requireAdmin();
-
-  if (!admin) {
-    return errorState("Administrator access is required.");
-  }
-
-  const matchId = getText(formData, "matchId");
-  const playerOneRegistrationId = getNullableText(
-    formData,
-    "playerOneRegistrationId"
-  );
-  const playerTwoRegistrationId = getNullableText(
-    formData,
-    "playerTwoRegistrationId"
-  );
-
-  if (!matchId) {
-    return errorState("The selected match could not be found.");
-  }
-
-  if (
-    playerOneRegistrationId &&
-    playerTwoRegistrationId &&
-    playerOneRegistrationId === playerTwoRegistrationId
-  ) {
-    return errorState("A player cannot occupy both match slots.");
-  }
-
-  const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.rpc("admin_update_match_participants", {
-    p_match_id: matchId,
-    p_player_one_registration_id: playerOneRegistrationId,
-    p_player_two_registration_id: playerTwoRegistrationId,
-    p_updated_by: admin.userId,
-  });
-
-  if (error) {
-    logMatchResultFailure("edit-match-participants", error);
-    return errorState(
-      getDatabaseMessage(
-        error,
-        "The match participants could not be updated. Please try again."
-      )
-    );
-  }
-
-  revalidateTournamentPaths();
-  return successState("Match participants updated.");
-}
-
 export async function resetAdminMatch(
   _previousState: MatchResultActionState,
   formData: FormData
@@ -810,7 +756,7 @@ async function loadMatchForMutation(
   const { data, error } = await supabase
     .from("tournament_matches")
     .select(
-      "id, generated_bracket_id, match_number, series_best_of, player_one_registration_id, player_two_registration_id, player_one:registrations!tournament_matches_player_one_registration_id_fkey(player_name), player_two:registrations!tournament_matches_player_two_registration_id_fkey(player_name), bracket_rounds!inner(name), generated_brackets!inner(tournament_brackets!inner(tournament_id, tournaments!inner(id, title)))"
+      "id, generated_bracket_id, match_number, series_best_of, player_one_registration_id, player_two_registration_id, player_one:registrations!tournament_matches_player_one_registration_id_fkey(player_name), player_two:registrations!tournament_matches_player_two_registration_id_fkey(player_name), bracket_rounds!inner(name), generated_brackets!inner(tournament_brackets!inner(tournament_id, launched_at, tournaments!inner(id, title)))"
     )
     .eq("id", matchId)
     .maybeSingle();
@@ -833,17 +779,21 @@ async function loadMatchForMutation(
     generated_brackets?: {
       tournament_brackets?: {
         tournament_id: string | null;
+        launched_at: string | null;
         tournaments?: { id: string; title: string | null } | { id: string; title: string | null }[];
       } | {
         tournament_id: string | null;
+        launched_at: string | null;
         tournaments?: { id: string; title: string | null } | { id: string; title: string | null }[];
       }[];
     } | {
       tournament_brackets?: {
         tournament_id: string | null;
+        launched_at: string | null;
         tournaments?: { id: string; title: string | null } | { id: string; title: string | null }[];
       } | {
         tournament_id: string | null;
+        launched_at: string | null;
         tournaments?: { id: string; title: string | null } | { id: string; title: string | null }[];
       }[];
     }[];
@@ -854,6 +804,10 @@ async function loadMatchForMutation(
   const generatedBracket = first(row.generated_brackets);
   const tournamentBracket = first(generatedBracket?.tournament_brackets);
   const tournament = first(tournamentBracket?.tournaments);
+
+  if (!tournamentBracket?.launched_at) {
+    return null;
+  }
 
   return {
     id: row.id,
@@ -1063,11 +1017,6 @@ function revalidateTournamentPaths() {
 
 function getText(formData: FormData, field: string) {
   return String(formData.get(field) ?? "").trim();
-}
-
-function getNullableText(formData: FormData, field: string) {
-  const value = getText(formData, field);
-  return value.length > 0 ? value : null;
 }
 
 function getScore(formData: FormData, field: string) {
