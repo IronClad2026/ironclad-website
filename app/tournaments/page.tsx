@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import TournamentsExperience from "@/components/TournamentsExperience";
 import { loadMatchResultData } from "@/lib/match-result-data";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
 import {
   getGeneratedBracketRegistrationIds,
   loadGeneratedBracketPageRows,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/tournament-bracket-data";
 import {
   getTournamentBracketDisplayName,
+  isTournamentBracketPublic,
   mapTournamentRow,
   type TournamentParticipant,
   type TournamentRow,
@@ -54,7 +56,7 @@ export default async function TournamentsPage() {
     supabase
       .from("tournaments")
       .select(
-        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
+        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
       )
       .order("grand_final_at", { ascending: false, nullsFirst: false }),
     supabase.rpc("get_tournament_bracket_capacity"),
@@ -113,6 +115,19 @@ export default async function TournamentsPage() {
     );
   }
 
+  const tournamentRows = (tournamentResult.data ?? []) as TournamentRow[];
+  const publicBracketIds = new Set(
+    tournamentRows.flatMap((tournament) =>
+      isTournamentBracketPublic(tournament.status)
+        ? (tournament.tournament_brackets ?? []).map((bracket) => bracket.id)
+        : []
+    )
+  );
+  const publicGeneratedBracketRows = (
+    generatedBracketResult.data ?? []
+  ).filter((generated) =>
+    publicBracketIds.has(generated.tournament_bracket_id)
+  );
   const registrations = (registrationResult.data ?? []) as {
     id: string;
     clerk_user_id: string;
@@ -133,8 +148,27 @@ export default async function TournamentsPage() {
     created_at: string | null;
   }[];
   const referencedRegistrationIds = getGeneratedBracketRegistrationIds(
-    generatedBracketResult.data ?? []
+    publicGeneratedBracketRows
   );
+  const activeCohortCountByBracket = new Map<string, number>();
+  const waitlistCountByBracket = new Map<string, number>();
+
+  for (const registration of registrations) {
+    if (isActiveReviewCohortStatus(registration.registration_status)) {
+      activeCohortCountByBracket.set(
+        registration.tournament_bracket_id,
+        (activeCohortCountByBracket.get(
+          registration.tournament_bracket_id
+        ) ?? 0) + 1
+      );
+    } else if (registration.registration_status === "waitlisted") {
+      waitlistCountByBracket.set(
+        registration.tournament_bracket_id,
+        (waitlistCountByBracket.get(registration.tournament_bracket_id) ?? 0) +
+          1
+      );
+    }
+  }
   const bracketRegistrations = registrations.filter(
     (registration) =>
       registration.registration_status === "approved" ||
@@ -179,23 +213,21 @@ export default async function TournamentsPage() {
       (capacityResult.data ?? []) as {
         bracket_id: string;
         registered_players: number;
-        waitlisted_players: number;
       }[]
     ).map((capacity) => [
       capacity.bracket_id,
       {
         registeredPlayers: capacity.registered_players,
-        waitlistedPlayers: capacity.waitlisted_players,
       },
     ])
   );
-  const tournamentRows = (tournamentResult.data ?? []) as TournamentRow[];
-
   for (const tournament of tournamentRows) {
     for (const bracket of tournament.tournament_brackets ?? []) {
       const capacity = capacityByBracket.get(bracket.id);
       bracket.registered_players = capacity?.registeredPlayers ?? 0;
-      bracket.waitlisted_players = capacity?.waitlistedPlayers ?? 0;
+      bracket.active_cohort_players =
+        activeCohortCountByBracket.get(bracket.id) ?? 0;
+      bracket.waitlisted_players = waitlistCountByBracket.get(bracket.id) ?? 0;
     }
   }
 
@@ -273,7 +305,7 @@ export default async function TournamentsPage() {
   }
 
   const generatedByTournament = mapGeneratedBrackets(
-    generatedBracketResult.data ?? [],
+    publicGeneratedBracketRows,
     tournamentRows
   );
   const tournaments = tournamentRows.map((row) => {

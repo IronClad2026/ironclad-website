@@ -192,6 +192,10 @@ export async function saveTournament(
     formData,
     "registrationOpenAt"
   );
+  const registrationCloseAt = parseOptionalDateTime(
+    formData,
+    "registrationCloseAt"
+  );
   const grandFinalAt = parseOptionalDateTime(formData, "grandFinalAt");
   const status = getText(formData, "status") as TournamentStatus;
   const format = getText(formData, "format") as TournamentFormat;
@@ -226,6 +230,7 @@ export async function saveTournament(
     rulesUrl,
     battlefyUrl,
     registrationOpenAt,
+    registrationCloseAt,
     grandFinalAt,
     brackets: bracketInputs,
     bracketCount: brackets.length,
@@ -297,7 +302,7 @@ export async function saveTournament(
     p_description: description,
     p_banner_image_url: bannerImageUrl,
     p_registration_open_at: toIsoDateTime(registrationOpenAt),
-    p_registration_close_at: null,
+    p_registration_close_at: toIsoDateTime(registrationCloseAt),
     p_start_date: null,
     p_end_date: null,
     p_status: status,
@@ -336,6 +341,8 @@ export async function saveTournament(
     savedTournament.description !== description ||
     savedTournament.banner_image_url !== bannerImageUrl ||
     toTimestamp(savedTournament.registration_open_at) !== registrationOpenAt ||
+    toTimestamp(savedTournament.registration_close_at) !==
+      registrationCloseAt ||
     toTimestamp(savedTournament.grand_final_at) !== grandFinalAt ||
     savedTournament.format !== format ||
     savedTournament.rule_format !== ruleFormat ||
@@ -806,7 +813,7 @@ function readBracket(
     !eloRules ||
     eloRules.length > 500 ||
     !Number.isInteger(maxPlayers) ||
-    maxPlayers < 2 ||
+    maxPlayers < 8 ||
     maxPlayers > 1024
   ) {
     return null;
@@ -950,6 +957,7 @@ function getTournamentValidationError(input: {
   rulesUrl: string | null;
   battlefyUrl: string | null;
   registrationOpenAt: number | null;
+  registrationCloseAt: number | null;
   grandFinalAt: number | null;
   brackets: {
     config: (typeof TOURNAMENT_BRACKET_CONFIGS)[number];
@@ -998,9 +1006,16 @@ function getTournamentValidationError(input: {
   if (input.battlefyUrl && !isHttpUrl(input.battlefyUrl)) {
     return "Battlefy URL must begin with http:// or https://.";
   }
+  if (
+    input.registrationOpenAt !== null &&
+    input.registrationCloseAt !== null &&
+    input.registrationOpenAt >= input.registrationCloseAt
+  ) {
+    return "Registration opening time must be before the closing time.";
+  }
   for (const bracketInput of input.brackets) {
     if (bracketInput.enabled && !bracketInput.bracket) {
-      return `${bracketInput.config.label} requires ELO rules and a maximum player count between 2 and 1,024.`;
+      return `${bracketInput.config.label} requires ELO rules and a maximum player count between 8 and 1,024.`;
     }
     if (
       bracketInput.bracket &&

@@ -29,6 +29,11 @@ import {
 } from "@/lib/platform-settings";
 import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 import {
+  PHASE_FOUR_ACTIVE_COHORT_SIZE,
+  hasReachedActiveReviewMinimum,
+  isActiveReviewCohortStatus,
+} from "@/lib/tournament-registration-cohort";
+import {
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -915,24 +920,56 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           tournamentId: tournament.id,
           tournamentTitle: tournament.title,
           bracketName: getTournamentBracketDisplayName(bracket.name),
-          maxPlayers: bracket.max_players,
         },
       ])
     )
   );
+  const activeCohortCountByBracket = new Map<string, number>();
   const approvedCountByBracket = new Map<string, number>();
+  const waitlistCountByBracket = new Map<string, number>();
   for (const registration of baseRegistrations) {
-    if (
-      registration.registration_status === "approved" &&
-      registration.tournament_bracket_id
-    ) {
-      approvedCountByBracket.set(
+    if (!registration.tournament_bracket_id) {
+      continue;
+    }
+
+    if (isActiveReviewCohortStatus(registration.registration_status)) {
+      activeCohortCountByBracket.set(
         registration.tournament_bracket_id,
-        (approvedCountByBracket.get(registration.tournament_bracket_id) ?? 0) +
+        (activeCohortCountByBracket.get(
+          registration.tournament_bracket_id
+        ) ?? 0) + 1
+      );
+      if (registration.registration_status === "approved") {
+        approvedCountByBracket.set(
+          registration.tournament_bracket_id,
+          (approvedCountByBracket.get(registration.tournament_bracket_id) ??
+            0) + 1
+        );
+      }
+    } else if (registration.registration_status === "waitlisted") {
+      waitlistCountByBracket.set(
+        registration.tournament_bracket_id,
+        (waitlistCountByBracket.get(registration.tournament_bracket_id) ?? 0) +
           1
       );
     }
   }
+  const registrationCohortSummaries = Array.from(
+    bracketMetaById,
+    ([bracketId, meta]) => {
+      const activeCohortCount =
+        activeCohortCountByBracket.get(bracketId) ?? 0;
+
+      return {
+        bracketId,
+        ...meta,
+        activeCohortCount,
+        approvedCount: approvedCountByBracket.get(bracketId) ?? 0,
+        waitlistCount: waitlistCountByBracket.get(bracketId) ?? 0,
+        minimumReached: hasReachedActiveReviewMinimum(activeCohortCount),
+      };
+    }
+  );
   const waitlistPositionByRegistration =
     buildWaitlistPositionMap(baseRegistrations);
   const registrations = baseRegistrations.map((registration) => ({
@@ -966,8 +1003,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   )
     .map(([bracketId, waitlisted]) => {
       const meta = bracketMetaById.get(bracketId);
-      const approvedCount = approvedCountByBracket.get(bracketId) ?? 0;
-      const openSlots = Math.max((meta?.maxPlayers ?? 0) - approvedCount, 0);
+      const activeCohortCount =
+        activeCohortCountByBracket.get(bracketId) ?? 0;
+      const openSlots = Math.max(
+        PHASE_FOUR_ACTIVE_COHORT_SIZE - activeCohortCount,
+        0
+      );
       const nextPlayer = waitlisted.slice().sort(compareWaitlistedRegistrations)[0];
       return meta && openSlots > 0 && nextPlayer
         ? { bracketId, meta, openSlots, nextPlayer }
@@ -1356,8 +1397,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
           {params?.notice === "bracket-full" && (
             <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold leading-6 text-amber-200">
-              Approval blocked because the bracket is already at approved
-              capacity.
+              Approval blocked because the bracket already has eight active
+              review-cohort registrations.
             </div>
           )}
 
@@ -1374,6 +1415,44 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Waitlist promotion blocked because this bracket has already been
               generated or the tournament is live. Use the protected bracket
               management workflow for post-generation roster corrections.
+            </div>
+          )}
+
+          {registrationCohortSummaries.length > 0 && (
+            <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {registrationCohortSummaries.map((summary) => (
+                <div
+                  key={summary.bracketId}
+                  className={`rounded-2xl border p-4 ${
+                    summary.minimumReached
+                      ? "border-orange-400/35 bg-orange-500/10"
+                      : "border-white/10 bg-black/30"
+                  }`}
+                >
+                  <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                    {summary.tournamentTitle}
+                  </p>
+                  <p className="mt-2 font-black text-white">
+                    {summary.bracketName}
+                  </p>
+                  <p className="mt-3 text-2xl font-black text-orange-300">
+                    {summary.activeCohortCount} /{" "}
+                    {PHASE_FOUR_ACTIVE_COHORT_SIZE}
+                  </p>
+                  <p className="mt-1 text-xs uppercase tracking-wider text-zinc-400">
+                    Active review cohort
+                  </p>
+                  <p className="mt-3 text-sm font-bold text-zinc-200">
+                    {summary.minimumReached
+                      ? "Minimum Reached / Admin Review"
+                      : "Below Minimum"}
+                  </p>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    Approved: {summary.approvedCount} · Waitlist:{" "}
+                    {summary.waitlistCount}
+                  </p>
+                </div>
+              ))}
             </div>
           )}
 

@@ -49,6 +49,7 @@ vi.mock("@/app/tournaments/actions", () => ({
 import {
   RegisterModal,
   getVerifiedDivisionBracketName,
+  isRegistrationWaitlistOnlyForDivision,
   type RelicVerifiedDivision,
 } from "@/components/TournamentsExperience";
 
@@ -72,6 +73,8 @@ const brackets = [
     requirement: "Below 1100 ELO",
     maxPlayers: "Max 8",
     registeredPlayers: 0,
+    activeCohortPlayers: 0,
+    activeCohortSize: 8,
     waitlistedPlayers: 0,
     isFull: false,
     isWaitlistOnly: false,
@@ -83,6 +86,8 @@ const brackets = [
     requirement: "1100-1399 ELO",
     maxPlayers: "Max 8",
     registeredPlayers: 0,
+    activeCohortPlayers: 0,
+    activeCohortSize: 8,
     waitlistedPlayers: 0,
     isFull: false,
     isWaitlistOnly: false,
@@ -94,6 +99,8 @@ const brackets = [
     requirement: "1400+ ELO",
     maxPlayers: "Max 8",
     registeredPlayers: 0,
+    activeCohortPlayers: 0,
+    activeCohortSize: 8,
     waitlistedPlayers: 0,
     isFull: false,
     isWaitlistOnly: false,
@@ -125,7 +132,9 @@ const tournament: TournamentCard = {
   rules: "Safe rules",
   schedule: [],
   contact: "Safe contact",
+  registrationEnabled: true,
   registrationOpenAt: "2026-01-01T00:00:00.000Z",
+  registrationCloseAt: "2026-12-31T23:59:59.000Z",
   grandFinalAt: "2026-08-21T00:00:00.000Z",
   createdAt: "2026-08-05T00:00:00.000Z",
   resultConfirmationWindowMinutes: 30,
@@ -166,6 +175,30 @@ describe("Relic verified-division registration UI", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("derives waitlist intake from the viewer's verified division", () => {
+    const divisionTournament: TournamentCard = {
+      ...tournament,
+      brackets: tournament.brackets.map((bracket) => ({
+        ...bracket,
+        isFull: bracket.name === "Challenge Bracket",
+        isWaitlistOnly: bracket.name === "Challenge Bracket",
+      })),
+    };
+
+    expect(
+      isRegistrationWaitlistOnlyForDivision(
+        divisionTournament,
+        "Challenge"
+      )
+    ).toBe(true);
+    expect(
+      isRegistrationWaitlistOnlyForDivision(divisionTournament, "Academy")
+    ).toBe(false);
+    expect(
+      isRegistrationWaitlistOnlyForDivision(divisionTournament, null)
+    ).toBe(false);
   });
 
   it.each([
