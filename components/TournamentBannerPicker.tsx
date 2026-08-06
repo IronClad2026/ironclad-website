@@ -97,7 +97,7 @@ export default function TournamentBannerPicker({
     <div className="md:col-span-2">
       <span className="text-sm font-bold">Banner Image</span>
       <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-        <div className="relative aspect-[16/6] min-h-44 overflow-hidden bg-zinc-950">
+        <div className="relative aspect-[16/6] sm:min-h-44 overflow-hidden bg-zinc-950">
           {previewUrl ? (
             <div
               role="img"

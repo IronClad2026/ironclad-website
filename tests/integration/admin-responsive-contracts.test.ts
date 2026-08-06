@@ -20,6 +20,9 @@ const registrationSelectAll = readSource(
 );
 const deleteTournament = readSource("components/DeleteTournamentControl.tsx");
 const matchControls = readSource("components/MatchResultControls.tsx");
+const tournamentBannerPicker = readSource(
+  "components/TournamentBannerPicker.tsx"
+);
 
 // These assertions cover component/CSS contracts only. They are intentionally
 // not treated as rendered or visually inspected viewport validation.
@@ -40,6 +43,27 @@ describe("admin responsive component and CSS contracts", () => {
     expect(tournamentAdminPage).toContain(
       'className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"'
     );
+  });
+
+  it("keeps the tournament editor and banner preview within narrow grid tracks", () => {
+    expect(tournamentAdminPage).toContain(
+      'className="mt-8 grid gap-5 md:grid-cols-2"'
+    );
+    expect(tournamentAdminPage).toContain(
+      'className="mt-8 grid gap-5 lg:grid-cols-3"'
+    );
+    expect(tournamentAdminPage).toContain(
+      'className="mt-8 grid gap-8 xl:grid-cols-[360px_1fr]"'
+    );
+    expect(tournamentAdminPage).toContain("break-words text-4xl");
+    expect(tournamentAdminPage).toContain("break-words text-3xl");
+    expect(tournamentBannerPicker).toContain(
+      "relative aspect-[16/6] sm:min-h-44 overflow-hidden bg-zinc-950"
+    );
+    expect(tournamentBannerPicker).not.toContain(
+      "relative aspect-[16/6] min-h-44"
+    );
+    expect(count(tournamentBannerPicker, "min-h-44")).toBe(1);
   });
 
   it("keeps registration-review modal content, header, close, and actions reachable", () => {
