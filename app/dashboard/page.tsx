@@ -17,6 +17,7 @@ import DashboardMatchHistory from "@/components/DashboardMatchHistory";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
 import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
+import PlayerRegistrationActions from "@/components/PlayerRegistrationActions";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import { loadPlayerNotifications } from "@/lib/notifications";
@@ -37,16 +38,38 @@ type RegistrationStatus =
   | "approved"
   | "rejected"
   | "manual_review"
-  | "waitlisted";
+  | "waitlisted"
+  | "withdrawn";
+
+type WaitlistOfferStatus =
+  | "offered"
+  | "accepted"
+  | "declined"
+  | "expired"
+  | "cancelled"
+  | null;
 
 type PlayerRegistration = {
   id: string;
   tournament_title: string;
   bracket_name: string;
   registration_status: RegistrationStatus;
+  tournament_bracket_id: string;
   elo_status: string;
   submitted_elo: number | null;
+  withdrawn_at: string | null;
+  waitlist_offer_status: WaitlistOfferStatus;
+  waitlist_offer_created_at: string | null;
+  waitlist_offer_expires_at: string | null;
+  waitlist_offer_resolved_at: string | null;
+  launched_at: string | null;
   created_at: string;
+};
+
+type PlayerRegistrationRow = Omit<PlayerRegistration, "launched_at"> & {
+  tournament_brackets?:
+    | { launched_at: string | null }
+    | { launched_at: string | null }[];
 };
 
 export default async function PlayerDashboardPage() {
@@ -69,7 +92,7 @@ export default async function PlayerDashboardPage() {
       supabase
         .from("registrations")
         .select(
-          "id, tournament_title, bracket_name, registration_status, elo_status, submitted_elo, created_at"
+          "id, tournament_title, tournament_bracket_id, bracket_name, registration_status, elo_status, submitted_elo, withdrawn_at, waitlist_offer_status, waitlist_offer_created_at, waitlist_offer_expires_at, waitlist_offer_resolved_at, created_at, tournament_brackets!inner(launched_at)"
         )
         .eq("clerk_user_id", userId)
         .order("created_at", { ascending: false }),
@@ -89,8 +112,11 @@ export default async function PlayerDashboardPage() {
   }
 
   const profile = (profileResult.data ?? null) as PlayerProfile | null;
-  const registrations = (registrationsResult.data ??
-    []) as PlayerRegistration[];
+  const registrations = ((registrationsResult.data ??
+    []) as PlayerRegistrationRow[]).map((registration) => ({
+    ...registration,
+    launched_at: first(registration.tournament_brackets)?.launched_at ?? null,
+  }));
   const profileComplete = isPlayerProfileComplete(profile);
 
   return (
@@ -398,7 +424,7 @@ function RegistrationCard({
   registration: PlayerRegistration;
 }) {
   return (
-    <article className="border border-orange-500/20 bg-black/70 p-6 shadow-2xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/80">
+    <article id={`registration-${registration.id}`} className="scroll-mt-28 border border-orange-500/20 bg-black/70 p-6 shadow-2xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/80">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-orange-300">
@@ -433,6 +459,13 @@ function RegistrationCard({
       </div>
 
       <RegistrationDecision registration={registration} />
+      <PlayerRegistrationActions
+        registrationId={registration.id}
+        registrationStatus={registration.registration_status}
+        waitlistOfferStatus={registration.waitlist_offer_status}
+        waitlistOfferExpiresAt={registration.waitlist_offer_expires_at}
+        launchedAt={registration.launched_at}
+      />
     </article>
   );
 }
@@ -442,6 +475,48 @@ function RegistrationDecision({
 }: {
   registration: PlayerRegistration;
 }) {
+  const waitlistContent = {
+    offered: {
+      title: "Tournament spot available",
+      message:
+        "A place is reserved for you until the deadline below. Accept to return to administrator review or decline to release it.",
+      className: "border-amber-400/40 bg-amber-500/10 text-amber-100",
+    },
+    declined: {
+      title: "Waitlist spot declined",
+      message: "This waitlist registration is closed.",
+      className: "border-white/10 bg-white/[0.04] text-zinc-300",
+    },
+    expired: {
+      title: "Waitlist offer expired",
+      message: "The available place has moved to the next eligible player.",
+      className: "border-white/10 bg-white/[0.04] text-zinc-300",
+    },
+    cancelled: {
+      title: "Waitlist closed",
+      message: "This division has started and no place became available.",
+      className: "border-white/10 bg-white/[0.04] text-zinc-300",
+    },
+    accepted: {
+      title: "Spot accepted",
+      message: "Your registration is awaiting administrator review.",
+      className:
+        "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+    },
+    waiting: registration.launched_at
+      ? {
+          title: "Waitlist closed",
+          message:
+            "This division has started, and no place became available. Thank you for joining the waitlist.",
+          className: "border-white/10 bg-white/[0.04] text-zinc-300",
+        }
+      : {
+          title: "Waitlisted",
+          message:
+            "The active cohort is currently full. Your registration is queued by submission time if a slot opens.",
+          className: "border-amber-500/30 bg-amber-500/10 text-amber-200",
+        },
+  }[registration.waitlist_offer_status ?? "waiting"];
   const content = {
     approved: {
       title: "Registration approved",
@@ -462,12 +537,12 @@ function RegistrationDecision({
       className:
         "border-orange-500/30 bg-orange-500/10 text-orange-200",
     },
-    waitlisted: {
-      title: "Waitlisted",
+    waitlisted: waitlistContent,
+    withdrawn: {
+      title: "Registration withdrawn",
       message:
-        "The approved roster is currently full. Your registration is queued by submission time if a slot opens.",
-      className:
-        "border-amber-500/30 bg-amber-500/10 text-amber-200",
+        "You withdrew before launch. This decision is final for this tournament.",
+      className: "border-white/10 bg-white/[0.04] text-zinc-300",
     },
     pending: {
       title: "Pending review",
@@ -512,6 +587,11 @@ function StatusBadge({ status }: { status: RegistrationStatus }) {
       label: "Waitlisted",
       icon: Clock3,
       className: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+    },
+    withdrawn: {
+      label: "Withdrawn",
+      icon: XCircle,
+      className: "border-zinc-500/40 bg-zinc-500/10 text-zinc-300",
     },
     pending: {
       label: "Pending",
@@ -597,4 +677,8 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function first<T>(value: T | T[] | null | undefined): T | null {
+  return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 }

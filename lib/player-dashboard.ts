@@ -175,6 +175,7 @@ type TournamentBracketRow = {
   id: string;
   tournament_id: string;
   name: string;
+  launched_at: string | null;
 };
 
 type TournamentRow = {
@@ -400,7 +401,7 @@ export async function loadPlayerCareerDashboard(
   ];
   const { data: bracketData, error: bracketError } = await supabase
     .from("tournament_brackets")
-    .select("id, tournament_id, name")
+    .select("id, tournament_id, name, launched_at")
     .in("id", bracketIds);
 
   if (bracketError) {
@@ -416,6 +417,22 @@ export async function loadPlayerCareerDashboard(
   }
 
   const tournamentBrackets = (bracketData ?? []) as TournamentBracketRow[];
+  const launchedBracketIds = new Set(
+    tournamentBrackets
+      .filter((bracket) => bracket.launched_at !== null)
+      .map((bracket) => bracket.id)
+  );
+  const launchedGeneratedBracketIds = new Set(
+    generatedBrackets
+      .filter((generated) =>
+        launchedBracketIds.has(generated.tournament_bracket_id)
+      )
+      .map((generated) => generated.id)
+  );
+  const launchedMatches = matches.filter((match) =>
+    launchedGeneratedBracketIds.has(match.generated_bracket_id)
+  );
+  const launchedMatchIds = new Set(launchedMatches.map((match) => match.id));
   const tournamentIds = [
     ...new Set([
       ...tournamentBrackets.map((bracket) => bracket.tournament_id),
@@ -491,17 +508,28 @@ export async function loadPlayerCareerDashboard(
   return buildCareerDashboard({
     clerkUserId,
     registrations,
-    matches,
-    submissions: submissionRows,
-    reportGroups: reportGroupRows,
-    generatedBrackets,
+    matches: launchedMatches,
+    submissions: submissionRows.filter((submission) =>
+      launchedMatchIds.has(submission.match_id)
+    ),
+    reportGroups: reportGroupRows.filter((reportGroup) =>
+      launchedMatchIds.has(reportGroup.match_id)
+    ),
+    generatedBrackets: generatedBrackets.filter((generated) =>
+      launchedGeneratedBracketIds.has(generated.id)
+    ),
     rounds: (roundsResult.data ?? []) as RoundRow[],
     participants: (participantsResult.data ?? []) as RegistrationRow[],
     tournamentBrackets,
     tournaments: (tournamentData ?? []) as TournamentRow[],
-    standings: (standingsResult.data ?? []) as StandingRow[],
-    roundRobinMatches: (roundRobinMatchesResult.data ??
-      []) as BracketMatchStatusRow[],
+    standings: ((standingsResult.data ?? []) as StandingRow[]).filter(
+      (standing) =>
+        launchedGeneratedBracketIds.has(standing.generated_bracket_id)
+    ),
+    roundRobinMatches: ((roundRobinMatchesResult.data ??
+      []) as BracketMatchStatusRow[]).filter((match) =>
+      launchedGeneratedBracketIds.has(match.generated_bracket_id)
+    ),
     approvedTournamentIds,
     dismissedSubmissionNotifications,
     dismissedReportGroupNotifications,

@@ -27,6 +27,7 @@ function evidenceInput(
     registeredAt,
     registrationOrder: 3,
     waitlistPosition: 1,
+    waitlistOfferStatus: null,
     ...overrides,
   };
 }
@@ -41,6 +42,7 @@ function orderInput(
     tournamentBracketId: "challenge-a",
     createdAt: registeredAt,
     status: "pending",
+    waitlistOfferStatus: null,
     ...overrides,
   };
 }
@@ -63,6 +65,7 @@ describe("administrator registration-review evidence", () => {
       registeredAt,
       registrationOrder: 3,
       waitlistPosition: 1,
+      waitlistOfferStatus: null,
     });
     expect(Object.keys(evidence).sort()).toEqual(
       [
@@ -79,6 +82,7 @@ describe("administrator registration-review evidence", () => {
         "verifiedDivision",
         "verifiedFaction",
         "waitlistPosition",
+        "waitlistOfferStatus",
       ].sort()
     );
     expect(evidence).not.toHaveProperty("registrationId");
@@ -188,6 +192,10 @@ describe("administrator registration-review ordering", () => {
       }),
       orderInput("waitlist-b", { status: "waitlisted" }),
       orderInput("waitlist-a", { status: "waitlisted" }),
+      orderInput("offered", {
+        status: "waitlisted",
+        waitlistOfferStatus: "offered",
+      }),
       orderInput("other-bracket", {
         tournamentBracketId: "academy-a",
         createdAt: "2026-08-05T11:00:00.000Z",
@@ -208,6 +216,7 @@ describe("administrator registration-review ordering", () => {
     expect(positions.has("active-earlier")).toBe(false);
     expect(positions.get("waitlist-a")).toBe(1);
     expect(positions.get("waitlist-b")).toBe(2);
+    expect(positions.has("offered")).toBe(false);
     expect(positions.get("other-bracket")).toBe(1);
     expect(positions.get("other-tournament")).toBe(1);
     expect(positions.has("unscoped")).toBe(false);

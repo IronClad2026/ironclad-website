@@ -77,6 +77,7 @@ function createMatchClient({
     generated_brackets: {
       tournament_brackets: {
         tournament_id: "tournament-1",
+        launched_at: "2026-08-06T03:00:00.000Z",
         tournaments: {
           id: "tournament-1",
           title: "Test Tournament",

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   adminIdentity,
@@ -42,7 +44,6 @@ vi.mock("next/cache", () => ({
 import {
   confirmMatchResultReportGroup,
   disputeMatchResultReportGroup,
-  editAdminMatchParticipants,
   resetAdminMatch,
   reviewMatchResult,
   reviewMatchResultReportGroup,
@@ -215,6 +216,7 @@ describe("match-result workflow contracts", () => {
         generated_brackets: {
           tournament_brackets: {
             tournament_id: "tournament-1",
+            launched_at: "2026-08-06T03:00:00.000Z",
             tournaments: {
               id: "tournament-1",
               title: "Test Tournament",
@@ -281,6 +283,57 @@ describe("match-result workflow contracts", () => {
     expect(createInAppNotificationMock.mock.calls[0][0]).not.toHaveProperty(
       "actorClerkUserId"
     );
+  });
+
+  it("rejects match activity while the division bracket is still private", async () => {
+    const matchQuery = createThenableQuery({
+      data: {
+        id: "match-1",
+        generated_bracket_id: "generated-1",
+        match_number: 1,
+        series_best_of: 3,
+        player_one_registration_id: "registration-player-one",
+        player_two_registration_id: "registration-player-two",
+        player_one: { player_name: "Player One" },
+        player_two: { player_name: "Player Two" },
+        bracket_rounds: { name: "Final" },
+        generated_brackets: {
+          tournament_brackets: {
+            tournament_id: "tournament-1",
+            launched_at: null,
+            tournaments: {
+              id: "tournament-1",
+              title: "Test Tournament",
+            },
+          },
+        },
+      },
+      error: null,
+    });
+    const rpc = vi.fn();
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === "tournament_matches") return matchQuery;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+      rpc,
+    };
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(client);
+
+    const result = await submitNoShowReport(
+      idleState,
+      createFormData({
+        matchId: "match-1",
+        noShowRegistrationId: "registration-player-two",
+      })
+    );
+
+    expect(result).toEqual({
+      status: "error",
+      message: "This tournament match is no longer available.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("preserves administrator report-group review without notification audit IDs", async () => {
@@ -491,30 +544,24 @@ describe("match-result workflow contracts", () => {
     }
   });
 
-  it("preserves a safe administrator participant-edit business error", async () => {
-    const service = createRpcClient({
-      rpcError: {
-        message:
-          "Participant edits are blocked because this match has result activity or proof records",
-      },
-    });
-    authMock.mockResolvedValue(adminIdentity);
-    createSupabaseAdminClientMock.mockReturnValue(service.client);
+  it("removes the ordinary post-launch participant reassignment path", () => {
+    const actionSource = readFileSync(
+      resolve(process.cwd(), "app/tournaments/match-actions.ts"),
+      "utf8"
+    );
+    const controlsSource = readFileSync(
+      resolve(process.cwd(), "components/MatchResultControls.tsx"),
+      "utf8"
+    );
+    const tournamentSource = readFileSync(
+      resolve(process.cwd(), "components/TournamentsExperience.tsx"),
+      "utf8"
+    );
 
-    await expect(
-      editAdminMatchParticipants(
-        idleState,
-        createFormData({
-          matchId: "match-1",
-          playerOneRegistrationId: "registration-one",
-          playerTwoRegistrationId: "registration-two",
-        })
-      )
-    ).resolves.toEqual({
-      status: "error",
-      message:
-        "Participants cannot be changed while this match has result activity.",
-    });
+    expect(actionSource).not.toContain("editAdminMatchParticipants");
+    expect(actionSource).not.toContain("admin_update_match_participants");
+    expect(controlsSource).not.toContain("AdminParticipantEditForm");
+    expect(tournamentSource).not.toContain("AdminParticipantEditForm");
   });
 
   it("preserves a safe downstream reset business error", async () => {

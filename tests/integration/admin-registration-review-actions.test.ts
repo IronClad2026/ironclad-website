@@ -10,13 +10,6 @@ const reviewRowsSource = readFileSync(
   resolve(process.cwd(), "components/AdminRegistrationReviewRows.tsx"),
   "utf8"
 );
-const cohortMigrationSource = readFileSync(
-  resolve(
-    process.cwd(),
-    "supabase/migrations/20260805150000_eight_player_registration_cohort.sql"
-  ),
-  "utf8"
-);
 
 function sliceSource(source: string, startMarker: string, endMarker: string) {
   const start = source.indexOf(startMarker);
@@ -62,6 +55,11 @@ const approveSelectedRegistrationsAction = sliceSource(
   "async function approveSelectedRegistrations(",
   "export default async function AdminPage("
 );
+const deleteSelectedRegistrationsAction = sliceSource(
+  adminPageSource,
+  "async function deleteSelectedRegistrations(",
+  "async function approveSelectedRegistrations("
+);
 const selectedRegistrationModal = sliceSource(
   adminPageSource,
   "{selectedRegistration && (",
@@ -77,14 +75,21 @@ const menuActions = sliceSource(
   "function getMenuActions(",
   "function EvidenceValue("
 );
-const compactCohortMigration = compact(cohortMigrationSource.toLowerCase());
-const cohortGuard = sliceSource(
-  compactCohortMigration,
-  "create or replace function public.enforce_tournament_registration_availability()",
-  "alter function public.enforce_tournament_registration_availability()"
-);
-
 describe("admin registration review action contracts", () => {
+  it("excludes launched-division history from active FIFO queue projections", () => {
+    const compactAdminPage = compact(adminPageSource);
+
+    expect(compactAdminPage).toContain(
+      "const isBracketWaitlistOpen = (bracketId: string | null) => bracketId !== null && bracketMetaById.get(bracketId)?.launchedAt === null;"
+    );
+    expect(
+      [...adminPageSource.matchAll(/isBracketWaitlistOpen\(/g)]
+    ).toHaveLength(3);
+    expect(adminPageSource).toMatch(
+      /registrationOrderInputs\.filter\(\s*\(\{\s*tournamentBracketId\s*\}\)\s*=>\s*isBracketWaitlistOpen\(tournamentBracketId\)\s*\)/
+    );
+  });
+
   it("keeps every existing decision and private-note control in one workflow", () => {
     const compactAction = compact(updateRegistrationStatusAction);
     const compactModal = compact(selectedRegistrationModal);
@@ -104,7 +109,6 @@ describe("admin registration review action contracts", () => {
       "approved",
       "rejected",
       "manual_review",
-      "waitlisted",
     ]) {
       expect(compactModal).toContain(`name="nextStatus" value="${status}"`);
     }
@@ -112,13 +116,25 @@ describe("admin registration review action contracts", () => {
     expect(compactMenuActions).toContain('nextStatus: "approved"');
     expect(compactMenuActions).toContain('label: "Reject"');
     expect(compactMenuActions).toContain('focus: "manual_review"');
-    expect(compactMenuActions).toContain('focus: "waitlist"');
+    expect(compactMenuActions).not.toContain('focus: "waitlist"');
+    expect(compactMenuActions).not.toContain("Move to Waitlist");
+    expect(compactMenuActions).not.toContain("Move Back to Waitlist");
     expect(compactMenuActions).toContain('label: "Edit Private Note"');
-    expect(compactMenuActions).toContain(
-      'status === "waitlisted" ? "Promote to Participant" : "Approve"'
+    expect(compactMenuActions).not.toContain("Promote to Participant");
+    expect(compactMenuActions).toContain('if (status === "waitlisted")');
+    const waitlistedActions = sliceSource(
+      compactMenuActions,
+      'if (status === "waitlisted")',
+      'if (status === "approved")'
     );
+    expect(waitlistedActions).not.toContain("approveAction");
+    expect(waitlistedActions).not.toContain("manualReviewAction");
+    expect(waitlistedActions).not.toContain("returnPendingAction");
     expect(compactModal).toContain('status === "waitlisted"');
-    expect(compactModal).toContain('"Approve From Waitlist"');
+    expect(compactModal).not.toContain('"Approve From Waitlist"');
+    expect(compactModal).toContain(
+      "A waitlisted player cannot be promoted by an administrator."
+    );
     expect(compactDirectAction).toContain(
       "<form action={updateRegistrationStatusAction}"
     );
@@ -135,11 +151,13 @@ describe("admin registration review action contracts", () => {
       approveSelectedRegistrationsAction
     );
 
-    expect(individualPayloads).toEqual([
-      "registration_status: nextStatus, admin_notes: adminNotes,",
+    expect(individualPayloads).toEqual([]);
+    expect(bulkPayloads).toEqual([]);
+    expect(rpcNames(updateRegistrationStatusAction)).toEqual([
+      "review_tournament_registration",
     ]);
-    expect(bulkPayloads).toEqual([
-      'registration_status: "approved"',
+    expect(rpcNames(approveSelectedRegistrationsAction)).toEqual([
+      "review_tournament_registration",
     ]);
 
     const mutationPayloads = [...individualPayloads, ...bulkPayloads].join(
@@ -161,15 +179,30 @@ describe("admin registration review action contracts", () => {
     }
   });
 
+  it("keeps ordinary deletion unavailable and restricts cleanup to terminal rows", () => {
+    const compactDelete = compact(deleteSelectedRegistrationsAction);
+    const compactPage = compact(adminPageSource);
+
+    expect(compactPage).not.toContain("Delete Selected");
+    expect(compactDelete).toContain(
+      'registration.registration_status !== "rejected" && registration.registration_status !== "withdrawn"'
+    );
+    expect(compactDelete).toContain(
+      'notice: "registration-delete-blocked"'
+    );
+  });
+
   it("does not generate, publish, or start competition as a review side effect", () => {
     const reviewActions = compact(
       `${updateRegistrationStatusAction}\n${approveSelectedRegistrationsAction}`
     );
 
     expect(rpcNames(updateRegistrationStatusAction)).toEqual([
-      "is_tournament_bracket_regeneration_safe",
+      "review_tournament_registration",
     ]);
-    expect(rpcNames(approveSelectedRegistrationsAction)).toEqual([]);
+    expect(rpcNames(approveSelectedRegistrationsAction)).toEqual([
+      "review_tournament_registration",
+    ]);
 
     for (const forbiddenEffect of [
       'from("generated_brackets")',
@@ -212,46 +245,5 @@ describe("admin registration review action contracts", () => {
     expect(compactNotifications).not.toContain("privateAdminNote");
     expect(notificationCall).not.toContain("adminNotes");
     expect(notificationCall).not.toContain("admin_notes");
-  });
-});
-
-describe("Slice 1 registration cohort safeguards", () => {
-  it("keeps the eight-place active cohort scoped to one tournament division", () => {
-    expect(cohortGuard).toContain(
-      "v_active_cohort_limit constant integer := 8"
-    );
-    expect(cohortGuard).toContain(
-      "count(*) filter ( where registration_status in ( 'pending', 'manual_review', 'approved' ) )"
-    );
-    expect(cohortGuard).not.toContain(
-      "where registration_status in ( 'pending', 'manual_review', 'approved', 'waitlisted' )"
-    );
-    expect(cohortGuard).not.toContain(
-      "where registration_status in ( 'pending', 'manual_review', 'approved', 'rejected' )"
-    );
-    expect(cohortGuard).toContain(
-      "where bracket.id = new.tournament_bracket_id and tournament.id = new.tournament_id"
-    );
-    expect(cohortGuard).toContain(
-      "from public.registrations where tournament_bracket_id = new.tournament_bracket_id and id <> new.id"
-    );
-  });
-
-  it("keeps manual waitlist promotion deterministic and oldest-first", () => {
-    expect(cohortGuard).toContain(
-      "registration.tournament_bracket_id = new.tournament_bracket_id"
-    );
-    expect(cohortGuard).toContain(
-      "registration.created_at < new.created_at or ( registration.created_at = new.created_at and registration.id::text < new.id::text )"
-    );
-    expect(cohortGuard).toContain(
-      "old.registration_status = 'waitlisted' and new.registration_status = 'approved'"
-    );
-    expect(cohortGuard).toContain(
-      "cannot promote this registration before older waitlisted registrations for the same bracket"
-    );
-    expect(cohortGuard).toContain(
-      "cannot approve a manual registration insert while waitlisted registrations exist for the same bracket"
-    );
   });
 });

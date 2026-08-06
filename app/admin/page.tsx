@@ -28,7 +28,6 @@ import {
 import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 import {
   PHASE_FOUR_ACTIVE_COHORT_SIZE,
-  hasReachedActiveReviewMinimum,
   isActiveReviewCohortStatus,
 } from "@/lib/tournament-registration-cohort";
 import {
@@ -38,13 +37,13 @@ import {
   type AdminRegistrationOrderInput,
   type AdminRegistrationReviewRow,
   type AdminRegistrationStatus,
+  type AdminWaitlistOfferStatus,
 } from "@/lib/admin-registration-review";
 import {
   AlertTriangle,
   CheckCircle,
   Clock,
   ShieldAlert,
-  Trash2,
   Trophy,
   X,
   XCircle,
@@ -58,16 +57,14 @@ type CustomClaims = {
 
 type RegistrationStatus = AdminRegistrationStatus;
 type FilterStatus = "all" | RegistrationStatus;
-type AdminFocusTarget = "note" | "reject" | "manual_review" | "waitlist";
+type AdminFocusTarget = "note" | "reject" | "manual_review";
 type AdminNotice =
   | "note-required"
   | "saved"
   | "save-failed"
-  | "bracket-preserved"
   | "registration-deleted"
   | "registration-delete-failed"
   | "registration-delete-blocked"
-  | "waitlist-order-blocked"
   | "bracket-full"
   | "registration-closed"
   | "registration-locked"
@@ -82,7 +79,12 @@ type AdminPageProps = {
     notice?: AdminNotice;
     detail?: string;
     focus?: AdminFocusTarget;
-    bracketNotice?: "population-saved" | "population-failed";
+    bracketNotice?:
+      | "population-saved"
+      | "population-failed"
+      | "division-launched"
+      | "division-already-launched"
+      | "division-launch-failed";
   }>;
 };
 
@@ -104,6 +106,7 @@ type SupabaseRegistration = {
   tournament_bracket_id: string | null;
   tournament_title: string | null;
   bracket_name: string | null;
+  waitlist_offer_status: AdminWaitlistOfferStatus | null;
   waitlist_position?: number | null;
   registration_order?: number | null;
 };
@@ -114,7 +117,12 @@ type AdminTournamentOption = {
   status: string;
   grand_final_at: string | null;
   created_at: string;
-  tournament_brackets?: { id: string; name: string; max_players: number }[];
+  tournament_brackets?: {
+    id: string;
+    name: string;
+    max_players: number;
+    launched_at: string | null;
+  }[];
 };
 
 function formatStatus(status: string) {
@@ -172,6 +180,7 @@ function getSafeFilter(filter?: string): FilterStatus {
     "approved",
     "rejected",
     "waitlisted",
+    "withdrawn",
   ];
 
   return validFilters.includes(filter as FilterStatus)
@@ -257,10 +266,6 @@ function isUuid(value: string) {
 function describeRegistrationUpdateFailure(message: string) {
   const lowerMessage = message.toLowerCase();
 
-  if (lowerMessage.includes("older waitlisted")) {
-    return "older waitlisted players must be promoted first";
-  }
-
   if (lowerMessage.includes("bracket is full")) {
     return "bracket capacity is full";
   }
@@ -335,14 +340,11 @@ function buildRegistrationStatusNotification({
   };
 
   if (nextStatus === "approved") {
-    const promoted = previousStatus === "waitlisted";
     return {
       ...base,
-      type: promoted ? "registration.promoted" : "registration.approved",
-      title: promoted ? "Promoted from Waitlist" : "Registration Approved",
-      message: promoted
-        ? `You have been promoted from the waitlist and are now an official participant in ${tournamentTitle}.`
-        : `You have been approved for ${tournamentTitle}.`,
+      type: "registration.approved",
+      title: "Registration Approved",
+      message: `You have been approved for ${tournamentTitle}.`,
     };
   }
 
@@ -460,49 +462,20 @@ async function updateRegistrationStatus(formData: FormData) {
     );
   }
 
-  const approvedRosterChanged =
-    currentRegistration.registration_status !== nextStatus &&
-    (currentRegistration.registration_status === "approved" ||
-      nextStatus === "approved");
-  let bracketPreserved = false;
-
-  if (
-    approvedRosterChanged &&
-    currentRegistration.tournament_bracket_id
-  ) {
-    const { data: regenerationSafe, error: safetyError } =
-      await supabase.rpc("is_tournament_bracket_regeneration_safe", {
-        p_tournament_bracket_id:
-          currentRegistration.tournament_bracket_id,
-      });
-
-    if (safetyError) {
-      console.error(
-        "Bracket regeneration safety lookup failed:",
-        safetyError.message
-      );
-    } else {
-      bracketPreserved = regenerationSafe === false;
-    }
-  }
-
-  const { error } = await supabase
-    .from("registrations")
-    .update({
-      registration_status: nextStatus,
-      admin_notes: adminNotes,
-    })
-    .eq("id", registrationId);
+  const { error } = await supabase.rpc("review_tournament_registration", {
+    p_registration_id: registrationId,
+    p_registration_status: nextStatus,
+    p_admin_notes: adminNotes || null,
+  });
 
   if (error) {
     console.error("Supabase status update error:", error.message);
     const lowerMessage = error.message.toLowerCase();
-    const notice: AdminNotice = lowerMessage.includes("older waitlisted")
-      ? "waitlist-order-blocked"
-      : lowerMessage.includes("bracket is full")
+    const notice: AdminNotice = lowerMessage.includes("capacity") ||
+      lowerMessage.includes("bracket is full")
         ? "bracket-full"
-        : lowerMessage.includes("roster is locked") ||
-            lowerMessage.includes("bracket generation")
+        : lowerMessage.includes("launched") ||
+            lowerMessage.includes("roster is locked")
           ? "registration-locked"
         : lowerMessage.includes("registration is not available")
           ? "registration-closed"
@@ -536,7 +509,7 @@ async function updateRegistrationStatus(formData: FormData) {
     buildHref({
       filter: !selected && nextStatus === "approved" ? "approved" : activeFilter,
       selected: selected || undefined,
-      notice: bracketPreserved ? "bracket-preserved" : "saved",
+      notice: "saved",
     })
   );
 }
@@ -588,6 +561,21 @@ async function deleteSelectedRegistrations(formData: FormData) {
       buildHref({
         filter: activeFilter,
         notice: "registration-delete-failed",
+      })
+    );
+  }
+
+  const hasHistoricalRegistration = registrationsForDelete.some(
+    (registration) =>
+      registration.registration_status !== "rejected" &&
+      registration.registration_status !== "withdrawn"
+  );
+
+  if (hasHistoricalRegistration) {
+    redirect(
+      buildHref({
+        filter: activeFilter,
+        notice: "registration-delete-blocked",
       })
     );
   }
@@ -793,10 +781,25 @@ async function approveSelectedRegistrations(formData: FormData) {
       continue;
     }
 
-    const { error } = await supabase
-      .from("registrations")
-      .update({ registration_status: "approved" })
-      .eq("id", registration.id);
+    if (registration.registration_status === "waitlisted") {
+      failures.push(
+        `${registration.player_name || registration.id}: the player must accept a FIFO spot offer before administrator approval`
+      );
+      continue;
+    }
+
+    if (registration.registration_status === "withdrawn") {
+      failures.push(
+        `${registration.player_name || registration.id}: withdrawal is final for this tournament`
+      );
+      continue;
+    }
+
+    const { error } = await supabase.rpc("review_tournament_registration", {
+      p_registration_id: registration.id,
+      p_registration_status: "approved",
+      p_admin_notes: null,
+    });
 
     if (error) {
       failures.push(
@@ -878,13 +881,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("registrations")
         .select(
-          "id, player_name, country, submitted_elo, elo_verified_elo, elo_highest_faction, elo_checked_at, elo_verification_source, elo_verified_division, elo_calculation_version, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name"
+          "id, player_name, country, submitted_elo, elo_verified_elo, elo_highest_faction, elo_checked_at, elo_verification_source, elo_verified_division, elo_calculation_version, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name, waitlist_offer_status"
         )
         .order("created_at", { ascending: false }),
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, max_players)"
+          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, max_players, launched_at)"
         )
         .order("grand_final_at", { ascending: false, nullsFirst: false }),
       supabase
@@ -913,6 +916,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       tournamentBracketId: registration.tournament_bracket_id,
       createdAt: registration.created_at,
       status: registration.registration_status,
+      waitlistOfferStatus: registration.waitlist_offer_status,
     }));
   const registrationPriorityById = buildRegistrationOrderMap(
     registrationOrderInputs
@@ -920,6 +924,43 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const tournaments = [
     ...((tournamentResult.data ?? []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
+  const readinessResults = await Promise.all(
+    tournaments.flatMap((tournament) =>
+      (tournament.tournament_brackets ?? []).map(async (bracket) => {
+        const { data, error: readinessError } = await supabase.rpc(
+          "get_tournament_bracket_readiness",
+          { p_tournament_bracket_id: bracket.id }
+        );
+
+        if (readinessError) {
+          console.error(
+            "Admin division readiness load failed:",
+            readinessError.message
+          );
+          return null;
+        }
+
+        const result = Array.isArray(data) ? data[0] : data;
+        return result
+          ? {
+              bracketId: bracket.id,
+              approvedCount: Number(result.approved_count),
+              requiredCount: Number(result.required_count),
+              isReady: result.is_ready === true,
+              launchedAt:
+                typeof result.launched_at === "string"
+                  ? result.launched_at
+                  : bracket.launched_at,
+            }
+          : null;
+      })
+    )
+  );
+  const readinessByBracket = new Map(
+    readinessResults
+      .filter((result) => result !== null)
+      .map((result) => [result.bracketId, result])
+  );
   const tournamentsById = new Map(
     tournaments.map((tournament) => [tournament.id, tournament.title])
   );
@@ -931,10 +972,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           tournamentId: tournament.id,
           tournamentTitle: tournament.title,
           bracketName: getTournamentBracketDisplayName(bracket.name),
+          launchedAt: bracket.launched_at,
         },
       ])
     )
   );
+  const isBracketWaitlistOpen = (bracketId: string | null) =>
+    bracketId !== null &&
+    bracketMetaById.get(bracketId)?.launchedAt === null;
   const activeCohortCountByBracket = new Map<string, number>();
   const approvedCountByBracket = new Map<string, number>();
   const waitlistCountByBracket = new Map<string, number>();
@@ -957,7 +1002,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             0) + 1
         );
       }
-    } else if (registration.registration_status === "waitlisted") {
+    } else if (
+      registration.registration_status === "waitlisted" &&
+      registration.waitlist_offer_status === null &&
+      isBracketWaitlistOpen(registration.tournament_bracket_id)
+    ) {
       waitlistCountByBracket.set(
         registration.tournament_bracket_id,
         (waitlistCountByBracket.get(registration.tournament_bracket_id) ?? 0) +
@@ -975,14 +1024,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         bracketId,
         ...meta,
         activeCohortCount,
-        approvedCount: approvedCountByBracket.get(bracketId) ?? 0,
+        approvedCount:
+          readinessByBracket.get(bracketId)?.approvedCount ??
+          approvedCountByBracket.get(bracketId) ??
+          0,
+        requiredCount:
+          readinessByBracket.get(bracketId)?.requiredCount ??
+          PHASE_FOUR_ACTIVE_COHORT_SIZE,
         waitlistCount: waitlistCountByBracket.get(bracketId) ?? 0,
-        minimumReached: hasReachedActiveReviewMinimum(activeCohortCount),
+        isReady: readinessByBracket.get(bracketId)?.isReady ?? false,
+        launchedAt:
+          readinessByBracket.get(bracketId)?.launchedAt ?? meta.launchedAt,
       };
     }
   );
   const waitlistPositionByRegistration = buildWaitlistPositionMap(
-    registrationOrderInputs
+    registrationOrderInputs.filter(({ tournamentBracketId }) =>
+      isBracketWaitlistOpen(tournamentBracketId)
+    )
   );
   const registrations = baseRegistrations.map((registration) => ({
     ...registration,
@@ -993,40 +1052,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     .filter(
       (registration) =>
         registration.registration_status === "waitlisted" &&
-        registration.tournament_bracket_id
+        registration.waitlist_offer_status === null &&
+        registration.tournament_bracket_id &&
+        isBracketWaitlistOpen(registration.tournament_bracket_id)
     )
     .slice()
     .sort(compareWaitlistedRegistrations)
     .slice(0, 6);
-  const waitlistSlotNotices = Array.from(
-    registrations
-      .filter(
-        (registration) =>
-          registration.registration_status === "waitlisted" &&
-          registration.tournament_bracket_id
-      )
-      .reduce((groups, registration) => {
-        const bracketId = registration.tournament_bracket_id as string;
-        const group = groups.get(bracketId) ?? [];
-        group.push(registration);
-        groups.set(bracketId, group);
-        return groups;
-      }, new Map<string, SupabaseRegistration[]>())
-  )
-    .map(([bracketId, waitlisted]) => {
-      const meta = bracketMetaById.get(bracketId);
-      const activeCohortCount =
-        activeCohortCountByBracket.get(bracketId) ?? 0;
-      const openSlots = Math.max(
-        PHASE_FOUR_ACTIVE_COHORT_SIZE - activeCohortCount,
-        0
-      );
-      const nextPlayer = waitlisted.slice().sort(compareWaitlistedRegistrations)[0];
-      return meta && openSlots > 0 && nextPlayer
-        ? { bracketId, meta, openSlots, nextPlayer }
-        : null;
-    })
-    .filter((notice) => notice !== null);
   const generatedByBracket = new Map(
     (
       (generatedResult.data ?? []) as {
@@ -1051,6 +1083,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         brackets: (tournament.tournament_brackets ?? [])
           .map((bracket) => {
             const generated = generatedByBracket.get(bracket.id);
+            const readiness = readinessByBracket.get(bracket.id);
             const assignments: Record<number, string | null> = {};
             for (const match of generated?.tournament_matches ?? []) {
               if (match.player_one_slot) {
@@ -1076,6 +1109,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   : (generated.slot_count * (generated.slot_count - 1)) / 2
                 : 0,
               assignments,
+              approvedCount:
+                readiness?.approvedCount ??
+                approvedCountByBracket.get(bracket.id) ??
+                0,
+              requiredCount:
+                readiness?.requiredCount ?? PHASE_FOUR_ACTIVE_COHORT_SIZE,
+              isReady: readiness?.isReady ?? false,
+              launchedAt: readiness?.launchedAt ?? bracket.launched_at,
               participants: registrations
                 .filter(
                   (registration) =>
@@ -1113,6 +1154,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       registrationId: registration.id,
       tournamentId: registration.tournament_id,
       privateAdminNote: registration.admin_notes,
+      isDivisionLaunched: Boolean(
+        registration.tournament_bracket_id &&
+          bracketMetaById.get(registration.tournament_bracket_id)?.launchedAt
+      ),
       ...buildAdminRegistrationEvidence({
         playerDisplayName: registration.player_name,
         tournamentName:
@@ -1132,6 +1177,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         registeredAt: registration.created_at,
         waitlistPosition: registration.waitlist_position,
         registrationOrder: registration.registration_order,
+        waitlistOfferStatus: registration.waitlist_offer_status,
       }),
     }));
   const selectedRegistration = allRegistrationReviewRows.find(
@@ -1351,14 +1397,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <CheckCircle className="h-4 w-4" />
                 Approve Selected
               </button>
-              <button
-                type="submit"
-                form="registration-bulk-form"
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-red-200 transition hover:border-red-400/60 hover:bg-red-500/20 sm:w-auto"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Selected
-              </button>
             </div>
           </div>
 
@@ -1404,13 +1442,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           )}
 
-          {params?.notice === "waitlist-order-blocked" && (
-            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold leading-6 text-amber-200">
-              Waitlist promotion blocked. Promote the oldest waitlisted player
-              for this bracket first, unless you explicitly change the queue.
-            </div>
-          )}
-
           {params?.notice === "bracket-full" && (
             <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold leading-6 text-amber-200">
               Approval blocked because the bracket already has eight active
@@ -1420,17 +1451,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
           {params?.notice === "registration-closed" && (
             <div className="mb-5 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-semibold leading-6 text-orange-200">
-              Registration update blocked because this tournament is no longer
-              open for roster changes. Set the tournament back to registration
-              open before making waitlist promotions.
+              Registration update blocked because this division is closed for
+              roster changes.
             </div>
           )}
 
           {params?.notice === "registration-locked" && (
             <div className="mb-5 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-semibold leading-6 text-orange-200">
-              Waitlist promotion blocked because this bracket has already been
-              generated or the tournament is live. Use the protected bracket
-              management workflow for post-generation roster corrections.
+              Registration update blocked because this division has launched
+              and its roster is locked.
             </div>
           )}
 
@@ -1440,8 +1469,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <div
                   key={summary.bracketId}
                   className={`rounded-2xl border p-4 ${
-                    summary.minimumReached
+                    summary.isReady
                       ? "border-orange-400/35 bg-orange-500/10"
+                      : summary.launchedAt
+                        ? "border-sky-400/35 bg-sky-500/10"
                       : "border-white/10 bg-black/30"
                   }`}
                 >
@@ -1452,19 +1483,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     {summary.bracketName}
                   </p>
                   <p className="mt-3 text-2xl font-black text-orange-300">
-                    {summary.activeCohortCount} /{" "}
-                    {PHASE_FOUR_ACTIVE_COHORT_SIZE}
+                    {summary.approvedCount} / {summary.requiredCount}
                   </p>
                   <p className="mt-1 text-xs uppercase tracking-wider text-zinc-400">
-                    Active review cohort
+                    Approved players
                   </p>
                   <p className="mt-3 text-sm font-bold text-zinc-200">
-                    {summary.minimumReached
-                      ? "Minimum Reached / Admin Review"
-                      : "Below Minimum"}
+                    {summary.launchedAt
+                      ? "Division launched — roster locked"
+                      : summary.isReady
+                        ? `${summary.approvedCount}/${summary.requiredCount} approved — ready for private bracket preparation`
+                        : `${summary.approvedCount}/${summary.requiredCount} approved — review incomplete`}
                   </p>
                   <p className="mt-1 text-sm text-zinc-400">
-                    Approved: {summary.approvedCount} · Waitlist:{" "}
+                    Active cohort: {summary.activeCohortCount} · Waiting:{" "}
                     {summary.waitlistCount}
                   </p>
                 </div>
@@ -1472,45 +1504,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           )}
 
-          {(waitlistNotices.length > 0 || waitlistSlotNotices.length > 0) && (
-            <div className="mb-5 grid gap-3 lg:grid-cols-2">
+          {waitlistNotices.length > 0 && (
+            <div className="mb-5">
               {waitlistNotices.length > 0 && (
                 <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
                   <p className="text-xs font-black uppercase tracking-wider text-amber-300">
-                    Waitlist Activity
+                    Waiting for a FIFO spot offer
                   </p>
                   <div className="mt-3 space-y-2 text-sm text-amber-50/90">
                     {waitlistNotices.map((registration) => (
                       <p key={registration.id}>
-                        {registration.player_name || "Player"} joined Waitlist
+                        {registration.player_name || "Player"} is Waitlist
                         Position #{registration.waitlist_position ?? "?"} for{" "}
                         {registration.tournament_title ||
                           (registration.tournament_id
                             ? tournamentsById.get(registration.tournament_id)
                             : null) ||
                           "this tournament"}
-                        .
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {waitlistSlotNotices.length > 0 && (
-                <div className="rounded-2xl border border-green-500/25 bg-green-500/10 p-4">
-                  <p className="text-xs font-black uppercase tracking-wider text-green-300">
-                    Slot Available
-                  </p>
-                  <div className="mt-3 space-y-2 text-sm text-green-50/90">
-                    {waitlistSlotNotices.map((notice) => (
-                      <p key={notice.bracketId}>
-                        {notice.openSlots} slot
-                        {notice.openSlots === 1 ? "" : "s"} available in{" "}
-                        {notice.meta.tournamentTitle} -{" "}
-                        {notice.meta.bracketName}. Next queued player:{" "}
-                        {notice.nextPlayer.player_name || "Player"} at
-                        Waitlist Position #
-                        {notice.nextPlayer.waitlist_position ?? "?"}.
+                        . Vacancies are offered transactionally in FIFO order.
                       </p>
                     ))}
                   </div>
@@ -1711,6 +1722,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       : "Not waitlisted",
                 },
                 {
+                  label: "Waitlist offer",
+                  value: selectedRegistration.waitlistOfferStatus
+                    ? formatStatus(selectedRegistration.waitlistOfferStatus)
+                    : "No active or historical offer",
+                },
+                {
+                  label: "Division launch state",
+                  value: selectedRegistration.isDivisionLaunched
+                    ? "Launched — roster locked"
+                    : "Not launched",
+                },
+                {
                   label: "Registered at",
                   value: formatAdminEvidenceDateTime(
                     selectedRegistration.registeredAt
@@ -1783,8 +1806,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {params?.notice && (
                 <div
                   className={`mt-4 rounded-xl border p-4 text-sm ${
-                    params.notice === "saved" ||
-                    params.notice === "bracket-preserved"
+                    params.notice === "saved"
                       ? "border-green-500/30 bg-green-500/10 text-green-300"
                       : "border-red-500/30 bg-red-500/10 text-red-300"
                   }`}
@@ -1793,10 +1815,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     ? "Add an admin note before rejecting or marking this registration for manual review."
                     : params.notice === "saved"
                       ? "Registration decision and admin note saved."
-                      : params.notice === "bracket-preserved"
-                        ? "Registration saved. The populated or active bracket was preserved and was not regenerated. Use an explicit administrator reset before rebuilding it."
-                        : params.notice === "registration-locked"
-                          ? "This bracket has already been generated or the tournament is live. Use the protected bracket management workflow for roster corrections."
+                      : params.notice === "registration-locked"
+                          ? "This division has launched, so its roster decisions are locked. Private administrator notes remain editable."
                           : "The registration decision could not be saved. Check the note length and try again."}
                 </div>
               )}
@@ -1811,50 +1831,65 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Save Private Note
                 </button>
 
-                <button
-                  type="submit"
-                  name="nextStatus"
-                  value="approved"
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 transition hover:bg-green-500/20 lg:w-auto"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  {selectedRegistration.status === "waitlisted"
-                    ? "Approve From Waitlist"
-                    : "Approve"}
-                </button>
+                {!selectedRegistration.isDivisionLaunched &&
+                  selectedRegistration.status !== "waitlisted" &&
+                  selectedRegistration.status !== "withdrawn" && (
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="approved"
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 transition hover:bg-green-500/20 lg:w-auto"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Approve
+                    </button>
+                  )}
 
-                <button
-                  type="submit"
-                  name="nextStatus"
-                  value="rejected"
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 lg:w-auto"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Reject
-                </button>
+                {!selectedRegistration.isDivisionLaunched &&
+                  selectedRegistration.status !== "withdrawn" && (
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="rejected"
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 lg:w-auto"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Reject
+                    </button>
+                  )}
 
-                <button
-                  type="submit"
-                  name="nextStatus"
-                  value="manual_review"
-                  autoFocus={params?.focus === "manual_review"}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/20 lg:w-auto"
-                >
-                  <AlertTriangle className="h-4 w-4" />
-                  Mark Manual Review
-                </button>
+                {!selectedRegistration.isDivisionLaunched &&
+                  selectedRegistration.status !== "waitlisted" &&
+                  selectedRegistration.status !== "withdrawn" && (
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="manual_review"
+                      autoFocus={params?.focus === "manual_review"}
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/20 lg:w-auto"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                      Mark Manual Review
+                    </button>
+                  )}
 
-                <button
-                  type="submit"
-                  name="nextStatus"
-                  value="waitlisted"
-                  autoFocus={params?.focus === "waitlist"}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/20 lg:w-auto"
-                >
-                  <Clock className="h-4 w-4" />
-                  Waitlist
-                </button>
               </div>
+
+              {selectedRegistration.status === "waitlisted" &&
+                !selectedRegistration.isDivisionLaunched && (
+                  <p className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
+                    A waitlisted player cannot be promoted by an administrator.
+                    The player must receive the oldest eligible FIFO offer,
+                    accept it, and return to Pending review first.
+                  </p>
+                )}
+
+              {selectedRegistration.isDivisionLaunched && (
+                <p className="mt-4 rounded-xl border border-sky-500/25 bg-sky-500/10 p-4 text-sm leading-6 text-sky-100">
+                  This division has launched. Registration status decisions are
+                  locked; private administrator notes remain editable.
+                </p>
+              )}
             </form>
           </div>
         </div>

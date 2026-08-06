@@ -292,7 +292,10 @@ export default function InAppNotificationCenter({
   const handlePlayerNotificationClick = (notification: InAppNotification) => {
     if (pending) return;
 
-    if (isPlayerMatchConfirmationNotification(notification)) {
+    if (
+      isPlayerMatchConfirmationNotification(notification) ||
+      isPlayerWaitlistOfferNotification(notification)
+    ) {
       startTransition(async () => {
         if (notification.readAt === null) {
           const formData = new FormData();
@@ -1024,6 +1027,10 @@ function isPlayerMatchConfirmationNotification(notification: InAppNotification) 
     notification.type === "match.confirmation_required" ||
     notification.title.toLowerCase() === "match result confirmation required"
   );
+}
+
+function isPlayerWaitlistOfferNotification(notification: InAppNotification) {
+  return notification.type === "registration.waitlist_offer";
 }
 
 function formatTimestamp(value: string) {

@@ -11,6 +11,9 @@ export type TournamentRuleFormat = "format_a" | "format_b";
 export type TournamentBracketName = "Academy" | "Challenge" | "Main";
 export type TournamentBracketFieldPrefix = "academy" | "challenge" | "main";
 
+export const WAITLIST_DISCLOSURE_MESSAGE =
+  "This division currently has all 8 active places filled. By continuing, you will join the waitlist. Your place is not guaranteed. If a player withdraws before launch, waitlisted players will be contacted in order and asked to confirm the available spot.";
+
 export const TOURNAMENT_BRACKET_CONFIGS: readonly {
   name: TournamentBracketName;
   fieldPrefix: TournamentBracketFieldPrefix;
@@ -86,6 +89,7 @@ export type TournamentCard = {
     waitlistedPlayers: number;
     isFull: boolean;
     isWaitlistOnly: boolean;
+    launchedAt: string | null;
     prize: string;
   }[];
   details: string;
@@ -115,7 +119,8 @@ export type TournamentParticipant = {
     | "manual_review"
     | "approved"
     | "rejected"
-    | "waitlisted";
+    | "waitlisted"
+    | "withdrawn";
   bracketId: string;
   bracketName: string;
 };
@@ -289,6 +294,7 @@ export type TournamentBracketRow = {
   registered_players?: number;
   active_cohort_players?: number;
   waitlisted_players?: number;
+  launched_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -372,6 +378,7 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
         (bracket.active_cohort_players ?? 0) >=
           PHASE_FOUR_ACTIVE_COHORT_SIZE ||
         (bracket.waitlisted_players ?? 0) > 0,
+      launchedAt: bracket.launched_at,
       prize: "Included in tournament prize pool",
     })),
     details: row.description,
@@ -414,7 +421,8 @@ export function isTournamentRegistrationOpen(
   );
 
   return (
-    tournament.statusValue === "registration_open" &&
+    (tournament.statusValue === "registration_open" ||
+      tournament.statusValue === "in_progress") &&
     tournament.registrationEnabled &&
     registrationOpens !== "invalid" &&
     registrationCloses !== "invalid" &&
@@ -423,8 +431,28 @@ export function isTournamentRegistrationOpen(
   );
 }
 
-export function isTournamentBracketPublic(status: TournamentStatus) {
-  return status === "in_progress" || status === "completed";
+export function isTournamentBracketRegistrationOpen(
+  tournament: Pick<
+    TournamentCard,
+    | "statusValue"
+    | "registrationEnabled"
+    | "registrationOpenAt"
+    | "registrationCloseAt"
+    | "brackets"
+  >,
+  bracketId: string,
+  now = Date.now()
+) {
+  return (
+    isTournamentRegistrationOpen(tournament, now) &&
+    tournament.brackets.some(
+      (bracket) => bracket.id === bracketId && bracket.launchedAt === null
+    )
+  );
+}
+
+export function isTournamentBracketPublic(launchedAt: string | null) {
+  return launchedAt !== null;
 }
 
 function getOptionalTimestamp(value: string) {

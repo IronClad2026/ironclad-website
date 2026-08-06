@@ -49,8 +49,8 @@ vi.mock("@/lib/tournament-bracket-data", () => ({
 
 vi.mock("@/lib/tournaments", () => ({
   getTournamentBracketDisplayName: (name: string) => name,
-  isTournamentBracketPublic: (status: string) =>
-    status === "in_progress" || status === "completed",
+  isTournamentBracketPublic: (launchedAt: string | null) =>
+    launchedAt !== null,
   mapTournamentRow: mapTournamentRowMock,
 }));
 
@@ -211,6 +211,7 @@ const viewerRegistrationShape = {
     status: "value",
     createdAt: "value",
     waitlistPosition: "value",
+    waitlistOfferStatus: "value",
   },
 } satisfies ExactShape;
 
@@ -268,7 +269,8 @@ function createPageClient(
     | "manual_review"
     | "approved"
     | "rejected"
-    | "waitlisted" = "approved"
+    | "waitlisted" = "approved",
+  waitlistOfferStatus: "offered" | null = null
 ) {
   const rawTournament = {
     id: TOURNAMENT_ID,
@@ -281,6 +283,10 @@ function createPageClient(
         id: BRACKET_ID,
         tournament_id: TOURNAMENT_ID,
         name: "Main",
+        launched_at:
+          tournamentStatus === "registration_open"
+            ? null
+            : "2026-07-25T00:00:00.000Z",
         registered_players: 0,
         waitlisted_players: 0,
       },
@@ -302,6 +308,7 @@ function createPageClient(
       | "approved"
       | "rejected"
       | "waitlisted";
+    waitlist_offer_status: "offered" | null;
     admin_notes: string | null;
     created_at: string;
   }> = [
@@ -316,6 +323,7 @@ function createPageClient(
       elo_verified_elo: 1500,
       elo_verification_source: "relic",
       registration_status: viewerRegistrationStatus,
+      waitlist_offer_status: null,
       admin_notes: `${SECRET_RESULT_PATH} ${SECRET_SUPABASE_URL}`,
       created_at: "2026-07-25T00:00:00.000Z",
     },
@@ -330,6 +338,7 @@ function createPageClient(
       elo_verified_elo: 1450,
       elo_verification_source: "relic",
       registration_status: "approved",
+      waitlist_offer_status: null,
       admin_notes: SECRET_ADMIN_ID,
       created_at: "2026-07-25T00:00:00.000Z",
     },
@@ -346,6 +355,7 @@ function createPageClient(
       elo_verified_elo: 1400 - index,
       elo_verification_source: "relic",
       registration_status: "pending",
+      waitlist_offer_status: null,
       admin_notes: null,
       created_at: `2026-07-25T00:00:0${index}.000Z`,
     });
@@ -362,6 +372,7 @@ function createPageClient(
       elo_verified_elo: 1300,
       elo_verification_source: "relic",
       registration_status: "waitlisted",
+      waitlist_offer_status: waitlistOfferStatus,
       admin_notes: null,
       created_at: "2026-07-25T00:00:08.000Z",
     });
@@ -433,6 +444,7 @@ async function loadClientProps({
   activeRegistrationCount,
   includeWaitlistedRegistration,
   viewerRegistrationStatus,
+  waitlistOfferStatus,
 }: {
   admin: boolean;
   participantCurrentElo?: number;
@@ -441,6 +453,7 @@ async function loadClientProps({
   tournamentStatus?: string;
   activeRegistrationCount?: number;
   includeWaitlistedRegistration?: boolean;
+  waitlistOfferStatus?: "offered" | null;
   viewerRegistrationStatus?:
     | "pending"
     | "manual_review"
@@ -461,7 +474,8 @@ async function loadClientProps({
     tournamentStatus,
     activeRegistrationCount,
     includeWaitlistedRegistration,
-    viewerRegistrationStatus
+    viewerRegistrationStatus,
+    waitlistOfferStatus
   );
   createSupabaseAdminClientMock.mockReturnValue(client);
 
@@ -664,6 +678,26 @@ describe("tournament Client Component result payload", () => {
             active_cohort_players: 7,
             registered_players: 2,
             waitlisted_players: 1,
+          }),
+        ],
+      })
+    );
+  });
+
+  it("counts an offer as reserved capacity but excludes it from the FIFO waitlist display", async () => {
+    await loadClientProps({
+      admin: false,
+      activeRegistrationCount: 7,
+      includeWaitlistedRegistration: true,
+      waitlistOfferStatus: "offered",
+    });
+
+    expect(mapTournamentRowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tournament_brackets: [
+          expect.objectContaining({
+            active_cohort_players: 8,
+            waitlisted_players: 0,
           }),
         ],
       })

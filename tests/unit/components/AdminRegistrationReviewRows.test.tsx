@@ -29,7 +29,9 @@ function reviewRow(
     registeredAt: "2026-08-05T10:00:00.000Z",
     registrationOrder: 2,
     waitlistPosition: null,
+    waitlistOfferStatus: null,
     privateAdminNote: "Private review context",
+    isDivisionLaunched: false,
     ...overrides,
   };
 }
@@ -46,12 +48,13 @@ function setViewport(width: number, height: number) {
 }
 
 function renderRows(
-  updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>
+  updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>,
+  registration = reviewRow()
 ) {
   return render(
     <form id="registration-bulk-form">
       <AdminRegistrationReviewRows
-        registrations={[reviewRow()]}
+        registrations={[registration]}
         activeFilter="pending"
         formId="registration-bulk-form"
         selectionScope="pending:tournament-1"
@@ -148,11 +151,8 @@ describe("administrator registration review responsive interaction", () => {
       "href",
       "/admin?filter=pending&selected=registration-main-1&focus=manual_review"
     );
-    expect(within(menu).getByRole("menuitem", { name: "Move to Waitlist" }))
-      .toHaveAttribute(
-        "href",
-        "/admin?filter=pending&selected=registration-main-1&focus=waitlist"
-      );
+    expect(within(menu).queryByRole("menuitem", { name: /Waitlist/i }))
+      .not.toBeInTheDocument();
 
     const approve = within(menu).getByRole("menuitem", { name: "Approve" });
     expect(approve).toHaveAttribute("type", "submit");
@@ -165,6 +165,59 @@ describe("administrator registration review responsive interaction", () => {
     expect(submitted.get("nextStatus")).toBe("approved");
     expect(submitted.get("activeFilter")).toBe("pending");
     expect(submitted.get("adminNotes")).toBe("Private review context");
+  });
+
+  it("never offers direct promotion for a waitlisted registration", () => {
+    const action = vi.fn<(formData: FormData) => void>();
+    const registration = reviewRow({
+      status: "waitlisted",
+      waitlistPosition: 1,
+      waitlistOfferStatus: "offered",
+    });
+    const { container } = renderRows(action, registration);
+    const card = getCard(container);
+
+    fireEvent.click(
+      within(card).getByRole("button", {
+        name: `Open actions for ${longPlayerName}`,
+      })
+    );
+
+    const menu = screen.getByRole("menu");
+    expect(within(menu).queryByRole("menuitem", { name: "Approve" }))
+      .not.toBeInTheDocument();
+    expect(
+      within(menu).queryByRole("menuitem", { name: /Promote/i })
+    ).not.toBeInTheDocument();
+    expect(
+      within(menu).queryByRole("menuitem", { name: /Pending Review/i })
+    ).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Reject" }))
+      .toBeInTheDocument();
+    expect(within(card).getByText("Offer Offered")).toBeInTheDocument();
+  });
+
+  it("locks roster decisions and bulk selection after division launch", () => {
+    const action = vi.fn<(formData: FormData) => void>();
+    const registration = reviewRow({ isDivisionLaunched: true });
+    const { container } = renderRows(action, registration);
+    const card = getCard(container);
+    const checkbox = within(card).getByRole("checkbox");
+
+    expect(checkbox).toBeDisabled();
+    expect(
+      within(card).getByText("Division launched — roster decisions are locked.")
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(card).getByRole("button", {
+        name: `Open actions for ${longPlayerName}`,
+      })
+    );
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(1);
+    expect(within(menu).getByRole("menuitem", { name: "Review Details" }))
+      .toBeInTheDocument();
   });
 
   it("keeps cards primary below xl and contains the desktop table overflow", () => {

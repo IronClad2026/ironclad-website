@@ -79,6 +79,11 @@ class SupabaseQueryMock implements PromiseLike<QueryResult> {
     return this;
   }
 
+  is(column: string, value: unknown) {
+    this.record.filters.push([column, value]);
+    return this;
+  }
+
   order(column: string, options: unknown) {
     this.record.orders.push([column, options]);
     return this;
@@ -198,7 +203,9 @@ function createTournament(
     registration_open_at: "2026-08-01T00:00:00.000Z",
     registration_close_at: "2026-08-10T00:00:00.000Z",
     registration_enabled: true,
-    tournament_brackets: [{ id: BRACKET_ID, name: bracketName }],
+    tournament_brackets: [
+      { id: BRACKET_ID, name: bracketName, launched_at: null },
+    ],
     ...overrides,
   };
 }
@@ -213,6 +220,7 @@ function registrationInput(overrides: Record<string, unknown> = {}) {
     playerParticipationAgreement: true,
     adminFinalDecisionAgreement: true,
     ownershipConfirmation: true,
+    waitlistConfirmed: false,
     ...overrides,
   };
 }
@@ -247,6 +255,7 @@ function successfulRpcResult(
         tournament_bracket_id: args.p_tournament_bracket_id,
         registration_status: registrationStatus,
         submitted_elo: args.p_relic_elo,
+        waitlist_confirmation_required: false,
       },
     ],
     error: null,
@@ -388,6 +397,46 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(client.rpc).toHaveBeenCalledOnce();
   });
 
+  it("requires deliberate waitlist confirmation when capacity changes before commit", async () => {
+    const client = createRegistrationClient({
+      rpcResults: [
+        {
+          data: [
+            {
+              id: null,
+              registration_status: null,
+              waitlist_confirmation_required: true,
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+    const result = await submitTournamentRegistration(registrationInput());
+
+    expect(result).toMatchObject({
+      success: false,
+      requiresWaitlistConfirmation: true,
+    });
+    expect(result.message).toContain("Your place is not guaranteed");
+    expect(client.rpc).toHaveBeenCalledWith(
+      "submit_verified_player_registration",
+      expect.objectContaining({ p_waitlist_confirmed: false })
+    );
+    expect(createInAppNotificationMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(
+      client.queries.filter((query) =>
+        query.filters.some(
+          ([column, value]) =>
+            column === "registration_status" && value === "waitlisted"
+        )
+      )
+    ).toHaveLength(0);
+  });
+
   it("honors the authoritative registration-enabled state before calling Relic", async () => {
     const client = createRegistrationClient({
       tournament: createTournament("Challenge", {
@@ -470,6 +519,7 @@ describe("Relic-authoritative tournament registration action", () => {
           p_relic_faction: faction,
           p_relic_division: division,
           p_relic_calculation_version: CALCULATION_VERSION,
+          p_waitlist_confirmed: false,
         }
       );
 
@@ -491,7 +541,7 @@ describe("Relic-authoritative tournament registration action", () => {
       tournament: createTournament("Challenge", {
         id: SECOND_TOURNAMENT_ID,
         tournament_brackets: [
-          { id: SECOND_BRACKET_ID, name: "Challenge" },
+          { id: SECOND_BRACKET_ID, name: "Challenge", launched_at: null },
         ],
       }),
     });
@@ -541,7 +591,9 @@ describe("Relic-authoritative tournament registration action", () => {
       })
     );
 
-    const result = await submitTournamentRegistration(registrationInput());
+    const result = await submitTournamentRegistration(
+      registrationInput({ waitlistConfirmed: true })
+    );
 
     expect(result.success).toBe(true);
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
@@ -694,12 +746,18 @@ describe("Relic-authoritative tournament registration action", () => {
     });
     createSupabaseAdminClientMock.mockReturnValue(client.client);
 
-    const result = await submitTournamentRegistration(registrationInput());
+    const result = await submitTournamentRegistration(
+      registrationInput({ waitlistConfirmed: true })
+    );
 
     expect(result).toEqual({
       success: true,
       message: "Registration submitted to waitlist position #2.",
     });
+    expect(client.rpc).toHaveBeenCalledWith(
+      "submit_verified_player_registration",
+      expect.objectContaining({ p_waitlist_confirmed: true })
+    );
     expect(createInAppNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         tournamentId: TOURNAMENT_ID,

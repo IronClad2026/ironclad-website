@@ -6,6 +6,7 @@ import { GitBranch } from "lucide-react";
 import AdminBracketPopulation, {
   type BracketPopulationData,
 } from "@/components/AdminBracketPopulation";
+import { launchTournamentDivision } from "@/app/admin/tournaments/actions";
 
 export type AdminBracketTournamentOption = {
   id: string;
@@ -16,6 +17,10 @@ export type AdminBracketTournamentOption = {
       format: BracketPopulationData["format"] | null;
       actualMatchCount: number;
       expectedMatchCount: number;
+      approvedCount: number;
+      requiredCount: number;
+      isReady: boolean;
+      launchedAt: string | null;
     }
   >;
 };
@@ -25,7 +30,12 @@ export default function AdminBracketManagement({
   notice,
 }: {
   tournaments: AdminBracketTournamentOption[];
-  notice?: "population-saved" | "population-failed";
+  notice?:
+    | "population-saved"
+    | "population-failed"
+    | "division-launched"
+    | "division-already-launched"
+    | "division-launch-failed";
 }) {
   const [tournamentId, setTournamentId] = useState(tournaments[0]?.id ?? "");
   const selectedTournament = useMemo(
@@ -41,6 +51,32 @@ export default function AdminBracketManagement({
     selectedTournament?.brackets.find(
       (bracket) => bracket.bracketId === bracketId
     ) ?? selectedTournament?.brackets[0];
+  const assignedRegistrationIds = new Set(
+    Object.values(selectedBracket?.assignments ?? {}).filter(
+      (registrationId): registrationId is string => Boolean(registrationId)
+    )
+  );
+  const assignmentsComplete = Boolean(
+    selectedBracket &&
+      selectedBracket.slotCount === selectedBracket.requiredCount &&
+      assignedRegistrationIds.size === selectedBracket.requiredCount &&
+      [...assignedRegistrationIds].every((registrationId) =>
+        selectedBracket.participants.some(
+          (participant) => participant.id === registrationId
+        )
+      )
+  );
+  const structureComplete = Boolean(
+    selectedBracket &&
+      selectedBracket.actualMatchCount === selectedBracket.expectedMatchCount
+  );
+  const canLaunch = Boolean(
+    selectedBracket?.generatedBracketId &&
+      selectedBracket.isReady &&
+      assignmentsComplete &&
+      structureComplete &&
+      !selectedBracket.launchedAt
+  );
 
   const selectTournament = (nextTournamentId: string) => {
     const tournament = tournaments.find(
@@ -64,8 +100,8 @@ export default function AdminBracketManagement({
             Manual Bracket Placement
           </h2>
           <p className="mt-1 text-sm leading-5 text-zinc-400">
-            Pick a generated bracket and assign approved participants to exact
-            public slots.
+            Prepare each generated bracket privately, then launch its division
+            explicitly when all eight approved players are seeded.
           </p>
         </div>
       </div>
@@ -73,14 +109,22 @@ export default function AdminBracketManagement({
       {notice && (
         <div
           className={`mt-4 rounded-xl border p-3 text-sm font-bold ${
-            notice === "population-saved"
+              notice === "population-saved" ||
+              notice === "division-launched" ||
+              notice === "division-already-launched"
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
               : "border-red-500/30 bg-red-500/10 text-red-300"
           }`}
         >
           {notice === "population-saved"
-            ? "Bracket assignments saved and published."
-            : "Bracket assignments could not be saved. Confirm every selected player is approved and unique."}
+            ? "Bracket assignments saved privately. The division remains unpublished until Launch Division."
+            : notice === "division-launched"
+              ? "Division launched. Its bracket is now public and its roster is locked."
+              : notice === "division-already-launched"
+                ? "This division was already launched; its original launch time and notifications were preserved."
+                : notice === "division-launch-failed"
+                  ? "Division launch failed. Confirm readiness, all eight unique assignments, and private-draft integrity."
+                  : "Bracket assignments could not be saved. Confirm every selected player is approved and unique."}
         </div>
       )}
 
@@ -137,8 +181,9 @@ export default function AdminBracketManagement({
                   <p className="mt-1 leading-5">
                     This bracket has {selectedBracket.actualMatchCount} of{" "}
                     {selectedBracket.expectedMatchCount} required match records.
-                    Use Repair Missing Match Records before saving player
-                    assignments.
+                    Regenerate the private structure before saving player
+                    assignments. Regeneration resets this unlaunched draft and
+                    requires reseeding.
                   </p>
                   <Link
                     href={`/admin/tournaments?selected=${selectedTournament.id}`}
@@ -154,27 +199,83 @@ export default function AdminBracketManagement({
                     {selectedTournament.title} - {selectedBracket.bracketName}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">
-                    {selectedBracket.slotCount} slots -{" "}
-                    {selectedBracket.participants.length} approved participants
+                    {selectedBracket.approvedCount}/{selectedBracket.requiredCount}
+                    {" "}approved
+                    {selectedBracket.isReady
+                      ? " — ready for private bracket preparation"
+                      : " — administrator review incomplete"}
+                  </p>
+                  <p
+                    className={`mt-2 text-xs font-black uppercase tracking-wider ${
+                      selectedBracket.launchedAt
+                        ? "text-sky-300"
+                        : "text-amber-300"
+                    }`}
+                  >
+                    {selectedBracket.launchedAt
+                      ? `Launched ${new Date(
+                          selectedBracket.launchedAt
+                        ).toLocaleString()}`
+                      : "Private draft — not published"}
                   </p>
                 </div>
-                <Link
-                  href="/tournaments"
-                  className="inline-flex min-h-11 shrink-0 items-center text-sm font-black text-sky-300 transition hover:text-sky-200"
-                >
-                  View Current Bracket
-                </Link>
+                {selectedBracket.launchedAt && (
+                  <Link
+                    href="/tournaments"
+                    className="inline-flex min-h-11 shrink-0 items-center text-sm font-black text-sky-300 transition hover:text-sky-200"
+                  >
+                    View Public Bracket
+                  </Link>
+                )}
               </div>
-              <AdminBracketPopulation
-                tournamentId={selectedTournament.id}
-                tournamentTitle={selectedTournament.title}
-                bracket={{
-                  ...selectedBracket,
-                  generatedBracketId: selectedBracket.generatedBracketId,
-                  format: selectedBracket.format,
-                }}
-                buttonLabel="Populate Tournament Bracket"
-              />
+              {!selectedBracket.launchedAt && (
+                <AdminBracketPopulation
+                  tournamentId={selectedTournament.id}
+                  tournamentTitle={selectedTournament.title}
+                  bracket={{
+                    ...selectedBracket,
+                    generatedBracketId: selectedBracket.generatedBracketId,
+                    format: selectedBracket.format,
+                  }}
+                  buttonLabel="Edit Private Seeding"
+                />
+              )}
+
+              {!selectedBracket.launchedAt && (
+                <form
+                  action={launchTournamentDivision}
+                  className="mt-4 rounded-2xl border border-orange-500/25 bg-orange-500/10 p-4"
+                >
+                  <input
+                    type="hidden"
+                    name="tournamentBracketId"
+                    value={selectedBracket.bracketId}
+                  />
+                  <p className="text-xs font-black uppercase tracking-wider text-orange-300">
+                    Final publication boundary
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-zinc-300">
+                    Launch publishes only this division, records its actual start
+                    time, locks its roster, and closes its waitlist. Other
+                    divisions remain unaffected.
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={!canLaunch}
+                    className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-orange-500 px-5 py-3 text-sm font-black uppercase tracking-wider text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400 sm:w-auto"
+                  >
+                    Launch Division
+                  </button>
+                  {!canLaunch && (
+                    <p className="mt-3 text-xs leading-5 text-zinc-400">
+                      Launch unlocks after the private structure is complete,
+                      readiness is {selectedBracket.requiredCount}/
+                      {selectedBracket.requiredCount} approved, and every seed is
+                      assigned to a unique approved player.
+                    </p>
+                  )}
+                </form>
+              )}
             </div>
           ) : (
             <p className="mt-4 rounded-2xl border border-dashed border-white/10 p-4 text-sm text-zinc-500">

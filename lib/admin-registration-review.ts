@@ -3,7 +3,15 @@ export type AdminRegistrationStatus =
   | "manual_review"
   | "approved"
   | "rejected"
-  | "waitlisted";
+  | "waitlisted"
+  | "withdrawn";
+
+export type AdminWaitlistOfferStatus =
+  | "offered"
+  | "accepted"
+  | "declined"
+  | "expired"
+  | "cancelled";
 
 export type AdminRegistrationOrderInput = {
   registrationId: string;
@@ -11,6 +19,7 @@ export type AdminRegistrationOrderInput = {
   tournamentBracketId: string | null;
   createdAt: string;
   status: AdminRegistrationStatus;
+  waitlistOfferStatus?: AdminWaitlistOfferStatus | null;
 };
 
 export type AdminRegistrationEvidenceInput = {
@@ -28,6 +37,7 @@ export type AdminRegistrationEvidenceInput = {
   registeredAt: string;
   registrationOrder: number | null;
   waitlistPosition: number | null;
+  waitlistOfferStatus: AdminWaitlistOfferStatus | null;
 };
 
 export type AdminRegistrationEvidence = {
@@ -44,12 +54,14 @@ export type AdminRegistrationEvidence = {
   registeredAt: string;
   registrationOrder: number | null;
   waitlistPosition: number | null;
+  waitlistOfferStatus: AdminWaitlistOfferStatus | null;
 };
 
 export type AdminRegistrationReviewRow = AdminRegistrationEvidence & {
   registrationId: string;
   tournamentId: string | null;
   privateAdminNote: string | null;
+  isDivisionLaunched: boolean;
 };
 
 export function compareRegistrationChronology(
@@ -71,7 +83,11 @@ export function buildWaitlistPositionMap(
   registrations: AdminRegistrationOrderInput[]
 ) {
   return buildScopedPositionMap(
-    registrations.filter((registration) => registration.status === "waitlisted")
+    registrations.filter(
+      (registration) =>
+        registration.status === "waitlisted" &&
+        registration.waitlistOfferStatus === null
+    )
   );
 }
 
@@ -93,6 +109,7 @@ export function buildAdminRegistrationEvidence(
     registrationOrder: input.registrationOrder,
     waitlistPosition:
       input.status === "waitlisted" ? input.waitlistPosition : null,
+    waitlistOfferStatus: input.waitlistOfferStatus,
   };
 }
 

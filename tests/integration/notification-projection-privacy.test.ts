@@ -88,6 +88,32 @@ describe("notification browser privacy boundary", () => {
     expect(payload).not.toContain(actorClerkUserId);
   });
 
+  it("routes a waitlist spot offer to its exact owner dashboard card", async () => {
+    const registrationId = "11111111-1111-4111-8111-111111111111";
+    const notificationQuery = createNotificationProjectionClient({
+      id: "notification-offer-1",
+      recipient_role: "player",
+      type: "registration.waitlist_offer",
+      title: "Tournament Spot Available",
+      message: "A place is available until the stated deadline.",
+      actor_display_name: null,
+      tournament_id: "22222222-2222-4222-8222-222222222222",
+      tournament_title: "Synthetic Tournament",
+      registration_id: registrationId,
+      match_id: null,
+      report_group_id: null,
+      read_at: null,
+      created_at: "2026-08-06T03:00:00.000Z",
+    });
+    createSupabaseAdminClientMock.mockReturnValue(notificationQuery.client);
+
+    const result = await loadPlayerNotifications(recipientClerkUserId);
+
+    expect(result.notifications[0]?.href).toBe(
+      `/dashboard#registration-${registrationId}`
+    );
+  });
+
   it("does not persist a reviewer Clerk ID in report-group review notifications", async () => {
     const client = createNotificationContextClient();
     createInAppNotificationsMock.mockResolvedValue(true);

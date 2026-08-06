@@ -123,12 +123,26 @@ describe("player dashboard result privacy", () => {
       expect(visibleOutput).not.toContain(secretValue);
     }
   });
+
+  it("does not expose matches, results, or standings from an unlaunched draft", async () => {
+    const dashboardClient = createDashboardClient({ launchedAt: null });
+    createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
+
+    const dashboard = await loadPlayerCareerDashboard(viewerClerkUserId);
+
+    expect(dashboard.notifications).toEqual([]);
+    expect(dashboard.matchHistory).toEqual([]);
+    expect(dashboard.champions).toEqual([]);
+    expect(dashboard.statistics.matchesPlayed).toBe(0);
+  });
 });
 
 function createDashboardClient({
   metadataError = null,
+  launchedAt = "2026-08-06T03:00:00.000Z",
 }: {
   metadataError?: unknown;
+  launchedAt?: string | null;
 } = {}) {
   const selects: { table: string; columns: string }[] = [];
 
@@ -159,7 +173,7 @@ function createDashboardClient({
         target.order = () => query;
         target.then = (resolve, reject) =>
           Promise.resolve(
-            resolveDashboardQuery(table, filters, metadataError)
+            resolveDashboardQuery(table, filters, metadataError, launchedAt)
           ).then(resolve, reject);
 
         return query;
@@ -172,7 +186,8 @@ function createDashboardClient({
 function resolveDashboardQuery(
   table: string,
   filters: ReadonlyMap<string, unknown>,
-  metadataError: unknown
+  metadataError: unknown,
+  launchedAt: string | null
 ): QueryResult {
   const viewerRegistration = {
     id: "registration-1",
@@ -253,6 +268,7 @@ function resolveDashboardQuery(
         id: "bracket-1",
         tournament_id: "tournament-1",
         name: "Main",
+        launched_at: launchedAt,
       },
     ],
     tournament_standings: [],

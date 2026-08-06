@@ -22,6 +22,17 @@ const compactCorrectionMigration = correctionMigration
   .toLowerCase()
   .replace(/\s+/g, " ")
   .trim();
+const phase4Migration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260806130000_phase4_withdrawal_waitlist_division_launch.sql"
+  ),
+  "utf8"
+);
+const compactPhase4Migration = phase4Migration
+  .toLowerCase()
+  .replace(/\s+/g, " ")
+  .trim();
 const registrationAction = readFileSync(
   resolve(process.cwd(), "app/tournaments/actions.ts"),
   "utf8"
@@ -47,7 +58,7 @@ function extractFunctionBody(functionName: string) {
 }
 
 describe("Relic tournament registration migration contract", () => {
-  it("drops only the obsolete five-argument RPC without changing the approved contract", () => {
+  it("drops only the obsolete five-argument RPC and uses the latest approved contract", () => {
     expect(compactCorrectionMigration).toBe(
       "begin; drop function if exists public.submit_verified_player_registration( uuid, text, uuid, uuid, text ); commit;"
     );
@@ -73,6 +84,15 @@ describe("Relic tournament registration migration contract", () => {
     expect(normalizedSha256(migration)).toBe(
       "5532ec5acd6d63505274482ee5e5662f4d713565037682c064fc09db8e92a278"
     );
+    expect(compactPhase4Migration).toContain(
+      "drop function if exists public.submit_verified_player_registration( uuid, text, text, uuid, uuid, bigint, text, text, text );"
+    );
+    expect(compactPhase4Migration).toContain(
+      "create function public.submit_verified_player_registration( p_profile_id uuid, p_clerk_user_id text, p_steam_id64 text, p_tournament_id uuid, p_tournament_bracket_id uuid, p_relic_elo bigint, p_relic_faction text, p_relic_division text, p_relic_calculation_version text, p_waitlist_confirmed boolean )"
+    );
+    expect(compactPhase4Migration).toContain(
+      "waitlist_confirmation_required boolean"
+    );
 
     const rpcCalls = [
       ...registrationAction.matchAll(
@@ -95,7 +115,11 @@ describe("Relic tournament registration migration contract", () => {
       "p_relic_faction",
       "p_relic_division",
       "p_relic_calculation_version",
+      "p_waitlist_confirmed",
     ]);
+    expect(rpcCalls[0][1]).toMatch(
+      /\bp_waitlist_confirmed\s*:\s*input\.waitlistConfirmed\b/
+    );
   });
 
   it("widens the existing ELO snapshot fields and adds only division and calculation version", () => {

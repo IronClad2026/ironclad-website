@@ -56,14 +56,14 @@ export default async function TournamentsPage() {
     supabase
       .from("tournaments")
       .select(
-        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, created_at, updated_at)"
+        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, created_at, updated_at)"
       )
       .order("grand_final_at", { ascending: false, nullsFirst: false }),
     supabase.rpc("get_tournament_bracket_capacity"),
     supabase
       .from("registrations")
       .select(
-        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, elo_verified_elo, elo_verification_source, registration_status, created_at"
+        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, elo_verified_elo, elo_verification_source, registration_status, waitlist_offer_status, created_at"
       )
       .not("tournament_id", "is", null)
       .not("tournament_bracket_id", "is", null),
@@ -118,9 +118,9 @@ export default async function TournamentsPage() {
   const tournamentRows = (tournamentResult.data ?? []) as TournamentRow[];
   const publicBracketIds = new Set(
     tournamentRows.flatMap((tournament) =>
-      isTournamentBracketPublic(tournament.status)
-        ? (tournament.tournament_brackets ?? []).map((bracket) => bracket.id)
-        : []
+      (tournament.tournament_brackets ?? [])
+        .filter((bracket) => isTournamentBracketPublic(bracket.launched_at))
+        .map((bracket) => bracket.id)
     )
   );
   const publicGeneratedBracketRows = (
@@ -143,7 +143,15 @@ export default async function TournamentsPage() {
       | "manual_review"
       | "approved"
       | "rejected"
-      | "waitlisted";
+      | "waitlisted"
+      | "withdrawn";
+    waitlist_offer_status:
+      | "offered"
+      | "accepted"
+      | "declined"
+      | "expired"
+      | "cancelled"
+      | null;
     created_at: string | null;
   }[];
   const referencedRegistrationIds = getGeneratedBracketRegistrationIds(
@@ -153,14 +161,23 @@ export default async function TournamentsPage() {
   const waitlistCountByBracket = new Map<string, number>();
 
   for (const registration of registrations) {
-    if (isActiveReviewCohortStatus(registration.registration_status)) {
+    if (
+      isActiveReviewCohortStatus(registration.registration_status) ||
+      (registration.registration_status === "waitlisted" &&
+        registration.waitlist_offer_status === "offered")
+    ) {
       activeCohortCountByBracket.set(
         registration.tournament_bracket_id,
         (activeCohortCountByBracket.get(
           registration.tournament_bracket_id
         ) ?? 0) + 1
       );
-    } else if (registration.registration_status === "waitlisted") {
+    }
+
+    if (
+      registration.registration_status === "waitlisted" &&
+      registration.waitlist_offer_status === null
+    ) {
       waitlistCountByBracket.set(
         registration.tournament_bracket_id,
         (waitlistCountByBracket.get(registration.tournament_bracket_id) ?? 0) +
@@ -251,6 +268,7 @@ export default async function TournamentsPage() {
             bracketNames.get(registration.tournament_bracket_id) ??
             "Tournament Bracket",
           status: registration.registration_status,
+          waitlistOfferStatus: registration.waitlist_offer_status,
           createdAt: registration.created_at,
           waitlistPosition:
             registration.registration_status === "waitlisted"
@@ -360,12 +378,16 @@ function buildWaitlistPositionMap(
     id: string;
     tournament_bracket_id: string;
     registration_status: string;
+    waitlist_offer_status: string | null;
     created_at: string | null;
   }[]
 ) {
   const positions = new Map<string, number>();
   const byBracket = registrations.reduce((groups, registration) => {
-    if (registration.registration_status !== "waitlisted") {
+    if (
+      registration.registration_status !== "waitlisted" ||
+      registration.waitlist_offer_status !== null
+    ) {
       return groups;
     }
 

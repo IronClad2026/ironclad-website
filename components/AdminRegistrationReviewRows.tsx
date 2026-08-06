@@ -18,7 +18,7 @@ import type {
 export type { AdminRegistrationReviewRow } from "@/lib/admin-registration-review";
 
 type FilterStatus = "all" | AdminRegistrationStatus;
-type FocusTarget = "note" | "reject" | "manual_review" | "waitlist";
+type FocusTarget = "note" | "reject" | "manual_review";
 
 type ContextMenuState = {
   registration: AdminRegistrationReviewRow;
@@ -227,8 +227,19 @@ export default function AdminRegistrationReviewRows({
                 <td className="py-4 pr-5">
                   <StatusBadge status={registration.status} />
                   {registration.status === "waitlisted" && (
-                    <p className="mt-2 text-xs font-black text-amber-300">
-                      FIFO position {formatPosition(registration.waitlistPosition)}
+                    <>
+                      <p className="mt-2 text-xs font-black text-amber-300">
+                        {registration.waitlistOfferStatus
+                          ? `Offer ${formatStatus(registration.waitlistOfferStatus)}`
+                          : `FIFO position ${formatPosition(
+                              registration.waitlistPosition
+                            )}`}
+                      </p>
+                    </>
+                  )}
+                  {registration.isDivisionLaunched && (
+                    <p className="mt-2 text-xs font-black text-sky-300">
+                      Division launched — roster locked
                     </p>
                   )}
                 </td>
@@ -309,6 +320,12 @@ function RegistrationCard({
         <StatusBadge status={registration.status} />
       </div>
 
+      {registration.isDivisionLaunched && (
+        <p className="mt-3 rounded-xl border border-sky-500/25 bg-sky-500/10 p-3 text-xs font-bold text-sky-200">
+          Division launched — roster decisions are locked.
+        </p>
+      )}
+
       <div className="mt-4 min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-3">
         <p className="break-words font-semibold text-white">
           {registration.tournamentName || "N/A"}
@@ -352,7 +369,9 @@ function RegistrationCard({
           label="Waitlist position"
           value={
             registration.status === "waitlisted"
-              ? formatPosition(registration.waitlistPosition)
+              ? registration.waitlistOfferStatus
+                ? `Offer ${formatStatus(registration.waitlistOfferStatus)}`
+                : formatPosition(registration.waitlistPosition)
               : "Not waitlisted"
           }
         />
@@ -396,6 +415,7 @@ function RegistrationCheckbox({
         aria-label={`Select registration for ${
           registration.playerDisplayName || "player"
         }`}
+        disabled={!isBulkApprovable(registration)}
         className="h-5 w-5 rounded border-white/20 bg-black/40 text-orange-500 focus:ring-orange-500"
       />
     </label>
@@ -446,7 +466,7 @@ function RegistrationContextMenu({
   menuRef: RefObject<HTMLDivElement | null>;
 }) {
   const registration = menu.registration;
-  const actions = getMenuActions(registration.status);
+  const actions = getMenuActions(registration);
 
   return (
     <div
@@ -567,7 +587,8 @@ function buildRegistrationHref(
   return `/admin?${params.toString()}`;
 }
 
-function getMenuActions(status: AdminRegistrationStatus): MenuAction[] {
+function getMenuActions(registration: AdminRegistrationReviewRow): MenuAction[] {
+  const { status } = registration;
   const detailsAction: MenuAction = {
     kind: "details",
     label: "Review Details",
@@ -575,7 +596,7 @@ function getMenuActions(status: AdminRegistrationStatus): MenuAction[] {
   };
   const approveAction: MenuAction = {
     kind: "direct",
-    label: status === "waitlisted" ? "Promote to Participant" : "Approve",
+    label: "Approve",
     nextStatus: "approved",
     className: "text-green-300 hover:bg-green-500/10",
   };
@@ -598,18 +619,16 @@ function getMenuActions(status: AdminRegistrationStatus): MenuAction[] {
     focus: "manual_review",
     className: "text-orange-300 hover:bg-orange-500/10",
   };
-  const waitlistAction: MenuAction = {
-    kind: "details",
-    label: status === "approved" ? "Move Back to Waitlist" : "Move to Waitlist",
-    focus: "waitlist",
-    className: "text-amber-300 hover:bg-amber-500/10",
-  };
   const returnPendingAction: MenuAction = {
     kind: "direct",
     label: "Return to Pending Review",
     nextStatus: "pending",
     className: "text-slate-200 hover:bg-white/10",
   };
+
+  if (registration.isDivisionLaunched) {
+    return [detailsAction];
+  }
 
   if (status === "pending") {
     return [
@@ -618,7 +637,6 @@ function getMenuActions(status: AdminRegistrationStatus): MenuAction[] {
       rejectAction,
       writeNoteAction,
       manualReviewAction,
-      waitlistAction,
     ];
   }
 
@@ -627,7 +645,6 @@ function getMenuActions(status: AdminRegistrationStatus): MenuAction[] {
       detailsAction,
       approveAction,
       rejectAction,
-      waitlistAction,
       writeNoteAction,
       returnPendingAction,
     ];
@@ -636,11 +653,8 @@ function getMenuActions(status: AdminRegistrationStatus): MenuAction[] {
   if (status === "waitlisted") {
     return [
       detailsAction,
-      approveAction,
       rejectAction,
-      manualReviewAction,
       writeNoteAction,
-      returnPendingAction,
     ];
   }
 
@@ -648,19 +662,30 @@ function getMenuActions(status: AdminRegistrationStatus): MenuAction[] {
     return [
       detailsAction,
       manualReviewAction,
-      waitlistAction,
       rejectAction,
       writeNoteAction,
     ];
+  }
+
+  if (status === "withdrawn") {
+    return [detailsAction, writeNoteAction];
   }
 
   return [
     detailsAction,
     approveAction,
     manualReviewAction,
-    waitlistAction,
     writeNoteAction,
   ];
+}
+
+function isBulkApprovable(registration: AdminRegistrationReviewRow) {
+  return (
+    !registration.isDivisionLaunched &&
+    registration.status !== "waitlisted" &&
+    registration.status !== "withdrawn" &&
+    registration.status !== "approved"
+  );
 }
 
 function EvidenceValue({
@@ -773,6 +798,10 @@ function getStatusBadgeClass(status: AdminRegistrationStatus) {
 
   if (status === "waitlisted") {
     return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+  }
+
+  if (status === "withdrawn") {
+    return "border-zinc-500/30 bg-zinc-500/10 text-zinc-400";
   }
 
   return "border-white/10 bg-white/[0.04] text-zinc-300";

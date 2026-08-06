@@ -24,6 +24,8 @@ const SNAPSHOT_SELECT = [
   "elo_verified_elo",
   "elo_verified_division",
   "registration_status",
+  "waitlist_offer_status",
+  "tournament_bracket:tournament_brackets(launched_at)",
   "tournament:tournaments!inner(title, status)",
 ].join(", ");
 const PUBLIC_SNAPSHOT_SELECT = `${SNAPSHOT_SELECT}, profile:players!registrations_profile_id_fkey!inner(public_profile_enabled)`;
@@ -35,6 +37,15 @@ type ActiveSnapshotRow = {
   elo_verified_elo: unknown;
   elo_verified_division: unknown;
   registration_status: unknown;
+  waitlist_offer_status: unknown;
+  tournament_bracket:
+    | {
+        launched_at: unknown;
+      }
+    | Array<{
+        launched_at: unknown;
+      }>
+    | null;
   tournament:
     | {
         title: unknown;
@@ -147,6 +158,11 @@ function mapActiveTournamentEloSnapshot(
       ? row.profile[0]
       : null
     : row.profile;
+  const tournamentBracket = Array.isArray(row.tournament_bracket)
+    ? row.tournament_bracket.length === 1
+      ? row.tournament_bracket[0]
+      : null
+    : row.tournament_bracket;
 
   if (
     (requirePublicProfile && profile?.public_profile_enabled !== true) ||
@@ -154,6 +170,10 @@ function mapActiveTournamentEloSnapshot(
     !ACTIVE_REGISTRATION_STATUSES.includes(
       row.registration_status as (typeof ACTIVE_REGISTRATION_STATUSES)[number]
     ) ||
+    (row.registration_status === "waitlisted" &&
+      (tournamentBracket?.launched_at !== null ||
+        (row.waitlist_offer_status !== null &&
+          row.waitlist_offer_status !== "offered"))) ||
     !tournament ||
     typeof tournament.status !== "string" ||
     !ACTIVE_TOURNAMENT_STATUSES.includes(
