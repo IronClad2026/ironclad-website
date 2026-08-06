@@ -68,13 +68,13 @@ export default function AdminMatchResultSummaries({
   return (
     <div className="space-y-4">
       {pending.length > 0 && (
-        <div className="rounded-2xl border border-orange-400/25 bg-orange-500/[0.04] p-5">
+        <div className="rounded-2xl border border-orange-400/25 bg-orange-500/[0.04] p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-wider text-orange-200">
                 Series Review
               </p>
-              <p className="mt-2 text-sm text-white">
+              <p className="mt-2 break-words text-sm text-white">
                 {participantName(
                   participantsById,
                   match.playerOneRegistrationId ?? ""
@@ -143,9 +143,9 @@ export default function AdminMatchResultSummaries({
       {historical.map((submission) => (
         <div
           key={submission.id}
-          className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-5"
+          className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4 sm:p-5"
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-4">
             <p className="text-xs font-black uppercase tracking-wider text-amber-200">
               Submission #{submission.submissionNumber} -{" "}
               {formatStatus(submission.status)}
@@ -241,7 +241,7 @@ function EvidenceSummary({
         )}
       </div>
       {submission.notes && (
-        <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-400">
+        <p className="mt-3 whitespace-pre-wrap break-words text-xs leading-5 text-slate-400">
           {submission.notes}
         </p>
       )}
@@ -368,7 +368,7 @@ function ReviewButton({
       name="decision"
       value={decision}
       disabled={disabled}
-      className={`rounded-lg px-2 py-2 text-[10px] font-black uppercase tracking-wider text-white transition disabled:opacity-50 ${className}`}
+      className={`min-h-11 rounded-lg px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition disabled:opacity-50 ${className}`}
     >
       {label}
     </button>
@@ -379,7 +379,7 @@ function SummaryValue({ label, value }: { label: string; value: string }) {
   return (
     <p>
       <span className="text-slate-500">{label}:</span>{" "}
-      <strong className="text-white">{value}</strong>
+      <strong className="break-words text-white">{value}</strong>
     </p>
   );
 }
@@ -390,7 +390,7 @@ function ProofLink({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-sky-200"
+      className="inline-flex min-h-11 items-center justify-center rounded-md border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-sky-200"
     >
       {label}
     </a>

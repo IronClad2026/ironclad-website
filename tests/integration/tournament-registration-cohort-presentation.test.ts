@@ -7,6 +7,13 @@ import {
   type TournamentRow,
 } from "@/lib/tournaments";
 
+function readNormalizedSource(path: string) {
+  return readFileSync(resolve(process.cwd(), path), "utf8").replaceAll(
+    "\r\n",
+    "\n"
+  );
+}
+
 function createTournamentRow(): TournamentRow {
   return {
     id: "11111111-1111-4111-8111-111111111111",
@@ -118,10 +125,7 @@ describe("registration cohort presentation", () => {
     expect(isTournamentBracketPublic("in_progress")).toBe(true);
     expect(isTournamentBracketPublic("completed")).toBe(true);
 
-    const pageSource = readFileSync(
-      resolve(process.cwd(), "app/tournaments/page.tsx"),
-      "utf8"
-    );
+    const pageSource = readNormalizedSource("app/tournaments/page.tsx");
     const filteredRowsIndex = pageSource.indexOf(
       "const publicGeneratedBracketRows"
     );
@@ -139,21 +143,15 @@ describe("registration cohort presentation", () => {
   });
 
   it("exposes one administrator closing-time control and derived cohort labels", () => {
-    const adminPageSource = readFileSync(
-      resolve(process.cwd(), "app/admin/page.tsx"),
-      "utf8"
+    const adminPageSource = readNormalizedSource("app/admin/page.tsx");
+    const tournamentFormSource = readNormalizedSource(
+      "app/admin/tournaments/page.tsx"
     );
-    const tournamentFormSource = readFileSync(
-      resolve(process.cwd(), "app/admin/tournaments/page.tsx"),
-      "utf8"
+    const tournamentActionSource = readNormalizedSource(
+      "app/admin/tournaments/actions.ts"
     );
-    const tournamentActionSource = readFileSync(
-      resolve(process.cwd(), "app/admin/tournaments/actions.ts"),
-      "utf8"
-    );
-    const tournamentExperienceSource = readFileSync(
-      resolve(process.cwd(), "components/TournamentsExperience.tsx"),
-      "utf8"
+    const tournamentExperienceSource = readNormalizedSource(
+      "components/TournamentsExperience.tsx"
     );
 
     expect(adminPageSource).toContain("Minimum Reached / Admin Review");

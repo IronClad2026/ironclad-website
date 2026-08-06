@@ -9,9 +9,7 @@ import {
   type NotificationCreateInput,
 } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import AdminRegistrationReviewRows, {
-  type AdminRegistrationReviewRow,
-} from "@/components/AdminRegistrationReviewRows";
+import AdminRegistrationReviewRows from "@/components/AdminRegistrationReviewRows";
 import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
 import AdminBracketManagement, {
   type AdminBracketTournamentOption,
@@ -34,6 +32,14 @@ import {
   isActiveReviewCohortStatus,
 } from "@/lib/tournament-registration-cohort";
 import {
+  buildAdminRegistrationEvidence,
+  buildRegistrationOrderMap,
+  buildWaitlistPositionMap,
+  type AdminRegistrationOrderInput,
+  type AdminRegistrationReviewRow,
+  type AdminRegistrationStatus,
+} from "@/lib/admin-registration-review";
+import {
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -50,12 +56,7 @@ type CustomClaims = {
   };
 };
 
-type RegistrationStatus =
-  | "pending"
-  | "manual_review"
-  | "approved"
-  | "rejected"
-  | "waitlisted";
+type RegistrationStatus = AdminRegistrationStatus;
 type FilterStatus = "all" | RegistrationStatus;
 type AdminFocusTarget = "note" | "reject" | "manual_review" | "waitlist";
 type AdminNotice =
@@ -88,13 +89,14 @@ type AdminPageProps = {
 type SupabaseRegistration = {
   id: string;
   player_name: string;
-  clerk_user_id: string;
-  discord_username: string;
-  steam_name: string;
-  country: string;
-  region: string;
-  timezone: string;
-  submitted_elo: number;
+  country: string | null;
+  submitted_elo: number | null;
+  elo_verified_elo: number | null;
+  elo_highest_faction: string | null;
+  elo_checked_at: string | null;
+  elo_verification_source: string | null;
+  elo_verified_division: string | null;
+  elo_calculation_version: string | null;
   registration_status: RegistrationStatus;
   admin_notes: string | null;
   created_at: string;
@@ -117,8 +119,49 @@ type AdminTournamentOption = {
 
 function formatStatus(status: string) {
   return status
-    .replace("_", " ")
+    .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatAdminVerificationSource(source: string | null) {
+  if (!source) {
+    return null;
+  }
+
+  if (source.toLowerCase() === "relic") {
+    return "Relic";
+  }
+
+  if (source.toLowerCase() === "coh3stats") {
+    return "CoH3 Stats";
+  }
+
+  return formatStatus(source);
+}
+
+function formatAdminEvidenceDateTime(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = new Date(value).getTime();
+
+  return Number.isFinite(timestamp)
+    ? new Date(value).toLocaleString()
+    : "Unavailable";
+}
+
+function compareAdminRegistrationReviewRows(
+  left: AdminRegistrationReviewRow,
+  right: AdminRegistrationReviewRow
+) {
+  return (
+    (left.tournamentId ?? "").localeCompare(right.tournamentId ?? "") ||
+    (left.selectedBracket ?? "").localeCompare(right.selectedBracket ?? "") ||
+    (left.registrationOrder ?? Number.MAX_SAFE_INTEGER) -
+      (right.registrationOrder ?? Number.MAX_SAFE_INTEGER) ||
+    left.registrationId.localeCompare(right.registrationId)
+  );
 }
 
 function getSafeFilter(filter?: string): FilterStatus {
@@ -203,47 +246,6 @@ function compareWaitlistedRegistrations(
     (Number.isFinite(rightTime) ? rightTime : 0);
 
   return timeDelta || left.id.localeCompare(right.id);
-}
-
-function buildWaitlistPositionMap(registrations: SupabaseRegistration[]) {
-  const positions = new Map<string, number>();
-  const byBracket = registrations.reduce((groups, registration) => {
-    if (
-      registration.registration_status !== "waitlisted" ||
-      !registration.tournament_bracket_id
-    ) {
-      return groups;
-    }
-
-    const group = groups.get(registration.tournament_bracket_id) ?? [];
-    group.push(registration);
-    groups.set(registration.tournament_bracket_id, group);
-    return groups;
-  }, new Map<string, SupabaseRegistration[]>());
-
-  for (const group of byBracket.values()) {
-    group
-      .slice()
-      .sort(compareWaitlistedRegistrations)
-      .forEach((registration, index) => {
-        positions.set(registration.id, index + 1);
-      });
-  }
-
-  return positions;
-}
-
-function buildRegistrationPriorityMap(registrations: SupabaseRegistration[]) {
-  const priorities = new Map<string, number>();
-
-  registrations
-    .slice()
-    .sort(compareWaitlistedRegistrations)
-    .forEach((registration, index) => {
-      priorities.set(registration.id, index + 1);
-    });
-
-  return priorities;
 }
 
 function isUuid(value: string) {
@@ -876,7 +878,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("registrations")
         .select(
-          "id, player_name, clerk_user_id, discord_username, steam_name, country, region, timezone, submitted_elo, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name"
+          "id, player_name, country, submitted_elo, elo_verified_elo, elo_highest_faction, elo_checked_at, elo_verification_source, elo_verified_division, elo_calculation_version, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name"
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -904,8 +906,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const baseRegistrations = (registrationsData ?? []) as SupabaseRegistration[];
-  const registrationPriorityById =
-    buildRegistrationPriorityMap(baseRegistrations);
+  const registrationOrderInputs: AdminRegistrationOrderInput[] =
+    baseRegistrations.map((registration) => ({
+      registrationId: registration.id,
+      tournamentId: registration.tournament_id,
+      tournamentBracketId: registration.tournament_bracket_id,
+      createdAt: registration.created_at,
+      status: registration.registration_status,
+    }));
+  const registrationPriorityById = buildRegistrationOrderMap(
+    registrationOrderInputs
+  );
   const tournaments = [
     ...((tournamentResult.data ?? []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
@@ -970,12 +981,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       };
     }
   );
-  const waitlistPositionByRegistration =
-    buildWaitlistPositionMap(baseRegistrations);
+  const waitlistPositionByRegistration = buildWaitlistPositionMap(
+    registrationOrderInputs
+  );
   const registrations = baseRegistrations.map((registration) => ({
     ...registration,
     waitlist_position: waitlistPositionByRegistration.get(registration.id) ?? null,
-    registration_order: registrationPriorityById.get(registration.id) ?? 0,
+    registration_order: registrationPriorityById.get(registration.id) ?? null,
   }));
   const waitlistNotices = registrations
     .filter(
@@ -1096,37 +1108,41 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     );
   }
 
-  const selectedRegistration = registrations.find(
-    (registration) => registration.id === params?.selected
-  );
-
-  const filteredRegistrations =
-    activeFilter === "all"
-      ? registrations
-      : registrations.filter(
-          (registration) => registration.registration_status === activeFilter
-        );
-  const registrationReviewRows: AdminRegistrationReviewRow[] =
-    filteredRegistrations.map((registration) => ({
-      id: registration.id,
+  const allRegistrationReviewRows: AdminRegistrationReviewRow[] =
+    registrations.map((registration) => ({
+      registrationId: registration.id,
       tournamentId: registration.tournament_id,
-      playerName: registration.player_name,
-      tournamentName:
-        registration.tournament_title ||
-        (registration.tournament_id
-          ? tournamentsById.get(registration.tournament_id) ?? ""
-          : ""),
-      bracketName: registration.bracket_name,
-      createdAt: registration.created_at,
-      region: registration.region,
-      submittedElo: registration.submitted_elo,
-      country: registration.country,
-      discordUsername: registration.discord_username,
-      status: registration.registration_status || "pending",
-      adminNotes: registration.admin_notes,
-      waitlistPosition: registration.waitlist_position ?? null,
-      registrationOrder: registration.registration_order ?? 0,
+      privateAdminNote: registration.admin_notes,
+      ...buildAdminRegistrationEvidence({
+        playerDisplayName: registration.player_name,
+        tournamentName:
+          registration.tournament_title ||
+          (registration.tournament_id
+            ? tournamentsById.get(registration.tournament_id) ?? ""
+            : ""),
+        selectedBracket: registration.bracket_name,
+        submittedElo: registration.submitted_elo,
+        verifiedElo: registration.elo_verified_elo,
+        verifiedDivision: registration.elo_verified_division,
+        verifiedFaction: registration.elo_highest_faction,
+        verificationSource: registration.elo_verification_source,
+        verificationCheckedAt: registration.elo_checked_at,
+        eligibilityRulesVersion: registration.elo_calculation_version,
+        status: registration.registration_status,
+        registeredAt: registration.created_at,
+        waitlistPosition: registration.waitlist_position,
+        registrationOrder: registration.registration_order,
+      }),
     }));
+  const selectedRegistration = allRegistrationReviewRows.find(
+    (registration) => registration.registrationId === params?.selected
+  );
+  const registrationReviewRows =
+    activeFilter === "all"
+      ? allRegistrationReviewRows.slice().sort(compareAdminRegistrationReviewRows)
+      : allRegistrationReviewRows.filter(
+          (registration) => registration.status === activeFilter
+        ).sort(compareAdminRegistrationReviewRows);
   const totalRegistrationCountByTournament = registrations.reduce(
     (counts, registration) => {
       const key = registration.tournament_id ?? "unassigned";
@@ -1253,10 +1269,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   ];
 
   return (
-    <main className="min-h-screen bg-black px-6 pt-32 pb-16 text-white">
+    <main className="min-h-screen overflow-x-hidden bg-black px-4 pt-28 pb-16 text-white sm:px-6 sm:pt-32">
       <section className="mx-auto max-w-7xl space-y-8">
         <div
-          className="relative overflow-hidden rounded-3xl border border-orange-500/30 bg-cover bg-center p-8 shadow-2xl"
+          className="relative overflow-hidden rounded-3xl border border-orange-500/30 bg-cover bg-center p-5 shadow-2xl sm:p-8"
           style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
         >
           <div className="absolute inset-0 bg-black/75" />
@@ -1267,7 +1283,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Private Admin Area
             </p>
 
-            <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">
+            <h1 className="mt-4 break-words text-3xl font-bold tracking-tight sm:text-4xl md:text-6xl">
               IronClad Admin Command Center
             </h1>
 
@@ -1310,12 +1326,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
 
         <section className="relative z-10 space-y-5">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-6">
           <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="text-2xl font-bold">Registration Review</h2>
               <p className="mt-1 text-sm text-zinc-400">
-                Showing {filteredRegistrations.length} registration(s).
+                Showing {registrationReviewRows.length} registration(s).
               </p>
             </div>
 
@@ -1325,12 +1341,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             >
               <input type="hidden" name="activeFilter" value={activeFilter} />
             </form>
-            <div className="flex flex-wrap gap-3">
+            <div className="grid w-full gap-3 sm:flex sm:w-auto sm:flex-wrap">
               <button
                 type="submit"
                 form="registration-bulk-form"
                 formAction={approveSelectedRegistrations}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20 sm:w-auto"
               >
                 <CheckCircle className="h-4 w-4" />
                 Approve Selected
@@ -1338,7 +1354,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <button
                 type="submit"
                 form="registration-bulk-form"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-red-200 transition hover:border-red-400/60 hover:bg-red-500/20"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-red-200 transition hover:border-red-400/60 hover:bg-red-500/20 sm:w-auto"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete Selected
@@ -1509,7 +1525,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             {registrationReviewGroups.map((group) => (
               <div
                 key={group.key}
-                className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur"
+                className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-5"
               >
                 <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -1528,43 +1544,28 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </p>
                   </div>
 
-                  <span className="w-fit rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-black uppercase tracking-wider text-zinc-300">
-                    {formatStatus(group.status)}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="xl:hidden">
+                      <AdminRegistrationSelectAll
+                        formId="registration-bulk-form"
+                        name="registrationId"
+                        scope={group.key}
+                        showLabel
+                      />
+                    </div>
+                    <span className="w-fit rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-black uppercase tracking-wider text-zinc-300">
+                      {formatStatus(group.status)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="overflow-x-auto overflow-y-visible">
-                  <table className="w-full min-w-[1220px] text-left text-sm">
-                    <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
-                      <tr>
-                        <th className="py-4">
-                          <AdminRegistrationSelectAll
-                            formId="registration-bulk-form"
-                            name="registrationId"
-                            scope={group.key}
-                          />
-                        </th>
-                        <th>Player Name</th>
-                        <th>Tournament Name</th>
-                        <th>Created</th>
-                        <th>Region</th>
-                        <th>ELO</th>
-                        <th>Country</th>
-                        <th>Discord</th>
-                        <th>Registration Status</th>
-                        <th>Waitlist</th>
-                      </tr>
-                    </thead>
-
-                    <AdminRegistrationReviewRows
-                      registrations={group.rows}
-                      activeFilter={activeFilter}
-                      formId="registration-bulk-form"
-                      selectionScope={group.key}
-                      updateRegistrationStatusAction={updateRegistrationStatus}
-                    />
-                  </table>
-                </div>
+                <AdminRegistrationReviewRows
+                  registrations={group.rows}
+                  activeFilter={activeFilter}
+                  formId="registration-bulk-form"
+                  selectionScope={group.key}
+                  updateRegistrationStatusAction={updateRegistrationStatus}
+                />
               </div>
             ))}
           </div>
@@ -1620,70 +1621,118 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </section>
 
       {selectedRegistration && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 px-4 py-8 backdrop-blur">
-          <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-orange-500/30 bg-zinc-950 p-6 shadow-2xl shadow-orange-950/40">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-3 backdrop-blur sm:p-6">
+          <div className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl overflow-y-auto overscroll-contain rounded-3xl border border-orange-500/30 bg-zinc-950 p-4 shadow-2xl shadow-orange-950/40 sm:max-h-[calc(100dvh-3rem)] sm:p-6">
+            <div className="sticky top-0 z-10 -mx-1 mb-5 flex items-start justify-between gap-4 border-b border-white/10 bg-zinc-950/95 px-1 pb-4 backdrop-blur">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">
                   Registration Details
                 </p>
 
-                <h2 className="mt-3 text-3xl font-bold">
-                  {selectedRegistration.player_name || "N/A"}
+                <h2 className="mt-3 break-words text-2xl font-bold sm:text-3xl">
+                  {selectedRegistration.playerDisplayName || "N/A"}
                 </h2>
 
                 <p className="mt-2 text-sm text-zinc-400">
-                  Full player registration review and admin decision panel.
+                  Immutable tournament evidence and private administrator review.
                 </p>
               </div>
 
               <Link
                 href={buildHref({ filter: activeFilter })}
-                className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-zinc-400 transition hover:border-orange-500/50 hover:text-orange-300"
+                aria-label="Close registration details"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] p-2 text-zinc-400 transition hover:border-orange-500/50 hover:text-orange-300"
               >
                 <X className="h-5 w-5" />
               </Link>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               {[
-                ["Player Name", selectedRegistration.player_name],
-                ["Discord", selectedRegistration.discord_username],
-                ["Steam Name", selectedRegistration.steam_name],
-                ["Country", selectedRegistration.country],
-                ["Region", selectedRegistration.region],
-                ["Timezone", selectedRegistration.timezone],
-                ["Submitted ELO", selectedRegistration.submitted_elo],
-                [
-                  "Registration Status",
-                  formatStatus(
-                    selectedRegistration.registration_status || "pending"
+                {
+                  label: "Player display name",
+                  value: selectedRegistration.playerDisplayName,
+                },
+                {
+                  label: "Tournament",
+                  value: selectedRegistration.tournamentName,
+                },
+                {
+                  label: "Selected bracket / division",
+                  value: selectedRegistration.selectedBracket,
+                },
+                {
+                  label: "Registration order (tournament division)",
+                  value: selectedRegistration.registrationOrder
+                    ? `#${selectedRegistration.registrationOrder}`
+                    : null,
+                },
+                {
+                  label: "Frozen tournament registration ELO",
+                  value: selectedRegistration.frozenRegistrationElo,
+                  detail:
+                    "Authoritative for this tournament. This is not the player's current profile ELO.",
+                },
+                {
+                  label: "Verified division",
+                  value: selectedRegistration.verifiedDivision,
+                },
+                {
+                  label: "Verified faction",
+                  value: selectedRegistration.verifiedFaction,
+                },
+                {
+                  label: "Verification source",
+                  value: formatAdminVerificationSource(
+                    selectedRegistration.verificationSource
                   ),
-                ],
-                [
-                  "Waitlist Position",
-                  selectedRegistration.registration_status === "waitlisted"
-                    ? `#${selectedRegistration.waitlist_position ?? "?"}`
-                    : "N/A",
-                ],
-                [
-                  "Created At",
-                  selectedRegistration.created_at
-                    ? new Date(selectedRegistration.created_at).toLocaleString()
-                    : "N/A",
-                ],
-              ].map(([label, value]) => (
+                },
+                {
+                  label: "Verification / check time",
+                  value: formatAdminEvidenceDateTime(
+                    selectedRegistration.verificationCheckedAt
+                  ),
+                },
+                {
+                  label: "Eligibility rules version",
+                  value: selectedRegistration.eligibilityRulesVersion,
+                },
+                {
+                  label: "Current registration status",
+                  value: formatStatus(selectedRegistration.status),
+                },
+                {
+                  label: "Waitlist position",
+                  value:
+                    selectedRegistration.status === "waitlisted"
+                      ? selectedRegistration.waitlistPosition
+                        ? `#${selectedRegistration.waitlistPosition}`
+                        : null
+                      : "Not waitlisted",
+                },
+                {
+                  label: "Registered at",
+                  value: formatAdminEvidenceDateTime(
+                    selectedRegistration.registeredAt
+                  ),
+                },
+              ].map(({ label, value, detail }) => (
                 <div
                   key={label}
-                  className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                  className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
                 >
                   <p className="text-xs uppercase tracking-wider text-zinc-500">
                     {label}
                   </p>
 
-                  <p className="mt-2 font-semibold text-white">
-                    {value || "N/A"}
+                  <p className="mt-2 break-words font-semibold text-white">
+                    {value === null || value === "" ? "Unavailable" : value}
                   </p>
+                  {detail && (
+                    <p className="mt-2 text-xs leading-5 text-orange-200/75">
+                      {detail}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -1692,7 +1741,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <input
                 type="hidden"
                 name="registrationId"
-                value={selectedRegistration.id}
+                value={selectedRegistration.registrationId}
               />
               <input
                 type="hidden"
@@ -1702,7 +1751,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <input
                 type="hidden"
                 name="selected"
-                value={selectedRegistration.id}
+                value={selectedRegistration.registrationId}
               />
 
               <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
@@ -1710,23 +1759,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   htmlFor="adminNotes"
                   className="text-xs font-bold uppercase tracking-wider text-orange-300"
                 >
-                  Admin Notes
+                  Private Admin Note
                 </label>
                 <p className="mt-2 text-xs leading-5 text-zinc-400">
                   Required when rejecting a registration or marking it for
-                  manual review. This note is shown to the player.
+                  manual review. This note is restricted to administrators and
+                  is never included in player-facing status messages.
                 </p>
                 <textarea
                   id="adminNotes"
                   name="adminNotes"
-                  defaultValue={selectedRegistration.admin_notes ?? ""}
+                  defaultValue={selectedRegistration.privateAdminNote ?? ""}
                   maxLength={1000}
                   rows={5}
                   autoFocus={
                     params?.focus === "note" || params?.focus === "reject"
                   }
                   className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400"
-                  placeholder="Explain the decision or information needed from the player."
+                  placeholder="Record private review context for administrators."
                 />
               </div>
 
@@ -1751,24 +1801,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               )}
 
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-6 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-2 lg:flex lg:flex-wrap">
                 <button
                   type="submit"
                   name="nextStatus"
-                  value={selectedRegistration.registration_status || "pending"}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:border-white/30 hover:bg-white/[0.08]"
+                  value={selectedRegistration.status}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:border-white/30 hover:bg-white/[0.08] lg:w-auto"
                 >
-                  Save Note
+                  Save Private Note
                 </button>
 
                 <button
                   type="submit"
                   name="nextStatus"
                   value="approved"
-                  className="inline-flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 transition hover:bg-green-500/20"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 transition hover:bg-green-500/20 lg:w-auto"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  {selectedRegistration.registration_status === "waitlisted"
+                  {selectedRegistration.status === "waitlisted"
                     ? "Approve From Waitlist"
                     : "Approve"}
                 </button>
@@ -1777,7 +1827,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   type="submit"
                   name="nextStatus"
                   value="rejected"
-                  className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 lg:w-auto"
                 >
                   <XCircle className="h-4 w-4" />
                   Reject
@@ -1788,7 +1838,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   name="nextStatus"
                   value="manual_review"
                   autoFocus={params?.focus === "manual_review"}
-                  className="inline-flex items-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/20"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/20 lg:w-auto"
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Mark Manual Review
@@ -1799,7 +1849,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   name="nextStatus"
                   value="waitlisted"
                   autoFocus={params?.focus === "waitlist"}
-                  className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/20"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/20 lg:w-auto"
                 >
                   <Clock className="h-4 w-4" />
                   Waitlist

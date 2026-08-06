@@ -209,7 +209,6 @@ const viewerRegistrationShape = {
     tournamentBracketId: "value",
     bracketName: "value",
     status: "value",
-    adminNotes: "value",
     createdAt: "value",
     waitlistPosition: "value",
   },
@@ -263,7 +262,13 @@ function createPageClient(
   participantCurrentElo = 1500,
   tournamentStatus = "in_progress",
   activeRegistrationCount = 2,
-  includeWaitlistedRegistration = false
+  includeWaitlistedRegistration = false,
+  viewerRegistrationStatus:
+    | "pending"
+    | "manual_review"
+    | "approved"
+    | "rejected"
+    | "waitlisted" = "approved"
 ) {
   const rawTournament = {
     id: TOURNAMENT_ID,
@@ -310,7 +315,7 @@ function createPageClient(
       submitted_elo: 1500,
       elo_verified_elo: 1500,
       elo_verification_source: "relic",
-      registration_status: "approved",
+      registration_status: viewerRegistrationStatus,
       admin_notes: `${SECRET_RESULT_PATH} ${SECRET_SUPABASE_URL}`,
       created_at: "2026-07-25T00:00:00.000Z",
     },
@@ -376,6 +381,7 @@ function createPageClient(
     data: { relic_verified_division: verifiedDivision },
     error: verifiedDivisionError,
   });
+  const registrationQuery = createQuery(results.registrations);
   const participantPlayersQuery = createQuery(results.players);
   let playerQueryCount = 0;
   const from = vi.fn((table: string) => {
@@ -384,6 +390,10 @@ function createPageClient(
       return playerQueryCount === 1
         ? viewerDivisionQuery
         : participantPlayersQuery;
+    }
+
+    if (table === "registrations") {
+      return registrationQuery;
     }
 
     const result = results[table];
@@ -398,6 +408,7 @@ function createPageClient(
   return {
     from,
     participantPlayersQuery,
+    registrationQuery,
     rpc: vi.fn(async () => ({
       data: [
         {
@@ -421,6 +432,7 @@ async function loadClientProps({
   tournamentStatus,
   activeRegistrationCount,
   includeWaitlistedRegistration,
+  viewerRegistrationStatus,
 }: {
   admin: boolean;
   participantCurrentElo?: number;
@@ -429,6 +441,12 @@ async function loadClientProps({
   tournamentStatus?: string;
   activeRegistrationCount?: number;
   includeWaitlistedRegistration?: boolean;
+  viewerRegistrationStatus?:
+    | "pending"
+    | "manual_review"
+    | "approved"
+    | "rejected"
+    | "waitlisted";
 }) {
   const viewerClerkUserId = admin ? SECRET_ADMIN_ID : SECRET_PLAYER_ID;
   authMock.mockResolvedValue({
@@ -442,7 +460,8 @@ async function loadClientProps({
     participantCurrentElo,
     tournamentStatus,
     activeRegistrationCount,
-    includeWaitlistedRegistration
+    includeWaitlistedRegistration,
+    viewerRegistrationStatus
   );
   createSupabaseAdminClientMock.mockReturnValue(client);
 
@@ -549,6 +568,30 @@ describe("tournament Client Component result payload", () => {
       expect(loadMatchResultDataMock).toHaveBeenCalledOnce();
     }
   );
+
+  it("keeps private administrator notes out of rejected-player payloads", async () => {
+    const { client, props } = await loadClientProps({
+      admin: false,
+      viewerRegistrationStatus: "rejected",
+    });
+    const viewer = props.viewer as {
+      registrations: Array<Record<string, unknown>>;
+    };
+    const [registrationColumns] = vi.mocked(
+      client.registrationQuery.select
+    ).mock.calls[0];
+
+    expect(registrationColumns).toEqual(expect.any(String));
+    expect(String(registrationColumns)).not.toContain("admin_notes");
+    expect(viewer.registrations).toHaveLength(1);
+    expect(viewer.registrations[0]).not.toHaveProperty("adminNotes");
+    expect(serializePrivacyValue(viewer.registrations)).not.toContain(
+      SECRET_RESULT_PATH
+    );
+    expect(serializePrivacyValue(viewer.registrations)).not.toContain(
+      SECRET_SUPABASE_URL
+    );
+  });
 
   it("loads only the authenticated player's private verified division", async () => {
     const { client, props } = await loadClientProps({

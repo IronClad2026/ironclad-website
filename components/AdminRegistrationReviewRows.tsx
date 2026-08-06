@@ -1,33 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
+import { MoreVertical } from "lucide-react";
+import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
+import type {
+  AdminRegistrationReviewRow,
+  AdminRegistrationStatus,
+} from "@/lib/admin-registration-review";
 
-export type AdminRegistrationReviewRow = {
-  id: string;
-  tournamentId: string | null;
-  playerName: string;
-  tournamentName: string;
-  bracketName: string | null;
-  createdAt: string | null;
-  region: string | null;
-  submittedElo: number | null;
-  country: string | null;
-  discordUsername: string | null;
-  status: RegistrationStatus;
-  adminNotes: string | null;
-  waitlistPosition: number | null;
-  registrationOrder: number;
-};
+export type { AdminRegistrationReviewRow } from "@/lib/admin-registration-review";
 
-type RegistrationStatus =
-  | "pending"
-  | "manual_review"
-  | "approved"
-  | "rejected"
-  | "waitlisted";
-
-type FilterStatus = "all" | RegistrationStatus;
+type FilterStatus = "all" | AdminRegistrationStatus;
 type FocusTarget = "note" | "reject" | "manual_review" | "waitlist";
 
 type ContextMenuState = {
@@ -40,13 +30,13 @@ type MenuAction =
   | {
       kind: "direct";
       label: string;
-      nextStatus: RegistrationStatus;
+      nextStatus: AdminRegistrationStatus;
       className: string;
     }
   | {
       kind: "details";
       label: string;
-      focus: FocusTarget;
+      focus?: FocusTarget;
       className: string;
     };
 
@@ -78,7 +68,7 @@ export default function AdminRegistrationReviewRows({
         target instanceof Node &&
         (menuRef.current?.contains(target) ||
           (target instanceof Element &&
-            target.closest("[data-registration-review-row='true']")))
+            target.closest("[data-registration-action-trigger='true']")))
       ) {
         return;
       }
@@ -92,108 +82,179 @@ export default function AdminRegistrationReviewRows({
       }
     };
 
+    const closeOnResize = () => setMenu(null);
+
     document.addEventListener("pointerdown", closeMenu);
     document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeOnResize);
 
     return () => {
       document.removeEventListener("pointerdown", closeMenu);
       document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeOnResize);
     };
   }, [menu]);
 
+  const openMenu = (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    registration: AdminRegistrationReviewRow
+  ) => {
+    const trigger = event.currentTarget.getBoundingClientRect();
+    const gutter = 16;
+    const menuWidth = Math.min(272, window.innerWidth - gutter * 2);
+    const menuHeight = Math.min(420, window.innerHeight - gutter * 2);
+    const x = Math.max(
+      gutter,
+      Math.min(trigger.right - menuWidth, window.innerWidth - menuWidth - gutter)
+    );
+    const below = trigger.bottom + 8;
+    const y =
+      below + menuHeight <= window.innerHeight - gutter
+        ? below
+        : Math.max(gutter, trigger.top - menuHeight - 8);
+
+    setMenu({ registration, x, y });
+  };
+
   return (
     <>
-      <tbody>
+      <div
+        data-registration-review-cards="true"
+        className="grid min-w-0 gap-3 xl:hidden"
+      >
         {registrations.map((registration) => (
-          <tr
-            key={registration.id}
-            data-registration-review-row="true"
-            onClick={(event) => {
-              setMenu({
-                registration,
-                x: Math.min(event.clientX, window.innerWidth - 260),
-                y: Math.min(event.clientY, window.innerHeight - 260),
-              });
-            }}
-            className="cursor-pointer border-b border-white/5 text-zinc-300 transition hover:bg-orange-500/[0.05]"
-          >
-            <td className="py-4">
-              <input
-                form={formId}
-                type="checkbox"
-                name="registrationId"
-                value={registration.id}
-                data-registration-selection="true"
-                data-registration-selection-scope={selectionScope}
-                aria-label={`Select registration for ${
-                  registration.playerName || "player"
-                }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setMenu(null);
-                }}
-                className="h-4 w-4 rounded border-white/20 bg-black/40 text-orange-500 focus:ring-orange-500"
-              />
-            </td>
-
-            <td className="py-4 font-semibold text-white">
-              <span>{registration.playerName || "N/A"}</span>
-              <span className="ml-2 align-middle text-[11px] font-black text-zinc-500">
-                &middot; #{registration.registrationOrder}
-              </span>
-            </td>
-
-            <td className="py-4">
-              <p className="font-semibold text-white">
-                {registration.tournamentName || "N/A"}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                {registration.bracketName
-                  ? `${registration.bracketName} Bracket`
-                  : "Bracket not assigned"}
-              </p>
-            </td>
-
-            <td className="py-4">
-              {registration.createdAt
-                ? new Date(registration.createdAt).toLocaleDateString()
-                : "N/A"}
-            </td>
-            <td className="py-4">{registration.region || "N/A"}</td>
-            <td className="py-4">{registration.submittedElo ?? "N/A"}</td>
-            <td className="py-4">{registration.country || "N/A"}</td>
-            <td className="py-4">{registration.discordUsername || "N/A"}</td>
-
-            <td className="py-4">
-              <span
-                className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                  registration.status
-                )}`}
-              >
-                {formatStatus(registration.status)}
-              </span>
-            </td>
-
-            <td className="py-4">
-              {registration.status === "waitlisted" ? (
-                <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-black text-amber-300">
-                  #{registration.waitlistPosition ?? "?"}
-                </span>
-              ) : (
-                <span className="text-xs text-zinc-600">-</span>
-              )}
-            </td>
-          </tr>
+          <RegistrationCard
+            key={registration.registrationId}
+            registration={registration}
+            activeFilter={activeFilter}
+            formId={formId}
+            selectionScope={selectionScope}
+            menuOpen={
+              menu?.registration.registrationId === registration.registrationId
+            }
+            onOpenMenu={openMenu}
+          />
         ))}
 
         {registrations.length === 0 && (
-          <tr>
-            <td colSpan={10} className="py-10 text-center text-zinc-500">
-              No registrations found for this status.
-            </td>
-          </tr>
+          <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-zinc-500">
+            No registrations found for this status.
+          </p>
         )}
-      </tbody>
+      </div>
+
+      <div className="hidden max-w-full overflow-x-auto overscroll-x-contain xl:block">
+        <table className="w-full min-w-[1080px] text-left text-sm">
+          <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
+            <tr>
+              <th className="py-3 pr-3">
+                <AdminRegistrationSelectAll
+                  formId={formId}
+                  name="registrationId"
+                  scope={selectionScope}
+                />
+              </th>
+              <th className="py-3 pr-5">Player / Order</th>
+              <th className="py-3 pr-5">Tournament / Division</th>
+              <th className="py-3 pr-5">Registration ELO</th>
+              <th className="py-3 pr-5">Verification Evidence</th>
+              <th className="py-3 pr-5">Status</th>
+              <th className="py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {registrations.map((registration) => (
+              <tr
+                key={registration.registrationId}
+                data-registration-review-row="true"
+                className="border-b border-white/5 align-top text-zinc-300 transition hover:bg-orange-500/[0.05]"
+              >
+                <td className="py-3 pr-3">
+                  <RegistrationCheckbox
+                    registration={registration}
+                    formId={formId}
+                    selectionScope={selectionScope}
+                  />
+                </td>
+                <td className="max-w-56 py-4 pr-5">
+                  <p className="break-words font-semibold text-white">
+                    {registration.playerDisplayName || "N/A"}
+                  </p>
+                  <p className="mt-1 text-xs font-black text-zinc-500">
+                    Division order {formatPosition(registration.registrationOrder)}
+                  </p>
+                </td>
+                <td className="max-w-64 py-4 pr-5">
+                  <p className="break-words font-semibold text-white">
+                    {registration.tournamentName || "N/A"}
+                  </p>
+                  <p className="mt-1 break-words text-xs text-zinc-500">
+                    {registration.selectedBracket || "Division not assigned"}
+                  </p>
+                </td>
+                <td className="py-4 pr-5">
+                  <p className="font-black text-orange-200">
+                    {formatElo(registration.frozenRegistrationElo)}
+                  </p>
+                  <p className="mt-1 max-w-40 text-xs leading-5 text-zinc-500">
+                    Frozen at registration, not current profile ELO
+                  </p>
+                </td>
+                <td className="max-w-64 py-4 pr-5 text-xs leading-5">
+                  <EvidenceLine
+                    label="Verified division"
+                    value={registration.verifiedDivision}
+                  />
+                  <EvidenceLine
+                    label="Faction"
+                    value={registration.verifiedFaction}
+                  />
+                  <EvidenceLine
+                    label="Source"
+                    value={formatVerificationSource(
+                      registration.verificationSource
+                    )}
+                  />
+                  <EvidenceLine
+                    label="Checked"
+                    value={formatDateTime(registration.verificationCheckedAt)}
+                  />
+                  <EvidenceLine
+                    label="Rules"
+                    value={registration.eligibilityRulesVersion}
+                  />
+                </td>
+                <td className="py-4 pr-5">
+                  <StatusBadge status={registration.status} />
+                  {registration.status === "waitlisted" && (
+                    <p className="mt-2 text-xs font-black text-amber-300">
+                      FIFO position {formatPosition(registration.waitlistPosition)}
+                    </p>
+                  )}
+                </td>
+                <td className="py-3 text-right">
+                  <ActionMenuButton
+                    registration={registration}
+                    expanded={
+                      menu?.registration.registrationId ===
+                      registration.registrationId
+                    }
+                    onOpenMenu={openMenu}
+                  />
+                </td>
+              </tr>
+            ))}
+
+            {registrations.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-10 text-center text-zinc-500">
+                  No registrations found for this status.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {typeof document !== "undefined" && menu
         ? createPortal(
@@ -208,6 +269,166 @@ export default function AdminRegistrationReviewRows({
           )
         : null}
     </>
+  );
+}
+
+function RegistrationCard({
+  registration,
+  activeFilter,
+  formId,
+  selectionScope,
+  menuOpen,
+  onOpenMenu,
+}: {
+  registration: AdminRegistrationReviewRow;
+  activeFilter: FilterStatus;
+  formId: string;
+  selectionScope?: string;
+  menuOpen: boolean;
+  onOpenMenu: (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    registration: AdminRegistrationReviewRow
+  ) => void;
+}) {
+  return (
+    <article className="min-w-0 rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="flex min-w-0 items-start gap-3">
+        <RegistrationCheckbox
+          registration={registration}
+          formId={formId}
+          selectionScope={selectionScope}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-black text-white">
+            {registration.playerDisplayName || "N/A"}
+          </p>
+          <p className="mt-1 text-xs font-black text-orange-300">
+            Division order {formatPosition(registration.registrationOrder)}
+          </p>
+        </div>
+        <StatusBadge status={registration.status} />
+      </div>
+
+      <div className="mt-4 min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+        <p className="break-words font-semibold text-white">
+          {registration.tournamentName || "N/A"}
+        </p>
+        <p className="mt-1 break-words text-xs text-zinc-400">
+          {registration.selectedBracket || "Division not assigned"}
+        </p>
+      </div>
+
+      <dl className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
+        <EvidenceValue
+          label="Frozen tournament registration ELO"
+          value={formatElo(registration.frozenRegistrationElo)}
+          detail="Captured at registration; not current profile ELO."
+        />
+        <EvidenceValue
+          label="Verified division"
+          value={registration.verifiedDivision}
+        />
+        <EvidenceValue
+          label="Verified faction"
+          value={registration.verifiedFaction}
+        />
+        <EvidenceValue
+          label="Verification source"
+          value={formatVerificationSource(registration.verificationSource)}
+        />
+        <EvidenceValue
+          label="Verification / check time"
+          value={formatDateTime(registration.verificationCheckedAt)}
+        />
+        <EvidenceValue
+          label="Eligibility rules version"
+          value={registration.eligibilityRulesVersion}
+        />
+        <EvidenceValue
+          label="Registered at"
+          value={formatDateTime(registration.registeredAt)}
+        />
+        <EvidenceValue
+          label="Waitlist position"
+          value={
+            registration.status === "waitlisted"
+              ? formatPosition(registration.waitlistPosition)
+              : "Not waitlisted"
+          }
+        />
+      </dl>
+
+      <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <a
+          href={buildRegistrationHref(activeFilter, registration.registrationId)}
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 py-2 text-xs font-black uppercase tracking-wider text-zinc-200 transition hover:border-orange-400/50 hover:text-orange-200"
+        >
+          Review details
+        </a>
+        <ActionMenuButton
+          registration={registration}
+          expanded={menuOpen}
+          onOpenMenu={onOpenMenu}
+        />
+      </div>
+    </article>
+  );
+}
+
+function RegistrationCheckbox({
+  registration,
+  formId,
+  selectionScope,
+}: {
+  registration: AdminRegistrationReviewRow;
+  formId: string;
+  selectionScope?: string;
+}) {
+  return (
+    <label className="inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-black/30">
+      <input
+        form={formId}
+        type="checkbox"
+        name="registrationId"
+        value={registration.registrationId}
+        data-registration-selection="true"
+        data-registration-selection-scope={selectionScope}
+        aria-label={`Select registration for ${
+          registration.playerDisplayName || "player"
+        }`}
+        className="h-5 w-5 rounded border-white/20 bg-black/40 text-orange-500 focus:ring-orange-500"
+      />
+    </label>
+  );
+}
+
+function ActionMenuButton({
+  registration,
+  expanded,
+  onOpenMenu,
+}: {
+  registration: AdminRegistrationReviewRow;
+  expanded: boolean;
+  onOpenMenu: (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    registration: AdminRegistrationReviewRow
+  ) => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-registration-action-trigger="true"
+      aria-haspopup="menu"
+      aria-expanded={expanded}
+      aria-label={`Open actions for ${
+        registration.playerDisplayName || "player"
+      }`}
+      onClick={(event) => onOpenMenu(event, registration)}
+      className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-xs font-black uppercase tracking-wider text-orange-200 transition hover:border-orange-300/60 hover:bg-orange-500/20"
+    >
+      <MoreVertical className="h-5 w-5" />
+      <span className="xl:hidden">Actions</span>
+    </button>
   );
 }
 
@@ -230,15 +451,17 @@ function RegistrationContextMenu({
   return (
     <div
       ref={menuRef}
+      role="menu"
+      aria-label={`Registration actions for ${registration.playerDisplayName}`}
       style={{ left: menu.x, top: menu.y }}
-      className="fixed z-[10050] w-56 overflow-hidden rounded-2xl border border-orange-500/25 bg-zinc-950/95 p-2 text-sm shadow-2xl shadow-orange-950/50 backdrop-blur-xl"
+      className="fixed z-[10050] max-h-[calc(100dvh-2rem)] w-[min(17rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-orange-500/25 bg-zinc-950/95 p-2 text-sm shadow-2xl shadow-orange-950/50 backdrop-blur-xl"
     >
       <div className="border-b border-white/10 px-3 py-2">
-        <p className="truncate text-xs font-black uppercase tracking-wider text-orange-300">
-          Registration #{registration.registrationOrder}
+        <p className="text-xs font-black uppercase tracking-wider text-orange-300">
+          Division order {formatPosition(registration.registrationOrder)}
         </p>
-        <p className="truncate text-sm font-bold text-white">
-          {registration.playerName || "Player"}
+        <p className="mt-1 break-words text-sm font-bold text-white">
+          {registration.playerDisplayName || "Player"}
         </p>
       </div>
 
@@ -255,10 +478,10 @@ function RegistrationContextMenu({
             />
           ) : (
             <MenuLink
-              key={`${action.kind}:${action.focus}`}
+              key={`${action.kind}:${action.label}`}
               href={buildRegistrationHref(
                 activeFilter,
-                registration.id,
+                registration.registrationId,
                 action.focus
               )}
               label={action.label}
@@ -286,18 +509,23 @@ function DirectStatusAction({
 }) {
   return (
     <form action={updateRegistrationStatusAction} onSubmit={onSubmitStart}>
-      <input type="hidden" name="registrationId" value={registration.id} />
+      <input
+        type="hidden"
+        name="registrationId"
+        value={registration.registrationId}
+      />
       <input type="hidden" name="nextStatus" value={action.nextStatus} />
       <input type="hidden" name="activeFilter" value={activeFilter} />
       <input type="hidden" name="selected" value="" />
       <input
         type="hidden"
         name="adminNotes"
-        value={registration.adminNotes ?? ""}
+        value={registration.privateAdminNote ?? ""}
       />
       <button
         type="submit"
-        className={`w-full rounded-xl px-3 py-2.5 text-left text-xs font-black uppercase tracking-wider transition ${action.className}`}
+        role="menuitem"
+        className={`min-h-11 w-full rounded-xl px-3 py-2.5 text-left text-xs font-black uppercase tracking-wider transition ${action.className}`}
       >
         {action.label}
       </button>
@@ -317,7 +545,8 @@ function MenuLink({
   return (
     <a
       href={href}
-      className={`block rounded-xl px-3 py-2.5 text-xs font-black uppercase tracking-wider transition ${className}`}
+      role="menuitem"
+      className={`flex min-h-11 items-center rounded-xl px-3 py-2.5 text-xs font-black uppercase tracking-wider transition ${className}`}
     >
       {label}
     </a>
@@ -327,16 +556,23 @@ function MenuLink({
 function buildRegistrationHref(
   filter: FilterStatus,
   selected: string,
-  focus: FocusTarget
+  focus?: FocusTarget
 ) {
   const params = new URLSearchParams();
   params.set("filter", filter);
   params.set("selected", selected);
-  params.set("focus", focus);
+  if (focus) {
+    params.set("focus", focus);
+  }
   return `/admin?${params.toString()}`;
 }
 
-function getMenuActions(status: RegistrationStatus): MenuAction[] {
+function getMenuActions(status: AdminRegistrationStatus): MenuAction[] {
+  const detailsAction: MenuAction = {
+    kind: "details",
+    label: "Review Details",
+    className: "text-white hover:bg-white/10",
+  };
   const approveAction: MenuAction = {
     kind: "direct",
     label: status === "waitlisted" ? "Promote to Participant" : "Approve",
@@ -351,7 +587,7 @@ function getMenuActions(status: RegistrationStatus): MenuAction[] {
   };
   const writeNoteAction: MenuAction = {
     kind: "details",
-    label: "Write Note",
+    label: "Edit Private Note",
     focus: "note",
     className: "text-orange-200 hover:bg-orange-500/10",
   };
@@ -377,6 +613,7 @@ function getMenuActions(status: RegistrationStatus): MenuAction[] {
 
   if (status === "pending") {
     return [
+      detailsAction,
       approveAction,
       rejectAction,
       writeNoteAction,
@@ -387,6 +624,7 @@ function getMenuActions(status: RegistrationStatus): MenuAction[] {
 
   if (status === "manual_review") {
     return [
+      detailsAction,
       approveAction,
       rejectAction,
       waitlistAction,
@@ -397,6 +635,7 @@ function getMenuActions(status: RegistrationStatus): MenuAction[] {
 
   if (status === "waitlisted") {
     return [
+      detailsAction,
       approveAction,
       rejectAction,
       manualReviewAction,
@@ -406,19 +645,120 @@ function getMenuActions(status: RegistrationStatus): MenuAction[] {
   }
 
   if (status === "approved") {
-    return [manualReviewAction, waitlistAction, rejectAction, writeNoteAction];
+    return [
+      detailsAction,
+      manualReviewAction,
+      waitlistAction,
+      rejectAction,
+      writeNoteAction,
+    ];
   }
 
-  return [approveAction, manualReviewAction, waitlistAction, writeNoteAction];
+  return [
+    detailsAction,
+    approveAction,
+    manualReviewAction,
+    waitlistAction,
+    writeNoteAction,
+  ];
+}
+
+function EvidenceValue({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string | number | null;
+  detail?: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl border border-white/10 bg-black/30 p-3">
+      <dt className="text-[11px] font-black uppercase tracking-wider text-zinc-500">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-semibold text-white">
+        {formatValue(value)}
+      </dd>
+      {detail && <p className="mt-1 text-xs leading-5 text-zinc-500">{detail}</p>}
+    </div>
+  );
+}
+
+function EvidenceLine({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null;
+}) {
+  return (
+    <p className="break-words">
+      <span className="text-zinc-500">{label}:</span>{" "}
+      <span className="font-semibold text-zinc-200">{formatValue(value)}</span>
+    </p>
+  );
+}
+
+function StatusBadge({ status }: { status: AdminRegistrationStatus }) {
+  return (
+    <span
+      className={`inline-flex w-fit shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+        status
+      )}`}
+    >
+      {formatStatus(status)}
+    </span>
+  );
 }
 
 function formatStatus(status: string) {
   return status
-    .replace("_", " ")
+    .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function getStatusBadgeClass(status: RegistrationStatus) {
+function formatVerificationSource(source: string | null) {
+  if (!source) {
+    return null;
+  }
+
+  if (source.toLowerCase() === "relic") {
+    return "Relic";
+  }
+
+  if (source.toLowerCase() === "coh3stats") {
+    return "CoH3 Stats";
+  }
+
+  return formatStatus(source);
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = new Date(value).getTime();
+
+  return Number.isFinite(timestamp)
+    ? new Date(value).toLocaleString()
+    : "Unavailable";
+}
+
+function formatElo(value: number | null) {
+  return value === null ? "Unavailable" : value.toLocaleString();
+}
+
+function formatPosition(value: number | null) {
+  return value === null ? "Unavailable" : `#${value}`;
+}
+
+function formatValue(value: string | number | null) {
+  return value === null || value === "" ? "Unavailable" : value;
+}
+
+function getStatusBadgeClass(status: AdminRegistrationStatus) {
   if (status === "approved") {
     return "border-green-500/30 bg-green-500/10 text-green-400";
   }

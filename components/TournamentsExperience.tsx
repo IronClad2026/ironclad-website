@@ -609,7 +609,6 @@ function getViewerRegistrationDisplay(
     return {
       title: "Registration Not Approved",
       description:
-        registration.adminNotes?.trim() ||
         "This registration was not approved by tournament administration.",
       tone: "red",
       icon: X,
@@ -3918,7 +3917,6 @@ type TournamentViewerRegistration = {
     | "approved"
     | "rejected"
     | "waitlisted";
-  adminNotes: string | null;
   createdAt: string | null;
   waitlistPosition: number | null;
 };

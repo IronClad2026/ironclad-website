@@ -211,7 +211,7 @@ function AdminBracketPopulationWorkspace({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 w-full rounded-lg bg-orange-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400"
+        className="mt-3 min-h-11 w-full rounded-lg bg-orange-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400"
       >
         {buttonLabel}
       </button>
@@ -255,11 +255,11 @@ function AdminBracketPopulationWorkspace({
                       </p>
                       <h2
                         id="bracket-workspace-title"
-                        className="mt-1 truncate text-xl font-black text-white sm:text-2xl"
+                        className="mt-1 break-words text-xl font-black text-white sm:text-2xl"
                       >
                         Populate {bracket.bracketName}
                       </h2>
-                      <p className="mt-1 truncate text-sm text-slate-400">
+                      <p className="mt-1 break-words text-sm text-slate-400">
                         {tournamentTitle}
                       </p>
                     </div>
@@ -286,7 +286,7 @@ function AdminBracketPopulationWorkspace({
                           className="mt-0.5 shrink-0 text-orange-300"
                         />
                         <div className="min-w-0">
-                          <p className="font-black text-white">
+                          <p className="break-words font-black text-white">
                             {tournamentTitle}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
@@ -366,7 +366,7 @@ function AdminBracketPopulationWorkspace({
                           onDragEnd={() => setActiveDropTarget(null)}
                           className="cursor-grab rounded-xl border border-white/10 bg-black/30 p-3 transition hover:border-orange-400/40 active:cursor-grabbing"
                         >
-                          <p className="font-bold text-white">
+                          <p className="break-words font-bold text-white">
                             {participant.name}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
@@ -385,9 +385,9 @@ function AdminBracketPopulationWorkspace({
 
                 <main className="min-h-0 min-w-0 overflow-y-auto p-5 sm:p-7 lg:p-8">
                   <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-r from-white/[0.04] to-transparent p-4">
-                    <div>
+                    <div className="min-w-0">
                       <SectionLabel>Current Assignments</SectionLabel>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 break-words text-xs text-slate-500">
                         {assignedIds.size} of {bracket.slotCount} slots populated
                           {" - "}
                         {availableParticipants.length} players available
@@ -538,7 +538,7 @@ function AdminBracketPopulationWorkspace({
                                 onClick={() =>
                                   assignParticipant(slotNumber, "")
                                 }
-                                className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400 transition hover:text-orange-300"
+                                className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400 transition hover:text-orange-300"
                               >
                                 <UserMinus size={14} />
                                 Remove Assignment
@@ -564,7 +564,7 @@ function AdminBracketPopulationWorkspace({
                     <button
                       type="button"
                       onClick={() => setAssignments(bracket.assignments)}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-5 py-3 text-sm font-black text-slate-300 transition hover:border-white/30 hover:text-white"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 px-5 py-3 text-sm font-black text-slate-300 transition hover:border-white/30 hover:text-white"
                     >
                       <RotateCcw size={16} />
                       Reset Changes
@@ -587,7 +587,7 @@ function AdminBracketPopulationWorkspace({
                       />
                       <button
                         type="submit"
-                        className="w-full rounded-xl bg-orange-500 px-6 py-3 text-sm font-black text-white transition hover:bg-orange-400"
+                        className="min-h-11 w-full rounded-xl bg-orange-500 px-6 py-3 text-sm font-black text-white transition hover:bg-orange-400"
                       >
                         Save Bracket Assignments
                       </button>
