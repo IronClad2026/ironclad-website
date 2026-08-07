@@ -12,7 +12,6 @@ import {
   MAX_AVATAR_UPLOAD_SIZE_BYTES,
   MAX_AVATAR_UPLOAD_SIZE_LABEL,
 } from "@/lib/avatar";
-import { isPlayerProfileComplete } from "@/lib/player-profile";
 import { supabaseUrl } from "@/lib/supabase-config";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -56,12 +55,12 @@ export async function savePlayerProfile(
   const supabase = await createAuthenticatedSupabaseClient();
   const { data: existingProfile, error: existingProfileError } = await supabase
     .from("players")
-    .select("id, avatar_url, steam_username")
+    .select("id")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
   if (existingProfileError) {
-    console.error("Existing player avatar lookup error:", existingProfileError);
+    console.error("Existing player profile lookup error:", existingProfileError);
 
     return {
       status: "error",
@@ -148,21 +147,11 @@ export async function savePlayerProfile(
     avatarUrl = getPlayerAvatarProxyUrl(playerId, Date.now());
   }
 
-  const finalAvatarUrl = avatarUrl ?? existingProfile?.avatar_url ?? null;
-  const profileCompleted = isPlayerProfileComplete({
-    ...validation.data,
-    avatar_url: finalAvatarUrl,
-    steam_username:
-      typeof existingProfile?.steam_username === "string"
-        ? existingProfile.steam_username
-        : null,
-  });
   const { error } = await supabase.from("players").upsert(
     {
       id: playerId,
       clerk_user_id: userId,
       ...validation.data,
-      profile_completed: profileCompleted,
       ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
     },
     {

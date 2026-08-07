@@ -73,7 +73,7 @@ describe("profile save Steam identity regression", () => {
     authMock.mockResolvedValue(playerIdentity);
   });
 
-  it("ignores a forged Steam display name while preserving synchronized profile completion", async () => {
+  it("ignores a forged Steam display name and leaves completion to the protected database rule", async () => {
     const fixture = createProfileClient();
     createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
 
@@ -98,10 +98,10 @@ describe("profile save Steam identity regression", () => {
     expect(profileUpdate).toMatchObject({
       clerk_user_id: playerIdentity.userId,
       id: "player-existing",
-      profile_completed: true,
     });
     for (const protectedField of [
       "steam_username",
+      "profile_completed",
       "current_elo",
       "coh3_player_card_url",
       "steam_id64",
@@ -114,9 +114,7 @@ describe("profile save Steam identity regression", () => {
     ]) {
       expect(profileUpdate).not.toHaveProperty(protectedField);
     }
-    expect(fixture.select).toHaveBeenCalledWith(
-      "id, avatar_url, steam_username"
-    );
+    expect(fixture.select).toHaveBeenCalledWith("id");
     expect(options).toEqual({ onConflict: "clerk_user_id" });
     expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
   });

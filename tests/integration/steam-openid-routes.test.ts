@@ -43,6 +43,7 @@ const STEAM_AUTH_URL =
   "https://steamcommunity.com/openid/login?openid.mode=checkid_setup";
 const STEAM_ID = "18446744073709551614";
 const DIFFERENT_STEAM_ID = "18446744073709551613";
+const LEGACY_STEAM_DISPLAY_NAME = "Legacy manual Steam name";
 const STEAM_DISPLAY_NAME = "鉄の狼 ⚔️";
 const UPDATED_STEAM_DISPLAY_NAME = "Iron Wolf ™";
 const USER_ID = "user_test_player";
@@ -534,7 +535,7 @@ describe("Steam connection callback route", () => {
         {
           data: createPlayerRow({
             profile_completed: true,
-            steam_username: "Existing Steam Name",
+            steam_username: LEGACY_STEAM_DISPLAY_NAME,
           }),
           error: null,
         },
@@ -568,7 +569,30 @@ describe("Steam connection callback route", () => {
     }
   });
 
-  it("refreshes only the display name for the same linked identity", async () => {
+  it("preserves a complete linked profile when display-name lookup fails", async () => {
+    fetchSteamDisplayNameMock.mockResolvedValueOnce(null);
+    const fixture = createCallbackClient({
+      readResults: [
+        {
+          data: createPlayerRow({
+            profile_completed: true,
+            steam_id64: STEAM_ID,
+            steam_username: LEGACY_STEAM_DISPLAY_NAME,
+          }),
+          error: null,
+        },
+      ],
+    });
+    createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+
+    const response = await callbackGET(createCallbackRequest());
+
+    expectProfileRedirect(response, "connected");
+    expect(fetchSteamDisplayNameMock).toHaveBeenCalledWith(STEAM_ID);
+    expect(fixture.update).not.toHaveBeenCalled();
+  });
+
+  it("replaces a legacy display name only through trusted same-ID refresh", async () => {
     fetchSteamDisplayNameMock.mockResolvedValueOnce(
       UPDATED_STEAM_DISPLAY_NAME
     );
@@ -578,7 +602,7 @@ describe("Steam connection callback route", () => {
           data: createPlayerRow({
             profile_completed: true,
             steam_id64: STEAM_ID,
-            steam_username: STEAM_DISPLAY_NAME,
+            steam_username: LEGACY_STEAM_DISPLAY_NAME,
           }),
           error: null,
         },

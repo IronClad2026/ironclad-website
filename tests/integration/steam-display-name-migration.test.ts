@@ -51,21 +51,27 @@ describe("Steam display name protection migration contract", () => {
     );
   });
 
-  it("invalidates legacy manual names without changing historical registrations", () => {
-    expect(compactMigration).toContain(
-      "update public.players set steam_username = null, profile_completed = false where steam_username is not null;"
-    );
+  it("preserves existing display names while realigning stored completion", () => {
+    expect(compactMigration).not.toContain("set steam_username = null");
+    expect(compactMigration).not.toContain("profile_completed = false");
+    expect(compactMigration).not.toContain("where steam_username is not null");
     expect(compactMigration.match(/\bupdate public\.players\b/g)).toHaveLength(1);
     expect(compactMigration).not.toContain("update public.registrations");
+    expect(compactMigration).toContain(
+      "and nullif(btrim(player.steam_id64), '') is not null"
+    );
+    expect(compactMigration).not.toContain(
+      "nullif(btrim(player.steam_username), '') is not null"
+    );
   });
 
-  it("recomputes completion atomically from the protected row", () => {
+  it("uses verified SteamID64 for atomic profile completion", () => {
     expect(compactMigration).toContain(
       "new.profile_completed = ( nullif(btrim(new.avatar_url), '') is not null"
     );
     for (const field of [
       "discord_username",
-      "steam_username",
+      "steam_id64",
       "country",
       "region",
       "timezone",
@@ -74,6 +80,9 @@ describe("Steam display name protection migration contract", () => {
         `nullif(btrim(new.${field}), '') is not null`
       );
     }
+    expect(compactMigration).not.toContain(
+      "nullif(btrim(new.steam_username), '') is not null"
+    );
     expect(compactMigration).toContain(
       "nullif(btrim(new.display_name), '') is not null or nullif(btrim(new.in_game_name), '') is not null"
     );

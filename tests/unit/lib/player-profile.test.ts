@@ -10,7 +10,7 @@ const completeProfile: PlayerProfileCompletionData = {
   display_name: "Test Player",
   in_game_name: "TestPlayer",
   discord_username: "test-player",
-  steam_username: "steam-display-name",
+  steam_id64: "18446744073709551614",
   country: "Australia",
   region: "Oceania",
   timezone: "Australia/Sydney",
@@ -25,7 +25,7 @@ describe("player profile completion", () => {
   it.each([
     "avatar_url",
     "discord_username",
-    "steam_username",
+    "steam_id64",
     "country",
     "region",
     "timezone",
@@ -33,6 +33,17 @@ describe("player profile completion", () => {
     expect(
       isPlayerProfileComplete({ ...completeProfile, [field]: null })
     ).toBe(false);
+  });
+
+  it("requires verified Steam identity rather than a Steam display name", () => {
+    const legacyDisplayNameOnly = {
+      ...completeProfile,
+      steam_id64: null,
+      steam_username: "Legacy manual Steam name",
+    };
+
+    expect(isPlayerProfileComplete(completeProfile)).toBe(true);
+    expect(isPlayerProfileComplete(legacyDisplayNameOnly)).toBe(false);
   });
 
   it("preserves the existing display-name-or-IGN identity rule", () => {

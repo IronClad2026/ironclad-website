@@ -26,11 +26,12 @@ export type PlayerProfileCompletionData = Pick<
   | "display_name"
   | "in_game_name"
   | "discord_username"
-  | "steam_username"
   | "country"
   | "region"
   | "timezone"
->;
+> & {
+  steam_id64: string | null;
+};
 
 export function isPlayerProfileComplete(
   profile: Partial<PlayerProfileCompletionData> | null | undefined
@@ -43,7 +44,7 @@ export function isPlayerProfileComplete(
     hasText(profile.avatar_url) &&
       (hasText(profile.display_name) || hasText(profile.in_game_name)) &&
       hasText(profile.discord_username) &&
-      hasText(profile.steam_username) &&
+      hasText(profile.steam_id64) &&
       hasText(profile.country) &&
       hasText(profile.region) &&
       hasText(profile.timezone)
