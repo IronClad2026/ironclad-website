@@ -18,6 +18,7 @@ import {
   validateSteamOpenIdCallback,
   validateSteamOpenIdFlowCookie,
   verifySteamOpenIdAssertion,
+  type SteamOpenIdFlowIntent,
   type SteamOpenIdPositiveAssertion,
 } from "@/lib/steam-openid";
 
@@ -25,6 +26,10 @@ const ORIGIN = "https://ironclad.example";
 const STATE = "A".repeat(43);
 const SESSION_ID = "sess_test_current";
 const NOW_MS = Date.parse("2026-07-30T10:00:00Z");
+const FLOW_INTENTS: readonly SteamOpenIdFlowIntent[] = [
+  "connect",
+  "refresh",
+];
 const CLAIMED_ID =
   "https://steamcommunity.com/openid/id/18446744073709551615";
 const STEAM_ID64 = "18446744073709551614";
@@ -160,7 +165,7 @@ describe("Steam authentication request", () => {
 
 describe("Steam flow cookie", () => {
   it("creates a short-lived host-only secure cookie payload", () => {
-    const flow = createSteamOpenIdFlow(SESSION_ID, NOW_MS);
+    const flow = createSteamOpenIdFlow(SESSION_ID, "connect", NOW_MS);
     const decodedCookie = Buffer.from(
       flow.cookieValue,
       "base64url"
@@ -168,6 +173,7 @@ describe("Steam flow cookie", () => {
 
     expect(STEAM_OPENID_FLOW_COOKIE_NAME).toMatch(/^__Host-/);
     expect(flow.state).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(flow.intent).toBe("connect");
     expect(flow.expiresAt.getTime()).toBe(
       NOW_MS + STEAM_OPENID_FLOW_TTL_SECONDS * 1_000
     );
@@ -183,21 +189,25 @@ describe("Steam flow cookie", () => {
     expect(decodedCookie).not.toContain(SESSION_ID);
   });
 
-  it("accepts the matching state and Clerk session", () => {
-    const flow = createSteamOpenIdFlow(SESSION_ID, NOW_MS);
+  it.each(FLOW_INTENTS)(
+    "accepts the matching state and Clerk session for the %s intent",
+    (intent) => {
+      const flow = createSteamOpenIdFlow(SESSION_ID, intent, NOW_MS);
 
-    expect(
-      validateSteamOpenIdFlowCookie({
-        cookieValue: flow.cookieValue,
-        returnedState: flow.state,
-        sessionId: SESSION_ID,
-        nowMs: NOW_MS + 1_000,
-      })
-    ).toEqual({ ok: true });
-  });
+      expect(flow.intent).toBe(intent);
+      expect(
+        validateSteamOpenIdFlowCookie({
+          cookieValue: flow.cookieValue,
+          returnedState: flow.state,
+          sessionId: SESSION_ID,
+          nowMs: NOW_MS + 1_000,
+        })
+      ).toEqual({ ok: true, intent });
+    }
+  );
 
   it("rejects a different state", () => {
-    const flow = createSteamOpenIdFlow(SESSION_ID, NOW_MS);
+    const flow = createSteamOpenIdFlow(SESSION_ID, "connect", NOW_MS);
 
     expect(
       validateSteamOpenIdFlowCookie({
@@ -210,7 +220,7 @@ describe("Steam flow cookie", () => {
   });
 
   it("rejects a different Clerk session", () => {
-    const flow = createSteamOpenIdFlow(SESSION_ID, NOW_MS);
+    const flow = createSteamOpenIdFlow(SESSION_ID, "connect", NOW_MS);
 
     expect(
       validateSteamOpenIdFlowCookie({
@@ -223,7 +233,7 @@ describe("Steam flow cookie", () => {
   });
 
   it("rejects an expired flow", () => {
-    const flow = createSteamOpenIdFlow(SESSION_ID, NOW_MS);
+    const flow = createSteamOpenIdFlow(SESSION_ID, "connect", NOW_MS);
 
     expect(
       validateSteamOpenIdFlowCookie({
@@ -233,6 +243,48 @@ describe("Steam flow cookie", () => {
         nowMs: flow.expiresAt.getTime(),
       })
     ).toEqual({ ok: false, reason: "expired" });
+  });
+
+  it("rejects an unrecognized flow intent", () => {
+    const flow = createSteamOpenIdFlow(SESSION_ID, "connect", NOW_MS);
+    const payload = JSON.parse(
+      Buffer.from(flow.cookieValue, "base64url").toString("utf8")
+    ) as Record<string, unknown>;
+    payload.intent = "replace";
+    const malformedCookie = Buffer.from(
+      JSON.stringify(payload),
+      "utf8"
+    ).toString("base64url");
+
+    expect(
+      validateSteamOpenIdFlowCookie({
+        cookieValue: malformedCookie,
+        returnedState: flow.state,
+        sessionId: SESSION_ID,
+        nowMs: NOW_MS + 1_000,
+      })
+    ).toEqual({ ok: false, reason: "malformed" });
+  });
+
+  it("rejects a valid intent that was changed after flow creation", () => {
+    const flow = createSteamOpenIdFlow(SESSION_ID, "connect", NOW_MS);
+    const payload = JSON.parse(
+      Buffer.from(flow.cookieValue, "base64url").toString("utf8")
+    ) as Record<string, unknown>;
+    payload.intent = "refresh";
+    const modifiedCookie = Buffer.from(
+      JSON.stringify(payload),
+      "utf8"
+    ).toString("base64url");
+
+    expect(
+      validateSteamOpenIdFlowCookie({
+        cookieValue: modifiedCookie,
+        returnedState: flow.state,
+        sessionId: SESSION_ID,
+        nowMs: NOW_MS + 1_000,
+      })
+    ).toEqual({ ok: false, reason: "session_mismatch" });
   });
 
   it.each([undefined, null, "", "not-base64url!"])(

@@ -68,11 +68,16 @@ export async function POST(request: Request) {
     return redirectToProfile(origin, "failed");
   }
 
+  const intent =
+    typeof player.steam_id64 === "string" && player.steam_id64.length > 0
+      ? "refresh"
+      : "connect";
+
   let flow;
   let response;
 
   try {
-    flow = createSteamOpenIdFlow(sessionId);
+    flow = createSteamOpenIdFlow(sessionId, intent);
     response = NextResponse.redirect(
       buildSteamOpenIdAuthenticationUrl(origin, flow.state),
       303

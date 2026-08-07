@@ -285,6 +285,7 @@ describe("Steam connection start route", () => {
       },
       cookieValue: "flow-cookie",
       expiresAt: Date.now() + 600_000,
+      intent: "connect",
       state: "opaque-state",
     });
   });
@@ -341,7 +342,10 @@ describe("Steam connection start route", () => {
 
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(STEAM_AUTH_URL);
-    expect(createSteamOpenIdFlowMock).toHaveBeenCalledWith(SESSION_ID);
+    expect(createSteamOpenIdFlowMock).toHaveBeenCalledWith(
+      SESSION_ID,
+      "refresh"
+    );
     expect(response.headers.get("set-cookie")).toContain(
       `${FLOW_COOKIE_NAME}=flow-cookie`
     );
@@ -365,6 +369,10 @@ describe("Steam connection start route", () => {
       "private, no-store, max-age=0"
     );
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(createSteamOpenIdFlowMock).toHaveBeenCalledWith(
+      SESSION_ID,
+      "connect"
+    );
     expect(buildSteamOpenIdAuthenticationUrlMock).toHaveBeenCalledWith(
       ORIGIN,
       "opaque-state"
@@ -381,7 +389,7 @@ describe("Steam connection callback route", () => {
     );
     validateSteamOpenIdFlowCookieMock.mockReturnValue({
       ok: true,
-      expiresAt: Date.now() + 600_000,
+      intent: "connect",
     });
     buildSteamOpenIdCallbackUrlMock.mockReturnValue(CALLBACK_URL);
     validateSteamOpenIdCallbackMock.mockReturnValue({
@@ -545,7 +553,7 @@ describe("Steam connection callback route", () => {
 
     const response = await callbackGET(createCallbackRequest());
 
-    expectProfileRedirect(response, "connected");
+    expectProfileRedirect(response, "display-name-failed");
     expectFlowCookieConsumed(response);
     expect(fixture.update).toHaveBeenCalledOnce();
     expect(fixture.update).toHaveBeenCalledWith({ steam_id64: STEAM_ID });
@@ -570,6 +578,10 @@ describe("Steam connection callback route", () => {
   });
 
   it("preserves a complete linked profile when display-name lookup fails", async () => {
+    validateSteamOpenIdFlowCookieMock.mockReturnValueOnce({
+      ok: true,
+      intent: "refresh",
+    });
     fetchSteamDisplayNameMock.mockResolvedValueOnce(null);
     const fixture = createCallbackClient({
       readResults: [
@@ -587,12 +599,16 @@ describe("Steam connection callback route", () => {
 
     const response = await callbackGET(createCallbackRequest());
 
-    expectProfileRedirect(response, "connected");
+    expectProfileRedirect(response, "display-name-failed");
     expect(fetchSteamDisplayNameMock).toHaveBeenCalledWith(STEAM_ID);
     expect(fixture.update).not.toHaveBeenCalled();
   });
 
   it("replaces a legacy display name only through trusted same-ID refresh", async () => {
+    validateSteamOpenIdFlowCookieMock.mockReturnValueOnce({
+      ok: true,
+      intent: "refresh",
+    });
     fetchSteamDisplayNameMock.mockResolvedValueOnce(
       UPDATED_STEAM_DISPLAY_NAME
     );
@@ -620,7 +636,7 @@ describe("Steam connection callback route", () => {
 
     const response = await callbackGET(createCallbackRequest());
 
-    expectProfileRedirect(response, "connected");
+    expectProfileRedirect(response, "refreshed");
     expect(fetchSteamDisplayNameMock).toHaveBeenCalledWith(STEAM_ID);
     expect(fixture.update).toHaveBeenCalledOnce();
     expect(fixture.update).toHaveBeenCalledWith({
@@ -653,7 +669,68 @@ describe("Steam connection callback route", () => {
     }
   });
 
+  it("keeps the linked identity and protected profile fields when display-name persistence fails", async () => {
+    validateSteamOpenIdFlowCookieMock.mockReturnValueOnce({
+      ok: true,
+      intent: "refresh",
+    });
+    const fixture = createCallbackClient({
+      readResults: [
+        {
+          data: createPlayerRow({
+            profile_completed: true,
+            steam_id64: STEAM_ID,
+            steam_username: LEGACY_STEAM_DISPLAY_NAME,
+          }),
+          error: null,
+        },
+      ],
+      syncResult: {
+        data: null,
+        error: { message: "storage unavailable" },
+      },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+
+    const response = await callbackGET(createCallbackRequest());
+
+    expectProfileRedirect(response, "display-name-failed");
+    expect(fetchSteamDisplayNameMock).toHaveBeenCalledWith(STEAM_ID);
+    expect(fixture.update).toHaveBeenCalledOnce();
+    expect(fixture.update).toHaveBeenCalledWith({
+      steam_username: STEAM_DISPLAY_NAME,
+    });
+    expect(fixture.syncFilters).toEqual(
+      expect.arrayContaining([
+        { column: "id", operator: "eq", value: "player-1" },
+        { column: "clerk_user_id", operator: "eq", value: USER_ID },
+        { column: "steam_id64", operator: "eq", value: STEAM_ID },
+      ])
+    );
+    const [refreshUpdate] = fixture.update.mock.calls[0] as [
+      Record<string, unknown>,
+    ];
+
+    for (const protectedField of [
+      "steam_id64",
+      "profile_completed",
+      "current_elo",
+      "relic_verified_elo",
+      "relic_verified_faction",
+      "relic_verified_division",
+      "relic_elo_calculation_version",
+      "relic_elo_verified_at",
+      "relic_elo_last_attempt_at",
+    ]) {
+      expect(refreshUpdate).not.toHaveProperty(protectedField);
+    }
+  });
+
   it("does not replace a different linked identity", async () => {
+    validateSteamOpenIdFlowCookieMock.mockReturnValueOnce({
+      ok: true,
+      intent: "refresh",
+    });
     const fixture = createCallbackClient({
       readResults: [
         {

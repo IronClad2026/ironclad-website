@@ -73,6 +73,29 @@ describe("SteamConnectionCard", () => {
     expect(container.textContent).not.toMatch(/[0-9]{17,20}/);
   });
 
+  it.each([
+    ["connected", "Steam account connected successfully."],
+    [
+      "refreshed",
+      "Steam account refreshed successfully. Your Steam Display Name is up to date.",
+    ],
+    [
+      "display-name-failed",
+      "Your Steam account is still connected, but we couldn’t refresh your Steam Display Name. Please try again later.",
+    ],
+  ] as const)("renders the %s profile feedback", (result, message) => {
+    render(
+      <SteamConnectionCard
+        connected
+        hasPlayer
+        result={result}
+        statusAvailable
+      />
+    );
+
+    expect(screen.getByText(message)).toBeInTheDocument();
+  });
+
   it("fails closed when server-side status is unavailable", () => {
     render(
       <SteamConnectionCard
@@ -91,21 +114,32 @@ describe("SteamConnectionCard", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("does not trust a manually supplied connected result", () => {
-    render(
-      <SteamConnectionCard
-        connected={false}
-        hasPlayer
-        result="connected"
-        statusAvailable
-      />
-    );
+  it.each([
+    ["connected", "Steam account connected successfully."],
+    [
+      "refreshed",
+      "Steam account refreshed successfully. Your Steam Display Name is up to date.",
+    ],
+    [
+      "display-name-failed",
+      "Your Steam account is still connected, but we couldn’t refresh your Steam Display Name. Please try again later.",
+    ],
+  ] as const)(
+    "does not trust a manually supplied %s result",
+    (result, message) => {
+      render(
+        <SteamConnectionCard
+          connected={false}
+          hasPlayer
+          result={result}
+          statusAvailable
+        />
+      );
 
-    expect(
-      screen.queryByText("Your Steam account is now connected.")
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Connect Steam Account" })
-    ).toBeInTheDocument();
-  });
+      expect(screen.queryByText(message)).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Connect Steam Account" })
+      ).toBeInTheDocument();
+    }
+  );
 });

@@ -22,7 +22,7 @@ export const STEAM_OPENID_FLOW_COOKIE_NAME =
 export const STEAM_OPENID_FLOW_TTL_SECONDS = 10 * 60;
 export const STEAM_OPENID_REQUEST_TIMEOUT_MS = 5_000;
 
-const FLOW_COOKIE_VERSION = 1;
+const FLOW_COOKIE_VERSION = 2;
 const FLOW_STATE_BYTE_LENGTH = 32;
 const FLOW_STATE_LENGTH = 43;
 const FLOW_COOKIE_MAX_LENGTH = 512;
@@ -55,6 +55,8 @@ const ERROR_MESSAGES = {
 
 export type SteamOpenIdErrorCode = keyof typeof ERROR_MESSAGES;
 
+export type SteamOpenIdFlowIntent = "connect" | "refresh";
+
 export class SteamOpenIdError extends Error {
   readonly code: SteamOpenIdErrorCode;
 
@@ -66,7 +68,7 @@ export class SteamOpenIdError extends Error {
 }
 
 export type SteamOpenIdFlowValidation =
-  | { ok: true }
+  | { ok: true; intent: SteamOpenIdFlowIntent }
   | {
       ok: false;
       reason:
@@ -79,6 +81,7 @@ export type SteamOpenIdFlowValidation =
 
 export interface SteamOpenIdFlow {
   state: string;
+  intent: SteamOpenIdFlowIntent;
   cookieValue: string;
   expiresAt: Date;
   cookieOptions: {
@@ -94,6 +97,7 @@ export interface SteamOpenIdFlow {
 interface SteamOpenIdFlowCookiePayload {
   v: typeof FLOW_COOKIE_VERSION;
   state: string;
+  intent: SteamOpenIdFlowIntent;
   sessionHash: string;
   expiresAt: number;
 }
@@ -149,8 +153,19 @@ function isValidFlowState(value: string): boolean {
   );
 }
 
-function hashSessionId(sessionId: string): string {
-  return createHash("sha256").update(sessionId, "utf8").digest("base64url");
+function isValidFlowIntent(
+  value: unknown
+): value is SteamOpenIdFlowIntent {
+  return value === "connect" || value === "refresh";
+}
+
+function hashSessionId(
+  sessionId: string,
+  intent: SteamOpenIdFlowIntent
+): string {
+  return createHash("sha256")
+    .update(`${sessionId}\0${intent}`, "utf8")
+    .digest("base64url");
 }
 
 function safelyEqual(left: string, right: string): boolean {
@@ -195,14 +210,16 @@ function decodeFlowCookie(
     const keys = Object.keys(record);
 
     if (
-      keys.length !== 4 ||
+      keys.length !== 5 ||
       !keys.includes("v") ||
       !keys.includes("state") ||
+      !keys.includes("intent") ||
       !keys.includes("sessionHash") ||
       !keys.includes("expiresAt") ||
       record.v !== FLOW_COOKIE_VERSION ||
       typeof record.state !== "string" ||
       !isValidFlowState(record.state) ||
+      !isValidFlowIntent(record.intent) ||
       typeof record.sessionHash !== "string" ||
       !isValidFlowState(record.sessionHash) ||
       typeof record.expiresAt !== "number" ||
@@ -214,6 +231,7 @@ function decodeFlowCookie(
     return {
       v: FLOW_COOKIE_VERSION,
       state: record.state,
+      intent: record.intent,
       sessionHash: record.sessionHash,
       expiresAt: record.expiresAt,
     };
@@ -272,10 +290,15 @@ export function generateSteamOpenIdState(): string {
 
 export function createSteamOpenIdFlow(
   sessionId: string,
+  intent: SteamOpenIdFlowIntent,
   nowMs = Date.now()
 ): SteamOpenIdFlow {
   requireNonEmptySessionId(sessionId);
   requireValidNow(nowMs);
+
+  if (!isValidFlowIntent(intent)) {
+    throw new SteamOpenIdError("invalid_state");
+  }
 
   const state = generateSteamOpenIdState();
   const expiresAtMs =
@@ -284,12 +307,14 @@ export function createSteamOpenIdFlow(
   const cookieValue = encodeFlowCookie({
     v: FLOW_COOKIE_VERSION,
     state,
-    sessionHash: hashSessionId(sessionId),
+    intent,
+    sessionHash: hashSessionId(sessionId, intent),
     expiresAt: expiresAtMs,
   });
 
   return {
     state,
+    intent,
     cookieValue,
     expiresAt,
     cookieOptions: {
@@ -349,11 +374,16 @@ export function validateSteamOpenIdFlowCookie({
     return { ok: false, reason: "state_mismatch" };
   }
 
-  if (!safelyEqual(payload.sessionHash, hashSessionId(sessionId))) {
+  if (
+    !safelyEqual(
+      payload.sessionHash,
+      hashSessionId(sessionId, payload.intent)
+    )
+  ) {
     return { ok: false, reason: "session_mismatch" };
   }
 
-  return { ok: true };
+  return { ok: true, intent: payload.intent };
 }
 
 export function buildSteamOpenIdCallbackUrl(

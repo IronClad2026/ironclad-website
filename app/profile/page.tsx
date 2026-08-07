@@ -16,8 +16,10 @@ type SteamConnectionResult =
   | "connected"
   | "cancelled"
   | "already-connected"
+  | "display-name-failed"
   | "duplicate"
-  | "failed";
+  | "failed"
+  | "refreshed";
 
 type ProfilePageProps = {
   searchParams: Promise<{
@@ -60,8 +62,10 @@ const steamConnectionResults = new Set<SteamConnectionResult>([
   "connected",
   "cancelled",
   "already-connected",
+  "display-name-failed",
   "duplicate",
   "failed",
+  "refreshed",
 ]);
 
 function getSteamConnectionResult(

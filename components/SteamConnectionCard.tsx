@@ -2,8 +2,10 @@ type SteamConnectionResult =
   | "connected"
   | "cancelled"
   | "already-connected"
+  | "display-name-failed"
   | "duplicate"
-  | "failed";
+  | "failed"
+  | "refreshed";
 
 type SteamConnectionCardProps = {
   connected: boolean;
@@ -17,8 +19,18 @@ const resultMessages: Record<
   { message: string; tone: "success" | "error" | "neutral" }
 > = {
   connected: {
-    message: "Your Steam account is now connected.",
+    message: "Steam account connected successfully.",
     tone: "success",
+  },
+  refreshed: {
+    message:
+      "Steam account refreshed successfully. Your Steam Display Name is up to date.",
+    tone: "success",
+  },
+  "display-name-failed": {
+    message:
+      "Your Steam account is still connected, but we couldn’t refresh your Steam Display Name. Please try again later.",
+    tone: "neutral",
   },
   cancelled: {
     message: "Steam connection was cancelled.",
@@ -51,8 +63,12 @@ export default function SteamConnectionCard({
   result,
   statusAvailable,
 }: SteamConnectionCardProps) {
+  const resultRequiresConnection =
+    result === "connected" ||
+    result === "refreshed" ||
+    result === "display-name-failed";
   const resultMessage =
-    result && (result !== "connected" || connected)
+    result && (!resultRequiresConnection || connected)
       ? resultMessages[result]
       : null;
 
