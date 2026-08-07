@@ -68,10 +68,6 @@ export async function POST(request: Request) {
     return redirectToProfile(origin, "failed");
   }
 
-  if (typeof player.steam_id64 === "string" && player.steam_id64.length > 0) {
-    return redirectToProfile(origin, "already-connected");
-  }
-
   let flow;
   let response;
 

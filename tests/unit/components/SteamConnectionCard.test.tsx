@@ -46,7 +46,7 @@ describe("SteamConnectionCard", () => {
     expect(form).toHaveAttribute("method", "post");
   });
 
-  it("shows connected status without replacement controls or an identifier", () => {
+  it("offers a same-origin POST display-name refresh without replacement controls or an identifier", () => {
     const { container } = render(
       <SteamConnectionCard
         connected
@@ -57,8 +57,18 @@ describe("SteamConnectionCard", () => {
     );
 
     expect(screen.getByText("Steam connected")).toBeInTheDocument();
+    const refreshButton = screen.getByRole("button", {
+      name: "Refresh Steam Display Name",
+    });
+    const refreshForm = refreshButton.closest("form");
+
+    expect(refreshForm).toHaveAttribute("action", "/api/steam/connect");
+    expect(refreshForm).toHaveAttribute("method", "post");
     expect(
-      screen.queryByRole("button", { name: /connect|replace|disconnect/i })
+      screen.queryByRole("button", { name: /replace|disconnect/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Connect Steam Account" })
     ).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/[0-9]{17,20}/);
   });

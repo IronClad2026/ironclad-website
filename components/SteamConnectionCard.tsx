@@ -89,12 +89,22 @@ export default function SteamConnectionCard({
               Steam connection status is temporarily unavailable.
             </p>
           ) : connected ? (
-            <div className="inline-flex items-center gap-2 border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-300">
-              <span
-                aria-hidden="true"
-                className="h-2 w-2 rounded-full bg-emerald-400"
-              />
-              Steam connected
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="inline-flex items-center gap-2 self-start border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-300">
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 rounded-full bg-emerald-400"
+                />
+                Steam connected
+              </div>
+              <form action="/api/steam/connect" method="post">
+                <button
+                  type="submit"
+                  className="border border-white/15 bg-white/5 px-4 py-3 text-sm font-bold text-zinc-200 transition hover:border-orange-400/50 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+                >
+                  Refresh Steam Display Name
+                </button>
+              </form>
             </div>
           ) : (
             <form action="/api/steam/connect" method="post">

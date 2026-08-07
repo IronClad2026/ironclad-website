@@ -5,7 +5,6 @@ import IronCladUserButton from "@/components/IronCladUserButton";
 import ScrollReveal from "@/components/ScrollReveal";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import {
-  isPlayerProfileComplete,
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -68,7 +67,7 @@ export default async function HomeAccountSection() {
   }
 
   const profile = (data ?? null) as PlayerProfile | null;
-  const profileComplete = isPlayerProfileComplete(profile);
+  const profileComplete = profile?.profile_completed === true;
 
   if (!profile || !profileComplete) {
     return (

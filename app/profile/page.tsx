@@ -7,7 +7,6 @@ import SteamConnectionCard from "@/components/SteamConnectionCard";
 import { getOwnActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
 import { getIronCladDivision } from "@/lib/elo-verification/divisions";
 import {
-  isPlayerProfileComplete,
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -213,7 +212,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
     }
   }
 
-  const profileComplete = isPlayerProfileComplete(profile);
+  const profileComplete = profile?.profile_completed === true;
 
   return (
     <main

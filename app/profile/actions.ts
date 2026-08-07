@@ -12,7 +12,6 @@ import {
   MAX_AVATAR_UPLOAD_SIZE_BYTES,
   MAX_AVATAR_UPLOAD_SIZE_LABEL,
 } from "@/lib/avatar";
-import { isPlayerProfileComplete } from "@/lib/player-profile";
 import { supabaseUrl } from "@/lib/supabase-config";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -20,7 +19,6 @@ type ValidatedProfile = {
   display_name: string;
   in_game_name: string;
   discord_username: string;
-  steam_username: string;
   country: string;
   region: string;
   timezone: string;
@@ -57,12 +55,12 @@ export async function savePlayerProfile(
   const supabase = await createAuthenticatedSupabaseClient();
   const { data: existingProfile, error: existingProfileError } = await supabase
     .from("players")
-    .select("id, avatar_url")
+    .select("id")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
   if (existingProfileError) {
-    console.error("Existing player avatar lookup error:", existingProfileError);
+    console.error("Existing player profile lookup error:", existingProfileError);
 
     return {
       status: "error",
@@ -149,17 +147,11 @@ export async function savePlayerProfile(
     avatarUrl = getPlayerAvatarProxyUrl(playerId, Date.now());
   }
 
-  const finalAvatarUrl = avatarUrl ?? existingProfile?.avatar_url ?? null;
-  const profileCompleted = isPlayerProfileComplete({
-    ...validation.data,
-    avatar_url: finalAvatarUrl,
-  });
   const { error } = await supabase.from("players").upsert(
     {
       id: playerId,
       clerk_user_id: userId,
       ...validation.data,
-      profile_completed: profileCompleted,
       ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
     },
     {
@@ -299,7 +291,6 @@ function validateProfile(formData: FormData): {
     displayName: getValue(formData, "displayName"),
     inGameName: getValue(formData, "inGameName"),
     discordUsername: getValue(formData, "discordUsername"),
-    steamUsername: getValue(formData, "steamUsername"),
     country: getValue(formData, "country"),
     region: getValue(formData, "region"),
     timezone: getValue(formData, "timezone"),
@@ -314,13 +305,6 @@ function validateProfile(formData: FormData): {
     "discordUsername",
     values.discordUsername,
     "Discord username",
-    100
-  );
-  requireText(
-    errors,
-    "steamUsername",
-    values.steamUsername,
-    "Steam username",
     100
   );
   requireText(errors, "country", values.country, "Country", 100);
@@ -340,7 +324,6 @@ function validateProfile(formData: FormData): {
       display_name: values.displayName,
       in_game_name: values.inGameName,
       discord_username: values.discordUsername,
-      steam_username: values.steamUsername,
       country: values.country,
       region: values.region,
       timezone: values.timezone,

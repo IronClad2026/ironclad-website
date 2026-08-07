@@ -26,7 +26,6 @@ import {
   type PlayerStatistics,
 } from "@/lib/player-dashboard";
 import {
-  isPlayerProfileComplete,
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
@@ -117,7 +116,7 @@ export default async function PlayerDashboardPage() {
     ...registration,
     launched_at: first(registration.tournament_brackets)?.launched_at ?? null,
   }));
-  const profileComplete = isPlayerProfileComplete(profile);
+  const profileComplete = profile?.profile_completed === true;
 
   return (
     <main

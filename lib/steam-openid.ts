@@ -10,6 +10,8 @@ export const STEAM_OPENID_PROVIDER_IDENTIFIER =
   "https://steamcommunity.com/openid/";
 export const STEAM_OPENID_ENDPOINT =
   "https://steamcommunity.com/openid/login";
+export const STEAM_PLAYER_SUMMARIES_ENDPOINT =
+  "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/";
 export const STEAM_OPENID_NAMESPACE =
   "http://specs.openid.net/auth/2.0";
 export const STEAM_OPENID_IDENTIFIER_SELECT =
@@ -113,8 +115,31 @@ interface VerifySteamOpenIdOptions {
   timeoutMs?: number;
 }
 
+interface FetchSteamDisplayNameOptions extends VerifySteamOpenIdOptions {
+  apiKey?: string;
+}
+
 function isSafeTimestamp(value: number): boolean {
   return Number.isSafeInteger(value) && value >= 0;
+}
+
+function isValidRequestTimeout(value: number): boolean {
+  return (
+    Number.isSafeInteger(value) &&
+    value > 0 &&
+    value <= MAX_REQUEST_TIMEOUT_MS
+  );
+}
+
+function isCanonicalSteamId64(value: string): boolean {
+  return (
+    /^(0|[1-9][0-9]{0,19})$/.test(value) &&
+    (value.length < MAX_STEAM_ID64.length || value <= MAX_STEAM_ID64)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isValidFlowState(value: string): boolean {
@@ -594,10 +619,7 @@ export function parseSteamId64FromClaimedId(
 
   const steamId64 = match[1];
 
-  if (
-    steamId64.length === MAX_STEAM_ID64.length &&
-    steamId64 > MAX_STEAM_ID64
-  ) {
+  if (!isCanonicalSteamId64(steamId64)) {
     throw new SteamOpenIdError("invalid_callback");
   }
 
@@ -645,11 +667,7 @@ export async function verifySteamOpenIdAssertion(
     timeoutMs = STEAM_OPENID_REQUEST_TIMEOUT_MS,
   }: VerifySteamOpenIdOptions = {}
 ): Promise<string> {
-  if (
-    !Number.isSafeInteger(timeoutMs) ||
-    timeoutMs <= 0 ||
-    timeoutMs > MAX_REQUEST_TIMEOUT_MS
-  ) {
+  if (!isValidRequestTimeout(timeoutMs)) {
     throw new SteamOpenIdError("invalid_configuration");
   }
 
@@ -708,4 +726,87 @@ export async function verifySteamOpenIdAssertion(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function fetchSteamDisplayName(
+  steamId64: string,
+  {
+    apiKey = process.env.STEAM_WEB_API_KEY,
+    fetchImpl = fetch,
+    timeoutMs = STEAM_OPENID_REQUEST_TIMEOUT_MS,
+  }: FetchSteamDisplayNameOptions = {}
+): Promise<string | null> {
+  const normalizedApiKey = apiKey?.trim();
+
+  if (
+    !isCanonicalSteamId64(steamId64) ||
+    !normalizedApiKey ||
+    !isValidRequestTimeout(timeoutMs)
+  ) {
+    return null;
+  }
+
+  const requestUrl = new URL(STEAM_PLAYER_SUMMARIES_ENDPOINT);
+  requestUrl.searchParams.set("key", normalizedApiKey);
+  requestUrl.searchParams.set("steamids", steamId64);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(requestUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+      redirect: "error",
+      signal: controller.signal,
+    });
+
+    if (response.status !== 200) {
+      return null;
+    }
+
+    const payload: unknown = await response.json();
+
+    if (controller.signal.aborted) {
+      return null;
+    }
+
+    return parseSteamDisplayName(payload, steamId64);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseSteamDisplayName(
+  payload: unknown,
+  steamId64: string
+): string | null {
+  if (!isRecord(payload) || !isRecord(payload.response)) {
+    return null;
+  }
+
+  const { players } = payload.response;
+
+  if (!Array.isArray(players) || players.length !== 1) {
+    return null;
+  }
+
+  const [player] = players;
+
+  if (
+    !isRecord(player) ||
+    player.steamid !== steamId64 ||
+    typeof player.personaname !== "string" ||
+    player.personaname.trim().length === 0 ||
+    Array.from(player.personaname).length > 100
+  ) {
+    return null;
+  }
+
+  return player.personaname;
 }
