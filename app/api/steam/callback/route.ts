@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import {
   buildSteamOpenIdCallbackUrl,
+  fetchSteamDisplayName,
   getSteamOpenIdCallbackState,
   normalizeSteamOpenIdOrigin,
   STEAM_OPENID_FLOW_COOKIE_NAME,
@@ -102,6 +103,12 @@ export async function GET(request: NextRequest) {
   }
 
   if (currentPlayer.steamId64 === steamId64) {
+    await synchronizeSteamDisplayName(
+      supabase,
+      currentPlayer,
+      userId,
+      steamId64
+    );
     return terminalResponse(redirectToProfile(origin, "connected"));
   }
 
@@ -116,6 +123,7 @@ export async function GET(request: NextRequest) {
     const result = await supabase
       .from("players")
       .update({ steam_id64: steamId64 })
+      .eq("id", currentPlayer.id)
       .eq("clerk_user_id", userId)
       .is("steam_id64", null)
       .select("steam_id64")
@@ -138,12 +146,24 @@ export async function GET(request: NextRequest) {
   }
 
   if (linkedPlayer?.steam_id64 === steamId64) {
+    await synchronizeSteamDisplayName(
+      supabase,
+      currentPlayer,
+      userId,
+      steamId64
+    );
     return terminalResponse(redirectToProfile(origin, "connected"));
   }
 
   const racedPlayer = await loadCurrentSteamIdentity(supabase, userId);
 
   if (racedPlayer.status === "found" && racedPlayer.steamId64 === steamId64) {
+    await synchronizeSteamDisplayName(
+      supabase,
+      racedPlayer,
+      userId,
+      steamId64
+    );
     return terminalResponse(redirectToProfile(origin, "connected"));
   }
 
@@ -156,7 +176,7 @@ export async function GET(request: NextRequest) {
 
 type SteamIdentityLookup =
   | { status: "error" | "missing" }
-  | { status: "found"; steamId64: string | null };
+  | { status: "found"; id: string; steamId64: string | null };
 
 type SteamIdentityClient = ReturnType<typeof createSupabaseAdminClient>;
 
@@ -186,17 +206,53 @@ async function loadCurrentSteamIdentity(
     return { status: "error" };
   }
 
-  if (!data?.id) {
+  if (typeof data?.id !== "string" || data.id.length === 0) {
     return { status: "missing" };
   }
 
   return {
     status: "found",
+    id: data.id,
     steamId64:
       typeof data.steam_id64 === "string" && data.steam_id64.length > 0
         ? data.steam_id64
         : null,
   };
+}
+
+async function synchronizeSteamDisplayName(
+  supabase: SteamIdentityClient,
+  player: Extract<SteamIdentityLookup, { status: "found" }>,
+  userId: string,
+  steamId64: string
+) {
+  const steamDisplayName = await fetchSteamDisplayName(steamId64);
+
+  if (!steamDisplayName) {
+    console.error("Steam display name lookup failed.");
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("players")
+      .update({ steam_username: steamDisplayName })
+      .eq("id", player.id)
+      .eq("clerk_user_id", userId)
+      .eq("steam_id64", steamId64)
+      .select("steam_id64, steam_username, profile_completed")
+      .maybeSingle();
+
+    if (
+      error ||
+      data?.steam_id64 !== steamId64 ||
+      data?.steam_username !== steamDisplayName
+    ) {
+      console.error("Steam display name storage failed.");
+    }
+  } catch {
+    console.error("Steam display name storage failed.");
+  }
 }
 
 function getDatabaseErrorCode(error: unknown) {

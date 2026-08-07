@@ -67,7 +67,6 @@ export type ProfileField =
   | "displayName"
   | "inGameName"
   | "discordUsername"
-  | "steamUsername"
   | "country"
   | "region"
   | "timezone"

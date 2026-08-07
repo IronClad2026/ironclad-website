@@ -20,7 +20,6 @@ type ValidatedProfile = {
   display_name: string;
   in_game_name: string;
   discord_username: string;
-  steam_username: string;
   country: string;
   region: string;
   timezone: string;
@@ -57,7 +56,7 @@ export async function savePlayerProfile(
   const supabase = await createAuthenticatedSupabaseClient();
   const { data: existingProfile, error: existingProfileError } = await supabase
     .from("players")
-    .select("id, avatar_url")
+    .select("id, avatar_url, steam_username")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
@@ -153,6 +152,10 @@ export async function savePlayerProfile(
   const profileCompleted = isPlayerProfileComplete({
     ...validation.data,
     avatar_url: finalAvatarUrl,
+    steam_username:
+      typeof existingProfile?.steam_username === "string"
+        ? existingProfile.steam_username
+        : null,
   });
   const { error } = await supabase.from("players").upsert(
     {
@@ -299,7 +302,6 @@ function validateProfile(formData: FormData): {
     displayName: getValue(formData, "displayName"),
     inGameName: getValue(formData, "inGameName"),
     discordUsername: getValue(formData, "discordUsername"),
-    steamUsername: getValue(formData, "steamUsername"),
     country: getValue(formData, "country"),
     region: getValue(formData, "region"),
     timezone: getValue(formData, "timezone"),
@@ -314,13 +316,6 @@ function validateProfile(formData: FormData): {
     "discordUsername",
     values.discordUsername,
     "Discord username",
-    100
-  );
-  requireText(
-    errors,
-    "steamUsername",
-    values.steamUsername,
-    "Steam username",
     100
   );
   requireText(errors, "country", values.country, "Country", 100);
@@ -340,7 +335,6 @@ function validateProfile(formData: FormData): {
       display_name: values.displayName,
       in_game_name: values.inGameName,
       discord_username: values.discordUsername,
-      steam_username: values.steamUsername,
       country: values.country,
       region: values.region,
       timezone: values.timezone,

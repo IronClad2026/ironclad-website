@@ -266,13 +266,20 @@ export default function PlayerProfileForm({
             error={state.errors.discordUsername}
             required
           />
-          <ProfileInput
-            label="Steam Username"
-            name="steamUsername"
-            defaultValue={profile?.steam_username}
-            error={state.errors.steamUsername}
-            required
-          />
+          <div>
+            <span className="text-sm font-bold text-white">
+              Steam Display Name
+            </span>
+            <output
+              aria-label="Steam Display Name"
+              className={`${profileInputClass} flex min-h-12 items-center border-white/10 text-zinc-200`}
+            >
+              {profile?.steam_username?.trim() || "Not synced"}
+            </output>
+            <span className="mt-1 block text-xs leading-5 text-zinc-500">
+              Connect or refresh Steam below to sync this read-only value.
+            </span>
+          </div>
         </div>
       </section>
 

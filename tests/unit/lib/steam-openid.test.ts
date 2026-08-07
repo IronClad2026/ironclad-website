@@ -3,6 +3,7 @@ import {
   buildSteamOpenIdAuthenticationUrl,
   buildSteamOpenIdCallbackUrl,
   createSteamOpenIdFlow,
+  fetchSteamDisplayName,
   generateSteamOpenIdState,
   getSteamOpenIdCallbackState,
   normalizeSteamOpenIdOrigin,
@@ -12,6 +13,7 @@ import {
   STEAM_OPENID_FLOW_TTL_SECONDS,
   STEAM_OPENID_IDENTIFIER_SELECT,
   STEAM_OPENID_NAMESPACE,
+  STEAM_PLAYER_SUMMARIES_ENDPOINT,
   SteamOpenIdError,
   validateSteamOpenIdCallback,
   validateSteamOpenIdFlowCookie,
@@ -25,6 +27,8 @@ const SESSION_ID = "sess_test_current";
 const NOW_MS = Date.parse("2026-07-30T10:00:00Z");
 const CLAIMED_ID =
   "https://steamcommunity.com/openid/id/18446744073709551615";
+const STEAM_ID64 = "18446744073709551614";
+const STEAM_WEB_API_KEY = "test-steam-web-api-key";
 const EXPECTED_RETURN_TO = buildSteamOpenIdCallbackUrl(ORIGIN, STATE);
 const REQUIRED_SIGNED_FIELDS =
   "op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle";
@@ -533,5 +537,133 @@ describe("verifySteamOpenIdAssertion", () => {
     ).rejects.toMatchObject({
       code: "verification_timeout",
     });
+  });
+});
+
+describe("fetchSteamDisplayName", () => {
+  it("returns the exact Unicode display name for the verified SteamID64", async () => {
+    const displayName = "鉄の狼 ⚔️ ™ <Rifle & Co>";
+    const fetchImpl = vi.fn().mockResolvedValue(
+      Response.json({
+        response: {
+          players: [
+            {
+              personaname: displayName,
+              steamid: STEAM_ID64,
+            },
+          ],
+        },
+      })
+    );
+
+    await expect(
+      fetchSteamDisplayName(STEAM_ID64, {
+        apiKey: STEAM_WEB_API_KEY,
+        fetchImpl: fetchImpl as typeof fetch,
+      })
+    ).resolves.toBe(displayName);
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const [input, init] = fetchImpl.mock.calls[0] as [
+      RequestInfo | URL,
+      RequestInit,
+    ];
+    const requestUrl = new URL(String(input));
+
+    expect(`${requestUrl.origin}${requestUrl.pathname}`).toBe(
+      STEAM_PLAYER_SUMMARIES_ENDPOINT
+    );
+    expect(Object.fromEntries(requestUrl.searchParams)).toEqual({
+      key: STEAM_WEB_API_KEY,
+      steamids: STEAM_ID64,
+    });
+    expect(init).toMatchObject({
+      cache: "no-store",
+      method: "GET",
+      redirect: "error",
+    });
+  });
+
+  it("does not call Steam when the server API key is missing", async () => {
+    const fetchImpl = vi.fn();
+
+    await expect(
+      fetchSteamDisplayName(STEAM_ID64, {
+        apiKey: "   ",
+        fetchImpl: fetchImpl as typeof fetch,
+      })
+    ).resolves.toBeNull();
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects a persona returned for a different SteamID64", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      Response.json({
+        response: {
+          players: [
+            {
+              personaname: "Untrusted Name",
+              steamid: "18446744073709551613",
+            },
+          ],
+        },
+      })
+    );
+
+    await expect(
+      fetchSteamDisplayName(STEAM_ID64, {
+        apiKey: STEAM_WEB_API_KEY,
+        fetchImpl: fetchImpl as typeof fetch,
+      })
+    ).resolves.toBeNull();
+  });
+
+  it.each([
+    ["non-success response", new Response("", { status: 503 })],
+    ["malformed JSON", new Response("{", { status: 200 })],
+    [
+      "malformed player summary",
+      Response.json({
+        response: {
+          players: [{ personaname: 123, steamid: STEAM_ID64 }],
+        },
+      }),
+    ],
+  ])("returns null for a %s", async (_scenario, response) => {
+    const fetchImpl = vi.fn().mockResolvedValue(response);
+
+    await expect(
+      fetchSteamDisplayName(STEAM_ID64, {
+        apiKey: STEAM_WEB_API_KEY,
+        fetchImpl: fetchImpl as typeof fetch,
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("aborts a player-summary request at the bounded timeout", async () => {
+    const fetchImpl = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () =>
+              reject(
+                new DOMException("The request was aborted.", "AbortError")
+              ),
+            { once: true }
+          );
+        })
+    );
+
+    await expect(
+      fetchSteamDisplayName(STEAM_ID64, {
+        apiKey: STEAM_WEB_API_KEY,
+        fetchImpl: fetchImpl as typeof fetch,
+        timeoutMs: 5,
+      })
+    ).resolves.toBeNull();
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 });

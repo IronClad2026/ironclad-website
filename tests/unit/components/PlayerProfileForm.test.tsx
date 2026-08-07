@@ -15,7 +15,7 @@ const profile: PlayerProfile = {
   display_name: "Profile Tester",
   in_game_name: "ProfileTester",
   discord_username: "profile-tester",
-  steam_username: "steam-display-name",
+  steam_username: "鋼鉄の司令官 ✨",
   coh3_player_card_url: "https://coh3stats.com/players/legacy-value",
   country: "Australia",
   region: "Oceania",
@@ -68,6 +68,26 @@ describe("PlayerProfileForm Relic cutover", () => {
         name: "View active tournament ELO snapshots",
       })
     ).toBeInTheDocument();
+  });
+
+  it("displays the synchronized Steam Display Name as read-only", () => {
+    render(
+      <PlayerProfileForm
+        profile={profile}
+        verifiedCurrentElo={1375}
+        activeTournamentEloSnapshots={[]}
+      />
+    );
+
+    const steamDisplayName = screen.getByLabelText("Steam Display Name");
+
+    expect(steamDisplayName.tagName).toBe("OUTPUT");
+    expect(steamDisplayName).toHaveTextContent("鋼鉄の司令官 ✨");
+    expect(steamDisplayName).not.toHaveAttribute("name");
+    expect(screen.queryByLabelText("Steam Username")).not.toBeInTheDocument();
+    expect(
+      document.querySelector('input[name="steamUsername"]')
+    ).not.toBeInTheDocument();
   });
 
   it("displays N/A when no successful Relic verification exists", () => {

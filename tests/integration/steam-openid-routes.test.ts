@@ -6,6 +6,7 @@ const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const buildSteamOpenIdAuthenticationUrlMock = vi.hoisted(() => vi.fn());
 const buildSteamOpenIdCallbackUrlMock = vi.hoisted(() => vi.fn());
 const createSteamOpenIdFlowMock = vi.hoisted(() => vi.fn());
+const fetchSteamDisplayNameMock = vi.hoisted(() => vi.fn());
 const getSteamOpenIdCallbackStateMock = vi.hoisted(() => vi.fn());
 const normalizeSteamOpenIdOriginMock = vi.hoisted(() => vi.fn());
 const validateSteamOpenIdCallbackMock = vi.hoisted(() => vi.fn());
@@ -25,6 +26,7 @@ vi.mock("@/lib/steam-openid", () => ({
   buildSteamOpenIdAuthenticationUrl: buildSteamOpenIdAuthenticationUrlMock,
   buildSteamOpenIdCallbackUrl: buildSteamOpenIdCallbackUrlMock,
   createSteamOpenIdFlow: createSteamOpenIdFlowMock,
+  fetchSteamDisplayName: fetchSteamDisplayNameMock,
   getSteamOpenIdCallbackState: getSteamOpenIdCallbackStateMock,
   normalizeSteamOpenIdOrigin: normalizeSteamOpenIdOriginMock,
   validateSteamOpenIdCallback: validateSteamOpenIdCallbackMock,
@@ -40,6 +42,9 @@ const CALLBACK_URL = `${ORIGIN}/api/steam/callback?state=opaque-state`;
 const STEAM_AUTH_URL =
   "https://steamcommunity.com/openid/login?openid.mode=checkid_setup";
 const STEAM_ID = "18446744073709551614";
+const DIFFERENT_STEAM_ID = "18446744073709551613";
+const STEAM_DISPLAY_NAME = "鉄の狼 ⚔️";
+const UPDATED_STEAM_DISPLAY_NAME = "Iron Wolf ™";
 const USER_ID = "user_test_player";
 const SESSION_ID = "session_test_player";
 const FLOW_COOKIE_NAME = "__Host-ironclad-steam-link";
@@ -72,10 +77,43 @@ function createStartClient({
   };
 }
 
+type PlayerRow = {
+  avatar_url: string | null;
+  country: string | null;
+  discord_username: string | null;
+  display_name: string;
+  id: string;
+  in_game_name: string;
+  profile_completed: boolean;
+  region: string | null;
+  steam_id64: string | null;
+  steam_username: string | null;
+  timezone: string | null;
+};
+
 type QueryResult = {
-  data: { id?: string; steam_id64?: string | null } | null;
+  data: Partial<PlayerRow> | null;
   error: { code?: string; message: string } | null;
 };
+
+function createPlayerRow(
+  overrides: Partial<PlayerRow> = {}
+): PlayerRow {
+  return {
+    avatar_url: "/api/players/player-1/avatar",
+    country: "Australia",
+    discord_username: "iron-wolf",
+    display_name: "Iron Wolf",
+    id: "player-1",
+    in_game_name: "IronWolf",
+    profile_completed: false,
+    region: "Oceania",
+    steam_id64: null,
+    steam_username: null,
+    timezone: "Australia/Sydney",
+    ...overrides,
+  };
+}
 
 function createCallbackClient({
   linkResult = {
@@ -84,13 +122,22 @@ function createCallbackClient({
   },
   readResults = [
     {
-      data: { id: "player-1", steam_id64: null },
+      data: createPlayerRow(),
       error: null,
     },
   ],
+  syncResult = {
+    data: {
+      profile_completed: true,
+      steam_id64: STEAM_ID,
+      steam_username: STEAM_DISPLAY_NAME,
+    },
+    error: null,
+  },
 }: {
   linkResult?: QueryResult;
   readResults?: QueryResult[];
+  syncResult?: QueryResult;
 } = {}) {
   const pendingReads = [...readResults];
   const readMaybeSingle = vi.fn(async () => {
@@ -105,11 +152,42 @@ function createCallbackClient({
   const readEq = vi.fn(() => ({ maybeSingle: readMaybeSingle }));
   const readSelect = vi.fn(() => ({ eq: readEq }));
 
-  const linkMaybeSingle = vi.fn(async () => linkResult);
-  const linkSelect = vi.fn(() => ({ maybeSingle: linkMaybeSingle }));
-  const linkIs = vi.fn(() => ({ select: linkSelect }));
-  const linkEq = vi.fn(() => ({ is: linkIs }));
-  const update = vi.fn(() => ({ eq: linkEq }));
+  type UpdateFilter =
+    | { column: string; operator: "eq"; value: unknown }
+    | { column: string; operator: "is"; value: unknown };
+  type UpdateBuilder = {
+    eq: ReturnType<typeof vi.fn>;
+    is: ReturnType<typeof vi.fn>;
+    maybeSingle: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+  };
+
+  function createUpdateBuilder(result: QueryResult) {
+    const filters: UpdateFilter[] = [];
+    const builder = {} as UpdateBuilder;
+    const maybeSingle = vi.fn(async () => result);
+
+    builder.eq = vi.fn((column: string, value: unknown) => {
+      filters.push({ column, operator: "eq", value });
+      return builder;
+    });
+    builder.is = vi.fn((column: string, value: unknown) => {
+      filters.push({ column, operator: "is", value });
+      return builder;
+    });
+    builder.maybeSingle = maybeSingle;
+    builder.select = vi.fn(() => builder);
+
+    return { builder, filters, maybeSingle };
+  }
+
+  const linkUpdate = createUpdateBuilder(linkResult);
+  const syncUpdate = createUpdateBuilder(syncResult);
+  const update = vi.fn((payload: Record<string, unknown>) =>
+    Object.hasOwn(payload, "steam_id64")
+      ? linkUpdate.builder
+      : syncUpdate.builder
+  );
 
   const from = vi.fn(() => ({
     select: readSelect,
@@ -119,13 +197,16 @@ function createCallbackClient({
   return {
     client: { from },
     from,
-    linkEq,
-    linkIs,
-    linkMaybeSingle,
-    linkSelect,
+    linkEq: linkUpdate.builder.eq,
+    linkFilters: linkUpdate.filters,
+    linkIs: linkUpdate.builder.is,
+    linkMaybeSingle: linkUpdate.maybeSingle,
+    linkSelect: linkUpdate.builder.select,
     readEq,
     readMaybeSingle,
     readSelect,
+    syncFilters: syncUpdate.filters,
+    syncMaybeSingle: syncUpdate.maybeSingle,
     update,
   };
 }
@@ -249,7 +330,7 @@ describe("Steam connection start route", () => {
     expect(createSteamOpenIdFlowMock).not.toHaveBeenCalled();
   });
 
-  it("does not start a replacement flow for an already-connected player", async () => {
+  it("allows an already-connected player to reauthenticate for a display-name refresh", async () => {
     const fixture = createStartClient({
       data: { id: "player-1", steam_id64: STEAM_ID },
     });
@@ -257,8 +338,12 @@ describe("Steam connection start route", () => {
 
     const response = await connectPOST(createConnectRequest());
 
-    expectProfileRedirect(response, "already-connected");
-    expect(createSteamOpenIdFlowMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(STEAM_AUTH_URL);
+    expect(createSteamOpenIdFlowMock).toHaveBeenCalledWith(SESSION_ID);
+    expect(response.headers.get("set-cookie")).toContain(
+      `${FLOW_COOKIE_NAME}=flow-cookie`
+    );
   });
 
   it("sets the protected flow cookie and redirects to Steam", async () => {
@@ -303,6 +388,7 @@ describe("Steam connection callback route", () => {
       status: "positive",
     });
     verifySteamOpenIdAssertionMock.mockResolvedValue(STEAM_ID);
+    fetchSteamDisplayNameMock.mockResolvedValue(STEAM_DISPLAY_NAME);
   });
 
   it("rejects an unauthenticated callback and consumes the cookie", async () => {
@@ -412,7 +498,7 @@ describe("Steam connection callback route", () => {
     expect(fixture.update).not.toHaveBeenCalled();
   });
 
-  it("stores the first verified Steam identity conditionally", async () => {
+  it("links the verified SteamID64 before storing its trusted display name", async () => {
     const fixture = createCallbackClient();
     createSupabaseAdminClientMock.mockReturnValue(fixture.client);
 
@@ -420,16 +506,36 @@ describe("Steam connection callback route", () => {
 
     expectProfileRedirect(response, "connected");
     expectFlowCookieConsumed(response);
-    expect(fixture.update).toHaveBeenCalledWith({ steam_id64: STEAM_ID });
+    expect(fetchSteamDisplayNameMock).toHaveBeenCalledWith(STEAM_ID);
+    expect(fixture.update).toHaveBeenNthCalledWith(1, {
+      steam_id64: STEAM_ID,
+    });
+    expect(fixture.update).toHaveBeenNthCalledWith(2, {
+      steam_username: STEAM_DISPLAY_NAME,
+    });
+    expect(fixture.update).toHaveBeenCalledTimes(2);
+    expect(fixture.linkEq).toHaveBeenCalledWith("id", "player-1");
     expect(fixture.linkEq).toHaveBeenCalledWith("clerk_user_id", USER_ID);
     expect(fixture.linkIs).toHaveBeenCalledWith("steam_id64", null);
+    expect(fixture.syncFilters).toHaveLength(3);
+    expect(fixture.syncFilters).toEqual(
+      expect.arrayContaining([
+        { column: "id", operator: "eq", value: "player-1" },
+        { column: "clerk_user_id", operator: "eq", value: USER_ID },
+        { column: "steam_id64", operator: "eq", value: STEAM_ID },
+      ])
+    );
   });
 
-  it("treats the same linked identity as idempotent success", async () => {
+  it("keeps a verified SteamID64 linked when display-name lookup fails", async () => {
+    fetchSteamDisplayNameMock.mockResolvedValueOnce(null);
     const fixture = createCallbackClient({
       readResults: [
         {
-          data: { id: "player-1", steam_id64: STEAM_ID },
+          data: createPlayerRow({
+            profile_completed: true,
+            steam_username: "Existing Steam Name",
+          }),
           error: null,
         },
       ],
@@ -439,14 +545,95 @@ describe("Steam connection callback route", () => {
     const response = await callbackGET(createCallbackRequest());
 
     expectProfileRedirect(response, "connected");
-    expect(fixture.update).not.toHaveBeenCalled();
+    expectFlowCookieConsumed(response);
+    expect(fixture.update).toHaveBeenCalledOnce();
+    expect(fixture.update).toHaveBeenCalledWith({ steam_id64: STEAM_ID });
+    expect(fixture.syncFilters).toEqual([]);
+    const [identityUpdate] = fixture.update.mock.calls[0] as [
+      Record<string, unknown>,
+    ];
+
+    for (const excludedField of [
+      "steam_username",
+      "profile_completed",
+      "current_elo",
+      "relic_verified_elo",
+      "relic_verified_faction",
+      "relic_verified_division",
+      "relic_elo_calculation_version",
+      "relic_elo_verified_at",
+      "relic_elo_last_attempt_at",
+    ]) {
+      expect(identityUpdate).not.toHaveProperty(excludedField);
+    }
+  });
+
+  it("refreshes only the display name for the same linked identity", async () => {
+    fetchSteamDisplayNameMock.mockResolvedValueOnce(
+      UPDATED_STEAM_DISPLAY_NAME
+    );
+    const fixture = createCallbackClient({
+      readResults: [
+        {
+          data: createPlayerRow({
+            profile_completed: true,
+            steam_id64: STEAM_ID,
+            steam_username: STEAM_DISPLAY_NAME,
+          }),
+          error: null,
+        },
+      ],
+      syncResult: {
+        data: {
+          profile_completed: true,
+          steam_id64: STEAM_ID,
+          steam_username: UPDATED_STEAM_DISPLAY_NAME,
+        },
+        error: null,
+      },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+
+    const response = await callbackGET(createCallbackRequest());
+
+    expectProfileRedirect(response, "connected");
+    expect(fetchSteamDisplayNameMock).toHaveBeenCalledWith(STEAM_ID);
+    expect(fixture.update).toHaveBeenCalledOnce();
+    expect(fixture.update).toHaveBeenCalledWith({
+      steam_username: UPDATED_STEAM_DISPLAY_NAME,
+    });
+    expect(fixture.syncFilters).toHaveLength(3);
+    expect(fixture.syncFilters).toEqual(
+      expect.arrayContaining([
+        { column: "id", operator: "eq", value: "player-1" },
+        { column: "clerk_user_id", operator: "eq", value: USER_ID },
+        { column: "steam_id64", operator: "eq", value: STEAM_ID },
+      ])
+    );
+    const [refreshUpdate] = fixture.update.mock.calls[0] as [
+      Record<string, unknown>,
+    ];
+
+    for (const protectedField of [
+      "steam_id64",
+      "profile_completed",
+      "current_elo",
+      "relic_verified_elo",
+      "relic_verified_faction",
+      "relic_verified_division",
+      "relic_elo_calculation_version",
+      "relic_elo_verified_at",
+      "relic_elo_last_attempt_at",
+    ]) {
+      expect(refreshUpdate).not.toHaveProperty(protectedField);
+    }
   });
 
   it("does not replace a different linked identity", async () => {
     const fixture = createCallbackClient({
       readResults: [
         {
-          data: { id: "player-1", steam_id64: "18446744073709551613" },
+          data: createPlayerRow({ steam_id64: DIFFERENT_STEAM_ID }),
           error: null,
         },
       ],
@@ -457,6 +644,7 @@ describe("Steam connection callback route", () => {
 
     expectProfileRedirect(response, "already-connected");
     expect(fixture.update).not.toHaveBeenCalled();
+    expect(fetchSteamDisplayNameMock).not.toHaveBeenCalled();
   });
 
   it("maps a unique-index race to the duplicate identity result", async () => {
@@ -490,14 +678,11 @@ describe("Steam connection callback route", () => {
       linkResult: { data: null, error: null },
       readResults: [
         {
-          data: { id: "player-1", steam_id64: null },
+          data: createPlayerRow(),
           error: null,
         },
         {
-          data: {
-            id: "player-1",
-            steam_id64: "18446744073709551613",
-          },
+          data: createPlayerRow({ steam_id64: DIFFERENT_STEAM_ID }),
           error: null,
         },
       ],

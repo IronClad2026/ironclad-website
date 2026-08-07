@@ -22,8 +22,9 @@ import { savePlayerProfile } from "@/app/profile/actions";
 function createProfileClient() {
   const maybeSingle = vi.fn(async () => ({
     data: {
-      avatar_url: null,
+      avatar_url: "/api/players/player-existing/avatar",
       id: "player-existing",
+      steam_username: "Synced Steam 名 ✨",
     },
     error: null,
   }));
@@ -44,6 +45,7 @@ function createProfileClient() {
   return {
     client: { from },
     from,
+    select,
     upsert,
   };
 }
@@ -53,7 +55,7 @@ function createValidProfileForm() {
   formData.set("displayName", "Test Player");
   formData.set("inGameName", "Test IGN");
   formData.set("discordUsername", "test-discord");
-  formData.set("steamUsername", "display-only-steam-name");
+  formData.set("steamUsername", "forged-browser-steam-name");
   formData.set(
     "coh3PlayerCardUrl",
     "https://coh3stats.com/players/forged-legacy-value"
@@ -71,7 +73,7 @@ describe("profile save Steam identity regression", () => {
     authMock.mockResolvedValue(playerIdentity);
   });
 
-  it("ignores forged legacy URL and ELO fields while saving unrelated profile fields", async () => {
+  it("ignores a forged Steam display name while preserving synchronized profile completion", async () => {
     const fixture = createProfileClient();
     createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
 
@@ -96,9 +98,10 @@ describe("profile save Steam identity regression", () => {
     expect(profileUpdate).toMatchObject({
       clerk_user_id: playerIdentity.userId,
       id: "player-existing",
-      steam_username: "display-only-steam-name",
+      profile_completed: true,
     });
     for (const protectedField of [
+      "steam_username",
       "current_elo",
       "coh3_player_card_url",
       "steam_id64",
@@ -111,6 +114,9 @@ describe("profile save Steam identity regression", () => {
     ]) {
       expect(profileUpdate).not.toHaveProperty(protectedField);
     }
+    expect(fixture.select).toHaveBeenCalledWith(
+      "id, avatar_url, steam_username"
+    );
     expect(options).toEqual({ onConflict: "clerk_user_id" });
     expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
   });
