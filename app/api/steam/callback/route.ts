@@ -6,6 +6,7 @@ import {
   getSteamOpenIdCallbackState,
   normalizeSteamOpenIdOrigin,
   STEAM_OPENID_FLOW_COOKIE_NAME,
+  type SteamOpenIdFlowIntent,
   validateSteamOpenIdCallback,
   validateSteamOpenIdFlowCookie,
   verifySteamOpenIdAssertion,
@@ -16,8 +17,10 @@ type ProfileResult =
   | "already-connected"
   | "cancelled"
   | "connected"
+  | "display-name-failed"
   | "duplicate"
-  | "failed";
+  | "failed"
+  | "refreshed";
 
 export async function GET(request: NextRequest) {
   let sessionId: string | null = null;
@@ -65,6 +68,8 @@ export async function GET(request: NextRequest) {
     return terminalResponse(redirectToProfile(origin, "failed"));
   }
 
+  const intent = flowValidation.intent;
+
   let callback;
 
   try {
@@ -103,13 +108,18 @@ export async function GET(request: NextRequest) {
   }
 
   if (currentPlayer.steamId64 === steamId64) {
-    await synchronizeSteamDisplayName(
+    const displayNameSynchronized = await synchronizeSteamDisplayName(
       supabase,
       currentPlayer,
       userId,
       steamId64
     );
-    return terminalResponse(redirectToProfile(origin, "connected"));
+    return terminalResponse(
+      redirectToProfile(
+        origin,
+        getSuccessfulProfileResult(intent, displayNameSynchronized)
+      )
+    );
   }
 
   if (currentPlayer.steamId64 !== null) {
@@ -146,25 +156,35 @@ export async function GET(request: NextRequest) {
   }
 
   if (linkedPlayer?.steam_id64 === steamId64) {
-    await synchronizeSteamDisplayName(
+    const displayNameSynchronized = await synchronizeSteamDisplayName(
       supabase,
       currentPlayer,
       userId,
       steamId64
     );
-    return terminalResponse(redirectToProfile(origin, "connected"));
+    return terminalResponse(
+      redirectToProfile(
+        origin,
+        getSuccessfulProfileResult(intent, displayNameSynchronized)
+      )
+    );
   }
 
   const racedPlayer = await loadCurrentSteamIdentity(supabase, userId);
 
   if (racedPlayer.status === "found" && racedPlayer.steamId64 === steamId64) {
-    await synchronizeSteamDisplayName(
+    const displayNameSynchronized = await synchronizeSteamDisplayName(
       supabase,
       racedPlayer,
       userId,
       steamId64
     );
-    return terminalResponse(redirectToProfile(origin, "connected"));
+    return terminalResponse(
+      redirectToProfile(
+        origin,
+        getSuccessfulProfileResult(intent, displayNameSynchronized)
+      )
+    );
   }
 
   if (racedPlayer.status === "found" && racedPlayer.steamId64 !== null) {
@@ -225,12 +245,12 @@ async function synchronizeSteamDisplayName(
   player: Extract<SteamIdentityLookup, { status: "found" }>,
   userId: string,
   steamId64: string
-) {
+): Promise<boolean> {
   const steamDisplayName = await fetchSteamDisplayName(steamId64);
 
   if (!steamDisplayName) {
     console.error("Steam display name lookup failed.");
-    return;
+    return false;
   }
 
   try {
@@ -249,10 +269,25 @@ async function synchronizeSteamDisplayName(
       data?.steam_username !== steamDisplayName
     ) {
       console.error("Steam display name storage failed.");
+      return false;
     }
+
+    return true;
   } catch {
     console.error("Steam display name storage failed.");
+    return false;
   }
+}
+
+function getSuccessfulProfileResult(
+  intent: SteamOpenIdFlowIntent,
+  displayNameSynchronized: boolean
+): ProfileResult {
+  if (!displayNameSynchronized) {
+    return "display-name-failed";
+  }
+
+  return intent === "refresh" ? "refreshed" : "connected";
 }
 
 function getDatabaseErrorCode(error: unknown) {
