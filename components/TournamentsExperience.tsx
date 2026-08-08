@@ -14,6 +14,7 @@ import MatchResultControls, {
   ResultEntryForm,
 } from "@/components/MatchResultControls";
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
+import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { PlayerProfile } from "@/lib/player-profile";
@@ -1011,11 +1012,13 @@ function Brackets({
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
+  focusedMatchId,
 }: {
   tournament: TournamentCard;
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
+  focusedMatchId: string | null;
 }) {
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
@@ -1025,12 +1028,31 @@ function Brackets({
   );
   const [selectedAdminMatchId, setSelectedAdminMatchId] =
     useState<string | null>(null);
-  const selectedAdminMatch =
+  const selectedAdminBracket =
     selectedAdminMatchId === null
       ? null
-      : tournament.generatedBrackets
-          .flatMap((generated) => generated.matches)
-          .find((match) => match.id === selectedAdminMatchId) ?? null;
+      : tournament.generatedBrackets.find((generated) =>
+          generated.matches.some((match) => match.id === selectedAdminMatchId)
+        ) ?? null;
+  const selectedAdminMatch =
+    selectedAdminBracket === null
+      ? null
+      : selectedAdminBracket.matches.find(
+          (match) => match.id === selectedAdminMatchId
+        ) ?? null;
+
+  useEffect(() => {
+    if (!focusedMatchId || !window.matchMedia("(min-width: 1024px)").matches) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (viewer.isAdmin) setSelectedAdminMatchId(focusedMatchId);
+      document
+        .getElementById(`match-desktop-${focusedMatchId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [focusedMatchId, viewer.isAdmin]);
 
   return (
     <div className="space-y-5">
@@ -1055,6 +1077,9 @@ function Brackets({
         const champion = generated
           ? getBracketChampion(generated, participantsById)
           : null;
+        const completedWithoutChampion = generated
+          ? isBracketCompletedWithoutChampion(generated)
+          : false;
         const canOpenResults = Boolean(
           generated &&
             !viewer.isAdmin &&
@@ -1089,6 +1114,7 @@ function Brackets({
                   {generated && canOpenResults && (
                     <BracketMatchResultsWorkspace
                       bracketName={bracket.name}
+                      bracketFormat={generated.format}
                       matches={generated.matches}
                       participantsById={participantsById}
                       viewer={viewer}
@@ -1115,6 +1141,9 @@ function Brackets({
                 champion={champion}
               />
             )}
+            {completedWithoutChampion && (
+              <NoChampionPresentation bracketName={bracket.name} />
+            )}
             {!generated ? (
               <p className="mt-6 border border-white/12 p-8 text-center text-zinc-500">
                 The empty bracket structure will generate automatically when
@@ -1135,6 +1164,8 @@ function Brackets({
               <SingleEliminationBracket
                 matches={generated.matches}
                 participantsById={participantsById}
+                focusedMatchId={focusedMatchId}
+                anchorPrefix="match-desktop"
                 onAdminMatchSelect={
                   viewer.isAdmin
                     ? (match) => setSelectedAdminMatchId(match.id)
@@ -1149,6 +1180,7 @@ function Brackets({
         <AdminMatchManagementModal
           tournament={tournament}
           match={selectedAdminMatch}
+          bracketFormat={selectedAdminBracket?.format ?? "single_elimination"}
           participantsById={participantsById}
           viewer={viewer}
           submissions={matchResultSubmissions.filter(
@@ -1166,6 +1198,7 @@ function Brackets({
 
 function BracketMatchResultsWorkspace({
   bracketName,
+  bracketFormat,
   matches,
   participantsById,
   viewer,
@@ -1173,6 +1206,7 @@ function BracketMatchResultsWorkspace({
   matchResultReportGroups,
 }: {
   bracketName: string;
+  bracketFormat: GeneratedTournamentBracket["format"];
   matches: GeneratedTournamentMatch[];
   participantsById: Map<string, TournamentParticipant>;
   viewer: TournamentViewer;
@@ -1347,8 +1381,16 @@ function BracketMatchResultsWorkspace({
                                 }
                               />
                             </div>
+                            {bracketFormat === "single_elimination" && (
+                              <div className="mb-5">
+                                <MatchDeadlinePresentation match={match} />
+                              </div>
+                            )}
                             <MatchResultControls
                               match={match}
+                              deadlineManaged={
+                                bracketFormat === "single_elimination"
+                              }
                               participantsById={participantsById}
                               isAdmin={viewer.isAdmin}
                               canSubmit={viewer.registrationIds.some(
@@ -1386,6 +1428,7 @@ function BracketMatchResultsWorkspace({
 function AdminMatchManagementModal({
   tournament,
   match,
+  bracketFormat,
   participantsById,
   viewer,
   submissions,
@@ -1394,6 +1437,7 @@ function AdminMatchManagementModal({
 }: {
   tournament: TournamentCard;
   match: GeneratedTournamentMatch;
+  bracketFormat: GeneratedTournamentBracket["format"];
   participantsById: Map<string, TournamentParticipant>;
   viewer: TournamentViewer;
   submissions: MatchResultSubmission[];
@@ -1422,8 +1466,14 @@ function AdminMatchManagementModal({
     (submission) => submission.status === "pending"
   );
   const hasParticipants = Boolean(playerOne && playerTwo);
+  const deadlineManaged = bracketFormat === "single_elimination";
   const canEnterOfficialResult =
-    hasParticipants && !activeReportGroup && !hasPendingSubmission;
+    hasParticipants &&
+    (!deadlineManaged ||
+      (match.status === "in_progress" &&
+        !(match.holdStartedAt && !match.holdReleasedAt))) &&
+    !activeReportGroup &&
+    !hasPendingSubmission;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1590,6 +1640,12 @@ function AdminMatchManagementModal({
               </div>
             </div>
 
+            {deadlineManaged && (
+              <div className="mt-5">
+                <AdminMatchDeadlineControls match={match} />
+              </div>
+            )}
+
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
               <div className="border border-white/12 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20">
                 {canEnterOfficialResult ? (
@@ -1606,6 +1662,12 @@ function AdminMatchManagementModal({
                     <p className="mt-3 text-xs leading-5 text-zinc-400">
                       {!hasParticipants
                         ? "Both participants must be assigned before an official result can be entered."
+                        : deadlineManaged && match.status !== "in_progress"
+                          ? "This match is not currently active for result entry."
+                          : deadlineManaged &&
+                              match.holdStartedAt &&
+                              !match.holdReleasedAt
+                            ? "Release the administrative hold before entering an official result."
                         : "Resolve the active review package or pending legacy submission before entering a direct official result."}
                     </p>
                   </div>
@@ -1789,14 +1851,58 @@ function getBracketChampion(
     : null;
 }
 
+function isBracketCompletedWithoutChampion(
+  bracket: GeneratedTournamentBracket
+) {
+  if (bracket.format !== "single_elimination" || bracket.matches.length === 0) {
+    return false;
+  }
+
+  const finalMatch = bracket.matches
+    .slice()
+    .sort(
+      (left, right) =>
+        right.roundNumber - left.roundNumber ||
+        right.matchNumber - left.matchNumber
+    )[0];
+
+  return (
+    finalMatch?.status === "completed" &&
+    !finalMatch.winnerRegistrationId &&
+    ["deadline_double_forfeit", "empty_feeder"].includes(
+      finalMatch.outcomeType ?? ""
+    )
+  );
+}
+
+function NoChampionPresentation({ bracketName }: { bracketName: string }) {
+  return (
+    <section className="mt-6 border border-zinc-500/30 bg-zinc-500/[0.06] px-5 py-6 text-center">
+      <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400">
+        Division Complete
+      </p>
+      <h3 className="mt-2 text-xl font-black text-white">
+        No champion was awarded
+      </h3>
+      <p className="mt-2 text-sm leading-6 text-zinc-400">
+        {bracketName} ended without an eligible player advancing from the Final.
+      </p>
+    </section>
+  );
+}
+
 function SingleEliminationBracket({
   matches,
   participantsById,
   onAdminMatchSelect,
+  focusedMatchId,
+  anchorPrefix,
 }: {
   matches: GeneratedTournamentMatch[];
   participantsById: Map<string, TournamentParticipant>;
   onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
+  focusedMatchId: string | null;
+  anchorPrefix: "match-desktop" | "match-mobile";
 }) {
   const rounds = Array.from(
     matches.reduce((groups, match) => {
@@ -1894,6 +2000,9 @@ function SingleEliminationBracket({
                   <ModernBracketMatch
                     key={match.id}
                     match={toDisplayMatch(match, participantsById)}
+                    deadlineMatch={match}
+                    anchorId={`${anchorPrefix}-${match.id}`}
+                    focused={focusedMatchId === match.id}
                     isActiveRound={isActive}
                     hasNextRound={roundIndex < rounds.length - 1}
                     connectorDirection={
@@ -1917,12 +2026,18 @@ function SingleEliminationBracket({
 
 function ModernBracketMatch({
   match,
+  deadlineMatch,
+  anchorId,
+  focused,
   isActiveRound,
   hasNextRound,
   connectorDirection,
   onAdminSelect,
 }: {
   match: Match;
+  deadlineMatch: GeneratedTournamentMatch;
+  anchorId: string;
+  focused: boolean;
   isActiveRound: boolean;
   hasNextRound: boolean;
   connectorDirection: "up" | "down";
@@ -1930,9 +2045,11 @@ function ModernBracketMatch({
 }) {
   const card = (
     <div
+      id={anchorId}
       className={classNames(
         "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1",
         onAdminSelect && "cursor-pointer hover:border-orange-300/80",
+        focused && "ring-2 ring-orange-300 ring-offset-4 ring-offset-black",
         match.status === "live"
           ? "border-orange-400/80 shadow-[0_0_28px_rgba(249,115,22,0.22)]"
           : match.status === "pending_review"
@@ -1959,6 +2076,7 @@ function ModernBracketMatch({
       </div>
       <BroadcastTeamRow team={match.teamA} />
       <BroadcastTeamRow team={match.teamB} />
+      <MatchDeadlinePresentation match={deadlineMatch} compact />
     </div>
   );
 
@@ -2026,6 +2144,154 @@ function MatchStatus({ status }: { status: Match["status"] }) {
           : status}
     </span>
   );
+}
+
+export function MatchDeadlinePresentation({
+  match,
+  compact = false,
+}: {
+  match: GeneratedTournamentMatch;
+  compact?: boolean;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
+  const extensionAppliesToCurrentActivation = timestampFallsInActivation(
+    match.extendedAt,
+    match.activatedAt
+  );
+  const deadlineTimestamp = match.deadlineAt
+    ? new Date(match.deadlineAt).getTime()
+    : null;
+  const overdue =
+    match.status === "in_progress" &&
+    deadlineTimestamp !== null &&
+    Number.isFinite(deadlineTimestamp) &&
+    now >= deadlineTimestamp;
+  let label: string | null = null;
+  let tone = "border-white/10 bg-black/25 text-zinc-400";
+
+  useEffect(() => {
+    if (match.status !== "in_progress" || holdActive) return;
+
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [holdActive, match.status]);
+
+  if (match.outcomeType === "deadline_double_forfeit") {
+    label = formatDoubleForfeitLabel(match.roundName);
+    tone = "border-red-400/25 bg-red-500/10 text-red-200";
+  } else if (match.outcomeType === "automatic_bye") {
+    label = formatAutomaticAdvanceLabel(match.roundName);
+    tone = "border-sky-400/25 bg-sky-500/10 text-sky-200";
+  } else if (match.outcomeType === "empty_feeder") {
+    label = formatEmptyFeederLabel(match.roundName);
+    tone = "border-zinc-400/20 bg-zinc-500/10 text-zinc-300";
+  } else if (holdActive) {
+    label = "Deadline paused by an administrator";
+    tone = "border-amber-400/25 bg-amber-500/10 text-amber-100";
+  } else if (match.status === "pending_review") {
+    label = "Result or ruling under review — deadline enforcement is paused";
+    tone = "border-amber-400/25 bg-amber-500/10 text-amber-100";
+  } else if (overdue) {
+    label = "Deadline passed — awaiting authoritative ruling";
+    tone = "border-red-400/25 bg-red-500/10 text-red-200";
+  } else if (match.status === "in_progress" && match.deadlineAt) {
+    label = `Deadline ${formatLocalDateTime(match.deadlineAt)}`;
+    tone = "border-orange-400/25 bg-orange-500/10 text-orange-100";
+  } else if (
+    match.status === "scheduled" &&
+    Boolean(match.playerOneRegistrationId) !== Boolean(match.playerTwoRegistrationId)
+  ) {
+    label = "Waiting for opponent — your deadline has not started";
+    tone = "border-sky-400/20 bg-sky-500/[0.08] text-sky-200";
+  }
+
+  if (!label) return null;
+
+  return (
+    <div
+      data-match-deadline-state
+      className={classNames(
+        "border font-bold leading-5",
+        compact ? "mx-3 mb-3 px-3 py-2 text-[10px]" : "p-4 text-xs",
+        tone
+      )}
+    >
+      <p>{label}</p>
+      {match.extensionMinutes &&
+        match.deadlineAt &&
+        !holdActive &&
+        extensionAppliesToCurrentActivation && (
+        <p className="mt-1 opacity-80">
+          Includes a {formatMatchDuration(match.extensionMinutes)} extension.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function formatLocalDateTime(value: string) {
+  const timestamp = new Date(value);
+  if (!Number.isFinite(timestamp.getTime())) return "unavailable";
+
+  return new Intl.DateTimeFormat("en-AU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(timestamp);
+}
+
+function formatMatchDuration(minutes: number) {
+  if (minutes % 60 !== 0) return `${minutes} minutes`;
+  const hours = minutes / 60;
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
+function timestampFallsInActivation(
+  eventAt: string | null,
+  activatedAt: string | null
+) {
+  if (!eventAt || !activatedAt) return false;
+
+  const eventTimestamp = new Date(eventAt).getTime();
+  const activationTimestamp = new Date(activatedAt).getTime();
+  return (
+    Number.isFinite(eventTimestamp) &&
+    Number.isFinite(activationTimestamp) &&
+    eventTimestamp >= activationTimestamp
+  );
+}
+
+function formatDoubleForfeitLabel(roundName: string) {
+  const normalized = roundName.trim().toLowerCase();
+  if (normalized === "final" || normalized === "grand final") {
+    return "Final double forfeit — division completed without a champion";
+  }
+  if (normalized.includes("semi")) {
+    return "Semifinal double forfeit — no player advances from this matchup";
+  }
+  return "Quarterfinal double forfeit — no player advances from this feeder";
+}
+
+function formatAutomaticAdvanceLabel(roundName: string) {
+  const normalized = roundName.trim().toLowerCase();
+  if (normalized === "final" || normalized === "grand final") {
+    return "Final walkover — champion advanced without a played match";
+  }
+  if (normalized.includes("semi")) {
+    return "Semifinal automatic bye — sole eligible player advances to the Final";
+  }
+  return "Automatic bye — sole eligible player advances without a played match";
+}
+
+function formatEmptyFeederLabel(roundName: string) {
+  const normalized = roundName.trim().toLowerCase();
+  if (normalized === "final" || normalized === "grand final") {
+    return "Final closed — division completed without a champion";
+  }
+  if (normalized.includes("semi")) {
+    return "Semifinal closed — no eligible player advances";
+  }
+  return "Match closed — no eligible player advances";
 }
 
 function BroadcastTeamRow({ team }: { team: MatchTeam }) {
@@ -3622,11 +3888,13 @@ function MobileBrackets({
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
+  focusedMatchId,
 }: {
   tournament: TournamentCard;
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
+  focusedMatchId: string | null;
 }) {
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
@@ -3636,12 +3904,31 @@ function MobileBrackets({
   );
   const [selectedAdminMatchId, setSelectedAdminMatchId] =
     useState<string | null>(null);
-  const selectedAdminMatch =
+  const selectedAdminBracket =
     selectedAdminMatchId === null
       ? null
-      : tournament.generatedBrackets
-          .flatMap((generated) => generated.matches)
-          .find((match) => match.id === selectedAdminMatchId) ?? null;
+      : tournament.generatedBrackets.find((generated) =>
+          generated.matches.some((match) => match.id === selectedAdminMatchId)
+        ) ?? null;
+  const selectedAdminMatch =
+    selectedAdminBracket === null
+      ? null
+      : selectedAdminBracket.matches.find(
+          (match) => match.id === selectedAdminMatchId
+        ) ?? null;
+
+  useEffect(() => {
+    if (!focusedMatchId || window.matchMedia("(min-width: 1024px)").matches) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (viewer.isAdmin) setSelectedAdminMatchId(focusedMatchId);
+      document
+        .getElementById(`match-mobile-${focusedMatchId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [focusedMatchId, viewer.isAdmin]);
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-5">
@@ -3666,6 +3953,9 @@ function MobileBrackets({
         const champion = generated
           ? getBracketChampion(generated, participantsById)
           : null;
+        const completedWithoutChampion = generated
+          ? isBracketCompletedWithoutChampion(generated)
+          : false;
         const canOpenResults = Boolean(
           generated &&
             !viewer.isAdmin &&
@@ -3701,6 +3991,7 @@ function MobileBrackets({
                   {generated && canOpenResults && (
                     <BracketMatchResultsWorkspace
                       bracketName={bracket.name}
+                      bracketFormat={generated.format}
                       matches={generated.matches}
                       participantsById={participantsById}
                       viewer={viewer}
@@ -3728,6 +4019,9 @@ function MobileBrackets({
                 champion={champion}
               />
             )}
+            {completedWithoutChampion && (
+              <NoChampionPresentation bracketName={bracket.name} />
+            )}
 
             {!generated ? (
               <p className="mt-6 border border-white/12 p-6 text-center text-zinc-500">
@@ -3750,6 +4044,8 @@ function MobileBrackets({
                 <SingleEliminationBracket
                   matches={generated.matches}
                   participantsById={participantsById}
+                  focusedMatchId={focusedMatchId}
+                  anchorPrefix="match-mobile"
                   onAdminMatchSelect={
                     viewer.isAdmin
                       ? (match) => setSelectedAdminMatchId(match.id)
@@ -3766,6 +4062,7 @@ function MobileBrackets({
         <AdminMatchManagementModal
           tournament={tournament}
           match={selectedAdminMatch}
+          bracketFormat={selectedAdminBracket?.format ?? "single_elimination"}
           participantsById={participantsById}
           viewer={viewer}
           submissions={matchResultSubmissions.filter(
@@ -3927,6 +4224,7 @@ function MobileMainContent({
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
+  focusedMatchId,
 }: {
   activeTab: TabKey;
   activeOverviewPanel: OverviewPanelKey;
@@ -3936,6 +4234,7 @@ function MobileMainContent({
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
+  focusedMatchId: string | null;
 }) {
   return (
     <main className="relative z-10 w-full max-w-full min-w-0 px-4 py-5 sm:px-5">
@@ -3954,6 +4253,7 @@ function MobileMainContent({
           viewer={viewer}
           matchResultSubmissions={matchResultSubmissions}
           matchResultReportGroups={matchResultReportGroups}
+          focusedMatchId={focusedMatchId}
         />
       )}
       {activeTab === "media" && <MobileMedia tournament={tournament} />}
@@ -3973,6 +4273,7 @@ function MainContent({
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
+  focusedMatchId,
 }: {
   activeTab: TabKey;
   activeOverviewPanel: OverviewPanelKey;
@@ -3982,6 +4283,7 @@ function MainContent({
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
+  focusedMatchId: string | null;
 }) {
   return (
     <main className="relative z-10 px-5 py-6 lg:px-8">
@@ -4000,6 +4302,7 @@ function MainContent({
           viewer={viewer}
           matchResultSubmissions={matchResultSubmissions}
           matchResultReportGroups={matchResultReportGroups}
+          focusedMatchId={focusedMatchId}
         />
       )}
       {activeTab === "media" && <Media tournament={tournament} />}
@@ -4149,9 +4452,15 @@ export default function TournamentsExperience({
   const rawTournamentParam = searchParams.get("tournament");
   const rawTabParam = searchParams.get("tab");
   const rawPanelParam = searchParams.get("panel");
+  const rawMatchParam = searchParams.get("match");
   const activeTab = getValidTab(rawTabParam);
   const urlTournament = findTournamentFromUrl(tournaments, rawTournamentParam);
   const selectedTournament = urlTournament ?? tournaments[0];
+  const focusedMatchId = selectedTournament.generatedBrackets
+    .flatMap((bracket) => bracket.matches)
+    .some((match) => match.id === rawMatchParam)
+    ? rawMatchParam
+    : null;
   const requestedOverviewPanel = getValidOverviewPanel(rawPanelParam);
   const activeOverviewPanel =
     activeTab === "overview" &&
@@ -4200,6 +4509,7 @@ export default function TournamentsExperience({
       } else {
         params.delete("panel");
       }
+      params.delete("match");
 
       const nextQuery = params.toString();
       const nextPath = nextQuery ? `${pathname}?${nextQuery}` : pathname;
@@ -4235,7 +4545,8 @@ export default function TournamentsExperience({
     const hasTournamentStateParam =
       rawTournamentParam !== null ||
       rawTabParam !== null ||
-      rawPanelParam !== null;
+      rawPanelParam !== null ||
+      rawMatchParam !== null;
 
     if (!hasTournamentStateParam) {
       return;
@@ -4248,12 +4559,16 @@ export default function TournamentsExperience({
     const invalidPanelParam =
       rawPanelParam !== null &&
       (activeTab !== "overview" || rawPanelParam !== activeOverviewPanel);
+    const invalidMatchParam =
+      rawMatchParam !== null &&
+      (activeTab !== "brackets" || focusedMatchId === null);
 
     if (
       !missingTournamentParam &&
       !invalidTournamentParam &&
       !invalidTabParam &&
-      !invalidPanelParam
+      !invalidPanelParam &&
+      !invalidMatchParam
     ) {
       return;
     }
@@ -4270,9 +4585,11 @@ export default function TournamentsExperience({
     activeOverviewPanel,
     activeTab,
     rawPanelParam,
+    rawMatchParam,
     rawTabParam,
     rawTournamentParam,
     selectedTournament,
+    focusedMatchId,
     updateTournamentUrl,
     urlTournament,
   ]);
@@ -4406,6 +4723,7 @@ export default function TournamentsExperience({
               viewer={viewer}
               matchResultSubmissions={matchResultSubmissions}
               matchResultReportGroups={matchResultReportGroups}
+              focusedMatchId={focusedMatchId}
             />
           </div>
         </div>
@@ -4445,6 +4763,7 @@ export default function TournamentsExperience({
           viewer={viewer}
           matchResultSubmissions={matchResultSubmissions}
           matchResultReportGroups={matchResultReportGroups}
+          focusedMatchId={focusedMatchId}
         />
       </div>
 

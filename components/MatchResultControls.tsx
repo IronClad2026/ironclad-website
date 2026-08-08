@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   resetAdminMatch,
   saveAdminMatchResult,
@@ -29,6 +29,7 @@ export default function MatchResultControls({
   canSubmit,
   submissions,
   reportGroups,
+  deadlineManaged,
   showDirectAdminControls = false,
   presentation = "inline",
 }: {
@@ -38,6 +39,7 @@ export default function MatchResultControls({
   canSubmit: boolean;
   submissions: MatchResultSubmission[];
   reportGroups: MatchResultReportGroup[];
+  deadlineManaged: boolean;
   showDirectAdminControls?: boolean;
   presentation?: "inline" | "workspace";
 }) {
@@ -60,14 +62,52 @@ export default function MatchResultControls({
       )
   );
   const canOpenForReportGroups = reportGroups.length > 0;
+  const [now, setNow] = useState(() => Date.now());
+  const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
+  const deadlineOpen = Boolean(
+    match.deadlineAt && now < new Date(match.deadlineAt).getTime()
+  );
+
+  useEffect(() => {
+    if (!deadlineManaged || match.status !== "in_progress" || holdActive) {
+      return;
+    }
+
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [deadlineManaged, holdActive, match.status]);
   const canSubmitNewReport =
     canSubmit &&
     hasParticipants &&
-    match.status !== "completed" &&
+    (deadlineManaged
+      ? match.status === "in_progress" && deadlineOpen && !holdActive
+      : match.status !== "completed") &&
     !activeReportGroup &&
     !pendingSubmission;
   const shouldShowAdminResultEntry =
-    isAdmin && hasParticipants && !activeReportGroup && !pendingSubmission;
+    isAdmin &&
+    hasParticipants &&
+    (!deadlineManaged ||
+      (match.status === "in_progress" && !holdActive)) &&
+    !activeReportGroup &&
+    !pendingSubmission;
+  const playerControlLabel = getPlayerControlLabel({
+    match,
+    deadlineManaged,
+    hasParticipants,
+    holdActive,
+    deadlineOpen,
+    hasActiveReportGroup: Boolean(activeReportGroup),
+    hasPendingSubmission: Boolean(pendingSubmission),
+  });
+  const adminControlLabel = getAdminControlLabel({
+    match,
+    deadlineManaged,
+    hasParticipants,
+    holdActive,
+    hasActiveReportGroup: Boolean(activeReportGroup),
+    hasPendingSubmission: Boolean(pendingSubmission),
+  });
 
   if (!isAdmin && !canSubmit && submissions.length === 0 && !canOpenForReportGroups) {
     return null;
@@ -81,7 +121,7 @@ export default function MatchResultControls({
           : "space-y-4"
       }
     >
-          {isAdmin && match.status === "completed" && (
+          {isAdmin && match.status === "completed" && !match.outcomeType && (
             <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/5 p-3 text-[10px] leading-5 text-slate-400">
               <p className="font-black uppercase tracking-wider text-emerald-200">
                 Official Result Audit
@@ -198,8 +238,52 @@ export default function MatchResultControls({
 
           {!hasParticipants && (
             <p className="text-xs text-slate-500">
-              Both participants must be assigned before a result can be
-              recorded.
+              {deadlineManaged &&
+              (match.playerOneRegistrationId || match.playerTwoRegistrationId)
+                ? "Waiting for opponent — your deadline has not started."
+                : "Both participants must be assigned before a result can be recorded."}
+            </p>
+          )}
+          {deadlineManaged &&
+            hasParticipants &&
+            holdActive && (
+              <p className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
+                This match is on an administrative hold. Result submission and
+                deadline enforcement resume after the hold is released.
+              </p>
+            )}
+          {deadlineManaged &&
+            canSubmit &&
+            hasParticipants &&
+            match.status === "scheduled" && (
+              <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-400">
+                This matchup has not activated. Result and no-show controls
+                become available only after the division launches and both
+                official participants are ready.
+              </p>
+            )}
+          {deadlineManaged &&
+            isAdmin &&
+            hasParticipants &&
+            match.status === "scheduled" && (
+              <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-400">
+                This matchup is waiting for authoritative activation. No direct
+                result action is available yet.
+              </p>
+            )}
+          {deadlineManaged &&
+            canSubmit &&
+            match.status === "in_progress" &&
+            !holdActive &&
+            !deadlineOpen && (
+              <p className="rounded-xl border border-red-400/20 bg-red-500/5 p-4 text-xs leading-5 text-red-100/80">
+                The effective deadline has passed. New player reports are
+                closed while the authoritative deadline ruling is processed.
+              </p>
+            )}
+          {canSubmit && match.status === "completed" && match.outcomeType && (
+            <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-300">
+              {formatTerminalOutcome(match)}
             </p>
           )}
     </div>
@@ -219,17 +303,7 @@ export default function MatchResultControls({
         }`}
       >
         <span>
-          {isAdmin
-            ? activeReportGroup
-              ? "Confirmation Review Required"
-              : pendingSubmission
-                ? "Result Review Required"
-                : "Result Controls"
-            : activeReportGroup
-              ? "Result Pending Confirmation"
-              : pendingSubmission
-                ? "Result Pending Review"
-                : "Submit Match Result"}
+          {isAdmin ? adminControlLabel : playerControlLabel}
         </span>
         <span className="text-slate-500">{expanded ? "Hide" : "Open"}</span>
       </button>
@@ -239,6 +313,103 @@ export default function MatchResultControls({
       )}
     </div>
   );
+}
+
+function getPlayerControlLabel({
+  match,
+  deadlineManaged,
+  hasParticipants,
+  holdActive,
+  deadlineOpen,
+  hasActiveReportGroup,
+  hasPendingSubmission,
+}: {
+  match: GeneratedTournamentMatch;
+  deadlineManaged: boolean;
+  hasParticipants: boolean;
+  holdActive: boolean;
+  deadlineOpen: boolean;
+  hasActiveReportGroup: boolean;
+  hasPendingSubmission: boolean;
+}) {
+  if (!deadlineManaged) {
+    if (hasActiveReportGroup) return "Result Pending Confirmation";
+    if (hasPendingSubmission) return "Result Pending Review";
+    return "Submit Match Result";
+  }
+
+  if (match.outcomeType === "deadline_double_forfeit") {
+    return "Double Forfeit Ruling";
+  }
+  if (match.outcomeType === "automatic_bye") {
+    return "Automatic Advancement";
+  }
+  if (match.outcomeType === "empty_feeder") {
+    return "No Eligible Player Advanced";
+  }
+  if (match.status === "completed") return "Match Completed";
+  if (match.status === "scheduled") {
+    return hasParticipants ? "Match Not Active" : "Waiting for Opponent";
+  }
+  if (holdActive) return "Match Deadline Paused";
+  if (match.status === "in_progress" && !deadlineOpen) {
+    return match.deadlineAt ? "Deadline Passed" : "Match Not Active";
+  }
+  if (match.status === "pending_review" || hasPendingSubmission) {
+    return "Result Pending Review";
+  }
+  if (hasActiveReportGroup) return "Result Pending Confirmation";
+  return "Submit Match Result";
+}
+
+function getAdminControlLabel({
+  match,
+  deadlineManaged,
+  hasParticipants,
+  holdActive,
+  hasActiveReportGroup,
+  hasPendingSubmission,
+}: {
+  match: GeneratedTournamentMatch;
+  deadlineManaged: boolean;
+  hasParticipants: boolean;
+  holdActive: boolean;
+  hasActiveReportGroup: boolean;
+  hasPendingSubmission: boolean;
+}) {
+  if (!deadlineManaged) {
+    if (hasActiveReportGroup) return "Confirmation Review Required";
+    if (hasPendingSubmission) return "Result Review Required";
+    return "Result Controls";
+  }
+
+  if (match.outcomeType === "deadline_double_forfeit") {
+    return "Double Forfeit Ruling";
+  }
+  if (match.outcomeType === "automatic_bye") {
+    return "Automatic Advancement";
+  }
+  if (match.outcomeType === "empty_feeder") return "Empty Feeder Outcome";
+  if (match.status === "completed") return "Match Completed";
+  if (match.status === "scheduled") {
+    return hasParticipants ? "Match Not Active" : "Waiting for Participants";
+  }
+  if (holdActive) return "Match Deadline Paused";
+  if (hasActiveReportGroup) return "Confirmation Review Required";
+  if (match.status === "pending_review" || hasPendingSubmission) {
+    return "Result Review Required";
+  }
+  return "Result Controls";
+}
+
+function formatTerminalOutcome(match: GeneratedTournamentMatch) {
+  if (match.outcomeType === "deadline_double_forfeit") {
+    return "The deadline ruling eliminated both players. No result may be submitted.";
+  }
+  if (match.outcomeType === "automatic_bye") {
+    return "The sole eligible player advanced automatically. No match was played and no result is required.";
+  }
+  return "This feeder closed without an eligible participant. No result may be submitted.";
 }
 
 export function ResultEntryForm({
@@ -364,8 +535,9 @@ export function AdminResetMatchForm({
         </p>
         <p className="mt-2 text-[11px] leading-5 text-slate-400">
           Resets pending review state when safe. Replay and proof records are
-          preserved for audit. Completed or downstream-dependent matches are
-          blocked server-side.
+          preserved for audit. Completed results and untouched derived outcomes
+          are unwound only while downstream play remains safe; extension and
+          hold usage stay consumed.
         </p>
       </div>
 
