@@ -2146,7 +2146,7 @@ function MatchStatus({ status }: { status: Match["status"] }) {
   );
 }
 
-function MatchDeadlinePresentation({
+export function MatchDeadlinePresentation({
   match,
   compact = false,
 }: {
@@ -2262,8 +2262,8 @@ function timestampFallsInActivation(
 }
 
 function formatDoubleForfeitLabel(roundName: string) {
-  const normalized = roundName.toLowerCase();
-  if (normalized.includes("final") && !normalized.includes("semi")) {
+  const normalized = roundName.trim().toLowerCase();
+  if (normalized === "final" || normalized === "grand final") {
     return "Final double forfeit — division completed without a champion";
   }
   if (normalized.includes("semi")) {
@@ -2273,8 +2273,8 @@ function formatDoubleForfeitLabel(roundName: string) {
 }
 
 function formatAutomaticAdvanceLabel(roundName: string) {
-  const normalized = roundName.toLowerCase();
-  if (normalized.includes("final") && !normalized.includes("semi")) {
+  const normalized = roundName.trim().toLowerCase();
+  if (normalized === "final" || normalized === "grand final") {
     return "Final walkover — champion advanced without a played match";
   }
   if (normalized.includes("semi")) {
@@ -2284,8 +2284,8 @@ function formatAutomaticAdvanceLabel(roundName: string) {
 }
 
 function formatEmptyFeederLabel(roundName: string) {
-  const normalized = roundName.toLowerCase();
-  if (normalized.includes("final") && !normalized.includes("semi")) {
+  const normalized = roundName.trim().toLowerCase();
+  if (normalized === "final" || normalized === "grand final") {
     return "Final closed — division completed without a champion";
   }
   if (normalized.includes("semi")) {

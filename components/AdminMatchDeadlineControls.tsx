@@ -254,21 +254,22 @@ function ActionMessage({ state }: { state: MatchDeadlineActionState }) {
 }
 
 function formatDeadlineState(match: GeneratedTournamentMatch) {
+  const normalizedRoundName = match.roundName.trim().toLowerCase();
+  const isFinal =
+    normalizedRoundName === "final" || normalizedRoundName === "grand final";
+
   if (match.outcomeType === "deadline_double_forfeit") {
-    return match.roundName.toLowerCase().includes("final") &&
-      !match.roundName.toLowerCase().includes("semi")
+    return isFinal
       ? "Final double forfeit — completed without a champion"
       : `${match.roundName} double forfeit — no player advanced`;
   }
   if (match.outcomeType === "automatic_bye") {
-    return match.roundName.toLowerCase().includes("final") &&
-      !match.roundName.toLowerCase().includes("semi")
+    return isFinal
       ? "Final walkover — champion advanced without a played match"
       : `${match.roundName} automatic bye — no match was played`;
   }
   if (match.outcomeType === "empty_feeder") {
-    return match.roundName.toLowerCase().includes("final") &&
-      !match.roundName.toLowerCase().includes("semi")
+    return isFinal
       ? "Final closed — completed without a champion"
       : `${match.roundName} closed — no eligible player advanced`;
   }

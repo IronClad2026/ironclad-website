@@ -32,6 +32,7 @@ vi.mock("@/components/PlayerMatchResultForm", () => ({
 
 import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
 import MatchResultControls from "@/components/MatchResultControls";
+import { MatchDeadlinePresentation } from "@/components/TournamentsExperience";
 
 afterEach(() => cleanup());
 
@@ -131,31 +132,130 @@ describe("matchup deadline player and administrator presentation", () => {
 
   it.each([
     [
+      "Quarter Finals",
       "deadline_double_forfeit",
-      "Final double forfeit — completed without a champion",
+      "Quarter Finals double forfeit — no player advanced",
+      "Quarterfinal double forfeit — no player advances from this feeder",
+      /^Final double forfeit/,
     ],
     [
+      "Semi Finals",
+      "deadline_double_forfeit",
+      "Semi Finals double forfeit — no player advanced",
+      "Semifinal double forfeit — no player advances from this matchup",
+      /^Final double forfeit/,
+    ],
+    [
+      "Final",
+      "deadline_double_forfeit",
+      "Final double forfeit — completed without a champion",
+      "Final double forfeit — division completed without a champion",
+      null,
+    ],
+    [
+      "Grand Final",
+      "deadline_double_forfeit",
+      "Final double forfeit — completed without a champion",
+      "Final double forfeit — division completed without a champion",
+      null,
+    ],
+    [
+      "Quarter Finals",
+      "automatic_bye",
+      "Quarter Finals automatic bye — no match was played",
+      "Automatic bye — sole eligible player advances without a played match",
+      /^Final walkover/,
+    ],
+    [
+      "Semi Finals",
+      "automatic_bye",
+      "Semi Finals automatic bye — no match was played",
+      "Semifinal automatic bye — sole eligible player advances to the Final",
+      /^Final walkover/,
+    ],
+    [
+      "Final",
       "automatic_bye",
       "Final walkover — champion advanced without a played match",
+      "Final walkover — champion advanced without a played match",
+      null,
     ],
-    ["empty_feeder", "Final closed — completed without a champion"],
-  ] as const)("presents the %s terminal outcome", (outcomeType, label) => {
-    render(
-      <AdminMatchDeadlineControls
-        match={matchFixture({
-          status: "completed",
-          outcomeType,
-          roundName: "Final",
-          roundNumber: 3,
-        })}
-      />
-    );
+    [
+      "Grand Final",
+      "automatic_bye",
+      "Final walkover — champion advanced without a played match",
+      "Final walkover — champion advanced without a played match",
+      null,
+    ],
+    [
+      "Quarter Finals",
+      "empty_feeder",
+      "Quarter Finals closed — no eligible player advanced",
+      "Match closed — no eligible player advances",
+      /^Final closed/,
+    ],
+    [
+      "Semi Finals",
+      "empty_feeder",
+      "Semi Finals closed — no eligible player advanced",
+      "Semifinal closed — no eligible player advances",
+      /^Final closed/,
+    ],
+    [
+      "Final",
+      "empty_feeder",
+      "Final closed — completed without a champion",
+      "Final closed — division completed without a champion",
+      null,
+    ],
+    [
+      "Grand Final",
+      "empty_feeder",
+      "Final closed — completed without a champion",
+      "Final closed — division completed without a champion",
+      null,
+    ],
+  ] as const)(
+    "classifies the %s %s outcome on both presentation surfaces",
+    (
+      roundName,
+      outcomeType,
+      adminLabel,
+      publicLabel,
+      forbiddenFinalLabel
+    ) => {
+      const adminView = render(
+        <AdminMatchDeadlineControls
+          match={matchFixture({ status: "completed", outcomeType, roundName })}
+        />
+      );
 
-    expect(screen.getByText(label)).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Apply One-Time Extension" })
-    ).not.toBeInTheDocument();
-  });
+      expect(screen.getByText(adminLabel)).toBeInTheDocument();
+      if (forbiddenFinalLabel) {
+        expect(screen.queryByText(forbiddenFinalLabel)).not.toBeInTheDocument();
+      }
+      adminView.unmount();
+
+      render(
+        <MatchDeadlinePresentation
+          match={matchFixture({ status: "completed", outcomeType, roundName })}
+        />
+      );
+
+      expect(screen.getByText(publicLabel)).toBeInTheDocument();
+      if (forbiddenFinalLabel) {
+        expect(screen.queryByText(forbiddenFinalLabel)).not.toBeInTheDocument();
+      }
+      if (
+        outcomeType === "deadline_double_forfeit" &&
+        forbiddenFinalLabel
+      ) {
+        expect(
+          screen.queryByText(/division completed without a champion/)
+        ).not.toBeInTheDocument();
+      }
+    }
+  );
 
   it("tells an early downstream player that no deadline has started", () => {
     render(
@@ -262,7 +362,7 @@ describe("matchup deadline player and administrator presentation", () => {
     expect(screen.getByText(/This matchup has not activated/)).toBeInTheDocument();
   });
 
-  it("keeps direct match focus and all deadline outcome labels in the existing bracket surface", () => {
+  it("keeps direct match focus and aggregate outcome handling in the existing bracket surface", () => {
     const source = readFileSync(
       resolve(process.cwd(), "components/TournamentsExperience.tsx"),
       "utf8"
@@ -275,18 +375,6 @@ describe("matchup deadline player and administrator presentation", () => {
       "Waiting for opponent — your deadline has not started"
     );
     expect(source).toContain("Deadline passed — awaiting authoritative ruling");
-    expect(source).toContain(
-      "Quarterfinal double forfeit — no player advances from this feeder"
-    );
-    expect(source).toContain(
-      "Semifinal automatic bye — sole eligible player advances to the Final"
-    );
-    expect(source).toContain(
-      "Final walkover — champion advanced without a played match"
-    );
-    expect(source).toContain(
-      "Final closed — division completed without a champion"
-    );
     expect(source).toContain("No champion was awarded");
     expect(source).toContain(
       '["deadline_double_forfeit", "empty_feeder"].includes'
