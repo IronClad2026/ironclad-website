@@ -52,7 +52,9 @@ describe("notification browser privacy boundary", () => {
       registration_id: "registration-1",
       match_id: "match-1",
       report_group_id: "report-group-1",
+      event_key: "match:match-1:activation:1:reminder:1",
       metadata: {
+        deadlineAt: "2026-08-01T12:00:00.000Z",
         actor_clerk_user_id: actorClerkUserId,
         proofPath:
           "match-1/user_synthetic_notification_actor/private.rec",
@@ -75,7 +77,7 @@ describe("notification browser privacy boundary", () => {
 
     expect(projectionSelect).not.toContain("recipient_clerk_user_id");
     expect(projectionSelect).not.toContain("actor_clerk_user_id");
-    expect(projectionSelect).not.toContain("metadata");
+    expect(projectionSelect).toContain("metadata");
     expect(result.notifications).toHaveLength(1);
     expect(Object.keys(result.notifications[0])).not.toContain(
       "recipientClerkUserId"
@@ -84,6 +86,10 @@ describe("notification browser privacy boundary", () => {
       "actorClerkUserId"
     );
     expect(Object.keys(result.notifications[0])).not.toContain("metadata");
+    expect(Object.keys(result.notifications[0])).not.toContain("eventKey");
+    expect(result.notifications[0].deadlineAt).toBe(
+      "2026-08-01T12:00:00.000Z"
+    );
     expect(payload).not.toContain(recipientClerkUserId);
     expect(payload).not.toContain(actorClerkUserId);
   });
@@ -102,6 +108,8 @@ describe("notification browser privacy boundary", () => {
       registration_id: registrationId,
       match_id: null,
       report_group_id: null,
+      event_key: "registration:offer:1",
+      metadata: {},
       read_at: null,
       created_at: "2026-08-06T03:00:00.000Z",
     });
@@ -111,6 +119,44 @@ describe("notification browser privacy boundary", () => {
 
     expect(result.notifications[0]?.href).toBe(
       `/dashboard#registration-${registrationId}`
+    );
+  });
+
+  it("routes a deadline event to the exact tournament bracket match", async () => {
+    const tournamentId = "22222222-2222-4222-8222-222222222222";
+    const matchId = "33333333-3333-4333-8333-333333333333";
+    const notificationQuery = createNotificationProjectionClient({
+      id: "notification-deadline-1",
+      recipient_role: "player",
+      type: "match.deadline_reminder",
+      title: "Match Deadline Reminder",
+      message: "Your matchup deadline is approaching.",
+      actor_display_name: null,
+      tournament_id: tournamentId,
+      tournament_title: "Synthetic Tournament",
+      registration_id: null,
+      match_id: matchId,
+      report_group_id: null,
+      event_key: `match:${matchId}:activation:1:reminder:1`,
+      metadata: {
+        reminderOrdinal: 1,
+        deadlineAt: "2026-08-01T12:00:00.000Z",
+        privateReason: "must not project",
+      },
+      read_at: null,
+      created_at: "2026-07-29T12:00:00.000Z",
+    });
+    createSupabaseAdminClientMock.mockReturnValue(notificationQuery.client);
+
+    const result = await loadPlayerNotifications(recipientClerkUserId);
+
+    expect(result.notifications[0]).toMatchObject({
+      matchId,
+      deadlineAt: "2026-08-01T12:00:00.000Z",
+      href: `/tournaments?tournament=${tournamentId}&tab=brackets&match=${matchId}`,
+    });
+    expect(JSON.stringify(result.notifications[0])).not.toContain(
+      "privateReason"
     );
   });
 

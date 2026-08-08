@@ -294,7 +294,8 @@ export default function InAppNotificationCenter({
 
     if (
       isPlayerMatchConfirmationNotification(notification) ||
-      isPlayerWaitlistOfferNotification(notification)
+      isPlayerWaitlistOfferNotification(notification) ||
+      notification.type.startsWith("match.")
     ) {
       startTransition(async () => {
         if (notification.readAt === null) {
@@ -790,6 +791,11 @@ function AdminNotificationDetail({
         <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-zinc-300">
           {notification.message}
         </p>
+        {notification.deadlineAt && (
+          <p className="mt-4 rounded-xl border border-orange-400/20 bg-orange-500/10 px-4 py-3 text-xs font-bold text-orange-100">
+            Match deadline: {formatFullTimestamp(notification.deadlineAt)}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -827,10 +833,10 @@ function AdminNotificationDetail({
             onClick={() => onOpenContext(notification.href as string)}
             className="rounded-xl bg-orange-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400"
           >
-            {notification.registrationId
-              ? "Open Registration"
-              : notification.matchId || notification.reportGroupId
-                ? "Open Match"
+            {notification.matchId || notification.reportGroupId
+              ? "Open Match"
+              : notification.registrationId
+                ? "Open Registration"
                 : "Open Context"}
           </button>
         )}
@@ -892,6 +898,11 @@ function PlayerNotificationItem({
         <span className="mt-1 block text-sm leading-5 text-zinc-300">
           {notification.message}
         </span>
+        {notification.deadlineAt && (
+          <span className="mt-2 block text-xs font-bold text-orange-200">
+            Deadline: {formatFullTimestamp(notification.deadlineAt)}
+          </span>
+        )}
         <span className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
           <Clock3 className="h-3.5 w-3.5" />
           {formatTimestamp(notification.createdAt)}
@@ -1017,6 +1028,17 @@ function NotificationIcon({ type }: { type: string }) {
 
   if (type.includes("match.dispute") || type.includes("match.no_show")) {
     return <MessageSquareWarning className={className} />;
+  }
+
+  if (
+    type === "match.deadline_ruling" ||
+    type === "match.deadline_updated"
+  ) {
+    return <Clock3 className={className} />;
+  }
+
+  if (type === "match.ready" || type === "match.automatic_advance") {
+    return <Trophy className={className} />;
   }
 
   return <Bell className={className} />;

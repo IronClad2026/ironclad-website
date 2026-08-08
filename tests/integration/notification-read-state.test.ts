@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  deleteNotifications,
   markAllNotificationsRead,
   markNotificationRead,
   markNotificationsRead,
@@ -102,5 +103,51 @@ describe("notification read-state filtering", () => {
         clerkUserId: "user_player_a",
       })
     ).resolves.toBe(false);
+  });
+
+  it("soft-hides canonical events while physically deleting only legacy rows", async () => {
+    const supabase = createSupabaseQueryMock();
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    await expect(
+      deleteNotifications({
+        notificationIds: ["canonical-or-legacy-notification"],
+        scope: "player",
+        clerkUserId: "user_player_a",
+      })
+    ).resolves.toBe(true);
+
+    expect(supabase.from).toHaveBeenCalledTimes(2);
+    expect(supabase.calls).toEqual(
+      expect.arrayContaining([
+        {
+          method: "update",
+          args: [{ in_app_hidden_at: expect.any(String) }],
+        },
+        { method: "not", args: ["event_key", "is", null] },
+        { method: "delete", args: [] },
+        { method: "is", args: ["event_key", null] },
+      ])
+    );
+    expect(
+      supabase.calls.filter(
+        (call) =>
+          call.method === "eq" &&
+          call.args[0] === "recipient_clerk_user_id" &&
+          call.args[1] === "user_player_a"
+      )
+    ).toHaveLength(2);
+  });
+
+  it("never recreates a broad delete when there are no selected rows", async () => {
+    await expect(
+      deleteNotifications({
+        notificationIds: [],
+        scope: "player",
+        clerkUserId: "user_player_a",
+      })
+    ).resolves.toBe(true);
+
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 });

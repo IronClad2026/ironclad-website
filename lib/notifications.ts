@@ -16,6 +16,7 @@ export type InAppNotification = {
   registrationId: string | null;
   matchId: string | null;
   reportGroupId: string | null;
+  deadlineAt: string | null;
   readAt: string | null;
   createdAt: string;
   href: string | null;
@@ -41,6 +42,7 @@ export type NotificationCreateInput = {
   registrationId?: string | null;
   matchId?: string | null;
   reportGroupId?: string | null;
+  eventKey?: string | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -56,12 +58,14 @@ type NotificationRow = {
   registration_id: string | null;
   match_id: string | null;
   report_group_id: string | null;
+  event_key: string | null;
+  metadata: Record<string, unknown> | null;
   read_at: string | null;
   created_at: string;
 };
 
 const NOTIFICATION_SELECT =
-  "id, recipient_role, type, title, message, actor_display_name, tournament_id, tournament_title, registration_id, match_id, report_group_id, read_at, created_at";
+  "id, recipient_role, type, title, message, actor_display_name, tournament_id, tournament_title, registration_id, match_id, report_group_id, event_key, metadata, read_at, created_at";
 
 export async function createInAppNotification(
   input: NotificationCreateInput
@@ -87,6 +91,7 @@ export async function createInAppNotification(
     registration_id: input.registrationId ?? null,
     match_id: input.matchId ?? null,
     report_group_id: input.reportGroupId ?? null,
+    event_key: input.eventKey ?? null,
     metadata: input.metadata ?? {},
   });
 
@@ -115,6 +120,7 @@ export async function createInAppNotifications(
       registration_id: input.registrationId ?? null,
       match_id: input.matchId ?? null,
       report_group_id: input.reportGroupId ?? null,
+      event_key: input.eventKey ?? null,
       metadata: input.metadata ?? {},
     }))
     .filter(
@@ -146,16 +152,19 @@ export async function loadPlayerNotifications(
       .from("notifications")
       .select(NOTIFICATION_SELECT)
       .eq("recipient_clerk_user_id", clerkUserId)
+      .is("in_app_hidden_at", null)
       .order("created_at", { ascending: false })
       .limit(limit),
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
-      .eq("recipient_clerk_user_id", clerkUserId),
+      .eq("recipient_clerk_user_id", clerkUserId)
+      .is("in_app_hidden_at", null),
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("recipient_clerk_user_id", clerkUserId)
+      .is("in_app_hidden_at", null)
       .is("read_at", null),
   ]);
 
@@ -191,16 +200,19 @@ export async function loadAdminNotifications(
       .from("notifications")
       .select(NOTIFICATION_SELECT)
       .eq("recipient_role", "admin")
+      .is("in_app_hidden_at", null)
       .order("created_at", { ascending: false })
       .limit(limit),
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
-      .eq("recipient_role", "admin"),
+      .eq("recipient_role", "admin")
+      .is("in_app_hidden_at", null),
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("recipient_role", "admin")
+      .is("in_app_hidden_at", null)
       .is("read_at", null),
   ]);
 
@@ -342,18 +354,32 @@ export async function deleteNotifications({
   }
 
   const supabase = createSupabaseAdminClient();
-  const query = supabase.from("notifications").delete().in("id", ids);
+  const hiddenAt = new Date().toISOString();
+  const canonicalQuery = supabase
+    .from("notifications")
+    .update({ in_app_hidden_at: hiddenAt })
+    .in("id", ids)
+    .not("event_key", "is", null);
+
+  const legacyQuery = supabase
+    .from("notifications")
+    .delete()
+    .in("id", ids)
+    .is("event_key", null);
 
   if (scope === "admin") {
-    query.eq("recipient_role", "admin");
+    canonicalQuery.eq("recipient_role", "admin");
+    legacyQuery.eq("recipient_role", "admin");
   } else {
-    query.eq("recipient_clerk_user_id", clerkUserId ?? "");
+    canonicalQuery.eq("recipient_clerk_user_id", clerkUserId ?? "");
+    legacyQuery.eq("recipient_clerk_user_id", clerkUserId ?? "");
   }
 
-  const { error } = await query;
+  const [{ error: canonicalError }, { error: legacyError }] =
+    await Promise.all([canonicalQuery, legacyQuery]);
 
-  if (error) {
-    logNotificationFailure("delete", error);
+  if (canonicalError || legacyError) {
+    logNotificationFailure("delete", canonicalError ?? legacyError);
     return false;
   }
 
@@ -376,6 +402,7 @@ function mapNotification(
     registrationId: row.registration_id,
     matchId: row.match_id,
     reportGroupId: row.report_group_id,
+    deadlineAt: getPublicDeadlineAt(row.type, row.metadata),
     readAt: row.read_at,
     createdAt: row.created_at,
     href: buildNotificationHref(row, scope),
@@ -402,14 +429,20 @@ function buildNotificationHref(
   scope: NotificationScope
 ): string | null {
   if (scope === "admin") {
+    if (row.match_id) {
+      return buildMatchHref(row);
+    }
+
     if (row.registration_id) {
       return `/admin?filter=all&selected=${encodeURIComponent(
         row.registration_id
       )}`;
     }
 
-    if (row.match_id || row.tournament_id || row.report_group_id) {
-      return "/tournaments";
+    if (row.tournament_id || row.report_group_id) {
+      return row.tournament_id
+        ? `/tournaments?tournament=${encodeURIComponent(row.tournament_id)}`
+        : "/tournaments";
     }
 
     return "/admin";
@@ -423,9 +456,43 @@ function buildNotificationHref(
     return `/dashboard#registration-${encodeURIComponent(row.registration_id)}`;
   }
 
-  if (row.tournament_id || row.match_id || row.report_group_id) {
-    return "/tournaments";
+  if (row.match_id) {
+    return buildMatchHref(row);
+  }
+
+  if (row.tournament_id || row.report_group_id) {
+    return row.tournament_id
+      ? `/tournaments?tournament=${encodeURIComponent(row.tournament_id)}`
+      : "/tournaments";
   }
 
   return "/dashboard";
+}
+
+function buildMatchHref(row: NotificationRow) {
+  const params = new URLSearchParams();
+
+  if (row.tournament_id) {
+    params.set("tournament", row.tournament_id);
+  }
+  params.set("tab", "brackets");
+  params.set("match", row.match_id ?? "");
+
+  return `/tournaments?${params.toString()}`;
+}
+
+function getPublicDeadlineAt(
+  type: string,
+  metadata: Record<string, unknown> | null
+) {
+  if (type === "match.deadline_updated" && metadata?.updateKind === "hold") {
+    return null;
+  }
+
+  const value = metadata?.deadlineAt;
+
+  if (typeof value !== "string") return null;
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? value : null;
 }
