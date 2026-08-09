@@ -1425,7 +1425,7 @@ function BracketMatchResultsWorkspace({
   );
 }
 
-function AdminMatchManagementModal({
+export function AdminMatchManagementModal({
   tournament,
   match,
   bracketFormat,
@@ -1513,7 +1513,7 @@ function AdminMatchManagementModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 12 }}
           transition={{ duration: 0.2 }}
-          className="relative flex max-h-[88vh] w-[94vw] max-w-5xl flex-col overflow-hidden border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-[0_0_90px_rgba(0,0,0,0.68)]"
+          className="relative flex max-h-[88vh] w-full max-w-5xl min-w-0 flex-col overflow-hidden border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-[0_0_90px_rgba(0,0,0,0.68)]"
         >
           <header className="relative shrink-0 border-b border-white/10 px-5 py-5 sm:px-7">
             <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.9)]" />
@@ -1543,9 +1543,15 @@ function AdminMatchManagementModal({
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7">
-            <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-              <div className="border border-white/12 bg-black/45 p-5 shadow-xl shadow-black/20">
+          <div
+            data-admin-match-scrollport
+            className="min-h-0 w-full max-w-full min-w-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7"
+          >
+            <div
+              data-admin-match-overview-grid
+              className="grid w-full max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_320px]"
+            >
+              <div className="min-w-0 max-w-full border border-white/12 bg-black/45 p-5 shadow-xl shadow-black/20">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs font-black uppercase tracking-wider text-zinc-400">
                     Match Snapshot
@@ -1574,7 +1580,7 @@ function AdminMatchManagementModal({
                 </div>
               </div>
 
-              <div className="border border-white/12 bg-black/45 p-5 text-xs leading-5 text-zinc-300 shadow-xl shadow-black/20">
+              <div className="min-w-0 max-w-full border border-white/12 bg-black/45 p-5 text-xs leading-5 text-zinc-300 shadow-xl shadow-black/20">
                 <p className="text-xs font-black uppercase tracking-wider text-zinc-400">
                   Review State
                 </p>
@@ -1641,13 +1647,16 @@ function AdminMatchManagementModal({
             </div>
 
             {deadlineManaged && (
-              <div className="mt-5">
+              <div className="mt-5 w-full max-w-full min-w-0">
                 <AdminMatchDeadlineControls match={match} />
               </div>
             )}
 
-            <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              <div className="border border-white/12 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20">
+            <div
+              data-admin-match-actions-grid
+              className="mt-5 grid w-full max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2"
+            >
+              <div className="min-w-0 max-w-full border border-white/12 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20">
                 {canEnterOfficialResult ? (
                   <ResultEntryForm
                     match={match}
@@ -1674,7 +1683,9 @@ function AdminMatchManagementModal({
                 )}
               </div>
 
-              <AdminResetMatchForm match={match} />
+              <div className="min-w-0 max-w-full">
+                <AdminResetMatchForm match={match} />
+              </div>
             </div>
           </div>
         </motion.section>
@@ -1697,20 +1708,26 @@ function MatchManagementRow({
 }) {
   return (
     <div
+      data-admin-match-player-row
       className={classNames(
-        "flex items-center justify-between gap-4 border px-4 py-3",
+        "flex w-full max-w-full min-w-0 items-center justify-between gap-4 border px-4 py-3",
         winner
           ? "border-white/12 bg-orange-500/10 text-white"
           : "border-white/12 bg-white/[0.03] text-zinc-300"
       )}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
           {label}
         </p>
-        <p className="mt-1 truncate text-sm font-black">{value}</p>
+        <p
+          data-admin-match-player-name
+          className="mt-1 whitespace-normal [overflow-wrap:anywhere] text-sm font-black"
+        >
+          {value}
+        </p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-3">
         {winner && <Crown size={16} className="text-orange-300" />}
         <span className="grid h-9 w-10 place-items-center rounded-lg border border-white/10 bg-black/35 font-mono text-sm font-black text-white">
           {score ?? "-"}

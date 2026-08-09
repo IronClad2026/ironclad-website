@@ -32,7 +32,10 @@ vi.mock("@/components/PlayerMatchResultForm", () => ({
 
 import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
 import MatchResultControls from "@/components/MatchResultControls";
-import { MatchDeadlinePresentation } from "@/components/TournamentsExperience";
+import {
+  AdminMatchManagementModal,
+  MatchDeadlinePresentation,
+} from "@/components/TournamentsExperience";
 
 afterEach(() => cleanup());
 
@@ -90,6 +93,130 @@ function participants(...values: TournamentParticipant[]) {
 }
 
 describe("matchup deadline player and administrator presentation", () => {
+  it("contains the administrator match dialog and wraps long identities on narrow layouts", () => {
+    const longPlayerOne = {
+      ...participantOne,
+      name: "PHASE4_TEST_PLAYER_WITH_A_DELIBERATELY_LONG_UNBROKEN_IDENTITY_0001",
+    };
+    const longPlayerTwo = {
+      ...participantTwo,
+      name: "Another deliberately long administrator-visible player identity",
+    };
+    type ModalProps = Parameters<typeof AdminMatchManagementModal>[0];
+
+    render(
+      <AdminMatchManagementModal
+        tournament={
+          {
+            title: "Responsive Match Management Validation",
+          } as ModalProps["tournament"]
+        }
+        match={matchFixture()}
+        bracketFormat="single_elimination"
+        participantsById={participants(longPlayerOne, longPlayerTwo)}
+        viewer={
+          {
+            isAdmin: true,
+            relicVerifiedDivision: null,
+            registrationIds: [],
+            registrations: [],
+          } as ModalProps["viewer"]
+        }
+        submissions={[]}
+        reportGroups={[]}
+        onClose={vi.fn()}
+      />
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveClass("w-full", "max-w-5xl", "min-w-0");
+    expect(dialog).not.toHaveClass("w-[94vw]");
+
+    const scrollport = dialog.querySelector("[data-admin-match-scrollport]");
+    const overviewGrid = dialog.querySelector(
+      "[data-admin-match-overview-grid]"
+    );
+    const actionsGrid = dialog.querySelector("[data-admin-match-actions-grid]");
+
+    expect(scrollport).toHaveClass("w-full", "max-w-full", "min-w-0");
+    expect(scrollport).not.toHaveClass("overflow-x-auto", "overflow-x-hidden");
+    expect(overviewGrid).toHaveClass(
+      "w-full",
+      "max-w-full",
+      "min-w-0",
+      "grid-cols-[minmax(0,1fr)]",
+      "lg:grid-cols-[minmax(0,1fr)_320px]"
+    );
+    expect(actionsGrid).toHaveClass(
+      "w-full",
+      "max-w-full",
+      "min-w-0",
+      "grid-cols-[minmax(0,1fr)]",
+      "lg:grid-cols-2"
+    );
+
+    const playerRows = dialog.querySelectorAll("[data-admin-match-player-row]");
+    expect(playerRows).toHaveLength(2);
+    [longPlayerOne.name, longPlayerTwo.name].forEach((name, index) => {
+      const playerName = playerRows[index].querySelector(
+        "[data-admin-match-player-name]"
+      );
+      expect(playerRows[index]).toHaveClass(
+        "w-full",
+        "max-w-full",
+        "min-w-0"
+      );
+      expect(playerName).toHaveTextContent(name);
+      expect(playerName).toHaveClass(
+        "whitespace-normal",
+        "[overflow-wrap:anywhere]"
+      );
+      expect(playerName).not.toHaveClass("truncate", "whitespace-nowrap");
+    });
+
+    const deadlineSection = screen.getByText("Match Deadline").closest("section");
+    expect(deadlineSection?.parentElement).toHaveClass(
+      "w-full",
+      "max-w-full",
+      "min-w-0"
+    );
+    expect(screen.getByLabelText("Extension minutes")).toHaveClass(
+      "min-h-11",
+      "w-full"
+    );
+    expect(screen.getByLabelText("Administrator reason")).toHaveClass(
+      "min-h-11",
+      "w-full"
+    );
+    expect(screen.getByLabelText("Exceptional hold reason")).toHaveClass(
+      "min-h-11",
+      "w-full"
+    );
+    expect(
+      screen.getByRole("button", { name: "Apply One-Time Extension" })
+    ).toHaveClass("min-h-11", "w-full", "sm:w-auto");
+    expect(
+      screen.getByRole("button", { name: "Place Match On Hold" })
+    ).toHaveClass("min-h-11", "w-full", "sm:w-auto");
+
+    expect(dialog.querySelector('input[name="playerOneScore"]')).toHaveClass(
+      "w-full"
+    );
+    expect(dialog.querySelector('input[name="playerTwoScore"]')).toHaveClass(
+      "w-full"
+    );
+    expect(
+      dialog.querySelector('select[name="winnerRegistrationId"]')
+    ).toHaveClass("w-full");
+    expect(
+      screen.getByRole("button", { name: "Complete Match & Advance Winner" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset Match" })).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Close match management" })
+    ).toHaveLength(2);
+  });
+
   it("shows one-time responsive extension and hold controls only for an active match", () => {
     render(<AdminMatchDeadlineControls match={matchFixture()} />);
 
