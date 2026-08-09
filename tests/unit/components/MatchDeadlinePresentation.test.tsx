@@ -199,15 +199,56 @@ describe("matchup deadline player and administrator presentation", () => {
       screen.getByRole("button", { name: "Place Match On Hold" })
     ).toHaveClass("min-h-11", "w-full", "sm:w-auto");
 
-    expect(dialog.querySelector('input[name="playerOneScore"]')).toHaveClass(
-      "w-full"
+    const officialResultForm = screen
+      .getByText("Official Result Entry")
+      .closest("form") as HTMLFormElement;
+    expect(officialResultForm).toBeInTheDocument();
+
+    const scoreInputs = [
+      officialResultForm.querySelector<HTMLInputElement>(
+        'input[name="playerOneScore"]'
+      ),
+      officialResultForm.querySelector<HTMLInputElement>(
+        'input[name="playerTwoScore"]'
+      ),
+    ];
+    [longPlayerOne.name, longPlayerTwo.name].forEach((name, index) => {
+      const scoreInput = scoreInputs[index] as HTMLInputElement;
+      const playerLabel = scoreInput.closest("label");
+      const playerName = playerLabel?.querySelector("span");
+
+      expect(playerLabel?.parentElement).toHaveClass(
+        "grid",
+        "grid-cols-[1fr_90px]"
+      );
+      expect(playerLabel).toHaveClass("min-w-0");
+      expect(playerName).toHaveTextContent(name);
+      expect(playerName).toHaveClass(
+        "whitespace-normal",
+        "[overflow-wrap:anywhere]"
+      );
+      expect(playerName).not.toHaveClass("truncate", "whitespace-nowrap");
+      expect(scoreInput).toHaveClass("w-full");
+      expect(scoreInput).toBeEnabled();
+
+      fireEvent.change(scoreInput, {
+        target: { value: index === 0 ? "2" : "1" },
+      });
+      expect(scoreInput).toHaveValue(index === 0 ? 2 : 1);
+    });
+
+    const winnerSelect = officialResultForm.querySelector<HTMLSelectElement>(
+      'select[name="winnerRegistrationId"]'
+    ) as HTMLSelectElement;
+    expect(winnerSelect).toHaveClass("w-full");
+    expect(winnerSelect).toBeEnabled();
+    expect(Array.from(winnerSelect.options).map((option) => option.text)).toEqual(
+      ["Select winner", longPlayerOne.name, longPlayerTwo.name]
     );
-    expect(dialog.querySelector('input[name="playerTwoScore"]')).toHaveClass(
-      "w-full"
-    );
-    expect(
-      dialog.querySelector('select[name="winnerRegistrationId"]')
-    ).toHaveClass("w-full");
+    fireEvent.change(winnerSelect, {
+      target: { value: longPlayerOne.registrationId },
+    });
+    expect(winnerSelect).toHaveValue(longPlayerOne.registrationId);
     expect(
       screen.getByRole("button", { name: "Complete Match & Advance Winner" })
     ).toBeInTheDocument();

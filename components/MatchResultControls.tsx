@@ -441,7 +441,7 @@ export function ResultEntryForm({
 
       <div className="grid grid-cols-[1fr_90px] gap-3">
         <label className="min-w-0">
-          <span className="block truncate text-xs font-bold text-slate-300">
+          <span className="block whitespace-normal [overflow-wrap:anywhere] text-xs font-bold text-slate-300">
             {playerOneName}
           </span>
           <input
@@ -461,7 +461,7 @@ export function ResultEntryForm({
 
       <div className="grid grid-cols-[1fr_90px] gap-3">
         <label className="min-w-0">
-          <span className="block truncate text-xs font-bold text-slate-300">
+          <span className="block whitespace-normal [overflow-wrap:anywhere] text-xs font-bold text-slate-300">
             {playerTwoName}
           </span>
           <input
