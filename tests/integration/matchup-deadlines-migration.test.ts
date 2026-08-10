@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -10,6 +10,66 @@ const migration = readFileSync(
   "utf8"
 );
 const compactMigration = migration.toLowerCase().replace(/\s+/g, " ").trim();
+const hardeningMigrationName =
+  "20260810100000_harden_matchup_core_search_paths.sql";
+const hardeningMigration = readFileSync(
+  resolve(process.cwd(), "supabase/migrations", hardeningMigrationName),
+  "utf8"
+);
+const compactHardeningMigration = hardeningMigration
+  .toLowerCase()
+  .replace(/\s+/g, " ")
+  .trim();
+
+function canonicalizeFunctionIdentities(sql: string) {
+  return sql
+    .replace(/\(\s+/g, "(")
+    .replace(/\s+\)/g, ")")
+    .replace(/,\s*/g, ",");
+}
+
+const canonicalMigration = canonicalizeFunctionIdentities(compactMigration);
+const canonicalHardeningMigration = canonicalizeFunctionIdentities(
+  compactHardeningMigration
+);
+
+const hardenedCoreFunctions = [
+  {
+    coreName: "create_match_result_report_group_without_matchup_deadline",
+    wrapperName: "create_match_result_report_group",
+    signature: "uuid, text, uuid, integer, integer, uuid[], text",
+  },
+  {
+    coreName: "submit_match_no_show_report_without_matchup_deadline",
+    wrapperName: "submit_match_no_show_report",
+    signature: "uuid, text, uuid, text",
+  },
+  {
+    coreName: "admin_finalize_match_result_report_group_core",
+    wrapperName: "admin_finalize_match_result_report_group",
+    signature: "uuid, text, text, text, integer, integer, uuid",
+  },
+  {
+    coreName: "review_match_series_result_without_deadline_restore",
+    wrapperName: "review_match_series_result",
+    signature: "uuid, text, text, text",
+  },
+  {
+    coreName: "admin_reset_tournament_match_without_deadline_outcomes",
+    wrapperName: "admin_reset_tournament_match",
+    signature: "uuid, text",
+  },
+  {
+    coreName: "recalculate_leaderboard_for_season_without_outcome_filtering",
+    wrapperName: "recalculate_leaderboard_for_season",
+    signature: "uuid, text",
+  },
+  {
+    coreName: "recalculate_leaderboard_for_tournament_without_matchup_outcomes",
+    wrapperName: "recalculate_leaderboard_for_tournament",
+    signature: "uuid, text",
+  },
+] as const;
 
 function extractFunction(functionName: string) {
   const marker = `create or replace function public.${functionName}(`;
@@ -365,5 +425,87 @@ describe("matchup deadlines and no-winner progression migration", () => {
     expect(compactMigration).not.toContain(
       "grant select ( id, player_one_registration_id, player_two_registration_id, activation_version"
     );
+  });
+});
+
+describe("matchup internal core search-path hardening migration", () => {
+  it.each(hardenedCoreFunctions)(
+    "hardens $coreName without changing its callable contract",
+    ({ coreName, wrapperName, signature }) => {
+      const canonicalSignature = signature.replaceAll(" ", "");
+      const internalIdentity = `public.${coreName}(${canonicalSignature})`;
+      const wrapperIdentity = `public.${wrapperName}(${canonicalSignature})`;
+      const baseRename =
+        `alter function ${wrapperIdentity} rename to ${coreName};`;
+      const wrapperCreate =
+        `create or replace function public.${wrapperName}(`;
+
+      expect(canonicalMigration).toContain(baseRename);
+      expect(canonicalMigration.indexOf(baseRename)).toBeLessThan(
+        canonicalMigration.indexOf(wrapperCreate)
+      );
+      expect(canonicalMigration).toContain(
+        `alter function ${wrapperIdentity} owner to postgres;`
+      );
+
+      expect(canonicalHardeningMigration).toContain(
+        `alter function ${internalIdentity} set search_path = pg_catalog;`
+      );
+      expect(canonicalHardeningMigration).toContain(
+        `alter function ${internalIdentity} owner to postgres;`
+      );
+      expect(canonicalHardeningMigration).toContain(
+        `revoke all on function ${internalIdentity} from public,anon,authenticated,service_role;`
+      );
+      expect(canonicalHardeningMigration).not.toContain(
+        `create or replace function public.${coreName}(`
+      );
+      expect(canonicalHardeningMigration).not.toContain(
+        `create function public.${coreName}(`
+      );
+      expect(canonicalHardeningMigration).not.toContain(
+        `rename to ${coreName}`
+      );
+    }
+  );
+
+  it("is ordered after the base migration and cannot create another overload", () => {
+    const migrationNames = readdirSync(
+      resolve(process.cwd(), "supabase/migrations")
+    )
+      .filter((name) => name.endsWith(".sql"))
+      .sort();
+    const baseMigrationName =
+      "20260808100000_matchup_deadlines_double_forfeit.sql";
+
+    expect(hardeningMigrationName > baseMigrationName).toBe(true);
+    expect(migrationNames.indexOf(baseMigrationName)).toBeGreaterThan(-1);
+    expect(migrationNames.indexOf(hardeningMigrationName)).toBeGreaterThan(
+      migrationNames.indexOf(baseMigrationName)
+    );
+    expect(compactHardeningMigration.startsWith("begin;")).toBe(true);
+    expect(compactHardeningMigration.endsWith("commit;")).toBe(true);
+    expect(compactHardeningMigration).not.toMatch(
+      /\bcreate(?: or replace)? function\b/
+    );
+    expect(compactHardeningMigration).not.toContain(" rename to ");
+    expect(compactHardeningMigration).not.toContain("drop function");
+
+    const alteredIdentities = [
+      ...canonicalHardeningMigration.matchAll(
+        /alter function public\.([a-z0-9_]+)\(\s*([^)]*?)\s*\)/g
+      ),
+    ].map((match) => `${match[1]}(${match[2].trim()})`);
+
+    for (const { coreName, signature } of hardenedCoreFunctions) {
+      const expectedIdentity = `${coreName}(${signature.replaceAll(" ", "")})`;
+      const identitiesForCore = new Set(
+        alteredIdentities.filter((identity) =>
+          identity.startsWith(`${coreName}(`)
+        )
+      );
+
+      expect(identitiesForCore).toEqual(new Set([expectedIdentity]));
+    }
   });
 });
