@@ -29,6 +29,17 @@ import { loadPlayerNotifications } from "@/lib/notifications";
 const recipientClerkUserId = "user_synthetic_notification_recipient";
 const actorClerkUserId = "user_synthetic_notification_actor";
 const reviewerClerkUserId = "user_synthetic_notification_reviewer";
+const privateEmailFields = [
+  ["email_template_key", "emailTemplateKey"],
+  ["email_delivery_status", "emailDeliveryStatus"],
+  ["email_attempt_count", "emailAttemptCount"],
+  ["email_next_attempt_at", "emailNextAttemptAt"],
+  ["email_claim_token", "emailClaimToken"],
+  ["email_claim_expires_at", "emailClaimExpiresAt"],
+  ["email_sent_at", "emailSentAt"],
+  ["email_last_error_code", "emailLastErrorCode"],
+  ["email_provider_message_id", "emailProviderMessageId"],
+] as const;
 
 describe("notification browser privacy boundary", () => {
   beforeEach(() => {
@@ -61,6 +72,15 @@ describe("notification browser privacy boundary", () => {
       },
       read_at: null,
       created_at: "2026-07-25T00:00:00.000Z",
+      email_template_key: "deadline_reminder_72h",
+      email_delivery_status: "processing",
+      email_attempt_count: 1,
+      email_next_attempt_at: null,
+      email_claim_token: "private-claim-token",
+      email_claim_expires_at: "2026-08-01T12:10:00.000Z",
+      email_sent_at: null,
+      email_last_error_code: null,
+      email_provider_message_id: null,
     });
     createSupabaseAdminClientMock.mockReturnValue(
       notificationQuery.client
@@ -87,6 +107,13 @@ describe("notification browser privacy boundary", () => {
     );
     expect(Object.keys(result.notifications[0])).not.toContain("metadata");
     expect(Object.keys(result.notifications[0])).not.toContain("eventKey");
+    for (const [databaseField, dtoField] of privateEmailFields) {
+      expect(projectionSelect).not.toContain(databaseField);
+      expect(Object.keys(result.notifications[0])).not.toContain(
+        databaseField
+      );
+      expect(Object.keys(result.notifications[0])).not.toContain(dtoField);
+    }
     expect(result.notifications[0].deadlineAt).toBe(
       "2026-08-01T12:00:00.000Z"
     );
@@ -112,6 +139,34 @@ describe("notification browser privacy boundary", () => {
       metadata: {},
       read_at: null,
       created_at: "2026-08-06T03:00:00.000Z",
+    });
+    createSupabaseAdminClientMock.mockReturnValue(notificationQuery.client);
+
+    const result = await loadPlayerNotifications(recipientClerkUserId);
+
+    expect(result.notifications[0]?.href).toBe(
+      `/dashboard#registration-${registrationId}`
+    );
+  });
+
+  it("keeps canonical registration approval on its owner dashboard card", async () => {
+    const registrationId = "11111111-1111-4111-8111-111111111111";
+    const notificationQuery = createNotificationProjectionClient({
+      id: "notification-approved-1",
+      recipient_role: "player",
+      type: "registration.approved",
+      title: "Registration Approved",
+      message: "Your registration has been approved.",
+      actor_display_name: "IronClad Admin",
+      tournament_id: "22222222-2222-4222-8222-222222222222",
+      tournament_title: "Synthetic Tournament",
+      registration_id: registrationId,
+      match_id: null,
+      report_group_id: null,
+      event_key: `registration:${registrationId}:approved`,
+      metadata: {},
+      read_at: null,
+      created_at: "2026-08-10T03:00:00.000Z",
     });
     createSupabaseAdminClientMock.mockReturnValue(notificationQuery.client);
 
