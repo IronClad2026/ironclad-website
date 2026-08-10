@@ -135,14 +135,80 @@ describe("player dashboard result privacy", () => {
     expect(dashboard.champions).toEqual([]);
     expect(dashboard.statistics.matchesPlayed).toBe(0);
   });
+
+  it("recognizes a Final walkover champion without fabricating a played match", async () => {
+    const dashboardClient = createDashboardClient({
+      roundNumber: 3,
+      slotCount: 8,
+      matchOverrides: {
+        outcome_type: "automatic_bye",
+        player_two_registration_id: null,
+        player_one_score: null,
+        player_two_score: null,
+        official_result_submission_id: null,
+      },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
+
+    const dashboard = await loadPlayerCareerDashboard(viewerClerkUserId);
+
+    expect(dashboard.statistics).toMatchObject({
+      matchesPlayed: 0,
+      matchesWon: 0,
+      matchesLost: 0,
+      winRate: 0,
+      tournamentsWon: 1,
+    });
+    expect(dashboard.matchHistory).toEqual([]);
+    expect(dashboard.champions).toEqual([
+      expect.objectContaining({
+        tournamentName: "Synthetic Tournament",
+        bracketName: "Main",
+        winnerName: "Viewer",
+      }),
+    ]);
+  });
+
+  it("does not award a champion or played-match statistic for a Final double forfeit", async () => {
+    const dashboardClient = createDashboardClient({
+      roundNumber: 3,
+      slotCount: 8,
+      matchOverrides: {
+        outcome_type: "deadline_double_forfeit",
+        player_one_score: null,
+        player_two_score: null,
+        winner_registration_id: null,
+        official_result_submission_id: null,
+      },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
+
+    const dashboard = await loadPlayerCareerDashboard(viewerClerkUserId);
+
+    expect(dashboard.statistics).toMatchObject({
+      matchesPlayed: 0,
+      matchesWon: 0,
+      matchesLost: 0,
+      winRate: 0,
+      tournamentsWon: 0,
+    });
+    expect(dashboard.matchHistory).toEqual([]);
+    expect(dashboard.champions).toEqual([]);
+  });
 });
 
 function createDashboardClient({
   metadataError = null,
   launchedAt = "2026-08-06T03:00:00.000Z",
+  matchOverrides = {},
+  roundNumber = 1,
+  slotCount = 4,
 }: {
   metadataError?: unknown;
   launchedAt?: string | null;
+  matchOverrides?: Record<string, unknown>;
+  roundNumber?: number;
+  slotCount?: number;
 } = {}) {
   const selects: { table: string; columns: string }[] = [];
 
@@ -173,7 +239,15 @@ function createDashboardClient({
         target.order = () => query;
         target.then = (resolve, reject) =>
           Promise.resolve(
-            resolveDashboardQuery(table, filters, metadataError, launchedAt)
+            resolveDashboardQuery(
+              table,
+              filters,
+              metadataError,
+              launchedAt,
+              matchOverrides,
+              roundNumber,
+              slotCount
+            )
           ).then(resolve, reject);
 
         return query;
@@ -187,7 +261,10 @@ function resolveDashboardQuery(
   table: string,
   filters: ReadonlyMap<string, unknown>,
   metadataError: unknown,
-  launchedAt: string | null
+  launchedAt: string | null,
+  matchOverrides: Record<string, unknown>,
+  roundNumber: number,
+  slotCount: number
 ): QueryResult {
   const viewerRegistration = {
     id: "registration-1",
@@ -221,16 +298,18 @@ function resolveDashboardQuery(
     player_two_score: 0,
     winner_registration_id: "registration-1",
     official_result_submission_id: "submission-1",
+    outcome_type: null,
     status: "completed",
     updated_at: "2026-07-25T00:00:00.000Z",
+    ...matchOverrides,
   };
 
   const dataByTable: Record<string, unknown> = {
     bracket_rounds: [
       {
         id: "round-1",
-        round_number: 1,
-        name: "Semifinal",
+        round_number: roundNumber,
+        name: roundNumber === Math.log2(slotCount) ? "Final" : "Semifinal",
       },
     ],
     generated_brackets: [
@@ -238,7 +317,7 @@ function resolveDashboardQuery(
         id: "generated-1",
         tournament_bracket_id: "bracket-1",
         format: "single_elimination",
-        slot_count: 4,
+        slot_count: slotCount,
       },
     ],
     match_result_report_groups: [],

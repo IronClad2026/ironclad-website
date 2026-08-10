@@ -47,6 +47,15 @@ const generatedBracketRow = {
           match_number: 1,
           series_best_of: 3,
           status: "completed",
+          activation_version: 1,
+          activated_at: "2026-06-24T00:00:00.000Z",
+          deadline_at: "2026-07-01T00:00:00.000Z",
+          outcome_type: null,
+          deadline_ruled_at: null,
+          extension_minutes: 720,
+          extended_at: "2026-06-27T00:00:00.000Z",
+          hold_started_at: null,
+          hold_released_at: null,
           player_one_slot: 1,
           player_two_slot: 2,
           player_one_registration_id: "registration-1",
@@ -91,6 +100,15 @@ const publicMatchShape = {
     roundNumber: "value",
     matchNumber: "value",
     status: "value",
+    activationVersion: "value",
+    activatedAt: "value",
+    deadlineAt: "value",
+    outcomeType: "value",
+    deadlineRuledAt: "value",
+    extensionMinutes: "value",
+    extendedAt: "value",
+    holdStartedAt: "value",
+    holdReleasedAt: "value",
     playerOneRegistrationId: "value",
     playerTwoRegistrationId: "value",
     playerOneSlot: "value",
@@ -107,6 +125,10 @@ const adminMatchPresentationShape = {
     officialResultReference: "value",
     officialResultDecisionLabel: "value",
     officialResultDecidedAt: "value",
+    extensionReason: "value",
+    holdReason: "value",
+    reminderOneSentAt: "value",
+    reminderTwoSentAt: "value",
   },
 } satisfies ExactShape;
 
@@ -221,9 +243,12 @@ describe("public tournament bracket data boundary", () => {
       data: [
         {
           id: "match-1",
+          activation_version: 1,
           official_result_submission_id: "submission_admin_only",
           official_result_decided_by: "synthetic-authorized-admin",
           official_result_decided_at: "2026-07-03T00:00:00.000Z",
+          extension_reason: "Player availability",
+          hold_reason: null,
         },
       ],
     });
@@ -243,7 +268,7 @@ describe("public tournament bracket data boundary", () => {
     expect(
       auditQuery.calls.find((call) => call.method === "select")?.args[0]
     ).toBe(
-      "id, official_result_submission_id, official_result_decided_by, official_result_decided_at"
+      "id, activation_version, official_result_submission_id, official_result_decided_by, official_result_decided_at, extension_reason, hold_reason"
     );
     expect(auditQuery.calls).toContainEqual({
       method: "in",
@@ -253,6 +278,10 @@ describe("public tournament bracket data boundary", () => {
       officialResultReference: "submission_admin_only",
       officialResultDecisionLabel: "Administrator",
       officialResultDecidedAt: "2026-07-03T00:00:00.000Z",
+      extensionReason: "Player availability",
+      holdReason: null,
+      reminderOneSentAt: null,
+      reminderTwoSentAt: null,
     });
     expectExactShape(adminMatch, adminMatchPresentationShape);
     expectNoSensitiveBrowserData(adminMatch, [
@@ -261,6 +290,62 @@ describe("public tournament bracket data boundary", () => {
     expect(JSON.stringify(adminMatch)).not.toContain(
       "synthetic-authorized-admin"
     );
+  });
+
+  it("derives reminder state only from the match's current activation", async () => {
+    const publicQuery = createSupabaseQueryMock({
+      data: [generatedBracketRow],
+    });
+    const matchAuditQuery = createSupabaseQueryMock({
+      data: [
+        {
+          id: "match-1",
+          activation_version: 2,
+          official_result_submission_id: null,
+          official_result_decided_by: null,
+          official_result_decided_at: null,
+          extension_reason: null,
+          hold_reason: null,
+        },
+      ],
+    });
+    const reminderQuery = createSupabaseQueryMock({
+      data: [
+        {
+          match_id: "match-1",
+          created_at: "2026-07-01T00:00:00.000Z",
+          metadata: { activationVersion: 1, reminderOrdinal: 1 },
+        },
+        {
+          match_id: "match-1",
+          created_at: "2026-07-20T00:00:00.000Z",
+          metadata: { activationVersion: 2, reminderOrdinal: 2 },
+        },
+      ],
+    });
+    const auditClient = {
+      from: vi.fn((table: string) => {
+        if (table === "tournament_matches") return matchAuditQuery.query;
+        if (table === "notifications") return reminderQuery.query;
+        throw new Error(`Unexpected deadline audit table: ${table}`);
+      }),
+    };
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock
+      .mockReturnValueOnce(publicQuery.client)
+      .mockReturnValueOnce(auditClient);
+
+    const result = await loadGeneratedBracketPageRows({
+      includeAdminAudit: true,
+    });
+    const match = mapGeneratedBrackets(result.data, tournamentRows).get(
+      "tournament-1"
+    )?.[0].matches[0];
+
+    expect(match).toMatchObject({
+      reminderOneSentAt: null,
+      reminderTwoSentAt: "2026-07-20T00:00:00.000Z",
+    });
   });
 
   it("fails closed to the public projection when the admin audit query fails", async () => {

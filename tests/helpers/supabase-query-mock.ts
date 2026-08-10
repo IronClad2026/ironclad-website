@@ -6,10 +6,12 @@ export type SupabaseQueryCall = {
 };
 
 const supportedQueryMethods = [
+  "delete",
   "eq",
   "in",
   "is",
   "maybeSingle",
+  "not",
   "order",
   "select",
   "update",

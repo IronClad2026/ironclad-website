@@ -110,6 +110,11 @@ type MatchRow = {
   player_two_score: number | null;
   winner_registration_id: string | null;
   official_result_submission_id: string | null;
+  outcome_type:
+    | "deadline_double_forfeit"
+    | "automatic_bye"
+    | "empty_feeder"
+    | null;
   series_best_of: number;
   status: string;
   updated_at: string;
@@ -256,13 +261,13 @@ export async function loadPlayerCareerDashboard(
     supabase
       .from("tournament_matches")
       .select(
-        "id, generated_bracket_id, round_id, match_number, series_best_of, player_one_registration_id, player_two_registration_id, player_one_score, player_two_score, winner_registration_id, official_result_submission_id, status, updated_at"
+        "id, generated_bracket_id, round_id, match_number, series_best_of, player_one_registration_id, player_two_registration_id, player_one_score, player_two_score, winner_registration_id, official_result_submission_id, outcome_type, status, updated_at"
       )
       .in("player_one_registration_id", registrationIds),
     supabase
       .from("tournament_matches")
       .select(
-        "id, generated_bracket_id, round_id, match_number, series_best_of, player_one_registration_id, player_two_registration_id, player_one_score, player_two_score, winner_registration_id, official_result_submission_id, status, updated_at"
+        "id, generated_bracket_id, round_id, match_number, series_best_of, player_one_registration_id, player_two_registration_id, player_one_score, player_two_score, winner_registration_id, official_result_submission_id, outcome_type, status, updated_at"
       )
       .in("player_two_registration_id", registrationIds),
   ]);
@@ -809,6 +814,7 @@ function buildCareerDashboard({
   const completedMatches = matches.filter(
     (match) =>
       match.status === "completed" &&
+      (match.outcome_type ?? null) === null &&
       match.player_one_score !== null &&
       match.player_two_score !== null &&
       match.winner_registration_id
@@ -821,10 +827,13 @@ function buildCareerDashboard({
   const matchesLost = completedMatches.length - matchesWon;
   const championsByKey = new Map<string, ChampionAchievement>();
 
-  for (const match of completedMatches) {
+  for (const match of matches) {
     if (
+      match.status !== "completed" ||
       !match.winner_registration_id ||
-      !viewerRegistrationIds.has(match.winner_registration_id)
+      !viewerRegistrationIds.has(match.winner_registration_id) ||
+      ((match.outcome_type ?? null) !== null &&
+        match.outcome_type !== "automatic_bye")
     ) {
       continue;
     }

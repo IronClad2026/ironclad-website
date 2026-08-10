@@ -132,6 +132,19 @@ export type PublicTournamentMatch = {
   roundNumber: number;
   matchNumber: number;
   status: "scheduled" | "in_progress" | "pending_review" | "completed";
+  activationVersion: number;
+  activatedAt: string | null;
+  deadlineAt: string | null;
+  outcomeType:
+    | "deadline_double_forfeit"
+    | "automatic_bye"
+    | "empty_feeder"
+    | null;
+  deadlineRuledAt: string | null;
+  extensionMinutes: number | null;
+  extendedAt: string | null;
+  holdStartedAt: string | null;
+  holdReleasedAt: string | null;
   playerOneRegistrationId: string | null;
   playerTwoRegistrationId: string | null;
   playerOneSlot: number | null;
@@ -145,12 +158,20 @@ export type AdminTournamentMatchPresentation = PublicTournamentMatch & {
   officialResultReference: string | null;
   officialResultDecisionLabel: "Administrator" | "Legacy result";
   officialResultDecidedAt: string | null;
+  extensionReason: string | null;
+  holdReason: string | null;
+  reminderOneSentAt: string | null;
+  reminderTwoSentAt: string | null;
 };
 
 export type GeneratedTournamentMatch = PublicTournamentMatch & {
   officialResultReference?: string | null;
   officialResultDecisionLabel?: "Administrator" | "Legacy result";
   officialResultDecidedAt?: string | null;
+  extensionReason?: string | null;
+  holdReason?: string | null;
+  reminderOneSentAt?: string | null;
+  reminderTwoSentAt?: string | null;
 };
 
 export type MatchResultSubmission = {
