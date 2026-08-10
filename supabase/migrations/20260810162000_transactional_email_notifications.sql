@@ -293,6 +293,7 @@ as $$
 declare
   v_registration public.registrations%rowtype;
   v_match public.tournament_matches%rowtype;
+  v_match_context record;
   v_round_number integer;
   v_round_name text;
   v_max_round_number integer;
@@ -364,28 +365,20 @@ begin
     and nullif(btrim(new.recipient_clerk_user_id), '') is not null
     and new.recipient_role = 'player' then
     select
-      tournament_match,
-      round.round_number,
-      round.name,
+      tournament_match as match_row,
+      round.round_number as round_number,
+      round.name as round_name,
       (
         select max(candidate_round.round_number)
         from public.bracket_rounds as candidate_round
         where candidate_round.generated_bracket_id =
           tournament_match.generated_bracket_id
-      ),
-      bracket.id,
-      bracket.tournament_id,
-      generated.format,
-      bracket.launched_at
-    into
-      v_match,
-      v_round_number,
-      v_round_name,
-      v_max_round_number,
-      v_bracket_id,
-      v_tournament_id,
-      v_format,
-      v_launched_at
+      ) as max_round_number,
+      bracket.id as bracket_id,
+      bracket.tournament_id as tournament_id,
+      generated.format as bracket_format,
+      bracket.launched_at as launched_at
+    into v_match_context
     from public.tournament_matches as tournament_match
     join public.bracket_rounds as round
       on round.id = tournament_match.round_id
@@ -402,8 +395,20 @@ begin
       and tournament_match.outcome_type is null
       and tournament_match.deadline_ruled_at is null;
 
-    if not found
-      or v_format <> 'single_elimination'
+    if not found then
+      return new;
+    end if;
+
+    v_match := v_match_context.match_row;
+    v_round_number := v_match_context.round_number;
+    v_round_name := v_match_context.round_name;
+    v_max_round_number := v_match_context.max_round_number;
+    v_bracket_id := v_match_context.bracket_id;
+    v_tournament_id := v_match_context.tournament_id;
+    v_format := v_match_context.bracket_format;
+    v_launched_at := v_match_context.launched_at;
+
+    if v_format <> 'single_elimination'
       or v_launched_at is null
       or v_match.status <> 'in_progress'
       -- Version one is the normal activation. Administrative reopen/reset

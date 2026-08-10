@@ -371,9 +371,15 @@ describe("transactional-email migration contract", () => {
     );
 
     expect(initializer).toMatch(
-      /select tournament_match\s*,\s*round\.round_number/
+      /select\s+tournament_match as match_row\s*,\s*round\.round_number as round_number/
     );
+    expect(initializer).toMatch(
+      /into\s+v_match_context\s+from public\.tournament_matches/
+    );
+    expect(initializer).toContain("v_match := v_match_context.match_row");
     expect(initializer).not.toContain("select tournament_match.*");
+    expect(initializer).not.toMatch(/into\s+v_match\s*,/);
+    expect(initializer).not.toMatch(/into\s+v_match_context\s*,/);
   });
 
   it("claims at most ten due rows deterministically with unique ten-minute leases", () => {
