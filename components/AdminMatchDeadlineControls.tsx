@@ -1,12 +1,14 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import {
   extendTournamentMatchDeadline,
   holdTournamentMatchDeadline,
   releaseTournamentMatchDeadline,
   type MatchDeadlineActionState,
 } from "@/app/admin/tournaments/deadline-actions";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import type { GeneratedTournamentMatch } from "@/lib/tournaments";
 
 const initialState: MatchDeadlineActionState = {
@@ -31,7 +33,7 @@ export default function AdminMatchDeadlineControls({
     releaseTournamentMatchDeadline,
     initialState
   );
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
   const extensionAppliesToCurrentActivation = timestampFallsInActivation(
     match.extendedAt,
@@ -41,20 +43,34 @@ export default function AdminMatchDeadlineControls({
     match.holdStartedAt,
     match.activatedAt
   );
-  const deadlinePassed = match.deadlineAt
-    ? now >= new Date(match.deadlineAt).getTime()
-    : false;
+  const deadlinePassed =
+    match.deadlineAt && now !== null
+      ? now >= new Date(match.deadlineAt).getTime()
+      : false;
   const isActive = match.status === "in_progress" && Boolean(match.deadlineAt);
   const canExtend =
-    isActive && !deadlinePassed && !holdActive && match.extendedAt === null;
+    isActive &&
+    now !== null &&
+    !deadlinePassed &&
+    !holdActive &&
+    match.extendedAt === null;
   const canStartHold =
-    isActive && !deadlinePassed && !holdActive && match.holdStartedAt === null;
+    isActive &&
+    now !== null &&
+    !deadlinePassed &&
+    !holdActive &&
+    match.holdStartedAt === null;
 
   useEffect(() => {
     if (!isActive || holdActive) return;
 
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
+    const updateNow = () => setNow(Date.now());
+    const initialTimer = window.setTimeout(updateNow, 0);
+    const interval = window.setInterval(updateNow, 1_000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(interval);
+    };
   }, [holdActive, isActive]);
 
   return (
@@ -76,29 +92,55 @@ export default function AdminMatchDeadlineControls({
       <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
         <DeadlineValue
           label="Activated"
-          value={formatDateTime(match.activatedAt, "Not activated")}
+          value={
+            <HydrationSafeLocalDateTime
+              value={match.activatedAt}
+              fallback="Not activated"
+            />
+          }
         />
         <DeadlineValue
           label="Effective deadline"
-          value={formatDateTime(match.deadlineAt, "Not started")}
+          value={
+            <HydrationSafeLocalDateTime
+              value={match.deadlineAt}
+              fallback="Not started"
+            />
+          }
         />
         <DeadlineValue
           label="Reminder one (72h)"
-          value={formatDateTime(match.reminderOneSentAt, "Not sent")}
+          value={
+            <HydrationSafeLocalDateTime
+              value={match.reminderOneSentAt}
+              fallback="Not sent"
+            />
+          }
         />
         <DeadlineValue
           label="Reminder two (24h)"
-          value={formatDateTime(match.reminderTwoSentAt, "Not sent")}
+          value={
+            <HydrationSafeLocalDateTime
+              value={match.reminderTwoSentAt}
+              fallback="Not sent"
+            />
+          }
         />
         <DeadlineValue
           label="Extension"
           value={
             match.extensionMinutes
               ? extensionAppliesToCurrentActivation
-                ? `${formatDuration(match.extensionMinutes)} added to this activation ${formatDateTime(
-                    match.extendedAt,
-                    ""
-                  )}`
+                ? (
+                    <>
+                      {formatDuration(match.extensionMinutes)} added to this
+                      activation{" "}
+                      <HydrationSafeLocalDateTime
+                        value={match.extendedAt}
+                        fallback=""
+                      />
+                    </>
+                  )
                 : `${formatDuration(match.extensionMinutes)} lifetime allowance used on a previous activation`
               : "Unused"
           }
@@ -107,10 +149,26 @@ export default function AdminMatchDeadlineControls({
           label="Administrative hold"
           value={
             holdActive
-              ? `Active since ${formatDateTime(match.holdStartedAt, "")}`
+              ? (
+                  <>
+                    Active since{" "}
+                    <HydrationSafeLocalDateTime
+                      value={match.holdStartedAt}
+                      fallback=""
+                    />
+                  </>
+                )
               : match.holdStartedAt
                 ? holdBelongsToCurrentActivation
-                  ? `Used this activation; released ${formatDateTime(match.holdReleasedAt, "")}`
+                  ? (
+                      <>
+                        Used this activation; released{" "}
+                        <HydrationSafeLocalDateTime
+                          value={match.holdReleasedAt}
+                          fallback=""
+                        />
+                      </>
+                    )
                   : "Lifetime allowance used on a previous activation"
                 : "Unused"
           }
@@ -212,7 +270,7 @@ export default function AdminMatchDeadlineControls({
   );
 }
 
-function DeadlineValue({ label, value }: { label: string; value: string }) {
+function DeadlineValue({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0 rounded-xl border border-white/10 bg-black/25 p-3">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
@@ -286,17 +344,6 @@ function formatDeadlineState(match: GeneratedTournamentMatch) {
   return match.playerOneRegistrationId || match.playerTwoRegistrationId
     ? "Waiting for opponent"
     : "Not activated";
-}
-
-function formatDateTime(value: string | null | undefined, fallback: string) {
-  if (!value) return fallback;
-  const timestamp = new Date(value);
-  if (!Number.isFinite(timestamp.getTime())) return fallback;
-
-  return new Intl.DateTimeFormat("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
 }
 
 function formatDuration(minutes: number) {

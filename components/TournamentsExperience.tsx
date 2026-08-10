@@ -15,6 +15,7 @@ import MatchResultControls, {
 } from "@/components/MatchResultControls";
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { PlayerProfile } from "@/lib/player-profile";
@@ -2170,7 +2171,7 @@ export function MatchDeadlinePresentation({
   match: GeneratedTournamentMatch;
   compact?: boolean;
 }) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
   const extensionAppliesToCurrentActivation = timestampFallsInActivation(
     match.extendedAt,
@@ -2183,15 +2184,21 @@ export function MatchDeadlinePresentation({
     match.status === "in_progress" &&
     deadlineTimestamp !== null &&
     Number.isFinite(deadlineTimestamp) &&
+    now !== null &&
     now >= deadlineTimestamp;
-  let label: string | null = null;
+  let label: ReactNode = null;
   let tone = "border-white/10 bg-black/25 text-zinc-400";
 
   useEffect(() => {
     if (match.status !== "in_progress" || holdActive) return;
 
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
+    const updateNow = () => setNow(Date.now());
+    const initialTimer = window.setTimeout(updateNow, 0);
+    const interval = window.setInterval(updateNow, 30_000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(interval);
+    };
   }, [holdActive, match.status]);
 
   if (match.outcomeType === "deadline_double_forfeit") {
@@ -2213,7 +2220,15 @@ export function MatchDeadlinePresentation({
     label = "Deadline passed — awaiting authoritative ruling";
     tone = "border-red-400/25 bg-red-500/10 text-red-200";
   } else if (match.status === "in_progress" && match.deadlineAt) {
-    label = `Deadline ${formatLocalDateTime(match.deadlineAt)}`;
+    label = (
+      <>
+        Deadline{" "}
+        <HydrationSafeLocalDateTime
+          value={match.deadlineAt}
+          fallback="unavailable"
+        />
+      </>
+    );
     tone = "border-orange-400/25 bg-orange-500/10 text-orange-100";
   } else if (
     match.status === "scheduled" &&
@@ -2245,16 +2260,6 @@ export function MatchDeadlinePresentation({
       )}
     </div>
   );
-}
-
-function formatLocalDateTime(value: string) {
-  const timestamp = new Date(value);
-  if (!Number.isFinite(timestamp.getTime())) return "unavailable";
-
-  return new Intl.DateTimeFormat("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
 }
 
 function formatMatchDuration(minutes: number) {

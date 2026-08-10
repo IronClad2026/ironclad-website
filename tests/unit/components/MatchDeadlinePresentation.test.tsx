@@ -2,7 +2,9 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   GeneratedTournamentMatch,
@@ -31,6 +33,7 @@ vi.mock("@/components/PlayerMatchResultForm", () => ({
 }));
 
 import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import MatchResultControls from "@/components/MatchResultControls";
 import {
   AdminMatchManagementModal,
@@ -93,7 +96,169 @@ function participants(...values: TournamentParticipant[]) {
 }
 
 describe("matchup deadline player and administrator presentation", () => {
-  it("contains the administrator match dialog and wraps long identities on narrow layouts", () => {
+  it("hydrates deterministic UTC deadline markup into viewer-local time", async () => {
+    const value = "2026-08-16T23:24:00.000Z";
+    const originalTimeZone = process.env.TZ;
+    const recoverableErrors: unknown[] = [];
+    const container = document.createElement("div");
+    let root: ReturnType<typeof hydrateRoot> | null = null;
+
+    document.body.append(container);
+
+    try {
+      process.env.TZ = "UTC";
+      const utcMarkup = renderToString(
+        <HydrationSafeLocalDateTime value={value} fallback="unavailable" />
+      );
+
+      process.env.TZ = "Australia/Sydney";
+      const sydneyServerMarkup = renderToString(
+        <HydrationSafeLocalDateTime value={value} fallback="unavailable" />
+      );
+
+      expect(sydneyServerMarkup).toBe(utcMarkup);
+      expect(utcMarkup).toContain("16 Aug 2026, 11:24 pm");
+      expect(utcMarkup).toContain(`dateTime="${value}"`);
+
+      container.innerHTML = utcMarkup;
+      await act(async () => {
+        root = hydrateRoot(
+          container,
+          <HydrationSafeLocalDateTime value={value} fallback="unavailable" />,
+          {
+            onRecoverableError: (error) => recoverableErrors.push(error),
+          }
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(recoverableErrors).toEqual([]);
+      expect(container.querySelector("time")).toHaveTextContent(
+        "17 Aug 2026, 9:24 am"
+      );
+      expect(container.querySelector("time")).toHaveAttribute(
+        "datetime",
+        value
+      );
+    } finally {
+      if (root) {
+        await act(async () => root?.unmount());
+      }
+      container.remove();
+      if (originalTimeZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = originalTimeZone;
+      }
+    }
+  });
+
+  it("crosses a deadline after hydration without changing the first client render", async () => {
+    const deadlineAt = "2026-08-16T23:24:00.000Z";
+    const deadlineTimestamp = new Date(deadlineAt).getTime();
+    const originalTimeZone = process.env.TZ;
+    const now = vi.spyOn(Date, "now");
+    const recoverableErrors: unknown[] = [];
+    const container = document.createElement("div");
+    let root: ReturnType<typeof hydrateRoot> | null = null;
+    const match = matchFixture({ deadlineAt });
+
+    document.body.append(container);
+
+    try {
+      process.env.TZ = "UTC";
+      now.mockReturnValue(deadlineTimestamp - 1_000);
+      const serverMarkup = renderToString(
+        <MatchDeadlinePresentation match={match} />
+      );
+
+      expect(serverMarkup).toContain("Deadline");
+      expect(serverMarkup).toContain(`dateTime="${deadlineAt}"`);
+      container.innerHTML = serverMarkup;
+
+      process.env.TZ = "Australia/Sydney";
+      now.mockReturnValue(deadlineTimestamp + 1_000);
+      await act(async () => {
+        root = hydrateRoot(
+          container,
+          <MatchDeadlinePresentation match={match} />,
+          {
+            onRecoverableError: (error) => recoverableErrors.push(error),
+          }
+        );
+      });
+
+      expect(recoverableErrors).toEqual([]);
+      expect(container).toHaveTextContent(
+        "Deadline passed — awaiting authoritative ruling"
+      );
+    } finally {
+      if (root) {
+        await act(async () => root?.unmount());
+      }
+      container.remove();
+      now.mockRestore();
+      if (originalTimeZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = originalTimeZone;
+      }
+    }
+  });
+
+  it("preserves deadline presentation states while localizing the active instant", async () => {
+    const activeMatch = matchFixture({
+      deadlineAt: "2099-08-08T00:00:00.000Z",
+      extensionMinutes: 1_440,
+      extendedAt: "2099-08-02T00:00:00.000Z",
+    });
+    const view = render(<MatchDeadlinePresentation match={activeMatch} />);
+    const activeDeadlineLabel = view.container.querySelector(
+      "[data-match-deadline-state] p"
+    );
+
+    expect(activeDeadlineLabel).toHaveTextContent("Deadline");
+    expect(activeDeadlineLabel?.querySelector("time")).toHaveAttribute(
+      "datetime",
+      activeMatch.deadlineAt
+    );
+    expect(
+      screen.getByText("Includes a 24 hours extension.")
+    ).toBeInTheDocument();
+
+    view.rerender(
+      <MatchDeadlinePresentation
+        match={matchFixture({
+          holdStartedAt: "2099-08-03T00:00:00.000Z",
+        })}
+      />
+    );
+    expect(
+      screen.getByText("Deadline paused by an administrator")
+    ).toBeInTheDocument();
+
+    view.rerender(
+      <MatchDeadlinePresentation
+        match={matchFixture({ status: "pending_review" })}
+      />
+    );
+    expect(
+      screen.getByText(
+        "Result or ruling under review — deadline enforcement is paused"
+      )
+    ).toBeInTheDocument();
+
+    view.rerender(
+      <MatchDeadlinePresentation
+        match={matchFixture({ deadlineAt: "2000-01-01T00:00:00.000Z" })}
+      />
+    );
+    expect(
+      await screen.findByText("Deadline passed — awaiting authoritative ruling")
+    ).toBeInTheDocument();
+  });
+
+  it("contains the administrator match dialog and wraps long identities on narrow layouts", async () => {
     const longPlayerOne = {
       ...participantOne,
       name: "PHASE4_TEST_PLAYER_WITH_A_DELIBERATELY_LONG_UNBROKEN_IDENTITY_0001",
@@ -180,7 +345,7 @@ describe("matchup deadline player and administrator presentation", () => {
       "max-w-full",
       "min-w-0"
     );
-    expect(screen.getByLabelText("Extension minutes")).toHaveClass(
+    expect(await screen.findByLabelText("Extension minutes")).toHaveClass(
       "min-h-11",
       "w-full"
     );
@@ -258,12 +423,12 @@ describe("matchup deadline player and administrator presentation", () => {
     ).toHaveLength(2);
   });
 
-  it("shows one-time responsive extension and hold controls only for an active match", () => {
+  it("shows one-time responsive extension and hold controls only for an active match", async () => {
     render(<AdminMatchDeadlineControls match={matchFixture()} />);
 
     expect(screen.getByText("Active matchup")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Apply One-Time Extension" })
+      await screen.findByRole("button", { name: "Apply One-Time Extension" })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Place Match On Hold" })
@@ -273,6 +438,97 @@ describe("matchup deadline player and administrator presentation", () => {
       "2880"
     );
     expect(screen.getAllByText("Unused")).toHaveLength(2);
+  });
+
+  it("keeps expired player and administrator mutations closed throughout hydration", async () => {
+    const expiredMatch = matchFixture({
+      deadlineAt: "2000-01-01T00:00:00.000Z",
+    });
+    const adminView = render(
+      <AdminMatchDeadlineControls match={expiredMatch} />
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Apply One-Time Extension" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Place Match On Hold" })
+    ).not.toBeInTheDocument();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(
+      screen.queryByRole("button", { name: "Apply One-Time Extension" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Place Match On Hold" })
+    ).not.toBeInTheDocument();
+    adminView.unmount();
+
+    render(
+      <MatchResultControls
+        match={expiredMatch}
+        deadlineManaged
+        participantsById={participants(participantOne, participantTwo)}
+        isAdmin={false}
+        canSubmit
+        submissions={[]}
+        reportGroups={[]}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Deadline Passed/ }));
+    expect(screen.queryByText("Player result form marker")).not.toBeInTheDocument();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.queryByText("Player result form marker")).not.toBeInTheDocument();
+  });
+
+  it("renders every administrator deadline audit instant with semantic local time", () => {
+    const activatedAt = "2099-08-01T00:00:00.000Z";
+    const deadlineAt = "2099-08-08T00:00:00.000Z";
+    const reminderOneSentAt = "2099-08-05T00:00:00.000Z";
+    const reminderTwoSentAt = "2099-08-07T00:00:00.000Z";
+    const extendedAt = "2099-08-02T00:00:00.000Z";
+    const holdStartedAt = "2099-08-03T00:00:00.000Z";
+    const holdReleasedAt = "2099-08-03T01:00:00.000Z";
+
+    render(
+      <AdminMatchDeadlineControls
+        match={matchFixture({
+          activatedAt,
+          deadlineAt,
+          reminderOneSentAt,
+          reminderTwoSentAt,
+          extensionMinutes: 60,
+          extendedAt,
+          holdStartedAt,
+          holdReleasedAt,
+        })}
+      />
+    );
+
+    const timestampFor = (label: string) =>
+      screen.getByText(label).parentElement?.querySelector("time");
+
+    expect(timestampFor("Activated")).toHaveAttribute("datetime", activatedAt);
+    expect(timestampFor("Effective deadline")).toHaveAttribute(
+      "datetime",
+      deadlineAt
+    );
+    expect(timestampFor("Reminder one (72h)")).toHaveAttribute(
+      "datetime",
+      reminderOneSentAt
+    );
+    expect(timestampFor("Reminder two (24h)")).toHaveAttribute(
+      "datetime",
+      reminderTwoSentAt
+    );
+    expect(timestampFor("Extension")).toHaveAttribute("datetime", extendedAt);
+    expect(timestampFor("Administrative hold")).toHaveAttribute(
+      "datetime",
+      holdReleasedAt
+    );
   });
 
   it("shows a held match and only the release transition", () => {
@@ -296,6 +552,9 @@ describe("matchup deadline player and administrator presentation", () => {
       screen.queryByRole("button", { name: "Place Match On Hold" })
     ).not.toBeInTheDocument();
     expect(screen.getByText("Exceptional platform incident")).toBeInTheDocument();
+    expect(
+      screen.getByText("Administrative hold").parentElement?.querySelector("time")
+    ).toHaveAttribute("datetime", "2099-08-03T00:00:00.000Z");
   });
 
   it.each([

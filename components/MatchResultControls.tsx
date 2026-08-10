@@ -62,10 +62,12 @@ export default function MatchResultControls({
       )
   );
   const canOpenForReportGroups = reportGroups.length > 0;
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
   const deadlineOpen = Boolean(
-    match.deadlineAt && now < new Date(match.deadlineAt).getTime()
+    match.deadlineAt &&
+      now !== null &&
+      now < new Date(match.deadlineAt).getTime()
   );
 
   useEffect(() => {
@@ -73,8 +75,13 @@ export default function MatchResultControls({
       return;
     }
 
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
+    const updateNow = () => setNow(Date.now());
+    const initialTimer = window.setTimeout(updateNow, 0);
+    const interval = window.setInterval(updateNow, 1_000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(interval);
+    };
   }, [deadlineManaged, holdActive, match.status]);
   const canSubmitNewReport =
     canSubmit &&
