@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -11,6 +12,23 @@ const migrationPath = resolve(
 );
 const migration = readFileSync(migrationPath, "utf8");
 const compactMigration = migration.toLowerCase().replace(/\s+/g, " ").trim();
+const migrationSha256 =
+  "e10c360ef42c8a3bdaf4de32539cb19ca66c444a38f186f9b26a2286a9fce2d4";
+const vercelBypassMigrationName =
+  "20260811100000_transactional_email_vercel_protection_bypass.sql";
+const vercelBypassMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations",
+  vercelBypassMigrationName
+);
+const vercelBypassMigration = readFileSync(
+  vercelBypassMigrationPath,
+  "utf8"
+);
+const compactVercelBypassMigration = vercelBypassMigration
+  .toLowerCase()
+  .replace(/\s+/g, " ")
+  .trim();
 
 const emailFields = [
   "email_template_key",
@@ -41,21 +59,23 @@ const deliveryStatuses = [
   "permanent_failure",
 ] as const;
 
-function extractFunction(functionName: string) {
+function extractFunction(
+  functionName: string,
+  source = compactMigration,
+  sourceName = migrationName
+) {
   const marker = new RegExp(
     `create(?: or replace)? function (?:public|ironclad_private)\\.${functionName}\\(`
   );
-  const match = marker.exec(compactMigration);
+  const match = marker.exec(source);
   const createIndex = match?.index ?? -1;
-  const endIndex = compactMigration.indexOf("$$;", createIndex);
+  const endIndex = source.indexOf("$$;", createIndex);
 
   if (createIndex < 0 || endIndex < 0) {
-    throw new Error(
-      `${functionName} was not found in ${migrationName}.`
-    );
+    throw new Error(`${functionName} was not found in ${sourceName}.`);
   }
 
-  return compactMigration.slice(createIndex, endIndex + 3);
+  return source.slice(createIndex, endIndex + 3);
 }
 
 function valuesAllowedByCheck(columnName: string) {
@@ -568,5 +588,121 @@ describe("transactional-email migration contract", () => {
     expect(
       existsSync(resolve(process.cwd(), "vercel.json"))
     ).toBe(false);
+  });
+});
+
+describe("transactional-email Vercel protection bypass migration", () => {
+  const invocation = extractFunction(
+    "invoke_transactional_email_worker",
+    compactVercelBypassMigration,
+    vercelBypassMigrationName
+  );
+  const originalInvocation = extractFunction(
+    "invoke_transactional_email_worker"
+  );
+
+  it("is ordered after the applied migration without changing it", () => {
+    const normalizedMigration = migration.replace(/\r\n/g, "\n");
+
+    expect(vercelBypassMigrationName > migrationName).toBe(true);
+    expect(compactVercelBypassMigration.startsWith("begin;")).toBe(true);
+    expect(compactVercelBypassMigration.endsWith("commit;")).toBe(true);
+    expect(
+      createHash("sha256").update(normalizedMigration).digest("hex")
+    ).toBe(migrationSha256);
+  });
+
+  it("preserves the invocation signature, ownership, security, and grants", () => {
+    expect(invocation).toContain(
+      "create or replace function public.invoke_transactional_email_worker() returns bigint language plpgsql security definer set search_path = pg_catalog"
+    );
+    expect(countMatches(compactVercelBypassMigration, /create or replace function/g)).toBe(1);
+    expect(compactVercelBypassMigration).toContain(
+      "alter function public.invoke_transactional_email_worker() owner to postgres"
+    );
+    expect(compactVercelBypassMigration).toContain(
+      "revoke all on function public.invoke_transactional_email_worker() from public, anon, authenticated, service_role"
+    );
+    expect(compactVercelBypassMigration).not.toMatch(
+      /grant execute on function public\.invoke_transactional_email_worker/
+    );
+  });
+
+  it("requires all three exact nonblank Vault values before pg_net", () => {
+    const vaultSecretNames = new Set(
+      [...invocation.matchAll(/'(ironclad_[a-z0-9_]+)'/g)].map(
+        (match) => match[1]
+      )
+    );
+
+    expect(vaultSecretNames).toEqual(
+      new Set([
+        "ironclad_transactional_email_worker_url",
+        "ironclad_transactional_email_worker_secret",
+        "ironclad_transactional_email_vercel_bypass_secret",
+      ])
+    );
+    expect(countMatches(invocation, /from vault\.decrypted_secrets/g)).toBe(3);
+
+    for (const variable of [
+      "v_worker_url",
+      "v_worker_secret",
+      "v_vercel_bypass_secret",
+    ]) {
+      expect(invocation).toContain(
+        `${variable} := nullif(btrim(${variable}), '')`
+      );
+    }
+
+    const missingValueGuard =
+      "if v_worker_url is null or v_worker_secret is null or v_vercel_bypass_secret is null then return null; end if;";
+    expect(invocation).toContain(missingValueGuard);
+    expect(invocation.indexOf(missingValueGuard)).toBeLessThan(
+      invocation.indexOf("net.http_post")
+    );
+  });
+
+  it("sends both security layers without exposing secret values", () => {
+    expect(invocation).toMatch(
+      /headers := jsonb_build_object\( 'authorization', 'bearer ' \|\| v_worker_secret, 'content-type', 'application\/json', 'x-vercel-protection-bypass', v_vercel_bypass_secret \)/
+    );
+    expect(countMatches(invocation, /headers := jsonb_build_object\(/g)).toBe(1);
+    expect(invocation).not.toMatch(/\braise\b|\bpg_notify\b/);
+    expect(invocation).not.toMatch(
+      /return\s+v_(?:worker_url|worker_secret|vercel_bypass_secret)/
+    );
+  });
+
+  it("preserves URL validation, request ID, body, and timeout", () => {
+    const urlGuard =
+      "if v_worker_url !~ '^https://[^/?#@[:space:]]+/api/internal/transactional-email$' or position('?' in v_worker_url) > 0 or position('#' in v_worker_url) > 0 or position('@' in v_worker_url) > 0 then return null; end if;";
+
+    expect(originalInvocation).toContain(urlGuard);
+    expect(invocation).toContain(urlGuard);
+    expect(countMatches(invocation, /net\.http_post\(/g)).toBe(1);
+    expect(invocation).toContain("return net.http_post(");
+    expect(invocation).toContain(
+      "body := jsonb_build_object('source', 'pg_cron')"
+    );
+    expect(invocation).toContain("timeout_milliseconds := 70000");
+    expect(invocation).not.toContain("exception when others");
+  });
+
+  it("leaves the one existing five-minute cron contract unchanged", () => {
+    const combinedMigrations =
+      `${compactMigration} ${compactVercelBypassMigration}`;
+
+    expect(
+      countMatches(compactVercelBypassMigration, /cron\.(?:un)?schedule\(/g)
+    ).toBe(0);
+    expect(countMatches(combinedMigrations, /cron\.schedule\(/g)).toBe(1);
+    expect(combinedMigrations).toContain(
+      "'ironclad-transactional-email-worker'"
+    );
+    expect(combinedMigrations).toContain("'*/5 * * * *'");
+    expect(combinedMigrations).toContain(
+      "'select public.invoke_transactional_email_worker();'"
+    );
+    expect(existsSync(resolve(process.cwd(), "vercel.json"))).toBe(false);
   });
 });
