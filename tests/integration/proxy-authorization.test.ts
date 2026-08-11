@@ -50,8 +50,9 @@ describe("Next.js proxy authorization", () => {
     "/api/match-proofs/",
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/report-group/11111111-1111-4111-8111-111111111111/replay",
+    "/api/internal/transactional-email",
   ])(
-    "lets the exact self-authenticated proof route %s reach its own auth boundary",
+    "lets the self-authenticated route %s reach its own auth boundary",
     async (pathname) => {
       const protect = vi.fn(async () => undefined);
 
@@ -75,6 +76,10 @@ describe("Next.js proxy authorization", () => {
     "/api/match-proofs-private",
     "/api/match-proofs.example",
     "/api/match-proofsx/submission/id/replay",
+    "/api/internal/transactional-email/",
+    "/api/internal/transactional-email/run",
+    "/api/internal/transactional-email-private",
+    "/api/internal/transactional-emails",
   ])("calls auth.protect for %s", async (pathname) => {
     const protect = vi.fn(async () => undefined);
 

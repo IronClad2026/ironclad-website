@@ -450,7 +450,8 @@ function buildNotificationHref(
 
   if (
     row.registration_id &&
-    (row.type === "registration.waitlist_offer" ||
+    (row.type === "registration.approved" ||
+      row.type === "registration.waitlist_offer" ||
       row.type === "registration.waitlist_closed")
   ) {
     return `/dashboard#registration-${encodeURIComponent(row.registration_id)}`;

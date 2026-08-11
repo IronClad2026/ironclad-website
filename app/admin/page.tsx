@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 import {
   createInAppNotification,
-  createInAppNotifications,
   loadAdminNotifications,
   type NotificationCreateInput,
 } from "@/lib/notifications";
@@ -338,15 +337,6 @@ function buildRegistrationStatusNotification({
       bracketName: registration.bracket_name,
     },
   };
-
-  if (nextStatus === "approved") {
-    return {
-      ...base,
-      type: "registration.approved",
-      title: "Registration Approved",
-      message: `You have been approved for ${tournamentTitle}.`,
-    };
-  }
 
   if (nextStatus === "rejected") {
     return {
@@ -773,7 +763,6 @@ async function approveSelectedRegistrations(formData: FormData) {
     }
   );
   let approvedCount = 0;
-  const approvalNotifications: NotificationCreateInput[] = [];
 
   for (const registration of orderedRegistrations) {
     if (registration.registration_status === "approved") {
@@ -809,21 +798,7 @@ async function approveSelectedRegistrations(formData: FormData) {
       );
     } else {
       approvedCount += 1;
-      const notification = buildRegistrationStatusNotification({
-        previousStatus: registration.registration_status,
-        nextStatus: "approved",
-        registration,
-        actorClerkUserId: userId,
-      });
-
-      if (notification) {
-        approvalNotifications.push(notification);
-      }
     }
-  }
-
-  if (approvalNotifications.length > 0) {
-    await createInAppNotifications(approvalNotifications);
   }
 
   revalidatePath("/admin");

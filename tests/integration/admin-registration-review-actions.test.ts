@@ -220,7 +220,7 @@ describe("admin registration review action contracts", () => {
     }
   });
 
-  it("builds generic player notifications without private review context", () => {
+  it("leaves approval notification creation to the canonical database trigger", () => {
     const compactNotifications = compact(notificationBuilder);
     const notificationCall = sliceSource(
       updateRegistrationStatusAction,
@@ -228,9 +228,20 @@ describe("admin registration review action contracts", () => {
       "  if (notification)"
     );
 
-    expect(compactNotifications).toContain(
-      "You have been approved for ${tournamentTitle}."
+    expect(compactNotifications).not.toContain("registration.approved");
+    expect(compactNotifications).not.toContain("Registration Approved");
+    expect(approveSelectedRegistrationsAction).not.toContain(
+      "buildRegistrationStatusNotification"
     );
+    expect(adminPageSource).not.toContain("createInAppNotifications");
+
+    expect(notificationCall).not.toContain("adminNotes");
+    expect(notificationCall).not.toContain("admin_notes");
+  });
+
+  it("preserves generic notifications for unrelated review states without private context", () => {
+    const compactNotifications = compact(notificationBuilder);
+
     expect(compactNotifications).toContain(
       "Your registration for ${tournamentTitle} has been rejected."
     );
@@ -243,7 +254,5 @@ describe("admin registration review action contracts", () => {
     expect(compactNotifications.toLowerCase()).not.toContain("admin_notes");
     expect(compactNotifications).not.toContain("adminNotes");
     expect(compactNotifications).not.toContain("privateAdminNote");
-    expect(notificationCall).not.toContain("adminNotes");
-    expect(notificationCall).not.toContain("admin_notes");
   });
 });
