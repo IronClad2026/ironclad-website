@@ -16,7 +16,10 @@ vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
 }));
 
-import { recalculateLeaderboardAllTime } from "@/lib/leaderboard/admin";
+import {
+  recalculateLeaderboardAllTime,
+  recalculateLeaderboardForCurrentSeason,
+} from "@/lib/leaderboard/admin";
 
 const runId = "9e0dc4ee-1803-4d25-97fc-59f0da1ec72b";
 
@@ -45,6 +48,33 @@ function createRecalculationClient(options?: {
   };
 
   return { client, runQuery };
+}
+
+function createCurrentSeasonClient(activeSeasonId: string | null) {
+  const seasonQuery = {
+    eq: vi.fn(() => seasonQuery),
+    maybeSingle: vi.fn(async () => ({
+      data: activeSeasonId ? { id: activeSeasonId } : null,
+      error: null,
+    })),
+    select: vi.fn(() => seasonQuery),
+  };
+  const runQuery = {
+    eq: vi.fn(() => runQuery),
+    maybeSingle: vi.fn(async () => ({
+      data: { id: runId, status: "completed", notes: null },
+      error: null,
+    })),
+    select: vi.fn(() => runQuery),
+  };
+  const client = {
+    from: vi.fn((table: string) =>
+      table === "leaderboard_seasons" ? seasonQuery : runQuery
+    ),
+    rpc: vi.fn(async () => ({ data: runId, error: null })),
+  };
+
+  return { client, seasonQuery };
 }
 
 describe("leaderboard manual recalculation authorization", () => {
@@ -103,5 +133,42 @@ describe("leaderboard manual recalculation authorization", () => {
       runId: undefined,
     });
     expect(result.message).not.toContain(privateProviderDetail);
+  });
+
+  it("keeps current-season recovery available without pre-creating a season", async () => {
+    const currentSeasonId = "2361a5dd-64c4-44b3-bf60-29f6772379a9";
+    const recalculation = createCurrentSeasonClient(currentSeasonId);
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(recalculation.client);
+
+    await expect(recalculateLeaderboardForCurrentSeason()).resolves.toEqual({
+      status: "success",
+      message: "Current season leaderboard recalculated.",
+      runId,
+    });
+    expect(recalculation.client.rpc).toHaveBeenCalledWith(
+      "recalculate_leaderboard_for_season",
+      {
+        p_season_id: currentSeasonId,
+        p_triggered_by_clerk_user_id: adminIdentity.userId,
+      }
+    );
+    expect(recalculation.client.rpc).not.toHaveBeenCalledWith(
+      "get_or_create_leaderboard_season",
+      expect.anything()
+    );
+  });
+
+  it("does not create an empty future season when no active season exists", async () => {
+    const recalculation = createCurrentSeasonClient(null);
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(recalculation.client);
+
+    await expect(recalculateLeaderboardForCurrentSeason()).resolves.toEqual({
+      status: "error",
+      message: "There is no active leaderboard season to recalculate.",
+      runId: undefined,
+    });
+    expect(recalculation.client.rpc).not.toHaveBeenCalled();
   });
 });

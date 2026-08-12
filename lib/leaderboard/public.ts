@@ -13,7 +13,7 @@ export type PublicLeaderboardSeason = {
   id: string;
   name: string;
   year: number;
-  seasonNumber: 1 | 2;
+  seasonNumber: number;
   startDate: string;
   endDate: string;
   isActive: boolean;
@@ -361,7 +361,7 @@ function mapSeason(row: SeasonRow): PublicLeaderboardSeason {
     id: row.id,
     name: row.name,
     year: row.year,
-    seasonNumber: row.season_number === 2 ? 2 : 1,
+    seasonNumber: row.season_number,
     startDate: row.start_date,
     endDate: row.end_date,
     isActive: row.is_active,

@@ -58,9 +58,9 @@ function createQuery(result: QueryResult) {
 
 const currentSeason = {
   id: "season-1",
-  name: "2026 Season 2",
+  name: "2026 Main/Pro Season 3",
   year: 2026,
-  season_number: 2,
+  season_number: 3,
   start_date: "2026-07-01",
   end_date: "2026-12-31",
   is_active: true,
@@ -213,7 +213,7 @@ describe("public leaderboard projection", () => {
     ]);
     expect(data.currentSeason).toMatchObject({
       id: "season-1",
-      seasonNumber: 2,
+      seasonNumber: 3,
       isActive: true,
     });
     expect(data.seasonStandings).toMatchObject([
