@@ -61,6 +61,19 @@ export type TournamentSaveState = {
   error: string | null;
 };
 
+export type TournamentTerminalActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+type TournamentTerminalOutcome =
+  | "cancelled"
+  | "already_cancelled"
+  | "voided"
+  | "already_voided"
+  | "under_review"
+  | "already_under_review";
+
 export async function createTournamentBannerUpload(input: {
   fileName: string;
   contentType: string;
@@ -617,6 +630,69 @@ export async function launchTournamentDivision(formData: FormData) {
   );
 }
 
+export async function cancelTournamentAction(
+  _previousState: TournamentTerminalActionState,
+  formData: FormData
+): Promise<TournamentTerminalActionState> {
+  return mutateTournamentTerminalState("cancel", formData);
+}
+
+export async function voidTournamentAction(
+  _previousState: TournamentTerminalActionState,
+  formData: FormData
+): Promise<TournamentTerminalActionState> {
+  return mutateTournamentTerminalState("void", formData);
+}
+
+async function mutateTournamentTerminalState(
+  operation: "cancel" | "void",
+  formData: FormData
+): Promise<TournamentTerminalActionState> {
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+
+  if (!userId || role !== "admin") {
+    return terminalErrorState("Administrator access is required.");
+  }
+
+  const tournamentId = getText(formData, "tournamentId");
+  const reason = getText(formData, "reason");
+
+  if (!isUuid(tournamentId)) {
+    return terminalErrorState("Select a valid tournament.");
+  }
+  if (!reason) {
+    return terminalErrorState("An administrator reason is required.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc(
+    operation === "cancel" ? "cancel_tournament" : "void_tournament",
+    {
+      p_tournament_id: tournamentId,
+      p_reason: reason,
+      p_actor_clerk_user_id: userId,
+    }
+  );
+
+  const outcome = getTournamentTerminalOutcome(data, operation);
+  if (error || !outcome) {
+    logTournamentTerminalFailure(operation, error);
+    return terminalErrorState(
+      getTournamentTerminalErrorMessage(operation, error?.message)
+    );
+  }
+
+  revalidatePath("/admin/tournaments", "page");
+  revalidatePath("/tournaments");
+  revalidatePath("/rankings");
+
+  return {
+    status: "success",
+    message: getTournamentTerminalSuccessMessage(outcome),
+  };
+}
+
 export async function deleteTournament(formData: FormData) {
   const { userId, sessionClaims } = await auth();
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
@@ -871,6 +947,104 @@ function isTournamentHardDeleteGuardError(error: unknown) {
       "message" in error &&
       error.message === TOURNAMENT_HARD_DELETE_GUARD_MESSAGE
   );
+}
+
+function getTournamentTerminalOutcome(
+  value: unknown,
+  operation: "cancel" | "void"
+): TournamentTerminalOutcome | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  const outcome = "outcome" in value ? value.outcome : null;
+  if (
+    operation === "cancel" &&
+    (outcome === "cancelled" || outcome === "already_cancelled")
+  ) {
+    return outcome;
+  }
+  if (
+    operation === "void" &&
+    (outcome === "voided" ||
+      outcome === "already_voided" ||
+      outcome === "under_review" ||
+      outcome === "already_under_review")
+  ) {
+    return outcome;
+  }
+
+  return null;
+}
+
+function getTournamentTerminalSuccessMessage(
+  outcome: TournamentTerminalOutcome
+) {
+  switch (outcome) {
+    case "cancelled":
+      return "The tournament was cancelled.";
+    case "already_cancelled":
+      return "The tournament is already cancelled.";
+    case "voided":
+      return "The tournament was voided.";
+    case "already_voided":
+      return "The tournament is already voided.";
+    case "under_review":
+      return "The finalized Main season is now under review; the tournament was not voided.";
+    case "already_under_review":
+      return "The finalized Main season is already under review; the tournament was not voided.";
+  }
+}
+
+function terminalErrorState(message: string): TournamentTerminalActionState {
+  return { status: "error", message };
+}
+
+function getTournamentTerminalErrorMessage(
+  operation: "cancel" | "void",
+  message: string | undefined
+) {
+  const normalized = message?.toLowerCase() ?? "";
+
+  if (
+    operation === "cancel" &&
+    (normalized.includes("official competitive history") ||
+      normalized.includes("leaderboard point"))
+  ) {
+    return "This tournament has official competitive history and must use Void.";
+  }
+  if (operation === "cancel" && normalized.includes("launched")) {
+    return "Only a launched tournament can be cancelled.";
+  }
+  if (
+    operation === "void" &&
+    normalized.includes("admin") &&
+    normalized.includes("adjustment")
+  ) {
+    return "Resolve the tournament-linked administrator leaderboard adjustment before voiding this tournament.";
+  }
+
+  return operation === "cancel"
+    ? "The tournament could not be cancelled. Refresh and try again."
+    : "The tournament void review could not be completed. Refresh and try again.";
+}
+
+function logTournamentTerminalFailure(
+  operation: "cancel" | "void",
+  error: unknown
+) {
+  const candidateCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : "";
+  const code = /^[A-Z0-9]{3,10}$/.test(candidateCode)
+    ? candidateCode
+    : "TERMINAL_FAILED";
+
+  console.error("Tournament terminal operation failed.", { operation, code });
 }
 
 function readBracket(

@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -10,6 +9,8 @@ export type DeleteAccountState = {
   status: "idle" | "error" | "success";
   message: string;
 };
+
+type AccountClosureOutcome = "deleted" | "pseudonymized" | "not_found";
 
 export async function deleteIronCladAccount(
   _previousState: DeleteAccountState,
@@ -46,31 +47,6 @@ export async function deleteIronCladAccount(
     };
   }
 
-  const anonymizedUserId = `deleted:${randomUUID()}`;
-  const { error: registrationError } = await supabase
-    .from("registrations")
-    .update({
-      clerk_user_id: anonymizedUserId,
-      player_name: "Deleted Player",
-      discord_username: "Deleted Account",
-      steam_name: "Deleted Account",
-      country: "Anonymized",
-      region: "Anonymized",
-      timezone: "UTC",
-      coh3_player_card_url: null,
-    })
-    .eq("clerk_user_id", userId);
-
-  if (registrationError) {
-    console.error("Registration anonymization failed:", registrationError);
-
-    return {
-      status: "error",
-      message:
-        "Historical registrations could not be anonymized. Your account was not deleted.",
-    };
-  }
-
   const { error: avatarError } = await supabase.storage
     .from(AVATAR_BUCKET)
     .remove([`${userId}/avatar`]);
@@ -85,18 +61,23 @@ export async function deleteIronCladAccount(
     };
   }
 
-  const { error: profileError } = await supabase
-    .from("players")
-    .delete()
-    .eq("clerk_user_id", userId);
+  const { data: closureData, error: closureError } = await supabase.rpc(
+    "close_ironclad_player_account",
+    {
+      p_clerk_user_id: userId,
+    }
+  );
 
-  if (profileError) {
-    console.error("Player profile deletion failed:", profileError);
+  if (closureError || !isAccountClosureOutcome(closureData)) {
+    console.error(
+      "IronClad account closure failed:",
+      closureError ?? "Unexpected account closure response"
+    );
 
     return {
       status: "error",
       message:
-        "Your player profile could not be removed. Your Clerk account was not deleted.",
+        "Your IronClad data could not be safely closed. Your Clerk account was not deleted.",
     };
   }
 
@@ -109,7 +90,7 @@ export async function deleteIronCladAccount(
     return {
       status: "error",
       message:
-        "IronClad data was removed, but Clerk account deletion failed. Contact an administrator.",
+        "Your IronClad identity was closed, but Clerk account deletion failed. Contact an administrator.",
     };
   }
 
@@ -117,4 +98,19 @@ export async function deleteIronCladAccount(
     status: "success",
     message: "Your IronClad account has been deleted.",
   };
+}
+
+function isAccountClosureOutcome(value: unknown): value is {
+  outcome: AccountClosureOutcome;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const outcome = Reflect.get(value, "outcome");
+  return (
+    outcome === "deleted" ||
+    outcome === "pseudonymized" ||
+    outcome === "not_found"
+  );
 }

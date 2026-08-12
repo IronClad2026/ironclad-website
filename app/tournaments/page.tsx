@@ -284,13 +284,15 @@ export default async function TournamentsPage() {
 
   for (const registration of bracketRegistrations) {
     const player = playersByClerkId.get(registration.clerk_user_id);
+    const isClosedCompetitor = registration.clerk_user_id.startsWith("deleted:");
 
     const participant: TournamentParticipant = {
       registrationId: registration.id,
       name: player?.in_game_name || registration.player_name,
       country: player?.country || registration.country || "N/A",
-      elo:
-        registration.elo_verification_source === "relic"
+      elo: isClosedCompetitor
+        ? 0
+        : registration.elo_verification_source === "relic"
           ? (registration.elo_verified_elo ??
             registration.submitted_elo ??
             0)

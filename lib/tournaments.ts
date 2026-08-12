@@ -4,7 +4,9 @@ export type TournamentStatus =
   | "upcoming"
   | "registration_open"
   | "in_progress"
-  | "completed";
+  | "completed"
+  | "cancelled"
+  | "voided";
 
 export type TournamentFormat = "1v1" | "2v2" | "4v4";
 export type TournamentRuleFormat = "format_a" | "format_b";
@@ -67,7 +69,13 @@ export type TournamentCard = {
   format: TournamentFormat;
   ruleFormat: TournamentRuleFormat;
   ruleFormatLabel: string;
-  status: "Open" | "Closed" | "In Progress" | "Completed";
+  status:
+    | "Open"
+    | "Closed"
+    | "In Progress"
+    | "Completed"
+    | "Cancelled"
+    | "Voided";
   statusValue: TournamentStatus;
   image: string;
   description: string;
@@ -325,6 +333,8 @@ const statusLabels: Record<TournamentStatus, TournamentCard["status"]> = {
   registration_open: "Open",
   in_progress: "In Progress",
   completed: "Completed",
+  cancelled: "Cancelled",
+  voided: "Voided",
 };
 
 const ruleFormatLabels: Record<TournamentRuleFormat, string> = {
