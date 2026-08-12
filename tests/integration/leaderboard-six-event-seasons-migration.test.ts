@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const migrationName =
   "20260812120000_six_event_main_seasons_late_entry_bonus.sql";
+const correctionMigrationName =
+  "20260812121000_late_entry_bonus_non_played_progression.sql";
 const previousMigrationName =
   "20260812110000_leaderboard_scoring_correctness_concurrency.sql";
 const migration = readFileSync(
@@ -11,6 +13,14 @@ const migration = readFileSync(
   "utf8"
 );
 const compactMigration = migration.toLowerCase().replace(/\s+/g, " ").trim();
+const correctionMigration = readFileSync(
+  resolve(process.cwd(), "supabase/migrations", correctionMigrationName),
+  "utf8"
+);
+const compactCorrectionMigration = correctionMigration
+  .toLowerCase()
+  .replace(/\s+/g, " ")
+  .trim();
 const adminLeaderboardSource = readFileSync(
   resolve(process.cwd(), "lib/leaderboard/admin.ts"),
   "utf8"
@@ -20,22 +30,25 @@ const publicLeaderboardSource = readFileSync(
   "utf8"
 );
 
-function extractFunction(functionName: string) {
+function extractFunction(
+  functionName: string,
+  source = compactMigration
+) {
   const createMarkers = [
     `create or replace function public.${functionName}(`,
     `create function public.${functionName}(`,
   ];
   const start = createMarkers.reduce((found, marker) => {
-    const index = compactMigration.indexOf(marker);
+    const index = source.indexOf(marker);
     return found < 0 || (index >= 0 && index < found) ? index : found;
   }, -1);
-  const end = compactMigration.indexOf("$$;", start);
+  const end = source.indexOf("$$;", start);
 
   if (start < 0 || end < 0) {
     throw new Error(`${functionName} was not found in the PR 3 migration.`);
   }
 
-  return compactMigration.slice(start, end + 3);
+  return source.slice(start, end + 3);
 }
 
 const getOrCreateSeason = extractFunction("get_or_create_leaderboard_season");
@@ -49,7 +62,10 @@ const finalizedAdjustmentGuard = extractFunction(
   "guard_finalized_main_admin_adjustment"
 );
 const adminAdjustment = extractFunction("add_leaderboard_admin_adjustment");
-const validLateEntry = extractFunction("is_valid_late_entry_participation");
+const validLateEntry = extractFunction(
+  "is_valid_late_entry_participation",
+  compactCorrectionMigration
+);
 const awardLateEntry = extractFunction(
   "award_leaderboard_late_entry_bonuses"
 );
@@ -64,7 +80,7 @@ const tournamentRecalculation = extractFunction(
 );
 
 describe("six-event Main seasons and Career late-entry migration", () => {
-  it("is the only ordered migration after PR 2 and has one transaction", () => {
+  it("keeps both PR 3 migrations ordered and transactional", () => {
     const migrationNames = readdirSync(
       resolve(process.cwd(), "supabase/migrations")
     ).sort();
@@ -73,10 +89,21 @@ describe("six-event Main seasons and Career late-entry migration", () => {
     expect(migrationNames.indexOf(migrationName)).toBeGreaterThan(
       migrationNames.indexOf(previousMigrationName)
     );
+    expect(migrationNames.indexOf(correctionMigrationName)).toBeGreaterThan(
+      migrationNames.indexOf(migrationName)
+    );
     expect(compactMigration.startsWith("begin;")).toBe(true);
     expect(compactMigration.endsWith("commit;")).toBe(true);
+    expect(compactCorrectionMigration.startsWith("begin;")).toBe(true);
+    expect(compactCorrectionMigration.endsWith("commit;")).toBe(true);
     expect(compactMigration).not.toContain("create extension");
     expect(compactMigration).not.toMatch(/cron\.|create.*job|schedule\(/);
+    expect(compactCorrectionMigration).not.toMatch(
+      /create table|alter table|create index|cron\.|create.*job|schedule\(/
+    );
+    expect(compactCorrectionMigration).not.toMatch(
+      /create trigger|drop trigger|insert into|update public\.|delete from/
+    );
   });
 
   it("stores one immutable factual membership with at most six Main slots", () => {
@@ -310,7 +337,7 @@ describe("six-event Main seasons and Career late-entry migration", () => {
     );
   });
 
-  it("anchors on the first launched approved roster and delays a no-show bonus", () => {
+  it("anchors on the first launched approved roster and accepts non-played progression", () => {
     expect(awardLateEntry).toContain(
       "anchor_registration.registration_status = 'approved'"
     );
@@ -323,12 +350,47 @@ describe("six-event Main seasons and Career late-entry migration", () => {
     expect(awardLateEntry).toContain(
       ") < (anchor.first_completed_at, anchor.tournament_id)"
     );
+    expect(validLateEntry).toContain("tournament.id = p_tournament_id");
+    expect(validLateEntry).toContain("tournament.status = 'completed'");
+    expect(validLateEntry).toContain("bracket.id = p_tournament_bracket_id");
     expect(validLateEntry).toContain(
-      "public.is_tournament_match_played_for_leaderboard(match.id)"
+      "bracket.tournament_id = tournament.id"
     );
+    expect(validLateEntry).toContain(
+      "bracket.name in ('academy', 'challenge')"
+    );
+    expect(validLateEntry).toContain("bracket.launched_at is not null");
+    expect(validLateEntry).toContain("registration.id = p_registration_id");
+    expect(validLateEntry).toContain(
+      "registration.tournament_id = tournament.id"
+    );
+    expect(validLateEntry).toContain(
+      "registration.tournament_bracket_id = bracket.id"
+    );
+    expect(validLateEntry).toContain(
+      "registration.registration_status = 'approved'"
+    );
+    expect(validLateEntry).toContain("player.id = registration.profile_id");
     expect(validLateEntry).toContain(
       "not public.is_registration_confirmed_no_show_for_leaderboard("
     );
+    expect(validLateEntry).not.toMatch(
+      /is_tournament_match_played_for_leaderboard|tournament_matches|generated_brackets|player_one_score|player_two_score|winner_registration_id/
+    );
+    expect(compactCorrectionMigration).toContain(
+      "revoke all on function public.is_valid_late_entry_participation(uuid, uuid, uuid) from public, anon, authenticated, service_role"
+    );
+    expect(validLateEntry).toContain("language sql stable security definer");
+    expect(validLateEntry).toContain("set search_path = pg_catalog");
+    expect(compactCorrectionMigration).toContain(
+      "alter function public.is_valid_late_entry_participation(uuid, uuid, uuid) owner to postgres"
+    );
+    expect(
+      compactCorrectionMigration.match(
+        /create or replace function public\.is_valid_late_entry_participation\(/g
+      )
+    ).toHaveLength(1);
+    expect(compactCorrectionMigration).not.toContain("grant execute");
     expect(awardLateEntry).toContain(
       "public.is_valid_late_entry_participation( earlier_membership.tournament_id"
     );
