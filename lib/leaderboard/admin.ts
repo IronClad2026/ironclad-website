@@ -140,24 +140,13 @@ export async function recalculateLeaderboardForCurrentSeason(): Promise<Leaderbo
     return errorResult("Current leaderboard season could not be loaded.");
   }
 
-  let seasonId =
+  const seasonId =
     typeof activeSeason?.id === "string" ? activeSeason.id : null;
 
   if (!seasonId) {
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: createdSeasonId, error: seasonError } = await supabase.rpc(
-      "get_or_create_leaderboard_season",
-      {
-        p_date: today,
-      }
+    return errorResult(
+      "There is no active leaderboard season to recalculate."
     );
-
-    if (seasonError || typeof createdSeasonId !== "string") {
-      console.error("Current leaderboard season creation failed:", seasonError);
-      return errorResult("Current leaderboard season could not be prepared.");
-    }
-
-    seasonId = createdSeasonId;
   }
 
   const { data, error } = await supabase.rpc(
