@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { adminIdentity } from "@/tests/fixtures/auth";
+import {
+  adminIdentity,
+  anonymousIdentity,
+  playerIdentity,
+} from "@/tests/fixtures/auth";
 import {
   buildTournamentBannerPublicUrl,
   parseTournamentBannerPath,
@@ -58,6 +62,13 @@ function createTournamentFormData(url: string) {
   formData.set("academyEnabled", "on");
   formData.set("academyEloRules", "Below 1100 ELO");
   formData.set("academyMaxPlayers", "8");
+  return formData;
+}
+
+function createTournamentDeletionFormData() {
+  const formData = new FormData();
+  formData.set("tournamentId", "tournament-1");
+  formData.set("confirmation", "DELETE");
   return formData;
 }
 
@@ -674,7 +685,11 @@ describe("tournament storage cleanup privacy", () => {
     );
   });
 
-  it("deletes only the exact banner returned for the intended tournament", async () => {
+  it("preserves exact Storage cleanup for an allowed RPC manifest", async () => {
+    const proofPath =
+      "123e4567-e89b-42d3-a456-426614174000/" +
+      "223e4567-e89b-42d3-a456-426614174000/" +
+      "game-1-323e4567-e89b-42d3-a456-426614174000.rec";
     const unrelatedPath =
       "banners/323e4567-e89b-42d3-a456-426614174000.png";
     const targetQuery = createQuery({
@@ -697,7 +712,7 @@ describe("tournament storage cleanup privacy", () => {
       rpc: vi.fn(async () => ({
         data: {
           job_id: "cleanup-job-delete",
-          proof_paths: [],
+          proof_paths: [proofPath],
           banner_paths: [bannerPath],
         },
         error: null,
@@ -708,9 +723,7 @@ describe("tournament storage cleanup privacy", () => {
     };
     authMock.mockResolvedValue(adminIdentity);
     createSupabaseAdminClientMock.mockReturnValue(client);
-    const formData = new FormData();
-    formData.set("tournamentId", "tournament-1");
-    formData.set("confirmation", "DELETE");
+    const formData = createTournamentDeletionFormData();
 
     await expect(deleteTournament(formData)).rejects.toThrow(
       "NEXT_REDIRECT:/admin/tournaments?notice=deleted"
@@ -719,14 +732,125 @@ describe("tournament storage cleanup privacy", () => {
       p_tournament_id: "tournament-1",
       p_deleted_by: adminIdentity.userId,
     });
-    expect(storageBucket.remove).toHaveBeenCalledExactlyOnceWith([bannerPath]);
+    expect(storageBucket.remove).toHaveBeenCalledTimes(2);
+    expect(storageBucket.remove).toHaveBeenCalledWith([bannerPath]);
+    expect(storageBucket.remove).toHaveBeenCalledWith([proofPath]);
     expect(storageBucket.remove).not.toHaveBeenCalledWith([unrelatedPath]);
+    expect(client.storage.from).toHaveBeenCalledWith("match-proofs");
+    expect(client.storage.from).toHaveBeenCalledWith("tournament-banners");
     expect(jobDeleteQuery.delete).toHaveBeenCalledOnce();
     expect(jobDeleteQuery.eq).toHaveBeenCalledWith(
       "id",
       "cleanup-job-delete"
     );
   });
+
+  it("maps the exact database guard refusal without starting Storage cleanup", async () => {
+    const targetQuery = createQuery({
+      data: { banner_image_url: bannerUrl },
+      error: null,
+    });
+    const storageFrom = vi.fn();
+    const from = vi.fn((table: string) => {
+      if (table !== "tournaments") {
+        throw new Error(`Unexpected table access: ${table}`);
+      }
+      return targetQuery;
+    });
+    const client = {
+      from,
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: {
+          code: "P0001",
+          message:
+            "Tournament has launched or contains competitive history and cannot be permanently deleted.",
+          details: "private-match-path user_private",
+          hint: "credential-value",
+        },
+      })),
+      storage: { from: storageFrom },
+    };
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(client);
+
+    await expect(
+      deleteTournament(createTournamentDeletionFormData())
+    ).rejects.toThrow(
+      "NEXT_REDIRECT:/admin/tournaments?selected=tournament-1&notice=delete-protected"
+    );
+
+    expect(client.rpc).toHaveBeenCalledExactlyOnceWith(
+      "delete_tournament_data",
+      {
+        p_tournament_id: "tournament-1",
+        p_deleted_by: adminIdentity.userId,
+      }
+    );
+    expect(storageFrom).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalledWith("tournament_deletion_jobs");
+    expect(console.error).not.toHaveBeenCalled();
+    const visibleOutput = JSON.stringify({
+      logs: vi.mocked(console.error).mock.calls,
+      redirects: redirectMock.mock.calls,
+    });
+    expect(visibleOutput).not.toContain("private-match-path");
+    expect(visibleOutput).not.toContain("user_private");
+    expect(visibleOutput).not.toContain("credential-value");
+  });
+
+  it("keeps unexpected database failures on the generic safe path", async () => {
+    const privateError = "private-match-path user_private credential-value";
+    const targetQuery = createQuery({
+      data: { banner_image_url: bannerUrl },
+      error: null,
+    });
+    const storageFrom = vi.fn();
+    const client = {
+      from: vi.fn(() => targetQuery),
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: {
+          code: "P0001",
+          message: privateError,
+          details: privateError,
+        },
+      })),
+      storage: { from: storageFrom },
+    };
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(client);
+
+    await expect(
+      deleteTournament(createTournamentDeletionFormData())
+    ).rejects.toThrow(
+      "NEXT_REDIRECT:/admin/tournaments?selected=tournament-1&notice=delete-failed"
+    );
+
+    expect(storageFrom).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      "Tournament storage cleanup failed.",
+      { operation: "delete-tournament-data", code: "P0001" }
+    );
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      privateError
+    );
+  });
+
+  for (const [label, identity] of [
+    ["anonymous callers", anonymousIdentity],
+    ["non-admin players", playerIdentity],
+  ] as const) {
+    it(`rejects ${label} before creating a service-role client`, async () => {
+      authMock.mockResolvedValue(identity);
+
+      await expect(
+        deleteTournament(createTournamentDeletionFormData())
+      ).rejects.toThrow("Unauthorized");
+
+      expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+    });
+  }
 
   it("refuses a malformed retained banner cleanup manifest", async () => {
     const jobQuery = createQuery({

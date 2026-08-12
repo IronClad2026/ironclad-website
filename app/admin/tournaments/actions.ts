@@ -54,6 +54,9 @@ const validConfirmationWindows = new Set([
   720,
   1440,
 ]);
+const TOURNAMENT_HARD_DELETE_GUARD_CODE = "P0001";
+const TOURNAMENT_HARD_DELETE_GUARD_MESSAGE =
+  "Tournament has launched or contains competitive history and cannot be permanently deleted.";
 export type TournamentSaveState = {
   error: string | null;
 };
@@ -653,6 +656,12 @@ export async function deleteTournament(formData: FormData) {
     p_deleted_by: userId,
   });
 
+  if (isTournamentHardDeleteGuardError(error)) {
+    redirect(
+      `/admin/tournaments?selected=${tournamentId}&notice=delete-protected`
+    );
+  }
+
   if (error || !data) {
     logStorageCleanupFailure("delete-tournament-data", error);
     redirect(
@@ -851,6 +860,17 @@ function logStorageCleanupFailure(operation: string, error: unknown) {
     : "CLEANUP_FAILED";
 
   console.error("Tournament storage cleanup failed.", { operation, code });
+}
+
+function isTournamentHardDeleteGuardError(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === TOURNAMENT_HARD_DELETE_GUARD_CODE &&
+      "message" in error &&
+      error.message === TOURNAMENT_HARD_DELETE_GUARD_MESSAGE
+  );
 }
 
 function readBracket(
