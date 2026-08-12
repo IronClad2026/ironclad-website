@@ -248,7 +248,8 @@ async function loadAllTimeStandings(errors: string[]) {
     .order("total_points", { ascending: false })
     .order("tournament_wins", { ascending: false })
     .order("rounds_passed", { ascending: false })
-    .order("win_rate", { ascending: false });
+    .order("win_rate", { ascending: false })
+    .order("matches_won", { ascending: false });
 
   if (error) {
     console.error("Public leaderboard all-time standings load failed:", error);
@@ -440,7 +441,14 @@ function assignFallbackRanks(rows: PublicLeaderboardStanding[]) {
     group
       .sort(compareStandings)
       .forEach((row, index) => {
-        row.rank = row.rank ?? index + 1;
+        const previous = index > 0 ? group[index - 1] : null;
+
+        if (row.rank === null) {
+          row.rank =
+            previous && haveSameCompetitiveScore(previous, row)
+              ? previous.rank
+              : index + 1;
+        }
       });
   }
 
@@ -457,9 +465,36 @@ function compareStandings(
     right.totalPoints - left.totalPoints ||
     right.tournamentWins - left.tournamentWins ||
     right.roundsPassed - left.roundsPassed ||
-    right.winRate - left.winRate ||
-    left.playerName.localeCompare(right.playerName)
+    compareCompetitiveWinRate(left, right) ||
+    right.matchesWon - left.matchesWon ||
+    left.playerName.localeCompare(right.playerName) ||
+    left.playerId.localeCompare(right.playerId)
   );
+}
+
+function haveSameCompetitiveScore(
+  left: PublicLeaderboardStanding,
+  right: PublicLeaderboardStanding
+) {
+  return (
+    left.totalPoints === right.totalPoints &&
+    left.tournamentWins === right.tournamentWins &&
+    left.roundsPassed === right.roundsPassed &&
+    compareCompetitiveWinRate(left, right) === 0 &&
+    left.matchesWon === right.matchesWon
+  );
+}
+
+function compareCompetitiveWinRate(
+  left: PublicLeaderboardStanding,
+  right: PublicLeaderboardStanding
+) {
+  const leftPlayed = left.matchesPlayed > 0 ? left.matchesPlayed : 1;
+  const rightPlayed = right.matchesPlayed > 0 ? right.matchesPlayed : 1;
+  const leftWon = left.matchesPlayed > 0 ? left.matchesWon : 0;
+  const rightWon = right.matchesPlayed > 0 ? right.matchesWon : 0;
+
+  return rightWon * leftPlayed - leftWon * rightPlayed;
 }
 
 function getPublicAvatarUrl(playerId: string, hasAvatar: boolean) {

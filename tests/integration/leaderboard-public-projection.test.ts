@@ -206,6 +206,10 @@ describe("public leaderboard projection", () => {
         method: "order",
         args: ["win_rate", { ascending: false }],
       },
+      {
+        method: "order",
+        args: ["matches_won", { ascending: false }],
+      },
     ]);
     expect(data.currentSeason).toMatchObject({
       id: "season-1",
@@ -229,6 +233,59 @@ describe("public leaderboard projection", () => {
         currentElo: 1500,
         avatarUrl: "/players/player-1/avatar",
       },
+    ]);
+    expect(data.errors).toEqual([]);
+  });
+
+  it("assigns competition ranks from the five competitive keys and keeps ties", async () => {
+    const tiedZulu = {
+      ...allTimeStanding,
+      player_id: "player-zulu",
+      display_name: "Zulu",
+      in_game_name: "Zulu",
+      total_points: 100,
+      tournament_wins: 2,
+      rounds_passed: 5,
+      matches_played: 4,
+      matches_won: 2,
+      matches_lost: 2,
+      win_rate: 50,
+    };
+    const tiedAlpha = {
+      ...tiedZulu,
+      player_id: "player-alpha",
+      display_name: "Alpha",
+      in_game_name: "Alpha",
+    };
+    const fewerRealWins = {
+      ...tiedZulu,
+      player_id: "player-third",
+      display_name: "Third",
+      in_game_name: "Third",
+      matches_played: 2,
+      matches_won: 1,
+      matches_lost: 1,
+    };
+    const results: Record<string, QueryResult> = {
+      leaderboard_current_season: { data: null, error: null },
+      leaderboard_public_all_time_standings: {
+        data: [tiedZulu, fewerRealWins, tiedAlpha],
+        error: null,
+      },
+      leaderboard_season_champions: { data: [], error: null },
+    };
+    fromMock.mockImplementation((table: string) =>
+      createQuery(results[table]).query
+    );
+
+    const data = await getPublicLeaderboardData();
+
+    expect(
+      data.allTimeStandings.map(({ playerId, rank }) => ({ playerId, rank }))
+    ).toEqual([
+      { playerId: "player-alpha", rank: 1 },
+      { playerId: "player-zulu", rank: 1 },
+      { playerId: "player-third", rank: 3 },
     ]);
     expect(data.errors).toEqual([]);
   });
