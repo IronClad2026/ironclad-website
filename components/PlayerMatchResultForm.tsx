@@ -1,18 +1,37 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
+import {
+  type FormEvent,
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
-  submitMatchResult,
+  cleanupPreparedReplayUploads,
+  finalizeMatchResult,
+  prepareMatchReplayUploads,
   submitNoShowReport,
   type MatchResultActionState,
 } from "@/app/tournaments/match-actions";
+import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { GeneratedTournamentMatch } from "@/lib/tournaments";
 
 const initialState: MatchResultActionState = {
   status: "idle",
   message: "",
 };
+
+const maxReplayBytes = 10 * 1024 * 1024;
+
+type ReplaySubmissionPhase =
+  | "idle"
+  | "preparing"
+  | "uploading"
+  | "finalizing";
 
 export default function PlayerMatchResultForm({
   match,
@@ -23,19 +42,29 @@ export default function PlayerMatchResultForm({
   playerOneName: string;
   playerTwoName: string;
 }) {
-  const [state, formAction, pending] = useActionState(
-    submitMatchResult,
-    initialState
-  );
   const [noShowState, noShowFormAction, noShowPending] = useActionState(
     submitNoShowReport,
     initialState
   );
+  const { getToken } = useAuth();
   const router = useRouter();
+  const submissionInFlightRef = useRef(false);
+  const authenticatedSupabase = useMemo(
+    () => createAuthenticatedBrowserSupabaseClient(getToken),
+    [getToken]
+  );
+  const replayInputRef = useRef<HTMLInputElement>(null);
   const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
+  const [state, setState] = useState(initialState);
+  const [pending, setPending] = useState(false);
+  const [submissionPhase, setSubmissionPhase] =
+    useState<ReplaySubmissionPhase>("idle");
+  const [uploadGameNumber, setUploadGameNumber] = useState(0);
   const [playerOneScore, setPlayerOneScore] = useState("");
   const [playerTwoScore, setPlayerTwoScore] = useState("");
-  const [selectedReplayCount, setSelectedReplayCount] = useState(0);
+  const [winnerRegistrationId, setWinnerRegistrationId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [selectedReplays, setSelectedReplays] = useState<File[]>([]);
   const [replaySelectionError, setReplaySelectionError] = useState("");
   const [noShowOpen, setNoShowOpen] = useState(false);
   const scoreInfo = useMemo(
@@ -48,25 +77,160 @@ export default function PlayerMatchResultForm({
       ),
     [match.seriesBestOf, playerOneScore, playerTwoScore, winsRequired]
   );
+  const selectedReplayCount = selectedReplays.length;
   const replayCountMatches =
     scoreInfo.requiredReplayCount !== null &&
     selectedReplayCount === scoreInfo.requiredReplayCount &&
     !replaySelectionError;
   const submitDisabled =
     pending ||
+    noShowPending ||
     scoreInfo.requiredReplayCount === null ||
     !replayCountMatches;
 
   useEffect(() => {
-    if (state.status === "success" || noShowState.status === "success") {
+    if (noShowState.status === "success") {
       router.refresh();
     }
-  }, [noShowState.status, router, state.status]);
+  }, [noShowState.status, router]);
+
+  const submitMatchResult = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submissionInFlightRef.current) return;
+
+    const parsedPlayerOneScore = parseScore(playerOneScore);
+    const parsedPlayerTwoScore = parseScore(playerTwoScore);
+    const selectionError = validateReplaySelection(selectedReplays);
+
+    if (
+      parsedPlayerOneScore === null ||
+      parsedPlayerTwoScore === null ||
+      scoreInfo.requiredReplayCount === null ||
+      !winnerRegistrationId
+    ) {
+      setState({
+        status: "error",
+        message: "Enter the final score and select the match winner.",
+      });
+      return;
+    }
+
+    if (selectionError) {
+      setReplaySelectionError(selectionError);
+      setState({ status: "error", message: selectionError });
+      return;
+    }
+
+    if (selectedReplays.length !== scoreInfo.requiredReplayCount) {
+      setState({
+        status: "error",
+        message: `This score requires exactly ${scoreInfo.requiredReplayCount} replay file${
+          scoreInfo.requiredReplayCount === 1 ? "" : "s"
+        }.`,
+      });
+      return;
+    }
+
+    submissionInFlightRef.current = true;
+    setPending(true);
+    setState(initialState);
+    setSubmissionPhase("preparing");
+    setUploadGameNumber(0);
+    let preparedPaths: string[] = [];
+    let reachedFinalization = false;
+
+    try {
+      const preparation = await prepareMatchReplayUploads({
+        matchId: match.id,
+        playerOneScore: parsedPlayerOneScore,
+        playerTwoScore: parsedPlayerTwoScore,
+        winnerRegistrationId,
+        replayFiles: selectedReplays.map((file) => ({
+          name: file.name,
+          size: file.size,
+        })),
+      });
+
+      if (preparation.status === "error") {
+        setState(preparation);
+        return;
+      }
+
+      preparedPaths = preparation.uploads.map((upload) => upload.path);
+
+      for (const [index, upload] of preparation.uploads.entries()) {
+        setSubmissionPhase("uploading");
+        setUploadGameNumber(index + 1);
+        const { data, error } = await authenticatedSupabase.storage
+          .from(preparation.bucket)
+          .uploadToSignedUrl(
+            upload.path,
+            upload.token,
+            selectedReplays[index],
+            {
+              cacheControl: "3600",
+              contentType: "application/octet-stream",
+              upsert: false,
+            }
+          );
+
+        if (error || !data || data.path !== upload.path) {
+          throw new Error("SIGNED_UPLOAD_FAILED");
+        }
+      }
+
+      setSubmissionPhase("finalizing");
+      reachedFinalization = true;
+      const result = await finalizeMatchResult({
+        matchId: match.id,
+        playerOneScore: parsedPlayerOneScore,
+        playerTwoScore: parsedPlayerTwoScore,
+        winnerRegistrationId,
+        notes,
+        replayPaths: preparedPaths,
+      });
+
+      setState(result);
+
+      if (result.status === "success") {
+        setPlayerOneScore("");
+        setPlayerTwoScore("");
+        setWinnerRegistrationId("");
+        setNotes("");
+        setSelectedReplays([]);
+        setReplaySelectionError("");
+        if (replayInputRef.current) replayInputRef.current.value = "";
+        router.refresh();
+      }
+    } catch {
+      // Once finalization is dispatched, its trusted server path exclusively
+      // owns pre-commit cleanup. A second browser cleanup could otherwise race
+      // an in-flight RPC whose response was lost and delete soon-to-be-
+      // referenced proof.
+      if (!reachedFinalization && preparedPaths.length > 0) {
+        await cleanupPreparedReplayUploads({
+          matchId: match.id,
+          replayPaths: preparedPaths,
+        }).catch(() => undefined);
+      }
+
+      setState({
+        status: "error",
+        message: reachedFinalization
+          ? "IronClad could not confirm the final response. Refresh this match before retrying."
+          : "The replay upload failed. Your selected files are still available; please try again.",
+      });
+    } finally {
+      submissionInFlightRef.current = false;
+      setPending(false);
+      setSubmissionPhase("idle");
+      setUploadGameNumber(0);
+    }
+  };
 
   return (
     <div className="space-y-5">
-      <form action={formAction} className="space-y-5">
-        <input type="hidden" name="matchId" value={match.id} />
+      <form onSubmit={submitMatchResult} className="space-y-5">
         <div>
           <p className="text-xs font-black uppercase tracking-wider text-white">
             Submit Match Result
@@ -108,7 +272,8 @@ export default function PlayerMatchResultForm({
           <select
             name="winnerRegistrationId"
             required
-            defaultValue=""
+            value={winnerRegistrationId}
+            onChange={(event) => setWinnerRegistrationId(event.target.value)}
             className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-orange-400"
           >
             <option value="">Select winner</option>
@@ -126,19 +291,15 @@ export default function PlayerMatchResultForm({
             Replay proofs (.rec required)
           </span>
           <input
-            name="replays"
+            ref={replayInputRef}
             type="file"
             accept=".rec"
             multiple
             required
             onChange={(event) => {
               const files = Array.from(event.currentTarget.files ?? []);
-              setSelectedReplayCount(files.length);
-              setReplaySelectionError(
-                files.some((file) => !file.name.toLowerCase().endsWith(".rec"))
-                  ? "Every replay file must use the .rec extension."
-                  : ""
-              );
+              setSelectedReplays(files);
+              setReplaySelectionError(validateReplaySelection(files));
             }}
             className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
           />
@@ -171,12 +332,28 @@ export default function PlayerMatchResultForm({
             name="notes"
             maxLength={2000}
             rows={5}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
             className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-orange-400"
           />
         </label>
 
+        {pending && (
+          <p
+            aria-live="polite"
+            className="rounded-lg border border-orange-400/30 bg-orange-500/10 p-2 text-xs text-orange-100"
+          >
+            {getSubmissionPhaseLabel(
+              submissionPhase,
+              uploadGameNumber,
+              selectedReplayCount
+            )}
+          </p>
+        )}
+
         {state.status !== "idle" && (
           <p
+            aria-live="polite"
             className={`rounded-lg border p-2 text-xs ${
               state.status === "success"
                 ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
@@ -191,15 +368,22 @@ export default function PlayerMatchResultForm({
           disabled={submitDisabled}
           className="w-full rounded-xl bg-orange-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400 disabled:opacity-50"
         >
-          {pending ? "Submitting..." : "Submit for Opponent Confirmation"}
+          {pending
+            ? getSubmissionPhaseLabel(
+                submissionPhase,
+                uploadGameNumber,
+                selectedReplayCount
+              )
+            : "Submit for Opponent Confirmation"}
         </button>
       </form>
 
       <div className="rounded-2xl border border-red-400/20 bg-red-500/[0.04] p-4">
         <button
           type="button"
+          disabled={pending || noShowPending}
           onClick={() => setNoShowOpen((current) => !current)}
-          className="flex w-full items-center justify-between gap-3 text-left"
+          className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-50"
         >
           <span>
             <span className="block text-xs font-black uppercase tracking-wider text-red-200">
@@ -266,7 +450,7 @@ export default function PlayerMatchResultForm({
             )}
             <button
               type="submit"
-              disabled={noShowPending}
+              disabled={noShowPending || pending}
               className="w-full rounded-xl bg-red-700 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
             >
               {noShowPending ? "Submitting..." : "Submit No-Show Report"}
@@ -365,4 +549,37 @@ function parseScore(value: string) {
 
   const score = Number(value);
   return Number.isInteger(score) && score >= 0 ? score : null;
+}
+
+function validateReplaySelection(files: File[]) {
+  if (files.length === 0) {
+    return "Upload the match replay files before submitting.";
+  }
+
+  if (files.some((file) => file.size <= 0)) {
+    return "Replay files cannot be empty.";
+  }
+
+  if (files.some((file) => file.size > maxReplayBytes)) {
+    return "Replay files must be 10 MiB or smaller.";
+  }
+
+  if (files.some((file) => !file.name.toLowerCase().endsWith(".rec"))) {
+    return "Every replay file must use the .rec extension.";
+  }
+
+  return "";
+}
+
+function getSubmissionPhaseLabel(
+  phase: ReplaySubmissionPhase,
+  uploadGameNumber: number,
+  replayCount: number
+) {
+  if (phase === "preparing") return "Preparing replay upload…";
+  if (phase === "uploading") {
+    return `Uploading replay ${uploadGameNumber} of ${replayCount}…`;
+  }
+  if (phase === "finalizing") return "Verifying and submitting result…";
+  return "Verifying and submitting result…";
 }
