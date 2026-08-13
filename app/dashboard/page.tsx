@@ -229,8 +229,8 @@ export default async function PlayerDashboardPage() {
             ].join("|")}
             scope="player"
             title="Notifications"
-            description="Recent IronClad updates for registrations, waitlist movement, and match result decisions."
-            emptyMessage="Registration and match updates will appear here."
+            description="Recent IronClad updates for tournaments, registrations, waitlist movement, and match result decisions."
+            emptyMessage="Tournament, registration, and match updates will appear here."
             notifications={playerNotifications.notifications}
             totalCount={playerNotifications.totalCount}
             unreadCount={playerNotifications.unreadCount}

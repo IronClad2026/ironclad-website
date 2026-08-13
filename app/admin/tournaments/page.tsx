@@ -15,6 +15,7 @@ import TournamentFormDraft from "@/components/TournamentFormDraft";
 import TournamentFormShell, {
   TournamentSubmitButton,
 } from "@/components/TournamentFormShell";
+import TournamentRecoveryControl from "@/components/TournamentRecoveryControl";
 import {
   generateTournamentBracket,
   retryTournamentStorageCleanup,
@@ -28,6 +29,7 @@ import type {
 } from "@/lib/tournaments";
 import {
   TOURNAMENT_BRACKET_CONFIGS,
+  isTournamentTerminalStatus,
 } from "@/lib/tournaments";
 
 type CustomClaims = {
@@ -60,6 +62,18 @@ type AdminNotice =
   | "delete-storage-failed"
   | "cleanup-completed"
   | "cleanup-failed";
+
+type AdminTournamentRow = TournamentRow & {
+  terminal_at: string | null;
+  terminal_reason: string | null;
+};
+
+type UnderReviewSeasonRow = {
+  name: string;
+  under_review_at: string;
+  under_review_reason: string;
+  under_review_tournament_id: string;
+};
 
 function compareTournamentRows(left: TournamentRow, right: TournamentRow) {
   const leftHistorical = left.status === "completed" ? 1 : 0;
@@ -162,7 +176,7 @@ export default async function AdminTournamentsPage({
   const { data, error } = await supabase
     .from("tournaments")
     .select(
-      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, created_at, updated_at)"
+      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, terminal_at, terminal_reason, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, created_at, updated_at)"
     )
     .order("grand_final_at", { ascending: false, nullsFirst: false });
 
@@ -170,7 +184,7 @@ export default async function AdminTournamentsPage({
     logSupabaseError("Admin tournament list load failed:", error);
   }
 
-  const tournaments = [...((data ?? []) as TournamentRow[])].sort(
+  const tournaments = [...((data ?? []) as AdminTournamentRow[])].sort(
     compareTournamentRows
   );
   const [
@@ -297,12 +311,39 @@ export default async function AdminTournamentsPage({
   const selected = tournaments.find(
     (tournament) => tournament.id === params?.selected
   );
+  const selectedIsTerminal = selected
+    ? isTournamentTerminalStatus(selected.status)
+    : false;
+  let underReviewSeason: UnderReviewSeasonRow | null = null;
+
+  if (selected) {
+    const { data: underReviewData, error: underReviewError } = await supabase
+      .from("leaderboard_seasons")
+      .select(
+        "name, under_review_at, under_review_reason, under_review_tournament_id"
+      )
+      .eq("under_review_tournament_id", selected.id)
+      .not("under_review_at", "is", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (underReviewError) {
+      logSupabaseError(
+        "Tournament under-review metadata load failed:",
+        underReviewError
+      );
+    } else {
+      underReviewSeason = (underReviewData as UnderReviewSeasonRow | null) ?? null;
+    }
+  }
+
   const formValues = selected ? toFormValues(selected) : emptyTournament;
   const isEditing =
     !formValues.id ||
-    params?.edit === "1" ||
-    params?.notice === "invalid" ||
-    params?.notice === "save-failed";
+    (!selectedIsTerminal &&
+      (params?.edit === "1" ||
+        params?.notice === "invalid" ||
+        params?.notice === "save-failed"));
 
   return (
     <main className="min-h-screen min-w-0 bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32">
@@ -406,15 +447,17 @@ export default async function AdminTournamentsPage({
                     </div>
                   </div>
                   </Link>
-                  <DeleteTournamentControl
-                    tournamentId={tournament.id}
-                    tournamentTitle={tournament.title}
-                    editHref={`/admin/tournaments?selected=${tournament.id}`}
-                    preview={
-                      deletionPreviewByTournament.get(tournament.id) ??
-                      emptyDeletionPreview
-                    }
-                  />
+                  {!isTournamentTerminalStatus(tournament.status) && (
+                    <DeleteTournamentControl
+                      tournamentId={tournament.id}
+                      tournamentTitle={tournament.title}
+                      editHref={`/admin/tournaments?selected=${tournament.id}`}
+                      preview={
+                        deletionPreviewByTournament.get(tournament.id) ??
+                        emptyDeletionPreview
+                      }
+                    />
+                  )}
                 </div>
               ))}
 
@@ -436,6 +479,25 @@ export default async function AdminTournamentsPage({
             readinessByBracket={readinessByBracket}
             isEditing={isEditing}
             errorMessage={params?.error}
+            terminal={
+              selected && isTournamentTerminalStatus(selected.status)
+                ? {
+                    status: selected.status,
+                    at: selected.terminal_at,
+                    reason: selected.terminal_reason,
+                  }
+                : null
+            }
+            underReview={
+              selected && underReviewSeason
+                ? {
+                    seasonName: underReviewSeason.name,
+                    at: underReviewSeason.under_review_at,
+                    reason: underReviewSeason.under_review_reason,
+                    triggeringTournamentTitle: selected.title,
+                  }
+                : null
+            }
           />
         </div>
       </section>
@@ -469,6 +531,8 @@ function TournamentForm({
   readinessByBracket,
   isEditing,
   errorMessage,
+  terminal,
+  underReview,
 }: {
   values: TournamentFormValues;
   notice?: AdminNotice;
@@ -495,6 +559,17 @@ function TournamentForm({
   >;
   isEditing: boolean;
   errorMessage?: string;
+  terminal: {
+    status: "cancelled" | "voided";
+    at: string | null;
+    reason: string | null;
+  } | null;
+  underReview: {
+    seasonName: string;
+    at: string | null;
+    reason: string | null;
+    triggeringTournamentTitle: string;
+  } | null;
 }) {
   const formId = "tournament-editor-form";
 
@@ -781,6 +856,15 @@ function TournamentForm({
         </div>
       )}
       </TournamentFormShell>
+
+      {values.id && (
+        <TournamentRecoveryControl
+          tournamentId={values.id}
+          tournamentTitle={values.title}
+          terminal={terminal}
+          underReview={underReview}
+        />
+      )}
 
       {values.id &&
         isEditing &&

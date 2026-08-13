@@ -43,8 +43,12 @@ export default function DeleteAccountSection() {
           </p>
           <h2 className="mt-3 text-2xl font-bold text-white">Delete Account</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-            Permanently remove your Clerk account, player profile, and avatar.
-            Historical tournament records will remain anonymized.
+            Permanently remove your live IronClad sign-in and profile identity,
+            avatar, and direct personal identifiers. Private account links are
+            removed or neutralized. Official tournament, match, leaderboard,
+            and champion history is preserved publicly only as Former
+            Competitor. Referenced private replay proof may remain for
+            authorized review.
           </p>
         </div>
 
@@ -90,9 +94,12 @@ export default function DeleteAccountSection() {
             </div>
 
             <p className="relative z-10 mt-5 text-sm leading-6 text-zinc-300">
-              This cannot be undone. Your historical registrations will remain
-              available to tournament administrators without your personal
-              identity.
+              This cannot be undone. If you have official competition history,
+              its registrations, match results, leaderboard standings, champion
+              records, and referenced private replay proof will remain. Public
+              history will identify you only as Former Competitor, and private
+              proof remains limited to authorized reviewers. Otherwise, your
+              player record will be removed.
             </p>
 
             <form action={formAction} className="relative z-10 mt-6">

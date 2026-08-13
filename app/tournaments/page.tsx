@@ -10,6 +10,7 @@ import {
 } from "@/lib/tournament-bracket-data";
 import {
   getTournamentBracketDisplayName,
+  getPublicTournamentRowsForRequest,
   isTournamentBracketPublic,
   mapTournamentRow,
   type TournamentParticipant,
@@ -19,6 +20,12 @@ import {
 export const dynamic = "force-dynamic";
 
 type RelicVerifiedDivision = "Academy" | "Challenge" | "Main / Pro";
+
+type TournamentsPageProps = {
+  searchParams?: Promise<{
+    tournament?: string | string[];
+  }>;
+};
 
 function normalizeRelicVerifiedDivision(
   value: unknown
@@ -30,8 +37,11 @@ function normalizeRelicVerifiedDivision(
     : null;
 }
 
-export default async function TournamentsPage() {
+export default async function TournamentsPage({
+  searchParams,
+}: TournamentsPageProps = {}) {
   const { userId, sessionClaims } = await auth();
+  const params = await searchParams;
   const isAdmin =
     (
       sessionClaims as {
@@ -115,7 +125,15 @@ export default async function TournamentsPage() {
     );
   }
 
-  const tournamentRows = (tournamentResult.data ?? []) as TournamentRow[];
+  const allTournamentRows = (tournamentResult.data ?? []) as TournamentRow[];
+  const requestedTournament = getSingleSearchParam(params?.tournament);
+  const tournamentRows = getPublicTournamentRowsForRequest(
+    allTournamentRows,
+    requestedTournament ?? null
+  );
+  const includedTournamentIds = new Set(
+    tournamentRows.map((tournament) => tournament.id)
+  );
   const publicBracketIds = new Set(
     tournamentRows.flatMap((tournament) =>
       (tournament.tournament_brackets ?? [])
@@ -128,32 +146,36 @@ export default async function TournamentsPage() {
   ).filter((generated) =>
     publicBracketIds.has(generated.tournament_bracket_id)
   );
-  const registrations = (registrationResult.data ?? []) as {
-    id: string;
-    clerk_user_id: string;
-    tournament_id: string;
-    tournament_bracket_id: string;
-    player_name: string;
-    country: string | null;
-    submitted_elo: number | null;
-    elo_verified_elo: number | null;
-    elo_verification_source: string | null;
-    registration_status:
-      | "pending"
-      | "manual_review"
-      | "approved"
-      | "rejected"
-      | "waitlisted"
-      | "withdrawn";
-    waitlist_offer_status:
-      | "offered"
-      | "accepted"
-      | "declined"
-      | "expired"
-      | "cancelled"
-      | null;
-    created_at: string | null;
-  }[];
+  const registrations = (
+    (registrationResult.data ?? []) as {
+      id: string;
+      clerk_user_id: string;
+      tournament_id: string;
+      tournament_bracket_id: string;
+      player_name: string;
+      country: string | null;
+      submitted_elo: number | null;
+      elo_verified_elo: number | null;
+      elo_verification_source: string | null;
+      registration_status:
+        | "pending"
+        | "manual_review"
+        | "approved"
+        | "rejected"
+        | "waitlisted"
+        | "withdrawn";
+      waitlist_offer_status:
+        | "offered"
+        | "accepted"
+        | "declined"
+        | "expired"
+        | "cancelled"
+        | null;
+      created_at: string | null;
+    }[]
+  ).filter((registration) =>
+    includedTournamentIds.has(registration.tournament_id)
+  );
   const referencedRegistrationIds = getGeneratedBracketRegistrationIds(
     publicGeneratedBracketRows
   );
@@ -334,6 +356,13 @@ export default async function TournamentsPage() {
   });
   tournaments.sort(compareTournamentCards);
   const matchResultData = await loadMatchResultData();
+  const includedMatchIds = new Set(
+    tournaments.flatMap((tournament) =>
+      tournament.generatedBrackets.flatMap((bracket) =>
+        bracket.matches.map((match) => match.id)
+      )
+    )
+  );
 
   if (tournaments.length === 0) {
     return (
@@ -368,11 +397,19 @@ export default async function TournamentsPage() {
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
       }}
-      matchResultSubmissions={matchResultData.submissions}
-      matchResultReportGroups={matchResultData.reportGroups}
+      matchResultSubmissions={matchResultData.submissions.filter((submission) =>
+        includedMatchIds.has(submission.matchId)
+      )}
+      matchResultReportGroups={matchResultData.reportGroups.filter(
+        (reportGroup) => includedMatchIds.has(reportGroup.matchId)
+      )}
       eloVerificationEnabled={true}
     />
   );
+}
+
+function getSingleSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function buildWaitlistPositionMap(

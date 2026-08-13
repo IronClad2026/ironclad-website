@@ -9,6 +9,24 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
+type TournamentTerminalNotificationOutcome = "cancelled" | "voided";
+
+type TournamentTerminalRegistration = {
+  id: string;
+  clerkUserId: string;
+  registrationStatus: string;
+  tournamentTitle: string;
+  tournamentBracket: unknown;
+  waitlistOfferStatus: string | null;
+};
+
+const CANCELLATION_NOTIFICATION_STATUSES = [
+  "pending",
+  "manual_review",
+  "approved",
+  "waitlisted",
+] as const;
+
 type ReportGroupNotificationContext = {
   id: string;
   matchId: string;
@@ -35,6 +53,83 @@ type LegacySubmissionNotificationContext = {
   submittedByClerkUserId: string | null;
   submittedByName: string;
 };
+
+export async function notifyPlayersOfTournamentTerminalTransition(
+  supabase: SupabaseAdminClient,
+  {
+    tournamentId,
+    outcome,
+  }: {
+    tournamentId: string;
+    outcome: TournamentTerminalNotificationOutcome;
+  }
+): Promise<boolean> {
+  const query = supabase
+    .from("registrations")
+    .select(
+      "id, clerk_user_id, tournament_title, registration_status, waitlist_offer_status, tournament_bracket:tournament_brackets!inner(launched_at)"
+    )
+    .eq("tournament_id", tournamentId);
+  const { data, error } =
+    outcome === "cancelled"
+      ? await query.in("registration_status", [
+          ...CANCELLATION_NOTIFICATION_STATUSES,
+        ])
+      : await query.eq("registration_status", "approved");
+
+  if (error) {
+    logNotificationFailure(`tournament-${outcome}-context`, error);
+    return false;
+  }
+
+  const seenRegistrations = new Set<string>();
+  const notifications: NotificationCreateInput[] = [];
+
+  for (const value of Array.isArray(data) ? data : []) {
+    const registration = readTournamentTerminalRegistration(value);
+    if (!registration) continue;
+
+    const eligible =
+      outcome === "cancelled"
+        ? isAffectedCancellationRegistration(registration)
+        : registration.registrationStatus === "approved" &&
+          hasLaunchedTournamentBracket(registration.tournamentBracket);
+    const recipientRegistrationKey = `${registration.clerkUserId}:${registration.id}`;
+
+    if (!eligible || seenRegistrations.has(recipientRegistrationKey)) continue;
+    seenRegistrations.add(recipientRegistrationKey);
+
+    notifications.push({
+      recipientClerkUserId: registration.clerkUserId,
+      recipientRole: "player",
+      type:
+        outcome === "cancelled"
+          ? "tournament.cancelled"
+          : "tournament.voided",
+      title:
+        outcome === "cancelled"
+          ? "Tournament Cancelled"
+          : "Tournament Voided",
+      message:
+        outcome === "cancelled"
+          ? `${registration.tournamentTitle} was cancelled. Your registration is now closed, and no official competitive result was recorded.`
+          : `${registration.tournamentTitle} was voided. Its factual competition history remains available, but its results no longer count toward IronClad standings.`,
+      tournamentId,
+      tournamentTitle: registration.tournamentTitle,
+      registrationId: registration.id,
+      eventKey: `tournament:${tournamentId}:registration:${registration.id}:${outcome}`,
+    });
+  }
+
+  if (notifications.length === 0) return true;
+
+  const results = await Promise.all(
+    notifications.map((notification) =>
+      createInAppNotification(notification)
+    )
+  );
+  return results.every(Boolean);
+}
 
 export async function notifyAdminsOfMatchDispute(
   supabase: SupabaseAdminClient,
@@ -462,6 +557,72 @@ function buildMatchReviewNotification({
       decision,
     },
   };
+}
+
+function readTournamentTerminalRegistration(
+  value: unknown
+): TournamentTerminalRegistration | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const id = Reflect.get(value, "id");
+  const clerkUserId = Reflect.get(value, "clerk_user_id");
+  const registrationStatus = Reflect.get(value, "registration_status");
+  const tournamentTitle = Reflect.get(value, "tournament_title");
+  const waitlistOfferStatus = Reflect.get(value, "waitlist_offer_status");
+
+  if (
+    typeof id !== "string" ||
+    id.trim().length === 0 ||
+    typeof clerkUserId !== "string" ||
+    clerkUserId.trim().length === 0 ||
+    clerkUserId.trim().startsWith("deleted:") ||
+    typeof registrationStatus !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: id.trim(),
+    clerkUserId: clerkUserId.trim(),
+    registrationStatus,
+    tournamentTitle:
+      typeof tournamentTitle === "string" && tournamentTitle.trim().length > 0
+        ? tournamentTitle.trim()
+        : "This IronClad tournament",
+    tournamentBracket: Reflect.get(value, "tournament_bracket"),
+    waitlistOfferStatus:
+      typeof waitlistOfferStatus === "string" ? waitlistOfferStatus : null,
+  };
+}
+
+function isAffectedCancellationRegistration(
+  registration: TournamentTerminalRegistration
+) {
+  if (
+    !CANCELLATION_NOTIFICATION_STATUSES.includes(
+      registration.registrationStatus as (typeof CANCELLATION_NOTIFICATION_STATUSES)[number]
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    registration.registrationStatus !== "waitlisted" ||
+    registration.waitlistOfferStatus === null ||
+    registration.waitlistOfferStatus === "offered"
+  );
+}
+
+function hasLaunchedTournamentBracket(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(hasLaunchedTournamentBracket);
+  }
+  if (!value || typeof value !== "object") return false;
+
+  const launchedAt = Reflect.get(value, "launched_at");
+  return typeof launchedAt === "string" && launchedAt.trim().length > 0;
 }
 
 function logNotificationFailure(operation: string, error: unknown) {

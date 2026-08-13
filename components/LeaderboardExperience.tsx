@@ -26,67 +26,63 @@ type LeaderboardExperienceProps = {
   data: PublicLeaderboardData;
 };
 
-const bracketOptions: Array<{
-  value: LeaderboardBracketType;
+type PublicRankingView = "main" | "academy" | "challenge";
+
+const rankingOptions: Array<{
+  value: PublicRankingView;
   label: string;
-  description: string;
 }> = [
   {
-    value: "overall",
-    label: "Overall",
-    description: "Academy, Challenge, and Main combined",
+    value: "main",
+    label: "Main / Pro Season",
   },
   {
     value: "academy",
-    label: "Academy Bracket",
-    description: "Academy bracket scoring",
+    label: "Academy Career",
   },
   {
     value: "challenge",
-    label: "Challenge Bracket",
-    description: "Challenge bracket scoring",
+    label: "Challenge Career",
   },
-  {
-    value: "main",
-    label: "Main / Elite Bracket",
-    description: "Main / Elite bracket scoring",
-  },
-];
-
-const scopeOptions: Array<{ value: LeaderboardScope; label: string }> = [
-  { value: "season", label: "Current Season" },
-  { value: "all_time", label: "All Time" },
 ];
 
 export default function LeaderboardExperience({
   data,
 }: LeaderboardExperienceProps) {
-  const [scope, setScope] = useState<LeaderboardScope>("season");
-  const [bracketType, setBracketType] =
-    useState<LeaderboardBracketType>("overall");
+  const [rankingView, setRankingView] = useState<PublicRankingView>("main");
+  const isMainSeason = rankingView === "main";
+  const scope: LeaderboardScope = isMainSeason ? "season" : "all_time";
 
   const activeRows = useMemo(() => {
-    const source =
-      scope === "season" ? data.seasonStandings : data.allTimeStandings;
+    const source = isMainSeason
+      ? data.seasonStandings
+      : data.allTimeStandings;
 
     return source
-      .filter((row) => row.bracketType === bracketType)
+      .filter((row) => row.bracketType === rankingView)
       .slice()
       .sort(compareRows);
-  }, [bracketType, data.allTimeStandings, data.seasonStandings, scope]);
+  }, [data.allTimeStandings, data.seasonStandings, isMainSeason, rankingView]);
 
   const podiumRows = useMemo(
     () =>
       data.seasonStandings
-        .filter((row) => row.bracketType === "overall")
+        .filter(
+          (row) =>
+            row.bracketType === "main" &&
+            row.rank !== null &&
+            row.rank <= 3
+        )
         .slice()
-        .sort(compareRows)
-        .slice(0, 3),
+        .sort(compareRows),
     [data.seasonStandings]
   );
 
   const historyItems = useMemo(
-    () => buildTournamentHistory(data.seasonStandings),
+    () =>
+      buildTournamentHistory(
+        data.seasonStandings.filter((row) => row.bracketType === "main")
+      ),
     [data.seasonStandings]
   );
 
@@ -94,12 +90,8 @@ export default function LeaderboardExperience({
     <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#030303,#080808_42%,#030303)] text-white">
       <LeaderboardHero
         currentSeason={data.currentSeason}
-        seasonProgress={data.currentSeasonProgress}
-        playerCount={
-          data.seasonStandings.filter(
-            (row) => row.bracketType === "overall"
-          ).length
-        }
+        rankingView={rankingView}
+        playerCount={activeRows.length}
       />
 
       <section className="relative z-10 mx-auto max-w-[1800px] space-y-10 px-4 py-10 sm:px-6 lg:px-8 xl:px-10">
@@ -111,8 +103,24 @@ export default function LeaderboardExperience({
         )}
 
         <ScrollReveal>
-          <LeaderboardPodium rows={podiumRows} />
+          <section className="border border-orange-500/20 bg-black/70 p-4 shadow-2xl shadow-black/25 backdrop-blur sm:p-5">
+            <SegmentedControl
+              label="Public leaderboard"
+              options={rankingOptions}
+              value={rankingView}
+              onChange={setRankingView}
+            />
+          </section>
         </ScrollReveal>
+
+        {isMainSeason && (
+          <ScrollReveal>
+            <LeaderboardPodium
+              rows={podiumRows}
+              season={data.currentSeason}
+            />
+          </ScrollReveal>
+        )}
 
         <ScrollReveal>
           <section
@@ -130,46 +138,35 @@ export default function LeaderboardExperience({
                 </p>
 
                 <h2 className="mt-3 text-3xl font-black text-white">
-                  Player Ranking
+                  {getRankingViewLabel(rankingView)}
                 </h2>
 
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300">
-                  Switch between seasonal and all-time standings, then filter by
-                  bracket. All rows come from public-safe leaderboard views.
+                  {getRankingViewDescription(rankingView)} All rows come from
+                  public-safe leaderboard views.
                 </p>
-              </div>
-
-              <div className="grid gap-3 lg:min-w-[720px] lg:grid-cols-[0.85fr_1.15fr]">
-                <SegmentedControl
-                  label="Ranking Scope"
-                  options={scopeOptions}
-                  value={scope}
-                  onChange={setScope}
-                />
-
-                <SegmentedControl
-                  label="Bracket"
-                  options={bracketOptions}
-                  value={bracketType}
-                  onChange={setBracketType}
-                />
               </div>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <MetricCard label="Visible Players" value={activeRows.length} />
+            {!isMainSeason && <CareerExplanation division={rankingView} />}
 
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <MetricCard
-                label="Ranking Scope"
-                value={scope === "season" ? "Season" : "All Time"}
+                label="Visible Competitors"
+                value={activeRows.length}
               />
 
               <MetricCard
-                label="Bracket"
+                label="Ranking Model"
+                value={isMainSeason ? "Six-event season" : "Permanent Career"}
+              />
+
+              <MetricCard
+                label={isMainSeason ? "Season State" : "Division"}
                 value={
-                  bracketOptions.find(
-                    (option) => option.value === bracketType
-                  )?.label ?? "Overall"
+                  isMainSeason
+                    ? getMainSeasonState(data.currentSeason).shortLabel
+                    : getRankingViewLabel(rankingView)
                 }
               />
             </div>
@@ -178,10 +175,12 @@ export default function LeaderboardExperience({
           </section>
         </ScrollReveal>
 
-        <ScrollReveal className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
-          <TournamentHistoryLeaderboard items={historyItems} />
-          <SeasonChampionsArchive champions={data.seasonChampions} />
-        </ScrollReveal>
+        {isMainSeason && (
+          <ScrollReveal className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+            <TournamentHistoryLeaderboard items={historyItems} />
+            <SeasonChampionsArchive champions={data.seasonChampions} />
+          </ScrollReveal>
+        )}
       </section>
     </main>
   );
@@ -189,14 +188,20 @@ export default function LeaderboardExperience({
 
 function LeaderboardHero({
   currentSeason,
-  seasonProgress,
+  rankingView,
   playerCount,
 }: {
   currentSeason: PublicLeaderboardSeason | null;
-  seasonProgress: number;
+  rankingView: PublicRankingView;
   playerCount: number;
 }) {
-  const progress = currentSeason ? seasonProgress : 0;
+  const isMainSeason = rankingView === "main";
+  const seasonState = getMainSeasonState(currentSeason);
+  const validEventCount = Math.min(
+    Math.max(currentSeason?.validMainEventCount ?? 0, 0),
+    6
+  );
+  const progressWidth = `${(validEventCount / 6) * 100}%`;
 
   return (
     <section className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-20">
@@ -226,9 +231,8 @@ function LeaderboardHero({
           </h1>
 
           <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300 md:text-lg">
-            Track IronClad seasonal performance across Academy, Challenge, and
-            Main / Elite brackets. Points reset between seasons while all-time
-            achievements remain archived.
+            Main / Pro is the authoritative six-valid-event prize season.
+            Academy and Challenge track separate permanent Career standings.
           </p>
         </div>
 
@@ -236,19 +240,23 @@ function LeaderboardHero({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
-                Current Season
+                {isMainSeason ? "Featured Main / Pro Season" : "Career Standings"}
               </p>
 
               <h2 className="mt-2 text-2xl font-black text-white">
-                {currentSeason?.name ?? "Season Pending"}
+                {isMainSeason
+                  ? currentSeason?.name ?? "Season not started"
+                  : getRankingViewLabel(rankingView)}
               </h2>
 
               <p className="mt-2 text-sm text-zinc-400">
-                {currentSeason
+                {isMainSeason && currentSeason
                   ? `${formatDate(currentSeason.startDate)} - ${formatDate(
                       currentSeason.endDate
                     )}`
-                  : "Standings will appear after the first leaderboard recalculation publishes a current season."}
+                  : isMainSeason
+                    ? "No qualifying season is underway. Standings begin with the first valid Main / Pro event."
+                    : "Points remain part of this division's permanent competitive record."}
               </p>
             </div>
 
@@ -257,29 +265,65 @@ function LeaderboardHero({
             </div>
           </div>
 
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-zinc-400">
-              <span>Season Progress</span>
-              <span>{Math.round(progress)}%</span>
-            </div>
+          {isMainSeason ? (
+            <>
+              <div className="mt-6">
+                <div className="flex items-center justify-between gap-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  <span>Valid qualifying events</span>
+                  <span className="shrink-0 text-orange-200">
+                    {validEventCount} / 6
+                  </span>
+                </div>
 
-            <div className="mt-3 h-3 overflow-hidden rounded-full border border-orange-400/15 bg-black/70">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-300 shadow-[0_0_18px_rgba(249,115,22,0.55)]"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
+                <div className="mt-3 h-3 overflow-hidden rounded-full border border-orange-400/15 bg-black/70">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-300 shadow-[0_0_18px_rgba(249,115,22,0.55)]"
+                    style={{ width: progressWidth }}
+                  />
+                </div>
+
+                <p className="mt-3 text-sm leading-6 text-zinc-300">
+                  {seasonState.description}
+                </p>
+              </div>
+
+              {currentSeason?.isUnderReview && (
+                <div
+                  role="status"
+                  className="mt-5 border border-amber-300/35 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100"
+                >
+                  Season results are under review. Displayed standings are
+                  historical and are not currently confirmed for prize
+                  settlement.
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="mt-6 border border-orange-300/20 bg-orange-500/[0.06] p-4 text-sm leading-6 text-zinc-300">
+              Career points do not reset when a Main / Pro season finishes and
+              remain separate from the other Career division.
+            </p>
+          )}
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <HeroStat label="Players" value={playerCount} />
+            <HeroStat label="Competitors" value={playerCount} />
 
-            <HeroStat
-              label="Season"
-              value={currentSeason ? `S${currentSeason.seasonNumber}` : "TBA"}
-            />
-
-            <HeroStat label="Reset" value="2 / Year" />
+            {isMainSeason ? (
+              <>
+                <HeroStat
+                  label="Season"
+                  value={
+                    currentSeason ? `S${currentSeason.seasonNumber}` : "TBA"
+                  }
+                />
+                <HeroStat label="State" value={seasonState.shortLabel} />
+              </>
+            ) : (
+              <>
+                <HeroStat label="Scope" value="Permanent" />
+                <HeroStat label="Reset" value="Never" />
+              </>
+            )}
           </div>
         </div>
       </ScrollReveal>
@@ -305,43 +349,129 @@ function HeroStat({
   );
 }
 
+function CareerExplanation({ division }: { division: PublicRankingView }) {
+  const divisionLabel = division === "academy" ? "Academy" : "Challenge";
+
+  return (
+    <div
+      role="note"
+      className="mt-6 border border-orange-300/20 bg-orange-500/[0.055] p-4 text-sm leading-6 text-zinc-300 sm:p-5"
+    >
+      <p className="font-black text-white">
+        {divisionLabel} is a permanent Career standing.
+      </p>
+      <p className="mt-2">
+        Points do not reset when a Main / Pro season finishes. Academy history
+        remains Academy history, Challenge history remains Challenge history,
+        and neither Career standing determines Main / Pro seasonal cash prizes.
+      </p>
+      <p className="mt-2 text-zinc-400">
+        New Career entrants may receive +5 points per prior eligible event,
+        awarded once per division, up to +25.
+      </p>
+    </div>
+  );
+}
+
+function getRankingViewLabel(view: PublicRankingView) {
+  return (
+    rankingOptions.find((option) => option.value === view)?.label ??
+    "Main / Pro Season"
+  );
+}
+
+function getRankingViewDescription(view: PublicRankingView) {
+  if (view === "main") {
+    return "Official Main / Pro standings for the featured six-valid-event season.";
+  }
+
+  return `${view === "academy" ? "Academy" : "Challenge"} points and results remain in this permanent Career view.`;
+}
+
+function getMainSeasonState(season: PublicLeaderboardSeason | null) {
+  if (!season) {
+    return {
+      shortLabel: "Not started",
+      description: "Season not started.",
+      isFinal: false,
+    };
+  }
+
+  if (season.isUnderReview) {
+    return {
+      shortLabel: "Under review",
+      description:
+        "Frozen historical standings remain displayed while the finalized season is under review.",
+      isFinal: true,
+    };
+  }
+
+  if (season.isFinalized) {
+    return {
+      shortLabel: "Finalized",
+      description: "Finalized. These Main / Pro standings are frozen.",
+      isFinal: true,
+    };
+  }
+
+  if (season.validMainEventCount >= 6) {
+    return {
+      shortLabel: "Finalization pending",
+      description:
+        "Finalization pending. Automatic scoring and finalization should normally complete after the sixth valid event.",
+      isFinal: false,
+    };
+  }
+
+  return {
+    shortLabel: "In progress",
+    description: "Season in progress.",
+    isFinal: false,
+  };
+}
+
 function LeaderboardPodium({
   rows,
+  season,
 }: {
   rows: PublicLeaderboardStanding[];
+  season: PublicLeaderboardSeason | null;
 }) {
   if (rows.length === 0) {
     return (
       <EmptyPanel
         icon={Crown}
-        title="Top 3 Current Season Podium"
-        message="No public season leaders are available yet. Podium positions will appear after completed tournaments are recalculated."
+        title="Main / Pro prize positions unavailable"
+        message="Official competitive ranks will appear after valid Main / Pro results are published."
       />
     );
   }
 
-  const ordered = rows.length >= 3 ? [rows[1], rows[0], rows[2]] : rows;
+  const seasonState = getMainSeasonState(season);
 
   return (
-    <section>
+    <section aria-label="Main / Pro prize positions">
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
-            Current Season Leaders
+            {seasonState.isFinal
+              ? "Final Main / Pro Standings"
+              : "Current Main / Pro Standings"}
           </p>
 
           <h2 className="mt-2 text-3xl font-black text-white">
-            Top 3 Podium
+            Prize Positions
           </h2>
         </div>
 
         <p className="max-w-2xl text-sm text-zinc-400">
-          Overall bracket leaders from the active season standings.
+          Every competitor with official Main / Pro competitive rank 1, 2 or
+          3 remains represented. Display order does not change official rank.
         </p>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3 lg:items-end">
-        {ordered.map((row) => (
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 xl:items-end">
+        {rows.map((row) => (
           <PodiumCard
             key={row.playerId ?? `former-${row.displayOrder}`}
             row={row}
@@ -417,7 +547,7 @@ function LeaderboardTable({
       <EmptyPanel
         icon={Target}
         title="No standings published yet"
-        message="Leaderboard rows will appear here after administrators recalculate completed tournaments. Everyone starts from 0 points at go-live."
+        message="Leaderboard rows will appear after a valid tournament completion is automatically recalculated."
         className="mt-6"
       />
     );
@@ -540,6 +670,8 @@ function SegmentedControl<T extends string>({
       </p>
 
       <div
+        role="group"
+        aria-label={label}
         className={`grid gap-2 border border-orange-500/20 bg-black/55 p-2 shadow-inner shadow-black/30 ${
           options.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"
         }`}
@@ -645,11 +777,11 @@ function SeasonChampionsArchive({
     >
       <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
         <Award size={16} />
-        Season Champions Archive
+        Main / Pro Champion Archive
       </p>
 
       <h2 className="mt-3 text-2xl font-black text-white">
-        Champion Records
+        Latest Finalized Results
       </h2>
 
       {champions.length === 0 ? (
@@ -933,14 +1065,14 @@ function formatBracketLabel(
   }
 
   if (bracketType === "main") {
-    return "Main / Elite Bracket";
+    return "Main / Pro";
   }
 
   if (bracketType === "challenge") {
     return "Challenge Bracket";
   }
 
-  return "Overall";
+  return "Aggregate";
 }
 
 function PlayerProfileContainer({

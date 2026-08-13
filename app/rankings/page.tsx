@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Leaderboard & Ranking | IronClad",
   description:
-    "Track IronClad seasonal leaderboard standings, all-time rankings, bracket performance, and champion archives.",
+    "Track the six-event Main / Pro prize season and permanent Academy and Challenge Career standings.",
 };
 
 export default async function RankingsPage() {
