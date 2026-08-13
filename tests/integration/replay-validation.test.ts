@@ -40,15 +40,50 @@ const PLAYER_TWO_REGISTRATION_ID =
 const MAX_REPLAY_BYTES = 10 * 1024 * 1024;
 
 type MockError = { code?: string; message: string };
+type AttemptStatus =
+  | "prepared"
+  | "finalizing"
+  | "cleaning"
+  | "cleaned"
+  | "recycling"
+  | "committed";
+type MockReplayAttempt = {
+  id: string;
+  matchId: string;
+  ownerClerkUserId: string;
+  ownerRegistrationId: string;
+  winnerRegistrationId: string;
+  playerOneScore: number;
+  playerTwoScore: number;
+  requiredReplayCount: number;
+  declaredReplaySizes: number[];
+  paths: string[];
+  status: AttemptStatus;
+  finalizationClaimId: string | null;
+  cleanupClaimId: string | null;
+  recycleClaimId: string | null;
+  committedResult: Record<string, unknown> | null;
+};
 type MockOptions = {
   activeReport?: boolean;
+  beforeRpcCommit?: () => Promise<void>;
+  beforeStorageRemove?: (paths: string[]) => Promise<void>;
+  claimReplayPathCount?: number;
   legacyReport?: boolean;
   launched?: boolean;
   matchStatus?: string;
   ownedRegistrationId?: string | null;
+  preparationOutcomes?: Array<
+    | "create"
+    | "existing-blocked"
+    | "cooldown-budget"
+    | "cleanup-required"
+    | "recycle-required"
+  >;
   referenceError?: MockError | null;
   referencedPaths?: string[];
   rpcError?: MockError | null;
+  rpcResponseLossAfterCommit?: boolean;
   seriesBestOf?: number;
   tournamentStatus?: string;
 };
@@ -67,14 +102,14 @@ function validPreparationInput(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function validFinalizationInput(paths: string[]) {
+function validFinalizationInput(attemptId: string) {
   return {
     matchId: MATCH_ID,
+    attemptId,
     playerOneScore: 2,
     playerTwoScore: 0,
     winnerRegistrationId: PLAYER_ONE_REGISTRATION_ID,
     notes: "gg",
-    replayPaths: paths,
   };
 }
 
@@ -94,6 +129,8 @@ function createReplayClient(options: MockOptions = {}) {
     seriesBestOf: options.seriesBestOf ?? 3,
     tournamentStatus: options.tournamentStatus ?? "in_progress",
   };
+  const attempts = new Map<string, MockReplayAttempt>();
+  let preparationCallCount = 0;
   const payloads = new Map<string, Uint8Array[]>();
   const removedPaths: string[][] = [];
   const queryCalls: Array<{
@@ -123,24 +160,319 @@ function createReplayClient(options: MockOptions = {}) {
     },
   }));
   const remove = vi.fn(async (paths: string[]) => {
+    await options.beforeStorageRemove?.(paths);
     removedPaths.push([...paths]);
     for (const path of paths) payloads.delete(path);
     return { data: paths.map((name) => ({ name })), error: null };
   });
   const storageBucket = { createSignedUploadUrl, download, remove };
-  const rpc = vi.fn(async (_name: string, args: Record<string, unknown>) => {
-    if (state.rpcError) return { data: null, error: state.rpcError };
+  const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
+    if (name === "prepare_match_replay_upload_attempt") {
+      const forcedOutcome =
+        options.preparationOutcomes?.[preparationCallCount++] ?? null;
+      if (forcedOutcome === "existing-blocked") {
+        return rpcFailure(
+          "This replay attempt is already being finalized or cleaned"
+        );
+      }
+      if (forcedOutcome === "cooldown-budget") {
+        return rpcFailure(
+          "Replay upload capability cooldown or attempt budget is active"
+        );
+      }
+      const ownerClerkUserId = String(args.p_submitted_by_clerk_user_id);
+      const existing = [...attempts.values()].find(
+        (attempt) =>
+          attempt.matchId === args.p_match_id &&
+          attempt.ownerRegistrationId === state.ownedRegistrationId &&
+          ["prepared", "finalizing", "cleaning", "recycling"].includes(
+            attempt.status
+          )
+      );
+      if (existing && forcedOutcome !== "create") {
+        return {
+          data: null,
+          error: {
+            code: "55000",
+            message:
+              existing.status === "prepared"
+                ? "A replay upload attempt is already active; retry in 60 seconds"
+                : "This replay attempt is already being finalized or cleaned",
+          },
+        };
+      }
 
-    const replayPaths = args.p_replay_storage_paths as string[];
-    replayPaths.forEach((path) => state.referencedPaths.add(path));
-    return {
-      data: {
+      const attemptId = `77777777-7777-4777-8777-${String(
+        attempts.size + 1
+      ).padStart(12, "0")}`;
+      const requiredReplayCount =
+        Number(args.p_player_one_score) + Number(args.p_player_two_score);
+      const paths = Array.from({ length: 5 }, (_, index) => {
+        const objectId = `88888888-8888-4888-8888-${String(
+          index + 1
+        ).padStart(12, "0")}`;
+        return `${args.p_match_id}/${attemptId}/game-${index + 1}-${objectId}.rec`;
+      });
+      const attempt: MockReplayAttempt = {
+        id: attemptId,
+        matchId: String(args.p_match_id),
+        ownerClerkUserId,
+        ownerRegistrationId: state.ownedRegistrationId ?? "",
+        winnerRegistrationId: String(args.p_winner_registration_id),
+        playerOneScore: Number(args.p_player_one_score),
+        playerTwoScore: Number(args.p_player_two_score),
+        requiredReplayCount,
+        declaredReplaySizes: [...(args.p_declared_replay_sizes as number[])],
+        paths,
+        status: "prepared",
+        finalizationClaimId: null,
+        cleanupClaimId: null,
+        recycleClaimId: null,
+        committedResult: null,
+      };
+      attempts.set(attemptId, attempt);
+      if (forcedOutcome === "cleanup-required") {
+        const claimId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        attempt.status = "cleaning";
+        attempt.cleanupClaimId = claimId;
+        return {
+          data: {
+            outcome: "cleanup_required",
+            attempt_id: attemptId,
+            cleanup_claim_id: claimId,
+            replay_storage_paths: [...paths],
+          },
+          error: null,
+        };
+      }
+      if (forcedOutcome === "recycle-required") {
+        const claimId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+        attempt.status = "recycling";
+        attempt.recycleClaimId = claimId;
+        return {
+          data: {
+            outcome: "recycle_required",
+            attempt_id: attemptId,
+            recycle_claim_id: claimId,
+            replay_storage_paths: [...paths],
+          },
+          error: null,
+        };
+      }
+      return {
+        data: {
+          outcome: "prepared",
+          attempt_id: attemptId,
+          replay_storage_paths: paths.slice(0, requiredReplayCount),
+          required_replay_count: requiredReplayCount,
+          capability_issue_count: 1,
+        },
+        error: null,
+      };
+    }
+
+    if (name === "claim_match_replay_attempt_finalization") {
+      const attempt = attempts.get(String(args.p_attempt_id));
+      const ownershipError = validateAttemptRpcScope(attempt, args);
+      if (ownershipError) return { data: null, error: ownershipError };
+      if (!attempt) throw new Error("Attempt scope unexpectedly passed");
+
+      if (
+        args.p_winner_registration_id !== attempt.winnerRegistrationId ||
+        args.p_player_one_score !== attempt.playerOneScore ||
+        args.p_player_two_score !== attempt.playerTwoScore
+      ) {
+        return rpcFailure("Final result does not match this replay attempt");
+      }
+
+      if (attempt.status === "committed") {
+        return {
+          data: {
+            outcome: "committed",
+            report: attempt.committedResult,
+            winner_registration_id: attempt.winnerRegistrationId,
+            player_one_score: attempt.playerOneScore,
+            player_two_score: attempt.playerTwoScore,
+            required_replay_count: attempt.requiredReplayCount,
+          },
+          error: null,
+        };
+      }
+      if (attempt.status === "finalizing") {
+        return rpcFailure("Replay finalization is already in progress");
+      }
+      if (attempt.status !== "prepared") {
+        return rpcFailure("Replay attempt is not available for finalization");
+      }
+      if (
+        !state.launched ||
+        state.tournamentStatus === "cancelled" ||
+        state.tournamentStatus === "voided"
+      ) {
+        return rpcFailure(
+          "Terminal tournaments cannot accept competitive mutation"
+        );
+      }
+      if (state.activeReport || state.legacyReport) {
+        return rpcFailure("This match already has active result activity");
+      }
+
+      const claimId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      attempt.status = "finalizing";
+      attempt.finalizationClaimId = claimId;
+      return {
+        data: {
+          outcome: "claimed",
+          claim_id: claimId,
+          replay_storage_paths: attempt.paths.slice(
+            0,
+            options.claimReplayPathCount ?? attempt.requiredReplayCount
+          ),
+          winner_registration_id: attempt.winnerRegistrationId,
+          player_one_score: attempt.playerOneScore,
+          player_two_score: attempt.playerTwoScore,
+          required_replay_count: attempt.requiredReplayCount,
+        },
+        error: null,
+      };
+    }
+
+    if (name === "claim_match_replay_attempt_cleanup") {
+      const attempt = attempts.get(String(args.p_attempt_id));
+      const ownershipError = validateAttemptRpcScope(attempt, args);
+      if (ownershipError) return { data: null, error: ownershipError };
+      if (!attempt) throw new Error("Attempt scope unexpectedly passed");
+
+      if (attempt.status === "committed") {
+        return { data: { outcome: "preserved" }, error: null };
+      }
+      if (attempt.status === "cleaned") {
+        return { data: { outcome: "cleaned" }, error: null };
+      }
+      const suppliedFinalizationClaim =
+        typeof args.p_finalization_claim_id === "string"
+          ? args.p_finalization_claim_id
+          : null;
+      if (
+        attempt.status === "finalizing" &&
+        suppliedFinalizationClaim !== attempt.finalizationClaimId
+      ) {
+        return rpcFailure("Replay finalization owns this attempt");
+      }
+      if (attempt.status === "cleaning") {
+        return rpcFailure("Replay cleanup is already in progress");
+      }
+      if (![
+        "prepared",
+        "finalizing",
+      ].includes(attempt.status)) {
+        return rpcFailure("Replay attempt is not available for cleanup");
+      }
+
+      const cleanupClaimId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+      attempt.status = "cleaning";
+      attempt.finalizationClaimId = null;
+      attempt.cleanupClaimId = cleanupClaimId;
+      return {
+        data: {
+          outcome: "claimed",
+          cleanup_claim_id: cleanupClaimId,
+          replay_storage_paths: [...attempt.paths],
+        },
+        error: null,
+      };
+    }
+
+    if (name === "complete_match_replay_attempt_cleanup") {
+      const attempt = attempts.get(String(args.p_attempt_id));
+      if (
+        !attempt ||
+        attempt.status !== "cleaning" ||
+        attempt.cleanupClaimId !== args.p_cleanup_claim_id
+      ) {
+        return rpcFailure("Replay cleanup claim no longer owns this attempt");
+      }
+      attempt.status = "cleaned";
+      attempt.cleanupClaimId = null;
+      return { data: true, error: null };
+    }
+
+    if (name === "complete_match_replay_attempt_recycling") {
+      const attempt = attempts.get(String(args.p_attempt_id));
+      const ownershipError = validateAttemptRpcScope(attempt, args);
+      if (ownershipError) return { data: null, error: ownershipError };
+      if (
+        !attempt ||
+        attempt.status !== "recycling" ||
+        attempt.recycleClaimId !== args.p_recycle_claim_id
+      ) {
+        return rpcFailure("Replay recycling claim no longer owns this attempt");
+      }
+      attempt.paths = attempt.paths.map(
+        (_, index) =>
+          `${attempt.matchId}/${attempt.id}/game-${index + 1}-99999999-9999-4999-8999-${String(
+            index + 1
+          ).padStart(12, "0")}.rec`
+      );
+      attempt.status = "prepared";
+      attempt.recycleClaimId = null;
+      return {
+        data: {
+          outcome: "prepared",
+          attempt_id: attempt.id,
+          replay_storage_paths: attempt.paths.slice(
+            0,
+            attempt.requiredReplayCount
+          ),
+          required_replay_count: attempt.requiredReplayCount,
+          capability_issue_count: 2,
+        },
+        error: null,
+      };
+    }
+
+    if (name === "commit_match_replay_attempt_result") {
+      const attempt = attempts.get(String(args.p_attempt_id));
+      const ownershipError = validateAttemptRpcScope(attempt, args);
+      if (ownershipError) return { data: null, error: ownershipError };
+      if (
+        !attempt ||
+        attempt.status !== "finalizing" ||
+        attempt.finalizationClaimId !== args.p_finalization_claim_id
+      ) {
+        return rpcFailure(
+          "Replay finalization claim no longer owns this attempt"
+        );
+      }
+
+      await options.beforeRpcCommit?.();
+      if (state.rpcError) return { data: null, error: state.rpcError };
+      if (
+        !Array.isArray(args.p_replay_content_hashes) ||
+        args.p_replay_content_hashes.length !== attempt.requiredReplayCount
+      ) {
+        return rpcFailure("Replay hash count does not match this attempt");
+      }
+
+      const result = {
         report_group_id: "66666666-6666-4666-8666-666666666666",
         submission_number: 3,
         confirmation_deadline_at: "2026-08-13T10:00:00.000Z",
-      },
-      error: null,
-    };
+      };
+      attempt.paths
+        .slice(0, attempt.requiredReplayCount)
+        .forEach((path) => state.referencedPaths.add(path));
+      attempt.status = "committed";
+      attempt.finalizationClaimId = null;
+      attempt.committedResult = result;
+      state.activeReport = true;
+      if (options.rpcResponseLossAfterCommit) {
+        return rpcFailure("The committed response was lost in transit");
+      }
+      return { data: result, error: null };
+    }
+
+    throw new Error(`Unexpected RPC: ${name}`);
   });
   const client = {
     from,
@@ -239,8 +571,29 @@ function createReplayClient(options: MockOptions = {}) {
     throw new Error(`Unexpected query resolution: ${table}.${selected}`);
   }
 
+  function validateAttemptRpcScope(
+    attempt: MockReplayAttempt | undefined,
+    args: Record<string, unknown>
+  ): MockError | null {
+    if (!attempt || attempt.matchId !== args.p_match_id) {
+      return { code: "P0001", message: "Replay attempt not found" };
+    }
+    if (attempt.ownerClerkUserId !== args.p_submitted_by_clerk_user_id) {
+      return {
+        code: "P0001",
+        message: "Player does not own this replay attempt",
+      };
+    }
+    return null;
+  }
+
+  function rpcFailure(message: string) {
+    return { data: null, error: { code: "P0001", message } };
+  }
+
   return {
     client,
+    attempts,
     createSignedUploadUrl,
     download,
     payloads,
@@ -248,6 +601,8 @@ function createReplayClient(options: MockOptions = {}) {
     remove,
     removedPaths,
     rpc,
+    rpcCallsFor: (name: string) =>
+      rpc.mock.calls.filter(([rpcName]) => rpcName === name),
     state,
   };
 }
@@ -292,6 +647,14 @@ function streamFromChunks(chunks: Uint8Array[]) {
   });
 }
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 function recursivelyContainsTransportBody(value: unknown): boolean {
   if (value instanceof File || value instanceof FormData) return true;
   if (Array.isArray(value)) return value.some(recursivelyContainsTransportBody);
@@ -315,16 +678,16 @@ describe("replay direct-upload actions and trusted finalization", () => {
 
   it("requires authentication independently for prepare, finalize, and cleanup", async () => {
     authMock.mockResolvedValue(anonymousIdentity);
-    const path = `${MATCH_ID}/77777777-7777-4777-8777-777777777777/game-1-88888888-8888-4888-8888-888888888888.rec`;
+    const attemptId = "77777777-7777-4777-8777-777777777777";
 
     await expect(
       prepareMatchReplayUploads(validPreparationInput())
     ).resolves.toMatchObject({ status: "error", message: expect.stringContaining("Sign in") });
     await expect(
-      finalizeMatchResult(validFinalizationInput([path, path.replace("game-1", "game-2")]))
+      finalizeMatchResult(validFinalizationInput(attemptId))
     ).resolves.toMatchObject({ status: "error", message: expect.stringContaining("Sign in") });
     await expect(
-      cleanupPreparedReplayUploads({ matchId: MATCH_ID, replayPaths: [path] })
+      cleanupPreparedReplayUploads({ matchId: MATCH_ID, attemptId })
     ).resolves.toMatchObject({ status: "error", message: expect.stringContaining("Sign in") });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
@@ -443,9 +806,77 @@ describe("replay direct-upload actions and trusted finalization", () => {
     expect(
       new Set(result.uploads.map((upload) => upload.path.split("/")[1])).size
     ).toBe(1);
+    expect(result.uploads[0].path.split("/")[1]).toBe(result.attemptId);
   });
 
-  it("streams stored bytes, derives trusted SHA-256, and reuses the existing RPC", async () => {
+  it("bounds parallel and cooldown preparation to one active attempt", async () => {
+    const replayClient = createReplayClient();
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+
+    const results = await Promise.all([
+      prepareMatchReplayUploads(validPreparationInput()),
+      prepareMatchReplayUploads(validPreparationInput()),
+    ]);
+    expect(results.filter((result) => result.status === "success")).toHaveLength(
+      1
+    );
+    expect(results.filter((result) => result.status === "error")).toHaveLength(1);
+    expect(replayClient.attempts.size).toBe(1);
+    expect(replayClient.createSignedUploadUrl).toHaveBeenCalledTimes(2);
+
+    const cooldownRetry = await prepareMatchReplayUploads(
+      validPreparationInput()
+    );
+    expect(cooldownRetry.status).toBe("error");
+    expect(replayClient.attempts.size).toBe(1);
+    expect(replayClient.createSignedUploadUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it("replaces an abandoned preparation only after claiming and cleaning it", async () => {
+    const replayClient = createReplayClient({
+      preparationOutcomes: ["cleanup-required", "create"],
+    });
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+
+    const result = await prepareMatchReplayUploads(validPreparationInput());
+
+    expect(result.status).toBe("success");
+    expect(
+      replayClient.rpcCallsFor("prepare_match_replay_upload_attempt")
+    ).toHaveLength(2);
+    expect(
+      replayClient.rpcCallsFor("complete_match_replay_attempt_cleanup")
+    ).toHaveLength(1);
+    expect(replayClient.remove).toHaveBeenCalledTimes(1);
+    expect(replayClient.removedPaths[0]).toHaveLength(5);
+    expect(replayClient.createSignedUploadUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it("final-sweeps an expired namespace before signing fresh object paths", async () => {
+    const replayClient = createReplayClient({
+      preparationOutcomes: ["recycle-required"],
+    });
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+
+    const result = await prepareMatchReplayUploads(validPreparationInput());
+    if (result.status !== "success") throw new Error("Preparation failed");
+
+    expect(replayClient.remove).toHaveBeenCalledTimes(1);
+    expect(replayClient.removedPaths[0]).toHaveLength(5);
+    expect(
+      replayClient.rpcCallsFor("complete_match_replay_attempt_recycling")
+    ).toHaveLength(1);
+    expect(result.uploads.every((upload) => upload.path.includes("99999999"))).toBe(
+      true
+    );
+    expect(
+      result.uploads.some((upload) =>
+        replayClient.removedPaths[0].includes(upload.path)
+      )
+    ).toBe(false);
+  });
+
+  it("streams stored bytes, derives trusted SHA-256, and commits through the attempt wrapper", async () => {
     const replayClient = createReplayClient();
     createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
     const prepared = await prepareMatchReplayUploads(validPreparationInput());
@@ -455,18 +886,16 @@ describe("replay direct-upload actions and trusted finalization", () => {
     replayClient.payloads.set(prepared.uploads[0].path, [firstBytes]);
     replayClient.payloads.set(prepared.uploads[1].path, [secondBytes]);
 
-    const input = validFinalizationInput(
-      prepared.uploads.map((upload) => upload.path)
-    );
+    const input = validFinalizationInput(prepared.attemptId);
     const result = await finalizeMatchResult(input);
 
     expect(result).toMatchObject({ status: "success" });
     expect(replayClient.download).toHaveBeenCalledTimes(2);
     expect(replayClient.rpc).toHaveBeenCalledWith(
-      "submit_match_series_result_report",
+      "commit_match_replay_attempt_result",
       expect.objectContaining({
         p_match_id: MATCH_ID,
-        p_replay_storage_paths: input.replayPaths,
+        p_attempt_id: prepared.attemptId,
         p_replay_content_hashes: [
           createHash("sha256").update(firstBytes).digest("hex"),
           createHash("sha256").update(secondBytes).digest("hex"),
@@ -478,14 +907,14 @@ describe("replay direct-upload actions and trusted finalization", () => {
   });
 
   it("rechecks ownership and exact replay count before downloading stored proof", async () => {
-    const ownershipClient = createReplayClient({ ownedRegistrationId: null });
+    const ownershipClient = createReplayClient();
     createSupabaseAdminClientMock.mockReturnValue(ownershipClient.client);
-    const attemptId = "77777777-7777-4777-8777-777777777777";
-    const firstPath = `${MATCH_ID}/${attemptId}/game-1-88888888-8888-4888-8888-888888888888.rec`;
-    const secondPath = `${MATCH_ID}/${attemptId}/game-2-99999999-9999-4999-8999-999999999999.rec`;
+    const ownedAttempt = await prepareMatchReplayUploads(validPreparationInput());
+    if (ownedAttempt.status !== "success") throw new Error("Preparation failed");
+    ownershipClient.state.ownedRegistrationId = null;
 
     const ownershipResult = await finalizeMatchResult(
-      validFinalizationInput([firstPath, secondPath])
+      validFinalizationInput(ownedAttempt.attemptId)
     );
     expect(ownershipResult).toMatchObject({
       status: "error",
@@ -494,18 +923,55 @@ describe("replay direct-upload actions and trusted finalization", () => {
     expect(ownershipClient.download).not.toHaveBeenCalled();
     expect(ownershipClient.remove).not.toHaveBeenCalled();
 
-    const countClient = createReplayClient();
+    const countClient = createReplayClient({ claimReplayPathCount: 1 });
     createSupabaseAdminClientMock.mockReturnValue(countClient.client);
-    countClient.payloads.set(firstPath, [new TextEncoder().encode("proof")]);
-    const countResult = await finalizeMatchResult(
-      validFinalizationInput([firstPath])
+    const countAttempt = await prepareMatchReplayUploads(validPreparationInput());
+    if (countAttempt.status !== "success") throw new Error("Preparation failed");
+    countAttempt.uploads.forEach((upload) =>
+      countClient.payloads.set(upload.path, [new TextEncoder().encode("proof")])
     );
-    expect(countResult).toMatchObject({
-      status: "error",
-      message: expect.stringContaining("exactly 2 replay files"),
-    });
+    const countResult = await finalizeMatchResult(
+      validFinalizationInput(countAttempt.attemptId)
+    );
+    expect(countResult.status).toBe("error");
     expect(countClient.download).not.toHaveBeenCalled();
-    expect(countClient.remove).toHaveBeenCalledWith([firstPath]);
+    expect(countClient.remove).not.toHaveBeenCalled();
+  });
+
+  it("rejects changed result facts before claiming finalization and keeps the prepared attempt retryable", async () => {
+    const replayClient = createReplayClient();
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+    const prepared = await prepareMatchReplayUploads(validPreparationInput());
+    if (prepared.status !== "success") throw new Error("Preparation failed");
+    prepared.uploads.forEach((upload, index) =>
+      replayClient.payloads.set(upload.path, [
+        new TextEncoder().encode(`stored-game-${index + 1}`),
+      ])
+    );
+
+    const mismatch = await finalizeMatchResult({
+      ...validFinalizationInput(prepared.attemptId),
+      playerTwoScore: 1,
+    });
+
+    expect(mismatch).toMatchObject({
+      status: "error",
+      requiresRefresh: false,
+    });
+    expect(replayClient.download).not.toHaveBeenCalled();
+    expect(replayClient.remove).not.toHaveBeenCalled();
+    expect(replayClient.attempts.get(prepared.attemptId)?.status).toBe(
+      "prepared"
+    );
+
+    const retry = await finalizeMatchResult(
+      validFinalizationInput(prepared.attemptId)
+    );
+    expect(retry.status).toBe("success");
+    expect(replayClient.download).toHaveBeenCalledTimes(2);
+    expect(
+      replayClient.rpcCallsFor("commit_match_replay_attempt_result")
+    ).toHaveLength(1);
   });
 
   it("accepts an exact 10 MiB stored replay and hashes it one object at a time", async () => {
@@ -525,7 +991,7 @@ describe("replay direct-upload actions and trusted finalization", () => {
     replayClient.payloads.set(prepared.uploads[0].path, chunks);
 
     const result = await finalizeMatchResult({
-      ...validFinalizationInput([prepared.uploads[0].path]),
+      ...validFinalizationInput(prepared.attemptId),
       playerOneScore: 1,
     });
 
@@ -533,7 +999,7 @@ describe("replay direct-upload actions and trusted finalization", () => {
     const trustedHash = createHash("sha256");
     chunks.forEach((chunk) => trustedHash.update(chunk));
     expect(replayClient.rpc).toHaveBeenCalledWith(
-      "submit_match_series_result_report",
+      "commit_match_replay_attempt_result",
       expect.objectContaining({
         p_replay_content_hashes: [trustedHash.digest("hex")],
       })
@@ -559,13 +1025,15 @@ describe("replay direct-upload actions and trusted finalization", () => {
     );
 
     const result = await finalizeMatchResult(
-      validFinalizationInput(prepared.uploads.map((upload) => upload.path))
+      validFinalizationInput(prepared.attemptId)
     );
 
     expect(result.status).toBe("error");
-    expect(replayClient.rpc).not.toHaveBeenCalled();
+    expect(
+      replayClient.rpcCallsFor("commit_match_replay_attempt_result")
+    ).toHaveLength(0);
     expect(replayClient.remove).toHaveBeenCalledWith(
-      prepared.uploads.map((upload) => upload.path)
+      replayClient.attempts.get(prepared.attemptId)?.paths
     );
   });
 
@@ -580,36 +1048,51 @@ describe("replay direct-upload actions and trusted finalization", () => {
     );
 
     const result = await finalizeMatchResult(
-      validFinalizationInput(prepared.uploads.map((upload) => upload.path))
+      validFinalizationInput(prepared.attemptId)
     );
 
     expect(result).toMatchObject({
       status: "error",
       message: expect.stringContaining("unique replay"),
     });
-    expect(replayClient.rpc).not.toHaveBeenCalled();
+    expect(
+      replayClient.rpcCallsFor("commit_match_replay_attempt_result")
+    ).toHaveLength(0);
     expect(replayClient.remove).toHaveBeenCalledOnce();
   });
 
-  it("rejects malformed, wrong-match, and mixed-attempt paths without unsafe deletion", async () => {
+  it("rejects malformed, wrong-match, and wrong-owner attempts without unsafe deletion", async () => {
     const replayClient = createReplayClient();
     createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
     const prepared = await prepareMatchReplayUploads(validPreparationInput());
     if (prepared.status !== "success") throw new Error("Preparation failed");
-    const [first, second] = prepared.uploads.map((upload) => upload.path);
-    const cases = [
-      [first.replace(MATCH_ID, OTHER_MATCH_ID), second],
-      [first, second.replace(second.split("/")[1], "99999999-9999-4999-8999-999999999999")],
-      [first, second.replace("game-2", "game-5")],
-      [`${MATCH_ID}/../private.rec`, second],
-    ];
 
-    for (const replayPaths of cases) {
-      const result = await finalizeMatchResult(
-        validFinalizationInput(replayPaths)
-      );
-      expect(result.status).toBe("error");
-    }
+    const malformed = await finalizeMatchResult(
+      validFinalizationInput("../private-attempt")
+    );
+    expect(malformed.status).toBe("error");
+
+    const wrongMatch = await cleanupPreparedReplayUploads({
+      matchId: OTHER_MATCH_ID,
+      attemptId: prepared.attemptId,
+    });
+    expect(wrongMatch.status).toBe("error");
+
+    authMock.mockResolvedValue({
+      ...playerIdentity,
+      userId: "user_other_match_participant",
+    });
+    replayClient.state.ownedRegistrationId = PLAYER_TWO_REGISTRATION_ID;
+    const wrongOwner = await finalizeMatchResult(
+      validFinalizationInput(prepared.attemptId)
+    );
+    expect(wrongOwner.status).toBe("error");
+    const wrongOwnerCleanup = await cleanupPreparedReplayUploads({
+      matchId: MATCH_ID,
+      attemptId: prepared.attemptId,
+    });
+    expect(wrongOwnerCleanup.status).toBe("error");
+
     expect(replayClient.download).not.toHaveBeenCalled();
     expect(replayClient.remove).not.toHaveBeenCalled();
   });
@@ -628,7 +1111,7 @@ describe("replay direct-upload actions and trusted finalization", () => {
     replayClient.state.tournamentStatus = "voided";
 
     const terminalResult = await finalizeMatchResult(
-      validFinalizationInput(prepared.uploads.map((upload) => upload.path))
+      validFinalizationInput(prepared.attemptId)
     );
     expect(terminalResult).toMatchObject({
       status: "error",
@@ -649,49 +1132,96 @@ describe("replay direct-upload actions and trusted finalization", () => {
       )
     );
     await finalizeMatchResult(
-      validFinalizationInput(rpcPrepared.uploads.map((upload) => upload.path))
+      validFinalizationInput(rpcPrepared.attemptId)
     );
     expect(rpcFailureClient.remove).toHaveBeenCalledOnce();
   });
 
   it("cleanup refuses another match, fails closed on reference errors, and preserves referenced proof", async () => {
-    const replayClient = createReplayClient({ seriesBestOf: 1 });
-    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
-    const prepared = await prepareMatchReplayUploads(
+    const wrongMatchClient = createReplayClient({ seriesBestOf: 1 });
+    createSupabaseAdminClientMock.mockReturnValue(wrongMatchClient.client);
+    const wrongMatchAttempt = await prepareMatchReplayUploads(
       validPreparationInput({
         playerOneScore: 1,
         replayFiles: [{ name: "one.rec", size: 10 }],
       })
     );
-    if (prepared.status !== "success") throw new Error("Preparation failed");
-    const path = prepared.uploads[0].path;
-    replayClient.payloads.set(path, [new TextEncoder().encode("proof")]);
+    if (wrongMatchAttempt.status !== "success") {
+      throw new Error("Preparation failed");
+    }
 
     await cleanupPreparedReplayUploads({
-      matchId: MATCH_ID,
-      replayPaths: [path.replace(MATCH_ID, OTHER_MATCH_ID)],
+      matchId: OTHER_MATCH_ID,
+      attemptId: wrongMatchAttempt.attemptId,
     });
-    expect(replayClient.remove).not.toHaveBeenCalled();
+    expect(wrongMatchClient.remove).not.toHaveBeenCalled();
 
-    replayClient.state.referencedPaths.add(path);
-    const preserved = await cleanupPreparedReplayUploads({
+    const referenceClient = createReplayClient({ seriesBestOf: 1 });
+    createSupabaseAdminClientMock.mockReturnValue(referenceClient.client);
+    const referenceAttempt = await prepareMatchReplayUploads(
+      validPreparationInput({
+        playerOneScore: 1,
+        replayFiles: [{ name: "one.rec", size: 10 }],
+      })
+    );
+    if (referenceAttempt.status !== "success") {
+      throw new Error("Preparation failed");
+    }
+    const referencedPath = referenceAttempt.uploads[0].path;
+    referenceClient.state.referencedPaths.add(referencedPath);
+    const referenced = await cleanupPreparedReplayUploads({
       matchId: MATCH_ID,
-      replayPaths: [path],
+      attemptId: referenceAttempt.attemptId,
     });
-    expect(preserved).toEqual({ status: "success", removedCount: 0 });
-    expect(replayClient.remove).not.toHaveBeenCalled();
+    expect(referenced.status).toBe("error");
+    expect(referenceClient.remove).not.toHaveBeenCalled();
 
-    replayClient.state.referencedPaths.clear();
-    replayClient.state.referenceError = {
+    const referenceErrorClient = createReplayClient({ seriesBestOf: 1 });
+    createSupabaseAdminClientMock.mockReturnValue(referenceErrorClient.client);
+    const referenceErrorAttempt = await prepareMatchReplayUploads(
+      validPreparationInput({
+        playerOneScore: 1,
+        replayFiles: [{ name: "one.rec", size: 10 }],
+      })
+    );
+    if (referenceErrorAttempt.status !== "success") {
+      throw new Error("Preparation failed");
+    }
+    referenceErrorClient.state.referenceError = {
       code: "DB_FAIL",
       message: "private database detail",
     };
     const failedClosed = await cleanupPreparedReplayUploads({
       matchId: MATCH_ID,
-      replayPaths: [path],
+      attemptId: referenceErrorAttempt.attemptId,
     });
     expect(failedClosed.status).toBe("error");
-    expect(replayClient.remove).not.toHaveBeenCalled();
+    expect(referenceErrorClient.remove).not.toHaveBeenCalled();
+
+    const committedClient = createReplayClient({ seriesBestOf: 1 });
+    createSupabaseAdminClientMock.mockReturnValue(committedClient.client);
+    const committedAttempt = await prepareMatchReplayUploads(
+      validPreparationInput({
+        playerOneScore: 1,
+        replayFiles: [{ name: "one.rec", size: 10 }],
+      })
+    );
+    if (committedAttempt.status !== "success") {
+      throw new Error("Preparation failed");
+    }
+    committedClient.payloads.set(committedAttempt.uploads[0].path, [
+      new TextEncoder().encode("committed-proof"),
+    ]);
+    await finalizeMatchResult({
+      ...validFinalizationInput(committedAttempt.attemptId),
+      playerOneScore: 1,
+    });
+    const preserved = await cleanupPreparedReplayUploads({
+      matchId: MATCH_ID,
+      attemptId: committedAttempt.attemptId,
+    });
+    expect(preserved).toEqual({ status: "success", removedCount: 0 });
+    expect(committedClient.remove).not.toHaveBeenCalled();
   });
 
   it.each(["false", "throw", "revalidate"])(
@@ -720,7 +1250,7 @@ describe("replay direct-upload actions and trusted finalization", () => {
       );
 
       const result = await finalizeMatchResult(
-        validFinalizationInput(prepared.uploads.map((upload) => upload.path))
+        validFinalizationInput(prepared.attemptId)
       );
 
       expect(result).toMatchObject({ status: "success" });
@@ -732,26 +1262,163 @@ describe("replay direct-upload actions and trusted finalization", () => {
     }
   );
 
-  it("a response-loss retry cannot delete already-referenced replay proof", async () => {
+  it("reconciles an ambiguous RPC response after the atomic commit", async () => {
+    const replayClient = createReplayClient({ rpcResponseLossAfterCommit: true });
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+    const prepared = await prepareMatchReplayUploads(validPreparationInput());
+    if (prepared.status !== "success") throw new Error("Preparation failed");
+    prepared.uploads.forEach((upload, index) =>
+      replayClient.payloads.set(upload.path, [new Uint8Array([index + 1])])
+    );
+
+    const result = await finalizeMatchResult(
+      validFinalizationInput(prepared.attemptId)
+    );
+
+    expect(result.status).toBe("success");
+    expect(
+      replayClient.rpcCallsFor("commit_match_replay_attempt_result")
+    ).toHaveLength(1);
+    expect(replayClient.remove).not.toHaveBeenCalled();
+    expect(createInAppNotificationMock).not.toHaveBeenCalled();
+    expect(
+      prepared.uploads.every((upload) => replayClient.payloads.has(upload.path))
+    ).toBe(true);
+  });
+
+  it("reconciles a response-loss retry without deleting or recommitting proof", async () => {
     const replayClient = createReplayClient();
     createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
     const prepared = await prepareMatchReplayUploads(validPreparationInput());
     if (prepared.status !== "success") throw new Error("Preparation failed");
-    prepared.uploads.forEach((upload) => {
-      replayClient.state.referencedPaths.add(upload.path);
-      replayClient.payloads.set(upload.path, [new Uint8Array([1, 2, 3])]);
+    prepared.uploads.forEach((upload, index) => {
+      replayClient.payloads.set(upload.path, [new Uint8Array([index + 1])]);
     });
-    replayClient.state.activeReport = true;
+    const input = validFinalizationInput(prepared.attemptId);
+    const committed = await finalizeMatchResult(input);
+    expect(committed.status).toBe("success");
 
-    const result = await finalizeMatchResult(
-      validFinalizationInput(prepared.uploads.map((upload) => upload.path))
-    );
+    const retry = await finalizeMatchResult(input);
 
-    expect(result).toMatchObject({
-      status: "error",
-      message: expect.stringContaining("awaiting confirmation"),
-    });
+    expect(retry.status).toBe("success");
+    expect(
+      replayClient.rpcCallsFor("commit_match_replay_attempt_result")
+    ).toHaveLength(1);
+    expect(createInAppNotificationMock).toHaveBeenCalledOnce();
     expect(replayClient.remove).not.toHaveBeenCalled();
     expect(replayClient.payloads.size).toBe(2);
+  });
+
+  it("does not let cleanup delete proof after hashing while result commit is pending", async () => {
+    const rpcReached = deferred();
+    const allowRpcCommit = deferred();
+    const replayClient = createReplayClient({
+      beforeRpcCommit: async () => {
+        rpcReached.resolve();
+        await allowRpcCommit.promise;
+      },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+    const prepared = await prepareMatchReplayUploads(validPreparationInput());
+    if (prepared.status !== "success") throw new Error("Preparation failed");
+    prepared.uploads.forEach((upload, index) =>
+      replayClient.payloads.set(
+        upload.path,
+        [new TextEncoder().encode(`race-a-${index}`)]
+      )
+    );
+
+    const finalization = finalizeMatchResult(
+      validFinalizationInput(prepared.attemptId)
+    );
+    await rpcReached.promise;
+
+    const cleanup = await cleanupPreparedReplayUploads({
+      matchId: MATCH_ID,
+      attemptId: prepared.attemptId,
+    });
+    allowRpcCommit.resolve();
+    const committed = await finalization;
+
+    expect(committed.status).toBe("success");
+    expect(cleanup.status).toBe("error");
+    expect(replayClient.remove).not.toHaveBeenCalled();
+    expect(
+      prepared.uploads.every((upload) => replayClient.payloads.has(upload.path))
+    ).toBe(true);
+  });
+
+  it("does not let a stale cleanup decision delete proof after result commit", async () => {
+    const removeReached = deferred();
+    const allowRemove = deferred();
+    const replayClient = createReplayClient({
+      beforeStorageRemove: async () => {
+        removeReached.resolve();
+        await allowRemove.promise;
+      },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+    const prepared = await prepareMatchReplayUploads(validPreparationInput());
+    if (prepared.status !== "success") throw new Error("Preparation failed");
+    prepared.uploads.forEach((upload, index) =>
+      replayClient.payloads.set(
+        upload.path,
+        [new TextEncoder().encode(`race-b-${index}`)]
+      )
+    );
+
+    const cleanup = cleanupPreparedReplayUploads({
+      matchId: MATCH_ID,
+      attemptId: prepared.attemptId,
+    });
+    await removeReached.promise;
+    const rejectedFinalization = await finalizeMatchResult(
+      validFinalizationInput(prepared.attemptId)
+    );
+    allowRemove.resolve();
+    const cleanupResult = await cleanup;
+
+    expect(rejectedFinalization.status).toBe("error");
+    expect(cleanupResult).toEqual({ status: "success", removedCount: 5 });
+    expect(replayClient.state.referencedPaths.size).toBe(0);
+    expect(replayClient.payloads.size).toBe(0);
+  });
+
+  it("does not let a losing parallel finalization delete the winner's proof", async () => {
+    const rpcReached = deferred();
+    const allowRpcCommit = deferred();
+    const replayClient = createReplayClient({
+      beforeRpcCommit: async () => {
+        rpcReached.resolve();
+        await allowRpcCommit.promise;
+      },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+    const prepared = await prepareMatchReplayUploads(validPreparationInput());
+    if (prepared.status !== "success") throw new Error("Preparation failed");
+    prepared.uploads.forEach((upload, index) =>
+      replayClient.payloads.set(
+        upload.path,
+        [new TextEncoder().encode(`race-c-${index}`)]
+      )
+    );
+    const input = validFinalizationInput(prepared.attemptId);
+
+    const winner = finalizeMatchResult(input);
+    await rpcReached.promise;
+    const loser = await finalizeMatchResult(input);
+    allowRpcCommit.resolve();
+    const committed = await winner;
+
+    expect(committed.status).toBe("success");
+    expect(loser.status).toBe("error");
+    expect(
+      replayClient.rpcCallsFor("commit_match_replay_attempt_result")
+    ).toHaveLength(1);
+    expect(replayClient.download).toHaveBeenCalledTimes(2);
+    expect(replayClient.remove).not.toHaveBeenCalled();
+    expect(
+      prepared.uploads.every((upload) => replayClient.payloads.has(upload.path))
+    ).toBe(true);
   });
 });

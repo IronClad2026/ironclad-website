@@ -143,6 +143,7 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     prepareMatchReplayUploadsMock.mockResolvedValue({
       status: "success",
       bucket: "match-proofs",
+      attemptId: ATTEMPT_ID,
       uploads: [
         { gameNumber: 1, path: firstPath, token: "native-token-one" },
         { gameNumber: 2, path: secondPath, token: "native-token-two" },
@@ -211,11 +212,11 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     const finalInput = finalizeMatchResultMock.mock.calls[0][0];
     expect(finalInput).toEqual({
       matchId: MATCH_ID,
+      attemptId: ATTEMPT_ID,
       playerOneScore: 2,
       playerTwoScore: 0,
       winnerRegistrationId: PLAYER_ONE_REGISTRATION_ID,
       notes: "gg",
-      replayPaths: [firstPath, secondPath],
     });
     expect(recursivelyContainsFileBody(finalInput)).toBe(false);
     expect(fileInput).not.toHaveAttribute("name");
@@ -311,7 +312,7 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     expect(fileInput.files?.[0]).toBe(files[0]);
     expect(cleanupPreparedReplayUploadsMock).toHaveBeenCalledWith({
       matchId: MATCH_ID,
-      replayPaths: [firstPath, secondPath],
+      attemptId: ATTEMPT_ID,
     });
     expect(finalizeMatchResultMock).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain(privateProviderError);
@@ -340,7 +341,7 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     expect(uploadToSignedUrlMock).toHaveBeenCalledTimes(2);
     expect(cleanupPreparedReplayUploadsMock).toHaveBeenCalledWith({
       matchId: MATCH_ID,
-      replayPaths: [firstPath, secondPath],
+      attemptId: ATTEMPT_ID,
     });
     expect(finalizeMatchResultMock).not.toHaveBeenCalled();
   });
@@ -386,6 +387,37 @@ describe("PlayerMatchResultForm direct replay transport", () => {
       )
     ).toBeInTheDocument();
     expect(finalizeMatchResultMock).toHaveBeenCalledOnce();
+    expect(cleanupPreparedReplayUploadsMock).not.toHaveBeenCalled();
+    const submitButton = screen.getByRole("button", {
+      name: "Submit for Opponent Confirmation",
+    });
+    expect(submitButton).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Open$/ })).toBeDisabled();
+    fireEvent.submit(submitButton.closest("form") as HTMLFormElement);
+    expect(prepareMatchReplayUploadsMock).toHaveBeenCalledOnce();
+    expect(finalizeMatchResultMock).toHaveBeenCalledOnce();
+  });
+
+  it("locks conflicting retry paths when the server requires a match refresh", async () => {
+    finalizeMatchResultMock.mockResolvedValue({
+      status: "error",
+      message: "The result outcome is uncertain. Refresh this match.",
+      requiresRefresh: true,
+    });
+    const { container } = renderResultForm();
+    selectValidResult(container);
+    fireEvent.submit(
+      screen.getByRole("button", {
+        name: "Submit for Opponent Confirmation",
+      }).closest("form") as HTMLFormElement
+    );
+
+    await screen.findByText("The result outcome is uncertain. Refresh this match.");
+    const submitButton = screen.getByRole("button", {
+      name: "Submit for Opponent Confirmation",
+    });
+    expect(submitButton).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Open$/ })).toBeDisabled();
     expect(cleanupPreparedReplayUploadsMock).not.toHaveBeenCalled();
   });
 

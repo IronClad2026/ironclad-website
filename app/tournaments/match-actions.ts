@@ -34,12 +34,14 @@ type CustomClaims = {
 export type MatchResultActionState = {
   status: "idle" | "success" | "error";
   message: string;
+  requiresRefresh?: boolean;
 };
 
 export type PrepareMatchReplayUploadsState =
   | {
       status: "success";
       bucket: typeof MATCH_REPLAY_BUCKET;
+      attemptId: string;
       uploads: PreparedMatchReplayUpload[];
     }
   | {
@@ -72,12 +74,17 @@ export async function prepareMatchReplayUploads(
   const supabase = createSupabaseAdminClient();
 
   try {
-    const uploads = await prepareMatchReplayUploadsForPlayer(
+    const prepared = await prepareMatchReplayUploadsForPlayer(
       supabase,
       userId,
       input
     );
-    return { status: "success", bucket: MATCH_REPLAY_BUCKET, uploads };
+    return {
+      status: "success",
+      bucket: MATCH_REPLAY_BUCKET,
+      attemptId: prepared.attemptId,
+      uploads: prepared.uploads,
+    };
   } catch (error) {
     logMatchResultFailure("prepare-replay-uploads", error);
     return {
@@ -112,12 +119,17 @@ export async function finalizeMatchResult(
     );
   } catch (error) {
     logMatchResultFailure("finalize-match-result", error);
-    return errorState(
-      getReplayUploadMessage(
-        error,
-        "The match result could not be submitted. Please try again."
-      )
-    );
+    return {
+      ...errorState(
+        getReplayUploadMessage(
+          error,
+          "The match result could not be submitted. Please try again."
+        )
+      ),
+      requiresRefresh:
+        error instanceof MatchReplayUploadError &&
+        error.code === "FINALIZATION_UNCERTAIN",
+    };
   }
 
   // The RPC has committed. Notifications, cache refresh, formatting, or any
@@ -130,23 +142,25 @@ export async function finalizeMatchResult(
   let followUpWarning = false;
 
   try {
-    const notificationCreated = await createInAppNotification({
-      recipientRole: "admin",
-      type: "match.result_submitted",
-      title: "Match Result Submitted",
-      message: `${submitterName} submitted a result for Match #${committed.match.matchNumber}.`,
-      actorDisplayName: submitterName,
-      tournamentId: committed.match.tournamentId,
-      tournamentTitle: committed.match.tournamentTitle,
-      matchId: input.matchId,
-      reportGroupId: reportDetails.reportGroupId,
-      metadata: {
-        roundName: committed.match.roundName,
-        matchNumber: committed.match.matchNumber,
-        reportedScore: `${input.playerOneScore}-${input.playerTwoScore}`,
-        winnerRegistrationId: input.winnerRegistrationId,
-      },
-    });
+    const notificationCreated = committed.reconciled
+      ? true
+      : await createInAppNotification({
+          recipientRole: "admin",
+          type: "match.result_submitted",
+          title: "Match Result Submitted",
+          message: `${submitterName} submitted a result for Match #${committed.match.matchNumber}.`,
+          actorDisplayName: submitterName,
+          tournamentId: committed.match.tournamentId,
+          tournamentTitle: committed.match.tournamentTitle,
+          matchId: input.matchId,
+          reportGroupId: reportDetails.reportGroupId,
+          metadata: {
+            roundName: committed.match.roundName,
+            matchNumber: committed.match.matchNumber,
+            reportedScore: `${committed.playerOneScore}-${committed.playerTwoScore}`,
+            winnerRegistrationId: committed.winnerRegistrationId,
+          },
+        });
 
     if (!notificationCreated) {
       followUpWarning = true;
@@ -930,7 +944,55 @@ function getScore(formData: FormData, field: string) {
 
 function getDatabaseMessage(error: unknown, fallback: string) {
   const message = getErrorMessage(error).toLowerCase();
+  const replayPreparationWait = message.match(
+    /a replay upload attempt is already active; retry in (\d{1,3}) seconds/
+  );
+  if (replayPreparationWait) {
+    return `A replay upload is already active. Wait ${replayPreparationWait[1]} seconds before replacing it, or finish the current upload.`;
+  }
+  const replayBudgetWait = message.match(
+    /replay upload retry budget is exhausted; retry in (\d{1,5}) seconds/
+  );
+  if (replayBudgetWait) {
+    return `The replay retry budget is temporarily exhausted. Try again in ${replayBudgetWait[1]} seconds.`;
+  }
   const safeMessages: Array<[string, string]> = [
+    [
+      "clean the current replay attempt before changing its result",
+      "Clean the current replay attempt before changing the score or files.",
+    ],
+    [
+      "replay finalization is already in progress",
+      "This replay attempt is already being verified. Refresh the match before retrying.",
+    ],
+    [
+      "replay finalization owns this attempt",
+      "This replay attempt is already being verified and cannot be cleaned.",
+    ],
+    [
+      "replay cleanup is already in progress",
+      "Replay cleanup is already in progress. Wait a moment and try again.",
+    ],
+    [
+      "replay attempt recycling is already in progress",
+      "Replay retry preparation is already in progress. Wait a moment and try again.",
+    ],
+    [
+      "replay attempt is not available for finalization",
+      "This replay attempt is no longer available. Prepare the uploads again.",
+    ],
+    [
+      "replay attempt not found",
+      "This replay attempt is no longer available. Prepare the uploads again.",
+    ],
+    [
+      "player does not own this replay attempt",
+      "You can only manage replay attempts that you prepared.",
+    ],
+    [
+      "final result does not match this replay attempt",
+      "This replay attempt was prepared for a different score or winner. Restore those result details, or wait briefly before preparing a replacement.",
+    ],
     [
       "duplicate replay storage paths",
       "Each completed game requires a unique replay file.",

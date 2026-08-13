@@ -29,7 +29,9 @@ player browser -> private Supabase Storage
 ```
 
 The Next.js/Vercel result-submission request does not receive replay `File`
-bodies. It receives only small result and prepared-object metadata.
+bodies. Preparation receives only score and file metadata. Finalization and
+cleanup receive the opaque server-issued attempt ID, never replay bytes or a
+caller-selected Storage path list.
 
 Before upload, an authenticated IronClad server operation reloads the match,
 authorizes the player as an assigned participant, verifies that competition is
@@ -44,8 +46,10 @@ Paths are opaque and use this bounded shape:
 {match_uuid}/{attempt_uuid}/game-{game_number}-{object_uuid}.rec
 ```
 
-One submission attempt shares one random attempt UUID. Game numbers are
-contiguous from one, and each object receives a distinct random UUID. Paths do
+One submission attempt owns one database-generated attempt UUID and a fixed
+five-path namespace; a BO1/BO3/BO5 result uses only its required leading paths.
+Game numbers are contiguous from one, and each object receives a distinct
+random UUID. Paths do
 not contain Clerk IDs, email addresses, Steam IDs, Discord identities, display
 names, or original filenames.
 
@@ -57,6 +61,37 @@ anonymous and authenticated browser sessions have no general write policy for
 `match-proofs`; direct upload works only through the native path-specific
 capability.
 
+## Private attempt ownership and bounds
+
+`public.match_replay_upload_attempts` is a private, service-mediated table
+specific to this workflow. One active attempt is allowed per participant and
+match. It binds the server-generated namespace, submitting registration,
+declared replay sizes, score, winner and required replay count. RLS is forced;
+`anon` and `authenticated` have no table or RPC access, and direct DML is not
+granted to `service_role`.
+
+Preparation is serialized on the match. Only one attempt may be actively
+prepared, finalized, cleaned or recycled for one participant/match. A second
+prepare inside 60 seconds is refused; after that boundary it may safely claim
+and clean an abandoned preparation before continuing. At most three
+non-committed namespaces may exist for that participant/match. This gives a
+normal failed upload two immediate fresh-path retries without allowing
+unbounded signed-capability or object-path creation.
+
+A path batch is never signed twice. A cleaned namespace remains inside the
+three-slot budget until the native two-hour capability lifetime plus a
+five-minute issuance/clock buffer has passed. Reuse then requires an exclusive
+recycling claim, a final server-side deletion of all five old paths, and fresh
+random object UUIDs before any new capability is issued. A failed sweep stays
+non-finalizable and can be retried after its five-minute lease; it never opens a
+new namespace.
+
+Finalization atomically claims an attempt for a ten-minute lease before any
+Storage download or hashing. Only one caller receives the private claim token,
+so parallel losing requests do not repeat the expensive stored-byte work.
+Cleanup has a separate five-minute claim and cannot claim an actively
+finalizing or committed attempt. Claim tokens remain trusted-server-only.
+
 ## Trusted stored-object verification
 
 After direct upload, the finalization server independently:
@@ -64,14 +99,15 @@ After direct upload, the finalization server independently:
 1. re-authenticates the Clerk user;
 2. reloads and re-authorizes the current match and participant ownership;
 3. revalidates launched, non-terminal, score, winner and replay-count state;
-4. validates that all submitted paths use the exact match namespace, one
-   attempt root, contiguous game order and the opaque `.rec` structure;
+4. loads the database-owned paths and validates their exact match namespace,
+   attempt root, contiguous game order and opaque `.rec` structure;
 5. opens each private Storage object one at a time;
 6. streams the stored bytes, measuring their actual size and computing SHA-256;
 7. rejects a missing, empty or larger-than-10-MiB object;
 8. rejects duplicate stored replay payloads by authoritative hash; and
-9. calls the existing `submit_match_series_result_report` RPC with the trusted
-   ordered paths and SHA-256 hashes.
+9. calls the attempt commit RPC with trusted hashes; that wrapper reuses the
+   existing `submit_match_series_result_report` implementation with the
+   database-owned ordered paths.
 
 A client-computed hash, if ever used for early duplicate-selection feedback,
 is not authoritative. The existing database replay-count, unique-path,
@@ -95,25 +131,28 @@ confirmation/dispute state and the historical first-replay compatibility
 reference. `public.tournament_matches` retains its official-result audit link.
 The database stores private object paths, never permanent public URLs.
 
-Before `submit_match_series_result_report` succeeds, a failed upload,
-verification, state recheck or RPC causes best-effort cleanup of only the
-current attempt's validated, unreferenced paths. Cleanup re-authenticates and
-re-authorizes the participant, rejects paths outside that match and attempt,
-and refuses to remove an object already referenced by result history.
+Finalization and cleanup take mutually exclusive atomic database claims before
+hashing or deleting. Cleanup re-authenticates, requires the participant who
+prepared the attempt, receives paths only from the private attempt row, and
+retains a result-reference check as defense in depth. Once cleanup owns the
+attempt, finalization cannot commit. Once finalization owns the attempt,
+ordinary cleanup cannot delete it.
 
-Once the RPC succeeds, its replay objects are authoritative audit evidence and
-must not be removed. Notification, cache revalidation, response or UI failures
-after that commit boundary cannot delete referenced proof or turn the committed
-result into a generic retryable submission failure. A later retry may be
-rejected because the result already exists, but cleanup must still preserve all
-referenced objects.
+The attempt commit wrapper and existing result-report RPC run in one database
+transaction. Success both creates the normal result history and marks the
+attempt committed. Committed proof can never transition to cleanup. A lost
+response is reconciled from the stored committed result; later notification,
+cache revalidation or serialization failures cannot delete proof. Direct
+service-role execution of the older normal-result RPC overloads is revoked so
+the attempt arbiter cannot be bypassed.
 
 If a browser uploads and then disappears before finalization or explicit
-cleanup, the opaque private object can remain as an unreferenced orphan. This is
-the bounded residual of the native capability lifetime; it does not authorize
-result finalization or access to any other object. IronClad does not add an
-upload-intent table, token-revocation service, worker, queue or global Storage
-sweeper for this edge case.
+cleanup, the opaque private objects remain confined to the participant/match's
+fixed three-namespace budget. A late unexpired token still cannot authorize
+finalization, and its namespace cannot be reused until token expiry plus the
+buffer and a final sweep. Without a later preparation, a bounded abandoned
+private object may remain; IronClad does not add a token-revocation service,
+worker, queue, scheduler or global Storage sweeper.
 
 ## Private replay retrieval
 
