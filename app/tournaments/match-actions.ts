@@ -12,6 +12,17 @@ import {
   notifyPlayersOfLegacyMatchResultReview,
   notifyPlayersOfReportGroupReview,
 } from "@/lib/notification-events";
+import {
+  cleanupMatchReplayUploadsForPlayer,
+  finalizeMatchReplayResultForPlayer,
+  MATCH_REPLAY_BUCKET,
+  MatchReplayUploadError,
+  prepareMatchReplayUploadsForPlayer,
+  type CleanupMatchReplayUploadsInput,
+  type FinalizeMatchReplayResultInput,
+  type PrepareMatchReplayUploadsInput,
+  type PreparedMatchReplayUpload,
+} from "@/lib/match-replay-direct-upload";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type CustomClaims = {
@@ -25,13 +36,62 @@ export type MatchResultActionState = {
   message: string;
 };
 
-const MATCH_PROOF_BUCKET = "match-proofs";
-const MAX_PROOF_SIZE = 10 * 1024 * 1024;
-const REPLAY_EXTENSIONS = new Set(["rec"]);
+export type PrepareMatchReplayUploadsState =
+  | {
+      status: "success";
+      bucket: typeof MATCH_REPLAY_BUCKET;
+      uploads: PreparedMatchReplayUpload[];
+    }
+  | {
+      status: "error";
+      message: string;
+    };
 
-export async function submitMatchResult(
-  _previousState: MatchResultActionState,
-  formData: FormData
+export type CleanupPreparedReplayUploadsState =
+  | {
+      status: "success";
+      removedCount: number;
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
+export async function prepareMatchReplayUploads(
+  input: PrepareMatchReplayUploadsInput
+): Promise<PrepareMatchReplayUploadsState> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return {
+      status: "error",
+      message: "Sign in before preparing replay uploads.",
+    };
+  }
+
+  const supabase = createSupabaseAdminClient();
+
+  try {
+    const uploads = await prepareMatchReplayUploadsForPlayer(
+      supabase,
+      userId,
+      input
+    );
+    return { status: "success", bucket: MATCH_REPLAY_BUCKET, uploads };
+  } catch (error) {
+    logMatchResultFailure("prepare-replay-uploads", error);
+    return {
+      status: "error",
+      message: getReplayUploadMessage(
+        error,
+        "The replay upload could not be prepared. Please try again."
+      ),
+    };
+  }
+}
+
+export async function finalizeMatchResult(
+  input: FinalizeMatchReplayResultInput
 ): Promise<MatchResultActionState> {
   const { userId } = await auth();
 
@@ -39,195 +99,112 @@ export async function submitMatchResult(
     return errorState("Sign in before submitting a match result.");
   }
 
-  const matchId = getText(formData, "matchId");
-  const playerOneScore = getScore(formData, "playerOneScore");
-  const playerTwoScore = getScore(formData, "playerTwoScore");
-  const winnerRegistrationId = getText(formData, "winnerRegistrationId");
-  const notes = getText(formData, "notes");
-  const replayFiles = getFiles(formData, "replays");
-  const legacyReplay = getFile(formData, "replay");
-  const replays = replayFiles.length > 0
-    ? replayFiles
-    : legacyReplay
-      ? [legacyReplay]
-      : [];
-
-  if (!matchId || !winnerRegistrationId) {
-    return errorState("Enter the final score and select the match winner.");
-  }
-
-  if (replays.length === 0) {
-    return errorState("Upload the match replay files before submitting.");
-  }
-
-  const replayError = replays
-    .map((replay) => validateReplay(replay))
-    .find((error) => error !== null);
-
-  if (replayError) {
-    return errorState(replayError);
-  }
-
-  if (notes.length > 2000) {
-    return errorState("Result notes must be 2000 characters or fewer.");
-  }
-
   const supabase = createSupabaseAdminClient();
-  const match = await loadMatchForMutation(supabase, matchId);
-
-  if (!match) {
-    return errorState("This tournament match is no longer available.");
-  }
-
-  const participantRegistrationIds = [
-    match.player_one_registration_id,
-    match.player_two_registration_id,
-  ].filter((value): value is string => Boolean(value));
-
-  if (participantRegistrationIds.length !== 2) {
-    return errorState("Both match participants must be assigned.");
-  }
-
-  const { data: ownedRegistration, error: ownershipError } = await supabase
-    .from("registrations")
-    .select("id")
-    .in("id", participantRegistrationIds)
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
-
-  if (ownershipError || !ownedRegistration) {
-    return errorState(
-      "You can only submit results for matches you are participating in."
-    );
-  }
-
-  const opponentRegistrationId = participantRegistrationIds.find(
-    (registrationId) => registrationId !== ownedRegistration.id
-  );
-  if (!opponentRegistrationId) {
-    return errorState("The opposing player could not be identified.");
-  }
-
-  const scoreError = validateMatchScore(
-    match.series_best_of,
-    match.player_one_registration_id,
-    match.player_two_registration_id,
-    playerOneScore,
-    playerTwoScore,
-    winnerRegistrationId
-  );
-
-  if (scoreError) {
-    return errorState(scoreError);
-  }
-
-  const requiredReplayCount = (playerOneScore ?? 0) + (playerTwoScore ?? 0);
-
-  if (replays.length !== requiredReplayCount) {
-    return errorState(
-      `This score requires exactly ${requiredReplayCount} replay file${
-        requiredReplayCount === 1 ? "" : "s"
-      }.`
-    );
-  }
-
-  const replayHashes = await getReplayContentHashes(replays);
-  const uniqueReplayHashes = new Set(replayHashes);
-
-  if (uniqueReplayHashes.size !== replayHashes.length) {
-    return errorState(
-      "Each game requires a unique replay file. Remove duplicate replay uploads before submitting."
-    );
-  }
-
-  const uploadRoot = `${match.id}/${crypto.randomUUID()}`;
-  const uploadedPaths: string[] = [];
+  let committed: Awaited<
+    ReturnType<typeof finalizeMatchReplayResultForPlayer>
+  >;
 
   try {
-    const replayPaths: string[] = [];
-
-    for (const [index, replay] of replays.entries()) {
-      replayPaths.push(
-        await uploadProof(
-          supabase,
-          replay,
-          `${uploadRoot}/game-${index + 1}-${crypto.randomUUID()}.${getExtension(
-            replay.name
-          )}`,
-          uploadedPaths
-        )
-      );
-    }
-
-    await verifyUploadedProofs(supabase, replayPaths);
-
-    const { data: report, error: submissionError } =
-      await supabase.rpc("submit_match_series_result_report", {
-        p_match_id: matchId,
-        p_submitted_by_clerk_user_id: userId,
-        p_winner_registration_id: winnerRegistrationId,
-        p_player_one_score: playerOneScore,
-        p_player_two_score: playerTwoScore,
-        p_replay_storage_paths: replayPaths,
-        p_replay_content_hashes: replayHashes,
-        p_notes: notes || null,
-      });
-
-    if (submissionError) {
-      throw submissionError;
-    }
-
-    const reportDetails = report as {
-      report_group_id?: string;
-      submission_number?: number;
-      confirmation_deadline_at?: string;
-    } | null;
-
-    const submitterName = ownedRegistrationName(match, ownedRegistration.id);
-    await createInAppNotification({
-      recipientRole: "admin",
-      type: "match.result_submitted",
-      title: "Match Result Submitted",
-      message: `${submitterName} submitted a result for Match #${match.match_number}.`,
-      actorDisplayName: submitterName,
-      tournamentId: match.tournament_id,
-      tournamentTitle: match.tournament_title,
-      matchId,
-      reportGroupId: reportDetails?.report_group_id ?? null,
-      metadata: {
-        roundName: match.round_name,
-        matchNumber: match.match_number,
-        reportedScore: `${playerOneScore}-${playerTwoScore}`,
-        winnerRegistrationId,
-      },
-    });
-
-    revalidatePath("/tournaments");
-    revalidatePath("/dashboard");
-    return successState(
-      `Submission #${reportDetails?.submission_number ?? "new"} is awaiting opponent confirmation${
-        reportDetails?.confirmation_deadline_at
-          ? ` until ${formatDeadline(reportDetails.confirmation_deadline_at)}`
-          : ""
-      }.`
+    committed = await finalizeMatchReplayResultForPlayer(
+      supabase,
+      userId,
+      input
     );
   } catch (error) {
-    if (uploadedPaths.length > 0) {
-      const { error: cleanupError } = await supabase.storage
-        .from(MATCH_PROOF_BUCKET)
-        .remove(uploadedPaths);
-      if (cleanupError) {
-        logMatchResultFailure("proof-cleanup", cleanupError);
-      }
-    }
-
-    logMatchResultFailure("submit-match-result", error);
+    logMatchResultFailure("finalize-match-result", error);
     return errorState(
-      getDatabaseMessage(
+      getReplayUploadMessage(
         error,
         "The match result could not be submitted. Please try again."
       )
     );
+  }
+
+  // The RPC has committed. Notifications, cache refresh, formatting, or any
+  // response failure after this point must never delete referenced proof.
+  const reportDetails = getReportDetails(committed.report);
+  const submitterName = getReplaySubmitterName(
+    committed.match,
+    committed.ownedRegistrationId
+  );
+  let followUpWarning = false;
+
+  try {
+    const notificationCreated = await createInAppNotification({
+      recipientRole: "admin",
+      type: "match.result_submitted",
+      title: "Match Result Submitted",
+      message: `${submitterName} submitted a result for Match #${committed.match.matchNumber}.`,
+      actorDisplayName: submitterName,
+      tournamentId: committed.match.tournamentId,
+      tournamentTitle: committed.match.tournamentTitle,
+      matchId: input.matchId,
+      reportGroupId: reportDetails.reportGroupId,
+      metadata: {
+        roundName: committed.match.roundName,
+        matchNumber: committed.match.matchNumber,
+        reportedScore: `${input.playerOneScore}-${input.playerTwoScore}`,
+        winnerRegistrationId: input.winnerRegistrationId,
+      },
+    });
+
+    if (!notificationCreated) {
+      followUpWarning = true;
+      logMatchResultFailure("result-notification", {
+        code: "NOTIFY_FALSE",
+      });
+    }
+  } catch (error) {
+    followUpWarning = true;
+    logMatchResultFailure("result-notification", error);
+  }
+
+  try {
+    revalidatePath("/tournaments");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    followUpWarning = true;
+    logMatchResultFailure("result-revalidation", error);
+  }
+
+  const deadlineSuffix = getConfirmationDeadlineSuffix(
+    reportDetails.confirmationDeadlineAt
+  );
+  return successState(
+    `Submission #${reportDetails.submissionNumber ?? "new"} is awaiting opponent confirmation${deadlineSuffix}.${
+      followUpWarning
+        ? " The result was saved, but one follow-up update could not be completed. Refresh this match before taking another action."
+        : ""
+    }`
+  );
+}
+
+export async function cleanupPreparedReplayUploads(
+  input: CleanupMatchReplayUploadsInput
+): Promise<CleanupPreparedReplayUploadsState> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return {
+      status: "error",
+      message: "Sign in before cleaning up replay uploads.",
+    };
+  }
+
+  const supabase = createSupabaseAdminClient();
+  try {
+    const removedCount = await cleanupMatchReplayUploadsForPlayer(
+      supabase,
+      userId,
+      input
+    );
+    return { status: "success", removedCount };
+  } catch (error) {
+    logMatchResultFailure("cleanup-replay-uploads", error);
+    return {
+      status: "error",
+      message: "Replay cleanup could not be completed safely.",
+    };
   }
 }
 
@@ -929,79 +906,6 @@ function validateMatchScore(
   return null;
 }
 
-async function uploadProof(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  file: File,
-  path: string,
-  uploadedPaths: string[]
-) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const { data, error } = await supabase.storage
-    .from(MATCH_PROOF_BUCKET)
-    .upload(path, bytes, {
-      contentType: file.type || "application/octet-stream",
-      cacheControl: "3600",
-      upsert: false,
-    });
-
-  if (error) throw error;
-  if (data.path !== path) {
-    throw new Error("Proof upload could not be verified.");
-  }
-
-  uploadedPaths.push(path);
-  return path;
-}
-
-async function verifyUploadedProofs(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  paths: string[]
-) {
-  for (const path of paths) {
-    const parts = path.split("/");
-    const fileName = parts.pop();
-
-    if (!fileName) {
-      throw new Error("Supabase returned an invalid proof storage path.");
-    }
-
-    const { data, error } = await supabase.storage
-      .from(MATCH_PROOF_BUCKET)
-      .list(parts.join("/"), {
-        limit: 1,
-        search: fileName,
-      });
-
-    if (error || !data.some((object) => object.name === fileName)) {
-      throw new Error("Proof upload verification failed.");
-    }
-  }
-}
-
-function validateReplay(file: File) {
-  if (file.size > MAX_PROOF_SIZE) {
-    return "Replay files must be 10 MB or smaller.";
-  }
-
-  if (!REPLAY_EXTENSIONS.has(getExtension(file.name))) {
-    return "Replay proof must use a .rec file.";
-  }
-
-  return null;
-}
-
-async function getReplayContentHashes(files: File[]) {
-  return Promise.all(files.map((file) => getReplayContentHash(file)));
-}
-
-async function getReplayContentHash(file: File) {
-  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 async function requireAdmin() {
   const { userId, sessionClaims } = await auth();
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
@@ -1022,21 +926,6 @@ function getText(formData: FormData, field: string) {
 function getScore(formData: FormData, field: string) {
   const value = Number(getText(formData, field));
   return Number.isInteger(value) && value >= 0 ? value : null;
-}
-
-function getFile(formData: FormData, field: string) {
-  const value = formData.get(field);
-  return value instanceof File && value.size > 0 ? value : null;
-}
-
-function getFiles(formData: FormData, field: string) {
-  return formData
-    .getAll(field)
-    .filter((value): value is File => value instanceof File && value.size > 0);
-}
-
-function getExtension(fileName: string) {
-  return fileName.split(".").pop()?.toLowerCase() ?? "";
 }
 
 function getDatabaseMessage(error: unknown, fallback: string) {
@@ -1252,6 +1141,14 @@ function getDatabaseMessage(error: unknown, fallback: string) {
       "tournament could not be resolved for this match",
       "The tournament for this match could not be found.",
     ],
+    [
+      "terminal tournaments cannot accept competitive mutation",
+      "This tournament is closed and cannot accept match results.",
+    ],
+    [
+      "tournament is being updated; retry the operation",
+      "The tournament is being updated. Wait a moment and try again.",
+    ],
   ];
 
   return (
@@ -1267,6 +1164,66 @@ function getErrorMessage(error: unknown) {
     typeof error.message === "string"
     ? error.message
     : "";
+}
+
+function getReplayUploadMessage(error: unknown, fallback: string) {
+  return error instanceof MatchReplayUploadError
+    ? error.message
+    : getDatabaseMessage(error, fallback);
+}
+
+function getReportDetails(report: unknown) {
+  if (typeof report !== "object" || report === null) {
+    return {
+      reportGroupId: null,
+      submissionNumber: null,
+      confirmationDeadlineAt: null,
+    };
+  }
+
+  const value = report as Record<string, unknown>;
+  return {
+    reportGroupId:
+      typeof value.report_group_id === "string" ? value.report_group_id : null,
+    submissionNumber:
+      typeof value.submission_number === "number"
+        ? value.submission_number
+        : null,
+    confirmationDeadlineAt:
+      typeof value.confirmation_deadline_at === "string"
+        ? value.confirmation_deadline_at
+        : null,
+  };
+}
+
+function getReplaySubmitterName(
+  match: Awaited<
+    ReturnType<typeof finalizeMatchReplayResultForPlayer>
+  >["match"],
+  registrationId: string
+) {
+  if (registrationId === match.playerOneRegistrationId) {
+    return match.playerOneName || "Player 1";
+  }
+
+  if (registrationId === match.playerTwoRegistrationId) {
+    return match.playerTwoName || "Player 2";
+  }
+
+  return "A player";
+}
+
+function getConfirmationDeadlineSuffix(value: string | null) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  try {
+    return ` until ${formatDeadline(value)}`;
+  } catch {
+    return "";
+  }
 }
 
 function logMatchResultFailure(operation: string, error: unknown) {
