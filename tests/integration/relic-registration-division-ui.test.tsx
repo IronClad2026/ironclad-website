@@ -101,7 +101,7 @@ const brackets = [
   },
   {
     id: "22222222-2222-4222-8222-222222222223",
-    name: "Main / Elite Bracket",
+    name: "Main / Pro Bracket",
     requirement: "1400+ ELO",
     maxPlayers: "Max 8",
     registeredPlayers: 0,
@@ -302,7 +302,7 @@ describe("Relic verified-division registration UI", () => {
   it.each([
     ["Academy", "Academy Bracket"],
     ["Challenge", "Challenge Bracket"],
-    ["Main / Pro", "Main / Elite Bracket"],
+    ["Main / Pro", "Main / Pro Bracket"],
   ] as const)(
     "enables and automatically selects only the %s division bracket",
     (verifiedDivision, expectedBracket) => {
@@ -341,7 +341,7 @@ describe("Relic verified-division registration UI", () => {
   it("rejects a disabled bracket even when its click is forced programmatically", () => {
     renderModal("Challenge");
     const challengeButton = getBracketButton("Challenge Bracket");
-    const mainButton = getBracketButton("Main / Elite Bracket");
+    const mainButton = getBracketButton("Main / Pro Bracket");
 
     mainButton.removeAttribute("disabled");
     fireEvent.click(mainButton);

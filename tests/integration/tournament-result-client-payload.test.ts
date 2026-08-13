@@ -48,6 +48,30 @@ vi.mock("@/lib/tournament-bracket-data", () => ({
 }));
 
 vi.mock("@/lib/tournaments", () => ({
+  getPublicTournamentRowsForRequest: <
+    Tournament extends {
+      id: string;
+      slug: string;
+      status: string;
+    },
+  >(
+    tournaments: Tournament[],
+    requestedReference: string | null
+  ) => {
+    const requested = requestedReference
+      ? tournaments.find(
+          (tournament) =>
+            tournament.id === requestedReference ||
+            tournament.slug === requestedReference
+        )
+      : null;
+
+    return tournaments.filter(
+      (tournament) =>
+        !["cancelled", "voided"].includes(tournament.status) ||
+        tournament.id === requested?.id
+    );
+  },
   getTournamentBracketDisplayName: (name: string) => name,
   isTournamentBracketPublic: (launchedAt: string | null) =>
     launchedAt !== null,
@@ -445,6 +469,7 @@ async function loadClientProps({
   includeWaitlistedRegistration,
   viewerRegistrationStatus,
   waitlistOfferStatus,
+  requestedTournament,
 }: {
   admin: boolean;
   participantCurrentElo?: number;
@@ -454,6 +479,7 @@ async function loadClientProps({
   activeRegistrationCount?: number;
   includeWaitlistedRegistration?: boolean;
   waitlistOfferStatus?: "offered" | null;
+  requestedTournament?: string;
   viewerRegistrationStatus?:
     | "pending"
     | "manual_review"
@@ -479,7 +505,11 @@ async function loadClientProps({
   );
   createSupabaseAdminClientMock.mockReturnValue(client);
 
-  const element = await TournamentsPage();
+  const element = await TournamentsPage({
+    searchParams: Promise.resolve(
+      requestedTournament ? { tournament: requestedTournament } : {}
+    ),
+  });
   expect(isValidElement(element)).toBe(true);
 
   if (!isValidElement(element)) {
@@ -537,10 +567,15 @@ describe("tournament Client Component result payload", () => {
         : new Map()
     );
     mapTournamentRowMock.mockImplementation(
-      (row: { created_at: string; id: string; title: string }) => ({
+      (row: {
+        created_at: string;
+        id: string;
+        status: string;
+        title: string;
+      }) => ({
         id: row.id,
         title: row.title,
-        statusValue: "active",
+        statusValue: row.status,
         grandFinalAt: null,
         createdAt: row.created_at,
         participants: [],
@@ -662,6 +697,23 @@ describe("tournament Client Component result payload", () => {
       expect.any(Array)
     );
     expect(tournament.generatedBrackets).toEqual([]);
+  });
+
+  it("loads an explicitly deep-linked terminal tournament with its factual history", async () => {
+    const { props } = await loadClientProps({
+      admin: false,
+      tournamentStatus: "voided",
+      requestedTournament: "synthetic-tournament",
+    });
+
+    expect(props.tournaments).toEqual([
+      expect.objectContaining({
+        id: TOURNAMENT_ID,
+        statusValue: "voided",
+      }),
+    ]);
+    expect(props.matchResultSubmissions).toEqual([safeSubmission]);
+    expect(props.matchResultReportGroups).toEqual([safeReportGroup]);
   });
 
   it("derives the waitlist count from registrations when the capacity RPC omits it", async () => {

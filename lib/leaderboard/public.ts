@@ -17,6 +17,9 @@ export type PublicLeaderboardSeason = {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  validMainEventCount: number;
+  isFinalized: boolean;
+  isUnderReview: boolean;
 };
 
 export type PublicLeaderboardStanding = {
@@ -63,7 +66,6 @@ export type PublicSeasonChampion = {
 
 export type PublicLeaderboardData = {
   currentSeason: PublicLeaderboardSeason | null;
-  currentSeasonProgress: number;
   seasonStandings: PublicLeaderboardStanding[];
   allTimeStandings: PublicLeaderboardStanding[];
   seasonChampions: PublicSeasonChampion[];
@@ -78,6 +80,9 @@ type SeasonRow = {
   start_date: string;
   end_date: string;
   is_active: boolean;
+  valid_main_event_count: number;
+  is_finalized: boolean;
+  is_under_review: boolean;
 };
 
 type SeasonStandingRow = {
@@ -152,7 +157,6 @@ export async function getPublicLeaderboardData(): Promise<PublicLeaderboardData>
 
   return {
     currentSeason,
-    currentSeasonProgress: currentSeason ? getSeasonProgress(currentSeason) : 0,
     seasonStandings,
     allTimeStandings,
     seasonChampions,
@@ -163,7 +167,9 @@ export async function getPublicLeaderboardData(): Promise<PublicLeaderboardData>
 async function loadCurrentSeason(errors: string[]) {
   const { data, error } = await supabase
     .from("leaderboard_current_season")
-    .select("id, name, year, season_number, start_date, end_date, is_active")
+    .select(
+      "id, name, year, season_number, start_date, end_date, is_active, valid_main_event_count, is_finalized, is_under_review"
+    )
     .maybeSingle();
 
   if (error) {
@@ -216,9 +222,9 @@ async function loadSeasonStandings(seasonId: string, errors: string[]) {
     return [];
   }
 
-  return assignFallbackRanks(
-    ((data ?? []) as unknown as SeasonStandingRow[]).map(mapSeasonStanding)
-  );
+  return ((data ?? []) as unknown as SeasonStandingRow[])
+    .map(mapSeasonStanding)
+    .sort(compareStandings);
 }
 
 async function loadAllTimeStandings(errors: string[]) {
@@ -258,7 +264,7 @@ async function loadAllTimeStandings(errors: string[]) {
     return [];
   }
 
-  return assignFallbackRanks(
+  return assignCareerDisplayRanks(
     ((data ?? []) as unknown as AllTimeStandingRow[]).map(mapAllTimeStanding)
   );
 }
@@ -269,6 +275,7 @@ async function loadSeasonChampions(errors: string[]) {
     .select(
       "id, season_id, season_name, player_id, player_name, country, has_avatar, bracket_type, final_rank, final_points"
     )
+    .eq("bracket_type", "main")
     .order("created_at", { ascending: false })
     .limit(24);
 
@@ -301,6 +308,9 @@ function mapSeason(row: SeasonRow): PublicLeaderboardSeason {
     startDate: row.start_date,
     endDate: row.end_date,
     isActive: row.is_active,
+    validMainEventCount: row.valid_main_event_count,
+    isFinalized: row.is_finalized,
+    isUnderReview: row.is_under_review,
   };
 }
 
@@ -366,7 +376,9 @@ function mapAllTimeStanding(row: AllTimeStandingRow): PublicLeaderboardStanding 
   };
 }
 
-function assignFallbackRanks(rows: PublicLeaderboardStanding[]) {
+// Career caches publish permanent factual totals but do not store a rank.
+// This display-only ordering is never used for Main / Pro prize positions.
+function assignCareerDisplayRanks(rows: PublicLeaderboardStanding[]) {
   const grouped = new Map<LeaderboardBracketType, PublicLeaderboardStanding[]>();
 
   for (const row of rows) {
@@ -438,16 +450,4 @@ function compareCompetitiveWinRate(
 
 function getPublicAvatarUrl(playerId: string | null, hasAvatar: boolean) {
   return playerId && hasAvatar ? `/players/${playerId}/avatar` : null;
-}
-
-function getSeasonProgress(season: PublicLeaderboardSeason) {
-  const now = Date.now();
-  const start = new Date(`${season.startDate}T00:00:00`).getTime();
-  const end = new Date(`${season.endDate}T23:59:59`).getTime();
-
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-    return 0;
-  }
-
-  return Math.min(Math.max(((now - start) / (end - start)) * 100, 0), 100);
 }

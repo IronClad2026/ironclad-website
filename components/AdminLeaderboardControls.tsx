@@ -187,8 +187,10 @@ export default function AdminLeaderboardControls({
             Leaderboard Controls
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-            Manually rebuild leaderboard events and cached rankings after
-            completed tournaments or approved administrative adjustments.
+            Recovery only. Normal completed-tournament scoring runs
+            automatically. Rebuild leaderboard events and cached rankings only
+            after a verified failure or an approved correction. Recalculation
+            does not resolve a season marked under review.
           </p>
         </div>
 
@@ -207,7 +209,9 @@ export default function AdminLeaderboardControls({
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-orange-400/30 bg-orange-500/10 px-4 py-3 text-sm font-black uppercase tracking-wider text-orange-100 transition hover:border-orange-300/60 hover:bg-orange-500/20 disabled:cursor-wait disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
-            {pending ? "Recalculating..." : "Recalculate Current Season"}
+            {pending
+              ? "Recalculating..."
+              : "Recovery: Recalculate Current Season"}
           </button>
 
           <button
@@ -218,7 +222,9 @@ export default function AdminLeaderboardControls({
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-black uppercase tracking-wider text-amber-100 transition hover:border-amber-300/60 hover:bg-amber-500/20 disabled:cursor-wait disabled:opacity-60"
           >
             <Trophy className="h-4 w-4" />
-            {pending ? "Recalculating..." : "Recalculate All-Time Ranking"}
+            {pending
+              ? "Recalculating..."
+              : "Recovery: Recalculate All-Time Ranking"}
           </button>
         </div>
 
@@ -260,7 +266,7 @@ export default function AdminLeaderboardControls({
               <RefreshCw
                 className={`h-4 w-4 ${pending ? "animate-spin" : ""}`}
               />
-              Recalculate Selected Tournament
+              Recovery: Recalculate Selected Tournament
             </button>
           </div>
         </div>

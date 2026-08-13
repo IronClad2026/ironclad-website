@@ -105,7 +105,7 @@ describe("match-result presentation privacy", () => {
     expect(screen.queryByText(syntheticClerkId)).not.toBeInTheDocument();
     expect(container.textContent).not.toContain(syntheticClerkId);
     expect(
-      screen.getByRole("link", { name: "Replay Proof" })
+      screen.getByRole("link", { name: "Accepted Replay Proof" })
     ).toHaveAttribute("href", submission.replayAccessHref);
   });
 });

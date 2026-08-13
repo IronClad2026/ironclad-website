@@ -20,7 +20,10 @@ import ScrollReveal from "@/components/ScrollReveal";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { PlayerProfile } from "@/lib/player-profile";
 import {
+  getPublicTournamentNavigation,
   getTournamentBracketDisplayName,
+  getTournamentTerminalPublicMessage,
+  isTournamentTerminalStatus,
   isTournamentRegistrationOpen,
   WAITLIST_DISCLOSURE_MESSAGE,
 } from "@/lib/tournaments";
@@ -439,6 +442,9 @@ function Hero({
   const registrationState = viewerRegistration
     ? getViewerRegistrationDisplay(tournament, viewerRegistration)
     : null;
+  const terminalTournament = isTournamentTerminalStatus(
+    tournament.statusValue
+  );
 
   return (
     <section className="relative overflow-hidden border-b border-orange-500/20 bg-black">
@@ -455,6 +461,7 @@ function Hero({
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
       <div className="relative z-10 px-5 py-8 lg:px-8 lg:py-10">
+        <TournamentTerminalBanner tournament={tournament} />
         <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
           <ScrollReveal>
             <div className="flex flex-wrap items-center gap-2">
@@ -511,7 +518,9 @@ function Hero({
             </div>
           </ScrollReveal>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
-            {registrationState ? (
+            {terminalTournament ? (
+              <TournamentReadOnlyCard />
+            ) : registrationState ? (
               <RegistrationStateCard state={registrationState} />
             ) : (
               <ActionCard
@@ -534,6 +543,52 @@ function Hero({
         </div>
       </div>
     </section>
+  );
+}
+
+function TournamentTerminalBanner({
+  tournament,
+}: {
+  tournament: TournamentCard;
+}) {
+  const message = getTournamentTerminalPublicMessage(tournament.statusValue);
+
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div
+      role="status"
+      className="mb-6 border border-amber-300/45 bg-amber-500/10 p-4 shadow-xl shadow-black/20"
+    >
+      <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-200">
+        {tournament.statusValue === "cancelled"
+          ? "Cancelled Tournament"
+          : "Voided Tournament"}
+      </p>
+      <p className="mt-2 max-w-4xl text-sm leading-6 text-zinc-100">
+        {message}
+      </p>
+      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
+        Read-only historical record
+      </p>
+    </div>
+  );
+}
+
+function TournamentReadOnlyCard() {
+  return (
+    <div className="min-h-[104px] w-full min-w-0 border border-amber-300/35 bg-black/65 p-4 text-left shadow-xl shadow-black/20 backdrop-blur">
+      <Info size={18} className="text-amber-200" />
+      <p className="mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider text-white">
+        Historical record
+      </p>
+      <p className="mt-1 break-words text-xs font-semibold leading-5 text-zinc-300">
+        Registration and result actions are unavailable for terminal
+        tournaments.
+      </p>
+    </div>
   );
 }
 
@@ -814,7 +869,7 @@ function Overview({
 
       <div className="space-y-6">
         <Card>
-          <h3 className="text-sm font-black uppercase tracking-wider text-white">Live Tournament</h3>
+          <h3 className="text-sm font-black uppercase tracking-wider text-white">Published Tournaments</h3>
           <div className="mt-4 space-y-3">
             {tournaments.map((item) => (
               <TournamentLinkCard key={item.title} item={item} />
@@ -1029,6 +1084,9 @@ function Brackets({
   );
   const [selectedAdminMatchId, setSelectedAdminMatchId] =
     useState<string | null>(null);
+  const terminalTournament = isTournamentTerminalStatus(
+    tournament.statusValue
+  );
   const selectedAdminBracket =
     selectedAdminMatchId === null
       ? null
@@ -1048,12 +1106,14 @@ function Brackets({
     }
 
     window.requestAnimationFrame(() => {
-      if (viewer.isAdmin) setSelectedAdminMatchId(focusedMatchId);
+      if (viewer.isAdmin && !terminalTournament) {
+        setSelectedAdminMatchId(focusedMatchId);
+      }
       document
         .getElementById(`match-desktop-${focusedMatchId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-  }, [focusedMatchId, viewer.isAdmin]);
+  }, [focusedMatchId, terminalTournament, viewer.isAdmin]);
 
   return (
     <div className="space-y-5">
@@ -1081,28 +1141,34 @@ function Brackets({
         const completedWithoutChampion = generated
           ? isBracketCompletedWithoutChampion(generated)
           : false;
-        const canOpenResults = Boolean(
+        const hasVisibleResultHistory = Boolean(
           generated &&
-            !viewer.isAdmin &&
-            (generated.matches.some(
-              (match) =>
-                viewer.registrationIds.includes(
-                  match.playerOneRegistrationId ?? ""
-                ) ||
-                viewer.registrationIds.includes(
-                  match.playerTwoRegistrationId ?? ""
-                )
+            (matchResultSubmissions.some((submission) =>
+              generated.matches.some(
+                (match) => match.id === submission.matchId
+              )
             ) ||
-              matchResultSubmissions.some((submission) =>
-                generated.matches.some(
-                  (match) => match.id === submission.matchId
-                )
-              ) ||
               matchResultReportGroups.some((reportGroup) =>
                 generated.matches.some(
                   (match) => match.id === reportGroup.matchId
                 )
               ))
+        );
+        const canOpenResults = Boolean(
+          generated &&
+            (terminalTournament
+              ? hasVisibleResultHistory
+              : !viewer.isAdmin &&
+                (generated.matches.some(
+                  (match) =>
+                    viewer.registrationIds.includes(
+                      match.playerOneRegistrationId ?? ""
+                    ) ||
+                    viewer.registrationIds.includes(
+                      match.playerTwoRegistrationId ?? ""
+                    )
+                ) ||
+                  hasVisibleResultHistory))
         );
         return (
           <Card key={bracket.id} className="overflow-visible">
@@ -1121,6 +1187,7 @@ function Brackets({
                       viewer={viewer}
                       matchResultSubmissions={matchResultSubmissions}
                       matchResultReportGroups={matchResultReportGroups}
+                      readOnly={terminalTournament}
                     />
                   )}
                 </div>
@@ -1156,7 +1223,7 @@ function Brackets({
                 standings={generated.standings}
                 participantsById={participantsById}
                 onAdminMatchSelect={
-                  viewer.isAdmin
+                  viewer.isAdmin && !terminalTournament
                     ? (match) => setSelectedAdminMatchId(match.id)
                     : undefined
                 }
@@ -1168,7 +1235,7 @@ function Brackets({
                 focusedMatchId={focusedMatchId}
                 anchorPrefix="match-desktop"
                 onAdminMatchSelect={
-                  viewer.isAdmin
+                  viewer.isAdmin && !terminalTournament
                     ? (match) => setSelectedAdminMatchId(match.id)
                     : undefined
                 }
@@ -1177,7 +1244,7 @@ function Brackets({
           </Card>
         );
       })}
-      {viewer.isAdmin && selectedAdminMatch && (
+      {viewer.isAdmin && !terminalTournament && selectedAdminMatch && (
         <AdminMatchManagementModal
           tournament={tournament}
           match={selectedAdminMatch}
@@ -1205,6 +1272,7 @@ function BracketMatchResultsWorkspace({
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
+  readOnly = false,
 }: {
   bracketName: string;
   bracketFormat: GeneratedTournamentBracket["format"];
@@ -1213,6 +1281,7 @@ function BracketMatchResultsWorkspace({
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
+  readOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const portalRoot =
@@ -1229,7 +1298,9 @@ function BracketMatchResultsWorkspace({
     const hasVisibleReportGroup = matchResultReportGroups.some(
       (reportGroup) => reportGroup.matchId === match.id
     );
-    return viewer.isAdmin || canSubmit || hasVisibleSubmission || hasVisibleReportGroup;
+    return readOnly
+      ? hasVisibleSubmission || hasVisibleReportGroup
+      : viewer.isAdmin || canSubmit || hasVisibleSubmission || hasVisibleReportGroup;
   });
   const pendingCount = visibleMatches.reduce(
     (total, match) =>
@@ -1311,7 +1382,9 @@ function BracketMatchResultsWorkspace({
                     <div className="flex items-start justify-between gap-5">
                       <div>
                         <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">
-                          Tournament Administration Workspace
+                          {readOnly
+                            ? "Tournament Match History"
+                            : "Tournament Administration Workspace"}
                         </p>
                         <h2
                           id={`match-results-${bracketName}`}
@@ -1320,8 +1393,9 @@ function BracketMatchResultsWorkspace({
                           {bracketName} Match Results
                         </h2>
                         <p className="mt-2 text-sm text-zinc-400">
-                          Review scores, proof files, player notes, and official
-                          decisions without crowding the public bracket.
+                          {readOnly
+                            ? "Review factual scores and existing authorized replay access from this historical record."
+                            : "Review scores, proof files, player notes, and official decisions without crowding the public bracket."}
                         </p>
                       </div>
                       <button
@@ -1393,14 +1467,17 @@ function BracketMatchResultsWorkspace({
                                 bracketFormat === "single_elimination"
                               }
                               participantsById={participantsById}
-                              isAdmin={viewer.isAdmin}
-                              canSubmit={viewer.registrationIds.some(
-                                (registrationId) =>
-                                  registrationId ===
-                                    match.playerOneRegistrationId ||
-                                  registrationId ===
-                                    match.playerTwoRegistrationId
-                              )}
+                              isAdmin={readOnly ? false : viewer.isAdmin}
+                              canSubmit={
+                                !readOnly &&
+                                viewer.registrationIds.some(
+                                  (registrationId) =>
+                                    registrationId ===
+                                      match.playerOneRegistrationId ||
+                                    registrationId ===
+                                      match.playerTwoRegistrationId
+                                )
+                              }
                               submissions={matchResultSubmissions.filter(
                                 (submission) =>
                                   submission.matchId === match.id
@@ -3313,6 +3390,9 @@ function MobileHero({
   const registrationState = viewerRegistration
     ? getViewerRegistrationDisplay(tournament, viewerRegistration)
     : null;
+  const terminalTournament = isTournamentTerminalStatus(
+    tournament.statusValue
+  );
   const metadata = [
     {
       icon: null,
@@ -3346,6 +3426,7 @@ function MobileHero({
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(128deg,rgba(0,0,0,0.92),rgba(0,0,0,0.64),rgba(249,115,22,0.18))]" />
 
       <div className="space-y-5">
+        <TournamentTerminalBanner tournament={tournament} />
         <div className="flex max-w-full flex-wrap items-center gap-2">
           <StatusPill
             tone={
@@ -3413,7 +3494,9 @@ function MobileHero({
         </div>
 
         <div className="w-full max-w-full min-w-0">
-          {registrationState ? (
+          {terminalTournament ? (
+            <TournamentReadOnlyCard />
+          ) : registrationState ? (
             <RegistrationStateCard state={registrationState} />
           ) : (
             <ActionCard
@@ -3583,7 +3666,7 @@ function MobileOverview({
 
       <MobileCard>
         <h3 className="text-sm font-black uppercase tracking-wider text-white">
-          Live Tournament
+          Published Tournaments
         </h3>
         <div className="mt-4 space-y-3">
           {tournaments.map((item) => (
@@ -3926,6 +4009,9 @@ function MobileBrackets({
   );
   const [selectedAdminMatchId, setSelectedAdminMatchId] =
     useState<string | null>(null);
+  const terminalTournament = isTournamentTerminalStatus(
+    tournament.statusValue
+  );
   const selectedAdminBracket =
     selectedAdminMatchId === null
       ? null
@@ -3945,12 +4031,14 @@ function MobileBrackets({
     }
 
     window.requestAnimationFrame(() => {
-      if (viewer.isAdmin) setSelectedAdminMatchId(focusedMatchId);
+      if (viewer.isAdmin && !terminalTournament) {
+        setSelectedAdminMatchId(focusedMatchId);
+      }
       document
         .getElementById(`match-mobile-${focusedMatchId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-  }, [focusedMatchId, viewer.isAdmin]);
+  }, [focusedMatchId, terminalTournament, viewer.isAdmin]);
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-5">
@@ -3978,28 +4066,34 @@ function MobileBrackets({
         const completedWithoutChampion = generated
           ? isBracketCompletedWithoutChampion(generated)
           : false;
-        const canOpenResults = Boolean(
+        const hasVisibleResultHistory = Boolean(
           generated &&
-            !viewer.isAdmin &&
-            (generated.matches.some(
-              (match) =>
-                viewer.registrationIds.includes(
-                  match.playerOneRegistrationId ?? ""
-                ) ||
-                viewer.registrationIds.includes(
-                  match.playerTwoRegistrationId ?? ""
-                )
+            (matchResultSubmissions.some((submission) =>
+              generated.matches.some(
+                (match) => match.id === submission.matchId
+              )
             ) ||
-              matchResultSubmissions.some((submission) =>
-                generated.matches.some(
-                  (match) => match.id === submission.matchId
-                )
-              ) ||
               matchResultReportGroups.some((reportGroup) =>
                 generated.matches.some(
                   (match) => match.id === reportGroup.matchId
                 )
               ))
+        );
+        const canOpenResults = Boolean(
+          generated &&
+            (terminalTournament
+              ? hasVisibleResultHistory
+              : !viewer.isAdmin &&
+                (generated.matches.some(
+                  (match) =>
+                    viewer.registrationIds.includes(
+                      match.playerOneRegistrationId ?? ""
+                    ) ||
+                    viewer.registrationIds.includes(
+                      match.playerTwoRegistrationId ?? ""
+                    )
+                ) ||
+                  hasVisibleResultHistory))
         );
 
         return (
@@ -4019,6 +4113,7 @@ function MobileBrackets({
                       viewer={viewer}
                       matchResultSubmissions={matchResultSubmissions}
                       matchResultReportGroups={matchResultReportGroups}
+                      readOnly={terminalTournament}
                     />
                   )}
                 </div>
@@ -4056,7 +4151,7 @@ function MobileBrackets({
                 standings={generated.standings}
                 participantsById={participantsById}
                 onAdminMatchSelect={
-                  viewer.isAdmin
+                  viewer.isAdmin && !terminalTournament
                     ? (match) => setSelectedAdminMatchId(match.id)
                     : undefined
                 }
@@ -4069,7 +4164,7 @@ function MobileBrackets({
                   focusedMatchId={focusedMatchId}
                   anchorPrefix="match-mobile"
                   onAdminMatchSelect={
-                    viewer.isAdmin
+                    viewer.isAdmin && !terminalTournament
                       ? (match) => setSelectedAdminMatchId(match.id)
                       : undefined
                   }
@@ -4080,7 +4175,7 @@ function MobileBrackets({
         );
       })}
 
-      {viewer.isAdmin && selectedAdminMatch && (
+      {viewer.isAdmin && !terminalTournament && selectedAdminMatch && (
         <AdminMatchManagementModal
           tournament={tournament}
           match={selectedAdminMatch}
@@ -4476,8 +4571,12 @@ export default function TournamentsExperience({
   const rawPanelParam = searchParams.get("panel");
   const rawMatchParam = searchParams.get("match");
   const activeTab = getValidTab(rawTabParam);
+  const publicTournaments = useMemo(
+    () => getPublicTournamentNavigation(tournaments),
+    [tournaments]
+  );
   const urlTournament = findTournamentFromUrl(tournaments, rawTournamentParam);
-  const selectedTournament = urlTournament ?? tournaments[0];
+  const selectedTournament = urlTournament ?? publicTournaments[0];
   const focusedMatchId = selectedTournament.generatedBrackets
     .flatMap((bracket) => bracket.matches)
     .some((match) => match.id === rawMatchParam)
@@ -4725,7 +4824,7 @@ export default function TournamentsExperience({
         <div className="mx-auto flex max-w-[1600px]">
           <Sidebar
             selectedTournament={selectedTournament}
-            tournaments={tournaments}
+            tournaments={publicTournaments}
             onSelectTournament={handleSelectTournament}
           />
           <div className="min-w-0 flex-1">
@@ -4741,7 +4840,7 @@ export default function TournamentsExperience({
               activeOverviewPanel={activeOverviewPanel}
               setActiveOverviewPanel={handleSetActiveOverviewPanel}
               tournament={selectedTournament}
-              tournaments={tournaments}
+              tournaments={publicTournaments}
               viewer={viewer}
               matchResultSubmissions={matchResultSubmissions}
               matchResultReportGroups={matchResultReportGroups}
@@ -4781,7 +4880,7 @@ export default function TournamentsExperience({
           activeOverviewPanel={activeOverviewPanel}
           setActiveOverviewPanel={handleSetActiveOverviewPanel}
           tournament={selectedTournament}
-          tournaments={tournaments}
+          tournaments={publicTournaments}
           viewer={viewer}
           matchResultSubmissions={matchResultSubmissions}
           matchResultReportGroups={matchResultReportGroups}
@@ -4792,7 +4891,7 @@ export default function TournamentsExperience({
       {showRegisterModal && registrationProfile && (
         <RegisterModal
           profile={registrationProfile}
-          tournaments={tournaments}
+          tournaments={publicTournaments}
           initialTournamentId={selectedTournament.id}
           verifiedDivision={viewer.relicVerifiedDivision}
           onClose={() => setShowRegisterModal(false)}
@@ -4814,7 +4913,7 @@ export default function TournamentsExperience({
       <MobileTournamentDrawer
         open={showMobilePanel}
         selectedTournament={selectedTournament}
-        tournaments={tournaments}
+        tournaments={publicTournaments}
         onClose={() => setShowMobilePanel(false)}
         onSelectTournament={handleMobileSelectTournament}
       />

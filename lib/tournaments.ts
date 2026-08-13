@@ -40,7 +40,7 @@ export const TOURNAMENT_BRACKET_CONFIGS: readonly {
   {
     name: "Main",
     fieldPrefix: "main",
-    label: "Main / Elite Bracket",
+    label: "Main / Pro Bracket",
     defaultEloRules: "1400+ ELO",
     defaultMaxPlayers: 8,
   },
@@ -484,6 +484,54 @@ export function isTournamentBracketRegistrationOpen(
 
 export function isTournamentBracketPublic(launchedAt: string | null) {
   return launchedAt !== null;
+}
+
+export function isTournamentTerminalStatus(
+  status: TournamentStatus
+): status is "cancelled" | "voided" {
+  return status === "cancelled" || status === "voided";
+}
+
+export function getPublicTournamentNavigation<
+  Tournament extends { statusValue: TournamentStatus },
+>(tournaments: Tournament[]) {
+  return tournaments.filter(
+    (tournament) => !isTournamentTerminalStatus(tournament.statusValue)
+  );
+}
+
+export function getPublicTournamentRowsForRequest<
+  Tournament extends {
+    id: string;
+    slug: string;
+    status: TournamentStatus;
+  },
+>(tournaments: Tournament[], requestedReference: string | null) {
+  const explicitlyRequestedTournament = requestedReference
+    ? tournaments.find(
+        (tournament) =>
+          tournament.id === requestedReference ||
+          tournament.slug === requestedReference
+      ) ?? null
+    : null;
+
+  return tournaments.filter(
+    (tournament) =>
+      !isTournamentTerminalStatus(tournament.status) ||
+      tournament.id === explicitlyRequestedTournament?.id
+  );
+}
+
+export function getTournamentTerminalPublicMessage(status: TournamentStatus) {
+  if (status === "cancelled") {
+    return "This tournament was cancelled before an official competitive outcome.";
+  }
+
+  if (status === "voided") {
+    return "This tournament was voided. Its factual match history is retained, but it no longer contributes to official standings.";
+  }
+
+  return null;
 }
 
 function getOptionalTimestamp(value: string) {

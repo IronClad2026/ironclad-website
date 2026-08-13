@@ -64,6 +64,9 @@ const currentSeason = {
   start_date: "2026-07-01",
   end_date: "2026-12-31",
   is_active: true,
+  valid_main_event_count: 3,
+  is_finalized: false,
+  is_under_review: false,
 };
 
 const seasonStanding = {
@@ -156,7 +159,7 @@ describe("public leaderboard projection", () => {
         .get("leaderboard_current_season")
         ?.calls.find((call) => call.method === "select")?.args[0]
     ).toBe(
-      "id, name, year, season_number, start_date, end_date, is_active"
+      "id, name, year, season_number, start_date, end_date, is_active, valid_main_event_count, is_finalized, is_under_review"
     );
     expect(
       queries.get("leaderboard_current_season")?.calls
@@ -184,6 +187,12 @@ describe("public leaderboard projection", () => {
         args: ["current_rank", { ascending: true, nullsFirst: false }],
       },
     ]);
+    expect(
+      queries.get("leaderboard_public_season_champions")?.calls
+    ).toContainEqual({
+      method: "eq",
+      args: ["bracket_type", "main"],
+    });
     expect(
       queries
         .get("leaderboard_public_all_time_standings")
@@ -218,6 +227,9 @@ describe("public leaderboard projection", () => {
       id: "season-1",
       seasonNumber: 3,
       isActive: true,
+      validMainEventCount: 3,
+      isFinalized: false,
+      isUnderReview: false,
     });
     expect(data.seasonStandings).toMatchObject([
       {
@@ -369,6 +381,71 @@ describe("public leaderboard projection", () => {
         playerName: "Former Competitor",
         avatarUrl: null,
       }),
+    ]);
+  });
+
+  it("keeps active opted-out competitors in official standings without profile presentation", async () => {
+    const optedOutStanding = {
+      ...seasonStanding,
+      player_id: null,
+      display_name: "OfficialCommander",
+      in_game_name: "OfficialCommander",
+      country: null,
+      region: null,
+      current_elo: null,
+      has_avatar: false,
+      current_rank: 2,
+      display_order: 9,
+    };
+    const results: Record<string, QueryResult> = {
+      leaderboard_current_season: { data: currentSeason, error: null },
+      leaderboard_public_season_standings: {
+        data: [optedOutStanding],
+        error: null,
+      },
+      leaderboard_public_all_time_standings: { data: [], error: null },
+      leaderboard_public_season_champions: { data: [], error: null },
+    };
+    fromMock.mockImplementation((table: string) =>
+      createQuery(results[table]).query
+    );
+
+    const data = await getPublicLeaderboardData();
+
+    expect(data.seasonStandings).toEqual([
+      expect.objectContaining({
+        playerId: null,
+        playerName: "OfficialCommander",
+        displayName: "OfficialCommander",
+        country: null,
+        region: null,
+        currentElo: null,
+        hasAvatar: false,
+        avatarUrl: null,
+        rank: 2,
+        displayOrder: 9,
+      }),
+    ]);
+  });
+
+  it("does not invent a Main / Pro rank when the public projection has no official rank", async () => {
+    const results: Record<string, QueryResult> = {
+      leaderboard_current_season: { data: currentSeason, error: null },
+      leaderboard_public_season_standings: {
+        data: [{ ...seasonStanding, current_rank: null }],
+        error: null,
+      },
+      leaderboard_public_all_time_standings: { data: [], error: null },
+      leaderboard_public_season_champions: { data: [], error: null },
+    };
+    fromMock.mockImplementation((table: string) =>
+      createQuery(results[table]).query
+    );
+
+    const data = await getPublicLeaderboardData();
+
+    expect(data.seasonStandings).toEqual([
+      expect.objectContaining({ rank: null }),
     ]);
   });
 });

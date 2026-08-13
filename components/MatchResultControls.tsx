@@ -541,10 +541,10 @@ export function AdminResetMatchForm({
           Reset Match
         </p>
         <p className="mt-2 text-[11px] leading-5 text-slate-400">
-          Resets pending review state when safe. Replay and proof records are
-          preserved for audit. Completed results and untouched derived outcomes
-          are unwound only while downstream play remains safe; extension and
-          hold usage stay consumed.
+          Resets pending review state when safe. Replay proof and legacy
+          attachment records are preserved for audit. Completed results and
+          untouched derived outcomes are unwound only while downstream play
+          remains safe; extension and hold usage stay consumed.
         </p>
       </div>
 
@@ -925,7 +925,7 @@ function SubmissionReview({
                 : "px-2 py-1"
             }`}
           >
-            Download Replay
+            Download Replay Proof
           </a>
         )}
         {submission.screenshotAccessHref && (
@@ -939,7 +939,7 @@ function SubmissionReview({
                 : "px-2 py-1"
             }`}
           >
-            View Screenshot
+            View Legacy Screenshot Attachment
           </a>
         )}
       </div>
@@ -952,7 +952,7 @@ function SubmissionReview({
             </span>
           </p>
           <p>
-            Screenshot proof:{" "}
+            Legacy screenshot attachment (not accepted proof):{" "}
             <span className="text-slate-300">
               {submission.hasScreenshot ? "Available" : "Unavailable"}
             </span>

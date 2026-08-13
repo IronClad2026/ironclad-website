@@ -72,6 +72,7 @@ export async function createInAppNotification(
 ): Promise<boolean> {
   const recipientClerkUserId = input.recipientClerkUserId?.trim() || null;
   const recipientRole = input.recipientRole ?? null;
+  const eventKey = input.eventKey?.trim() || null;
 
   if (!recipientClerkUserId && !recipientRole) {
     return false;
@@ -91,11 +92,15 @@ export async function createInAppNotification(
     registration_id: input.registrationId ?? null,
     match_id: input.matchId ?? null,
     report_group_id: input.reportGroupId ?? null,
-    event_key: input.eventKey ?? null,
+    event_key: eventKey,
     metadata: input.metadata ?? {},
   });
 
   if (error) {
+    if (eventKey && isDuplicateNotificationEvent(error)) {
+      return true;
+    }
+
     logNotificationFailure("create-one", error);
     return false;
   }
@@ -422,6 +427,15 @@ function logNotificationFailure(operation: string, error: unknown) {
     : "NOTIFY_FAILED";
 
   console.error("Notification operation failed.", { operation, code });
+}
+
+function isDuplicateNotificationEvent(error: unknown) {
+  return Boolean(
+    typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "23505"
+  );
 }
 
 function buildNotificationHref(

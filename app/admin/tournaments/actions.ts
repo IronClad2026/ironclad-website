@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { notifyPlayersOfTournamentTerminalTransition } from "@/lib/notification-events";
 import {
   MAX_TOURNAMENT_BANNER_BYTES,
   TOURNAMENT_BANNER_BUCKET,
@@ -657,12 +658,19 @@ async function mutateTournamentTerminalState(
 
   const tournamentId = getText(formData, "tournamentId");
   const reason = getText(formData, "reason");
+  const expectedConfirmation = operation === "cancel" ? "CANCEL" : "VOID";
+  const confirmation = formData.get("confirmation");
 
   if (!isUuid(tournamentId)) {
     return terminalErrorState("Select a valid tournament.");
   }
   if (!reason) {
     return terminalErrorState("An administrator reason is required.");
+  }
+  if (confirmation !== expectedConfirmation) {
+    return terminalErrorState(
+      `Type ${expectedConfirmation} exactly to confirm this operation.`
+    );
   }
 
   const supabase = createSupabaseAdminClient();
@@ -683,13 +691,37 @@ async function mutateTournamentTerminalState(
     );
   }
 
+  const notificationOutcome = getTerminalNotificationOutcome(outcome);
+  let notificationWarning = false;
+  if (notificationOutcome) {
+    try {
+      notificationWarning = !(await notifyPlayersOfTournamentTerminalTransition(
+        supabase,
+        { tournamentId, outcome: notificationOutcome }
+      ));
+    } catch (notificationError) {
+      notificationWarning = true;
+      logTournamentTerminalNotificationFailure(operation, notificationError);
+    }
+
+    if (notificationWarning) {
+      console.error("Tournament terminal notifications were incomplete.", {
+        operation,
+      });
+    }
+  }
+
   revalidatePath("/admin/tournaments", "page");
+  revalidatePath("/dashboard");
   revalidatePath("/tournaments");
   revalidatePath("/rankings");
 
+  const successMessage = getTournamentTerminalSuccessMessage(outcome);
   return {
     status: "success",
-    message: getTournamentTerminalSuccessMessage(outcome),
+    message: notificationWarning
+      ? `${successMessage} Some affected players may not see an in-app notification.`
+      : successMessage,
   };
 }
 
@@ -996,6 +1028,19 @@ function getTournamentTerminalSuccessMessage(
   }
 }
 
+function getTerminalNotificationOutcome(
+  outcome: TournamentTerminalOutcome
+): "cancelled" | "voided" | null {
+  if (outcome === "cancelled" || outcome === "already_cancelled") {
+    return "cancelled";
+  }
+  if (outcome === "voided" || outcome === "already_voided") {
+    return "voided";
+  }
+
+  return null;
+}
+
 function terminalErrorState(message: string): TournamentTerminalActionState {
   return { status: "error", message };
 }
@@ -1045,6 +1090,27 @@ function logTournamentTerminalFailure(
     : "TERMINAL_FAILED";
 
   console.error("Tournament terminal operation failed.", { operation, code });
+}
+
+function logTournamentTerminalNotificationFailure(
+  operation: "cancel" | "void",
+  error: unknown
+) {
+  const candidateCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : "";
+  const code = /^[A-Z0-9]{3,10}$/.test(candidateCode)
+    ? candidateCode
+    : "NOTIFY_FAILED";
+
+  console.error("Tournament terminal notification dispatch failed.", {
+    operation,
+    code,
+  });
 }
 
 function readBracket(

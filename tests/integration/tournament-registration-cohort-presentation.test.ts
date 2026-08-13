@@ -90,7 +90,7 @@ describe("registration cohort presentation", () => {
       (bracket) => bracket.name === "Challenge Bracket"
     );
     const main = tournament.brackets.find(
-      (bracket) => bracket.name === "Main / Elite Bracket"
+      (bracket) => bracket.name === "Main / Pro Bracket"
     );
 
     expect(academy).toMatchObject({

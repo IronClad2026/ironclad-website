@@ -4,10 +4,17 @@ import { adminIdentity, playerIdentity } from "@/tests/fixtures/auth";
 const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
+const notifyPlayersOfTournamentTerminalTransitionMock = vi.hoisted(() =>
+  vi.fn()
+);
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
 vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
+}));
+vi.mock("@/lib/notification-events", () => ({
+  notifyPlayersOfTournamentTerminalTransition:
+    notifyPlayersOfTournamentTerminalTransitionMock,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
@@ -26,13 +33,18 @@ const tournamentId = "123e4567-e89b-42d3-a456-426614174000";
 function terminalFormData({
   id = tournamentId,
   reason = "Tournament cannot continue",
+  operation = "cancel",
+  confirmation = operation === "cancel" ? "CANCEL" : "VOID",
 }: {
   id?: string;
   reason?: string;
+  operation?: "cancel" | "void";
+  confirmation?: string;
 } = {}) {
   const formData = new FormData();
   formData.set("tournamentId", id);
   formData.set("reason", reason);
+  formData.set("confirmation", confirmation);
   return formData;
 }
 
@@ -41,6 +53,8 @@ describe("administrator tournament terminal actions", () => {
     authMock.mockReset();
     createSupabaseAdminClientMock.mockReset();
     revalidatePathMock.mockReset();
+    notifyPlayersOfTournamentTerminalTransitionMock.mockReset();
+    notifyPlayersOfTournamentTerminalTransitionMock.mockResolvedValue(true);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
@@ -53,7 +67,10 @@ describe("administrator tournament terminal actions", () => {
       authMock.mockResolvedValue(playerIdentity);
 
       await expect(
-        action(initialState, terminalFormData())
+        action(
+          initialState,
+          terminalFormData({ operation: _operation as "cancel" | "void" })
+        )
       ).resolves.toEqual({
         status: "error",
         message: "Administrator access is required.",
@@ -77,7 +94,7 @@ describe("administrator tournament terminal actions", () => {
     await expect(
       voidTournamentAction(
         initialState,
-        terminalFormData({ reason: "   " })
+        terminalFormData({ reason: "   ", operation: "void" })
       )
     ).resolves.toEqual({
       status: "error",
@@ -85,6 +102,30 @@ describe("administrator tournament terminal actions", () => {
     });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["cancel", cancelTournamentAction, "CANCEL"],
+    ["void", voidTournamentAction, "VOID"],
+  ])(
+    "requires an exact %s confirmation before privileged access",
+    async (operation, action, confirmation) => {
+      authMock.mockResolvedValue(adminIdentity);
+
+      await expect(
+        action(
+          initialState,
+          terminalFormData({
+            operation: operation as "cancel" | "void",
+            confirmation: confirmation.toLowerCase(),
+          })
+        )
+      ).resolves.toEqual({
+        status: "error",
+        message: `Type ${confirmation} exactly to confirm this operation.`,
+      });
+      expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     [
@@ -114,7 +155,10 @@ describe("administrator tournament terminal actions", () => {
       await expect(
         action(
           initialState,
-          terminalFormData({ reason: "  Tournament cannot continue  " })
+          terminalFormData({
+            reason: "  Tournament cannot continue  ",
+            operation: _operation as "cancel" | "void",
+          })
         )
       ).resolves.toEqual({
         status: "success",
@@ -127,9 +171,16 @@ describe("administrator tournament terminal actions", () => {
       });
       expect(revalidatePathMock.mock.calls).toEqual([
         ["/admin/tournaments", "page"],
+        ["/dashboard"],
         ["/tournaments"],
         ["/rankings"],
       ]);
+      expect(
+        notifyPlayersOfTournamentTerminalTransitionMock
+      ).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ rpc }),
+        { tournamentId, outcome }
+      );
     }
   );
 
@@ -148,8 +199,14 @@ describe("administrator tournament terminal actions", () => {
     createSupabaseAdminClientMock.mockReturnValue({ rpc });
 
     await expect(
-      voidTournamentAction(initialState, terminalFormData())
+      voidTournamentAction(
+        initialState,
+        terminalFormData({ operation: "void" })
+      )
     ).resolves.toEqual({ status: "success", message });
+    expect(
+      notifyPlayersOfTournamentTerminalTransitionMock
+    ).not.toHaveBeenCalled();
   });
 
   it("rejects an unknown database outcome instead of claiming success", async () => {
@@ -179,7 +236,10 @@ describe("administrator tournament terminal actions", () => {
     createSupabaseAdminClientMock.mockReturnValue({ rpc });
 
     await expect(
-      voidTournamentAction(initialState, terminalFormData())
+      voidTournamentAction(
+        initialState,
+        terminalFormData({ operation: "void" })
+      )
     ).resolves.toEqual({
       status: "error",
       message:
@@ -191,6 +251,65 @@ describe("administrator tournament terminal actions", () => {
     expect(console.error).toHaveBeenCalledWith(
       "Tournament terminal operation failed.",
       { operation: "void", code: "P0001" }
+    );
+  });
+
+  it.each([
+    [
+      "already_cancelled",
+      cancelTournamentAction,
+      "cancel",
+      "cancelled",
+      "The tournament is already cancelled.",
+    ],
+    [
+      "already_voided",
+      voidTournamentAction,
+      "void",
+      "voided",
+      "The tournament is already voided.",
+    ],
+  ])(
+    "retries the idempotent notification dispatch for %s",
+    async (outcome, action, operation, notificationOutcome, message) => {
+      const rpc = vi.fn(async () => ({ data: { outcome }, error: null }));
+      authMock.mockResolvedValue(adminIdentity);
+      createSupabaseAdminClientMock.mockReturnValue({ rpc });
+
+      await expect(
+        action(
+          initialState,
+          terminalFormData({ operation: operation as "cancel" | "void" })
+        )
+      ).resolves.toEqual({ status: "success", message });
+      expect(
+        notifyPlayersOfTournamentTerminalTransitionMock
+      ).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ rpc }),
+        { tournamentId, outcome: notificationOutcome }
+      );
+    }
+  );
+
+  it("preserves a completed terminal mutation when notification delivery is incomplete", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { outcome: "cancelled" },
+      error: null,
+    }));
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ rpc });
+    notifyPlayersOfTournamentTerminalTransitionMock.mockResolvedValue(false);
+
+    await expect(
+      cancelTournamentAction(initialState, terminalFormData())
+    ).resolves.toEqual({
+      status: "success",
+      message:
+        "The tournament was cancelled. Some affected players may not see an in-app notification.",
+    });
+    expect(console.error).toHaveBeenCalledWith(
+      "Tournament terminal notifications were incomplete.",
+      { operation: "cancel" }
     );
   });
 });

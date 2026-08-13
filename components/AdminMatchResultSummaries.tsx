@@ -227,19 +227,28 @@ function EvidenceSummary({
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {submission.replayAccessHref ? (
-          <ProofLink href={submission.replayAccessHref} label="Replay Proof" />
+          <ProofLink
+            href={submission.replayAccessHref}
+            label="Accepted Replay Proof"
+          />
         ) : (
-          <MissingProof label="Replay Proof" />
+          <MissingProof label="Accepted Replay Proof" />
         )}
         {submission.screenshotAccessHref ? (
           <ProofLink
             href={submission.screenshotAccessHref}
-            label="Screenshot Proof"
+            label="Legacy Screenshot Attachment"
           />
         ) : (
-          <MissingProof label="Screenshot Proof" />
+          <MissingProof label="Legacy Screenshot Attachment" />
         )}
       </div>
+      {submission.screenshotAccessHref && (
+        <p className="mt-2 text-[11px] leading-5 text-slate-500">
+          Legacy screenshots remain available for historical context but are
+          not accepted match-result proof.
+        </p>
+      )}
       {submission.notes && (
         <p className="mt-3 whitespace-pre-wrap break-words text-xs leading-5 text-slate-400">
           {submission.notes}
