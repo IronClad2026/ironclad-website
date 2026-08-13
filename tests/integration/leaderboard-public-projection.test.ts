@@ -90,6 +90,7 @@ const seasonStanding = {
   current_rank: 1,
   previous_rank: 2,
   rank_movement: 1,
+  display_order: 1,
 };
 
 const allTimeStanding = {
@@ -109,6 +110,7 @@ const allTimeStanding = {
   matches_won: 8,
   matches_lost: 2,
   win_rate: 80,
+  display_order: 1,
 };
 
 describe("public leaderboard projection", () => {
@@ -128,7 +130,7 @@ describe("public leaderboard projection", () => {
         data: [allTimeStanding],
         error: null,
       },
-      leaderboard_season_champions: { data: [], error: null },
+      leaderboard_public_season_champions: { data: [], error: null },
     };
     fromMock.mockImplementation((table: string) => {
       const query = createQuery(results[table]);
@@ -144,6 +146,7 @@ describe("public leaderboard projection", () => {
         "leaderboard_current_season",
         "leaderboard_public_season_standings",
         "leaderboard_public_all_time_standings",
+        "leaderboard_public_season_champions",
       ])
     );
     expect(tables).not.toContain("leaderboard_player_season_stats");
@@ -272,7 +275,7 @@ describe("public leaderboard projection", () => {
         data: [tiedZulu, fewerRealWins, tiedAlpha],
         error: null,
       },
-      leaderboard_season_champions: { data: [], error: null },
+      leaderboard_public_season_champions: { data: [], error: null },
     };
     fromMock.mockImplementation((table: string) =>
       createQuery(results[table]).query
@@ -290,17 +293,39 @@ describe("public leaderboard projection", () => {
     expect(data.errors).toEqual([]);
   });
 
-  it("keeps an opted-out champion absent when the sanitized profile view returns no row", async () => {
+  it("keeps closed official history public only through pseudonymous projections", async () => {
+    const closedStanding = {
+      ...seasonStanding,
+      player_id: null,
+      display_name: "Former Competitor",
+      in_game_name: "Former Competitor",
+      country: null,
+      region: null,
+      current_elo: null,
+      has_avatar: false,
+      last_tournament_id: null,
+      current_rank: 1,
+    };
     const results: Record<string, QueryResult> = {
       leaderboard_current_season: { data: currentSeason, error: null },
-      leaderboard_public_season_standings: { data: [], error: null },
+      leaderboard_public_season_standings: {
+        data: [
+          { ...closedStanding, display_order: 2 },
+          { ...closedStanding, display_order: 1 },
+        ],
+        error: null,
+      },
       leaderboard_public_all_time_standings: { data: [], error: null },
-      leaderboard_season_champions: {
+      leaderboard_public_season_champions: {
         data: [
           {
-            id: "champion-1",
+            id: "former-champion:opaque",
             season_id: "season-1",
-            player_id: "opted-out-player",
+            season_name: "2026 Season 2",
+            player_id: null,
+            player_name: "Former Competitor",
+            country: null,
+            has_avatar: false,
             bracket_type: "main",
             final_rank: 1,
             final_points: 12,
@@ -308,11 +333,6 @@ describe("public leaderboard projection", () => {
         ],
         error: null,
       },
-      leaderboard_seasons: {
-        data: [{ id: "season-1", name: "2026 Season 2" }],
-        error: null,
-      },
-      public_player_profiles: { data: [], error: null },
     };
     fromMock.mockImplementation((table: string) =>
       createQuery(results[table]).query
@@ -321,10 +341,34 @@ describe("public leaderboard projection", () => {
     const data = await getPublicLeaderboardData();
     const tables = fromMock.mock.calls.map(([table]) => table);
 
-    expect(tables).toContain("public_player_profiles");
+    expect(tables).toContain("leaderboard_public_season_champions");
+    expect(tables).not.toContain("leaderboard_season_champions");
+    expect(tables).not.toContain("leaderboard_seasons");
+    expect(tables).not.toContain("public_player_profiles");
     expect(tables).not.toContain("players");
-    expect(data.seasonStandings).toEqual([]);
+    expect(data.seasonStandings).toHaveLength(2);
+    expect(data.seasonStandings.map((standing) => standing.displayOrder)).toEqual([
+      1, 2,
+    ]);
+    expect(data.seasonStandings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          playerId: null,
+          playerName: "Former Competitor",
+          avatarUrl: null,
+          rank: 1,
+        }),
+      ])
+    );
     expect(data.allTimeStandings).toEqual([]);
-    expect(data.seasonChampions).toEqual([]);
+    expect(data.seasonChampions).toEqual([
+      expect.objectContaining({
+        id: "former-champion:opaque",
+        seasonName: "2026 Season 2",
+        playerId: null,
+        playerName: "Former Competitor",
+        avatarUrl: null,
+      }),
+    ]);
   });
 });

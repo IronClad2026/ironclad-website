@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Award,
   BarChart3,
@@ -343,7 +343,7 @@ function LeaderboardPodium({
       <div className="grid gap-5 lg:grid-cols-3 lg:items-end">
         {ordered.map((row) => (
           <PodiumCard
-            key={`${row.playerId}-${row.rank}`}
+            key={row.playerId ?? `former-${row.displayOrder}`}
             row={row}
             prominent={row.rank === 1}
           />
@@ -361,8 +361,8 @@ function PodiumCard({
   prominent: boolean;
 }) {
   return (
-    <Link
-      href={`/players/${row.playerId}`}
+    <PlayerProfileContainer
+      playerId={row.playerId}
       className={`group relative block overflow-hidden border p-5 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${
         prominent
           ? "border-orange-300/55 bg-[linear-gradient(145deg,rgba(249,115,22,0.24),rgba(20,12,7,0.9),rgba(255,255,255,0.055))] shadow-orange-950/25 lg:min-h-[380px]"
@@ -401,7 +401,7 @@ function PodiumCard({
           <MiniStat label="Win Rate" value={`${formatNumber(row.winRate)}%`} />
         </div>
       </div>
-    </Link>
+    </PlayerProfileContainer>
   );
 }
 
@@ -446,7 +446,7 @@ function LeaderboardTable({
           <tbody className="divide-y divide-white/10 bg-black/30">
             {rows.map((row) => (
               <tr
-                key={`${scope}-${row.bracketType}-${row.playerId}`}
+                key={`${scope}-${row.bracketType}-${row.playerId ?? `former-${row.displayOrder}`}`}
                 className="transition hover:bg-orange-500/12"
               >
                 <td className="px-4 py-4 text-lg font-black text-orange-300">
@@ -454,8 +454,8 @@ function LeaderboardTable({
                 </td>
 
                 <td className="px-4 py-4">
-                  <Link
-                    href={`/players/${row.playerId}`}
+                  <PlayerProfileContainer
+                    playerId={row.playerId}
                     className="flex min-w-0 items-center gap-3"
                   >
                     <Avatar standing={row} size="small" />
@@ -471,7 +471,7 @@ function LeaderboardTable({
                         </p>
                       )}
                     </div>
-                  </Link>
+                  </PlayerProfileContainer>
                 </td>
 
                 <td className="px-4 py-4 text-zinc-300">
@@ -659,9 +659,9 @@ function SeasonChampionsArchive({
       ) : (
         <div className="mt-5 space-y-3">
           {champions.map((champion) => (
-            <Link
+            <PlayerProfileContainer
               key={champion.id}
-              href={`/players/${champion.playerId}`}
+              playerId={champion.playerId}
               className="flex items-center gap-4 border border-white/12 bg-black/45 p-4 transition hover:border-orange-400/45 hover:bg-orange-500/12 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
             >
               <div
@@ -699,7 +699,7 @@ function SeasonChampionsArchive({
                   {champion.finalPoints} pts
                 </p>
               </div>
-            </Link>
+            </PlayerProfileContainer>
           ))}
         </div>
       )}
@@ -896,7 +896,8 @@ function compareRows(
     right.tournamentWins - left.tournamentWins ||
     right.roundsPassed - left.roundsPassed ||
     right.winRate - left.winRate ||
-    left.playerName.localeCompare(right.playerName)
+    left.playerName.localeCompare(right.playerName) ||
+    left.displayOrder - right.displayOrder
   );
 }
 
@@ -940,4 +941,24 @@ function formatBracketLabel(
   }
 
   return "Overall";
+}
+
+function PlayerProfileContainer({
+  playerId,
+  className,
+  children,
+}: {
+  playerId: string | null;
+  className: string;
+  children: ReactNode;
+}) {
+  if (!playerId) {
+    return <div className={className}>{children}</div>;
+  }
+
+  return (
+    <Link href={`/players/${playerId}`} className={className}>
+      {children}
+    </Link>
+  );
 }

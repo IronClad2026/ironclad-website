@@ -22,7 +22,7 @@ export type PublicLeaderboardSeason = {
 export type PublicLeaderboardStanding = {
   scope: LeaderboardScope;
   seasonId: string | null;
-  playerId: string;
+  playerId: string | null;
   displayName: string;
   playerName: string;
   country: string | null;
@@ -45,13 +45,14 @@ export type PublicLeaderboardStanding = {
   rank: number | null;
   previousRank: number | null;
   rankMovement: number | null;
+  displayOrder: number;
 };
 
 export type PublicSeasonChampion = {
   id: string;
   seasonName: string;
   bracketType: LeaderboardBracketType;
-  playerId: string;
+  playerId: string | null;
   playerName: string;
   country: string | null;
   hasAvatar: boolean;
@@ -81,7 +82,7 @@ type SeasonRow = {
 
 type SeasonStandingRow = {
   season_id: string;
-  player_id: string;
+  player_id: string | null;
   display_name: string;
   in_game_name: string;
   country: string | null;
@@ -103,10 +104,11 @@ type SeasonStandingRow = {
   current_rank: number | null;
   previous_rank: number | null;
   rank_movement: number | null;
+  display_order: number;
 };
 
 type AllTimeStandingRow = {
-  player_id: string;
+  player_id: string | null;
   display_name: string;
   in_game_name: string;
   country: string | null;
@@ -122,23 +124,20 @@ type AllTimeStandingRow = {
   matches_won: number;
   matches_lost: number;
   win_rate: number;
+  display_order: number;
 };
 
 type ChampionRow = {
   id: string;
   season_id: string;
-  player_id: string;
-  bracket_type: LeaderboardBracketType;
-  final_rank: number;
-  final_points: number;
-};
-
-type PublicPlayerProfileRow = {
-  id: string;
-  display_name: string;
+  season_name: string;
+  player_id: string | null;
   player_name: string;
   country: string | null;
   has_avatar: boolean;
+  bracket_type: LeaderboardBracketType;
+  final_rank: number;
+  final_points: number;
 };
 
 export async function getPublicLeaderboardData(): Promise<PublicLeaderboardData> {
@@ -204,6 +203,7 @@ async function loadSeasonStandings(seasonId: string, errors: string[]) {
         "current_rank",
         "previous_rank",
         "rank_movement",
+        "display_order",
       ].join(", ")
     )
     .eq("season_id", seasonId)
@@ -242,6 +242,7 @@ async function loadAllTimeStandings(errors: string[]) {
         "matches_won",
         "matches_lost",
         "win_rate",
+        "display_order",
       ].join(", ")
     )
     .order("bracket_type", { ascending: true })
@@ -264,8 +265,10 @@ async function loadAllTimeStandings(errors: string[]) {
 
 async function loadSeasonChampions(errors: string[]) {
   const { data: championRows, error: championError } = await supabase
-    .from("leaderboard_season_champions")
-    .select("id, season_id, player_id, bracket_type, final_rank, final_points")
+    .from("leaderboard_public_season_champions")
+    .select(
+      "id, season_id, season_name, player_id, player_name, country, has_avatar, bracket_type, final_rank, final_points"
+    )
     .order("created_at", { ascending: false })
     .limit(24);
 
@@ -275,85 +278,18 @@ async function loadSeasonChampions(errors: string[]) {
     return [];
   }
 
-  const champions = (championRows ?? []) as ChampionRow[];
-  if (champions.length === 0) {
-    return [];
-  }
-
-  const [seasonNames, playerProfiles] = await Promise.all([
-    loadSeasonNames(uniquePresent(champions.map((champion) => champion.season_id))),
-    loadPublicPlayerProfiles(
-      uniquePresent(champions.map((champion) => champion.player_id))
-    ),
-  ]);
-
-  return champions
-    .map((champion) => {
-      const profile = playerProfiles.get(champion.player_id);
-      if (!profile) return null;
-
-      return {
-        id: champion.id,
-        seasonName: seasonNames.get(champion.season_id) ?? "Unknown Season",
-        bracketType: champion.bracket_type,
-        playerId: champion.player_id,
-        playerName: profile.player_name || profile.display_name,
-        country: profile.country,
-        hasAvatar: profile.has_avatar,
-        avatarUrl: getPublicAvatarUrl(champion.player_id, profile.has_avatar),
-        finalRank: champion.final_rank,
-        finalPoints: champion.final_points,
-      };
-    })
-    .filter((champion): champion is PublicSeasonChampion => champion !== null);
-}
-
-async function loadSeasonNames(seasonIds: string[]) {
-  const names = new Map<string, string>();
-
-  if (seasonIds.length === 0) {
-    return names;
-  }
-
-  const { data, error } = await supabase
-    .from("leaderboard_seasons")
-    .select("id, name")
-    .in("id", seasonIds);
-
-  if (error) {
-    console.error("Public leaderboard champion season names failed:", error);
-    return names;
-  }
-
-  for (const row of (data ?? []) as { id: string; name: string }[]) {
-    names.set(row.id, row.name);
-  }
-
-  return names;
-}
-
-async function loadPublicPlayerProfiles(playerIds: string[]) {
-  const profiles = new Map<string, PublicPlayerProfileRow>();
-
-  if (playerIds.length === 0) {
-    return profiles;
-  }
-
-  const { data, error } = await supabase
-    .from("public_player_profiles")
-    .select("id, display_name, player_name, country, has_avatar")
-    .in("id", playerIds);
-
-  if (error) {
-    console.error("Public leaderboard champion player profiles failed:", error);
-    return profiles;
-  }
-
-  for (const row of (data ?? []) as PublicPlayerProfileRow[]) {
-    profiles.set(row.id, row);
-  }
-
-  return profiles;
+  return ((championRows ?? []) as ChampionRow[]).map((champion) => ({
+    id: champion.id,
+    seasonName: champion.season_name,
+    bracketType: champion.bracket_type,
+    playerId: champion.player_id,
+    playerName: champion.player_name,
+    country: champion.country,
+    hasAvatar: champion.has_avatar,
+    avatarUrl: getPublicAvatarUrl(champion.player_id, champion.has_avatar),
+    finalRank: champion.final_rank,
+    finalPoints: champion.final_points,
+  }));
 }
 
 function mapSeason(row: SeasonRow): PublicLeaderboardSeason {
@@ -395,6 +331,7 @@ function mapSeasonStanding(row: SeasonStandingRow): PublicLeaderboardStanding {
     rank: row.current_rank,
     previousRank: row.previous_rank,
     rankMovement: row.rank_movement,
+    displayOrder: row.display_order,
   };
 }
 
@@ -425,6 +362,7 @@ function mapAllTimeStanding(row: AllTimeStandingRow): PublicLeaderboardStanding 
     rank: null,
     previousRank: null,
     rankMovement: null,
+    displayOrder: row.display_order,
   };
 }
 
@@ -468,7 +406,8 @@ function compareStandings(
     compareCompetitiveWinRate(left, right) ||
     right.matchesWon - left.matchesWon ||
     left.playerName.localeCompare(right.playerName) ||
-    left.playerId.localeCompare(right.playerId)
+    (left.playerId ?? "").localeCompare(right.playerId ?? "") ||
+    left.displayOrder - right.displayOrder
   );
 }
 
@@ -497,8 +436,8 @@ function compareCompetitiveWinRate(
   return rightWon * leftPlayed - leftWon * rightPlayed;
 }
 
-function getPublicAvatarUrl(playerId: string, hasAvatar: boolean) {
-  return hasAvatar ? `/players/${playerId}/avatar` : null;
+function getPublicAvatarUrl(playerId: string | null, hasAvatar: boolean) {
+  return playerId && hasAvatar ? `/players/${playerId}/avatar` : null;
 }
 
 function getSeasonProgress(season: PublicLeaderboardSeason) {
@@ -511,8 +450,4 @@ function getSeasonProgress(season: PublicLeaderboardSeason) {
   }
 
   return Math.min(Math.max(((now - start) / (end - start)) * 100, 0), 100);
-}
-
-function uniquePresent(values: Array<string | null>) {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))];
 }
