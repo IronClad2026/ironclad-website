@@ -113,10 +113,43 @@ describe("dashboard registration-note privacy", () => {
       expect(document.body.textContent).not.toContain("Admin Note");
     }
   );
+
+  it.each(["cancelled", "voided"] as const)(
+    "renders a %s tournament registration as factual read-only history",
+    async (tournamentStatus) => {
+      const client = createDashboardClient("waitlisted", {
+        waitlist_offer_status: "offered",
+        waitlist_offer_expires_at: "2099-08-07T03:00:00.000Z",
+        tournaments: { status: tournamentStatus },
+      });
+      createAuthenticatedSupabaseClientMock.mockResolvedValue(client);
+
+      render(await PlayerDashboardPage());
+
+      const [registrationColumns] = vi.mocked(
+        client.registrationsQuery.select
+      ).mock.calls[0];
+      expect(String(registrationColumns)).toContain(
+        "tournaments!inner(status)"
+      );
+      expect(screen.getByText("Read-only historical record")).toBeInTheDocument();
+      expect(screen.getByText("Privacy Test Tournament")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Accept Spot" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Decline Spot" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Withdraw Registration" })
+      ).not.toBeInTheDocument();
+    }
+  );
 });
 
 function createDashboardClient(
-  registrationStatus: "rejected" | "manual_review"
+  registrationStatus: "rejected" | "manual_review" | "waitlisted",
+  registrationOverrides: Record<string, unknown> = {}
 ) {
   const profileQuery = {
     select: vi.fn(),
@@ -138,8 +171,17 @@ function createDashboardClient(
           registration_status: registrationStatus,
           elo_status: "verified",
           submitted_elo: 1250,
+          tournament_bracket_id: "22222222-2222-4222-8222-222222222222",
+          withdrawn_at: null,
+          waitlist_offer_status: null,
+          waitlist_offer_created_at: null,
+          waitlist_offer_expires_at: null,
+          waitlist_offer_resolved_at: null,
+          tournament_brackets: { launched_at: null },
+          tournaments: { status: "registration_open" },
           admin_notes: PRIVATE_ADMIN_NOTE,
           created_at: "2026-08-05T00:00:00.000Z",
+          ...registrationOverrides,
         },
       ],
       error: null,

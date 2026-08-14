@@ -7,10 +7,15 @@ import AdminBracketPopulation, {
   type BracketPopulationData,
 } from "@/components/AdminBracketPopulation";
 import { launchTournamentDivision } from "@/app/admin/tournaments/actions";
+import {
+  isTournamentTerminalStatus,
+  type TournamentStatus,
+} from "@/lib/tournaments";
 
 export type AdminBracketTournamentOption = {
   id: string;
   title: string;
+  status: TournamentStatus;
   brackets: Array<
     Omit<BracketPopulationData, "generatedBracketId" | "format"> & {
       generatedBracketId: string | null;
@@ -51,6 +56,9 @@ export default function AdminBracketManagement({
     selectedTournament?.brackets.find(
       (bracket) => bracket.bracketId === bracketId
     ) ?? selectedTournament?.brackets[0];
+  const terminalTournament = selectedTournament
+    ? isTournamentTerminalStatus(selectedTournament.status)
+    : false;
   const assignedRegistrationIds = new Set(
     Object.values(selectedBracket?.assignments ?? {}).filter(
       (registrationId): registrationId is string => Boolean(registrationId)
@@ -75,7 +83,8 @@ export default function AdminBracketManagement({
       selectedBracket.isReady &&
       assignmentsComplete &&
       structureComplete &&
-      !selectedBracket.launchedAt
+      !selectedBracket.launchedAt &&
+      !terminalTournament
   );
 
   const selectTournament = (nextTournamentId: string) => {
@@ -170,9 +179,21 @@ export default function AdminBracketManagement({
             </label>
           </div>
 
+          {terminalTournament && (
+            <div className="mt-4 border border-amber-400/30 bg-amber-950/20 p-4 text-sm text-amber-100">
+              <p className="font-black uppercase tracking-wider">
+                Terminal tournament — view only
+              </p>
+              <p className="mt-2 leading-6">
+                Bracket facts remain visible, but seeding and launch controls are
+                unavailable.
+              </p>
+            </div>
+          )}
+
           {selectedBracket?.generatedBracketId && selectedBracket.format ? (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
-              {selectedBracket.actualMatchCount <
+              {!terminalTournament && selectedBracket.actualMatchCount <
                 selectedBracket.expectedMatchCount && (
                 <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">
                   <p className="font-black uppercase tracking-wider">
@@ -228,7 +249,7 @@ export default function AdminBracketManagement({
                   </Link>
                 )}
               </div>
-              {!selectedBracket.launchedAt && (
+              {!terminalTournament && !selectedBracket.launchedAt && (
                 <AdminBracketPopulation
                   tournamentId={selectedTournament.id}
                   tournamentTitle={selectedTournament.title}
@@ -241,7 +262,7 @@ export default function AdminBracketManagement({
                 />
               )}
 
-              {!selectedBracket.launchedAt && (
+              {!terminalTournament && !selectedBracket.launchedAt && (
                 <form
                   action={launchTournamentDivision}
                   className="mt-4 rounded-2xl border border-orange-500/25 bg-orange-500/10 p-4"

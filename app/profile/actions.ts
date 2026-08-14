@@ -12,7 +12,6 @@ import {
   MAX_AVATAR_UPLOAD_SIZE_BYTES,
   MAX_AVATAR_UPLOAD_SIZE_LABEL,
 } from "@/lib/avatar";
-import { supabaseUrl } from "@/lib/supabase-config";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 type ValidatedProfile = {
@@ -32,7 +31,7 @@ export async function savePlayerProfile(
   _previousState: ProfileActionState,
   formData: FormData
 ): Promise<ProfileActionState> {
-  const { getToken, userId } = await auth();
+  const { userId } = await auth();
 
   if (!userId) {
     return {
@@ -88,20 +87,10 @@ export async function savePlayerProfile(
     }
 
     const avatarPath = `${userId}/avatar`;
-    const sessionToken = await getToken();
     const uploadContext = {
-      projectHost: new URL(supabaseUrl).host,
       bucket: AVATAR_BUCKET,
-      objectPath: avatarPath,
-      fullStoragePath: `${AVATAR_BUCKET}/${avatarPath}`,
-      clerkUserId: userId,
-      hasSessionToken: Boolean(sessionToken),
-      sessionTokenLength: sessionToken?.length ?? 0,
-      fileName: avatar.name,
       contentType: avatar.type,
       fileSize: avatar.size,
-      validationPassed: true,
-      upsert: true,
     };
 
     console.info("Player avatar upload attempt:", uploadContext);
@@ -123,11 +112,14 @@ export async function savePlayerProfile(
     }
 
     if (uploadError) {
-      const storageError = serializeStorageError(uploadError);
+      const storageError = summarizeStorageError(uploadError);
 
       console.error("Player avatar upload failed:", {
         ...uploadContext,
-        storageError,
+        ...(storageError.providerStatus === null
+          ? {}
+          : { providerStatus: storageError.providerStatus }),
+        errorCode: storageError.errorCode,
       });
 
       return {
@@ -138,11 +130,7 @@ export async function savePlayerProfile(
       };
     }
 
-    console.info("Player avatar upload succeeded:", {
-      bucket: AVATAR_BUCKET,
-      objectPath: avatarPath,
-      clerkUserId: userId,
-    });
+    console.info("Player avatar upload succeeded:", uploadContext);
 
     avatarUrl = getPlayerAvatarProxyUrl(playerId, Date.now());
   }
@@ -179,72 +167,98 @@ export async function savePlayerProfile(
   };
 }
 
-type SerializedStorageError = {
-  name: string;
-  message: string;
-  status?: number | string;
-  statusCode?: number | string;
-  error?: string;
-  cause?: string;
+type StorageErrorCode =
+  | "STORAGE_BUCKET_NOT_FOUND"
+  | "STORAGE_PERMISSION_DENIED"
+  | "STORAGE_UNAUTHORIZED"
+  | "STORAGE_UPLOAD_FAILED";
+
+type StorageErrorSummary = {
+  errorCode: StorageErrorCode;
+  providerStatus: number | null;
 };
 
-function serializeStorageError(error: unknown): SerializedStorageError {
-  if (!(error instanceof Error)) {
-    return {
-      name: "UnknownStorageError",
-      message:
-        typeof error === "string" ? error : JSON.stringify(error ?? null),
-    };
-  }
-
-  const storageError = error as Error & {
-    status?: number | string;
-    statusCode?: number | string;
-    error?: string;
-    cause?: unknown;
-  };
-
-  return {
-    name: storageError.name,
-    message: storageError.message,
-    status: storageError.status,
-    statusCode: storageError.statusCode,
-    error: storageError.error,
-    cause:
-      storageError.cause instanceof Error
-        ? storageError.cause.message
-        : storageError.cause
-          ? String(storageError.cause)
-          : undefined,
-  };
-}
-
-function getAvatarUploadErrorMessage(error: SerializedStorageError) {
-  const details = `${error.message} ${error.error ?? ""}`.toLowerCase();
+function summarizeStorageError(error: unknown): StorageErrorSummary {
+  const record = isRecord(error) ? error : null;
+  const status = normalizeProviderStatus(
+    record?.statusCode ?? record?.status ?? null
+  );
+  const details = [
+    error instanceof Error ? error.message : null,
+    typeof error === "string" ? error : null,
+    typeof record?.message === "string" ? record.message : null,
+    typeof record?.error === "string" ? record.error : null,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLowerCase();
 
   if (details.includes("bucket") && details.includes("not found")) {
-    return 'Storage bucket "player-avatars" was not found.';
+    return {
+      errorCode: "STORAGE_BUCKET_NOT_FOUND",
+      providerStatus: status,
+    };
   }
 
   if (
     details.includes("row-level security") ||
     details.includes("policy") ||
-    error.status === 403 ||
-    error.statusCode === 403
+    status === 403
   ) {
-    return "Storage permission denied. Check the player-avatars RLS policies.";
+    return {
+      errorCode: "STORAGE_PERMISSION_DENIED",
+      providerStatus: status,
+    };
   }
 
   if (
     details.includes("jwt") ||
     details.includes("unauthorized") ||
-    error.status === 401 ||
-    error.statusCode === 401
+    status === 401
   ) {
+    return {
+      errorCode: "STORAGE_UNAUTHORIZED",
+      providerStatus: status,
+    };
+  }
+
+  return {
+    errorCode: "STORAGE_UPLOAD_FAILED",
+    providerStatus: status,
+  };
+}
+
+function getAvatarUploadErrorMessage(error: StorageErrorSummary) {
+  if (error.errorCode === "STORAGE_BUCKET_NOT_FOUND") {
+    return 'Storage bucket "player-avatars" was not found.';
+  }
+
+  if (error.errorCode === "STORAGE_PERMISSION_DENIED") {
+    return "Storage permission denied. Check the player-avatars RLS policies.";
+  }
+
+  if (error.errorCode === "STORAGE_UNAUTHORIZED") {
     return "Supabase did not accept the authenticated Clerk session.";
   }
 
-  return `Avatar upload failed: ${error.message}`;
+  return "Avatar upload failed. Please try again.";
+}
+
+function normalizeProviderStatus(value: unknown) {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^\d{3}$/.test(value)
+        ? Number(value)
+        : Number.NaN;
+
+  return Number.isInteger(parsed) && parsed >= 100 && parsed <= 599
+    ? parsed
+    : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function validateAvatar(file: File, bytes: Uint8Array) {

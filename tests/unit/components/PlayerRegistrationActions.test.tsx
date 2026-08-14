@@ -29,6 +29,7 @@ describe("PlayerRegistrationActions", () => {
         waitlistOfferStatus="offered"
         waitlistOfferExpiresAt="2099-08-07T03:00:00.000Z"
         launchedAt={null}
+        tournamentStatus="registration_open"
       />
     );
 
@@ -57,6 +58,7 @@ describe("PlayerRegistrationActions", () => {
           waitlistOfferStatus="accepted"
           waitlistOfferExpiresAt="2026-08-07T03:00:00.000Z"
           launchedAt={null}
+          tournamentStatus="registration_open"
         />
       );
 
@@ -82,6 +84,7 @@ describe("PlayerRegistrationActions", () => {
         waitlistOfferStatus="offered"
         waitlistOfferExpiresAt="2000-08-07T03:00:00.000Z"
         launchedAt={null}
+        tournamentStatus="registration_open"
       />
     );
 
@@ -104,6 +107,7 @@ describe("PlayerRegistrationActions", () => {
         waitlistOfferStatus={null}
         waitlistOfferExpiresAt={null}
         launchedAt="2026-08-06T03:00:00.000Z"
+        tournamentStatus="in_progress"
       />
     );
 
@@ -118,6 +122,7 @@ describe("PlayerRegistrationActions", () => {
         waitlistOfferStatus="cancelled"
         waitlistOfferExpiresAt={null}
         launchedAt="2026-08-06T03:00:00.000Z"
+        tournamentStatus="in_progress"
       />
     );
 
@@ -126,4 +131,31 @@ describe("PlayerRegistrationActions", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it.each(["cancelled", "voided"] as const)(
+    "removes player mutation controls when the overall tournament is %s",
+    (tournamentStatus) => {
+      const { container } = render(
+        <PlayerRegistrationActions
+          registrationId={REGISTRATION_ID}
+          registrationStatus="waitlisted"
+          waitlistOfferStatus="offered"
+          waitlistOfferExpiresAt="2099-08-07T03:00:00.000Z"
+          launchedAt={null}
+          tournamentStatus={tournamentStatus}
+        />
+      );
+
+      expect(container).toBeEmptyDOMElement();
+      expect(
+        screen.queryByRole("button", { name: "Accept Spot" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Decline Spot" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Withdraw Registration" })
+      ).not.toBeInTheDocument();
+    }
+  );
 });

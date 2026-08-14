@@ -24,7 +24,11 @@ import {
   getEloVerificationSetting,
   getEloVerificationSupportLinkSetting,
 } from "@/lib/platform-settings";
-import { getTournamentBracketDisplayName } from "@/lib/tournaments";
+import {
+  getTournamentBracketDisplayName,
+  isTournamentTerminalStatus,
+  type TournamentStatus,
+} from "@/lib/tournaments";
 import {
   PHASE_FOUR_ACTIVE_COHORT_SIZE,
   isActiveReviewCohortStatus,
@@ -113,7 +117,7 @@ type SupabaseRegistration = {
 type AdminTournamentOption = {
   id: string;
   title: string;
-  status: string;
+  status: TournamentStatus;
   grand_final_at: string | null;
   created_at: string;
   tournament_brackets?: {
@@ -939,6 +943,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const tournamentsById = new Map(
     tournaments.map((tournament) => [tournament.id, tournament.title])
   );
+  const terminalTournamentIds = new Set(
+    tournaments
+      .filter((tournament) => isTournamentTerminalStatus(tournament.status))
+      .map((tournament) => tournament.id)
+  );
   const bracketMetaById = new Map(
     tournaments.flatMap((tournament) =>
       (tournament.tournament_brackets ?? []).map((bracket) => [
@@ -948,13 +957,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           tournamentTitle: tournament.title,
           bracketName: getTournamentBracketDisplayName(bracket.name),
           launchedAt: bracket.launched_at,
+          isTournamentTerminal: isTournamentTerminalStatus(tournament.status),
         },
       ])
     )
   );
   const isBracketWaitlistOpen = (bracketId: string | null) =>
     bracketId !== null &&
-    bracketMetaById.get(bracketId)?.launchedAt === null;
+    bracketMetaById.get(bracketId)?.launchedAt === null &&
+    bracketMetaById.get(bracketId)?.isTournamentTerminal === false;
   const activeCohortCountByBracket = new Map<string, number>();
   const approvedCountByBracket = new Map<string, number>();
   const waitlistCountByBracket = new Map<string, number>();
@@ -1055,6 +1066,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .map((tournament) => ({
         id: tournament.id,
         title: tournament.title,
+        status: tournament.status,
         brackets: (tournament.tournament_brackets ?? [])
           .map((bracket) => {
             const generated = generatedByBracket.get(bracket.id);
@@ -1158,12 +1170,25 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const selectedRegistration = allRegistrationReviewRows.find(
     (registration) => registration.registrationId === params?.selected
   );
+  const selectedRegistrationIsTerminal = Boolean(
+    selectedRegistration?.tournamentId &&
+      terminalTournamentIds.has(selectedRegistration.tournamentId)
+  );
   const registrationReviewRows =
     activeFilter === "all"
       ? allRegistrationReviewRows.slice().sort(compareAdminRegistrationReviewRows)
       : allRegistrationReviewRows.filter(
           (registration) => registration.status === activeFilter
         ).sort(compareAdminRegistrationReviewRows);
+  const hasBulkApprovableRegistration = registrationReviewRows.some(
+    (registration) =>
+      !registration.isDivisionLaunched &&
+      (!registration.tournamentId ||
+        !terminalTournamentIds.has(registration.tournamentId)) &&
+      registration.status !== "waitlisted" &&
+      registration.status !== "withdrawn" &&
+      registration.status !== "approved"
+  );
   const totalRegistrationCountByTournament = registrations.reduce(
     (counts, registration) => {
       const key = registration.tournament_id ?? "unassigned";
@@ -1185,7 +1210,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const tournamentIdsWithMetadata = new Set(
     tournaments.map((tournament) => tournament.id)
   );
-  const registrationReviewGroups = tournaments.map((tournament) => ({
+  const registrationReviewGroups: {
+    key: string;
+    title: string;
+    status: TournamentStatus | "metadata_unavailable" | "unknown";
+    rows: AdminRegistrationReviewRow[];
+    totalCount: number;
+  }[] = tournaments.map((tournament) => ({
     key: tournament.id,
     title: tournament.title,
     status: tournament.status,
@@ -1367,7 +1398,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 type="submit"
                 form="registration-bulk-form"
                 formAction={approveSelectedRegistrations}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20 sm:w-auto"
+                disabled={!hasBulkApprovableRegistration}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-zinc-600 sm:w-auto"
               >
                 <CheckCircle className="h-4 w-4" />
                 Approve Selected
@@ -1550,6 +1582,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   activeFilter={activeFilter}
                   formId="registration-bulk-form"
                   selectionScope={group.key}
+                  isTournamentTerminal={terminalTournamentIds.has(group.key)}
                   updateRegistrationStatusAction={updateRegistrationStatus}
                 />
               </div>
@@ -1758,11 +1791,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   className="text-xs font-bold uppercase tracking-wider text-orange-300"
                 >
                   Private Admin Note
+                  {selectedRegistrationIsTerminal ? " (read-only)" : ""}
                 </label>
                 <p className="mt-2 text-xs leading-5 text-zinc-400">
-                  Required when rejecting a registration or marking it for
-                  manual review. This note is restricted to administrators and
-                  is never included in player-facing status messages.
+                  {selectedRegistrationIsTerminal
+                    ? "Terminal tournament notes are retained as read-only administrator history."
+                    : "Required when rejecting a registration or marking it for manual review. This note is restricted to administrators and is never included in player-facing status messages."}
                 </p>
                 <textarea
                   id="adminNotes"
@@ -1770,10 +1804,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   defaultValue={selectedRegistration.privateAdminNote ?? ""}
                   maxLength={1000}
                   rows={5}
+                  readOnly={selectedRegistrationIsTerminal}
                   autoFocus={
-                    params?.focus === "note" || params?.focus === "reject"
+                    !selectedRegistrationIsTerminal &&
+                    (params?.focus === "note" || params?.focus === "reject")
                   }
-                  className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400"
+                  className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400 read-only:cursor-default read-only:border-white/5 read-only:text-zinc-400"
                   placeholder="Record private review context for administrators."
                 />
               </div>
@@ -1791,7 +1827,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     : params.notice === "saved"
                       ? "Registration decision and admin note saved."
                       : params.notice === "registration-locked"
-                          ? "This division has launched, so its roster decisions are locked. Private administrator notes remain editable."
+                          ? selectedRegistrationIsTerminal
+                            ? "This tournament is terminal, so registration decisions and private administrator notes are read-only."
+                            : "This division has launched, so its roster decisions are locked. Private administrator notes remain editable."
                           : "The registration decision could not be saved. Check the note length and try again."}
                 </div>
               )}
@@ -1801,12 +1839,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   type="submit"
                   name="nextStatus"
                   value={selectedRegistration.status}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:border-white/30 hover:bg-white/[0.08] lg:w-auto"
+                  disabled={selectedRegistrationIsTerminal}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:border-white/30 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:border-white/5 disabled:text-zinc-600 lg:w-auto"
                 >
                   Save Private Note
                 </button>
 
                 {!selectedRegistration.isDivisionLaunched &&
+                  !selectedRegistrationIsTerminal &&
                   selectedRegistration.status !== "waitlisted" &&
                   selectedRegistration.status !== "withdrawn" && (
                     <button
@@ -1821,6 +1861,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   )}
 
                 {!selectedRegistration.isDivisionLaunched &&
+                  !selectedRegistrationIsTerminal &&
                   selectedRegistration.status !== "withdrawn" && (
                     <button
                       type="submit"
@@ -1834,6 +1875,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   )}
 
                 {!selectedRegistration.isDivisionLaunched &&
+                  !selectedRegistrationIsTerminal &&
                   selectedRegistration.status !== "waitlisted" &&
                   selectedRegistration.status !== "withdrawn" && (
                     <button
@@ -1851,7 +1893,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
 
               {selectedRegistration.status === "waitlisted" &&
-                !selectedRegistration.isDivisionLaunched && (
+                !selectedRegistration.isDivisionLaunched &&
+                !selectedRegistrationIsTerminal && (
                   <p className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
                     A waitlisted player cannot be promoted by an administrator.
                     The player must receive the oldest eligible FIFO offer,
@@ -1863,6 +1906,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <p className="mt-4 rounded-xl border border-sky-500/25 bg-sky-500/10 p-4 text-sm leading-6 text-sky-100">
                   This division has launched. Registration status decisions are
                   locked; private administrator notes remain editable.
+                </p>
+              )}
+
+              {selectedRegistrationIsTerminal && (
+                <p className="mt-4 rounded-xl border border-amber-400/25 bg-amber-950/20 p-4 text-sm leading-6 text-amber-100">
+                  This tournament is terminal. Competition decisions are locked;
+                  factual registration history and private administrator notes
+                  remain available in read-only form.
                 </p>
               )}
             </form>

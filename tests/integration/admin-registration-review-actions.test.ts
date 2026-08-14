@@ -80,7 +80,7 @@ describe("admin registration review action contracts", () => {
     const compactAdminPage = compact(adminPageSource);
 
     expect(compactAdminPage).toContain(
-      "const isBracketWaitlistOpen = (bracketId: string | null) => bracketId !== null && bracketMetaById.get(bracketId)?.launchedAt === null;"
+      "const isBracketWaitlistOpen = (bracketId: string | null) => bracketId !== null && bracketMetaById.get(bracketId)?.launchedAt === null && bracketMetaById.get(bracketId)?.isTournamentTerminal === false;"
     );
     expect(
       [...adminPageSource.matchAll(/isBracketWaitlistOpen\(/g)]
@@ -140,6 +140,30 @@ describe("admin registration review action contracts", () => {
     );
     expect(compactDirectAction).toContain(
       'name="adminNotes" value={registration.privateAdminNote ?? ""}'
+    );
+  });
+
+  it("makes terminal registration notes and empty bulk approval read-only", () => {
+    const compactPage = compact(adminPageSource);
+    const compactModal = compact(selectedRegistrationModal);
+
+    expect(compactPage).toContain(
+      "const hasBulkApprovableRegistration = registrationReviewRows.some("
+    );
+    expect(compactPage).toContain(
+      "disabled={!hasBulkApprovableRegistration}"
+    );
+    expect(compactModal).toContain(
+      "readOnly={selectedRegistrationIsTerminal}"
+    );
+    expect(compactModal).toContain(
+      "disabled={selectedRegistrationIsTerminal}"
+    );
+    expect(compactModal).toContain(
+      "private administrator notes remain available in read-only form."
+    );
+    expect(compactModal).toContain(
+      "registration decisions and private administrator notes are read-only."
     );
   });
 

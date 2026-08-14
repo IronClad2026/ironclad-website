@@ -1,54 +1,64 @@
-# Tournament deletion
+# Tournament recovery and deletion
 
-Tournament deletion is available only from the administrator tournament page.
-The UI requires the administrator to type `DELETE` before the destructive
-action is enabled.
+The administrator tournament page exposes three deliberately separate recovery
+paths. They are not interchangeable.
 
-## Database cleanup
+## Hard delete
 
-`delete_tournament_data` runs as one PostgreSQL transaction. Any database
-failure rolls back the entire database deletion.
+Hard delete is only for a genuinely disposable tournament that has never
+launched and has no generated bracket or competitive history. The administrator
+must type `DELETE` before the control is enabled.
 
-The function removes:
+`delete_tournament_data(uuid, text)` locks the tournament and its child rows,
+then refuses deletion when it finds a launched division, generated bracket,
+played or decided match, result submission/report group, or leaderboard point
+event. The protected refusal remains:
 
-- `match_result_submissions` for the tournament's matches
-- `generated_brackets`
-- `bracket_rounds` through the generated-bracket cascade
-- `tournament_matches` through the generated-bracket cascade
-- `tournament_standings` through the generated-bracket cascade
-- `registrations` linked by tournament or tournament bracket
-- `tournament_brackets`
-- the selected `tournaments` row
+> Tournament has launched or contains competitive history and cannot be
+> permanently deleted.
 
-Review history and proof references are columns on
-`match_result_submissions`, so they are removed with those submissions.
-Player notifications are derived from result submissions, and champion state
-is derived from completed match records; there are no separate notification or
-champion tables to clean up.
+This guard protects factual tournament, bracket, result, replay, and leaderboard
+history. A protected tournament must use Cancel or Void instead of hard delete.
 
-The registration bracket-refresh trigger is suppressed only inside the
-deletion transaction. This prevents bracket regeneration while registrations
-and generated records are being removed.
+For an eligible disposable tournament, the function runs the database cleanup
+in one PostgreSQL transaction. A database failure rolls back the deletion. The
+cleanup removes the tournament's result rows, generated bracket hierarchy,
+registrations, divisions, and tournament row according to their current foreign
+key relationships. The bracket-refresh trigger is suppressed only inside this
+trusted deletion transaction.
 
-## Storage cleanup
+## Cancel and Void
 
-Before deleting database rows, the function records every replay and screenshot
-path in `tournament_deletion_jobs`. After the database transaction commits, the
-server action removes those paths from the private `match-proofs` bucket and
-verifies that each object is absent.
+- **Cancel** is for launched competition without official competitive history.
+  The database verifies eligibility and retains the factual tournament record.
+- **Void** is for competition whose derived scoring effects must no longer
+  count while factual history remains. It preserves tournament, registration,
+  bracket, match, result, and replay history and reconciles eligible derived
+  scoring. A finalized Main / Pro season is placed under review rather than
+  silently rewriting frozen standings.
+
+Cancelled and voided tournaments are terminal and read-only. Normal player and
+administrator competition mutations are rejected by the database.
+
+## Storage cleanup after hard delete
+
+Before an eligible database deletion commits, the function records referenced
+replay paths, legacy screenshot paths, and managed tournament-banner paths in
+`tournament_deletion_jobs`. The server action then removes those objects and
+verifies their absence.
 
 Supabase Database and Storage cannot participate in one shared transaction. If
-Storage cleanup fails, the database deletion remains complete and the cleanup
-manifest is retained with `storage_failed` status. Administrators receive a
-visible retry action on the tournament management page. The manifest is deleted
-only after Storage cleanup is verified.
+Storage cleanup fails after the database commit, the cleanup manifest remains
+with `storage_failed` status and the administrator page exposes the existing
+retry action. The manifest is removed only after cleanup is verified.
 
-The count shown as Storage Files is the number of distinct proof paths
-referenced by the tournament's result submissions. It is not a live bucket
-inventory count.
+The displayed Storage Files count is the number of distinct referenced proof
+paths, not a live bucket inventory. Normal played-match proof is replay-only;
+legacy screenshot paths are tracked here solely for historical compatibility.
 
-## Security
+## Authority
 
-Both deletion RPCs are executable only by the Supabase service role. The server
-actions also require an authenticated Clerk user with the `admin` role. No
-browser client receives service-role credentials.
+The deletion and cleanup RPCs are executable only by `service_role`. Their
+server actions independently require an authenticated Clerk administrator. No
+browser client receives service-role credentials, and Cancel/Void/hard-delete
+do not weaken the terminal database guards.

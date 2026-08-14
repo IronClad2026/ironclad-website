@@ -6,6 +6,10 @@ import {
   withdrawTournamentRegistrationAction,
   type PlayerRegistrationActionState,
 } from "@/app/dashboard/registration-actions";
+import {
+  isTournamentTerminalStatus,
+  type TournamentStatus,
+} from "@/lib/tournaments";
 
 type RegistrationStatus =
   | "pending"
@@ -34,12 +38,14 @@ export default function PlayerRegistrationActions({
   waitlistOfferStatus,
   waitlistOfferExpiresAt,
   launchedAt,
+  tournamentStatus,
 }: {
   registrationId: string;
   registrationStatus: RegistrationStatus;
   waitlistOfferStatus: WaitlistOfferStatus;
   waitlistOfferExpiresAt: string | null;
   launchedAt: string | null;
+  tournamentStatus: TournamentStatus;
 }) {
   const [withdrawState, withdrawAction, withdrawPending] = useActionState(
     withdrawTournamentRegistrationAction,
@@ -51,6 +57,7 @@ export default function PlayerRegistrationActions({
   );
   const offerDeadline = parseTimestamp(waitlistOfferExpiresAt);
   const [offerExpired, setOfferExpired] = useState(false);
+  const terminalTournament = isTournamentTerminalStatus(tournamentStatus);
 
   useEffect(() => {
     if (offerDeadline === null) return;
@@ -92,6 +99,10 @@ export default function PlayerRegistrationActions({
   const hasOfferMessage =
     (waitlistOfferStatus !== null && waitlistOfferStatus !== "accepted") ||
     showAcceptedStatus;
+
+  if (terminalTournament) {
+    return null;
+  }
 
   if (!canWithdraw && !hasOfferMessage) {
     return null;

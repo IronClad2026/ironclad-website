@@ -20,7 +20,7 @@ vi.mock("@/lib/supabase-server", () => ({
 
 import { savePlayerProfile } from "@/app/profile/actions";
 
-function createProfileClient() {
+function createProfileClient(options?: { uploadError?: unknown }) {
   const maybeSingle = vi.fn(async () => ({
     data: {
       avatar_url: "/api/players/player-existing/avatar",
@@ -55,7 +55,7 @@ function createProfileClient() {
       void _path;
       void _file;
       void _options;
-      return { error: null };
+      return { error: options?.uploadError ?? null };
     }
   );
   const storageFrom = vi.fn(() => ({ upload }));
@@ -88,14 +88,14 @@ function createValidProfileForm() {
   return formData;
 }
 
-function createPngAvatar(size: number) {
+function createPngAvatar(size: number, fileName = "avatar.png") {
   const signature = new Uint8Array([
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
   ]);
 
   return new File(
     [signature, new Uint8Array(Math.max(0, size - signature.length))],
-    "avatar.png",
+    fileName,
     { type: "image/png" }
   );
 }
@@ -283,5 +283,139 @@ describe("profile save validation and Steam identity regression", () => {
 
     expect(fixture.upload).not.toHaveBeenCalled();
     expect(fixture.upsert).not.toHaveBeenCalled();
+  });
+
+  it("logs successful avatar uploads without identity, path, filename, or token details", async () => {
+    const privateUserId = "user_private_avatar_identity";
+    const privateToken = "private-session-token-value";
+    const privateFileName = "private-original-avatar-name.png";
+    const getToken = vi.fn(async () => privateToken);
+    const fixture = createProfileClient();
+    const consoleInfo = vi
+      .spyOn(console, "info")
+      .mockImplementation(() => undefined);
+    authMock.mockResolvedValue({
+      userId: privateUserId,
+      sessionClaims: { metadata: { role: "player" } },
+      getToken,
+    });
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
+    const formData = createValidProfileForm();
+    formData.set("avatar", createPngAvatar(1024, privateFileName));
+
+    await expect(
+      savePlayerProfile(
+        { status: "idle", message: "", errors: {} },
+        formData
+      )
+    ).resolves.toMatchObject({ status: "success" });
+
+    expect(getToken).not.toHaveBeenCalled();
+    expect(consoleInfo).toHaveBeenNthCalledWith(
+      1,
+      "Player avatar upload attempt:",
+      {
+        bucket: "player-avatars",
+        contentType: "image/png",
+        fileSize: 1024,
+      }
+    );
+    expect(consoleInfo).toHaveBeenNthCalledWith(
+      2,
+      "Player avatar upload succeeded:",
+      {
+        bucket: "player-avatars",
+        contentType: "image/png",
+        fileSize: 1024,
+      }
+    );
+
+    const visibleLogs = JSON.stringify(consoleInfo.mock.calls);
+    for (const privateValue of [
+      privateUserId,
+      privateToken,
+      privateFileName,
+      `${privateUserId}/avatar`,
+      "objectPath",
+      "fullStoragePath",
+      "sessionTokenLength",
+      "hasSessionToken",
+      "projectHost",
+    ]) {
+      expect(visibleLogs).not.toContain(privateValue);
+    }
+  });
+
+  it("normalizes failed avatar logs and never returns raw provider context", async () => {
+    const providerMessage = "private provider response and project details";
+    const providerCause = "private connection cause";
+    const providerError = Object.assign(new Error(providerMessage), {
+      statusCode: 503,
+      error: "private-provider-error-value",
+      cause: new Error(providerCause),
+    });
+    const fixture = createProfileClient({ uploadError: providerError });
+    const consoleInfo = vi
+      .spyOn(console, "info")
+      .mockImplementation(() => undefined);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
+    const formData = createValidProfileForm();
+    formData.set(
+      "avatar",
+      createPngAvatar(2048, "private-failed-avatar-name.png")
+    );
+
+    const result = await savePlayerProfile(
+      { status: "idle", message: "", errors: {} },
+      formData
+    );
+
+    expect(result).toEqual({
+      status: "error",
+      message: "Your avatar could not be uploaded. Check the image and try again.",
+      errors: {
+        avatar: "Avatar upload failed. Please try again.",
+      },
+    });
+    expect(consoleInfo).toHaveBeenCalledWith(
+      "Player avatar upload attempt:",
+      {
+        bucket: "player-avatars",
+        contentType: "image/png",
+        fileSize: 2048,
+      }
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      "Player avatar upload failed:",
+      {
+        bucket: "player-avatars",
+        contentType: "image/png",
+        fileSize: 2048,
+        providerStatus: 503,
+        errorCode: "STORAGE_UPLOAD_FAILED",
+      }
+    );
+    expect(fixture.upsert).not.toHaveBeenCalled();
+
+    const visibleOutput = JSON.stringify({
+      result,
+      info: consoleInfo.mock.calls,
+      error: consoleError.mock.calls,
+    });
+    for (const privateValue of [
+      providerMessage,
+      providerCause,
+      "private-provider-error-value",
+      "private-failed-avatar-name.png",
+      playerIdentity.userId,
+      `${playerIdentity.userId}/avatar`,
+      "cause",
+      "storageError",
+    ]) {
+      expect(visibleOutput).not.toContain(privateValue);
+    }
   });
 });
