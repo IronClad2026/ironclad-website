@@ -93,6 +93,13 @@ describe("Next.js proxy authorization", () => {
       doesProxyMatch({
         config,
         nextConfig: {},
+        url: "/profile",
+      })
+    ).toBe(true);
+    expect(
+      doesProxyMatch({
+        config,
+        nextConfig: {},
         url: "/players/11111111-1111-4111-8111-111111111111",
       })
     ).toBe(true);

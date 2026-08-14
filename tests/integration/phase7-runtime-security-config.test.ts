@@ -5,6 +5,8 @@ import { MAX_AVATAR_UPLOAD_SIZE_BYTES } from "@/lib/avatar";
 
 const SELECTED_NEXT_PATCH = "16.2.12";
 const MEBIBYTE_BYTES = 1024 * 1024;
+const NEXT_REQUEST_LIMIT_BYTES = 4_400_000;
+const VERCEL_FUNCTION_PAYLOAD_CEILING_BYTES = 4_500_000;
 
 type PackageManifest = {
   dependencies: Record<string, string>;
@@ -22,20 +24,6 @@ type PackageLock = {
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;
-}
-
-function parseConfiguredMebibytes(value: unknown) {
-  if (typeof value !== "string") {
-    throw new TypeError("Server Action body size must use an explicit mb value.");
-  }
-
-  const match = /^(\d+)mb$/.exec(value);
-
-  if (!match) {
-    throw new TypeError("Server Action body size must use an explicit mb value.");
-  }
-
-  return Number(match[1]) * MEBIBYTE_BYTES;
 }
 
 function maxLengthText(length: number) {
@@ -87,24 +75,34 @@ describe("Phase 7 runtime security and Server Action payload contract", () => {
     );
   });
 
-  it("keeps the application avatar boundary at exactly 10 MiB", () => {
-    expect(MAX_AVATAR_UPLOAD_SIZE_BYTES).toBe(10 * MEBIBYTE_BYTES);
+  it("keeps the application avatar boundary at exactly 4 MiB", () => {
+    expect(MAX_AVATAR_UPLOAD_SIZE_BYTES).toBe(4 * MEBIBYTE_BYTES);
   });
 
-  it("fits a measured maximum valid avatar FormData request below the 11 MiB action limit", async () => {
-    const bodySizeLimit =
+  it("fits a measured maximum valid avatar FormData request below both Next request limits", async () => {
+    const serverActionBodySizeLimit =
       nextConfig.experimental?.serverActions?.bodySizeLimit;
-    const configuredBytes = parseConfiguredMebibytes(bodySizeLimit);
+    const proxyClientMaxBodySize =
+      nextConfig.experimental?.proxyClientMaxBodySize;
     const request = new Request("http://localhost/profile", {
       method: "POST",
       body: createMaximumValidProfileForm(),
     });
     const encodedBytes = (await request.arrayBuffer()).byteLength;
+    const headroomBytes = NEXT_REQUEST_LIMIT_BYTES - encodedBytes;
 
-    expect(bodySizeLimit).toBe("11mb");
-    expect(bodySizeLimit).not.toBe("22mb");
+    expect(serverActionBodySizeLimit).toBe(NEXT_REQUEST_LIMIT_BYTES);
+    expect(proxyClientMaxBodySize).toBe(NEXT_REQUEST_LIMIT_BYTES);
+    expect(serverActionBodySizeLimit).toBeLessThan(
+      VERCEL_FUNCTION_PAYLOAD_CEILING_BYTES
+    );
+    expect(proxyClientMaxBodySize).toBeLessThan(
+      VERCEL_FUNCTION_PAYLOAD_CEILING_BYTES
+    );
+    expect(serverActionBodySizeLimit).not.toBe("22mb");
+    expect(serverActionBodySizeLimit).not.toBe("11mb");
     expect(encodedBytes).toBeGreaterThan(MAX_AVATAR_UPLOAD_SIZE_BYTES);
-    expect(encodedBytes).toBeLessThan(configuredBytes);
-    expect(configuredBytes - encodedBytes).toBeGreaterThan(1_000_000);
+    expect(encodedBytes).toBeLessThan(NEXT_REQUEST_LIMIT_BYTES);
+    expect(headroomBytes).toBeGreaterThan(190_000);
   });
 });

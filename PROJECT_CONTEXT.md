@@ -260,7 +260,7 @@ The profile form collects:
 - Optional biography
 
 `savePlayerProfile` validates all submitted values on the server. It also
-validates avatar MIME type, maximum size of 2 MB, and basic file signatures for
+validates avatar MIME type, maximum size of 4 MiB, and basic file signatures for
 JPEG, PNG, and WebP.
 
 The player record is upserted using `clerk_user_id` as the conflict target.
