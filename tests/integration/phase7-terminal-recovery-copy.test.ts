@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const deleteAccountSource = readFileSync(
   resolve(process.cwd(), "components/DeleteAccountSection.tsx"),
   "utf8"
-);
+).replace(/\r\n/g, "\n");
 const leaderboardControlsSource = readFileSync(
   resolve(process.cwd(), "components/AdminLeaderboardControls.tsx"),
   "utf8"

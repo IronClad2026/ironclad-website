@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(
   resolve(process.cwd(), "components/TournamentsExperience.tsx"),
   "utf8"
-);
+).replace(/\r\n/g, "\n");
 
 describe("terminal tournament read-only presentation", () => {
   it("renders factual terminal banners without private metadata", () => {

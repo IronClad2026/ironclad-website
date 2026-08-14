@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_AVATAR_UPLOAD_SIZE_BYTES } from "@/lib/avatar";
 import { playerIdentity } from "@/tests/fixtures/auth";
 
 const authMock = vi.hoisted(() => vi.fn());
@@ -41,11 +42,30 @@ function createProfileClient() {
     }
   );
   const from = vi.fn(() => ({ select, upsert }));
+  const upload = vi.fn(
+    async (
+      _path: string,
+      _file: File,
+      _options: {
+        cacheControl: string;
+        contentType: string;
+        upsert: boolean;
+      }
+    ) => {
+      void _path;
+      void _file;
+      void _options;
+      return { error: null };
+    }
+  );
+  const storageFrom = vi.fn(() => ({ upload }));
 
   return {
-    client: { from },
+    client: { from, storage: { from: storageFrom } },
     from,
     select,
+    storageFrom,
+    upload,
     upsert,
   };
 }
@@ -68,7 +88,19 @@ function createValidProfileForm() {
   return formData;
 }
 
-describe("profile save Steam identity regression", () => {
+function createPngAvatar(size: number) {
+  const signature = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ]);
+
+  return new File(
+    [signature, new Uint8Array(Math.max(0, size - signature.length))],
+    "avatar.png",
+    { type: "image/png" }
+  );
+}
+
+describe("profile save validation and Steam identity regression", () => {
   beforeEach(() => {
     authMock.mockResolvedValue(playerIdentity);
   });
@@ -117,5 +149,58 @@ describe("profile save Steam identity regression", () => {
     expect(fixture.select).toHaveBeenCalledWith("id");
     expect(options).toEqual({ onConflict: "clerk_user_id" });
     expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
+  });
+
+  it("accepts an avatar exactly at the 10 MiB application boundary", async () => {
+    const fixture = createProfileClient();
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const formData = createValidProfileForm();
+    formData.set("avatar", createPngAvatar(MAX_AVATAR_UPLOAD_SIZE_BYTES));
+
+    await expect(
+      savePlayerProfile(
+        {
+          status: "idle",
+          message: "",
+          errors: {},
+        },
+        formData
+      )
+    ).resolves.toMatchObject({ status: "success" });
+
+    expect(fixture.storageFrom).toHaveBeenCalledWith("player-avatars");
+    expect(fixture.upload).toHaveBeenCalledOnce();
+    const uploadedAvatar = fixture.upload.mock.calls[0][1];
+    expect(uploadedAvatar).toBeInstanceOf(File);
+    expect(uploadedAvatar.size).toBe(MAX_AVATAR_UPLOAD_SIZE_BYTES);
+  });
+
+  it("rejects an avatar one byte above the 10 MiB application boundary", async () => {
+    const fixture = createProfileClient();
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
+    const formData = createValidProfileForm();
+    formData.set(
+      "avatar",
+      createPngAvatar(MAX_AVATAR_UPLOAD_SIZE_BYTES + 1)
+    );
+
+    await expect(
+      savePlayerProfile(
+        {
+          status: "idle",
+          message: "",
+          errors: {},
+        },
+        formData
+      )
+    ).resolves.toEqual({
+      status: "error",
+      message: "Review the highlighted profile fields.",
+      errors: { avatar: "Avatar image must be 10 MB or smaller." },
+    });
+
+    expect(fixture.upload).not.toHaveBeenCalled();
+    expect(fixture.upsert).not.toHaveBeenCalled();
   });
 });

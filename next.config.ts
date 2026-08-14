@@ -3,7 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      bodySizeLimit: "22mb",
+      // Allows one 10 MiB avatar plus validated profile fields and multipart
+      // overhead. Replay and tournament-banner bytes upload directly to Storage.
+      bodySizeLimit: "11mb",
     },
   },
 };

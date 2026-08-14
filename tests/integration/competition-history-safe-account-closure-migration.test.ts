@@ -14,11 +14,11 @@ const compactMigration = migration.toLowerCase().replace(/\s+/g, " ").trim();
 const publicLeaderboardSource = readFileSync(
   resolve(process.cwd(), "lib/leaderboard/public.ts"),
   "utf8"
-);
+).replace(/\r\n/g, "\n");
 const leaderboardComponentSource = readFileSync(
   resolve(process.cwd(), "components/LeaderboardExperience.tsx"),
   "utf8"
-);
+).replace(/\r\n/g, "\n");
 function extractFunction(functionName: string) {
   const markers = [
     `create or replace function public.${functionName}(`,
