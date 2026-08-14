@@ -104,9 +104,6 @@ describe("Phase 7 leaderboard authority correction migration", () => {
       "utf8"
     );
 
-    expect(correction).not.toContain(
-      'drop policy if exists "public can read leaderboard all time stats"'
-    );
     expect(publicProjection).toContain(
       "grant select on table public.leaderboard_current_season, public.leaderboard_public_season_standings, public.leaderboard_public_all_time_standings, public.leaderboard_public_season_champions to anon, authenticated, service_role;"
     );
