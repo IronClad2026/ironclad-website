@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const MATCH_REPLAY_BUCKET = "match-proofs";
@@ -38,18 +38,23 @@ export type PreparedMatchReplayUpload = {
   token: string;
 };
 
+export type PreparedMatchReplayAttempt = {
+  attemptId: string;
+  uploads: PreparedMatchReplayUpload[];
+};
+
 export type FinalizeMatchReplayResultInput = {
   matchId: string;
+  attemptId: string;
   playerOneScore: number;
   playerTwoScore: number;
   winnerRegistrationId: string;
   notes: string;
-  replayPaths: string[];
 };
 
 export type CleanupMatchReplayUploadsInput = {
   matchId: string;
-  replayPaths: string[];
+  attemptId: string;
 };
 
 export type VerifiedStoredReplay = {
@@ -63,6 +68,10 @@ export type CommittedMatchReplayResult = {
   match: ReplayMatchContext;
   ownedRegistrationId: string;
   verifiedReplays: VerifiedStoredReplay[];
+  reconciled: boolean;
+  playerOneScore: number;
+  playerTwoScore: number;
+  winnerRegistrationId: string;
 };
 
 export class MatchReplayUploadError extends Error {
@@ -109,11 +118,44 @@ type ParsedReplayPaths = {
   paths: string[];
 };
 
+type PreparedReplayAttemptRecord = ParsedReplayPaths & {
+  requiredReplayCount: number;
+};
+
+type ReplayAttemptPreparation =
+  | ({ outcome: "prepared" } & PreparedReplayAttemptRecord)
+  | {
+      outcome: "cleanup_required";
+      attemptId: string;
+      claimId: string;
+      paths: string[];
+    }
+  | {
+      outcome: "recycle_required";
+      attemptId: string;
+      claimId: string;
+      paths: string[];
+    };
+
+type FinalizationClaim =
+  | { outcome: "committed"; report: unknown; result: ValidatedResult }
+  | {
+      outcome: "claimed";
+      claimId: string;
+      paths: string[];
+      result: ValidatedResult;
+    };
+
+type CleanupReplayAttemptResult = {
+  outcome: "removed" | "preserved" | "already_cleaned";
+  removedCount: number;
+};
+
 export async function prepareMatchReplayUploadsForPlayer(
   supabase: SupabaseAdminClient,
   clerkUserId: string,
   input: PrepareMatchReplayUploadsInput
-): Promise<PreparedMatchReplayUpload[]> {
+): Promise<PreparedMatchReplayAttempt> {
   const matchId = validateMatchId(input?.matchId);
   const replayFiles = validateReplayFileMetadata(input?.replayFiles);
   const authorized = await authorizeReplayParticipant(
@@ -135,37 +177,106 @@ export async function prepareMatchReplayUploadsForPlayer(
   }
 
   await assertNoExistingResultActivity(supabase, authorized.match);
+  let preparedAttempt: PreparedReplayAttemptRecord | null = null;
+  for (let transition = 0; transition < 4 && !preparedAttempt; transition += 1) {
+    const { data: attemptData, error: attemptError } = await supabase.rpc(
+      "prepare_match_replay_upload_attempt",
+      {
+        p_match_id: matchId,
+        p_submitted_by_clerk_user_id: clerkUserId,
+        p_winner_registration_id: result.winnerRegistrationId,
+        p_player_one_score: result.playerOneScore,
+        p_player_two_score: result.playerTwoScore,
+        p_declared_replay_sizes: replayFiles.map((file) => file.size),
+      }
+    );
 
-  const attemptId = randomUUID();
-  const uploads: PreparedMatchReplayUpload[] = [];
+    if (attemptError) throw attemptError;
+    const preparation = parseReplayAttemptPreparation(
+      matchId,
+      result.requiredReplayCount,
+      attemptData
+    );
 
-  for (const [index] of replayFiles.entries()) {
-    const path = `${matchId}/${attemptId}/game-${index + 1}-${randomUUID()}.rec`;
-    const { data, error } = await supabase.storage
-      .from(MATCH_REPLAY_BUCKET)
-      .createSignedUploadUrl(path, { upsert: false });
-
-    if (
-      error ||
-      !data ||
-      data.path !== path ||
-      typeof data.token !== "string" ||
-      data.token.length === 0
-    ) {
-      throw new MatchReplayUploadError(
-        "SIGN_FAILED",
-        "The replay upload could not be prepared. Please try again."
-      );
+    if (preparation.outcome === "prepared") {
+      preparedAttempt = preparation;
+      break;
     }
 
-    uploads.push({
-      gameNumber: index + 1,
-      path,
-      token: data.token,
-    });
+    await removeClaimedReplayPaths(supabase, preparation.paths);
+
+    if (preparation.outcome === "cleanup_required") {
+      await completeClaimedReplayCleanup(
+        supabase,
+        preparation.attemptId,
+        preparation.claimId
+      );
+      continue;
+    }
+
+    const { data: recycledData, error: recycledError } = await supabase.rpc(
+      "complete_match_replay_attempt_recycling",
+      {
+        p_attempt_id: preparation.attemptId,
+        p_recycle_claim_id: preparation.claimId,
+        p_match_id: matchId,
+        p_submitted_by_clerk_user_id: clerkUserId,
+      }
+    );
+    if (recycledError) throw recycledError;
+    const recycled = parseReplayAttemptPreparation(
+      matchId,
+      result.requiredReplayCount,
+      recycledData
+    );
+    if (recycled.outcome !== "prepared") throw invalidAttemptResponse();
+    preparedAttempt = recycled;
   }
 
-  return uploads;
+  if (!preparedAttempt) {
+    throw new MatchReplayUploadError(
+      "ATTEMPT_TRANSITIONS",
+      "The replay attempt could not be prepared safely. Please try again."
+    );
+  }
+  const uploads: PreparedMatchReplayUpload[] = [];
+
+  try {
+    for (const [index, path] of preparedAttempt.paths.entries()) {
+      const { data, error } = await supabase.storage
+        .from(MATCH_REPLAY_BUCKET)
+        .createSignedUploadUrl(path, { upsert: false });
+
+      if (
+        error ||
+        !data ||
+        data.path !== path ||
+        typeof data.token !== "string" ||
+        data.token.length === 0
+      ) {
+        throw new MatchReplayUploadError(
+          "SIGN_FAILED",
+          "The replay upload could not be prepared. Please try again."
+        );
+      }
+
+      uploads.push({
+        gameNumber: index + 1,
+        path,
+        token: data.token,
+      });
+    }
+  } catch (error) {
+    await cleanupReplayAttempt(
+      supabase,
+      clerkUserId,
+      matchId,
+      preparedAttempt.attemptId
+    ).catch(logReplayCleanupFailure);
+    throw error;
+  }
+
+  return { attemptId: preparedAttempt.attemptId, uploads };
 }
 
 export async function finalizeMatchReplayResultForPlayer(
@@ -174,32 +285,58 @@ export async function finalizeMatchReplayResultForPlayer(
   input: FinalizeMatchReplayResultInput
 ): Promise<CommittedMatchReplayResult> {
   const matchId = validateMatchId(input?.matchId);
-  const parsedPaths = parseReplayPaths(matchId, input?.replayPaths);
+  const attemptId = validateAttemptId(input?.attemptId);
   const authorized = await authorizeReplayParticipant(
     supabase,
     clerkUserId,
     matchId
   );
+  const expectedResult = validateResult(
+    authorized.match,
+    input?.playerOneScore,
+    input?.playerTwoScore,
+    input?.winnerRegistrationId
+  );
+  const notes = validateNotes(input?.notes);
+  let finalizationClaimId: string | null = null;
+  let finalizationStateAcquired = false;
 
   try {
-    assertTournamentAcceptsResults(authorized.match);
-    const result = validateResult(
-      authorized.match,
-      input?.playerOneScore,
-      input?.playerTwoScore,
-      input?.winnerRegistrationId
+    const { data: claimData, error: claimError } = await supabase.rpc(
+      "claim_match_replay_attempt_finalization",
+      {
+        p_attempt_id: attemptId,
+        p_match_id: matchId,
+        p_submitted_by_clerk_user_id: clerkUserId,
+        p_winner_registration_id: expectedResult.winnerRegistrationId,
+        p_player_one_score: expectedResult.playerOneScore,
+        p_player_two_score: expectedResult.playerTwoScore,
+      }
     );
-    const notes = validateNotes(input?.notes);
+    if (claimError) throw claimError;
+    finalizationStateAcquired = true;
 
-    if (parsedPaths.paths.length !== result.requiredReplayCount) {
-      throw replayCountError(result.requiredReplayCount);
+    const claim = parseFinalizationClaim(
+      matchId,
+      attemptId,
+      expectedResult,
+      claimData
+    );
+    if (claim.outcome === "committed") {
+      return {
+        report: claim.report,
+        match: authorized.match,
+        ownedRegistrationId: authorized.ownedRegistrationId,
+        verifiedReplays: [],
+        reconciled: true,
+        playerOneScore: claim.result.playerOneScore,
+        playerTwoScore: claim.result.playerTwoScore,
+        winnerRegistrationId: claim.result.winnerRegistrationId,
+      };
     }
 
-    await assertNoExistingResultActivity(supabase, authorized.match);
-    const verifiedReplays = await verifyStoredReplays(
-      supabase,
-      parsedPaths.paths
-    );
+    finalizationClaimId = claim.claimId;
+    const verifiedReplays = await verifyStoredReplays(supabase, claim.paths);
     const uniqueHashes = new Set(
       verifiedReplays.map((replay) => replay.sha256)
     );
@@ -212,14 +349,12 @@ export async function finalizeMatchReplayResultForPlayer(
     }
 
     const { data: report, error: submissionError } = await supabase.rpc(
-      "submit_match_series_result_report",
+      "commit_match_replay_attempt_result",
       {
+        p_attempt_id: attemptId,
+        p_finalization_claim_id: claim.claimId,
         p_match_id: matchId,
         p_submitted_by_clerk_user_id: clerkUserId,
-        p_winner_registration_id: result.winnerRegistrationId,
-        p_player_one_score: result.playerOneScore,
-        p_player_two_score: result.playerTwoScore,
-        p_replay_storage_paths: verifiedReplays.map((replay) => replay.path),
         p_replay_content_hashes: verifiedReplays.map((replay) => replay.sha256),
         p_notes: notes || null,
       }
@@ -236,12 +371,74 @@ export async function finalizeMatchReplayResultForPlayer(
       match: authorized.match,
       ownedRegistrationId: authorized.ownedRegistrationId,
       verifiedReplays,
+      reconciled: false,
+      playerOneScore: claim.result.playerOneScore,
+      playerTwoScore: claim.result.playerTwoScore,
+      winnerRegistrationId: claim.result.winnerRegistrationId,
     };
   } catch (error) {
+    // The claim RPC binds result facts before changing attempt state. A caller
+    // that supplies different, otherwise-valid facts must not turn the still-
+    // prepared attempt into cleanup work or lose an immediately valid retry.
+    if (
+      !finalizationStateAcquired &&
+      hasExactReplayDatabaseMessage(
+        error,
+        "Final result does not match this replay attempt"
+      )
+    ) {
+      throw error;
+    }
+
     try {
-      await removeUnreferencedReplayPaths(supabase, parsedPaths.paths);
+      const cleanup = await cleanupReplayAttempt(
+        supabase,
+        clerkUserId,
+        matchId,
+        attemptId,
+        finalizationClaimId
+      );
+      if (cleanup.outcome === "preserved") {
+        const { data: retryData, error: retryError } = await supabase.rpc(
+          "claim_match_replay_attempt_finalization",
+          {
+            p_attempt_id: attemptId,
+            p_match_id: matchId,
+            p_submitted_by_clerk_user_id: clerkUserId,
+            p_winner_registration_id: expectedResult.winnerRegistrationId,
+            p_player_one_score: expectedResult.playerOneScore,
+            p_player_two_score: expectedResult.playerTwoScore,
+          }
+        );
+        if (retryError) throw retryError;
+        const reconciled = parseFinalizationClaim(
+          matchId,
+          attemptId,
+          expectedResult,
+          retryData
+        );
+        if (reconciled.outcome !== "committed") {
+          throw invalidAttemptResponse();
+        }
+        return {
+          report: reconciled.report,
+          match: authorized.match,
+          ownedRegistrationId: authorized.ownedRegistrationId,
+          verifiedReplays: [],
+          reconciled: true,
+          playerOneScore: reconciled.result.playerOneScore,
+          playerTwoScore: reconciled.result.playerTwoScore,
+          winnerRegistrationId: reconciled.result.winnerRegistrationId,
+        };
+      }
     } catch (cleanupError) {
       logReplayCleanupFailure(cleanupError);
+      if (finalizationStateAcquired) {
+        throw new MatchReplayUploadError(
+          "FINALIZATION_UNCERTAIN",
+          "IronClad could not confirm the final result state. Refresh this match before retrying."
+        );
+      }
     }
     throw error;
   }
@@ -253,10 +450,15 @@ export async function cleanupMatchReplayUploadsForPlayer(
   input: CleanupMatchReplayUploadsInput
 ): Promise<number> {
   const matchId = validateMatchId(input?.matchId);
-  const parsedPaths = parseReplayPaths(matchId, input?.replayPaths);
+  const attemptId = validateAttemptId(input?.attemptId);
 
-  await authorizeReplayParticipant(supabase, clerkUserId, matchId);
-  return removeUnreferencedReplayPaths(supabase, parsedPaths.paths);
+  const cleanup = await cleanupReplayAttempt(
+    supabase,
+    clerkUserId,
+    matchId,
+    attemptId
+  );
+  return cleanup.removedCount;
 }
 
 async function authorizeReplayParticipant(
@@ -486,6 +688,16 @@ function validateMatchId(value: unknown) {
   return value;
 }
 
+function validateAttemptId(value: unknown) {
+  if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+    throw new MatchReplayUploadError(
+      "BAD_ATTEMPT",
+      "This replay upload attempt is invalid. Please prepare the uploads again."
+    );
+  }
+  return value;
+}
+
 function validateReplayFileMetadata(value: unknown) {
   if (!Array.isArray(value) || value.length === 0) {
     throw new MatchReplayUploadError(
@@ -693,6 +905,118 @@ function parseReplayPaths(matchId: string, value: unknown): ParsedReplayPaths {
   return { attemptId, paths: [...value] };
 }
 
+function parseReplayAttemptPreparation(
+  matchId: string,
+  requiredReplayCount: number,
+  value: unknown
+): ReplayAttemptPreparation {
+  if (typeof value !== "object" || value === null) {
+    throw invalidAttemptResponse();
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const attemptId = validateAttemptId(candidate.attempt_id);
+  const parsed = parseReplayPaths(matchId, candidate.replay_storage_paths);
+  if (parsed.attemptId !== attemptId) throw invalidAttemptResponse();
+
+  if (
+    candidate.outcome === "cleanup_required" ||
+    candidate.outcome === "recycle_required"
+  ) {
+    if (parsed.paths.length !== MAX_MATCH_REPLAY_COUNT) {
+      throw invalidAttemptResponse();
+    }
+    const claimId = validateAttemptId(
+      candidate.outcome === "cleanup_required"
+        ? candidate.cleanup_claim_id
+        : candidate.recycle_claim_id
+    );
+    return {
+      outcome: candidate.outcome,
+      attemptId,
+      claimId,
+      paths: parsed.paths,
+    };
+  }
+
+  if (
+    candidate.outcome !== "prepared" ||
+    parsed.paths.length !== requiredReplayCount ||
+    candidate.required_replay_count !== requiredReplayCount
+  ) {
+    throw invalidAttemptResponse();
+  }
+
+  return {
+    outcome: "prepared",
+    attemptId,
+    paths: parsed.paths,
+    requiredReplayCount,
+  };
+}
+
+function parseFinalizationClaim(
+  matchId: string,
+  attemptId: string,
+  expectedResult: ValidatedResult,
+  value: unknown
+): FinalizationClaim {
+  if (typeof value !== "object" || value === null) {
+    throw invalidAttemptResponse();
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const result = {
+    playerOneScore: candidate.player_one_score,
+    playerTwoScore: candidate.player_two_score,
+    winnerRegistrationId: candidate.winner_registration_id,
+    requiredReplayCount: candidate.required_replay_count,
+  };
+  if (
+    result.playerOneScore !== expectedResult.playerOneScore ||
+    result.playerTwoScore !== expectedResult.playerTwoScore ||
+    result.winnerRegistrationId !== expectedResult.winnerRegistrationId ||
+    result.requiredReplayCount !== expectedResult.requiredReplayCount
+  ) {
+    throw invalidAttemptResponse();
+  }
+
+  if (candidate.outcome === "committed") {
+    return {
+      outcome: "committed",
+      report: candidate.report,
+      result: expectedResult,
+    };
+  }
+
+  if (candidate.outcome !== "claimed") {
+    throw invalidAttemptResponse();
+  }
+
+  const claimId = validateAttemptId(candidate.claim_id);
+  const parsed = parseReplayPaths(matchId, candidate.replay_storage_paths);
+  if (
+    parsed.attemptId !== attemptId ||
+    parsed.paths.length !== expectedResult.requiredReplayCount
+  ) {
+    throw invalidAttemptResponse();
+  }
+
+  return {
+    outcome: "claimed",
+    claimId,
+    paths: parsed.paths,
+    result: expectedResult,
+  };
+}
+
+function invalidAttemptResponse() {
+  return new MatchReplayUploadError(
+    "ATTEMPT_RESPONSE",
+    "The replay attempt could not be verified safely. Please refresh and try again."
+  );
+}
+
 async function verifyStoredReplays(
   supabase: SupabaseAdminClient,
   paths: string[]
@@ -748,7 +1072,95 @@ async function verifyStoredReplays(
   return verified;
 }
 
-async function removeUnreferencedReplayPaths(
+async function removeClaimedReplayPaths(
+  supabase: SupabaseAdminClient,
+  paths: string[]
+) {
+  await assertReplayPathsUnreferenced(supabase, paths);
+
+  const { error } = await supabase.storage
+    .from(MATCH_REPLAY_BUCKET)
+    .remove(paths);
+  if (error) {
+    throw new MatchReplayUploadError(
+      "REMOVE_FAIL",
+      "Replay cleanup could not be completed safely."
+    );
+  }
+}
+
+async function completeClaimedReplayCleanup(
+  supabase: SupabaseAdminClient,
+  attemptId: string,
+  cleanupClaimId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "complete_match_replay_attempt_cleanup",
+    {
+      p_attempt_id: attemptId,
+      p_cleanup_claim_id: cleanupClaimId,
+    }
+  );
+  if (error || data !== true) {
+    throw new MatchReplayUploadError(
+      "CLEANUP_STATE",
+      "Replay cleanup could not be completed safely."
+    );
+  }
+}
+
+async function cleanupReplayAttempt(
+  supabase: SupabaseAdminClient,
+  clerkUserId: string,
+  matchId: string,
+  attemptId: string,
+  finalizationClaimId: string | null = null
+) {
+  const { data: cleanupData, error: cleanupClaimError } = await supabase.rpc(
+    "claim_match_replay_attempt_cleanup",
+    {
+      p_attempt_id: attemptId,
+      p_match_id: matchId,
+      p_submitted_by_clerk_user_id: clerkUserId,
+      p_finalization_claim_id: finalizationClaimId,
+    }
+  );
+
+  if (cleanupClaimError) throw cleanupClaimError;
+  if (typeof cleanupData !== "object" || cleanupData === null) {
+    throw invalidAttemptResponse();
+  }
+
+  const cleanup = cleanupData as Record<string, unknown>;
+  if (cleanup.outcome === "preserved" || cleanup.outcome === "cleaned") {
+    return {
+      outcome: cleanup.outcome === "preserved" ? "preserved" : "already_cleaned",
+      removedCount: 0,
+    } satisfies CleanupReplayAttemptResult;
+  }
+  if (cleanup.outcome !== "claimed") {
+    throw invalidAttemptResponse();
+  }
+
+  const cleanupClaimId = validateAttemptId(cleanup.cleanup_claim_id);
+  const parsed = parseReplayPaths(matchId, cleanup.replay_storage_paths);
+  if (
+    parsed.attemptId !== attemptId ||
+    parsed.paths.length !== MAX_MATCH_REPLAY_COUNT
+  ) {
+    throw invalidAttemptResponse();
+  }
+
+  await removeClaimedReplayPaths(supabase, parsed.paths);
+  await completeClaimedReplayCleanup(supabase, attemptId, cleanupClaimId);
+
+  return {
+    outcome: "removed",
+    removedCount: parsed.paths.length,
+  } satisfies CleanupReplayAttemptResult;
+}
+
+async function assertReplayPathsUnreferenced(
   supabase: SupabaseAdminClient,
   paths: string[]
 ) {
@@ -778,24 +1190,12 @@ async function removeUnreferencedReplayPaths(
       .map((row) => row.replay_storage_path)
       .filter((path): path is string => typeof path === "string")
   );
-  const removablePaths = paths.filter((path) => !referencedPaths.has(path));
-
-  if (removablePaths.length === 0) {
-    return 0;
-  }
-
-  const { error } = await supabase.storage
-    .from(MATCH_REPLAY_BUCKET)
-    .remove(removablePaths);
-
-  if (error) {
+  if (referencedPaths.size > 0) {
     throw new MatchReplayUploadError(
-      "REMOVE_FAIL",
+      "REFERENCED_PROOF",
       "Replay cleanup could not be completed safely."
     );
   }
-
-  return removablePaths.length;
 }
 
 function replayCountError(requiredReplayCount: number) {
@@ -804,6 +1204,16 @@ function replayCountError(requiredReplayCount: number) {
     `This score requires exactly ${requiredReplayCount} replay file${
       requiredReplayCount === 1 ? "" : "s"
     }.`
+  );
+}
+
+function hasExactReplayDatabaseMessage(error: unknown, expected: string) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.toLowerCase().includes(expected.toLowerCase())
   );
 }
 

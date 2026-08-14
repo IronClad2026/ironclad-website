@@ -57,6 +57,7 @@ export default function PlayerMatchResultForm({
   const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState(false);
+  const [finalizationUncertain, setFinalizationUncertain] = useState(false);
   const [submissionPhase, setSubmissionPhase] =
     useState<ReplaySubmissionPhase>("idle");
   const [uploadGameNumber, setUploadGameNumber] = useState(0);
@@ -85,6 +86,7 @@ export default function PlayerMatchResultForm({
   const submitDisabled =
     pending ||
     noShowPending ||
+    finalizationUncertain ||
     scoreInfo.requiredReplayCount === null ||
     !replayCountMatches;
 
@@ -96,7 +98,7 @@ export default function PlayerMatchResultForm({
 
   const submitMatchResult = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (submissionInFlightRef.current) return;
+    if (submissionInFlightRef.current || finalizationUncertain) return;
 
     const parsedPlayerOneScore = parseScore(playerOneScore);
     const parsedPlayerTwoScore = parseScore(playerTwoScore);
@@ -137,6 +139,7 @@ export default function PlayerMatchResultForm({
     setSubmissionPhase("preparing");
     setUploadGameNumber(0);
     let preparedPaths: string[] = [];
+    let preparedAttemptId = "";
     let reachedFinalization = false;
 
     try {
@@ -156,6 +159,7 @@ export default function PlayerMatchResultForm({
         return;
       }
 
+      preparedAttemptId = preparation.attemptId;
       preparedPaths = preparation.uploads.map((upload) => upload.path);
 
       for (const [index, upload] of preparation.uploads.entries()) {
@@ -183,14 +187,17 @@ export default function PlayerMatchResultForm({
       reachedFinalization = true;
       const result = await finalizeMatchResult({
         matchId: match.id,
+        attemptId: preparedAttemptId,
         playerOneScore: parsedPlayerOneScore,
         playerTwoScore: parsedPlayerTwoScore,
         winnerRegistrationId,
         notes,
-        replayPaths: preparedPaths,
       });
 
       setState(result);
+      if (result.status === "error" && result.requiresRefresh) {
+        setFinalizationUncertain(true);
+      }
 
       if (result.status === "success") {
         setPlayerOneScore("");
@@ -210,7 +217,7 @@ export default function PlayerMatchResultForm({
       if (!reachedFinalization && preparedPaths.length > 0) {
         await cleanupPreparedReplayUploads({
           matchId: match.id,
-          replayPaths: preparedPaths,
+          attemptId: preparedAttemptId,
         }).catch(() => undefined);
       }
 
@@ -220,6 +227,7 @@ export default function PlayerMatchResultForm({
           ? "IronClad could not confirm the final response. Refresh this match before retrying."
           : "The replay upload failed. Your selected files are still available; please try again.",
       });
+      if (reachedFinalization) setFinalizationUncertain(true);
     } finally {
       submissionInFlightRef.current = false;
       setPending(false);
@@ -381,7 +389,7 @@ export default function PlayerMatchResultForm({
       <div className="rounded-2xl border border-red-400/20 bg-red-500/[0.04] p-4">
         <button
           type="button"
-          disabled={pending || noShowPending}
+          disabled={pending || noShowPending || finalizationUncertain}
           onClick={() => setNoShowOpen((current) => !current)}
           className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-50"
         >
@@ -450,7 +458,7 @@ export default function PlayerMatchResultForm({
             )}
             <button
               type="submit"
-              disabled={noShowPending || pending}
+              disabled={noShowPending || pending || finalizationUncertain}
               className="w-full rounded-xl bg-red-700 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
             >
               {noShowPending ? "Submitting..." : "Submit No-Show Report"}
