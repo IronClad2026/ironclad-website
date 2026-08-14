@@ -23,8 +23,10 @@ import {
   getPublicTournamentNavigation,
   getTournamentBracketDisplayName,
   getTournamentTerminalPublicMessage,
+  formatTournamentParticipantFact,
   isTournamentTerminalStatus,
   isTournamentRegistrationOpen,
+  tournamentParticipantMatchesQuery,
   WAITLIST_DISCLOSURE_MESSAGE,
 } from "@/lib/tournaments";
 import type {
@@ -987,15 +989,11 @@ function Participants({ tournament }: { tournament: TournamentCard }) {
     [tournament.brackets, tournament.participants]
   );
   const filteredByBracket = useMemo(() => {
-      const normalizedQuery = query.toLowerCase();
-      const matchesQuery = (participant: TournamentParticipant) =>
-        `${participant.name} ${participant.country} ${participant.elo}`
-          .toLowerCase()
-          .includes(normalizedQuery);
-
       return participantSections.map((section) => ({
         ...section,
-        participants: section.participants.filter(matchesQuery),
+        participants: section.participants.filter((participant) =>
+          tournamentParticipantMatchesQuery(participant, query)
+        ),
       }));
     },
     [participantSections, query]
@@ -1054,7 +1052,7 @@ function ParticipantSection({
             <tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Player</th><th className="px-4 py-3">Country</th><th className="px-4 py-3">ELO</th><th className="px-4 py-3">Status</th></tr>
           </thead>
           <tbody className="divide-y divide-white/10 bg-black/30">
-            {participants.map((participant, index) => <tr key={participant.registrationId} className="transition hover:bg-orange-500/12"><td className="px-4 py-3 font-mono text-zinc-400">#{index + 1}</td><td className="px-4 py-3 font-bold text-white">{participant.name}</td><td className="px-4 py-3 text-zinc-300">{participant.country}</td><td className="px-4 py-3 text-zinc-300">{participant.elo}</td><td className="px-4 py-3"><StatusPill tone="green">Approved</StatusPill></td></tr>)}
+            {participants.map((participant, index) => <tr key={participant.registrationId} className="transition hover:bg-orange-500/12"><td className="px-4 py-3 font-mono text-zinc-400">#{index + 1}</td><td className="px-4 py-3 font-bold text-white">{participant.name}</td><td className="px-4 py-3 text-zinc-300">{formatTournamentParticipantFact(participant.country)}</td><td className="px-4 py-3 text-zinc-300">{formatTournamentParticipantFact(participant.elo)}</td><td className="px-4 py-3"><StatusPill tone="green">Approved</StatusPill></td></tr>)}
             {participants.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-zinc-500">No approved participants in this bracket.</td></tr>}
           </tbody>
         </table>
@@ -3872,15 +3870,11 @@ function MobileParticipants({ tournament }: { tournament: TournamentCard }) {
     [tournament.brackets, tournament.participants]
   );
   const filteredByBracket = useMemo(() => {
-    const normalizedQuery = query.toLowerCase();
-    const matchesQuery = (participant: TournamentParticipant) =>
-      `${participant.name} ${participant.country} ${participant.elo}`
-        .toLowerCase()
-        .includes(normalizedQuery);
-
     return participantSections.map((section) => ({
       ...section,
-      participants: section.participants.filter(matchesQuery),
+      participants: section.participants.filter((participant) =>
+        tournamentParticipantMatchesQuery(participant, query)
+      ),
     }));
   }, [participantSections, query]);
 
@@ -3964,7 +3958,7 @@ function MobileParticipantSection({
                   Country
                 </p>
                 <p className="mt-1 break-words font-bold text-zinc-200">
-                  {participant.country}
+                  {formatTournamentParticipantFact(participant.country)}
                 </p>
               </div>
               <div className="min-w-0">
@@ -3972,7 +3966,7 @@ function MobileParticipantSection({
                   ELO
                 </p>
                 <p className="mt-1 break-words font-bold text-zinc-200">
-                  {participant.elo}
+                  {formatTournamentParticipantFact(participant.elo)}
                 </p>
               </div>
             </div>

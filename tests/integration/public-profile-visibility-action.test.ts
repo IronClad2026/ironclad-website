@@ -88,6 +88,7 @@ describe("public profile visibility action", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
     expect(revalidatePathMock).toHaveBeenCalledWith("/players");
     expect(revalidatePathMock).toHaveBeenCalledWith(`/players/${PLAYER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
   });
 
   it("confirms a persisted opt-out before reporting success", async () => {

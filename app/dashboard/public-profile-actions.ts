@@ -89,6 +89,7 @@ export async function updatePublicProfileEnabled(
   revalidatePath("/dashboard");
   revalidatePath("/players");
   revalidatePath(`/players/${persistedPlayer.id as string}`);
+  revalidatePath("/tournaments");
 
   return {
     status: "success",
