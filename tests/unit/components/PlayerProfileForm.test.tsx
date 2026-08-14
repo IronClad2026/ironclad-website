@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PlayerProfileForm from "@/components/PlayerProfileForm";
 import type { PlayerProfile } from "@/lib/player-profile";
@@ -105,5 +105,48 @@ describe("PlayerProfileForm Relic cutover", () => {
         name: "View active tournament ELO snapshots",
       })
     ).not.toBeInTheDocument();
+  });
+
+  it("states the 4 MiB avatar application boundary", () => {
+    render(
+      <PlayerProfileForm
+        profile={profile}
+        verifiedCurrentElo={1375}
+        activeTournamentEloSnapshots={[]}
+      />
+    );
+
+    expect(
+      screen.getByText(/Maximum file size\s+4 MiB\./)
+    ).toBeInTheDocument();
+  });
+
+  it("rejects a client-selected avatar over 4 MiB with matching copy", () => {
+    render(
+      <PlayerProfileForm
+        profile={profile}
+        verifiedCurrentElo={1375}
+        activeTournamentEloSnapshots={[]}
+      />
+    );
+    const avatarInput = document.querySelector<HTMLInputElement>(
+      'input[name="avatar"]'
+    );
+
+    expect(avatarInput).not.toBeNull();
+    fireEvent.change(avatarInput!, {
+      target: {
+        files: [
+          new File([new Uint8Array(4 * 1024 * 1024 + 1)], "avatar.png", {
+            type: "image/png",
+          }),
+        ],
+      },
+    });
+
+    expect(
+      screen.getByText("Avatar image must be 4 MiB or smaller.")
+    ).toBeInTheDocument();
+    expect(avatarInput).toHaveValue("");
   });
 });

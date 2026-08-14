@@ -1,7 +1,7 @@
-// Keep Server Action uploads deploy-safe; the bucket remains 50 MB for a
-// future direct-to-Supabase upload flow that avoids platform payload limits.
-export const MAX_AVATAR_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
-export const MAX_AVATAR_UPLOAD_SIZE_LABEL = "10 MB";
+// Keep Server Action avatar uploads within the hosting request-body boundary.
+// The Storage bucket can remain broader because this is the application limit.
+export const MAX_AVATAR_UPLOAD_SIZE_BYTES = 4 * 1024 * 1024;
+export const MAX_AVATAR_UPLOAD_SIZE_LABEL = "4 MiB";
 
 export const ALLOWED_AVATAR_MIME_TYPES = [
   "image/jpeg",
