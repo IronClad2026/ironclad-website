@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { mapPublicTournamentParticipant } from "@/lib/tournaments";
 
 const migrationName =
   "20260813101000_competition_history_safe_account_closure.sql";
@@ -18,11 +19,6 @@ const leaderboardComponentSource = readFileSync(
   resolve(process.cwd(), "components/LeaderboardExperience.tsx"),
   "utf8"
 );
-const tournamentsPageSource = readFileSync(
-  resolve(process.cwd(), "app/tournaments/page.tsx"),
-  "utf8"
-);
-
 function extractFunction(functionName: string) {
   const markers = [
     `create or replace function public.${functionName}(`,
@@ -402,11 +398,29 @@ describe("competition-history-safe account closure migration", () => {
   });
 
   it("masks retained registration ELO snapshots for closed competitors", () => {
-    expect(tournamentsPageSource).toContain(
-      'registration.clerk_user_id.startsWith("deleted:")'
-    );
-    expect(tournamentsPageSource).toMatch(
-      /elo:\s*isClosedCompetitor\s*\?\s*0\s*:\s*registration\.elo_verification_source/
+    expect(
+      mapPublicTournamentParticipant(
+        {
+          registrationId: "11111111-1111-4111-8111-111111111111",
+          playerName: "HistoricalIGN",
+          country: "AU",
+          submittedElo: 1452,
+          verifiedElo: 1500,
+          status: "approved",
+          bracketId: "22222222-2222-4222-8222-222222222222",
+          bracketName: "Main / Pro Bracket",
+        },
+        {
+          publicProfileEnabled: false,
+          accountClosedAt: "2026-08-14T00:00:00.000Z",
+        }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        name: "Former Competitor",
+        country: null,
+        elo: null,
+      })
     );
   });
 

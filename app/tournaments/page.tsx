@@ -12,6 +12,7 @@ import {
   getTournamentBracketDisplayName,
   getPublicTournamentRowsForRequest,
   isTournamentBracketPublic,
+  mapPublicTournamentParticipant,
   mapTournamentRow,
   type TournamentParticipant,
   type TournamentRow,
@@ -73,7 +74,7 @@ export default async function TournamentsPage({
     supabase
       .from("registrations")
       .select(
-        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, elo_verified_elo, elo_verification_source, registration_status, waitlist_offer_status, created_at"
+        "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, elo_verified_elo, registration_status, waitlist_offer_status, created_at"
       )
       .not("tournament_id", "is", null)
       .not("tournament_bracket_id", "is", null),
@@ -156,7 +157,6 @@ export default async function TournamentsPage({
       country: string | null;
       submitted_elo: number | null;
       elo_verified_elo: number | null;
-      elo_verification_source: string | null;
       registration_status:
         | "pending"
         | "manual_review"
@@ -224,7 +224,7 @@ export default async function TournamentsPage({
     playerIds.length > 0
       ? await supabase
           .from("players")
-          .select("clerk_user_id, in_game_name, country, current_elo")
+          .select("clerk_user_id, public_profile_enabled, account_closed_at")
           .in("clerk_user_id", playerIds)
       : { data: [], error: null };
 
@@ -239,9 +239,8 @@ export default async function TournamentsPage({
     (
       (playerResult.data ?? []) as {
         clerk_user_id: string;
-        in_game_name: string;
-        country: string | null;
-        current_elo: number;
+        public_profile_enabled: boolean;
+        account_closed_at: string | null;
       }[]
     ).map((player) => [player.clerk_user_id, player])
   );
@@ -306,25 +305,26 @@ export default async function TournamentsPage({
 
   for (const registration of bracketRegistrations) {
     const player = playersByClerkId.get(registration.clerk_user_id);
-    const isClosedCompetitor = registration.clerk_user_id.startsWith("deleted:");
-
-    const participant: TournamentParticipant = {
-      registrationId: registration.id,
-      name: player?.in_game_name || registration.player_name,
-      country: player?.country || registration.country || "N/A",
-      elo: isClosedCompetitor
-        ? 0
-        : registration.elo_verification_source === "relic"
-          ? (registration.elo_verified_elo ??
-            registration.submitted_elo ??
-            0)
-          : (player?.current_elo ?? registration.submitted_elo ?? 0),
-      status: registration.registration_status,
-      bracketId: registration.tournament_bracket_id,
-      bracketName:
-        bracketNames.get(registration.tournament_bracket_id) ??
-        "Tournament Bracket",
-    };
+    const participant = mapPublicTournamentParticipant(
+      {
+        registrationId: registration.id,
+        playerName: registration.player_name,
+        country: registration.country,
+        submittedElo: registration.submitted_elo,
+        verifiedElo: registration.elo_verified_elo,
+        status: registration.registration_status,
+        bracketId: registration.tournament_bracket_id,
+        bracketName:
+          bracketNames.get(registration.tournament_bracket_id) ??
+          "Tournament Bracket",
+      },
+      player
+        ? {
+            publicProfileEnabled: player.public_profile_enabled,
+            accountClosedAt: player.account_closed_at,
+          }
+        : null
+    );
     const bracketParticipants =
       bracketParticipantsByTournament.get(registration.tournament_id) ?? [];
     bracketParticipants.push(participant);

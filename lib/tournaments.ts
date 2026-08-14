@@ -120,8 +120,8 @@ export type TournamentCard = {
 export type TournamentParticipant = {
   registrationId: string;
   name: string;
-  country: string;
-  elo: number;
+  country: string | null;
+  elo: number | null;
   status:
     | "pending"
     | "manual_review"
@@ -132,6 +132,64 @@ export type TournamentParticipant = {
   bracketId: string;
   bracketName: string;
 };
+
+export type TournamentParticipantRegistrationSnapshot = {
+  registrationId: string;
+  playerName: string;
+  country: string | null;
+  submittedElo: number | null;
+  verifiedElo: number | null;
+  status: TournamentParticipant["status"];
+  bracketId: string;
+  bracketName: string;
+};
+
+export type TournamentParticipantPrivacyState = {
+  publicProfileEnabled: boolean;
+  accountClosedAt: string | null;
+} | null;
+
+export function mapPublicTournamentParticipant(
+  registration: TournamentParticipantRegistrationSnapshot,
+  privacy: TournamentParticipantPrivacyState
+): TournamentParticipant {
+  const isClosed = privacy?.accountClosedAt != null;
+  const showOptionalFacts =
+    !isClosed && privacy?.publicProfileEnabled === true;
+
+  return {
+    registrationId: registration.registrationId,
+    name: isClosed ? "Former Competitor" : registration.playerName,
+    country: showOptionalFacts ? registration.country : null,
+    elo: showOptionalFacts
+      ? (registration.verifiedElo ?? registration.submittedElo)
+      : null,
+    status: registration.status,
+    bracketId: registration.bracketId,
+    bracketName: registration.bracketName,
+  };
+}
+
+export function formatTournamentParticipantFact(value: string | number | null) {
+  return value === null || value === "" ? "—" : String(value);
+}
+
+export function tournamentParticipantMatchesQuery(
+  participant: TournamentParticipant,
+  query: string
+) {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  return [participant.name, participant.country, participant.elo]
+    .filter((value): value is string | number => value !== null)
+    .join(" ")
+    .toLowerCase()
+    .includes(normalizedQuery);
+}
 
 export type PublicTournamentMatch = {
   id: string;

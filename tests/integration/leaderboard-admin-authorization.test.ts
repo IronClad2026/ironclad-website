@@ -17,6 +17,8 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 
 import {
+  deleteLeaderboardRecalculationRuns,
+  getRecentLeaderboardRecalculationRuns,
   recalculateLeaderboardAllTime,
   recalculateLeaderboardForCurrentSeason,
 } from "@/lib/leaderboard/admin";
@@ -75,6 +77,25 @@ function createCurrentSeasonClient(activeSeasonId: string | null) {
   };
 
   return { client, seasonQuery };
+}
+
+function createThenableRunQuery(result: {
+  data: Array<Record<string, unknown>>;
+  error: null;
+}) {
+  const query = {
+    delete: vi.fn(() => query),
+    in: vi.fn(() => query),
+    limit: vi.fn(() => query),
+    order: vi.fn(() => query),
+    select: vi.fn(() => query),
+    then: (
+      resolve: (value: typeof result) => unknown,
+      reject: (reason: unknown) => unknown
+    ) => Promise.resolve(result).then(resolve, reject),
+  };
+
+  return query;
 }
 
 describe("leaderboard manual recalculation authorization", () => {
@@ -170,5 +191,85 @@ describe("leaderboard manual recalculation authorization", () => {
       runId: undefined,
     });
     expect(recalculation.client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("reads recalculation history through the Clerk-authorized service client", async () => {
+    const runQuery = createThenableRunQuery({
+      data: [
+        {
+          id: runId,
+          scope: "all_time",
+          status: "completed",
+          started_at: "2026-08-14T00:00:00.000Z",
+          finished_at: "2026-08-14T00:00:01.000Z",
+          notes: null,
+          tournament_id: null,
+          season_id: null,
+        },
+      ],
+      error: null,
+    });
+    const client = {
+      from: vi.fn(() => runQuery),
+    };
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(client);
+
+    await expect(getRecentLeaderboardRecalculationRuns()).resolves.toEqual([
+      expect.objectContaining({
+        id: runId,
+        scope: "all_time",
+        status: "completed",
+      }),
+    ]);
+    expect(client.from).toHaveBeenCalledWith("leaderboard_recalculation_runs");
+    expect(runQuery.select).toHaveBeenCalledWith(
+      "id, scope, status, started_at, finished_at, notes, tournament_id, season_id"
+    );
+  });
+
+  it("rejects recalculation-history deletion before service-role access", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+
+    await expect(deleteLeaderboardRecalculationRuns([runId])).resolves.toEqual({
+      status: "error",
+      message:
+        "Only administrators can delete leaderboard recalculation run records.",
+      runId: undefined,
+    });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps administrator run-record deletion on the service-role path", async () => {
+    const matchingQuery = createThenableRunQuery({
+      data: [{ id: runId }],
+      error: null,
+    });
+    const deletionQuery = createThenableRunQuery({
+      data: [{ id: runId }],
+      error: null,
+    });
+    const verificationQuery = createThenableRunQuery({ data: [], error: null });
+    const queries = [matchingQuery, deletionQuery, verificationQuery];
+    const client = {
+      from: vi.fn(() => {
+        const query = queries.shift();
+        if (!query) {
+          throw new Error("Unexpected recalculation-run query.");
+        }
+        return query;
+      }),
+    };
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(client);
+
+    await expect(deleteLeaderboardRecalculationRuns([runId])).resolves.toEqual({
+      status: "success",
+      message: "Deleted 1 recalculation run record.",
+      deletedRunIds: [runId],
+    });
+    expect(client.from).toHaveBeenCalledTimes(3);
+    expect(deletionQuery.delete).toHaveBeenCalledOnce();
+    expect(verificationQuery.select).toHaveBeenCalledWith("id");
   });
 });

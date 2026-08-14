@@ -47,36 +47,41 @@ vi.mock("@/lib/tournament-bracket-data", () => ({
   mapGeneratedBrackets: mapGeneratedBracketsMock,
 }));
 
-vi.mock("@/lib/tournaments", () => ({
-  getPublicTournamentRowsForRequest: <
-    Tournament extends {
-      id: string;
-      slug: string;
-      status: string;
-    },
-  >(
-    tournaments: Tournament[],
-    requestedReference: string | null
-  ) => {
-    const requested = requestedReference
-      ? tournaments.find(
-          (tournament) =>
-            tournament.id === requestedReference ||
-            tournament.slug === requestedReference
-        )
-      : null;
+vi.mock("@/lib/tournaments", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/tournaments")>();
 
-    return tournaments.filter(
-      (tournament) =>
-        !["cancelled", "voided"].includes(tournament.status) ||
-        tournament.id === requested?.id
-    );
-  },
-  getTournamentBracketDisplayName: (name: string) => name,
-  isTournamentBracketPublic: (launchedAt: string | null) =>
-    launchedAt !== null,
-  mapTournamentRow: mapTournamentRowMock,
-}));
+  return {
+    ...actual,
+    getPublicTournamentRowsForRequest: <
+      Tournament extends {
+        id: string;
+        slug: string;
+        status: string;
+      },
+    >(
+      tournaments: Tournament[],
+      requestedReference: string | null
+    ) => {
+      const requested = requestedReference
+        ? tournaments.find(
+            (tournament) =>
+              tournament.id === requestedReference ||
+              tournament.slug === requestedReference
+          )
+        : null;
+
+      return tournaments.filter(
+        (tournament) =>
+          !["cancelled", "voided"].includes(tournament.status) ||
+          tournament.id === requested?.id
+      );
+    },
+    getTournamentBracketDisplayName: (name: string) => name,
+    isTournamentBracketPublic: (launchedAt: string | null) =>
+      launchedAt !== null,
+    mapTournamentRow: mapTournamentRowMock,
+  };
+});
 
 import TournamentsPage from "@/app/tournaments/page";
 
@@ -294,7 +299,19 @@ function createPageClient(
     | "approved"
     | "rejected"
     | "waitlisted" = "approved",
-  waitlistOfferStatus: "offered" | null = null
+  waitlistOfferStatus: "offered" | null = null,
+  participantProfiles: Record<
+    string,
+    {
+      accountClosedAt?: string | null;
+      country?: string | null;
+      currentElo?: number | null;
+      inGameName?: string;
+      publicProfileEnabled?: boolean;
+    }
+  > = {},
+  viewerEloVerificationSource: string | null = "relic",
+  viewerVerifiedElo: number | null = 1500
 ) {
   const rawTournament = {
     id: TOURNAMENT_ID,
@@ -324,8 +341,8 @@ function createPageClient(
     player_name: string;
     country: string | null;
     submitted_elo: number;
-    elo_verified_elo: number;
-    elo_verification_source: string;
+    elo_verified_elo: number | null;
+    elo_verification_source: string | null;
     registration_status:
       | "pending"
       | "manual_review"
@@ -344,8 +361,8 @@ function createPageClient(
       player_name: "Safe Viewer",
       country: "Australia",
       submitted_elo: 1500,
-      elo_verified_elo: 1500,
-      elo_verification_source: "relic",
+      elo_verified_elo: viewerVerifiedElo,
+      elo_verification_source: viewerEloVerificationSource,
       registration_status: viewerRegistrationStatus,
       waitlist_offer_status: null,
       admin_notes: `${SECRET_RESULT_PATH} ${SECRET_SUPABASE_URL}`,
@@ -401,12 +418,18 @@ function createPageClient(
       created_at: "2026-07-25T00:00:08.000Z",
     });
   }
-  const players = registrations.map((registration) => ({
-    clerk_user_id: registration.clerk_user_id,
-    in_game_name: registration.player_name,
-    country: registration.country,
-    current_elo: participantCurrentElo,
-  }));
+  const players = registrations.map((registration) => {
+    const profile = participantProfiles[registration.clerk_user_id];
+
+    return {
+      account_closed_at: profile?.accountClosedAt ?? null,
+      clerk_user_id: registration.clerk_user_id,
+      country: profile?.country ?? registration.country,
+      current_elo: profile?.currentElo ?? participantCurrentElo,
+      in_game_name: profile?.inGameName ?? registration.player_name,
+      public_profile_enabled: profile?.publicProfileEnabled ?? true,
+    };
+  });
   const results: Record<string, QueryResult> = {
     tournaments: { data: [rawTournament], error: null },
     registrations: { data: registrations, error: null },
@@ -470,6 +493,9 @@ async function loadClientProps({
   viewerRegistrationStatus,
   waitlistOfferStatus,
   requestedTournament,
+  participantProfiles,
+  viewerEloVerificationSource,
+  viewerVerifiedElo,
 }: {
   admin: boolean;
   participantCurrentElo?: number;
@@ -480,6 +506,9 @@ async function loadClientProps({
   includeWaitlistedRegistration?: boolean;
   waitlistOfferStatus?: "offered" | null;
   requestedTournament?: string;
+  participantProfiles?: Parameters<typeof createPageClient>[9];
+  viewerEloVerificationSource?: string | null;
+  viewerVerifiedElo?: number | null;
   viewerRegistrationStatus?:
     | "pending"
     | "manual_review"
@@ -501,7 +530,10 @@ async function loadClientProps({
     activeRegistrationCount,
     includeWaitlistedRegistration,
     viewerRegistrationStatus,
-    waitlistOfferStatus
+    waitlistOfferStatus,
+    participantProfiles,
+    viewerEloVerificationSource,
+    viewerVerifiedElo
   );
   createSupabaseAdminClientMock.mockReturnValue(client);
 
@@ -680,6 +712,117 @@ describe("tournament Client Component result payload", () => {
     expect(
       tournament.bracketParticipants.map((participant) => participant.elo)
     ).toEqual([1500, 1450]);
+  });
+
+  it("uses opted-in registration snapshots instead of later current-profile edits", async () => {
+    const { client, props } = await loadClientProps({
+      admin: false,
+      participantCurrentElo: 1605,
+      participantProfiles: {
+        [SECRET_PLAYER_ID]: {
+          country: "Italy",
+          currentElo: 1605,
+          inGameName: "NewCurrentIGN",
+          publicProfileEnabled: true,
+        },
+      },
+      viewerEloVerificationSource: null,
+      viewerVerifiedElo: null,
+    });
+    const [tournament] = props.tournaments as Array<{
+      participants: Array<{ country: string | null; elo: number | null; name: string }>;
+    }>;
+    const participant = tournament.participants.find(
+      (entry) => entry.name === "Safe Viewer"
+    );
+    const [selectedColumns] = vi.mocked(
+      client.participantPlayersQuery.select
+    ).mock.calls[0];
+
+    expect(selectedColumns).toBe(
+      "clerk_user_id, public_profile_enabled, account_closed_at"
+    );
+    expect(participant).toEqual(
+      expect.objectContaining({
+        name: "Safe Viewer",
+        country: "Australia",
+        elo: 1500,
+      })
+    );
+    expect(serializePrivacyValue(tournament.participants)).not.toContain(
+      "NewCurrentIGN"
+    );
+    expect(serializePrivacyValue(tournament.participants)).not.toContain("Italy");
+    expect(serializePrivacyValue(tournament.participants)).not.toContain("1605");
+  });
+
+  it("keeps opted-out competition identity while masking optional profile facts", async () => {
+    const { props } = await loadClientProps({
+      admin: false,
+      participantProfiles: {
+        [SECRET_PLAYER_ID]: {
+          country: "Italy",
+          currentElo: 1605,
+          inGameName: "PrivateCurrentIGN",
+          publicProfileEnabled: false,
+        },
+      },
+    });
+    const [tournament] = props.tournaments as Array<{
+      participants: Array<{ country: string | null; elo: number | null; name: string }>;
+    }>;
+    const participant = tournament.participants.find(
+      (entry) => entry.name === "Safe Viewer"
+    );
+
+    expect(participant).toEqual(
+      expect.objectContaining({ name: "Safe Viewer", country: null, elo: null })
+    );
+    expect(serializePrivacyValue(tournament.participants)).not.toContain(
+      "PrivateCurrentIGN"
+    );
+    expect(serializePrivacyValue(tournament.participants)).not.toContain("Italy");
+    expect(serializePrivacyValue(tournament.participants)).not.toContain("1605");
+  });
+
+  it("uses explicit account closure state for historical competitors", async () => {
+    const { props } = await loadClientProps({
+      admin: false,
+      participantProfiles: {
+        [SECRET_PLAYER_ID]: {
+          accountClosedAt: "2026-08-14T00:00:00.000Z",
+          country: "Italy",
+          currentElo: 1605,
+          inGameName: "FormerPrivateIGN",
+          publicProfileEnabled: false,
+        },
+      },
+    });
+    const [tournament] = props.tournaments as Array<{
+      participants: Array<{
+        country: string | null;
+        elo: number | null;
+        name: string;
+        registrationId: string;
+      }>;
+    }>;
+    const participant = tournament.participants.find(
+      (entry) => entry.registrationId === VIEWER_REGISTRATION_ID
+    );
+
+    expect(participant).toEqual(
+      expect.objectContaining({
+        name: "Former Competitor",
+        country: null,
+        elo: null,
+        registrationId: VIEWER_REGISTRATION_ID,
+      })
+    );
+    expect(serializePrivacyValue(tournament.participants)).not.toContain(
+      "FormerPrivateIGN"
+    );
+    expect(serializePrivacyValue(tournament.participants)).not.toContain("Italy");
+    expect(serializePrivacyValue(tournament.participants)).not.toContain("1605");
   });
 
   it("excludes generated brackets from the prelaunch public payload", async () => {
