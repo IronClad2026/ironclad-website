@@ -45,12 +45,14 @@ export default function AdminRegistrationReviewRows({
   activeFilter,
   formId,
   selectionScope,
+  isTournamentTerminal,
   updateRegistrationStatusAction,
 }: {
   registrations: AdminRegistrationReviewRow[];
   activeFilter: FilterStatus;
   formId: string;
   selectionScope?: string;
+  isTournamentTerminal: boolean;
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
 }) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
@@ -129,6 +131,7 @@ export default function AdminRegistrationReviewRows({
             activeFilter={activeFilter}
             formId={formId}
             selectionScope={selectionScope}
+            isTournamentTerminal={isTournamentTerminal}
             menuOpen={
               menu?.registration.registrationId === registration.registrationId
             }
@@ -174,6 +177,7 @@ export default function AdminRegistrationReviewRows({
                     registration={registration}
                     formId={formId}
                     selectionScope={selectionScope}
+                    isTournamentTerminal={isTournamentTerminal}
                   />
                 </td>
                 <td className="max-w-56 py-4 pr-5">
@@ -242,6 +246,11 @@ export default function AdminRegistrationReviewRows({
                       Division launched — roster locked
                     </p>
                   )}
+                  {isTournamentTerminal && (
+                    <p className="mt-2 text-xs font-black text-amber-300">
+                      Terminal tournament — competition controls are locked.
+                    </p>
+                  )}
                 </td>
                 <td className="py-3 text-right">
                   <ActionMenuButton
@@ -274,6 +283,7 @@ export default function AdminRegistrationReviewRows({
               menu={menu}
               activeFilter={activeFilter}
               updateRegistrationStatusAction={updateRegistrationStatusAction}
+              isTournamentTerminal={isTournamentTerminal}
               onClose={() => setMenu(null)}
             />,
             document.body
@@ -288,6 +298,7 @@ function RegistrationCard({
   activeFilter,
   formId,
   selectionScope,
+  isTournamentTerminal,
   menuOpen,
   onOpenMenu,
 }: {
@@ -295,6 +306,7 @@ function RegistrationCard({
   activeFilter: FilterStatus;
   formId: string;
   selectionScope?: string;
+  isTournamentTerminal: boolean;
   menuOpen: boolean;
   onOpenMenu: (
     event: ReactMouseEvent<HTMLButtonElement>,
@@ -308,6 +320,7 @@ function RegistrationCard({
           registration={registration}
           formId={formId}
           selectionScope={selectionScope}
+          isTournamentTerminal={isTournamentTerminal}
         />
         <div className="min-w-0 flex-1">
           <p className="break-words font-black text-white">
@@ -323,6 +336,11 @@ function RegistrationCard({
       {registration.isDivisionLaunched && (
         <p className="mt-3 rounded-xl border border-sky-500/25 bg-sky-500/10 p-3 text-xs font-bold text-sky-200">
           Division launched — roster decisions are locked.
+        </p>
+      )}
+      {isTournamentTerminal && (
+        <p className="mt-3 rounded-xl border border-amber-400/25 bg-amber-950/20 p-3 text-xs font-bold text-amber-100">
+          Terminal tournament — competition controls are locked.
         </p>
       )}
 
@@ -398,10 +416,12 @@ function RegistrationCheckbox({
   registration,
   formId,
   selectionScope,
+  isTournamentTerminal,
 }: {
   registration: AdminRegistrationReviewRow;
   formId: string;
   selectionScope?: string;
+  isTournamentTerminal: boolean;
 }) {
   return (
     <label className="inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-black/30">
@@ -415,7 +435,7 @@ function RegistrationCheckbox({
         aria-label={`Select registration for ${
           registration.playerDisplayName || "player"
         }`}
-        disabled={!isBulkApprovable(registration)}
+        disabled={!isBulkApprovable(registration, isTournamentTerminal)}
         className="h-5 w-5 rounded border-white/20 bg-black/40 text-orange-500 focus:ring-orange-500"
       />
     </label>
@@ -456,17 +476,19 @@ function RegistrationContextMenu({
   menu,
   activeFilter,
   updateRegistrationStatusAction,
+  isTournamentTerminal,
   onClose,
   menuRef,
 }: {
   menu: ContextMenuState;
   activeFilter: FilterStatus;
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
+  isTournamentTerminal: boolean;
   onClose: () => void;
   menuRef: RefObject<HTMLDivElement | null>;
 }) {
   const registration = menu.registration;
-  const actions = getMenuActions(registration);
+  const actions = getMenuActions(registration, isTournamentTerminal);
 
   return (
     <div
@@ -587,7 +609,10 @@ function buildRegistrationHref(
   return `/admin?${params.toString()}`;
 }
 
-function getMenuActions(registration: AdminRegistrationReviewRow): MenuAction[] {
+function getMenuActions(
+  registration: AdminRegistrationReviewRow,
+  isTournamentTerminal: boolean
+): MenuAction[] {
   const { status } = registration;
   const detailsAction: MenuAction = {
     kind: "details",
@@ -626,7 +651,7 @@ function getMenuActions(registration: AdminRegistrationReviewRow): MenuAction[] 
     className: "text-slate-200 hover:bg-white/10",
   };
 
-  if (registration.isDivisionLaunched) {
+  if (registration.isDivisionLaunched || isTournamentTerminal) {
     return [detailsAction];
   }
 
@@ -679,8 +704,12 @@ function getMenuActions(registration: AdminRegistrationReviewRow): MenuAction[] 
   ];
 }
 
-function isBulkApprovable(registration: AdminRegistrationReviewRow) {
+function isBulkApprovable(
+  registration: AdminRegistrationReviewRow,
+  isTournamentTerminal: boolean
+) {
   return (
+    !isTournamentTerminal &&
     !registration.isDivisionLaunched &&
     registration.status !== "waitlisted" &&
     registration.status !== "withdrawn" &&

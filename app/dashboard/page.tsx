@@ -29,6 +29,11 @@ import {
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
+import {
+  getTournamentTerminalPublicMessage,
+  isTournamentTerminalStatus,
+  type TournamentStatus,
+} from "@/lib/tournaments";
 
 export const dynamic = "force-dynamic";
 
@@ -62,13 +67,20 @@ type PlayerRegistration = {
   waitlist_offer_expires_at: string | null;
   waitlist_offer_resolved_at: string | null;
   launched_at: string | null;
+  tournament_status: TournamentStatus;
   created_at: string;
 };
 
-type PlayerRegistrationRow = Omit<PlayerRegistration, "launched_at"> & {
+type PlayerRegistrationRow = Omit<
+  PlayerRegistration,
+  "launched_at" | "tournament_status"
+> & {
   tournament_brackets?:
     | { launched_at: string | null }
     | { launched_at: string | null }[];
+  tournaments?:
+    | { status: TournamentStatus }
+    | { status: TournamentStatus }[];
 };
 
 export default async function PlayerDashboardPage() {
@@ -91,7 +103,7 @@ export default async function PlayerDashboardPage() {
       supabase
         .from("registrations")
         .select(
-          "id, tournament_title, tournament_bracket_id, bracket_name, registration_status, elo_status, submitted_elo, withdrawn_at, waitlist_offer_status, waitlist_offer_created_at, waitlist_offer_expires_at, waitlist_offer_resolved_at, created_at, tournament_brackets!inner(launched_at)"
+          "id, tournament_title, tournament_bracket_id, bracket_name, registration_status, elo_status, submitted_elo, withdrawn_at, waitlist_offer_status, waitlist_offer_created_at, waitlist_offer_expires_at, waitlist_offer_resolved_at, created_at, tournament_brackets!inner(launched_at), tournaments!inner(status)"
         )
         .eq("clerk_user_id", userId)
         .order("created_at", { ascending: false }),
@@ -115,6 +127,8 @@ export default async function PlayerDashboardPage() {
     []) as PlayerRegistrationRow[]).map((registration) => ({
     ...registration,
     launched_at: first(registration.tournament_brackets)?.launched_at ?? null,
+    tournament_status:
+      first(registration.tournaments)?.status ?? "upcoming",
   }));
   const profileComplete = profile?.profile_completed === true;
 
@@ -422,6 +436,10 @@ function RegistrationCard({
 }: {
   registration: PlayerRegistration;
 }) {
+  const terminalTournament = isTournamentTerminalStatus(
+    registration.tournament_status
+  );
+
   return (
     <article id={`registration-${registration.id}`} className="scroll-mt-28 border border-orange-500/20 bg-black/70 p-6 shadow-2xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/80">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -457,13 +475,28 @@ function RegistrationCard({
         />
       </div>
 
-      <RegistrationDecision registration={registration} />
+      {terminalTournament ? (
+        <div
+          role="status"
+          className="mt-5 border border-amber-400/30 bg-amber-950/20 p-4 text-amber-100"
+        >
+          <p className="text-sm font-black uppercase tracking-wider">
+            Read-only historical record
+          </p>
+          <p className="mt-2 text-sm leading-6">
+            {getTournamentTerminalPublicMessage(registration.tournament_status)}
+          </p>
+        </div>
+      ) : (
+        <RegistrationDecision registration={registration} />
+      )}
       <PlayerRegistrationActions
         registrationId={registration.id}
         registrationStatus={registration.registration_status}
         waitlistOfferStatus={registration.waitlist_offer_status}
         waitlistOfferExpiresAt={registration.waitlist_offer_expires_at}
         launchedAt={registration.launched_at}
+        tournamentStatus={registration.tournament_status}
       />
     </article>
   );

@@ -24,6 +24,7 @@ function tournamentOption(
   return {
     id: "123e4567-e89b-42d3-a456-426614174000",
     title: "IronClad Open",
+    status: "registration_open",
     brackets: [
       {
         generatedBracketId: "223e4567-e89b-42d3-a456-426614174000",
@@ -103,4 +104,26 @@ describe("administrator private bracket launch controls", () => {
     expect(screen.getByRole("link", { name: "View Public Bracket" }))
       .toHaveAttribute("href", "/tournaments");
   });
+
+  it.each(["cancelled", "voided"] as const)(
+    "keeps an unlaunched sibling division read-only when the tournament is %s",
+    (status) => {
+      render(
+        <AdminBracketManagement
+          tournaments={[{ ...tournamentOption(), status }]}
+        />
+      );
+
+      expect(screen.getByText("Terminal tournament — view only"))
+        .toBeInTheDocument();
+      expect(screen.getByText("Private draft — not published"))
+        .toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit Private Seeding" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Launch Division" })
+      ).not.toBeInTheDocument();
+    }
+  );
 });

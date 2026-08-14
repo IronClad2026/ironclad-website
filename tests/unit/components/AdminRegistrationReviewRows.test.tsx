@@ -49,7 +49,8 @@ function setViewport(width: number, height: number) {
 
 function renderRows(
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>,
-  registration = reviewRow()
+  registration = reviewRow(),
+  isTournamentTerminal = false
 ) {
   return render(
     <form id="registration-bulk-form">
@@ -58,6 +59,7 @@ function renderRows(
         activeFilter="pending"
         formId="registration-bulk-form"
         selectionScope="pending:tournament-1"
+        isTournamentTerminal={isTournamentTerminal}
         updateRegistrationStatusAction={updateRegistrationStatusAction}
       />
     </form>
@@ -219,6 +221,35 @@ describe("administrator registration review responsive interaction", () => {
     expect(within(menu).getByRole("menuitem", { name: "Review Details" }))
       .toBeInTheDocument();
   });
+
+  it.each(["cancelled", "voided"] as const)(
+    "locks %s tournament competition controls while retaining review access",
+    () => {
+      const { container } = renderRows(vi.fn(), reviewRow(), true);
+      const card = getCard(container);
+
+      expect(within(card).getByRole("checkbox")).toBeDisabled();
+      expect(
+        within(card).getByText(
+          "Terminal tournament — competition controls are locked."
+        )
+      ).toBeInTheDocument();
+
+      fireEvent.click(
+        within(card).getByRole("button", {
+          name: `Open actions for ${longPlayerName}`,
+        })
+      );
+      const menu = screen.getByRole("menu");
+      expect(within(menu).getAllByRole("menuitem")).toHaveLength(1);
+      expect(
+        within(menu).getByRole("menuitem", { name: "Review Details" })
+      ).toBeInTheDocument();
+      expect(
+        within(menu).queryByRole("menuitem", { name: "Approve" })
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it("keeps cards primary below xl and contains the desktop table overflow", () => {
     const { container } = renderRows(vi.fn());
