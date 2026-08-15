@@ -150,6 +150,7 @@ const tournament: TournamentCard = {
   participants: [],
   bracketParticipants: [],
   generatedBrackets: [],
+  mapPools: [],
 };
 
 const waitlistedRegistration: TournamentViewerRegistration = {

@@ -1,4 +1,5 @@
 import { PHASE_FOUR_ACTIVE_COHORT_SIZE } from "@/lib/tournament-registration-cohort";
+import type { PublishedTournamentMapPool } from "@/lib/tournament-map-pools";
 
 export type TournamentStatus =
   | "upcoming"
@@ -115,6 +116,7 @@ export type TournamentCard = {
   participants: TournamentParticipant[];
   bracketParticipants: TournamentParticipant[];
   generatedBrackets: GeneratedTournamentBracket[];
+  mapPools: PublishedTournamentMapPool[];
 };
 
 export type TournamentParticipant = {
@@ -382,6 +384,7 @@ export type TournamentBracketRow = {
   active_cohort_players?: number;
   waitlisted_players?: number;
   launched_at: string | null;
+  map_pool_published_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -489,6 +492,7 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
     participants: [],
     bracketParticipants: [],
     generatedBrackets: [],
+    mapPools: [],
   };
 }
 

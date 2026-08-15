@@ -46,6 +46,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
+  MapPinned,
   ShieldAlert,
   Trophy,
   X,
@@ -125,6 +126,7 @@ type AdminTournamentOption = {
     name: string;
     max_players: number;
     launched_at: string | null;
+    map_pool_published_at: string | null;
   }[];
 };
 
@@ -866,7 +868,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, max_players, launched_at)"
+          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, max_players, launched_at, map_pool_published_at)"
         )
         .order("grand_final_at", { ascending: false, nullsFirst: false }),
       supabase
@@ -903,6 +905,30 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const tournaments = [
     ...((tournamentResult.data ?? []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
+  const tournamentBracketIds = tournaments.flatMap((tournament) =>
+    (tournament.tournament_brackets ?? []).map((bracket) => bracket.id)
+  );
+  const currentMapPoolResult =
+    tournamentBracketIds.length > 0
+      ? await supabase
+          .from("tournament_bracket_map_pool_entries")
+          .select("tournament_bracket_id")
+          .in("tournament_bracket_id", tournamentBracketIds)
+          .is("removed_at", null)
+      : { data: [], error: null };
+  const currentMapCountByBracket = new Map<string, number>();
+  for (const entry of (currentMapPoolResult.data ?? []) as {
+    tournament_bracket_id: string;
+  }[]) {
+    currentMapCountByBracket.set(
+      entry.tournament_bracket_id,
+      (currentMapCountByBracket.get(entry.tournament_bracket_id) ?? 0) + 1
+    );
+  }
+
+  if (currentMapPoolResult.error) {
+    console.error("Admin map-pool readiness load failed.");
+  }
   const readinessResults = await Promise.all(
     tournaments.flatMap((tournament) =>
       (tournament.tournament_brackets ?? []).map(async (bracket) => {
@@ -1104,6 +1130,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 readiness?.requiredCount ?? PHASE_FOUR_ACTIVE_COHORT_SIZE,
               isReady: readiness?.isReady ?? false,
               launchedAt: readiness?.launchedAt ?? bracket.launched_at,
+              mapPoolPublishedAt: bracket.map_pool_published_at,
+              currentMapCount:
+                currentMapCountByBracket.get(bracket.id) ?? 0,
               participants: registrations
                 .filter(
                   (registration) =>
@@ -1343,13 +1372,22 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Control registrations, ELO checks, approvals, player verification,
               and the full IronClad tournament workflow.
             </p>
-            <Link
-              href="/admin/tournaments"
-              className="mt-7 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 font-bold text-white transition hover:bg-orange-400"
-            >
-              <Trophy className="h-4 w-4" />
-              Create Or Manage Tournaments
-            </Link>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link
+                href="/admin/tournaments"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 font-bold text-white transition hover:bg-orange-400"
+              >
+                <Trophy className="h-4 w-4" />
+                Create Or Manage Tournaments
+              </Link>
+              <Link
+                href="/admin/maps"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/40 bg-black/45 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/10"
+              >
+                <MapPinned className="h-4 w-4" />
+                Manage CoH3 Map Catalogue
+              </Link>
+            </div>
           </div>
         </div>
 

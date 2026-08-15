@@ -26,6 +26,8 @@ export type AdminBracketTournamentOption = {
       requiredCount: number;
       isReady: boolean;
       launchedAt: string | null;
+      mapPoolPublishedAt: string | null;
+      currentMapCount: number;
     }
   >;
 };
@@ -78,11 +80,16 @@ export default function AdminBracketManagement({
     selectedBracket &&
       selectedBracket.actualMatchCount === selectedBracket.expectedMatchCount
   );
+  const mapPoolReady = Boolean(
+    selectedBracket?.mapPoolPublishedAt &&
+      selectedBracket.currentMapCount >= 5
+  );
   const canLaunch = Boolean(
     selectedBracket?.generatedBracketId &&
       selectedBracket.isReady &&
       assignmentsComplete &&
       structureComplete &&
+      mapPoolReady &&
       !selectedBracket.launchedAt &&
       !terminalTournament
   );
@@ -289,10 +296,9 @@ export default function AdminBracketManagement({
                   </button>
                   {!canLaunch && (
                     <p className="mt-3 text-xs leading-5 text-zinc-400">
-                      Launch unlocks after the private structure is complete,
-                      readiness is {selectedBracket.requiredCount}/
-                      {selectedBracket.requiredCount} approved, and every seed is
-                      assigned to a unique approved player.
+                      {!mapPoolReady
+                        ? "Publish at least five eligible 1v1 maps before launching this Division."
+                        : `Launch unlocks after the private structure is complete, readiness is ${selectedBracket.requiredCount}/${selectedBracket.requiredCount} approved, and every seed is assigned to a unique approved player.`}
                     </p>
                   )}
                 </form>

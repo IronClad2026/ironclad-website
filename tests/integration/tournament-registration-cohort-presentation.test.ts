@@ -42,11 +42,12 @@ function createTournamentRow(): TournamentRow {
         tournament_id: "11111111-1111-4111-8111-111111111111",
         name: "Academy",
         elo_rules: "Below 1100 ELO",
-        max_players: 16,
+        max_players: 8,
         registered_players: 2,
         active_cohort_players: 7,
         waitlisted_players: 0,
         launched_at: null,
+        map_pool_published_at: null,
         created_at: "2026-08-01T00:00:00.000Z",
         updated_at: "2026-08-01T00:00:00.000Z",
       },
@@ -55,11 +56,12 @@ function createTournamentRow(): TournamentRow {
         tournament_id: "11111111-1111-4111-8111-111111111111",
         name: "Challenge",
         elo_rules: "1100-1399 ELO",
-        max_players: 32,
+        max_players: 8,
         registered_players: 5,
         active_cohort_players: 8,
         waitlisted_players: 2,
         launched_at: null,
+        map_pool_published_at: null,
         created_at: "2026-08-01T00:00:00.000Z",
         updated_at: "2026-08-01T00:00:00.000Z",
       },
@@ -68,11 +70,12 @@ function createTournamentRow(): TournamentRow {
         tournament_id: "11111111-1111-4111-8111-111111111111",
         name: "Main",
         elo_rules: "1400+ ELO",
-        max_players: 64,
+        max_players: 8,
         registered_players: 1,
         active_cohort_players: 3,
         waitlisted_players: 1,
         launched_at: null,
+        map_pool_published_at: null,
         created_at: "2026-08-01T00:00:00.000Z",
         updated_at: "2026-08-01T00:00:00.000Z",
       },
@@ -99,7 +102,7 @@ describe("registration cohort presentation", () => {
       activeCohortSize: 8,
       waitlistedPlayers: 0,
       isWaitlistOnly: false,
-      maxPlayers: "Max 16 players",
+      maxPlayers: "Max 8 players",
     });
     expect(challenge).toMatchObject({
       registeredPlayers: 5,
@@ -107,7 +110,7 @@ describe("registration cohort presentation", () => {
       activeCohortSize: 8,
       waitlistedPlayers: 2,
       isWaitlistOnly: true,
-      maxPlayers: "Max 32 players",
+      maxPlayers: "Max 8 players",
     });
     expect(main).toMatchObject({
       registeredPlayers: 1,
@@ -115,7 +118,7 @@ describe("registration cohort presentation", () => {
       activeCohortSize: 8,
       waitlistedPlayers: 1,
       isWaitlistOnly: true,
-      maxPlayers: "Max 64 players",
+      maxPlayers: "Max 8 players",
     });
     expect(tournament.registrationEnabled).toBe(true);
     expect(tournament.registrationCloseAt).toBe(

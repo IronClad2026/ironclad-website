@@ -10,6 +10,7 @@ import { redirect } from "next/navigation";
 import DeleteTournamentControl, {
   type TournamentDeletionPreview,
 } from "@/components/DeleteTournamentControl";
+import AdminTournamentMapPools from "@/components/AdminTournamentMapPools";
 import TournamentBannerPicker from "@/components/TournamentBannerPicker";
 import TournamentFormDraft from "@/components/TournamentFormDraft";
 import TournamentFormShell, {
@@ -21,6 +22,11 @@ import {
   retryTournamentStorageCleanup,
 } from "@/app/admin/tournaments/actions";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  mapCoh3MapDatabaseRow,
+  type Coh3MapDatabaseRow,
+  type Coh3MapRow,
+} from "@/lib/coh3-maps";
 import { logSupabaseError } from "@/lib/supabase-errors";
 import type {
   TournamentBracketFieldPrefix,
@@ -29,6 +35,7 @@ import type {
 } from "@/lib/tournaments";
 import {
   TOURNAMENT_BRACKET_CONFIGS,
+  getTournamentBracketSortOrder,
   isTournamentTerminalStatus,
 } from "@/lib/tournaments";
 
@@ -61,11 +68,20 @@ type AdminNotice =
   | "delete-failed"
   | "delete-storage-failed"
   | "cleanup-completed"
-  | "cleanup-failed";
+  | "cleanup-failed"
+  | "map-pool-published"
+  | "map-pool-corrected"
+  | "map-pool-invalid"
+  | "map-pool-failed";
 
-type AdminTournamentRow = TournamentRow & {
+type AdminTournamentBracketRow = TournamentBracketRow & {
+  map_pool_published_at: string | null;
+};
+
+type AdminTournamentRow = Omit<TournamentRow, "tournament_brackets"> & {
   terminal_at: string | null;
   terminal_reason: string | null;
+  tournament_brackets?: AdminTournamentBracketRow[];
 };
 
 type UnderReviewSeasonRow = {
@@ -176,7 +192,7 @@ export default async function AdminTournamentsPage({
   const { data, error } = await supabase
     .from("tournaments")
     .select(
-      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, terminal_at, terminal_reason, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, created_at, updated_at)"
+      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, terminal_at, terminal_reason, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
     )
     .order("grand_final_at", { ascending: false, nullsFirst: false });
 
@@ -314,26 +330,88 @@ export default async function AdminTournamentsPage({
   const selectedIsTerminal = selected
     ? isTournamentTerminalStatus(selected.status)
     : false;
+  const selectedMapPoolsAreReadOnly = selected
+    ? selectedIsTerminal || selected.status === "completed"
+    : false;
+  const selectedBrackets = [...(selected?.tournament_brackets ?? [])].sort(
+    (left, right) =>
+      getTournamentBracketSortOrder(left.name) -
+        getTournamentBracketSortOrder(right.name) ||
+      left.name.localeCompare(right.name)
+  );
   let underReviewSeason: UnderReviewSeasonRow | null = null;
+  let mapPoolCatalogue: Coh3MapRow[] = [];
+  const currentMapIdsByBracket = new Map<string, string[]>();
 
   if (selected) {
-    const { data: underReviewData, error: underReviewError } = await supabase
-      .from("leaderboard_seasons")
-      .select(
-        "name, under_review_at, under_review_reason, under_review_tournament_id"
-      )
-      .eq("under_review_tournament_id", selected.id)
-      .not("under_review_at", "is", null)
-      .limit(1)
-      .maybeSingle();
+    const selectedBracketIds = selectedBrackets.map(
+      (bracket) => bracket.id
+    );
+    const [underReviewResult, catalogueResult, poolEntriesResult] =
+      await Promise.all([
+        supabase
+          .from("leaderboard_seasons")
+          .select(
+            "name, under_review_at, under_review_reason, under_review_tournament_id"
+          )
+          .eq("under_review_tournament_id", selected.id)
+          .not("under_review_at", "is", null)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("coh3_maps")
+          .select(
+            "id, slug, display_name, source_type, creator_name, game_mode, status, thumbnail_path, source_reference, admin_note, created_at, updated_at, created_by_clerk_user_id, updated_by_clerk_user_id"
+          )
+          .order("display_name", { ascending: true }),
+        selectedBracketIds.length > 0
+          ? supabase
+              .from("tournament_bracket_map_pool_entries")
+              .select("tournament_bracket_id, coh3_map_id")
+              .in("tournament_bracket_id", selectedBracketIds)
+              .is("removed_at", null)
+          : Promise.resolve({
+              data: [] as {
+                tournament_bracket_id: string;
+                coh3_map_id: string;
+              }[],
+              error: null,
+            }),
+      ]);
 
-    if (underReviewError) {
+    if (underReviewResult.error) {
       logSupabaseError(
         "Tournament under-review metadata load failed:",
-        underReviewError
+        underReviewResult.error
       );
     } else {
-      underReviewSeason = (underReviewData as UnderReviewSeasonRow | null) ?? null;
+      underReviewSeason =
+        (underReviewResult.data as UnderReviewSeasonRow | null) ?? null;
+    }
+
+    if (catalogueResult.error) {
+      logSupabaseError(
+        "Tournament map catalogue admin load failed:",
+        catalogueResult.error
+      );
+    } else {
+      mapPoolCatalogue = (
+        (catalogueResult.data ?? []) as Coh3MapDatabaseRow[]
+      ).map(mapCoh3MapDatabaseRow);
+    }
+
+    if (poolEntriesResult.error) {
+      logSupabaseError(
+        "Tournament map-pool entries admin load failed:",
+        poolEntriesResult.error
+      );
+    } else {
+      for (const entry of poolEntriesResult.data ?? []) {
+        currentMapIdsByBracket.set(entry.tournament_bracket_id, [
+          ...(currentMapIdsByBracket.get(entry.tournament_bracket_id) ?? []),
+          entry.coh3_map_id,
+        ]);
+      }
     }
   }
 
@@ -470,35 +548,56 @@ export default async function AdminTournamentsPage({
             </div>
           </aside>
 
-          <TournamentForm
-            key={`${formValues.id ?? "new"}:${selected?.updated_at ?? "draft"}:${isEditing ? "edit" : "view"}`}
-            values={formValues}
-            notice={params?.notice}
-            generatedByBracket={generatedByBracket}
-            approvedByBracket={approvedByBracket}
-            readinessByBracket={readinessByBracket}
-            isEditing={isEditing}
-            errorMessage={params?.error}
-            terminal={
-              selected && isTournamentTerminalStatus(selected.status)
-                ? {
-                    status: selected.status,
-                    at: selected.terminal_at,
-                    reason: selected.terminal_reason,
-                  }
-                : null
-            }
-            underReview={
-              selected && underReviewSeason
-                ? {
-                    seasonName: underReviewSeason.name,
-                    at: underReviewSeason.under_review_at,
-                    reason: underReviewSeason.under_review_reason,
-                    triggeringTournamentTitle: selected.title,
-                  }
-                : null
-            }
-          />
+          <div className="min-w-0">
+            <TournamentForm
+              key={`${formValues.id ?? "new"}:${selected?.updated_at ?? "draft"}:${isEditing ? "edit" : "view"}`}
+              values={formValues}
+              notice={params?.notice}
+              generatedByBracket={generatedByBracket}
+              approvedByBracket={approvedByBracket}
+              readinessByBracket={readinessByBracket}
+              isEditing={isEditing}
+              errorMessage={params?.error}
+              terminal={
+                selected && isTournamentTerminalStatus(selected.status)
+                  ? {
+                      status: selected.status,
+                      at: selected.terminal_at,
+                      reason: selected.terminal_reason,
+                    }
+                  : null
+              }
+              underReview={
+                selected && underReviewSeason
+                  ? {
+                      seasonName: underReviewSeason.name,
+                      at: underReviewSeason.under_review_at,
+                      reason: underReviewSeason.under_review_reason,
+                      triggeringTournamentTitle: selected.title,
+                    }
+                  : null
+              }
+            />
+            {selected && selectedBrackets.length > 0 && (
+              <AdminTournamentMapPools
+                key={selected.id}
+                tournamentId={selected.id}
+                tournamentTitle={selected.title}
+                terminal={selectedMapPoolsAreReadOnly}
+                brackets={selectedBrackets.map(
+                  (bracket) => ({
+                    id: bracket.id,
+                    name: bracket.name,
+                    launchedAt: bracket.launched_at,
+                    mapPoolPublishedAt: bracket.map_pool_published_at,
+                    currentMapIds:
+                      currentMapIdsByBracket.get(bracket.id) ?? [],
+                  })
+                )}
+                catalogue={mapPoolCatalogue}
+              />
+            )}
+          </div>
         </div>
       </section>
     </main>
@@ -606,13 +705,19 @@ function TournamentForm({
             notice === "bracket-generated" ||
             notice === "generation-pending" ||
             notice === "deleted" ||
-            notice === "cleanup-completed"
+            notice === "cleanup-completed" ||
+            notice === "map-pool-published" ||
+            notice === "map-pool-corrected"
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
               : "border-red-500/30 bg-red-500/10 text-red-300"
           }`}
         >
           {notice === "saved"
             ? "Tournament saved. Existing bracket assignments were left unchanged."
+            : notice === "map-pool-published"
+              ? "Division map pool published. Unlaunched pools may be republished until launch."
+            : notice === "map-pool-corrected"
+              ? "The launched Division map pool was corrected and the change was audited."
             : notice === "deleted"
               ? "Tournament data and referenced proof files were permanently deleted."
             : notice === "cleanup-completed"
@@ -638,6 +743,10 @@ function TournamentForm({
                       ? "Tournament deletion failed. No database changes were committed."
                     : notice === "cleanup-failed"
                       ? "Storage cleanup still could not be verified. The cleanup manifest remains available for retry."
+                    : notice === "map-pool-invalid"
+                      ? "Select at least five distinct maps and provide all required map-pool details."
+                    : notice === "map-pool-failed"
+                      ? "The map-pool change was rejected. Check map eligibility, Division state, and tournament status."
                 : errorMessage ??
                   "Tournament could not be saved. Confirm the migration is applied and try again."}
         </div>
@@ -921,15 +1030,22 @@ function BracketFields({
           defaultValue={values.eloRules}
           readOnly={readOnly}
         />
-        <Field
-          label="Maximum Players"
-          name={`${prefix}MaxPlayers`}
-          type="number"
-          min={8}
-          max={1024}
-          defaultValue={String(values.maxPlayers)}
-          readOnly={readOnly}
-        />
+        <label>
+          <span className="text-sm font-bold">Launch Capacity</span>
+          <input
+            name={`${prefix}MaxPlayers`}
+            value="8"
+            readOnly
+            aria-describedby={`${prefix}-capacity-help`}
+            className={fieldClassName(true)}
+          />
+          <span
+            id={`${prefix}-capacity-help`}
+            className="mt-2 block text-xs leading-5 text-zinc-500"
+          >
+            Fixed at exactly eight players for the current 1v1 launch format.
+          </span>
+        </label>
       </div>
     </fieldset>
   );

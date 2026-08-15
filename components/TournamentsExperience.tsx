@@ -17,6 +17,7 @@ import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import ScrollReveal from "@/components/ScrollReveal";
+import TournamentMapPools from "@/components/TournamentMapPools";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { PlayerProfile } from "@/lib/player-profile";
 import {
@@ -852,6 +853,10 @@ function Overview({
             </div>
           </div>
         </Card>
+
+        {tournament.mapPools.length > 0 ? (
+          <TournamentMapPools pools={tournament.mapPools} />
+        ) : null}
 
         <Card>
           <div className="flex gap-3 overflow-x-auto overflow-y-visible border-b border-slate-800 px-1 py-3">
@@ -3624,6 +3629,10 @@ function MobileOverview({
           </div>
         </div>
       </MobileCard>
+
+      {tournament.mapPools.length > 0 ? (
+        <TournamentMapPools pools={tournament.mapPools} />
+      ) : null}
 
       <MobileCard>
         <div
