@@ -42,6 +42,8 @@ function tournamentOption(
         requiredCount: 8,
         isReady: true,
         launchedAt: null,
+        mapPoolPublishedAt: "2026-08-15T00:00:00.000Z",
+        currentMapCount: 5,
         ...overrides,
       },
     ],
@@ -85,6 +87,24 @@ describe("administrator private bracket launch controls", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Launch Division" }))
       .toBeDisabled();
+  });
+
+  it("keeps launch disabled until a five-map pool is published", () => {
+    render(
+      <AdminBracketManagement
+        tournaments={[
+          tournamentOption({
+            mapPoolPublishedAt: null,
+            currentMapCount: 0,
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Launch Division" }))
+      .toBeDisabled();
+    expect(screen.getByText(/publish at least five eligible 1v1 maps/i))
+      .toBeInTheDocument();
   });
 
   it("displays immutable launch state and removes draft mutation controls", () => {

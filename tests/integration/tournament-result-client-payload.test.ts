@@ -268,6 +268,7 @@ type QueryResult = {
 type Query = PromiseLike<QueryResult> & {
   eq: (...args: unknown[]) => Query;
   in: (...args: unknown[]) => Query;
+  is: (...args: unknown[]) => Query;
   maybeSingle: () => Promise<QueryResult>;
   not: (...args: unknown[]) => Query;
   order: (...args: unknown[]) => Query;
@@ -276,7 +277,7 @@ type Query = PromiseLike<QueryResult> & {
 
 function createQuery(result: QueryResult) {
   const query = {} as Query;
-  for (const method of ["eq", "in", "not", "order", "select"] as const) {
+  for (const method of ["eq", "in", "is", "not", "order", "select"] as const) {
     query[method] = vi.fn(() => query);
   }
   query.maybeSingle = vi.fn(async () => result);
@@ -434,6 +435,7 @@ function createPageClient(
     tournaments: { data: [rawTournament], error: null },
     registrations: { data: registrations, error: null },
     players: { data: players, error: null },
+    tournament_bracket_map_pool_entries: { data: [], error: null },
   };
   const viewerDivisionQuery = createQuery({
     data: { relic_verified_division: verifiedDivision },
@@ -473,7 +475,7 @@ function createPageClient(
           bracket_id: BRACKET_ID,
           tournament_id: TOURNAMENT_ID,
           registered_players: 2,
-          max_players: 32,
+          max_players: 8,
         },
       ],
       error: null,

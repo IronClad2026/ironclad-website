@@ -1129,8 +1129,7 @@ function readBracket(
     !eloRules ||
     eloRules.length > 500 ||
     !Number.isInteger(maxPlayers) ||
-    maxPlayers < 8 ||
-    maxPlayers > 1024
+    maxPlayers !== 8
   ) {
     return null;
   }
@@ -1344,7 +1343,7 @@ function getTournamentValidationError(input: {
   }
   for (const bracketInput of input.brackets) {
     if (bracketInput.enabled && !bracketInput.bracket) {
-      return `${bracketInput.config.label} requires ELO rules and a maximum player count between 8 and 1,024.`;
+      return `${bracketInput.config.label} launch capacity is fixed at exactly 8 players.`;
     }
     if (
       bracketInput.bracket &&

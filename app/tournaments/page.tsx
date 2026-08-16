@@ -4,6 +4,11 @@ import { loadMatchResultData } from "@/lib/match-result-data";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
 import {
+  groupPublicTournamentMapPoolEntries,
+  projectPublishedTournamentMapPools,
+  type PublicTournamentMapPoolEntryDatabaseRow,
+} from "@/lib/tournament-map-pools";
+import {
   getGeneratedBracketRegistrationIds,
   loadGeneratedBracketPageRows,
   mapGeneratedBrackets,
@@ -67,7 +72,7 @@ export default async function TournamentsPage({
     supabase
       .from("tournaments")
       .select(
-        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, created_at, updated_at)"
+        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
       )
       .order("grand_final_at", { ascending: false, nullsFirst: false }),
     supabase.rpc("get_tournament_bracket_capacity"),
@@ -134,6 +139,30 @@ export default async function TournamentsPage({
   );
   const includedTournamentIds = new Set(
     tournamentRows.map((tournament) => tournament.id)
+  );
+  const publishedMapPoolBracketIds = tournamentRows.flatMap((tournament) =>
+    (tournament.tournament_brackets ?? [])
+      .filter((bracket) => bracket.map_pool_published_at !== null)
+      .map((bracket) => bracket.id)
+  );
+  const mapPoolEntryResult =
+    publishedMapPoolBracketIds.length > 0
+      ? await supabase
+          .from("tournament_bracket_map_pool_entries")
+          .select(
+            "tournament_bracket_id, added_at, removed_at, coh3_maps(id, slug, display_name, source_type, creator_name, game_mode, status, thumbnail_path, source_reference, created_at, updated_at)"
+          )
+          .in("tournament_bracket_id", publishedMapPoolBracketIds)
+          .is("removed_at", null)
+          .order("added_at", { ascending: true })
+      : { data: [], error: null };
+
+  if (mapPoolEntryResult.error) {
+    console.error("Published tournament map pools failed to load.");
+  }
+
+  const mapPoolEntriesByBracket = groupPublicTournamentMapPoolEntries(
+    (mapPoolEntryResult.data ?? []) as unknown as PublicTournamentMapPoolEntryDatabaseRow[]
   );
   const publicBracketIds = new Set(
     tournamentRows.flatMap((tournament) =>
@@ -351,6 +380,17 @@ export default async function TournamentsPage({
     tournament.bracketParticipants =
       bracketParticipantsByTournament.get(row.id) ?? [];
     tournament.generatedBrackets = generatedByTournament.get(row.id) ?? [];
+    tournament.mapPools = mapPoolEntryResult.error
+      ? []
+      : projectPublishedTournamentMapPools(
+          (row.tournament_brackets ?? []).map((bracket) => ({
+            id: bracket.id,
+            name: getTournamentBracketDisplayName(bracket.name),
+            mapPoolPublishedAt: bracket.map_pool_published_at,
+            launchedAt: bracket.launched_at,
+            entries: mapPoolEntriesByBracket.get(bracket.id) ?? [],
+          }))
+        );
     tournament.players = tournament.participants.length;
     return tournament;
   });
