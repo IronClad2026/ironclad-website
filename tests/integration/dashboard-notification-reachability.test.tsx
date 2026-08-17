@@ -12,6 +12,8 @@ const dashboardNotificationsMock = vi.hoisted(() => vi.fn(() => null));
 const inAppNotificationCenterMock = vi.hoisted(() => vi.fn(() => null));
 const loadPlayerCareerDashboardMock = vi.hoisted(() => vi.fn());
 const loadPlayerNotificationsMock = vi.hoisted(() => vi.fn());
+const loadCommunityPollsForRequestMock = vi.hoisted(() => vi.fn());
+const pollsAndDecisionsMock = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -41,12 +43,20 @@ vi.mock("@/components/PublicProfileVisibilityCard", () => ({
   default: vi.fn(() => null),
 }));
 
+vi.mock("@/components/PollsAndDecisions", () => ({
+  default: pollsAndDecisionsMock,
+}));
+
 vi.mock("@/lib/notifications", () => ({
   loadPlayerNotifications: loadPlayerNotificationsMock,
 }));
 
 vi.mock("@/lib/player-dashboard", () => ({
   loadPlayerCareerDashboard: loadPlayerCareerDashboardMock,
+}));
+
+vi.mock("@/lib/player-polls", () => ({
+  loadCommunityPollsForRequest: loadCommunityPollsForRequestMock,
 }));
 
 vi.mock("@/lib/supabase-server", () => ({
@@ -95,6 +105,10 @@ describe("dashboard notification reachability", () => {
       unreadCount: 3,
       error: null,
     });
+    loadCommunityPollsForRequestMock.mockResolvedValue({
+      polls: [],
+      error: null,
+    });
   });
 
   it("separates match-result actions from ordinary unified notifications", async () => {
@@ -124,6 +138,14 @@ describe("dashboard notification reachability", () => {
     expect(unifiedNotificationCenters[0].props).not.toHaveProperty(
       "matchNotifications"
     );
+
+    const communityPollSections = findElements(page, pollsAndDecisionsMock);
+    expect(communityPollSections).toHaveLength(1);
+    expect(communityPollSections[0].props).toMatchObject({
+      surface: "community",
+      initialPolls: [],
+      initialError: null,
+    });
   });
 });
 

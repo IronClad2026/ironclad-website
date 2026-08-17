@@ -18,9 +18,11 @@ import DashboardNotifications from "@/components/DashboardNotifications";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
 import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
 import PlayerRegistrationActions from "@/components/PlayerRegistrationActions";
+import PollsAndDecisions from "@/components/PollsAndDecisions";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import { loadPlayerNotifications } from "@/lib/notifications";
+import { loadCommunityPollsForRequest } from "@/lib/player-polls";
 import {
   loadPlayerCareerDashboard,
   type PlayerStatistics,
@@ -91,7 +93,13 @@ export default async function PlayerDashboardPage() {
   }
 
   const supabase = await createAuthenticatedSupabaseClient();
-  const [profileResult, registrationsResult, career, playerNotifications] =
+  const [
+    profileResult,
+    registrationsResult,
+    career,
+    playerNotifications,
+    communityPolls,
+  ] =
     await Promise.all([
       supabase
         .from("players")
@@ -109,6 +117,7 @@ export default async function PlayerDashboardPage() {
         .order("created_at", { ascending: false }),
       loadPlayerCareerDashboard(userId),
       loadPlayerNotifications(userId),
+      loadCommunityPollsForRequest(),
     ]);
 
   if (profileResult.error) {
@@ -271,6 +280,14 @@ export default async function PlayerDashboardPage() {
             .join("|")}
           notifications={career.notifications}
         />
+
+        <div id="community-polls" className="mt-8 scroll-mt-28">
+          <PollsAndDecisions
+            surface="community"
+            initialPolls={communityPolls.polls}
+            initialError={communityPolls.error}
+          />
+        </div>
 
         {career.error && (
           <div className="mt-6">

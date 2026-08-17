@@ -295,7 +295,9 @@ export default function InAppNotificationCenter({
     if (
       isPlayerMatchConfirmationNotification(notification) ||
       isPlayerWaitlistOfferNotification(notification) ||
-      notification.type.startsWith("match.")
+      notification.type.startsWith("match.") ||
+      notification.type === "poll.published" ||
+      notification.type === "poll.decision_published"
     ) {
       startTransition(async () => {
         if (notification.readAt === null) {
@@ -1039,6 +1041,10 @@ function NotificationIcon({ type }: { type: string }) {
 
   if (type === "match.ready" || type === "match.automatic_advance") {
     return <Trophy className={className} />;
+  }
+
+  if (type === "poll.published" || type === "poll.decision_published") {
+    return <CheckCircle2 className={className} />;
   }
 
   return <Bell className={className} />;
