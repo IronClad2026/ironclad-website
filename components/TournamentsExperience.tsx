@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode, ElementType } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
@@ -8,6 +15,10 @@ import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { submitTournamentRegistration } from "@/app/tournaments/actions";
+import { rollMatchDice } from "@/app/tournaments/dice-actions";
+import MatchDiceRollOff, {
+  type MatchDiceLoadResult,
+} from "@/components/MatchDiceRollOff";
 import MatchResultControls, {
   AdminResetMatchForm,
   ReportGroupReview,
@@ -19,6 +30,7 @@ import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime"
 import ScrollReveal from "@/components/ScrollReveal";
 import TournamentMapPools from "@/components/TournamentMapPools";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { parseMatchDiceSnapshot } from "@/lib/match-dice";
 import type { PlayerProfile } from "@/lib/player-profile";
 import {
   getPublicTournamentNavigation,
@@ -447,7 +459,7 @@ function Hero({
     : null;
   const terminalTournament = isTournamentTerminalStatus(
     tournament.statusValue
-  );
+  ) || tournament.statusValue === "completed";
 
   return (
     <section className="relative overflow-hidden border-b border-orange-500/20 bg-black">
@@ -1066,6 +1078,76 @@ function ParticipantSection({
   );
 }
 
+function AuthenticatedMatchDiceRollOff({
+  matchId,
+  forceReadOnly = false,
+}: {
+  matchId: string;
+  forceReadOnly?: boolean;
+}) {
+  const { getToken, isSignedIn } = useAuth();
+  const supabase = useMemo(
+    () => createAuthenticatedBrowserSupabaseClient(getToken),
+    [getToken]
+  );
+  const loadSnapshot = useCallback(
+    async (
+      requestedMatchId: string,
+      signal?: AbortSignal
+    ): Promise<MatchDiceLoadResult> => {
+      if (!isSignedIn) {
+        return {
+          ok: false,
+          message: "Sign in to open this private Match workspace.",
+        };
+      }
+
+      try {
+        const request = supabase.rpc("get_match_dice_rolloff", {
+          p_match_id: requestedMatchId,
+        });
+        const { data, error } = await (signal
+          ? request.abortSignal(signal)
+          : request);
+
+        if (error) {
+          return {
+            ok: false,
+            message: "Dice Roll-Off history is unavailable right now.",
+          };
+        }
+
+        const snapshot = parseMatchDiceSnapshot(data, requestedMatchId);
+        if (!snapshot) {
+          return {
+            ok: false,
+            message: "Dice Roll-Off returned an invalid response.",
+          };
+        }
+
+        return { ok: true, snapshot };
+      } catch {
+        return {
+          ok: false,
+          message: signal?.aborted
+            ? "Dice Roll-Off request was cancelled."
+            : "Dice Roll-Off history is unavailable right now.",
+        };
+      }
+    },
+    [isSignedIn, supabase]
+  );
+
+  return (
+    <MatchDiceRollOff
+      matchId={matchId}
+      loadSnapshot={loadSnapshot}
+      rollDice={rollMatchDice}
+      forceReadOnly={forceReadOnly}
+    />
+  );
+}
+
 function Brackets({
   tournament,
   viewer,
@@ -1087,9 +1169,11 @@ function Brackets({
   );
   const [selectedAdminMatchId, setSelectedAdminMatchId] =
     useState<string | null>(null);
+  const [selectedPlayerMatchId, setSelectedPlayerMatchId] =
+    useState<string | null>(null);
   const terminalTournament = isTournamentTerminalStatus(
     tournament.statusValue
-  );
+  ) || tournament.statusValue === "completed";
   const selectedAdminBracket =
     selectedAdminMatchId === null
       ? null
@@ -1109,14 +1193,36 @@ function Brackets({
     }
 
     window.requestAnimationFrame(() => {
-      if (viewer.isAdmin && !terminalTournament) {
+      const focusedBracket = tournament.generatedBrackets.find((generated) =>
+        generated.matches.some((match) => match.id === focusedMatchId)
+      );
+      const focusedMatch = focusedBracket?.matches.find(
+        (match) => match.id === focusedMatchId
+      );
+      const viewerOwnsMatch = Boolean(
+        focusedMatch &&
+          viewer.registrationIds.some(
+            (registrationId) =>
+              registrationId === focusedMatch.playerOneRegistrationId ||
+              registrationId === focusedMatch.playerTwoRegistrationId
+          )
+      );
+
+      if (
+        focusedBracket?.format === "single_elimination" &&
+        focusedMatch &&
+        focusedMatch.activationVersion > 0 &&
+        viewerOwnsMatch
+      ) {
+        setSelectedPlayerMatchId(focusedMatchId);
+      } else if (viewer.isAdmin) {
         setSelectedAdminMatchId(focusedMatchId);
       }
       document
         .getElementById(`match-desktop-${focusedMatchId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-  }, [focusedMatchId, terminalTournament, viewer.isAdmin]);
+  }, [focusedMatchId, tournament.generatedBrackets, viewer]);
 
   return (
     <div className="space-y-5">
@@ -1157,21 +1263,20 @@ function Brackets({
                 )
               ))
         );
+        const hasOwnedMatch = Boolean(
+          generated?.matches.some(
+            (match) =>
+              viewer.registrationIds.includes(
+                match.playerOneRegistrationId ?? ""
+              ) ||
+              viewer.registrationIds.includes(
+                match.playerTwoRegistrationId ?? ""
+              )
+          )
+        );
         const canOpenResults = Boolean(
           generated &&
-            (terminalTournament
-              ? hasVisibleResultHistory
-              : !viewer.isAdmin &&
-                (generated.matches.some(
-                  (match) =>
-                    viewer.registrationIds.includes(
-                      match.playerOneRegistrationId ?? ""
-                    ) ||
-                    viewer.registrationIds.includes(
-                      match.playerTwoRegistrationId ?? ""
-                    )
-                ) ||
-                  hasVisibleResultHistory))
+            (hasOwnedMatch || (!viewer.isAdmin && hasVisibleResultHistory))
         );
         return (
           <Card key={bracket.id} className="overflow-visible">
@@ -1191,6 +1296,14 @@ function Brackets({
                       matchResultSubmissions={matchResultSubmissions}
                       matchResultReportGroups={matchResultReportGroups}
                       readOnly={terminalTournament}
+                      selectedMatchId={
+                        generated.matches.some(
+                          (match) => match.id === selectedPlayerMatchId
+                        )
+                          ? selectedPlayerMatchId
+                          : null
+                      }
+                      onSelectedMatchChange={setSelectedPlayerMatchId}
                     />
                   )}
                 </div>
@@ -1225,8 +1338,9 @@ function Brackets({
                 matches={generated.matches}
                 standings={generated.standings}
                 participantsById={participantsById}
+                adminReadOnly={terminalTournament}
                 onAdminMatchSelect={
-                  viewer.isAdmin && !terminalTournament
+                  viewer.isAdmin
                     ? (match) => setSelectedAdminMatchId(match.id)
                     : undefined
                 }
@@ -1235,10 +1349,15 @@ function Brackets({
               <SingleEliminationBracket
                 matches={generated.matches}
                 participantsById={participantsById}
+                adminReadOnly={terminalTournament}
                 focusedMatchId={focusedMatchId}
                 anchorPrefix="match-desktop"
+                viewerRegistrationIds={viewer.registrationIds}
+                onPlayerMatchSelect={(match) =>
+                  setSelectedPlayerMatchId(match.id)
+                }
                 onAdminMatchSelect={
-                  viewer.isAdmin && !terminalTournament
+                  viewer.isAdmin
                     ? (match) => setSelectedAdminMatchId(match.id)
                     : undefined
                 }
@@ -1247,7 +1366,7 @@ function Brackets({
           </Card>
         );
       })}
-      {viewer.isAdmin && !terminalTournament && selectedAdminMatch && (
+      {viewer.isAdmin && selectedAdminMatch && (
         <AdminMatchManagementModal
           tournament={tournament}
           match={selectedAdminMatch}
@@ -1260,6 +1379,7 @@ function Brackets({
           reportGroups={matchResultReportGroups.filter(
             (reportGroup) => reportGroup.matchId === selectedAdminMatch.id
           )}
+          readOnly={terminalTournament}
           onClose={() => setSelectedAdminMatchId(null)}
         />
       )}
@@ -1267,7 +1387,7 @@ function Brackets({
   );
 }
 
-function BracketMatchResultsWorkspace({
+export function BracketMatchResultsWorkspace({
   bracketName,
   bracketFormat,
   matches,
@@ -1276,6 +1396,8 @@ function BracketMatchResultsWorkspace({
   matchResultSubmissions,
   matchResultReportGroups,
   readOnly = false,
+  selectedMatchId = null,
+  onSelectedMatchChange,
 }: {
   bracketName: string;
   bracketFormat: GeneratedTournamentBracket["format"];
@@ -1285,8 +1407,13 @@ function BracketMatchResultsWorkspace({
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
   readOnly?: boolean;
+  selectedMatchId?: string | null;
+  onSelectedMatchChange?: (matchId: string | null) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const dialogTitleId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLElement | null>(null);
   const portalRoot =
     typeof document === "undefined" ? null : document.body;
   const visibleMatches = matches.filter((match) => {
@@ -1301,11 +1428,18 @@ function BracketMatchResultsWorkspace({
     const hasVisibleReportGroup = matchResultReportGroups.some(
       (reportGroup) => reportGroup.matchId === match.id
     );
-    return readOnly
-      ? hasVisibleSubmission || hasVisibleReportGroup
-      : viewer.isAdmin || canSubmit || hasVisibleSubmission || hasVisibleReportGroup;
+    return (
+      canSubmit ||
+      hasVisibleSubmission ||
+      hasVisibleReportGroup
+    );
   });
-  const pendingCount = visibleMatches.reduce(
+  const workspaceMatches = selectedMatchId
+    ? visibleMatches.filter((match) => match.id === selectedMatchId)
+    : visibleMatches;
+  const open =
+    manualOpen || Boolean(selectedMatchId && workspaceMatches.length === 1);
+  const pendingCount = workspaceMatches.reduce(
     (total, match) =>
       total +
       matchResultSubmissions.filter(
@@ -1324,27 +1458,63 @@ function BracketMatchResultsWorkspace({
     0
   );
 
+  const closeWorkspace = useCallback(() => {
+    setManualOpen(false);
+    onSelectedMatchChange?.(null);
+  }, [onSelectedMatchChange]);
+
   useEffect(() => {
     if (!open) return;
 
+    const opener =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+        ? document.activeElement
+        : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+    const handleDialogKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeWorkspace();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]"
+        ) ?? []
+      ).filter((element) => element.tabIndex >= 0);
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
-    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", handleDialogKeyDown);
+    closeButtonRef.current?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("keydown", handleDialogKeyDown);
+      if (opener?.isConnected) opener.focus();
     };
-  }, [open]);
+  }, [closeWorkspace, open]);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          onSelectedMatchChange?.(null);
+          setManualOpen(true);
+        }}
         className="inline-flex items-center gap-2 rounded-xl border border-orange-400/40 bg-orange-500/10 px-4 py-2 text-xs font-black uppercase tracking-wider text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 hover:shadow-[0_0_24px_rgba(249,115,22,0.15)]"
       >
         <Swords size={15} />
@@ -1360,25 +1530,26 @@ function BracketMatchResultsWorkspace({
         createPortal(
           <AnimatePresence>
             {open && (
-              <div className="fixed inset-0 z-[9999] grid place-items-center p-3 sm:p-6">
+              <div className="fixed inset-x-0 top-0 z-[9999] grid h-[100dvh] place-items-center p-2 [padding-bottom:max(0.5rem,env(safe-area-inset-bottom))] [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))] [padding-top:max(0.5rem,env(safe-area-inset-top))] sm:p-6">
                 <motion.button
                   type="button"
                   aria-label="Close match result workspace"
-                  onClick={() => setOpen(false)}
+                  onClick={closeWorkspace}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   className="absolute inset-0 h-full w-full cursor-default bg-black/85 backdrop-blur-md"
                 />
                 <motion.section
+                  ref={dialogRef}
                   role="dialog"
                   aria-modal="true"
-                  aria-labelledby={`match-results-${bracketName}`}
+                  aria-labelledby={dialogTitleId}
                   initial={{ opacity: 0, scale: 0.96, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.97, y: 12 }}
                   transition={{ duration: 0.22 }}
-                  className="relative flex h-[78vh] w-[94vw] flex-col overflow-hidden border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-[0_0_90px_rgba(0,0,0,0.68)] lg:w-[70vw] xl:w-[66vw]"
+                  className="relative flex h-full max-h-full w-full max-w-5xl flex-col overflow-hidden border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_32%),linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-[0_0_90px_rgba(0,0,0,0.68)] sm:h-[90dvh]"
                 >
                   <header className="relative shrink-0 border-b border-white/10 px-6 py-5 sm:px-8 sm:py-6">
                     <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.9)]" />
@@ -1387,23 +1558,26 @@ function BracketMatchResultsWorkspace({
                         <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">
                           {readOnly
                             ? "Tournament Match History"
-                            : "Tournament Administration Workspace"}
+                            : "Match Workspace"}
                         </p>
                         <h2
-                          id={`match-results-${bracketName}`}
+                          id={dialogTitleId}
                           className="mt-2 text-2xl font-black text-white sm:text-3xl"
                         >
-                          {bracketName} Match Results
+                          {bracketName} Match Workspace
                         </h2>
                         <p className="mt-2 text-sm text-zinc-400">
                           {readOnly
-                            ? "Review factual scores and existing authorized replay access from this historical record."
-                            : "Review scores, proof files, player notes, and official decisions without crowding the public bracket."}
+                            ? "Review authorized Dice Roll-Off, score, and replay history from this Match record."
+                            : bracketFormat === "single_elimination"
+                              ? "Complete the private Dice Roll-Off, then use the established Series result and replay controls below."
+                              : "Use the established Series result and replay controls below. Dice Roll-Off is unavailable for round-robin Matches."}
                         </p>
                       </div>
                       <button
+                        ref={closeButtonRef}
                         type="button"
-                        onClick={() => setOpen(false)}
+                        onClick={closeWorkspace}
                         className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
                         aria-label="Close match result workspace"
                       >
@@ -1412,7 +1586,7 @@ function BracketMatchResultsWorkspace({
                     </div>
                     <div className="mt-5 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wider text-zinc-400">
                       <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                        {visibleMatches.length} matches
+                        {workspaceMatches.length} matches
                       </span>
                       <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-amber-200">
                         {pendingCount} pending reviews
@@ -1422,7 +1596,7 @@ function BracketMatchResultsWorkspace({
 
                   <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8 sm:py-8">
                     <div className="space-y-7">
-                      {visibleMatches.map((match) => {
+                      {workspaceMatches.map((match) => {
                         const playerOne = match.playerOneRegistrationId
                           ? participantsById.get(
                               match.playerOneRegistrationId
@@ -1464,13 +1638,23 @@ function BracketMatchResultsWorkspace({
                                 <MatchDeadlinePresentation match={match} />
                               </div>
                             )}
+                            {bracketFormat === "single_elimination" &&
+                              selectedMatchId === match.id &&
+                              match.activationVersion > 0 && (
+                                <div className="mb-6">
+                                  <AuthenticatedMatchDiceRollOff
+                                    matchId={match.id}
+                                    forceReadOnly={readOnly}
+                                  />
+                                </div>
+                              )}
                             <MatchResultControls
                               match={match}
                               deadlineManaged={
                                 bracketFormat === "single_elimination"
                               }
                               participantsById={participantsById}
-                              isAdmin={readOnly ? false : viewer.isAdmin}
+                              isAdmin={false}
                               canSubmit={
                                 !readOnly &&
                                 viewer.registrationIds.some(
@@ -1514,6 +1698,7 @@ export function AdminMatchManagementModal({
   viewer,
   submissions,
   reportGroups,
+  readOnly = false,
   onClose,
 }: {
   tournament: TournamentCard;
@@ -1523,6 +1708,7 @@ export function AdminMatchManagementModal({
   viewer: TournamentViewer;
   submissions: MatchResultSubmission[];
   reportGroups: MatchResultReportGroup[];
+  readOnly?: boolean;
   onClose: () => void;
 }) {
   const portalRoot =
@@ -1549,6 +1735,7 @@ export function AdminMatchManagementModal({
   const hasParticipants = Boolean(playerOne && playerTwo);
   const deadlineManaged = bracketFormat === "single_elimination";
   const canEnterOfficialResult =
+    !readOnly &&
     hasParticipants &&
     (!deadlineManaged ||
       (match.status === "in_progress" &&
@@ -1601,7 +1788,7 @@ export function AdminMatchManagementModal({
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
-                  Direct Match Management
+                  {readOnly ? "Read-Only Match History" : "Direct Match Management"}
                 </p>
                 <h2
                   id={`admin-match-${match.id}`}
@@ -1706,7 +1893,7 @@ export function AdminMatchManagementModal({
                       key={reportGroup.id}
                       reportGroup={reportGroup}
                       match={match}
-                      isAdmin={viewer.isAdmin}
+                      isAdmin={!readOnly && viewer.isAdmin}
                       participantsById={participantsById}
                     />
                   ))}
@@ -1727,16 +1914,27 @@ export function AdminMatchManagementModal({
               </div>
             </div>
 
-            {deadlineManaged && (
+            {bracketFormat === "single_elimination" &&
+              match.activationVersion > 0 && (
+                <div className="mt-5 w-full max-w-full min-w-0">
+                  <AuthenticatedMatchDiceRollOff
+                    matchId={match.id}
+                    forceReadOnly
+                  />
+                </div>
+              )}
+
+            {!readOnly && deadlineManaged && (
               <div className="mt-5 w-full max-w-full min-w-0">
                 <AdminMatchDeadlineControls match={match} />
               </div>
             )}
 
-            <div
-              data-admin-match-actions-grid
-              className="mt-5 grid w-full max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2"
-            >
+            {!readOnly && (
+              <div
+                data-admin-match-actions-grid
+                className="mt-5 grid w-full max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2"
+              >
               <div className="min-w-0 max-w-full border border-white/12 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20">
                 {canEnterOfficialResult ? (
                   <ResultEntryForm
@@ -1767,7 +1965,8 @@ export function AdminMatchManagementModal({
               <div className="min-w-0 max-w-full">
                 <AdminResetMatchForm match={match} />
               </div>
-            </div>
+              </div>
+            )}
           </div>
         </motion.section>
       </div>
@@ -1992,13 +2191,19 @@ function NoChampionPresentation({ bracketName }: { bracketName: string }) {
 function SingleEliminationBracket({
   matches,
   participantsById,
+  adminReadOnly,
   onAdminMatchSelect,
+  onPlayerMatchSelect,
+  viewerRegistrationIds,
   focusedMatchId,
   anchorPrefix,
 }: {
   matches: GeneratedTournamentMatch[];
   participantsById: Map<string, TournamentParticipant>;
+  adminReadOnly: boolean;
   onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
+  onPlayerMatchSelect?: (match: GeneratedTournamentMatch) => void;
+  viewerRegistrationIds: string[];
   focusedMatchId: string | null;
   anchorPrefix: "match-desktop" | "match-mobile";
 }) {
@@ -2106,9 +2311,21 @@ function SingleEliminationBracket({
                     connectorDirection={
                       matchIndex % 2 === 0 ? "down" : "up"
                     }
+                    adminReadOnly={adminReadOnly}
                     onAdminSelect={
                       onAdminMatchSelect
                         ? () => onAdminMatchSelect(match)
+                        : undefined
+                    }
+                    onPlayerSelect={
+                      onPlayerMatchSelect &&
+                      match.activationVersion > 0 &&
+                      viewerRegistrationIds.some(
+                        (registrationId) =>
+                          registrationId === match.playerOneRegistrationId ||
+                          registrationId === match.playerTwoRegistrationId
+                      )
+                        ? () => onPlayerMatchSelect(match)
                         : undefined
                     }
                   />
@@ -2130,7 +2347,9 @@ function ModernBracketMatch({
   isActiveRound,
   hasNextRound,
   connectorDirection,
+  adminReadOnly,
   onAdminSelect,
+  onPlayerSelect,
 }: {
   match: Match;
   deadlineMatch: GeneratedTournamentMatch;
@@ -2139,14 +2358,17 @@ function ModernBracketMatch({
   isActiveRound: boolean;
   hasNextRound: boolean;
   connectorDirection: "up" | "down";
+  adminReadOnly: boolean;
   onAdminSelect?: () => void;
+  onPlayerSelect?: () => void;
 }) {
   const card = (
     <div
       id={anchorId}
       className={classNames(
         "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1",
-        onAdminSelect && "cursor-pointer hover:border-orange-300/80",
+        (onAdminSelect || onPlayerSelect) &&
+          "hover:border-orange-300/80",
         focused && "ring-2 ring-orange-300 ring-offset-4 ring-offset-black",
         match.status === "live"
           ? "border-orange-400/80 shadow-[0_0_28px_rgba(249,115,22,0.22)]"
@@ -2166,7 +2388,12 @@ function ModernBracketMatch({
         <div className="flex items-center gap-2">
           {onAdminSelect && (
             <span className="rounded border border-orange-400/25 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">
-              Manage
+              {adminReadOnly ? "Inspect" : "Manage"}
+            </span>
+          )}
+          {onPlayerSelect && (
+            <span className="rounded border border-orange-300/40 bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-100">
+              Your Match
             </span>
           )}
           <MatchStatus status={match.status} />
@@ -2208,6 +2435,16 @@ function ModernBracketMatch({
         </button>
       ) : (
         card
+      )}
+      {onPlayerSelect && (
+        <button
+          type="button"
+          onClick={onPlayerSelect}
+          className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 border border-orange-400/45 bg-orange-500/10 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+        >
+          <Swords size={15} aria-hidden="true" />
+          Open Match
+        </button>
       )}
     </motion.div>
   );
@@ -2438,11 +2675,13 @@ function RoundRobinBracket({
   matches,
   standings,
   participantsById,
+  adminReadOnly,
   onAdminMatchSelect,
 }: {
   matches: GeneratedTournamentMatch[];
   standings: TournamentCard["generatedBrackets"][number]["standings"];
   participantsById: Map<string, TournamentParticipant>;
+  adminReadOnly: boolean;
   onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
 }) {
   return (
@@ -2452,6 +2691,7 @@ function RoundRobinBracket({
           <MatchCard
             key={match.id}
             match={toDisplayMatch(match, participantsById)}
+            adminReadOnly={adminReadOnly}
             onAdminSelect={
               onAdminMatchSelect ? () => onAdminMatchSelect(match) : undefined
             }
@@ -2581,9 +2821,11 @@ function hasPrize(tournament: TournamentCard) {
 
 function MatchCard({
   match,
+  adminReadOnly,
   onAdminSelect,
 }: {
   match: Match;
+  adminReadOnly: boolean;
   onAdminSelect?: () => void;
 }) {
   const card = (
@@ -2603,7 +2845,7 @@ function MatchCard({
         <div className="flex items-center gap-2">
           {onAdminSelect && (
             <span className="rounded border border-orange-400/25 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">
-              Manage
+              {adminReadOnly ? "Inspect" : "Manage"}
             </span>
           )}
           <MatchStatus status={match.status} />
@@ -3395,7 +3637,7 @@ function MobileHero({
     : null;
   const terminalTournament = isTournamentTerminalStatus(
     tournament.statusValue
-  );
+  ) || tournament.statusValue === "completed";
   const metadata = [
     {
       icon: null,
@@ -4012,9 +4254,11 @@ function MobileBrackets({
   );
   const [selectedAdminMatchId, setSelectedAdminMatchId] =
     useState<string | null>(null);
+  const [selectedPlayerMatchId, setSelectedPlayerMatchId] =
+    useState<string | null>(null);
   const terminalTournament = isTournamentTerminalStatus(
     tournament.statusValue
-  );
+  ) || tournament.statusValue === "completed";
   const selectedAdminBracket =
     selectedAdminMatchId === null
       ? null
@@ -4034,14 +4278,36 @@ function MobileBrackets({
     }
 
     window.requestAnimationFrame(() => {
-      if (viewer.isAdmin && !terminalTournament) {
+      const focusedBracket = tournament.generatedBrackets.find((generated) =>
+        generated.matches.some((match) => match.id === focusedMatchId)
+      );
+      const focusedMatch = focusedBracket?.matches.find(
+        (match) => match.id === focusedMatchId
+      );
+      const viewerOwnsMatch = Boolean(
+        focusedMatch &&
+          viewer.registrationIds.some(
+            (registrationId) =>
+              registrationId === focusedMatch.playerOneRegistrationId ||
+              registrationId === focusedMatch.playerTwoRegistrationId
+          )
+      );
+
+      if (
+        focusedBracket?.format === "single_elimination" &&
+        focusedMatch &&
+        focusedMatch.activationVersion > 0 &&
+        viewerOwnsMatch
+      ) {
+        setSelectedPlayerMatchId(focusedMatchId);
+      } else if (viewer.isAdmin) {
         setSelectedAdminMatchId(focusedMatchId);
       }
       document
         .getElementById(`match-mobile-${focusedMatchId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-  }, [focusedMatchId, terminalTournament, viewer.isAdmin]);
+  }, [focusedMatchId, tournament.generatedBrackets, viewer]);
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-5">
@@ -4082,21 +4348,20 @@ function MobileBrackets({
                 )
               ))
         );
+        const hasOwnedMatch = Boolean(
+          generated?.matches.some(
+            (match) =>
+              viewer.registrationIds.includes(
+                match.playerOneRegistrationId ?? ""
+              ) ||
+              viewer.registrationIds.includes(
+                match.playerTwoRegistrationId ?? ""
+              )
+          )
+        );
         const canOpenResults = Boolean(
           generated &&
-            (terminalTournament
-              ? hasVisibleResultHistory
-              : !viewer.isAdmin &&
-                (generated.matches.some(
-                  (match) =>
-                    viewer.registrationIds.includes(
-                      match.playerOneRegistrationId ?? ""
-                    ) ||
-                    viewer.registrationIds.includes(
-                      match.playerTwoRegistrationId ?? ""
-                    )
-                ) ||
-                  hasVisibleResultHistory))
+            (hasOwnedMatch || (!viewer.isAdmin && hasVisibleResultHistory))
         );
 
         return (
@@ -4117,6 +4382,14 @@ function MobileBrackets({
                       matchResultSubmissions={matchResultSubmissions}
                       matchResultReportGroups={matchResultReportGroups}
                       readOnly={terminalTournament}
+                      selectedMatchId={
+                        generated.matches.some(
+                          (match) => match.id === selectedPlayerMatchId
+                        )
+                          ? selectedPlayerMatchId
+                          : null
+                      }
+                      onSelectedMatchChange={setSelectedPlayerMatchId}
                     />
                   )}
                 </div>
@@ -4153,8 +4426,9 @@ function MobileBrackets({
                 matches={generated.matches}
                 standings={generated.standings}
                 participantsById={participantsById}
+                adminReadOnly={terminalTournament}
                 onAdminMatchSelect={
-                  viewer.isAdmin && !terminalTournament
+                  viewer.isAdmin
                     ? (match) => setSelectedAdminMatchId(match.id)
                     : undefined
                 }
@@ -4164,10 +4438,15 @@ function MobileBrackets({
                 <SingleEliminationBracket
                   matches={generated.matches}
                   participantsById={participantsById}
+                  adminReadOnly={terminalTournament}
                   focusedMatchId={focusedMatchId}
                   anchorPrefix="match-mobile"
+                  viewerRegistrationIds={viewer.registrationIds}
+                  onPlayerMatchSelect={(match) =>
+                    setSelectedPlayerMatchId(match.id)
+                  }
                   onAdminMatchSelect={
-                    viewer.isAdmin && !terminalTournament
+                    viewer.isAdmin
                       ? (match) => setSelectedAdminMatchId(match.id)
                       : undefined
                   }
@@ -4178,7 +4457,7 @@ function MobileBrackets({
         );
       })}
 
-      {viewer.isAdmin && !terminalTournament && selectedAdminMatch && (
+      {viewer.isAdmin && selectedAdminMatch && (
         <AdminMatchManagementModal
           tournament={tournament}
           match={selectedAdminMatch}
@@ -4191,6 +4470,7 @@ function MobileBrackets({
           reportGroups={matchResultReportGroups.filter(
             (reportGroup) => reportGroup.matchId === selectedAdminMatch.id
           )}
+          readOnly={terminalTournament}
           onClose={() => setSelectedAdminMatchId(null)}
         />
       )}
@@ -4202,11 +4482,13 @@ function MobileRoundRobinBracket({
   matches,
   standings,
   participantsById,
+  adminReadOnly,
   onAdminMatchSelect,
 }: {
   matches: GeneratedTournamentMatch[];
   standings: TournamentCard["generatedBrackets"][number]["standings"];
   participantsById: Map<string, TournamentParticipant>;
+  adminReadOnly: boolean;
   onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
 }) {
   return (
@@ -4216,6 +4498,7 @@ function MobileRoundRobinBracket({
           <MatchCard
             key={match.id}
             match={toDisplayMatch(match, participantsById)}
+            adminReadOnly={adminReadOnly}
             onAdminSelect={
               onAdminMatchSelect ? () => onAdminMatchSelect(match) : undefined
             }
