@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import TournamentsExperience from "@/components/TournamentsExperience";
+import { loadTournamentPollsForRequest } from "@/lib/player-polls";
 import { loadMatchResultData } from "@/lib/match-result-data";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
@@ -395,6 +396,10 @@ export default async function TournamentsPage({
     return tournament;
   });
   tournaments.sort(compareTournamentCards);
+  const tournamentPolls = await loadTournamentPollsForRequest(
+    tournaments.map((tournament) => tournament.id),
+    Boolean(userId)
+  );
   const matchResultData = await loadMatchResultData();
   const includedMatchIds = new Set(
     tournaments.flatMap((tournament) =>
@@ -431,6 +436,8 @@ export default async function TournamentsPage({
   return (
     <TournamentsExperience
       tournaments={tournaments}
+      tournamentPollsByTournament={tournamentPolls.pollsByTournament}
+      pollLoadError={tournamentPolls.error}
       viewer={{
         isAdmin,
         relicVerifiedDivision,

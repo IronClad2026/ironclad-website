@@ -442,6 +442,11 @@ function buildNotificationHref(
   row: NotificationRow,
   scope: NotificationScope
 ): string | null {
+  const pollHref = buildPollNotificationHref(row);
+  if (pollHref) {
+    return pollHref;
+  }
+
   if (scope === "admin") {
     if (row.match_id) {
       return buildMatchHref(row);
@@ -482,6 +487,37 @@ function buildNotificationHref(
   }
 
   return "/dashboard";
+}
+
+function buildPollNotificationHref(row: NotificationRow) {
+  if (
+    row.type !== "poll.published" &&
+    row.type !== "poll.decision_published"
+  ) {
+    return null;
+  }
+
+  const pollId = readPollId(row.metadata);
+  if (row.tournament_id) {
+    const params = new URLSearchParams({
+      tournament: row.tournament_id,
+      tab: "decisions",
+    });
+    if (pollId) params.set("poll", pollId);
+    return `/tournaments?${params.toString()}`;
+  }
+
+  return "/dashboard#community-polls";
+}
+
+function readPollId(metadata: Record<string, unknown> | null) {
+  const value = metadata?.pollId;
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    )
+    ? value
+    : null;
 }
 
 function buildMatchHref(row: NotificationRow) {

@@ -19,6 +19,7 @@ const loadGeneratedBracketPageRowsMock = vi.hoisted(() => vi.fn());
 const loadMatchResultDataMock = vi.hoisted(() => vi.fn());
 const mapGeneratedBracketsMock = vi.hoisted(() => vi.fn());
 const mapTournamentRowMock = vi.hoisted(() => vi.fn());
+const loadTournamentPollsForRequestMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -30,6 +31,10 @@ vi.mock("@/components/TournamentsExperience", () => ({
 
 vi.mock("@/lib/match-result-data", () => ({
   loadMatchResultData: loadMatchResultDataMock,
+}));
+
+vi.mock("@/lib/player-polls", () => ({
+  loadTournamentPollsForRequest: loadTournamentPollsForRequestMock,
 }));
 
 vi.mock("@/lib/platform-settings", () => ({
@@ -257,6 +262,8 @@ const clientPropsShape = {
     },
     matchResultSubmissions: { array: submissionShape },
     matchResultReportGroups: { array: reportGroupShape },
+    tournamentPollsByTournament: "value",
+    pollLoadError: "value",
     eloVerificationEnabled: "value",
   },
 } satisfies ExactShape;
@@ -566,6 +573,7 @@ describe("tournament Client Component result payload", () => {
     loadMatchResultDataMock.mockReset();
     mapGeneratedBracketsMock.mockReset();
     mapTournamentRowMock.mockReset();
+    loadTournamentPollsForRequestMock.mockReset();
 
     getEloVerificationSettingMock.mockResolvedValue({
       enabled: true,
@@ -594,6 +602,10 @@ describe("tournament Client Component result payload", () => {
       submissions: [safeSubmission],
       reportGroups: [safeReportGroup],
       viewerRole: "participant",
+    });
+    loadTournamentPollsForRequestMock.mockResolvedValue({
+      pollsByTournament: { [TOURNAMENT_ID]: [] },
+      error: null,
     });
     mapGeneratedBracketsMock.mockImplementation((rows: unknown[]) =>
       rows.length > 0

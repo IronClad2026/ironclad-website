@@ -19,6 +19,7 @@ import { rollMatchDice } from "@/app/tournaments/dice-actions";
 import MatchDiceRollOff, {
   type MatchDiceLoadResult,
 } from "@/components/MatchDiceRollOff";
+import PollsAndDecisions from "@/components/PollsAndDecisions";
 import MatchResultControls, {
   AdminResetMatchForm,
   ReportGroupReview,
@@ -32,6 +33,7 @@ import TournamentMapPools from "@/components/TournamentMapPools";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import { parseMatchDiceSnapshot } from "@/lib/match-dice";
 import type { PlayerProfile } from "@/lib/player-profile";
+import type { PollViewerProjection } from "@/lib/polls";
 import {
   getPublicTournamentNavigation,
   getTournamentBracketDisplayName,
@@ -65,6 +67,7 @@ import {
   Swords,
   Trophy,
   Users,
+  Vote,
   X,
 } from "lucide-react";
 
@@ -76,7 +79,13 @@ import {
  * participants, brackets, media, announcements, and mobile menu.
  */
 
-type TabKey = "overview" | "participants" | "brackets" | "media" | "announcements";
+type TabKey =
+  | "overview"
+  | "participants"
+  | "brackets"
+  | "decisions"
+  | "media"
+  | "announcements";
 type OverviewPanelKey = "details" | "rules" | "prizes" | "schedule" | "contact";
 
 type ArchiveEvent = {
@@ -144,6 +153,7 @@ const tabs: { key: TabKey; label: string; icon: ElementType }[] = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "participants", label: "Participants", icon: Users },
   { key: "brackets", label: "Brackets", icon: Swords },
+  { key: "decisions", label: "Polls & Decisions", icon: Vote },
   { key: "media", label: "Media", icon: PlayCircle },
   { key: "announcements", label: "Announcements", icon: Radio },
 ];
@@ -3796,14 +3806,11 @@ function MobileTabs({
       aria-label="Tournament sections"
       className="w-full max-w-full min-w-0 border-y border-orange-500/20 bg-black/72 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl sm:px-5"
     >
-      <div className="grid w-full max-w-full min-w-0 grid-cols-6 gap-2">
+      <div className="grid w-full max-w-full min-w-0 grid-cols-3 gap-2">
         {tabs.map((tab) => {
           const selected = activeTab === tab.key;
           const Icon = tab.icon;
-          const spanClass =
-            tab.key === "media" || tab.key === "announcements"
-              ? "col-span-3"
-              : "col-span-2";
+          const spanClass = "col-span-1";
           return (
             <button
               key={tab.key}
@@ -4628,6 +4635,9 @@ function MobileMainContent({
   matchResultSubmissions,
   matchResultReportGroups,
   focusedMatchId,
+  tournamentPollsByTournament,
+  pollLoadError,
+  highlightedPollId,
 }: {
   activeTab: TabKey;
   activeOverviewPanel: OverviewPanelKey;
@@ -4638,6 +4648,9 @@ function MobileMainContent({
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
   focusedMatchId: string | null;
+  tournamentPollsByTournament: Record<string, PollViewerProjection[]>;
+  pollLoadError: string | null;
+  highlightedPollId: string | null;
 }) {
   return (
     <main className="relative z-10 w-full max-w-full min-w-0 px-4 py-5 sm:px-5">
@@ -4659,6 +4672,17 @@ function MobileMainContent({
           focusedMatchId={focusedMatchId}
         />
       )}
+      {activeTab === "decisions" && (
+        <PollsAndDecisions
+          key={tournament.id}
+          surface="tournament"
+          tournamentId={tournament.id}
+          initialPolls={tournamentPollsByTournament[tournament.id] ?? []}
+          initialError={pollLoadError}
+          highlightedPollId={highlightedPollId}
+          presentation="mobile"
+        />
+      )}
       {activeTab === "media" && <MobileMedia tournament={tournament} />}
       {activeTab === "announcements" && (
         <MobileAnnouncements tournament={tournament} />
@@ -4677,6 +4701,9 @@ function MainContent({
   matchResultSubmissions,
   matchResultReportGroups,
   focusedMatchId,
+  tournamentPollsByTournament,
+  pollLoadError,
+  highlightedPollId,
 }: {
   activeTab: TabKey;
   activeOverviewPanel: OverviewPanelKey;
@@ -4687,6 +4714,9 @@ function MainContent({
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
   focusedMatchId: string | null;
+  tournamentPollsByTournament: Record<string, PollViewerProjection[]>;
+  pollLoadError: string | null;
+  highlightedPollId: string | null;
 }) {
   return (
     <main className="relative z-10 px-5 py-6 lg:px-8">
@@ -4706,6 +4736,17 @@ function MainContent({
           matchResultSubmissions={matchResultSubmissions}
           matchResultReportGroups={matchResultReportGroups}
           focusedMatchId={focusedMatchId}
+        />
+      )}
+      {activeTab === "decisions" && (
+        <PollsAndDecisions
+          key={tournament.id}
+          surface="tournament"
+          tournamentId={tournament.id}
+          initialPolls={tournamentPollsByTournament[tournament.id] ?? []}
+          initialError={pollLoadError}
+          highlightedPollId={highlightedPollId}
+          presentation="desktop"
         />
       )}
       {activeTab === "media" && <Media tournament={tournament} />}
@@ -4838,11 +4879,15 @@ export type TournamentViewerRegistration = {
 
 export default function TournamentsExperience({
   tournaments,
+  tournamentPollsByTournament,
+  pollLoadError = null,
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
 }: {
   tournaments: TournamentCard[];
+  tournamentPollsByTournament?: Record<string, PollViewerProjection[]>;
+  pollLoadError?: string | null;
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
@@ -4856,6 +4901,7 @@ export default function TournamentsExperience({
   const rawTabParam = searchParams.get("tab");
   const rawPanelParam = searchParams.get("panel");
   const rawMatchParam = searchParams.get("match");
+  const rawPollParam = searchParams.get("poll");
   const activeTab = getValidTab(rawTabParam);
   const publicTournaments = useMemo(
     () => getPublicTournamentNavigation(tournaments),
@@ -4868,6 +4914,13 @@ export default function TournamentsExperience({
     .some((match) => match.id === rawMatchParam)
     ? rawMatchParam
     : null;
+  const focusedPollId =
+    activeTab === "decisions" &&
+    (tournamentPollsByTournament?.[selectedTournament.id] ?? []).some(
+      (poll) => poll.id === rawPollParam
+    )
+      ? rawPollParam
+      : null;
   const requestedOverviewPanel = getValidOverviewPanel(rawPanelParam);
   const activeOverviewPanel =
     activeTab === "overview" &&
@@ -4917,6 +4970,12 @@ export default function TournamentsExperience({
         params.delete("panel");
       }
       params.delete("match");
+      if (
+        tab !== "decisions" ||
+        (rawPollParam !== null && focusedPollId === null)
+      ) {
+        params.delete("poll");
+      }
 
       const nextQuery = params.toString();
       const nextPath = nextQuery ? `${pathname}?${nextQuery}` : pathname;
@@ -4932,7 +4991,7 @@ export default function TournamentsExperience({
         }
       }
     },
-    [pathname, router, searchParamString]
+    [focusedPollId, pathname, rawPollParam, router, searchParamString]
   );
 
   const scrollMobileHeroIntoView = useCallback(() => {
@@ -4953,7 +5012,8 @@ export default function TournamentsExperience({
       rawTournamentParam !== null ||
       rawTabParam !== null ||
       rawPanelParam !== null ||
-      rawMatchParam !== null;
+      rawMatchParam !== null ||
+      rawPollParam !== null;
 
     if (!hasTournamentStateParam) {
       return;
@@ -4969,13 +5029,17 @@ export default function TournamentsExperience({
     const invalidMatchParam =
       rawMatchParam !== null &&
       (activeTab !== "brackets" || focusedMatchId === null);
+    const invalidPollParam =
+      rawPollParam !== null &&
+      (activeTab !== "decisions" || focusedPollId === null);
 
     if (
       !missingTournamentParam &&
       !invalidTournamentParam &&
       !invalidTabParam &&
       !invalidPanelParam &&
-      !invalidMatchParam
+      !invalidMatchParam &&
+      !invalidPollParam
     ) {
       return;
     }
@@ -4993,10 +5057,12 @@ export default function TournamentsExperience({
     activeTab,
     rawPanelParam,
     rawMatchParam,
+    rawPollParam,
     rawTabParam,
     rawTournamentParam,
     selectedTournament,
     focusedMatchId,
+    focusedPollId,
     updateTournamentUrl,
     urlTournament,
   ]);
@@ -5131,6 +5197,9 @@ export default function TournamentsExperience({
               matchResultSubmissions={matchResultSubmissions}
               matchResultReportGroups={matchResultReportGroups}
               focusedMatchId={focusedMatchId}
+              tournamentPollsByTournament={tournamentPollsByTournament ?? {}}
+              pollLoadError={pollLoadError}
+              highlightedPollId={focusedPollId}
             />
           </div>
         </div>
@@ -5171,6 +5240,9 @@ export default function TournamentsExperience({
           matchResultSubmissions={matchResultSubmissions}
           matchResultReportGroups={matchResultReportGroups}
           focusedMatchId={focusedMatchId}
+          tournamentPollsByTournament={tournamentPollsByTournament ?? {}}
+          pollLoadError={pollLoadError}
+          highlightedPollId={focusedPollId}
         />
       </div>
 

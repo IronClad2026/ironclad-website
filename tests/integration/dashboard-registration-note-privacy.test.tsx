@@ -7,6 +7,7 @@ const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
 const loadPlayerCareerDashboardMock = vi.hoisted(() => vi.fn());
 const loadPlayerNotificationsMock = vi.hoisted(() => vi.fn());
+const loadCommunityPollsForRequestMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -32,6 +33,10 @@ vi.mock("@/components/InAppNotificationCenter", () => ({
   default: vi.fn(() => null),
 }));
 
+vi.mock("@/components/PollsAndDecisions", () => ({
+  default: vi.fn(() => null),
+}));
+
 vi.mock("@/components/PublicProfileVisibilityCard", () => ({
   default: vi.fn(() => null),
 }));
@@ -42,6 +47,10 @@ vi.mock("@/lib/notifications", () => ({
 
 vi.mock("@/lib/player-dashboard", () => ({
   loadPlayerCareerDashboard: loadPlayerCareerDashboardMock,
+}));
+
+vi.mock("@/lib/player-polls", () => ({
+  loadCommunityPollsForRequest: loadCommunityPollsForRequestMock,
 }));
 
 vi.mock("@/lib/supabase-server", () => ({
@@ -74,6 +83,10 @@ describe("dashboard registration-note privacy", () => {
       notifications: [],
       totalCount: 0,
       unreadCount: 0,
+      error: null,
+    });
+    loadCommunityPollsForRequestMock.mockResolvedValue({
+      polls: [],
       error: null,
     });
   });
