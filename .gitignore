@@ -15,6 +15,12 @@
 /playwright-report
 /test-results
 /.playwright
+/playwright/.auth/
+/playwright/.clerk/
+
+# local feature-clip capture assets
+/artifacts/feature-clips/
+/demo-assets/
 
 # next.js
 /.next/
