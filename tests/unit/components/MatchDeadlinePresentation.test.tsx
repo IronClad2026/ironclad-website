@@ -32,11 +32,23 @@ vi.mock("@/components/PlayerMatchResultForm", () => ({
   default: vi.fn(() => <div>Player result form marker</div>),
 }));
 
+vi.mock("@clerk/nextjs", () => ({
+  useAuth: () => ({
+    getToken: vi.fn(async () => "test-token"),
+    isSignedIn: true,
+  }),
+}));
+
+vi.mock("@/components/MatchDiceRollOff", () => ({
+  default: vi.fn(() => <div>Read-only dice history marker</div>),
+}));
+
 import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import MatchResultControls from "@/components/MatchResultControls";
 import {
   AdminMatchManagementModal,
+  BracketMatchResultsWorkspace,
   MatchDeadlinePresentation,
 } from "@/components/TournamentsExperience";
 
@@ -421,6 +433,41 @@ describe("matchup deadline player and administrator presentation", () => {
     expect(
       screen.getAllByRole("button", { name: "Close match management" })
     ).toHaveLength(2);
+  });
+
+  it("names the dynamic-viewport player workspace and restores its opener focus", () => {
+    render(
+      <BracketMatchResultsWorkspace
+        bracketName="Main / Pro Bracket"
+        bracketFormat="single_elimination"
+        matches={[matchFixture()]}
+        participantsById={participants(participantOne, participantTwo)}
+        viewer={{
+          isAdmin: false,
+          relicVerifiedDivision: null,
+          registrationIds: [participantOne.registrationId],
+          registrations: [],
+        }}
+        matchResultSubmissions={[]}
+        matchResultReportGroups={[]}
+      />
+    );
+
+    const opener = screen.getByRole("button", { name: "Match Results" });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Main / Pro Bracket Match Workspace",
+    });
+    expect(dialog.parentElement).toHaveClass("h-[100dvh]");
+    const dialogCloseButton = screen
+      .getAllByRole("button", { name: "Close match result workspace" })
+      .find((button) => dialog.contains(button));
+    expect(dialogCloseButton).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(opener).toHaveFocus();
   });
 
   it("shows one-time responsive extension and hold controls only for an active match", async () => {

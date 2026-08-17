@@ -18,20 +18,21 @@ describe("terminal tournament read-only presentation", () => {
     expect(source).not.toMatch(/terminalReason|terminatedByClerkUserId/);
   });
 
-  it("suppresses terminal registration and administrator match controls", () => {
+  it("suppresses terminal registration and administrator mutations", () => {
     expect(source).toContain(
       "terminalTournament ? (\n              <TournamentReadOnlyCard />"
     );
-    expect(source).toContain("viewer.isAdmin && !terminalTournament");
+    expect(source).toContain("viewer.isAdmin && selectedAdminMatch");
     expect(source).toContain("readOnly={terminalTournament}");
-    expect(source).toContain("isAdmin={readOnly ? false : viewer.isAdmin}");
-    expect(source).toContain("!readOnly &&");
+    expect(source).toContain("isAdmin={!readOnly && viewer.isAdmin}");
+    expect(source).toContain("!readOnly && deadlineManaged");
+    expect(source).toContain("!readOnly && (");
   });
 
   it("keeps factual result and replay presentation available read-only", () => {
     expect(source).toContain("Tournament Match History");
     expect(source).toContain(
-      "Review factual scores and existing authorized replay access from this historical record."
+      "Review authorized Dice Roll-Off, score, and replay history from this Match record."
     );
     expect(source).toContain("<MatchResultControls");
     expect(source).toContain("submissions={matchResultSubmissions.filter(");

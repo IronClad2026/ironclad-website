@@ -1,0 +1,253 @@
+.commandTable {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgb(249 115 22 / 32%);
+  background:
+    linear-gradient(rgb(249 115 22 / 4%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(249 115 22 / 4%) 1px, transparent 1px),
+    radial-gradient(circle at 72% 18%, rgb(249 115 22 / 12%), transparent 30%),
+    radial-gradient(circle at 18% 80%, rgb(120 113 108 / 10%), transparent 34%),
+    linear-gradient(145deg, #171717 0%, #090909 52%, #12100f 100%);
+  background-size: 34px 34px, 34px 34px, auto, auto, auto;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 5%),
+    inset 0 0 54px rgb(0 0 0 / 68%),
+    0 22px 55px rgb(0 0 0 / 28%);
+}
+
+.commandTable::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  opacity: 0.4;
+  background:
+    linear-gradient(113deg, transparent 13%, rgb(255 255 255 / 3%) 13.2%, transparent 13.5%),
+    linear-gradient(17deg, transparent 68%, rgb(255 255 255 / 2%) 68.2%, transparent 68.5%);
+}
+
+.tray {
+  position: relative;
+  display: grid;
+  min-height: 11rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgb(161 161 170 / 22%);
+  background:
+    radial-gradient(circle at center, rgb(249 115 22 / 7%), transparent 49%),
+    linear-gradient(135deg, rgb(39 39 42 / 62%), rgb(0 0 0 / 78%));
+  box-shadow:
+    inset 0 0 38px rgb(0 0 0 / 72%),
+    inset 0 0 0 1px rgb(255 255 255 / 2%);
+}
+
+.tray::before,
+.tray::after {
+  position: absolute;
+  pointer-events: none;
+  content: "";
+}
+
+.tray::before {
+  inset: 12px;
+  border: 1px dashed rgb(249 115 22 / 15%);
+}
+
+.tray::after {
+  top: 50%;
+  left: 50%;
+  width: 7rem;
+  height: 7rem;
+  border: 1px solid rgb(249 115 22 / 12%);
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+}
+
+.trayImpact {
+  animation: tray-impact 1.4s cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+
+.dicePair {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.4rem, 6vw, 3.75rem);
+}
+
+.dieScene {
+  --dice-size: 3.75rem;
+
+  position: relative;
+  display: inline-block;
+  width: var(--dice-size);
+  height: var(--dice-size);
+}
+
+.dieFlight {
+  position: absolute;
+  inset: 0;
+  display: block;
+  perspective: 700px;
+}
+
+.dieShadow {
+  position: absolute;
+  right: 4%;
+  bottom: -25%;
+  left: 4%;
+  height: 38%;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: rgb(0 0 0 / 58%);
+  filter: blur(8px);
+  transform: translate3d(0, 12px, 0) scaleX(1.05);
+}
+
+.dieMount {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  transform: rotateX(-48deg) rotateY(24deg);
+  transform-style: preserve-3d;
+}
+
+.die {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--dice-final-rotate-x)) rotateY(var(--dice-final-rotate-y)) rotateZ(var(--dice-final-rotate-z));
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 0.54rem;
+  border: 1px solid rgb(251 146 60 / 48%);
+  border-radius: 0.75rem;
+  backface-visibility: hidden;
+  background:
+    linear-gradient(145deg, rgb(82 82 91 / 94%), rgb(24 24 27 / 98%) 53%, rgb(9 9 11 / 100%));
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 13%),
+    inset 0 -4px 9px rgb(0 0 0 / 44%),
+    0 0 7px rgb(249 115 22 / 16%);
+}
+
+.front {
+  transform: translateZ(calc(var(--dice-size) / 2));
+}
+
+.back {
+  transform: rotateY(180deg) translateZ(calc(var(--dice-size) / 2));
+}
+
+.right {
+  transform: rotateY(90deg) translateZ(calc(var(--dice-size) / 2));
+}
+
+.left {
+  transform: rotateY(-90deg) translateZ(calc(var(--dice-size) / 2));
+}
+
+.top {
+  transform: rotateX(90deg) translateZ(calc(var(--dice-size) / 2));
+}
+
+.bottom {
+  transform: rotateX(-90deg) translateZ(calc(var(--dice-size) / 2));
+}
+
+.pip {
+  align-self: center;
+  justify-self: center;
+  width: clamp(0.42rem, 20%, 0.68rem);
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  background: #f5f0df;
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 60%),
+    0 0 4px rgb(255 248 220 / 38%);
+}
+
+.pips1 .pip:nth-child(1) { grid-area: 2 / 2; }
+.pips2 .pip:nth-child(1) { grid-area: 1 / 1; }
+.pips2 .pip:nth-child(2) { grid-area: 3 / 3; }
+.pips3 .pip:nth-child(1) { grid-area: 1 / 1; }
+.pips3 .pip:nth-child(2) { grid-area: 2 / 2; }
+.pips3 .pip:nth-child(3) { grid-area: 3 / 3; }
+.pips4 .pip:nth-child(1) { grid-area: 1 / 1; }
+.pips4 .pip:nth-child(2) { grid-area: 1 / 3; }
+.pips4 .pip:nth-child(3) { grid-area: 3 / 1; }
+.pips4 .pip:nth-child(4) { grid-area: 3 / 3; }
+.pips5 .pip:nth-child(1) { grid-area: 1 / 1; }
+.pips5 .pip:nth-child(2) { grid-area: 1 / 3; }
+.pips5 .pip:nth-child(3) { grid-area: 2 / 2; }
+.pips5 .pip:nth-child(4) { grid-area: 3 / 1; }
+.pips5 .pip:nth-child(5) { grid-area: 3 / 3; }
+.pips6 .pip:nth-child(1) { grid-area: 1 / 1; }
+.pips6 .pip:nth-child(2) { grid-area: 1 / 3; }
+.pips6 .pip:nth-child(3) { grid-area: 2 / 1; }
+.pips6 .pip:nth-child(4) { grid-area: 2 / 3; }
+.pips6 .pip:nth-child(5) { grid-area: 3 / 1; }
+.pips6 .pip:nth-child(6) { grid-area: 3 / 3; }
+
+.dust {
+  position: absolute;
+  z-index: 3;
+  bottom: 27%;
+  left: calc(50% + var(--dust-x));
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: rgb(214 211 209 / 38%);
+  opacity: 0;
+  animation: dust-impact 0.58s ease-out 0.76s both;
+}
+
+@keyframes tray-impact {
+  0%, 52%, 100% { transform: translate3d(0, 0, 0); }
+  58% { transform: translate3d(-2px, 1px, 0); }
+  62% { transform: translate3d(3px, -1px, 0); }
+  66% { transform: translate3d(-1px, 1px, 0); }
+}
+
+@keyframes dust-impact {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.6); }
+  25% { opacity: 0.34; }
+  100% { opacity: 0; transform: translate3d(var(--dust-drift), -24px, 0) scale(1.5); }
+}
+
+@media (min-width: 641px) {
+  .dieScene { --dice-size: 4.5rem; }
+  .tray { min-height: 12.5rem; }
+}
+
+@media (min-width: 1024px) {
+  .dieScene { --dice-size: 5.25rem; }
+  .tray { min-height: 14rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trayImpact,
+  .dust {
+    animation: none;
+  }
+
+  .dieFlight {
+    transition: opacity 0.16s ease, transform 0.16s ease;
+  }
+
+  .die {
+    transition: transform 0.16s ease;
+  }
+}
