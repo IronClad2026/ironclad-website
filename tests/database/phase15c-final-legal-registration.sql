@@ -5,26 +5,16 @@
 -- ironclad-staging. This SQL independently requires four Effective documents
 -- whose immutable URLs use the exact Vercel Preview host family, so the
 -- canonical Production register is rejected.
-
-set client_min_messages = warning;
-set role postgres;
-set request.jwt.claim.role = 'service_role';
-set request.jwt.claims =
-  '{"role":"service_role","sub":"phase15c-contract-admin"}';
-
-create temporary table phase15c_contract_baseline
-on commit preserve rows
-as
-select
-  (select count(*) from public.legal_documents) as legal_document_count,
-  (select count(*) from public.registration_acceptances) as acceptance_count,
-  (select count(*) from public.players) as player_count,
-  (select count(*) from public.tournaments) as tournament_count,
-  (select count(*) from public.tournament_brackets) as bracket_count,
-  (select count(*) from public.registrations) as registration_count;
+-- The wrapper independently compares protected row counts and deterministic
+-- fixture identifiers before and after this transaction-level ROLLBACK.
 
 begin;
 
+set local client_min_messages = warning;
+set local role postgres;
+set local request.jwt.claim.role = 'service_role';
+set local request.jwt.claims =
+  '{"role":"service_role","sub":"phase15c-contract-admin"}';
 set local lock_timeout = '5s';
 set local statement_timeout = '2min';
 set local idle_in_transaction_session_timeout = '1min';
@@ -554,54 +544,6 @@ end;
 $$;
 
 rollback;
-
-do $$
-declare
-  v_baseline pg_temp.phase15c_contract_baseline%rowtype;
-begin
-  select * into strict v_baseline
-  from pg_temp.phase15c_contract_baseline;
-
-  if (select count(*) from public.legal_documents)
-      is distinct from v_baseline.legal_document_count
-    or (select count(*) from public.registration_acceptances)
-      is distinct from v_baseline.acceptance_count
-    or (select count(*) from public.players)
-      is distinct from v_baseline.player_count
-    or (select count(*) from public.tournaments)
-      is distinct from v_baseline.tournament_count
-    or (select count(*) from public.tournament_brackets)
-      is distinct from v_baseline.bracket_count
-    or (select count(*) from public.registrations)
-      is distinct from v_baseline.registration_count then
-    raise exception 'Phase 15C contract changed Staging row counts';
-  end if;
-
-  if exists (
-    select 1
-    from public.players
-    where clerk_user_id like 'phase15c-contract-%'
-      or steam_id64 = '76561198000015001'
-  )
-    or exists (
-      select 1
-      from public.tournaments
-      where slug = 'phase15c-final-registration-contract'
-    )
-    or exists (
-      select 1
-      from public.registrations
-      where clerk_user_id like 'phase15c-contract-%'
-    )
-    or exists (
-      select 1
-      from public.registration_acceptances
-      where clerk_user_id like 'phase15c-contract-%'
-    ) then
-    raise exception 'Phase 15C deterministic fixture residue remains';
-  end if;
-end;
-$$;
 
 select jsonb_build_object(
   'contract', 'phase15c-final-legal-registration',

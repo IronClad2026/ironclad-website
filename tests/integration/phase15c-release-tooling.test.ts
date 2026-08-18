@@ -49,6 +49,9 @@ describe("Phase 15C release-tooling target gates", () => {
     expect(script).toContain(
       '"tests/integration/phase15c-release-tooling.test.ts"'
     );
+    expect(script).toContain(
+      '"tests/database/phase15c-final-legal-registration.sql"'
+    );
     expect(script).toContain('"docs/phase15c-publication-runbook.md"');
   });
 
@@ -95,6 +98,43 @@ describe("Phase 15C release-tooling target gates", () => {
     expect(contract).toContain("when 1 then 'version'");
     expect(contract).toContain("when 2 then 'URL'");
     expect(contract).toContain("when 3 then 'SHA-256'");
+  });
+
+  it("proves rollback residue with independent before-and-after queries", () => {
+    const script = source(
+      "scripts/phase15c/run-staging-registration-contract.mjs"
+    );
+    const contract = source(
+      "tests/database/phase15c-final-legal-registration.sql"
+    );
+
+    expect(script).toContain("buildResidueAuditSql()");
+    expect(script).toContain("baselineResidue");
+    expect(script).toContain("postflightResidue");
+    expect(script).toContain(
+      "assertSameResidueAudit(baselineResidue, postflightResidue)"
+    );
+    expect(script).toContain("FIXTURE_RESIDUE_KEYS");
+    expect(script).toContain("assertRollbackOnlyContract(contractSql)");
+    const executableLines = contract
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith("--"));
+    const transactionStatements = contract
+      .match(
+        /^[ \t]*(?:begin|rollback|commit(?:[ \t]+(?:work|transaction))?)[ \t]*;[ \t]*$/gimu
+      )
+      ?.map((line) => line.trim().toLowerCase());
+    expect(executableLines[0]).toBe("begin;");
+    expect(transactionStatements).toEqual(["begin;", "rollback;"]);
+    expect(contract).toContain("set local role postgres;");
+    expect(contract).toContain("set local request.jwt.claim.role");
+    expect(contract).toContain("set local request.jwt.claims");
+    expect(contract).toMatch(
+      /rollback;\s*select\s+jsonb_build_object\([\s\S]*\)\s+as\s+phase15c_contract_result;\s*$/iu
+    );
+    expect(contract).not.toMatch(/^[ \t]*(?:savepoint|rollback[ \t]+to)\b/imu);
+    expect(contract).not.toContain("pg_temp.phase15c_contract_baseline");
   });
 
   it("hashes protected Preview PDFs through the exact inspected deployment", () => {

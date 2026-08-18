@@ -28,8 +28,25 @@ const STAGING = Object.freeze({
 const REGISTERED_HEAD_TOOLING_PATHS = new Set([
   "docs/phase15c-publication-runbook.md",
   "scripts/phase15c/run-staging-registration-contract.mjs",
+  "tests/database/phase15c-final-legal-registration.sql",
   "tests/integration/phase15c-release-tooling.test.ts",
 ]);
+const RESIDUE_AUDIT_KEYS = Object.freeze([
+  "legal_documents",
+  "registration_acceptances",
+  "players",
+  "tournaments",
+  "tournament_brackets",
+  "registrations",
+  "fixture_players",
+  "fixture_tournaments",
+  "fixture_brackets",
+  "fixture_registrations",
+  "fixture_acceptances",
+]);
+const FIXTURE_RESIDUE_KEYS = Object.freeze(
+  RESIDUE_AUDIT_KEYS.filter((key) => key.startsWith("fixture_"))
+);
 const DOCUMENTS = Object.freeze([
   Object.freeze({
     kind: "rulebook",
@@ -189,12 +206,19 @@ async function main() {
     }
   }
 
+  const baselineResidue = readResidueAudit(
+    runSql(buildResidueAuditSql()),
+    "Staging contract preflight"
+  );
+
   const contractPath = resolve(
     "tests/database/phase15c-final-legal-registration.sql"
   );
   if (!existsSync(contractPath)) {
     throw new Error("Phase 15C Staging contract SQL is missing.");
   }
+  const contractSql = readFileSync(contractPath, "utf8");
+  assertRollbackOnlyContract(contractSql);
   const contract = runSupabase([
     "--output-format",
     "json",
@@ -216,6 +240,12 @@ async function main() {
     throw new Error("Staging contract did not return its zero-residue proof.");
   }
 
+  const postflightResidue = readResidueAudit(
+    runSql(buildResidueAuditSql()),
+    "Staging contract postflight"
+  );
+  assertSameResidueAudit(baselineResidue, postflightResidue);
+
   console.log(
     JSON.stringify(
       {
@@ -231,6 +261,10 @@ async function main() {
           url,
           sha256,
         })),
+        residue: {
+          before: baselineResidue,
+          after: postflightResidue,
+        },
         result: resultRows[0].phase15c_contract_result,
       },
       null,
@@ -251,6 +285,124 @@ select
 from public.legal_documents
 order by document_kind;
 `;
+}
+
+function buildResidueAuditSql() {
+  return `
+select jsonb_build_object(
+  'legal_documents', (select count(*) from public.legal_documents),
+  'registration_acceptances',
+    (select count(*) from public.registration_acceptances),
+  'players', (select count(*) from public.players),
+  'tournaments', (select count(*) from public.tournaments),
+  'tournament_brackets', (select count(*) from public.tournament_brackets),
+  'registrations', (select count(*) from public.registrations),
+  'fixture_players', (
+    select count(*)
+    from public.players
+    where id = '15c00000-0000-4000-8000-000000002001'::uuid
+      or clerk_user_id like 'phase15c-contract-%'
+      or steam_id64 = '76561198000015001'
+  ),
+  'fixture_tournaments', (
+    select count(*)
+    from public.tournaments
+    where id = '15c00000-0000-4000-8000-000000001001'::uuid
+      or slug = 'phase15c-final-registration-contract'
+  ),
+  'fixture_brackets', (
+    select count(*)
+    from public.tournament_brackets
+    where id = '15c00000-0000-4000-8000-000000001101'::uuid
+      or tournament_id = '15c00000-0000-4000-8000-000000001001'::uuid
+  ),
+  'fixture_registrations', (
+    select count(*)
+    from public.registrations
+    where clerk_user_id like 'phase15c-contract-%'
+      or tournament_id = '15c00000-0000-4000-8000-000000001001'::uuid
+  ),
+  'fixture_acceptances', (
+    select count(*)
+    from public.registration_acceptances
+    where clerk_user_id like 'phase15c-contract-%'
+  )
+) as phase15c_residue_audit;
+`;
+}
+
+function readResidueAudit(queryResult, label) {
+  const rows = extractRows(queryResult);
+  const audit = rows.length === 1 ? rows[0].phase15c_residue_audit : null;
+  if (!audit || typeof audit !== "object" || Array.isArray(audit)) {
+    throw new Error(`${label} did not return one residue-audit object.`);
+  }
+
+  for (const key of RESIDUE_AUDIT_KEYS) {
+    if (!Number.isSafeInteger(audit[key]) || audit[key] < 0) {
+      throw new Error(`${label} returned an invalid ${key} count.`);
+    }
+  }
+  for (const key of FIXTURE_RESIDUE_KEYS) {
+    if (audit[key] !== 0) {
+      throw new Error(`${label} found deterministic fixture residue in ${key}.`);
+    }
+  }
+
+  return Object.fromEntries(
+    RESIDUE_AUDIT_KEYS.map((key) => [key, audit[key]])
+  );
+}
+
+function assertSameResidueAudit(baseline, postflight) {
+  const changedKeys = RESIDUE_AUDIT_KEYS.filter(
+    (key) => baseline[key] !== postflight[key]
+  );
+  if (changedKeys.length > 0) {
+    throw new Error(
+      `Staging row counts changed during the rollback contract: ${changedKeys.join(
+        ", "
+      )}.`
+    );
+  }
+}
+
+function assertRollbackOnlyContract(sql) {
+  const executableLines = sql
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("--"));
+  const transactionStatements = Array.from(
+    sql.matchAll(
+      /^[ \t]*(?:begin|rollback|commit(?:[ \t]+(?:work|transaction))?)[ \t]*;[ \t]*$/gimu
+    ),
+    (match) => match[0].trim().toLowerCase()
+  );
+  if (
+    executableLines[0]?.toLowerCase() !== "begin;" ||
+    transactionStatements.length !== 2 ||
+    transactionStatements[0] !== "begin;" ||
+    transactionStatements[1] !== "rollback;" ||
+    /^[ \t]*(?:savepoint|rollback[ \t]+to)\b/imu.test(sql)
+  ) {
+    throw new Error(
+      "Staging contract must contain one leading BEGIN, one terminal ROLLBACK, and no COMMIT or savepoint."
+    );
+  }
+
+  const rollback = /^[ \t]*rollback[ \t]*;[ \t]*$/imu.exec(sql);
+  const tail = rollback
+    ? sql.slice(rollback.index + rollback[0].length)
+    : "";
+  if (
+    !/^\s*select\s+jsonb_build_object\([\s\S]*\)\s+as\s+phase15c_contract_result\s*;\s*$/iu.test(
+      tail
+    )
+  ) {
+    throw new Error(
+      "Staging contract may contain only its result projection after ROLLBACK."
+    );
+  }
 }
 
 function runSql(sql) {
@@ -567,6 +719,6 @@ This rollback-only command is fixed to ironclad-staging
 Effective register rows before exercising registration and proving zero fixture
 residue. The registered head defaults to the expected head. A distinct registered
 head is accepted only when it is an ancestor and the intervening changes are
-limited to this validator, its regression test, and this runbook. It exposes no
-Production target.`);
+limited to this validator, its rollback SQL contract, its regression test, and
+this runbook. It exposes no Production target.`);
 }

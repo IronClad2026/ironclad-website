@@ -71,13 +71,16 @@ it can activate the Staging register. Production rejects every base other than
    rejection of each of the six controls; authoritative version/URL/SHA-256 and
    database-time snapshots; selector and snapshot-tamper rejection; atomic
    registration plus acceptance; blank Discord; acceptance immutability; and
-   zero fixture residue. The wrapper exposes no Production target and the SQL
-    rejects Production canonical document URLs.
+   zero fixture residue. The wrapper must independently compare protected row
+   counts and deterministic fixture identifiers before and after the SQL
+   transaction rolls back. It exposes no Production target and the SQL rejects
+   Production canonical document URLs.
    Normally the registered artifact head and reviewed tooling head are the same.
    If a validator-only repair is required after immutable Staging activation,
    the registered head must be an ancestor of the reviewed tooling head, and the
-   intervening diff must be limited to the validator, its focused test, and this
-   runbook. Any corpus, PDF, web, SQL-contract, or other change fails closed.
+   intervening diff must be limited to the validator, its rollback-only SQL
+   contract, its focused test, and this runbook. Any corpus, PDF, web,
+   application migration, or other change fails closed.
 7. Validate the exact PR head and its preview. Merge only that reviewed head,
    then verify the Production deployment identifies the expected merge/deploy
    commit.
