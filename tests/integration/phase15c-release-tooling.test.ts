@@ -76,4 +76,15 @@ describe("Phase 15C release-tooling target gates", () => {
     expect(contract).toContain("when 2 then 'URL'");
     expect(contract).toContain("when 3 then 'SHA-256'");
   });
+
+  it("hashes protected Preview PDFs through the exact inspected deployment", () => {
+    const script = source("scripts/phase15c/legal-document-register.mjs");
+
+    expect(script).toContain('options.target === "staging"');
+    expect(script).toContain("? runVercelBytes([");
+    expect(script).toContain('"--deployment",');
+    expect(script).toContain("deployment.id");
+    expect(script).toContain('"--fail"');
+    expect(script).toContain('response.headers.get("content-type")');
+  });
 });

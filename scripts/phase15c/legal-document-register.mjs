@@ -215,17 +215,22 @@ async function main() {
   });
 
   for (const document of documents) {
-    const response = await fetch(document.url, {
-      cache: "no-store",
-      headers: { "user-agent": "IronClad-Phase15C-release/1.0" },
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Deployed artifact returned HTTP ${response.status}: ${document.url}`
-      );
-    }
-
-    const deployedBytes = Buffer.from(await response.arrayBuffer());
+    const deployedBytes =
+      options.target === "staging"
+        ? runVercelBytes([
+            "curl",
+            document.pathname,
+            "--deployment",
+            deployment.id,
+            "--yes",
+            "--scope",
+            VERCEL_SCOPE,
+            "--",
+            "--silent",
+            "--show-error",
+            "--fail",
+          ])
+        : await fetchPublicArtifact(document.url);
     const deployedHash = sha256(deployedBytes);
     if (deployedHash !== document.sha256) {
       throw new Error(
@@ -879,6 +884,14 @@ function runVercel(arguments_) {
   ]);
 }
 
+function runVercelBytes(arguments_) {
+  return runNpxBytes([
+    "--yes",
+    `vercel@${VERCEL_CLI_VERSION}`,
+    ...arguments_,
+  ]);
+}
+
 function runNpx(arguments_) {
   if (process.platform !== "win32") {
     return runCommand("npx", arguments_);
@@ -897,6 +910,24 @@ function runNpx(arguments_) {
   return runCommand(process.execPath, [npxCli, ...arguments_]);
 }
 
+function runNpxBytes(arguments_) {
+  if (process.platform !== "win32") {
+    return runCommandBytes("npx", arguments_);
+  }
+
+  const npxCli = join(
+    dirname(process.execPath),
+    "node_modules",
+    "npm",
+    "bin",
+    "npx-cli.js"
+  );
+  if (!existsSync(npxCli)) {
+    throw new Error(`Bundled npm launcher is unavailable: ${npxCli}`);
+  }
+  return runCommandBytes(process.execPath, [npxCli, ...arguments_]);
+}
+
 function runCommand(command, arguments_) {
   const result = spawnSync(command, arguments_, {
     cwd: process.cwd(),
@@ -913,6 +944,44 @@ function runCommand(command, arguments_) {
     throw new Error(`${command} failed: ${detail}`);
   }
   return result.stdout;
+}
+
+function runCommandBytes(command, arguments_) {
+  const result = spawnSync(command, arguments_, {
+    cwd: process.cwd(),
+    encoding: null,
+    maxBuffer: 8 * 1024 * 1024,
+    shell: false,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    const detail = Buffer.from(result.stderr || result.stdout || "unknown error")
+      .toString("utf8")
+      .trim();
+    throw new Error(`${command} failed: ${detail}`);
+  }
+  return Buffer.from(result.stdout);
+}
+
+async function fetchPublicArtifact(url) {
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: { "user-agent": "IronClad-Phase15C-release/1.0" },
+  });
+  if (!response.ok) {
+    throw new Error(`Deployed artifact returned HTTP ${response.status}: ${url}`);
+  }
+  if (response.headers.get("content-type") !== "application/pdf") {
+    throw new Error(
+      `Deployed artifact did not return application/pdf: ${url}`
+    );
+  }
+
+  return Buffer.from(await response.arrayBuffer());
 }
 
 function parseJson(value, label) {
