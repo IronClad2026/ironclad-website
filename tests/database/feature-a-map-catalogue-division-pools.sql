@@ -112,6 +112,13 @@ begin
 end;
 $$;
 
+-- This rollback-only Feature A fixture predates Phase 15A and creates synthetic
+-- registrations to exercise bracket capacity. Its acceptance contract is
+-- covered independently by the Phase 15A database test, so suspend only the
+-- deferred acceptance trigger for this unrelated fixture transaction.
+alter table public.registrations
+  disable trigger registrations_require_acceptance;
+
 do $$
 declare
   v_pool_tournament constant uuid :=
@@ -1397,6 +1404,9 @@ begin
   );
 end;
 $$;
+
+alter table public.registrations
+  enable trigger registrations_require_acceptance;
 
 rollback;
 

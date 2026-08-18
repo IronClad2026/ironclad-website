@@ -45,10 +45,16 @@ type TournamentRegistrationInput = {
   bracketId: string;
   tournamentTitle: string;
   bracketName: string;
+  rulebookDocumentId: string;
+  ppaDocumentId: string;
+  termsDocumentId: string;
+  privacyDocumentId: string;
   rulebookAgreement: boolean;
   playerParticipationAgreement: boolean;
-  adminFinalDecisionAgreement: boolean;
-  ownershipConfirmation: boolean;
+  termsAgreement: boolean;
+  privacyAcknowledgement: boolean;
+  age18Confirmation: boolean;
+  accountAndSteamOwnershipConfirmation: boolean;
   waitlistConfirmed: boolean;
 };
 
@@ -223,6 +229,17 @@ export async function submitTournamentRegistration(
         p_relic_faction: relicResult.faction,
         p_relic_division: relicResult.division,
         p_relic_calculation_version: relicResult.calculationVersion,
+        p_rulebook_document_id: input.rulebookDocumentId,
+        p_ppa_document_id: input.ppaDocumentId,
+        p_terms_document_id: input.termsDocumentId,
+        p_privacy_document_id: input.privacyDocumentId,
+        p_rulebook_accepted: input.rulebookAgreement,
+        p_ppa_accepted: input.playerParticipationAgreement,
+        p_terms_accepted: input.termsAgreement,
+        p_privacy_acknowledged: input.privacyAcknowledgement,
+        p_age_18_confirmed: input.age18Confirmation,
+        p_account_and_steam_ownership_confirmed:
+          input.accountAndSteamOwnershipConfirmation,
         p_waitlist_confirmed: input.waitlistConfirmed,
       }
     );
@@ -463,10 +480,16 @@ function isValidRegistrationInput(
       isUuid(value.bracketId) &&
       isBoundedText(value.tournamentTitle) &&
       isBoundedText(value.bracketName) &&
+      isUuid(value.rulebookDocumentId) &&
+      isUuid(value.ppaDocumentId) &&
+      isUuid(value.termsDocumentId) &&
+      isUuid(value.privacyDocumentId) &&
       value.rulebookAgreement === true &&
       value.playerParticipationAgreement === true &&
-      value.adminFinalDecisionAgreement === true &&
-      value.ownershipConfirmation === true &&
+      value.termsAgreement === true &&
+      value.privacyAcknowledgement === true &&
+      value.age18Confirmation === true &&
+      value.accountAndSteamOwnershipConfirmation === true &&
       typeof value.waitlistConfirmed === "boolean"
   );
 }
@@ -666,6 +689,13 @@ function getRegistrationErrorMessage(error: unknown) {
 
   if (message.includes("verified elo does not match")) {
     return WRONG_DIVISION_MESSAGE;
+  }
+
+  if (
+    message.includes("registration document set is unavailable") ||
+    message.includes("registration consent is invalid")
+  ) {
+    return "Registration is unavailable until the approved governing documents are effective.";
   }
 
   if (

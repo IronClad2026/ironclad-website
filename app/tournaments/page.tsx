@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import TournamentsExperience from "@/components/TournamentsExperience";
+import { loadEffectiveRegistrationDocumentSet } from "@/lib/legal-documents";
 import { loadTournamentPollsForRequest } from "@/lib/player-polls";
 import { loadMatchResultData } from "@/lib/match-result-data";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -69,6 +70,7 @@ export default async function TournamentsPage({
     registrationResult,
     generatedBracketResult,
     viewerDivisionResult,
+    registrationDocuments,
   ] = await Promise.all([
     supabase
       .from("tournaments")
@@ -88,6 +90,7 @@ export default async function TournamentsPage({
       includeAdminAudit: isAdmin,
     }),
     viewerDivisionRequest,
+    loadEffectiveRegistrationDocumentSet(supabase),
   ]);
 
   if (viewerDivisionResult.error) {
@@ -444,6 +447,7 @@ export default async function TournamentsPage({
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
       }}
+      registrationDocuments={registrationDocuments}
       matchResultSubmissions={matchResultData.submissions.filter((submission) =>
         includedMatchIds.has(submission.matchId)
       )}

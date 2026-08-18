@@ -58,6 +58,32 @@ import {
 } from "@/components/TournamentsExperience";
 
 const TOURNAMENT_ID = "11111111-1111-4111-8111-111111111111";
+const registrationDocuments = {
+  rulebook: {
+    id: "77777777-7777-4777-8777-777777777771",
+    kind: "rulebook" as const,
+    version: "fixture-rulebook-v1",
+    url: "https://example.test/legal/rulebook/fixture-v1",
+  },
+  ppa: {
+    id: "77777777-7777-4777-8777-777777777772",
+    kind: "ppa" as const,
+    version: "fixture-ppa-v1",
+    url: "https://example.test/legal/ppa/fixture-v1",
+  },
+  terms: {
+    id: "77777777-7777-4777-8777-777777777773",
+    kind: "terms" as const,
+    version: "fixture-terms-v1",
+    url: "https://example.test/legal/terms/fixture-v1",
+  },
+  privacy: {
+    id: "77777777-7777-4777-8777-777777777774",
+    kind: "privacy" as const,
+    version: "fixture-privacy-v1",
+    url: "https://example.test/legal/privacy/fixture-v1",
+  },
+};
 
 const profile = {
   display_name: "Safe Player",
@@ -174,6 +200,7 @@ function renderModal(
       tournaments={[selectedTournament]}
       initialTournamentId={selectedTournament.id}
       verifiedDivision={verifiedDivision}
+      registrationDocuments={registrationDocuments}
       onClose={vi.fn()}
     />
   );
@@ -188,13 +215,8 @@ function getBracketButton(name: string) {
 function advanceToAgreements() {
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  for (const agreement of [
-    "Rulebook Agreement",
-    "Player Participation Agreement",
-    "Admin Final Decision Agreement",
-    "Ownership Confirmation",
-  ]) {
-    fireEvent.click(screen.getByRole("checkbox", { name: agreement }));
+  for (const agreement of screen.getAllByRole("checkbox")) {
+    fireEvent.click(agreement);
   }
 }
 
@@ -210,6 +232,45 @@ describe("Relic verified-division registration UI", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("presents six explicit controls with exact versioned document links", () => {
+    renderModal("Challenge");
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(6);
+    expect(
+      screen.getByRole("link", {
+        name: "Player Participation Agreement (version fixture-ppa-v1)",
+      })
+    ).toHaveAttribute("href", registrationDocuments.ppa.url);
+    expect(
+      screen.getByRole("link", {
+        name: "Official Tournament Rulebook (version fixture-rulebook-v1)",
+      })
+    ).toHaveAttribute("href", registrationDocuments.rulebook.url);
+    expect(
+      screen.getByRole("link", {
+        name: "Terms of Service (version fixture-terms-v1)",
+      })
+    ).toHaveAttribute("href", registrationDocuments.terms.url);
+    expect(
+      screen.getByRole("link", {
+        name: "Privacy Policy (version fixture-privacy-v1)",
+      })
+    ).toHaveAttribute("href", registrationDocuments.privacy.url);
+    expect(
+      screen.getByRole("checkbox", {
+        name: "I confirm that I am at least 18 years old.",
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", {
+        name: /linked Steam account belongs to me/i,
+      })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Admin Final Decision/i)).not.toBeInTheDocument();
   });
 
   it("derives waitlist intake from the viewer's verified division", () => {

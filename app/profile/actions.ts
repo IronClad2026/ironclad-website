@@ -17,7 +17,7 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 type ValidatedProfile = {
   display_name: string;
   in_game_name: string;
-  discord_username: string;
+  discord_username: string | null;
   country: string;
   region: string;
   timezone: string;
@@ -140,6 +140,9 @@ export async function savePlayerProfile(
       id: playerId,
       clerk_user_id: userId,
       ...validation.data,
+      ...(validation.data.discord_username
+        ? {}
+        : { discord_public_enabled: false }),
       ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
     },
     {
@@ -158,6 +161,9 @@ export async function savePlayerProfile(
   }
 
   revalidatePath("/profile");
+  revalidatePath("/dashboard");
+  revalidatePath("/players");
+  revalidatePath(`/players/${playerId}`);
   revalidatePath("/");
 
   return {
@@ -314,7 +320,7 @@ function validateProfile(formData: FormData): {
 
   requireText(errors, "displayName", values.displayName, "Display name", 80);
   requireText(errors, "inGameName", values.inGameName, "In-game name", 80);
-  requireText(
+  validateOptionalText(
     errors,
     "discordUsername",
     values.discordUsername,
@@ -337,7 +343,7 @@ function validateProfile(formData: FormData): {
     data: {
       display_name: values.displayName,
       in_game_name: values.inGameName,
-      discord_username: values.discordUsername,
+      discord_username: values.discordUsername || null,
       country: values.country,
       region: values.region,
       timezone: values.timezone,
@@ -361,6 +367,18 @@ function requireText(
   if (!value) {
     errors[field] = `${label} is required.`;
   } else if (value.length > maxLength) {
+    errors[field] = `${label} must be ${maxLength} characters or fewer.`;
+  }
+}
+
+function validateOptionalText(
+  errors: Partial<Record<ProfileField, string>>,
+  field: ProfileField,
+  value: string,
+  label: string,
+  maxLength: number
+) {
+  if (value.length > maxLength) {
     errors[field] = `${label} must be ${maxLength} characters or fewer.`;
   }
 }

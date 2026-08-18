@@ -130,7 +130,9 @@ describe("profile save validation and Steam identity regression", () => {
     expect(profileUpdate).toMatchObject({
       clerk_user_id: playerIdentity.userId,
       id: "player-existing",
+      discord_username: "test-discord",
     });
+    expect(profileUpdate).not.toHaveProperty("discord_public_enabled");
     for (const protectedField of [
       "steam_username",
       "profile_completed",
@@ -149,6 +151,59 @@ describe("profile save validation and Steam identity regression", () => {
     expect(fixture.select).toHaveBeenCalledWith("id");
     expect(options).toEqual({ onConflict: "clerk_user_id" });
     expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
+  });
+
+  it("allows Discord to be cleared and neutralizes public visibility", async () => {
+    const fixture = createProfileClient();
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
+    const formData = createValidProfileForm();
+    formData.set("discordUsername", "   ");
+
+    await expect(
+      savePlayerProfile(
+        {
+          status: "idle",
+          message: "",
+          errors: {},
+        },
+        formData
+      )
+    ).resolves.toMatchObject({ status: "success" });
+
+    expect(fixture.upsert).toHaveBeenCalledOnce();
+    expect(fixture.upsert.mock.calls[0][0]).toMatchObject({
+      discord_username: null,
+      discord_public_enabled: false,
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/players");
+    expect(revalidatePathMock).toHaveBeenCalledWith(
+      "/players/player-existing"
+    );
+  });
+
+  it("still validates the maximum length of a supplied Discord username", async () => {
+    const formData = createValidProfileForm();
+    formData.set("discordUsername", "d".repeat(101));
+
+    await expect(
+      savePlayerProfile(
+        {
+          status: "idle",
+          message: "",
+          errors: {},
+        },
+        formData
+      )
+    ).resolves.toEqual({
+      status: "error",
+      message: "Review the highlighted profile fields.",
+      errors: {
+        discordUsername: "Discord username must be 100 characters or fewer.",
+      },
+    });
+
+    expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
   });
 
   it("accepts an avatar exactly at the 4 MiB application boundary", async () => {

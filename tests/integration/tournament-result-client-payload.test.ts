@@ -264,6 +264,42 @@ const clientPropsShape = {
     matchResultReportGroups: { array: reportGroupShape },
     tournamentPollsByTournament: "value",
     pollLoadError: "value",
+    registrationDocuments: {
+      object: {
+        rulebook: {
+          object: {
+            id: "value",
+            kind: "value",
+            version: "value",
+            url: "value",
+          },
+        },
+        ppa: {
+          object: {
+            id: "value",
+            kind: "value",
+            version: "value",
+            url: "value",
+          },
+        },
+        terms: {
+          object: {
+            id: "value",
+            kind: "value",
+            version: "value",
+            url: "value",
+          },
+        },
+        privacy: {
+          object: {
+            id: "value",
+            kind: "value",
+            version: "value",
+            url: "value",
+          },
+        },
+      },
+    },
     eloVerificationEnabled: "value",
   },
 } satisfies ExactShape;
@@ -443,6 +479,23 @@ function createPageClient(
     registrations: { data: registrations, error: null },
     players: { data: players, error: null },
     tournament_bracket_map_pool_entries: { data: [], error: null },
+    legal_documents: {
+      data: [
+        ["rulebook", "11111111-1111-4111-8111-111111111111"],
+        ["ppa", "22222222-2222-4222-8222-222222222222"],
+        ["terms", "33333333-3333-4333-8333-333333333333"],
+        ["privacy", "44444444-4444-4444-8444-444444444444"],
+      ].map(([document_kind, id]) => ({
+        id,
+        document_kind,
+        version: `fixture-${document_kind}-v1`,
+        immutable_url: `https://ironclad.test/legal/${document_kind}/fixture-v1`,
+        status: "effective",
+        effective_at: "2026-08-01T00:00:00.000Z",
+        sha256: "a".repeat(64),
+      })),
+      error: null,
+    },
   };
   const viewerDivisionQuery = createQuery({
     data: { relic_verified_division: verifiedDivision },

@@ -35,8 +35,9 @@ export default function AdminEloVerificationSupportLinkForm({
             ELO Verification Support Link
           </h3>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
-            This Discord link appears when an enabled ELO check blocks a
-            registration.
+            This legacy Discord support link is optional. Launch registration
+            uses Steam + Relic verification, and Players can request IronClad
+            Admin Assistance without Discord.
           </p>
         </div>
 

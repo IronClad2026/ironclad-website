@@ -260,11 +260,12 @@ export default function PlayerProfileForm({
             required
           />
           <ProfileInput
-            label="Discord Username"
+            label="Discord Username (optional)"
             name="discordUsername"
             defaultValue={profile?.discord_username}
             error={state.errors.discordUsername}
-            required
+            description="Discord is optional but strongly recommended for coordination. Public visibility is controlled separately from your dashboard."
+            maxLength={100}
           />
           <div>
             <span className="text-sm font-bold text-white">

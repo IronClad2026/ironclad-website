@@ -25,7 +25,6 @@ export type PlayerProfileCompletionData = Pick<
   | "avatar_url"
   | "display_name"
   | "in_game_name"
-  | "discord_username"
   | "country"
   | "region"
   | "timezone"
@@ -43,7 +42,6 @@ export function isPlayerProfileComplete(
   return Boolean(
     hasText(profile.avatar_url) &&
       (hasText(profile.display_name) || hasText(profile.in_game_name)) &&
-      hasText(profile.discord_username) &&
       hasText(profile.steam_id64) &&
       hasText(profile.country) &&
       hasText(profile.region) &&

@@ -97,6 +97,10 @@ export async function getPublicPlayerById(
 function mapPublicPlayerProfile(
   row: PublicPlayerProfileRow
 ): PublicPlayerProfile {
+  const discordUsername = row.discord_username?.trim() || null;
+  const discordPublicEnabled =
+    row.discord_public_enabled && discordUsername !== null;
+
   return {
     id: row.id,
     displayName: row.display_name,
@@ -105,8 +109,8 @@ function mapPublicPlayerProfile(
     region: row.region,
     currentElo: row.current_elo,
     publicProfileEnabled: row.public_profile_enabled,
-    discordPublicEnabled: row.discord_public_enabled,
-    discordUsername: row.discord_public_enabled ? row.discord_username : null,
+    discordPublicEnabled,
+    discordUsername: discordPublicEnabled ? discordUsername : null,
     hasAvatar: row.has_avatar,
     avatarUrl: row.has_avatar ? `/players/${row.id}/avatar` : null,
     createdAt: row.created_at,

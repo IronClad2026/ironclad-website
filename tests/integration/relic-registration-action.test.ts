@@ -43,6 +43,10 @@ const OLDER_REGISTRATION_ID = "44444444-4444-4444-8444-444444444444";
 const STEAM_ID64 = "76561198000000000";
 const CALCULATION_VERSION = "relic-highest-1v1-v1";
 const NOW = "2026-08-04T02:00:00.000Z";
+const RULEBOOK_DOCUMENT_ID = "77777777-7777-4777-8777-777777777771";
+const PPA_DOCUMENT_ID = "77777777-7777-4777-8777-777777777772";
+const TERMS_DOCUMENT_ID = "77777777-7777-4777-8777-777777777773";
+const PRIVACY_DOCUMENT_ID = "77777777-7777-4777-8777-777777777774";
 
 type QueryResult = { data: unknown; error: unknown };
 type QueryRecord = {
@@ -216,10 +220,16 @@ function registrationInput(overrides: Record<string, unknown> = {}) {
     bracketId: BRACKET_ID,
     tournamentTitle: "Untrusted tournament title",
     bracketName: "Untrusted bracket name",
+    rulebookDocumentId: RULEBOOK_DOCUMENT_ID,
+    ppaDocumentId: PPA_DOCUMENT_ID,
+    termsDocumentId: TERMS_DOCUMENT_ID,
+    privacyDocumentId: PRIVACY_DOCUMENT_ID,
     rulebookAgreement: true,
     playerParticipationAgreement: true,
-    adminFinalDecisionAgreement: true,
-    ownershipConfirmation: true,
+    termsAgreement: true,
+    privacyAcknowledgement: true,
+    age18Confirmation: true,
+    accountAndSteamOwnershipConfirmation: true,
     waitlistConfirmed: false,
     ...overrides,
   };
@@ -288,9 +298,16 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
   });
 
-  it("rejects malformed input and missing agreements before loading private data", async () => {
+  it.each([
+    "rulebookAgreement",
+    "playerParticipationAgreement",
+    "termsAgreement",
+    "privacyAcknowledgement",
+    "age18Confirmation",
+    "accountAndSteamOwnershipConfirmation",
+  ])("rejects a missing %s control before loading private data", async (field) => {
     const result = await submitTournamentRegistration(
-      registrationInput({ rulebookAgreement: false })
+      registrationInput({ [field]: false })
     );
 
     expect(result).toEqual({
@@ -299,6 +316,26 @@ describe("Relic-authoritative tournament registration action", () => {
     });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
+  });
+
+  it("never forwards browser-supplied document versions, URLs, or hashes", async () => {
+    const client = createRegistrationClient();
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+    const result = await submitTournamentRegistration(
+      registrationInput({
+        rulebookVersion: "tampered-version",
+        termsUrl: "https://attacker.invalid/terms",
+        privacySha256: "0".repeat(64),
+      })
+    );
+
+    expect(result.success).toBe(true);
+    const rpcArguments = client.rpc.mock.calls[0][1];
+    expect(rpcArguments).not.toHaveProperty("rulebookVersion");
+    expect(rpcArguments).not.toHaveProperty("termsUrl");
+    expect(rpcArguments).not.toHaveProperty("privacySha256");
+    expect(Object.keys(rpcArguments).some((key) => /version|url|sha256/i.test(key) && key !== "p_relic_calculation_version")).toBe(false);
   });
 
   it("requires a canonical completed player profile", async () => {
@@ -519,6 +556,16 @@ describe("Relic-authoritative tournament registration action", () => {
           p_relic_faction: faction,
           p_relic_division: division,
           p_relic_calculation_version: CALCULATION_VERSION,
+          p_rulebook_document_id: RULEBOOK_DOCUMENT_ID,
+          p_ppa_document_id: PPA_DOCUMENT_ID,
+          p_terms_document_id: TERMS_DOCUMENT_ID,
+          p_privacy_document_id: PRIVACY_DOCUMENT_ID,
+          p_rulebook_accepted: true,
+          p_ppa_accepted: true,
+          p_terms_accepted: true,
+          p_privacy_acknowledged: true,
+          p_age_18_confirmed: true,
+          p_account_and_steam_ownership_confirmed: true,
           p_waitlist_confirmed: false,
         }
       );

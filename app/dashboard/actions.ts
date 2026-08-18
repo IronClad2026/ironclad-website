@@ -296,8 +296,70 @@ export async function updateDiscordPublicEnabled(
     };
   }
 
-  const nextEnabled = Boolean(enabled);
+  if (typeof enabled !== "boolean") {
+    return {
+      status: "error",
+      message: "Choose whether Discord contact should be public.",
+      enabled: false,
+    };
+  }
+
+  const nextEnabled = enabled;
   const supabase = await createAuthenticatedSupabaseClient();
+  const { data: profile, error: profileError } = await supabase
+    .from("players")
+    .select("id, discord_username, discord_public_enabled")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error(
+      "Discord contact visibility profile lookup failed:",
+      profileError
+    );
+    return {
+      status: "error",
+      message: "Discord contact visibility could not be updated.",
+      enabled: !nextEnabled,
+    };
+  }
+
+  if (!profile) {
+    return {
+      status: "error",
+      message: "Complete your player profile before changing this setting.",
+      enabled: false,
+    };
+  }
+
+  const hasDiscordUsername = Boolean(
+    typeof profile.discord_username === "string" &&
+      profile.discord_username.trim()
+  );
+
+  if (nextEnabled && !hasDiscordUsername) {
+    const { error: disableError } = await supabase
+      .from("players")
+      .update({ discord_public_enabled: false })
+      .eq("clerk_user_id", userId);
+
+    if (disableError) {
+      console.error(
+        "Discord contact visibility neutralization failed:",
+        disableError
+      );
+    }
+
+    revalidateDiscordVisibilityPaths(profile.id as string);
+
+    return {
+      status: "error",
+      message:
+        "Add an optional Discord username to your profile before making it public.",
+      enabled: false,
+    };
+  }
+
   const { data, error } = await supabase
     .from("players")
     .update({ discord_public_enabled: nextEnabled })
@@ -317,14 +379,12 @@ export async function updateDiscordPublicEnabled(
   if (!data) {
     return {
       status: "error",
-      message: "Complete your player profile before changing this setting.",
-      enabled: false,
+      message: "Discord contact visibility could not be updated.",
+      enabled: Boolean(profile.discord_public_enabled),
     };
   }
 
-  revalidatePath("/dashboard");
-  revalidatePath("/players");
-  revalidatePath(`/players/${data.id as string}`);
+  revalidateDiscordVisibilityPaths(data.id as string);
 
   return {
     status: "success",
@@ -333,6 +393,12 @@ export async function updateDiscordPublicEnabled(
       : "Discord contact is hidden from your public profile.",
     enabled: Boolean(data.discord_public_enabled),
   };
+}
+
+function revalidateDiscordVisibilityPaths(playerId: string) {
+  revalidatePath("/dashboard");
+  revalidatePath("/players");
+  revalidatePath(`/players/${playerId}`);
 }
 
 async function loadViewerMatchIds(

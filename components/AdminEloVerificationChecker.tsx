@@ -31,7 +31,7 @@ export default function AdminEloVerificationChecker({
           <div>
             <Search className="h-8 w-8 text-orange-400" />
             <h3 className="mt-4 text-xl font-bold">
-              ELO Verification Checker
+              Legacy ELO Verification Flag
             </h3>
           </div>
 
@@ -48,8 +48,8 @@ export default function AdminEloVerificationChecker({
 
         <p className="mt-3 text-sm leading-6 text-zinc-400">
           {enabled
-            ? "Players must provide a COH3 Stats profile URL. The system will verify the highest ELO across factions for the tournament mode."
-            : "Fake/test ELO profiles are allowed. Registrations work normally and no COH3 Stats check is required."}
+            ? "This legacy administrative flag is enabled. Launch registration still requires the Player's linked Steam account and a fresh Relic API ELO verification."
+            : "This legacy administrative flag is disabled. Launch registration still requires the Player's linked Steam account and a fresh Relic API ELO verification."}
         </p>
 
         <form
