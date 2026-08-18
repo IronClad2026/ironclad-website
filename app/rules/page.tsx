@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useRef,
   useState,
@@ -12,6 +13,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
+  Download,
   FileCheck2,
   Gavel,
   Radio,
@@ -23,6 +25,11 @@ import {
 } from "lucide-react";
 
 import { fadeUp } from "@/lib/animations";
+import {
+  legalCorpus,
+  resolveEffectiveDateToken,
+  type LegalDocumentKind,
+} from "@/lib/legal-corpus-publication";
 
 type TabName = "1V1 RULES" | "RANKINGS & SEASONS" | "PPA & CONDUCT";
 
@@ -83,8 +90,8 @@ const operationsBriefing: {
   {
     icon: ShieldCheck,
     label: "Document Status",
-    title: "Review drafts are not effective",
-    text: "No governing document is Effective yet. Registration remains closed until approved versions are published.",
+    title: "Approved governing corpus",
+    text: `The Rulebook, PPA, Terms and Privacy Policy are Effective from ${legalCorpus.effectiveDateDisplay}. Registration uses their exact versioned records.`,
   },
   {
     icon: Radio,
@@ -208,52 +215,39 @@ const ruleSections: Record<TabName, [string, string][]> = {
     ],
     [
       "Versioned Acceptance",
-      "Registration records the exact accepted Rulebook, PPA, and Terms versions; the acknowledged Privacy Policy version; authenticated identity; server acceptance time; the 18+ declaration; and own-account confirmations. Registration remains closed while every governing document is still Review Draft / Not Effective.",
+      "Registration records the exact accepted Rulebook, PPA, and Terms versions; the acknowledged Privacy Policy version; authenticated identity; server acceptance time; the 18+ declaration; and own-account confirmations. Registration is available only while one complete approved document set is Effective.",
     ],
   ],
 };
 
-const documentStatuses: {
-  icon: LucideIcon;
-  title: string;
-  version: string;
-  status: string;
-  text: string;
-}[] = [
-  {
-    icon: ScrollText,
-    title: "Official Tournament Rulebook",
-    version: "Version 3.0",
-    status: "Revised Review Draft - Not Effective",
-    text: "Revised governing text is pending final legal review and publication approval. No current download is presented as Effective.",
-  },
-  {
-    icon: Gavel,
-    title: "Player Participation Agreement",
-    version: "Version 3.0",
-    status: "Revised Review Draft - Not Effective",
-    text: "Revised participation terms are pending final legal review and publication approval. No current download is presented as Effective.",
-  },
-  {
-    icon: FileCheck2,
-    title: "Terms of Service",
-    version: "Version 1.0",
-    status: "Review Draft - Not Effective",
-    text: "Final Terms are a later legal-publication item. No route or document is linked before approval.",
-  },
-  {
-    icon: Shield,
-    title: "Privacy Policy",
-    version: "Version 1.0",
-    status: "Review Draft - Not Effective",
-    text: "The final Privacy Policy is a later legal-publication item. No route or document is linked before approval.",
-  },
-];
+const documentIcons: Record<LegalDocumentKind, LucideIcon> = {
+  rulebook: ScrollText,
+  ppa: Gavel,
+  terms: FileCheck2,
+  privacy: Shield,
+};
+
+const documentStatuses = legalCorpus.documents.map((document) => ({
+  icon: documentIcons[document.kind],
+  kind: document.kind,
+  title: document.shortTitle,
+  version: `Version ${document.version}`,
+  status: document.status,
+  text: resolveEffectiveDateToken(document.subtitle),
+  href: document.publicPath,
+  filename: document.filename,
+  readHref:
+    document.kind === "terms"
+      ? "/terms"
+      : document.kind === "privacy"
+        ? "/privacy"
+        : document.publicPath,
+}));
 
 const faqs: [string, string][] = [
   [
     "How do I register?",
-    "Registration is free and native to IronClad. Sign in, complete the required profile fields, link your own Steam account, complete fresh Relic 1v1 verification, choose the eligible open Division, confirm that you are 18 or older and using your own accounts, and accept the exact governing-document versions shown. Registration remains closed until approved versions become Effective.",
+    "Registration is free and native to IronClad. Sign in, complete the required profile fields, link your own Steam account, complete fresh Relic 1v1 verification, choose the eligible open Division, confirm that you are 18 or older and using your own accounts, and accept the exact Effective governing-document versions shown.",
   ],
   [
     "How is my Division determined?",
@@ -399,10 +393,10 @@ function HeroSection({ reduceMotion }: { reduceMotion: boolean }) {
           </p>
 
           <div
-            className="mt-9 w-fit border border-amber-300/35 bg-amber-300/10 px-4 py-3 text-sm font-black uppercase tracking-wide text-amber-100"
+            className="mt-9 w-fit border border-emerald-300/35 bg-emerald-300/10 px-4 py-3 text-sm font-black uppercase tracking-wide text-emerald-100"
             role="status"
           >
-            Revised Review Draft - Not Effective
+            Effective · {legalCorpus.effectiveDateDisplay}
           </div>
         </motion.div>
 
@@ -422,11 +416,11 @@ function HeroSection({ reduceMotion }: { reduceMotion: boolean }) {
             <div className="absolute right-7 bottom-7 left-7">
               <div className="mb-5 h-1 w-24 bg-orange-400" />
               <p className="text-4xl font-black leading-none">
-                REVIEW DRAFTS
+                GOVERNING CORPUS
               </p>
               <p className="mt-4 text-sm leading-6 text-zinc-300">
-                The governing documents are not yet Effective. Registration
-                remains closed until approved versions are published.
+                Four approved, versioned documents are Effective from
+                {` ${legalCorpus.effectiveDateDisplay}`}.
               </p>
             </div>
           </div>
@@ -815,11 +809,11 @@ function OfficialDocumentsSection({ reduceMotion }: { reduceMotion: boolean }) {
           <SectionHeading
             eyebrow="Official Documents"
             title="Governing-document status."
-            text="The approved final versions will become the governing source of truth. Today, every document remains a Review Draft and is not Effective."
+            text={`The approved final versions are the governing source of truth from ${legalCorpus.effectiveDateDisplay}.`}
           />
           <p className="max-w-sm border-l border-orange-400/40 pl-4 text-sm leading-6 text-zinc-400">
-            Final artifacts, routes, and downloads will appear only after legal
-            and publication approval.
+            Download the immutable versioned PDFs used by Tournament
+            registration.
           </p>
         </div>
 
@@ -845,8 +839,8 @@ function OfficialDocumentsSection({ reduceMotion }: { reduceMotion: boolean }) {
                   <span className="grid h-12 w-12 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
                     <Icon size={23} aria-hidden="true" />
                   </span>
-                  <span className="border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 text-xs font-black uppercase text-amber-100">
-                    Not Effective
+                  <span className="border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1 text-xs font-black uppercase text-emerald-100">
+                    {document.status}
                   </span>
                 </div>
 
@@ -856,12 +850,40 @@ function OfficialDocumentsSection({ reduceMotion }: { reduceMotion: boolean }) {
                 <p className="mt-2 text-xs font-black uppercase tracking-wide text-orange-300">
                   {document.version}
                 </p>
-                <p className="mt-3 text-sm font-black uppercase leading-6 text-amber-100">
-                  {document.status}
-                </p>
                 <p className="mt-4 flex-1 text-sm leading-7 text-zinc-400">
                   {document.text}
                 </p>
+                <p className="mt-4 text-xs font-black uppercase tracking-wide text-zinc-500">
+                  Effective {legalCorpus.effectiveDateDisplay}
+                </p>
+                <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                  {document.kind === "terms" || document.kind === "privacy" ? (
+                    <Link
+                      className="inline-flex min-h-11 items-center justify-center border border-white/20 bg-white/[0.04] px-4 py-2 text-sm font-black text-white transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+                      href={document.readHref}
+                    >
+                      Read Online
+                    </Link>
+                  ) : (
+                    <a
+                      className="inline-flex min-h-11 items-center justify-center border border-white/20 bg-white/[0.04] px-4 py-2 text-sm font-black text-white transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+                      href={document.readHref}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      Read
+                      <span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                  )}
+                  <a
+                    className="inline-flex min-h-11 items-center justify-center gap-2 border border-orange-400/70 bg-orange-500/10 px-4 py-2 text-sm font-black text-orange-200 transition hover:border-orange-300 hover:bg-orange-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+                    download={document.filename}
+                    href={document.href}
+                  >
+                    Download PDF
+                    <Download aria-hidden="true" size={17} />
+                  </a>
+                </div>
               </motion.article>
             );
           })}
@@ -1000,7 +1022,7 @@ function DisclaimerSection({ reduceMotion }: { reduceMotion: boolean }) {
             </span>
             <div>
               <p className="text-xs font-black uppercase text-amber-200">
-                Review Draft Status
+                Governing Status
               </p>
               <h2 className="mt-2 text-3xl font-black text-white">
                 Plain-language guide
@@ -1012,9 +1034,9 @@ function DisclaimerSection({ reduceMotion }: { reduceMotion: boolean }) {
                 within their stated scope.
               </p>
               <p className="mt-4 max-w-3xl text-sm font-bold leading-7 text-amber-100 sm:text-base sm:leading-8">
-                Every governing document is currently Review Draft / Not
-                Effective. Registration remains closed until approved versions
-                are published.
+                The Rulebook, PPA, Terms and Privacy Policy are Effective from
+                {` ${legalCorpus.effectiveDateDisplay}`}. Registration records
+                the exact version presented for each document.
               </p>
             </div>
           </div>

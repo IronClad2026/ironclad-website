@@ -75,6 +75,8 @@ export async function loadEffectiveRegistrationDocumentSet(
       kind: row.document_kind,
       version: row.version,
       url: row.immutable_url,
+      effectiveDate: row.effective_at,
+      sha256: row.sha256,
     });
   }
 

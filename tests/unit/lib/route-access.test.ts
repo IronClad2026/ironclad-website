@@ -13,6 +13,9 @@ describe("public route access", () => {
     "/tournaments",
     "/tournaments/summer-cup",
     "/rules",
+    "/terms",
+    "/privacy",
+    "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.0.pdf",
     "/rankings",
     "/about",
     "/players",
@@ -36,6 +39,9 @@ describe("public route access", () => {
     "/aboutness",
     "/tournaments-admin",
     "/rankings-private",
+    "/terms-private",
+    "/privacy-private",
+    "/documents-rules-ppa-private/ironclad-privacy-policy-v1.0.pdf",
   ])("keeps the pathname %s protected", (pathname) => {
     expect(isPublicPathname(pathname)).toBe(false);
   });

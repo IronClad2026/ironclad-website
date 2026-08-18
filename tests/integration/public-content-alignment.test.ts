@@ -33,22 +33,22 @@ describe("Phase 15B public competition content", () => {
     ).toBe(false);
   });
 
-  it("exposes only the approved Rules categories, draft statuses, and FAQs", () => {
+  it("exposes only the approved Rules categories, Effective documents, and FAQs", () => {
     const rules = source("app/rules/page.tsx");
 
     expect(rules).toContain(
       'type TabName = "1V1 RULES" | "RANKINGS & SEASONS" | "PPA & CONDUCT";'
     );
-    expect(rules).toContain("Revised Review Draft - Not Effective");
-    expect(rules).toContain("Review Draft - Not Effective");
+    expect(rules).toContain("Approved governing corpus");
+    expect(rules).toContain("Download PDF");
+    expect(rules).toContain("Read Online");
+    expect(rules).not.toMatch(/Review Draft|Not Effective/);
     expect(rules).toContain("Screenshots are not accepted as substitute Match-result proof");
     expect(rules).toMatch(/individual ballot attribution is private/i);
     expect(rules).toContain("anonymous public totals exist only when explicitly enabled");
     expect(rules).toContain("How do Dice, Side and Map choices work?");
     expect(rules).toContain("Does every Tournament have prizes?");
-    expect(rules).not.toMatch(
-      /4V4 RULES|Main \/ Elite|PDF_|documents-rules-ppa|Download PDF/
-    );
+    expect(rules).not.toMatch(/4V4 RULES|Main \/ Elite|PDF_/);
   });
 
   it("uses neutral About and Rankings language while preserving true ties", () => {
