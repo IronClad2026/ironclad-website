@@ -219,8 +219,8 @@ declare
   v_previous_maintenance text;
 begin
   perform pg_temp.phase15a_assert(
-    session_user = 'postgres',
-    'the maintenance contract requires a postgres session owner'
+    current_user = 'postgres',
+    'the database contract must SET ROLE postgres'
   );
   perform pg_temp.phase15a_assert(
     pg_catalog.pg_try_advisory_xact_lock(
@@ -918,34 +918,46 @@ begin
     'retained evidence must remain immutable after closure and hard deletion'
   );
 
-  v_previous_maintenance := current_setting(
-    'ironclad.legal_evidence_maintenance',
-    true
-  );
-  perform set_config(
-    'ironclad.legal_evidence_maintenance',
-    'on',
-    true
-  );
-  delete from public.registration_acceptances
-  where registration_id = v_direct_valid;
-  perform set_config(
-    'ironclad.legal_evidence_maintenance',
-    coalesce(v_previous_maintenance, ''),
-    true
-  );
-  perform pg_temp.phase15a_assert(
-    not exists (
-      select 1
-      from public.registration_acceptances
-      where registration_id = v_direct_valid
-    )
-      and coalesce(
-        current_setting('ironclad.legal_evidence_maintenance', true),
-        ''
-      ) <> 'on',
-    'explicit owner-only maintenance deletion must be narrow and local'
-  );
+  -- Supabase CLI linked sessions use a short-lived login role and then
+  -- SET ROLE postgres, so they must not satisfy the stronger session_user
+  -- maintenance gate. A direct postgres owner session can exercise the narrow
+  -- GUC path; either way the outer rollback removes every test fixture.
+  if session_user = 'postgres' then
+    v_previous_maintenance := current_setting(
+      'ironclad.legal_evidence_maintenance',
+      true
+    );
+    perform set_config(
+      'ironclad.legal_evidence_maintenance',
+      'on',
+      true
+    );
+    delete from public.registration_acceptances
+    where registration_id = v_direct_valid;
+    perform set_config(
+      'ironclad.legal_evidence_maintenance',
+      coalesce(v_previous_maintenance, ''),
+      true
+    );
+    perform pg_temp.phase15a_assert(
+      not exists (
+        select 1
+        from public.registration_acceptances
+        where registration_id = v_direct_valid
+      )
+        and coalesce(
+          current_setting('ironclad.legal_evidence_maintenance', true),
+          ''
+        ) <> 'on',
+      'explicit owner-only maintenance deletion must be narrow and local'
+    );
+  else
+    perform pg_temp.phase15a_assert(
+      current_user = 'postgres'
+        and session_user not in ('anon', 'authenticated', 'service_role'),
+      'linked validation must use a non-API login that SET ROLE postgres'
+    );
+  end if;
 end;
 $$;
 
