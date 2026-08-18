@@ -29,7 +29,27 @@ describe("Phase 15C release-tooling target gates", () => {
     expect(script).toContain('ref: "zzbnneprhjicmajpjkdg"');
     expect(script).not.toMatch(/--target|ironclad-v2|nsyjtqpvyxlzyujlbzos/);
     expect(script).toContain("--activation-date");
+    expect(script).toContain("--registered-head");
     expect(script).toContain("effective_at");
+  });
+
+  it("limits a distinct registered Staging head to reviewed tooling-only recovery", () => {
+    const script = source(
+      "scripts/phase15c/run-staging-registration-contract.mjs"
+    );
+
+    expect(script).toContain("REGISTERED_HEAD_TOOLING_PATHS");
+    expect(script).toContain('"merge-base"');
+    expect(script).toContain('"--is-ancestor"');
+    expect(script).toContain('"diff"');
+    expect(script).toContain('"--name-only"');
+    expect(script).toContain(
+      '"scripts/phase15c/run-staging-registration-contract.mjs"'
+    );
+    expect(script).toContain(
+      '"tests/integration/phase15c-release-tooling.test.ts"'
+    );
+    expect(script).toContain('"docs/phase15c-publication-runbook.md"');
   });
 
   it("requires clean exact-head state and canonical date parity in both wrappers", () => {
@@ -86,5 +106,19 @@ describe("Phase 15C release-tooling target gates", () => {
     expect(script).toContain("deployment.id");
     expect(script).toContain('"--fail"');
     expect(script).toContain('response.headers.get("content-type")');
+  });
+
+  it("hashes protected Staging-contract PDFs through the registered deployment", () => {
+    const script = source(
+      "scripts/phase15c/run-staging-registration-contract.mjs"
+    );
+
+    expect(script).toContain("runVercelBytes([");
+    expect(script).toContain('"--deployment",');
+    expect(script).toContain("deployment.id");
+    expect(script).toContain('"--fail"');
+    expect(script).toContain(
+      "verifyVercelDeployment(baseUrl, registeredHead)"
+    );
   });
 });

@@ -44,9 +44,9 @@ regenerating or reusing those versions.
 
 Staging does not write the Production canonical URLs into its register. Its
 four `immutable_url` values must use the exact immutable Vercel Preview
-deployment origin for the reviewed head. The release helper requires that
-origin with `--base-url` and byte-verifies all four Preview artifacts before it
-can activate the Staging register. Production rejects every base other than
+deployment origin for the registered artifact head. The release helper requires
+that origin with `--base-url` and byte-verifies all four Preview artifacts before
+it can activate the Staging register. Production rejects every base other than
 `https://www.ironcladtournaments.com` and repeats the same byte/hash checks.
 
 ## Release gates
@@ -72,7 +72,12 @@ can activate the Staging register. Production rejects every base other than
    database-time snapshots; selector and snapshot-tamper rejection; atomic
    registration plus acceptance; blank Discord; acceptance immutability; and
    zero fixture residue. The wrapper exposes no Production target and the SQL
-   rejects Production canonical document URLs.
+    rejects Production canonical document URLs.
+   Normally the registered artifact head and reviewed tooling head are the same.
+   If a validator-only repair is required after immutable Staging activation,
+   the registered head must be an ancestor of the reviewed tooling head, and the
+   intervening diff must be limited to the validator, its focused test, and this
+   runbook. Any corpus, PDF, web, SQL-contract, or other change fails closed.
 7. Validate the exact PR head and its preview. Merge only that reviewed head,
    then verify the Production deployment identifies the expected merge/deploy
    commit.
@@ -103,7 +108,7 @@ Example commands (replace placeholders only after the corresponding gate):
 ```powershell
 node scripts/phase15c/legal-document-register.mjs --target staging --base-url https://EXACT_PREVIEW_DEPLOYMENT.vercel.app --activation-date YYYY-MM-DD --expected-head PR_HEAD
 node scripts/phase15c/legal-document-register.mjs --target staging --base-url https://EXACT_PREVIEW_DEPLOYMENT.vercel.app --activation-date YYYY-MM-DD --expected-head PR_HEAD --apply
-node scripts/phase15c/run-staging-registration-contract.mjs --base-url https://EXACT_PREVIEW_DEPLOYMENT.vercel.app --activation-date YYYY-MM-DD --expected-head PR_HEAD
+node scripts/phase15c/run-staging-registration-contract.mjs --base-url https://EXACT_REGISTERED_PREVIEW_DEPLOYMENT.vercel.app --activation-date YYYY-MM-DD --expected-head PR_HEAD --registered-head REGISTERED_STAGING_ARTIFACT_HEAD
 node scripts/phase15c/legal-document-register.mjs --target production --base-url https://www.ironcladtournaments.com --activation-date YYYY-MM-DD --expected-head DEPLOYED_HEAD
 node scripts/phase15c/legal-document-register.mjs --target production --base-url https://www.ironcladtournaments.com --activation-date YYYY-MM-DD --expected-head DEPLOYED_HEAD --apply
 ```
@@ -156,8 +161,10 @@ exists and is not a blocker to the present document-generation work.
 
 - Final PR head: pending
 - Reviewed PR URL: pending
-- Exact immutable Staging Preview origin/head: pending
-- Staging register activation timestamp: pending
+- Exact immutable Staging Preview origin/head:
+  `https://ironclad-website-k6shidoxy-ironclad-tournaments.vercel.app` /
+  `d16fe382251f458713c084b9459616f6774b8fab`
+- Staging register activation timestamp: `2026-08-18 09:03:23.846017+00`
 - Staging final-corpus registration contract/zero residue: pending
 - Production deployment/head: pending
 - Actual Production activation date: pending

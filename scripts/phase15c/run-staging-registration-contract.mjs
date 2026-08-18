@@ -25,6 +25,11 @@ const STAGING = Object.freeze({
   name: "ironclad-staging",
   ref: "zzbnneprhjicmajpjkdg",
 });
+const REGISTERED_HEAD_TOOLING_PATHS = new Set([
+  "docs/phase15c-publication-runbook.md",
+  "scripts/phase15c/run-staging-registration-contract.mjs",
+  "tests/integration/phase15c-release-tooling.test.ts",
+]);
 const DOCUMENTS = Object.freeze([
   Object.freeze({
     kind: "rulebook",
@@ -85,6 +90,12 @@ async function main() {
   if (!/^[0-9a-f]{40}$/.test(options.expectedHead ?? "")) {
     throw new Error("--expected-head must be a lowercase 40-character Git SHA.");
   }
+  const registeredHead = options.registeredHead ?? options.expectedHead;
+  if (!/^[0-9a-f]{40}$/.test(registeredHead)) {
+    throw new Error(
+      "--registered-head must be a lowercase 40-character Git SHA."
+    );
+  }
 
   const actualHead = runCommand("git", ["rev-parse", "HEAD"]).trim();
   if (actualHead !== options.expectedHead) {
@@ -92,9 +103,8 @@ async function main() {
       `Checked-out Git head ${actualHead} does not match expected head ${options.expectedHead}.`
     );
   }
-
-
   assertCleanGitWorktree(runCommand);
+  assertRegisteredHeadCompatibility(registeredHead, options.expectedHead);
   const corpus = parseJson(
     readFileSync(resolve("content/legal-corpus.json"), "utf8"),
     "canonical legal corpus"
@@ -105,7 +115,7 @@ async function main() {
     DOCUMENTS
   );
 
-  const deployment = verifyVercelDeployment(baseUrl, options.expectedHead);
+  const deployment = verifyVercelDeployment(baseUrl, registeredHead);
 
   const projects = parseJson(
     runSupabase(["--output", "json", "projects", "list"]),
@@ -138,14 +148,21 @@ async function main() {
     );
     const sha256 = hash(bytes);
     const url = `${baseUrl}${document.pathname}`;
-    const response = await fetch(url, {
-      cache: "no-store",
-      headers: { "user-agent": "IronClad-Phase15C-contract/1.0" },
-    });
-    if (!response.ok) {
-      throw new Error(`Preview artifact returned HTTP ${response.status}: ${url}`);
-    }
-    const deployedHash = hash(Buffer.from(await response.arrayBuffer()));
+    const deployedHash = hash(
+      runVercelBytes([
+        "curl",
+        document.pathname,
+        "--deployment",
+        deployment.id,
+        "--yes",
+        "--scope",
+        VERCEL_SCOPE,
+        "--",
+        "--silent",
+        "--show-error",
+        "--fail",
+      ])
+    );
     if (deployedHash !== sha256) {
       throw new Error(`Preview artifact hash mismatch for ${document.kind}.`);
     }
@@ -207,6 +224,7 @@ async function main() {
         deployment,
         activationDate: options.activationDate,
         expectedHead: options.expectedHead,
+        registeredHead,
         documents: expected.map(({ kind, version, url, sha256 }) => ({
           kind,
           version,
@@ -335,6 +353,44 @@ function verifyVercelDeployment(baseUrl, expectedHead) {
   };
 }
 
+function assertRegisteredHeadCompatibility(registeredHead, expectedHead) {
+  if (registeredHead === expectedHead) {
+    return;
+  }
+
+  try {
+    runCommand("git", [
+      "merge-base",
+      "--is-ancestor",
+      registeredHead,
+      expectedHead,
+    ]);
+  } catch {
+    throw new Error(
+      "The registered Staging artifact head must be an ancestor of the reviewed tooling head."
+    );
+  }
+
+  const changedPaths = runCommand("git", [
+    "diff",
+    "--name-only",
+    `${registeredHead}..${expectedHead}`,
+  ])
+    .split(/\r?\n/u)
+    .map((path) => path.trim().replaceAll("\\", "/"))
+    .filter(Boolean);
+  const unexpectedPaths = changedPaths.filter(
+    (path) => !REGISTERED_HEAD_TOOLING_PATHS.has(path)
+  );
+  if (unexpectedPaths.length > 0) {
+    throw new Error(
+      `Registered-head recovery includes non-tooling changes: ${unexpectedPaths.join(
+        ", "
+      )}.`
+    );
+  }
+}
+
 function extractRows(result) {
   if (!result || !Array.isArray(result.rows)) {
     throw new Error("Supabase query did not return a rows array.");
@@ -362,6 +418,14 @@ function runVercel(arguments_) {
   ]);
 }
 
+function runVercelBytes(arguments_) {
+  return runNpxBytes([
+    "--yes",
+    `vercel@${VERCEL_CLI_VERSION}`,
+    ...arguments_,
+  ]);
+}
+
 function runNpx(arguments_) {
   if (process.platform !== "win32") {
     return runCommand("npx", arguments_);
@@ -380,6 +444,24 @@ function runNpx(arguments_) {
   return runCommand(process.execPath, [npxCli, ...arguments_]);
 }
 
+function runNpxBytes(arguments_) {
+  if (process.platform !== "win32") {
+    return runCommandBytes("npx", arguments_);
+  }
+
+  const npxCli = join(
+    dirname(process.execPath),
+    "node_modules",
+    "npm",
+    "bin",
+    "npx-cli.js"
+  );
+  if (!existsSync(npxCli)) {
+    throw new Error(`Bundled npm launcher is unavailable: ${npxCli}`);
+  }
+  return runCommandBytes(process.execPath, [npxCli, ...arguments_]);
+}
+
 function runCommand(command, arguments_) {
   const result = spawnSync(command, arguments_, {
     cwd: process.cwd(),
@@ -395,6 +477,26 @@ function runCommand(command, arguments_) {
     throw new Error(`${command} failed: ${detail}`);
   }
   return result.stdout;
+}
+
+function runCommandBytes(command, arguments_) {
+  const result = spawnSync(command, arguments_, {
+    cwd: process.cwd(),
+    encoding: null,
+    maxBuffer: 8 * 1024 * 1024,
+    shell: false,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    const detail = Buffer.from(result.stderr || result.stdout || "unknown error")
+      .toString("utf8")
+      .trim();
+    throw new Error(`${command} failed: ${detail}`);
+  }
+  return Buffer.from(result.stdout);
 }
 
 function parseJson(value, label) {
@@ -424,6 +526,7 @@ function parseArguments(arguments_) {
     activationDate: null,
     baseUrl: null,
     expectedHead: null,
+    registeredHead: null,
     help: false,
   };
   for (let index = 0; index < arguments_.length; index += 1) {
@@ -436,6 +539,9 @@ function parseArguments(arguments_) {
       index += 1;
     } else if (argument === "--expected-head") {
       parsed.expectedHead = arguments_[index + 1] ?? null;
+      index += 1;
+    } else if (argument === "--registered-head") {
+      parsed.registeredHead = arguments_[index + 1] ?? null;
       index += 1;
     } else if (argument === "--help" || argument === "-h") {
       parsed.help = true;
@@ -453,10 +559,14 @@ function printHelp() {
   node scripts/phase15c/run-staging-registration-contract.mjs \\
     --base-url <exact-preview-origin> \\
     --activation-date <YYYY-MM-DD> \\
-    --expected-head <40-char-git-sha>
+    --expected-head <40-char-reviewed-tooling-git-sha> \\
+    [--registered-head <40-char-registered-artifact-git-sha>]
 
 This rollback-only command is fixed to ironclad-staging
 (${STAGING.ref}). It validates the exact final Preview PDFs and existing
 Effective register rows before exercising registration and proving zero fixture
-residue. It exposes no Production target.`);
+residue. The registered head defaults to the expected head. A distinct registered
+head is accepted only when it is an ancestor and the intervening changes are
+limited to this validator, its regression test, and this runbook. It exposes no
+Production target.`);
 }
