@@ -471,7 +471,9 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
           PHASE_FOUR_ACTIVE_COHORT_SIZE ||
         (bracket.waitlisted_players ?? 0) > 0,
       launchedAt: bracket.launched_at,
-      prize: "Included in tournament prize pool",
+      prize: row.prize_pool?.trim()
+        ? "Prize details are listed on this Tournament Page"
+        : "No prize is published for this Event",
     })),
     details: row.description,
     rules: row.rules_url

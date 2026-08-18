@@ -39,7 +39,7 @@ const tournamentBrackets = [
     text: "For rising competitors pushing into sharper brackets and stronger opponents.",
   },
   {
-    label: "Main / Elite",
+    label: "Main / Pro",
     range: "1400+ ELO",
     text: "For top competitors fighting for the highest IronClad placements.",
   },
@@ -49,7 +49,7 @@ const integrityHighlights = [
   { label: "ELO verification", icon: ShieldCheck },
   { label: "Admin approval", icon: UserCheck },
   { label: "Proof-based match results", icon: Upload },
-  { label: "Seasonal leaderboard tracking", icon: BarChart3 },
+  { label: "Career and season standings", icon: BarChart3 },
   { label: "Anti-impersonation checks", icon: FileCheck2 },
   { label: "Clear tournament rules", icon: BookOpen },
 ];
@@ -57,7 +57,7 @@ const integrityHighlights = [
 const visionItems = [
   "Better events",
   "Stronger community tools",
-  "Seasonal rankings",
+  "Career and season rankings",
   "Professional tournament experiences",
 ];
 
@@ -181,7 +181,7 @@ function MissionSection() {
     <CinematicSection
       eyebrow="Mission"
       title="A Competitive Home for CoH3 Players"
-      text="IronClad exists to support the Company of Heroes 3 competitive scene with organised tournaments, clear rules, fair brackets, seasonal rankings, and a serious community environment."
+      text="IronClad exists to support the Company of Heroes 3 competitive scene with organised tournaments, clear rules, fair brackets, Career and season rankings, and a serious community environment."
       background={{
         image: "/images/sfondi/1.jpg",
         position: "center 52%",
@@ -194,7 +194,10 @@ function MissionSection() {
           {[
             ["Clear Rules", "Every event starts from visible expectations."],
             ["Fair Brackets", "Players compete inside defined ELO ranges."],
-            ["Seasonal Progress", "Results become part of a long-term record."],
+            [
+              "Competitive Progress",
+              "Results build permanent Career standings or a six-Event Main / Pro season.",
+            ],
           ].map(([title, text]) => (
             <GlassPanel key={title}>
               <p className="text-lg font-black text-white">{title}</p>
@@ -363,8 +366,8 @@ function FutureVisionSection() {
           <p className="mt-7 max-w-3xl text-base leading-8 text-zinc-300 sm:text-lg">
             IronClad is more than a tournament website. It is a long-term
             project built to grow the Company of Heroes 3 competitive scene
-            through better events, stronger community tools, seasonal rankings,
-            and professional tournament experiences.
+            through better events, stronger community tools, Career and season
+            rankings, and professional tournament experiences.
           </p>
         </motion.div>
 

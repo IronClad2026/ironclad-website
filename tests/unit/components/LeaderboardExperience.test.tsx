@@ -153,7 +153,7 @@ describe("LeaderboardExperience", () => {
     expect(screen.getByText(/No qualifying season is underway/)).toBeInTheDocument();
   });
 
-  it("uses Main official ranks for prize positions and preserves true ties", () => {
+  it("uses Main official ranks for top standings and preserves true ties", () => {
     const oneOneThree = [
       standing({ playerName: "First Alpha", displayName: "First Alpha" }),
       standing({
@@ -207,17 +207,21 @@ describe("LeaderboardExperience", () => {
         })}
       />
     );
-    let prizePositions = screen.getByRole("region", {
-      name: "Main / Pro prize positions",
+    let topStandings = screen.getByRole("region", {
+      name: "Main / Pro top standings",
     });
 
-    expect(within(prizePositions).getByText("First Alpha")).toBeInTheDocument();
-    expect(within(prizePositions).getByText("First Bravo")).toBeInTheDocument();
-    expect(within(prizePositions).getByText("Third Charlie")).toBeInTheDocument();
-    expect(within(prizePositions).queryByText("Fourth Delta")).not.toBeInTheDocument();
+    expect(within(topStandings).getByText("First Alpha")).toBeInTheDocument();
+    expect(within(topStandings).getByText("First Bravo")).toBeInTheDocument();
+    expect(within(topStandings).getByText("Third Charlie")).toBeInTheDocument();
+    expect(within(topStandings).queryByText("Fourth Delta")).not.toBeInTheDocument();
     expect(
-      within(prizePositions).queryByText("Overall Wrong Source")
+      within(topStandings).queryByText("Overall Wrong Source")
     ).not.toBeInTheDocument();
+    expect(screen.getByText("Top Standings")).toBeInTheDocument();
+    expect(screen.queryByText("Prize Positions")).not.toBeInTheDocument();
+    expect(screen.queryByText(/prize season/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/cash prizes/i)).not.toBeInTheDocument();
     expect(screen.getByText("Latest Finalized Results")).toBeInTheDocument();
 
     view.rerender(
@@ -250,13 +254,13 @@ describe("LeaderboardExperience", () => {
         })}
       />
     );
-    prizePositions = screen.getByRole("region", {
-      name: "Main / Pro prize positions",
+    topStandings = screen.getByRole("region", {
+      name: "Main / Pro top standings",
     });
-    expect(within(prizePositions).getByText("Rank One")).toBeInTheDocument();
-    expect(within(prizePositions).getByText("Rank Two Alpha")).toBeInTheDocument();
-    expect(within(prizePositions).getByText("Rank Two Bravo")).toBeInTheDocument();
-    expect(within(prizePositions).queryByText("Rank Four")).not.toBeInTheDocument();
+    expect(within(topStandings).getByText("Rank One")).toBeInTheDocument();
+    expect(within(topStandings).getByText("Rank Two Alpha")).toBeInTheDocument();
+    expect(within(topStandings).getByText("Rank Two Bravo")).toBeInTheDocument();
+    expect(within(topStandings).queryByText("Rank Four")).not.toBeInTheDocument();
   });
 
   it("keeps Career divisions separate and renders opted-out and closed identities safely", () => {
@@ -340,7 +344,7 @@ describe("LeaderboardExperience", () => {
     ).toHaveTextContent("awarded once per division, up to +25");
     expect(screen.queryByText("Valid qualifying events")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("region", { name: "Main / Pro prize positions" })
+      screen.queryByRole("region", { name: "Main / Pro top standings" })
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Latest Finalized Results")).not.toBeInTheDocument();
 

@@ -2909,9 +2909,6 @@ function Media({ tournament }: { tournament: TournamentCard }) {
     tournament.rulesUrl
       ? { label: "Official Rules", url: tournament.rulesUrl }
       : null,
-    tournament.battlefyUrl
-      ? { label: "Battlefy Event", url: tournament.battlefyUrl }
-      : null,
   ].filter((link) => link !== null);
 
   return <Card><h2 className="text-xl font-black text-white">{tournament.title} Resources</h2>{links.length > 0 ? <div className="mt-5 grid gap-4 md:grid-cols-2">{links.map((link) => <a key={link.label} href={link.url} target="_blank" rel="noreferrer" className="group relative aspect-video overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100" style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${tournament.image})` }}><PlayCircle className="text-white opacity-90" /><p className="mt-20 text-sm font-bold text-white">{link.label}</p><p className="text-xs text-zinc-300">Open tournament resource</p></a>)}</div> : <p className="mt-5 border border-white/12 p-8 text-center text-zinc-500">No tournament resources have been published.</p>}</Card>;
@@ -4673,9 +4670,6 @@ function MobileMedia({ tournament }: { tournament: TournamentCard }) {
   const links = [
     tournament.rulesUrl
       ? { label: "Official Rules", url: tournament.rulesUrl }
-      : null,
-    tournament.battlefyUrl
-      ? { label: "Battlefy Event", url: tournament.battlefyUrl }
       : null,
   ].filter((link) => link !== null);
 

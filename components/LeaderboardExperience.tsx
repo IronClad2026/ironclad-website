@@ -231,7 +231,7 @@ function LeaderboardHero({
           </h1>
 
           <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300 md:text-lg">
-            Main / Pro is the authoritative six-valid-event prize season.
+            Main / Pro is the authoritative six-valid-event season.
             Academy and Challenge track separate permanent Career standings.
           </p>
         </div>
@@ -292,9 +292,8 @@ function LeaderboardHero({
                   role="status"
                   className="mt-5 border border-amber-300/35 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100"
                 >
-                  Season results are under review. Displayed standings are
-                  historical and are not currently confirmed for prize
-                  settlement.
+                  Season results are under review. Displayed standings are not
+                  final while season review remains open.
                 </div>
               )}
             </>
@@ -363,7 +362,7 @@ function CareerExplanation({ division }: { division: PublicRankingView }) {
       <p className="mt-2">
         Points do not reset when a Main / Pro season finishes. Academy history
         remains Academy history, Challenge history remains Challenge history,
-        and neither Career standing determines Main / Pro seasonal cash prizes.
+        and neither Career standing carries into Main / Pro season standings.
       </p>
       <p className="mt-2 text-zinc-400">
         New Career entrants may receive +5 points per prior eligible event,
@@ -441,7 +440,7 @@ function LeaderboardPodium({
     return (
       <EmptyPanel
         icon={Crown}
-        title="Main / Pro prize positions unavailable"
+        title="Main / Pro top standings unavailable"
         message="Official competitive ranks will appear after valid Main / Pro results are published."
       />
     );
@@ -450,7 +449,7 @@ function LeaderboardPodium({
   const seasonState = getMainSeasonState(season);
 
   return (
-    <section aria-label="Main / Pro prize positions">
+    <section aria-label="Main / Pro top standings">
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
@@ -460,13 +459,15 @@ function LeaderboardPodium({
           </p>
 
           <h2 className="mt-2 text-3xl font-black text-white">
-            Prize Positions
+            Top Standings
           </h2>
         </div>
 
         <p className="max-w-2xl text-sm text-zinc-400">
-          Every competitor with official Main / Pro competitive rank 1, 2 or
-          3 remains represented. Display order does not change official rank.
+          Every competitor sharing official Main / Pro rank 1, 2 or 3 remains
+          represented. Display order does not change official rank. Any
+          prize-bearing Event is governed separately by its published Event
+          Prize Terms.
         </p>
       </div>
 
