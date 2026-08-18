@@ -107,6 +107,30 @@ describe("PlayerProfileForm Relic cutover", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("presents Discord contact as optional", () => {
+    render(
+      <PlayerProfileForm
+        profile={profile}
+        verifiedCurrentElo={1375}
+        activeTournamentEloSnapshots={[]}
+      />
+    );
+
+    const discordUsername = document.querySelector<HTMLInputElement>(
+      'input[name="discordUsername"]'
+    );
+
+    expect(discordUsername).not.toBeNull();
+    expect(discordUsername).not.toBeRequired();
+    expect(discordUsername).toHaveAttribute("maxlength", "100");
+    expect(screen.getByText("Discord Username (optional)")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Discord is optional but strongly recommended for coordination. Public visibility is controlled separately from your dashboard."
+      )
+    ).toBeInTheDocument();
+  });
+
   it("states the 4 MiB avatar application boundary", () => {
     render(
       <PlayerProfileForm

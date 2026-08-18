@@ -9,7 +9,6 @@ const completeProfile: PlayerProfileCompletionData = {
   avatar_url: "/api/players/player-1/avatar",
   display_name: "Test Player",
   in_game_name: "TestPlayer",
-  discord_username: "test-player",
   steam_id64: "18446744073709551614",
   country: "Australia",
   region: "Oceania",
@@ -24,7 +23,6 @@ describe("player profile completion", () => {
 
   it.each([
     "avatar_url",
-    "discord_username",
     "steam_id64",
     "country",
     "region",
@@ -33,6 +31,11 @@ describe("player profile completion", () => {
     expect(
       isPlayerProfileComplete({ ...completeProfile, [field]: null })
     ).toBe(false);
+  });
+
+  it("does not require Discord contact details", () => {
+    expect(isPlayerProfileComplete(completeProfile)).toBe(true);
+    expect(isPlayerProfileTournamentReady(completeProfile, true)).toBe(true);
   });
 
   it("requires verified Steam identity rather than a Steam display name", () => {

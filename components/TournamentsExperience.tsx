@@ -20,6 +20,7 @@ import MatchDiceRollOff, {
   type MatchDiceLoadResult,
 } from "@/components/MatchDiceRollOff";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
+import RequestAdminAssistanceButton from "@/components/RequestAdminAssistanceButton";
 import MatchResultControls, {
   AdminResetMatchForm,
   ReportGroupReview,
@@ -31,6 +32,7 @@ import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime"
 import ScrollReveal from "@/components/ScrollReveal";
 import TournamentMapPools from "@/components/TournamentMapPools";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
+import type { RegistrationDocumentSet } from "@/lib/legal-document-types";
 import { parseMatchDiceSnapshot } from "@/lib/match-dice";
 import type { PlayerProfile } from "@/lib/player-profile";
 import type { PollViewerProjection } from "@/lib/polls";
@@ -1658,6 +1660,18 @@ export function BracketMatchResultsWorkspace({
                                   />
                                 </div>
                               )}
+                            {match.status !== "completed" &&
+                              viewer.registrationIds.some(
+                                (registrationId) =>
+                                  registrationId ===
+                                    match.playerOneRegistrationId ||
+                                  registrationId ===
+                                    match.playerTwoRegistrationId
+                              ) && (
+                                <RequestAdminAssistanceButton
+                                  matchId={match.id}
+                                />
+                              )}
                             <MatchResultControls
                               match={match}
                               deadlineManaged={
@@ -3011,8 +3025,10 @@ type RegistrationFormState = {
   bracketName: string;
   rulebookAgreement: boolean;
   playerParticipationAgreement: boolean;
-  adminFinalDecisionAgreement: boolean;
-  ownershipConfirmation: boolean;
+  termsAgreement: boolean;
+  privacyAcknowledgement: boolean;
+  age18Confirmation: boolean;
+  accountAndSteamOwnershipConfirmation: boolean;
 };
 
 type RegistrationErrors = Partial<
@@ -3037,12 +3053,14 @@ export function RegisterModal({
   tournaments,
   initialTournamentId,
   verifiedDivision,
+  registrationDocuments,
 }: {
   onClose: () => void;
   profile: RegistrationPlayerProfile;
   tournaments: TournamentCard[];
   initialTournamentId: string;
   verifiedDivision: RelicVerifiedDivision | null;
+  registrationDocuments: RegistrationDocumentSet;
 }) {
   const router = useRouter();
   const initialTournament =
@@ -3071,8 +3089,10 @@ export function RegisterModal({
     bracketName: getVerifiedBracket(initialTournament),
     rulebookAgreement: false,
     playerParticipationAgreement: false,
-    adminFinalDecisionAgreement: false,
-    ownershipConfirmation: false,
+    termsAgreement: false,
+    privacyAcknowledgement: false,
+    age18Confirmation: false,
+    accountAndSteamOwnershipConfirmation: false,
   });
 
   const updateField = <K extends keyof RegistrationFormState>(field: K, value: RegistrationFormState[K]) => {
@@ -3144,20 +3164,28 @@ export function RegisterModal({
     }
 
     if (targetStep === "agreements") {
-      if (!form.rulebookAgreement) {
-        nextErrors.rulebookAgreement = "You must agree to the Rulebook.";
-      }
-
       if (!form.playerParticipationAgreement) {
         nextErrors.playerParticipationAgreement = "You must agree to the Player Participation Agreement.";
       }
 
-      if (!form.adminFinalDecisionAgreement) {
-        nextErrors.adminFinalDecisionAgreement = "You must agree that admin decisions are final.";
+      if (!form.rulebookAgreement) {
+        nextErrors.rulebookAgreement = "You must agree to the Official Tournament Rulebook.";
       }
 
-      if (!form.ownershipConfirmation) {
-        nextErrors.ownershipConfirmation = "You must confirm account/profile ownership.";
+      if (!form.termsAgreement) {
+        nextErrors.termsAgreement = "You must agree to the Terms of Service.";
+      }
+
+      if (!form.privacyAcknowledgement) {
+        nextErrors.privacyAcknowledgement = "You must acknowledge the Privacy Policy.";
+      }
+
+      if (!form.age18Confirmation) {
+        nextErrors.age18Confirmation = "You must confirm that you are at least 18 years old.";
+      }
+
+      if (!form.accountAndSteamOwnershipConfirmation) {
+        nextErrors.accountAndSteamOwnershipConfirmation = "You must confirm ownership of your IronClad account and linked Steam account.";
       }
     }
 
@@ -3221,10 +3249,17 @@ export function RegisterModal({
         )?.id ?? "",
       tournamentTitle: form.tournamentTitle,
       bracketName: form.bracketName,
+      rulebookDocumentId: registrationDocuments.rulebook.id,
+      ppaDocumentId: registrationDocuments.ppa.id,
+      termsDocumentId: registrationDocuments.terms.id,
+      privacyDocumentId: registrationDocuments.privacy.id,
       rulebookAgreement: form.rulebookAgreement,
       playerParticipationAgreement: form.playerParticipationAgreement,
-      adminFinalDecisionAgreement: form.adminFinalDecisionAgreement,
-      ownershipConfirmation: form.ownershipConfirmation,
+      termsAgreement: form.termsAgreement,
+      privacyAcknowledgement: form.privacyAcknowledgement,
+      age18Confirmation: form.age18Confirmation,
+      accountAndSteamOwnershipConfirmation:
+        form.accountAndSteamOwnershipConfirmation,
       waitlistConfirmed:
         registrationAvailability === "waitlist" ||
         waitlistConfirmationRequired,
@@ -3458,7 +3493,7 @@ export function RegisterModal({
               <div className="grid gap-3 sm:grid-cols-2">
                 <RegistrationProfileValue label="Display Name" value={profile.display_name} />
                 <RegistrationProfileValue label="IGN" value={profile.in_game_name} />
-                <RegistrationProfileValue label="Discord" value={profile.discord_username} />
+                <RegistrationProfileValue label="Discord (optional)" value={profile.discord_username} />
                 <RegistrationProfileValue label="Steam" value={profile.steam_username} />
                 <RegistrationProfileValue label="Country" value={profile.country} />
                 <RegistrationProfileValue label="Region" value={profile.region} />
@@ -3494,10 +3529,66 @@ export function RegisterModal({
               </div>
 
               <div className="space-y-3">
-                <AgreementCheckbox label="Rulebook Agreement" checked={form.rulebookAgreement} onChange={(checked) => updateField("rulebookAgreement", checked)} error={errors.rulebookAgreement} />
-                <AgreementCheckbox label="Player Participation Agreement" checked={form.playerParticipationAgreement} onChange={(checked) => updateField("playerParticipationAgreement", checked)} error={errors.playerParticipationAgreement} />
-                <AgreementCheckbox label="Admin Final Decision Agreement" checked={form.adminFinalDecisionAgreement} onChange={(checked) => updateField("adminFinalDecisionAgreement", checked)} error={errors.adminFinalDecisionAgreement} />
-                <AgreementCheckbox label="Ownership Confirmation" checked={form.ownershipConfirmation} onChange={(checked) => updateField("ownershipConfirmation", checked)} error={errors.ownershipConfirmation} />
+                <AgreementCheckbox
+                  label={
+                    <DocumentAgreementLabel
+                      prefix="I accept the"
+                      document={registrationDocuments.ppa}
+                      label="Player Participation Agreement"
+                    />
+                  }
+                  checked={form.playerParticipationAgreement}
+                  onChange={(checked) => updateField("playerParticipationAgreement", checked)}
+                  error={errors.playerParticipationAgreement}
+                />
+                <AgreementCheckbox
+                  label={
+                    <DocumentAgreementLabel
+                      prefix="I accept the"
+                      document={registrationDocuments.rulebook}
+                      label="Official Tournament Rulebook"
+                    />
+                  }
+                  checked={form.rulebookAgreement}
+                  onChange={(checked) => updateField("rulebookAgreement", checked)}
+                  error={errors.rulebookAgreement}
+                />
+                <AgreementCheckbox
+                  label={
+                    <DocumentAgreementLabel
+                      prefix="I accept the"
+                      document={registrationDocuments.terms}
+                      label="Terms of Service"
+                    />
+                  }
+                  checked={form.termsAgreement}
+                  onChange={(checked) => updateField("termsAgreement", checked)}
+                  error={errors.termsAgreement}
+                />
+                <AgreementCheckbox
+                  label={
+                    <DocumentAgreementLabel
+                      prefix="I acknowledge the"
+                      document={registrationDocuments.privacy}
+                      label="Privacy Policy"
+                    />
+                  }
+                  checked={form.privacyAcknowledgement}
+                  onChange={(checked) => updateField("privacyAcknowledgement", checked)}
+                  error={errors.privacyAcknowledgement}
+                />
+                <AgreementCheckbox
+                  label="I confirm that I am at least 18 years old."
+                  checked={form.age18Confirmation}
+                  onChange={(checked) => updateField("age18Confirmation", checked)}
+                  error={errors.age18Confirmation}
+                />
+                <AgreementCheckbox
+                  label="I confirm that I am using my own IronClad account and that the linked Steam account belongs to me."
+                  checked={form.accountAndSteamOwnershipConfirmation}
+                  onChange={(checked) => updateField("accountAndSteamOwnershipConfirmation", checked)}
+                  error={errors.accountAndSteamOwnershipConfirmation}
+                />
               </div>
 
               {waitlistSubmission && (
@@ -3564,7 +3655,33 @@ function RegistrationProfileValue({
   );
 }
 
-function AgreementCheckbox({ label, checked, onChange, error }: { label: string; checked: boolean; onChange: (checked: boolean) => void; error?: string }) {
+function DocumentAgreementLabel({
+  prefix,
+  document,
+  label,
+}: {
+  prefix: string;
+  document: RegistrationDocumentSet[keyof RegistrationDocumentSet];
+  label: string;
+}) {
+  return (
+    <>
+      {prefix}{" "}
+      <Link
+        href={document.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) => event.stopPropagation()}
+        className="text-orange-300 underline decoration-orange-500/60 underline-offset-4 transition hover:text-orange-200"
+      >
+        {label} (version {document.version})
+      </Link>
+      .
+    </>
+  );
+}
+
+function AgreementCheckbox({ label, checked, onChange, error }: { label: ReactNode; checked: boolean; onChange: (checked: boolean) => void; error?: string }) {
   return (
     <div>
       <label className={classNames("flex cursor-pointer items-start gap-3 border bg-black/45 p-4 transition hover:border-orange-500/70 hover:bg-orange-500/10", error ? "border-orange-400/80" : "border-white/12")}>
@@ -4755,7 +4872,7 @@ function MainContent({
   );
 }
 
-type RegistrationGate = "account" | "profile" | "closed" | "error";
+type RegistrationGate = "account" | "profile" | "documents" | "closed" | "error";
 
 function RegistrationGatePrompt({
   type,
@@ -4776,6 +4893,12 @@ function RegistrationGatePrompt({
       title: "Please complete your player profile before registering.",
       description:
         "IronClad uses your saved IGN, region, ELO, and verification details for tournament participation.",
+    },
+    documents: {
+      eyebrow: "Registration Documents Pending",
+      title: "Registration is not accepting legal consent yet.",
+      description:
+        "The governing documents are still under review. Registration will reopen after one approved, versioned document set is made effective.",
     },
     closed: {
       eyebrow: "Registration Unavailable",
@@ -4884,6 +5007,7 @@ export default function TournamentsExperience({
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
+  registrationDocuments = null,
 }: {
   tournaments: TournamentCard[];
   tournamentPollsByTournament?: Record<string, PollViewerProjection[]>;
@@ -4891,6 +5015,7 @@ export default function TournamentsExperience({
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
   matchResultReportGroups: MatchResultReportGroup[];
+  registrationDocuments?: RegistrationDocumentSet | null;
   eloVerificationEnabled: boolean;
 }) {
   const router = useRouter();
@@ -5114,6 +5239,11 @@ export default function TournamentsExperience({
       return;
     }
 
+    if (!registrationDocuments) {
+      setRegistrationGate("documents");
+      return;
+    }
+
     if (!isSignedIn || !userId) {
       setRegistrationGate("account");
       return;
@@ -5246,12 +5376,13 @@ export default function TournamentsExperience({
         />
       </div>
 
-      {showRegisterModal && registrationProfile && (
+      {showRegisterModal && registrationProfile && registrationDocuments && (
         <RegisterModal
           profile={registrationProfile}
           tournaments={publicTournaments}
           initialTournamentId={selectedTournament.id}
           verifiedDivision={viewer.relicVerifiedDivision}
+          registrationDocuments={registrationDocuments}
           onClose={() => setShowRegisterModal(false)}
         />
       )}

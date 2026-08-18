@@ -101,6 +101,26 @@ describe("public-player projection", () => {
     ]);
   });
 
+  it("neutralizes an inconsistent Discord opt-in with no usable username", async () => {
+    const supabase = createSupabaseQueryMock({
+      data: [
+        {
+          ...publicRow,
+          discord_public_enabled: true,
+          discord_username: "   ",
+        },
+      ],
+    });
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
+
+    await expect(getPublicPlayers()).resolves.toMatchObject([
+      {
+        discordPublicEnabled: false,
+        discordUsername: null,
+      },
+    ]);
+  });
+
   it("rejects an invalid player ID before creating a Supabase client", async () => {
     await expect(getPublicPlayerById("not-a-uuid")).resolves.toBeNull();
     expect(publicSupabaseClientMock.from).not.toHaveBeenCalled();

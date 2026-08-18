@@ -115,6 +115,16 @@ describe("Relic tournament registration migration contract", () => {
       "p_relic_faction",
       "p_relic_division",
       "p_relic_calculation_version",
+      "p_rulebook_document_id",
+      "p_ppa_document_id",
+      "p_terms_document_id",
+      "p_privacy_document_id",
+      "p_rulebook_accepted",
+      "p_ppa_accepted",
+      "p_terms_accepted",
+      "p_privacy_acknowledged",
+      "p_age_18_confirmed",
+      "p_account_and_steam_ownership_confirmed",
       "p_waitlist_confirmed",
     ]);
     expect(rpcCalls[0][1]).toMatch(

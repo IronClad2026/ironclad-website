@@ -14,16 +14,20 @@ export default function DiscordContactVisibilityCard({
   initialEnabled,
   hasDiscordUsername,
 }: DiscordContactVisibilityCardProps) {
-  const [enabled, setEnabled] = useState(initialEnabled);
+  const [enabled, setEnabled] = useState(initialEnabled && hasDiscordUsername);
   const [message, setMessage] = useState("");
+  const [messageStatus, setMessageStatus] = useState<
+    "success" | "error" | null
+  >(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
   const toggleVisibility = () => {
-    if (pending) return;
+    if (pending || !hasDiscordUsername) return;
 
     const nextEnabled = !enabled;
     setMessage("");
+    setMessageStatus(null);
 
     startTransition(async () => {
       const result = await updateDiscordPublicEnabled(nextEnabled);
@@ -31,11 +35,14 @@ export default function DiscordContactVisibilityCard({
       if (result.status === "success") {
         setEnabled(result.enabled);
         setMessage(result.message);
+        setMessageStatus(result.status);
         router.refresh();
         return;
       }
 
+      setEnabled(result.enabled);
       setMessage(result.message);
+      setMessageStatus(result.status);
     });
   };
 
@@ -62,15 +69,16 @@ export default function DiscordContactVisibilityCard({
           Discord Contact
         </p>
         <p className="mt-3 text-sm leading-6 text-zinc-400">
-          Allow other players to contact you through Discord from your public
-          IronClad profile.
+          Discord is optional but strongly recommended for coordination. If you
+          add a username, you can separately choose whether it appears on your
+          public IronClad profile.
         </p>
       </div>
 
       {!hasDiscordUsername && (
         <div className="mt-4 border border-amber-400/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80">
-          Add a Discord username to your player profile before this can appear
-          publicly.
+          Discord contact is unavailable until you add an optional username to
+          your player profile.
         </div>
       )}
 
@@ -78,9 +86,9 @@ export default function DiscordContactVisibilityCard({
         type="button"
         role="switch"
         aria-checked={enabled}
-        disabled={pending}
+        disabled={pending || !hasDiscordUsername}
         onClick={toggleVisibility}
-        className="mt-5 flex w-full items-center justify-between gap-4 border border-white/10 bg-black/45 p-2 text-left transition hover:border-orange-400/45 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+        className="mt-5 flex w-full items-center justify-between gap-4 border border-white/10 bg-black/45 p-2 text-left transition hover:border-orange-400/45 disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
       >
         <span className="flex items-center gap-3 px-2 text-sm font-bold text-zinc-200">
           {enabled ? (
@@ -88,7 +96,13 @@ export default function DiscordContactVisibilityCard({
           ) : (
             <EyeOff size={17} className="text-zinc-500" />
           )}
-          {pending ? "Updating..." : enabled ? "Turn Off" : "Turn On"}
+          {pending
+            ? "Updating..."
+            : !hasDiscordUsername
+              ? "Add Discord in Profile"
+              : enabled
+                ? "Turn Off"
+                : "Turn On"}
         </span>
 
         <span
@@ -109,7 +123,7 @@ export default function DiscordContactVisibilityCard({
       {message && (
         <p
           className={`mt-4 flex items-start gap-2 text-xs leading-5 ${
-            message.includes("could not") || message.includes("Complete")
+            messageStatus === "error"
               ? "text-red-300"
               : "text-emerald-300"
           }`}
