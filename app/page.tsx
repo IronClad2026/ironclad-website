@@ -1,7 +1,5 @@
-import CurrentTournamentCard from "@/components/CurrentTournamentCard";
 import HomeAccountSection from "@/components/HomeAccountSection";
 import ScrollReveal from "@/components/ScrollReveal";
-import { currentTournaments } from "@/data/currentTournaments";
 import {
   ArrowRight,
   Crosshair,
@@ -20,18 +18,41 @@ const discordUrl = "https://discord.gg/ZQSQjBNRm3";
 
 const commandStats = [
   {
-    label: "Active event paths",
-    value: String(currentTournaments.length).padStart(2, "0"),
+    label: "Launch format",
+    value: "1v1",
   },
   {
-
-    label: "Competition focus",
-    value: "CoH3",
+    label: "Division size",
+    value: "08",
   },
   {
     label: "Integrity model",
     value: "Fair play",
 
+  },
+];
+
+const competitionPaths = [
+  {
+    icon: ShieldCheck,
+    title: "VERIFIED 1V1",
+    text: "Connect Steam and verify your current Relic 1v1 ELO. IronClad places you in Academy, Challenge, or Main / Pro and locks that eligibility snapshot for the Event.",
+    cta: "VIEW TOURNAMENTS",
+    href: "/tournaments",
+  },
+  {
+    icon: Crosshair,
+    title: "PLAY & REPORT",
+    text: "Play from the published Division map pool, use authenticated Dice for odd-Game roll-offs, and report the Series with one private .rec replay for every Game played. Your opponent can confirm or dispute the report.",
+    cta: "READ 1V1 RULES",
+    href: "/rules#one-v-one-rules",
+  },
+  {
+    icon: Trophy,
+    title: "COMPETE & PROGRESS",
+    text: "Earn points through valid participation and progression. Academy and Challenge build permanent Career standings; Main / Pro runs in six-Event seasons.",
+    cta: "VIEW RANKINGS",
+    href: "/rankings",
   },
 ];
 
@@ -63,7 +84,7 @@ export default function Home() {
       <HeroSection />
       <HomeAccountSection />
       <PlayersSection />
-      <EventsSection />
+      <CompetitionPathSection />
     </main>
   );
 }
@@ -100,28 +121,28 @@ function HeroSection() {
           </h1>
 
           <p className="mt-7 max-w-2xl text-base leading-8 text-zinc-300 sm:text-lg">
-            Join a structured competitive community built around fair play,
-            seasonal tournaments, rankings, and tactical excellence.
+            Join native 1v1 competition built around verified Divisions, fair
+            play, permanent Career standings, and six-event Main / Pro seasons.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <a
+            <Link
               className="inline-flex min-h-12 items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+              href="/tournaments"
+            >
+              View Tournaments
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+
+            <a
+              className="inline-flex min-h-12 items-center justify-center gap-2 border border-white/20 bg-white/[0.035] px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
               href={discordUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
-              Join the Frontline
+              Join Discord (Optional)
               <Flag size={17} aria-hidden="true" />
             </a>
-
-            <Link
-              className="inline-flex min-h-12 items-center justify-center gap-2 border border-white/20 bg-white/[0.035] px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-              href="/tournaments"
-            >
-              View Current Events
-              <ArrowRight size={17} aria-hidden="true" />
-            </Link>
           </div>
 
           <dl className="mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
@@ -265,7 +286,7 @@ function PlayersSection() {
   );
 }
 
-function EventsSection() {
+function CompetitionPathSection() {
   return (
     <section
       className="relative isolate overflow-hidden bg-cover bg-center px-5 py-28 sm:px-8 lg:px-12"
@@ -273,7 +294,7 @@ function EventsSection() {
         backgroundImage: "url('/images/sfondi/2.jpg')",
         backgroundPosition: "center 48%",
       }}
-      aria-labelledby="events-section-title"
+      aria-labelledby="competition-path-title"
     >
       <div
         aria-hidden="true"
@@ -291,25 +312,74 @@ function EventsSection() {
       <ScrollReveal className="relative z-10 mx-auto max-w-7xl">
         <div className="mb-10">
           <SectionHeading
-            eyebrow="Live Tournament Access"
-            title="Current IronClad Events"
-            text="Access active IronClad brackets, schedules, match progress, and tournament details through the current tournament experience."
-            titleId="events-section-title"
+            eyebrow="COMPETITION PATH"
+            title="HOW IRONCLAD COMPETITION WORKS"
+            text="Verify your Division, play through a structured eight-Player bracket, and build an official competitive record."
+            titleId="competition-path-title"
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          {currentTournaments.map((tournament) => (
-            <CurrentTournamentCard
-              key={tournament.title}
-              tournament={tournament}
-            />
+          {competitionPaths.map((path, index) => (
+            <CompetitionPathCard key={path.title} path={path} index={index} />
           ))}
         </div>
 
       </ScrollReveal>
 
     </section>
+  );
+}
+
+function CompetitionPathCard({
+  path,
+  index,
+}: {
+  path: (typeof competitionPaths)[number];
+  index: number;
+}) {
+  const Icon = path.icon;
+
+  return (
+    <Link
+      href={path.href}
+      className="group relative block min-h-72 overflow-hidden border border-white/12 bg-zinc-950/72 p-6 transition hover:-translate-y-1 hover:border-orange-400/50 hover:bg-zinc-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-1 bg-orange-500/75"
+      />
+
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 opacity-0 transition group-hover:opacity-100"
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(249,115,22,0.12),transparent_50%)]" />
+      </div>
+
+      <div className="relative z-10 flex min-h-60 flex-col">
+        <div className="flex items-start justify-between gap-4">
+          <span className="grid h-12 w-12 place-items-center border border-orange-400/35 bg-orange-500/10 text-orange-200">
+            <Icon size={22} aria-hidden="true" />
+          </span>
+
+          <span className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">
+            {String(index + 1).padStart(2, "0")}
+          </span>
+        </div>
+
+        <h3 className="mt-6 text-2xl font-black leading-tight text-white">
+          {path.title}
+        </h3>
+
+        <p className="mt-4 text-sm leading-6 text-zinc-400">{path.text}</p>
+
+        <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-black text-orange-300 transition group-hover:text-orange-200">
+          {path.cta}
+          <ArrowRight size={16} aria-hidden="true" />
+        </span>
+      </div>
+    </Link>
   );
 }
 

@@ -26,6 +26,7 @@ import {
   type PollBallotActionResult,
 } from "@/app/polls/actions";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import InfoTooltip from "@/components/InfoTooltip";
 import {
   parseSinglePollProjection,
   type PollOptionProjection,
@@ -530,6 +531,15 @@ function PollCard({
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <Badge>{poll.authority === "binding" ? "Binding" : "Advisory"}</Badge>
+        <InfoTooltip
+          align="start"
+          label={`About ${poll.authority} Polls`}
+          content={
+            poll.authority === "binding"
+              ? "Eligible votes determine the configured top-K outcome once at least one valid ballot exists. A zero-ballot Poll is cancelled or replaced. Finalisation does not automatically change another subsystem."
+              : "Eligible votes inform the final Admin decision. The Published Decision may differ where the required rationale is provided."
+          }
+        />
         <Badge>{formatStatus(poll.status)}</Badge>
         {poll.maxSelections > 1 && <Badge>Choose up to {poll.maxSelections}</Badge>}
         {poll.winnerCount > 1 && <Badge>{poll.winnerCount} winners</Badge>}

@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 const TEST_SUPABASE_URL = "http://127.0.0.1:54321";
 const TEST_CLERK_PUBLISHABLE_KEY = "pk_test_Y2xlcmsudGVzdCQ=";
+const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.trim();
+const useProductionBuild = process.env.PLAYWRIGHT_USE_PRODUCTION_BUILD === "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -10,7 +12,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: externalBaseUrl ?? "http://127.0.0.1:3100",
     trace: "retain-on-failure",
   },
   projects: [
@@ -21,17 +23,21 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
-    env: {
-      CLERK_SECRET_KEY: "sk_test_not-a-real-secret",
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: TEST_CLERK_PUBLISHABLE_KEY,
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test-only-publishable-key",
-      NEXT_PUBLIC_SUPABASE_URL: TEST_SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY: "test-only-service-role-key",
-    },
-    reuseExistingServer: false,
-    timeout: 120_000,
-    url: "http://127.0.0.1:3100",
-  },
+  webServer: externalBaseUrl
+    ? undefined
+    : {
+        command: useProductionBuild
+          ? "npm run start -- --hostname 127.0.0.1 --port 3100"
+          : "npm run dev -- --hostname 127.0.0.1 --port 3100",
+        env: {
+          CLERK_SECRET_KEY: "sk_test_not-a-real-secret",
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: TEST_CLERK_PUBLISHABLE_KEY,
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test-only-publishable-key",
+          NEXT_PUBLIC_SUPABASE_URL: TEST_SUPABASE_URL,
+          SUPABASE_SERVICE_ROLE_KEY: "test-only-service-role-key",
+        },
+        reuseExistingServer: false,
+        timeout: 120_000,
+        url: "http://127.0.0.1:3100",
+      },
 });

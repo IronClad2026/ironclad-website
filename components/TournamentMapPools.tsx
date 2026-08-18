@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { ImageIcon, LockKeyhole, MapPinned } from "lucide-react";
+import InfoTooltip from "@/components/InfoTooltip";
 import type { PublishedTournamentMapPool } from "@/lib/tournament-map-pools";
 
 type TournamentMapPoolsProps = {
@@ -61,9 +62,9 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
           {pools.map((pool) => (
             <article
               key={pool.bracketId}
-              className="overflow-hidden rounded-3xl border border-white/12 bg-black/35 shadow-xl shadow-black/20"
+              className="rounded-3xl border border-white/12 bg-black/35 shadow-xl shadow-black/20"
             >
-              <header className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(249,115,22,0.13),rgba(255,255,255,0.025))] p-4 sm:p-5">
+              <header className="rounded-t-3xl border-b border-white/10 bg-[linear-gradient(135deg,rgba(249,115,22,0.13),rgba(255,255,255,0.025))] p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-300">
@@ -73,11 +74,22 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                       {pool.divisionName}
                     </h3>
                   </div>
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-200">
-                    {pool.launchedAt ? (
-                      <LockKeyhole size={12} aria-hidden="true" />
-                    ) : null}
-                    {pool.launchedAt ? "Frozen" : "Published"}
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-200">
+                      {pool.launchedAt ? (
+                        <LockKeyhole size={12} aria-hidden="true" />
+                      ) : null}
+                      {pool.launchedAt ? "Frozen" : "Published"}
+                    </span>
+                    <InfoTooltip
+                      align="end"
+                      label={`About the ${pool.launchedAt ? "frozen" : "published"} map pool`}
+                      content={
+                        pool.launchedAt
+                          ? "Launch has locked this Division's map pool. Only an audited Admin correction for a technical issue, exploit, game update or competitive-integrity reason may replace a Map."
+                          : "This Division's map pool is public but may still be republished before launch. Launch freezes the pool."
+                      }
+                    />
                   </span>
                 </div>
                 <p className="mt-3 text-xs font-bold text-zinc-400">

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Leaderboard & Ranking | IronClad",
   description:
-    "Track the six-event Main / Pro prize season and permanent Academy and Challenge Career standings.",
+    "Track the six-event Main / Pro season and permanent Academy and Challenge Career standings.",
 };
 
 export default async function RankingsPage() {

@@ -5,6 +5,7 @@ import {
   type FormEvent,
   useActionState,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -17,6 +18,7 @@ import {
   submitNoShowReport,
   type MatchResultActionState,
 } from "@/app/tournaments/match-actions";
+import InfoTooltip from "@/components/InfoTooltip";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { GeneratedTournamentMatch } from "@/lib/tournaments";
 
@@ -54,6 +56,7 @@ export default function PlayerMatchResultForm({
     [getToken]
   );
   const replayInputRef = useRef<HTMLInputElement>(null);
+  const replayInputLabelId = useId();
   const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState(false);
@@ -246,7 +249,8 @@ export default function PlayerMatchResultForm({
           <p className="mt-1 text-[11px] text-slate-500">
             Enter the final BO{match.seriesBestOf} score and upload one .rec
             replay for every game played. Your opponent will be asked to confirm
-            or dispute the result.
+            or dispute the result. Screenshots are not accepted as substitute
+            Match-result proof.
           </p>
         </div>
 
@@ -294,12 +298,20 @@ export default function PlayerMatchResultForm({
           </select>
         </label>
 
-        <label className="block">
-          <span className="text-xs font-bold text-slate-300">
-            Replay proofs (.rec required)
-          </span>
+        <div className="block">
+          <div className="inline-flex items-center gap-2 text-xs font-bold text-slate-300">
+            <span id={replayInputLabelId}>
+              Replay proofs (.rec required)
+            </span>
+            <InfoTooltip
+              align="start"
+              label="About replay uploads"
+              content="Upload one unique CoH3 .rec for each Game actually played. Each file may be up to 10 MiB. Replays are private, and screenshots are not accepted as substitute Match-result proof."
+            />
+          </div>
           <input
             ref={replayInputRef}
+            aria-labelledby={replayInputLabelId}
             type="file"
             accept=".rec"
             multiple
@@ -311,7 +323,7 @@ export default function PlayerMatchResultForm({
             }}
             className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
           />
-        </label>
+        </div>
         <div className="rounded-xl border border-white/10 bg-slate-950/70 p-3 text-[11px] leading-5 text-slate-400">
           <p>
             {scoreInfo.message ??

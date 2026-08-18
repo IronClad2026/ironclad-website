@@ -13,32 +13,29 @@ import {
   CheckCircle2,
   ChevronDown,
   FileCheck2,
-  FileDown,
   Gavel,
   Radio,
   ScrollText,
   Shield,
   ShieldCheck,
-  Swords,
   Trophy,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 
 import { fadeUp } from "@/lib/animations";
 
-const PDF_1V1 = "/documents-rules-ppa/1v1 rulebook.pdf";
-const PDF_4V4 = "/documents-rules-ppa/4v4 rulebook.pdf";
-const PDF_PPA = "/documents-rules-ppa/ict ppa.pdf";
+type TabName = "1V1 RULES" | "RANKINGS & SEASONS" | "PPA & CONDUCT";
 
-type TabName = "1v1 Rules" | "4v4 Rules" | "PPA & Conduct";
-
-const tabs: TabName[] = ["1v1 Rules", "4v4 Rules", "PPA & Conduct"];
+const tabs: TabName[] = [
+  "1V1 RULES",
+  "RANKINGS & SEASONS",
+  "PPA & CONDUCT",
+];
 
 const tabIds: Record<TabName, string> = {
-  "1v1 Rules": "one-v-one-rules",
-  "4v4 Rules": "four-v-four-rules",
-  "PPA & Conduct": "ppa-conduct",
+  "1V1 RULES": "one-v-one-rules",
+  "RANKINGS & SEASONS": "rankings-seasons",
+  "PPA & CONDUCT": "ppa-conduct",
 };
 
 const tabDetails: Record<
@@ -51,29 +48,29 @@ const tabDetails: Record<
     document: string;
   }
 > = {
-  "1v1 Rules": {
+  "1V1 RULES": {
     icon: Trophy,
     eyebrow: "Solo Competition",
-    title: "1v1 Rules",
+    title: "1V1 RULES",
     description:
-      "Bracket tiers, match formats, reporting duties, and ICT points for individual competition.",
-    document: "1v1 Rulebook",
+      "IronClad launch Tournaments are free CoH3 1v1 Events with separate eight-Player Academy, Challenge and Main / Pro Divisions. Quarterfinals and semifinals are BO3; the grand final is BO5.",
+    document: "Rulebook v3.0",
   },
-  "4v4 Rules": {
-    icon: Users,
-    eyebrow: "Team Operations",
-    title: "4v4 Rules",
+  "RANKINGS & SEASONS": {
+    icon: ScrollText,
+    eyebrow: "Competitive Record",
+    title: "RANKINGS & SEASONS",
     description:
-      "Team registration, roster standards, substitutes, disconnect handling, and conduct expectations.",
-    document: "4v4 Rulebook",
+      "Academy and Challenge maintain permanent Career standings. Main / Pro uses six-valid-Event seasons. Only genuine played competition creates played statistics.",
+    document: "Rulebook sections 13-14",
   },
-  "PPA & Conduct": {
+  "PPA & CONDUCT": {
     icon: Gavel,
     eyebrow: "Player Agreement",
-    title: "PPA & Conduct",
+    title: "PPA & CONDUCT",
     description:
-      "Player responsibilities, competitive integrity, dispute handling, and penalty framework.",
-    document: "PPA Document",
+      "The PPA governs eligibility, account ownership, conduct, evidence cooperation, privacy-facing obligations, sanctions, media and conditional prizes. Detailed Game procedure remains in the Rulebook.",
+    document: "PPA v3.0",
   },
 };
 
@@ -85,9 +82,9 @@ const operationsBriefing: {
 }[] = [
   {
     icon: ShieldCheck,
-    label: "Authority",
-    title: "Official PDFs decide disputes",
-    text: "Use this page for fast orientation, then rely on the rulebooks and PPA for formal decisions.",
+    label: "Document Status",
+    title: "Review drafts are not effective",
+    text: "No governing document is Effective yet. Registration remains closed until approved versions are published.",
   },
   {
     icon: Radio,
@@ -98,147 +95,215 @@ const operationsBriefing: {
   {
     icon: FileCheck2,
     label: "Integrity",
-    title: "Evidence and conduct matter",
-    text: "Match reports, replay proof, admin review, and respectful communication protect competition.",
-  },
-];
-
-const quickRules: {
-  icon: LucideIcon;
-  title: string;
-  items: string[];
-}[] = [
-  {
-    icon: Trophy,
-    title: "1v1 Tournament Format",
-    items: [
-      "Academy Bracket: Below 1100 ELO",
-      "Challenge Bracket: 1100-1399 ELO",
-      "Main / Elite Bracket: 1400+ ELO",
-      "Monthly tournaments",
-      "ICT points system",
-      "Bo3 matches / Bo5 finals",
-    ],
-  },
-  {
-    icon: Users,
-    title: "4v4 Competitive Format",
-    items: [
-      "Team-based competition",
-      "Beta/testing phase",
-      "Structured registration",
-      "Roster and substitute rules",
-      "Competitive integrity standards",
-    ],
+    title: "Plain language, exact boundaries",
+    text: "This guide summarises current native 1v1 competition and clearly separates platform-enforced features from player-managed rules.",
   },
 ];
 
 const ruleSections: Record<TabName, [string, string][]> = {
-  "1v1 Rules": [
+  "1V1 RULES": [
     [
-      "Registration Rules",
-      "Players must register before the deadline using the official tournament platform or Discord instructions. Accurate player information and current ELO may be required.",
+      "Eligibility & Native Registration",
+      "Registration is free and native to IronClad. Players must be 18 or older, use their own authenticated IronClad and linked Steam accounts, complete fresh Relic 1v1 verification, and accept the exact governing-document versions presented. Discord is not required.",
     ],
     [
-      "Bracket Structure",
-      "The 1v1 format is divided into Academy, Challenge, and Main / Elite brackets using non-overlapping ELO ranges.",
+      "ELO Snapshot & Division",
+      "The highest valid current Relic 1v1 faction ELO determines Academy (0-1099), Challenge (1100-1399), or Main / Pro (1400+). IronClad stores that eligibility as an immutable Event registration snapshot, so later live ELO changes do not move the Player for that Event.",
     ],
     [
-      "Match Format",
-      "Standard tournament matches are played as Bo3, with finals using Bo5 when specified by tournament staff.",
+      "Review, Waitlist & Launch",
+      "The first eight valid registrations enter the Active Review Cohort; later eligible Players may join the FIFO Waitlist. A vacancy offer uses the exact deadline shown by IronClad and returns an accepting Player to review. A Division launches only with exactly eight approved Players, a ready bracket, and its required published map pool.",
     ],
     [
-      "ICT Points System",
-      "Players earn IronClad Tournament Points through participation, placement, and consistent competitive performance.",
+      "Series & Lobby Settings",
+      "Each Division is an eight-Player single-elimination bracket. Quarterfinals and semifinals are BO3; the grand final is BO5. Players manually configure 1v1, 575 Victory Points, Standard Resources, Random starting positions, and Cheats disabled. IronClad does not configure or validate the CoH3 lobby.",
     ],
     [
-      "Match Reporting",
-      "Results must be reported through the tournament reporting system with replay proof when requested.",
+      "Published Map Pool",
+      "Each Division uses a published pool of at least five active 1v1 Maps. It may be republished before launch and freezes when the Division launches. After launch, only an audited technical-issue, exploit, game-update, or competitive-integrity correction may replace a Map. Poll finalisation does not change the pool automatically.",
     ],
     [
-      "Conduct & Fair Play",
-      "Players must respect opponents, admins, casters, and tournament integrity standards at all times.",
-    ],
-  ],
-  "4v4 Rules": [
-    [
-      "Team Registration",
-      "Teams must register with complete roster information before the announced deadline.",
+      "Dice & Manual Side/Map",
+      "Each Player initiates their own authenticated 2d6 for Games 1, 3, and 5; Games 3 and 5 may be pre-rolled, and a tie requires both Players to complete another authenticated round. The winner chooses Side or an eligible unused Map, and the opponent chooses the remaining item. Each Player may use any permitted faction within the assigned Side. In even Games, Players swap Sides and the preceding Game loser chooses a new Map. Maps normally do not repeat. IronClad records Dice history, not Side or Map choices.",
     ],
     [
-      "Roster Rules",
-      "Each team must maintain a valid roster and follow all eligibility requirements listed in the official 4v4 rulebook.",
+      "Scheduling & Communication",
+      "Make reasonable first contact as soon as practicable, normally within 24 hours after the Match becomes available; missing that target alone is not an automatic forfeit. Request Admin Assistance after 48 hours without a response, or earlier if the deadline may be jeopardised. IronClad notifications and Admin Assistance are platform fallbacks; Discord is optional, and Steam may be used where reasonably available outside IronClad.",
     ],
     [
-      "Substitute Rules",
-      "Substitutes may be allowed if approved by tournament staff and used within roster limitations.",
+      "Pauses & Disconnects",
+      "Each Player may take one reasonable pause per Game for a genuine technical or urgent issue, normally for up to five minutes; another or longer pause needs opponent agreement or Admin approval. A genuine disconnect before 10:00 normally means restart, subject to the approved fairness exceptions. At or after 10:00 there is no automatic winner: preserve the replay and request an Admin ruling.",
     ],
     [
-      "Match Format",
-      "4v4 matches follow structured competitive settings designed for team-based Company of Heroes 3 play.",
+      "Results & Replay Proof",
+      "Report the Series winner and final score through IronClad with one unique CoH3 `.rec` for every Game actually played, up to 10 MiB each. Replays are private. Screenshots are not accepted as substitute Match-result proof; separate supplemental material may be requested only for a dispute or integrity investigation.",
     ],
     [
-      "Disconnect Rules",
-      "Disconnects are handled by tournament admins based on evidence, timing, and competitive impact.",
-    ],
-    [
-      "Team Conduct",
-      "Teams are responsible for the conduct of every rostered player, substitute, and representative.",
+      "Confirmation, Disputes & No-Shows",
+      "The opponent may confirm or dispute a report before the displayed deadline, after which an undisputed report may be confirmed automatically. Disputes go to Admin review. A no-show is not self-awarded, and a bye, walkover, no-show, empty feeder, or double forfeit does not create fake played statistics.",
     ],
   ],
-  "PPA & Conduct": [
+  "RANKINGS & SEASONS": [
     [
-      "Player Responsibilities",
-      "Players are expected to read the official rules, communicate clearly, and follow tournament instructions.",
+      "Points by Division",
+      "Academy and Challenge award 10 participation points, 2 points per round passed, and 3 points for a Tournament win. Main / Pro awards 10 participation points, 5 points per round passed, and 5 points for a Tournament win.",
     ],
     [
-      "Competitive Integrity",
-      "Smurfing, cheating, match manipulation, abuse of exploits, or dishonest behavior may result in penalties.",
+      "Genuine Play",
+      "Played-Match totals, wins, losses, and win rate include only genuine completed Series between two Players. No-shows, automatic byes, walkovers, empty feeders, and double forfeits do not create played statistics, although legitimate non-played advancement may still earn approved round-passed points.",
     ],
     [
-      "Conduct Expectations",
-      "Harassment, hate speech, threats, or toxic behavior toward players, staff, or casters is not tolerated.",
+      "Career Standings",
+      "Academy and Challenge maintain separate permanent Career standings. They do not reset when a Main / Pro season ends.",
     ],
     [
-      "Dispute Handling",
-      "Disputes must be submitted respectfully with evidence. Tournament staff decisions are final unless otherwise stated.",
+      "Career Catch-Up",
+      "Academy and Challenge may award +5 points for each prior eligible missed completed Event in the same Division, up to +25. The award is available once per Player per Division and never applies to Main / Pro.",
     ],
     [
-      "Penalties",
-      "Penalties may include warnings, match forfeits, point deductions, suspensions, or removal from IronClad events.",
+      "Main / Pro Season",
+      "A Main / Pro season consists of exactly six valid qualifying Events. Event seven begins the next season, and the standings freeze after the sixth valid Event is scored unless a later integrity review places the season under review.",
+    ],
+    [
+      "Ranking & True Ties",
+      "Ranking order is total points, Tournament wins, rounds passed, exact genuine-Match win rate, then genuine Match wins. Players still equal on every competitive key share the same official rank. Names, display order, or internal IDs do not break a true tie.",
+    ],
+    [
+      "Conditional Prizes",
+      "A leaderboard rank is not automatically a prize position. Any prize-bearing Event is governed separately by Prize Terms published before registration. If a true tie crosses prize positions and no different fair method was published before registration, the crossed allocations are combined and divided equally among the tied Players. No unpublished leaderboard tie-break may be invented.",
+    ],
+  ],
+  "PPA & CONDUCT": [
+    [
+      "Eligibility & Own Accounts",
+      "Players must be at least 18, use their own IronClad and linked Steam accounts, provide accurate eligibility information, and complete the presented declarations. Account sharing, impersonation, unauthorised substitution, smurfing for bracket manipulation, and duplicate registration are prohibited.",
+    ],
+    [
+      "Optional Discord & Coordination",
+      "Discord is optional but recommended. IronClad notifications and the match-scoped Admin Assistance feature are the guaranteed platform fallbacks; Steam may be used where reasonably available outside IronClad. Public Discord visibility is a separate opt-in.",
+    ],
+    [
+      "Conduct & Integrity",
+      "Players must compete honestly and respectfully. Cheating, match manipulation, exploit abuse, stream sniping, harassment, evidence destruction, fraudulent voting, and deliberate scheduling or technical obstruction may result in proportionate sanctions.",
+    ],
+    [
+      "Poll Participation",
+      "A Tournament Poll declares its scope and Advisory or Binding status before voting, and its eligible audience freezes at publication. Each eligible Player may revise one authenticated current ballot, with selections up to the published limit, until close. Advisory voting informs the final Admin decision. Binding voting determines the configured top-K outcome with no quorum but requires at least one valid ballot; a zero-ballot Poll is cancelled or replaced, and a cutoff tie is resolved only among the tied cutoff options. Individual ballot attribution is private. Eligible Players may see aggregates according to configured live or after-close visibility; anonymous public totals exist only when explicitly enabled. The final Published Decision may be public, but finalisation does not automatically alter another subsystem.",
+    ],
+    [
+      "Evidence & Admin Review",
+      "Players must use reporting and dispute tools honestly and cooperate with proportionate evidence requests. Admins may review private replays, Match metadata, submitted communications, and other reliable material, but do not require account passwords, authentication codes, or unrestricted access to personal devices.",
+    ],
+    [
+      "Privacy & Public History",
+      "Optional public-profile visibility is separate from factual competition history. Private replays, Poll records, disputes, and Admin-review material remain access-controlled. Account closure may pseudonymise a history-bearing account rather than erase official brackets, results, and standings.",
+    ],
+    [
+      "Streaming & Media",
+      "A permitted personal live stream uses at least a two-minute delay unless a published Event or broadcast instruction requires longer or expressly waives the default. Official broadcast and integrity requirements take priority. Final media and privacy obligations remain subject to the approved governing documents.",
+    ],
+    [
+      "Event Prizes",
+      "Participation is free and not every Event has prizes. A prize-bearing Event must publish its gross amount, currency, allocation, material eligibility, fees, supported payout method, and expected timeframe before registration. Payout may be administered manually.",
+    ],
+    [
+      "Versioned Acceptance",
+      "Registration records the exact accepted Rulebook, PPA, and Terms versions; the acknowledged Privacy Policy version; authenticated identity; server acceptance time; the 18+ declaration; and own-account confirmations. Registration remains closed while every governing document is still Review Draft / Not Effective.",
     ],
   ],
 };
 
-const downloads: {
+const documentStatuses: {
   icon: LucideIcon;
   title: string;
+  version: string;
+  status: string;
   text: string;
-  href: string;
 }[] = [
   {
     icon: ScrollText,
-    title: "1v1 Rulebook",
-    text: "Complete official regulations for IronClad 1v1 tournaments.",
-    href: PDF_1V1,
-  },
-  {
-    icon: Swords,
-    title: "4v4 Rulebook",
-    text: "Official team-based format, roster, substitute, and match rules.",
-    href: PDF_4V4,
+    title: "Official Tournament Rulebook",
+    version: "Version 3.0",
+    status: "Revised Review Draft - Not Effective",
+    text: "Revised governing text is pending final legal review and publication approval. No current download is presented as Effective.",
   },
   {
     icon: Gavel,
-    title: "PPA Document",
-    text: "Player participation agreement, conduct standards, and penalty framework.",
-    href: PDF_PPA,
+    title: "Player Participation Agreement",
+    version: "Version 3.0",
+    status: "Revised Review Draft - Not Effective",
+    text: "Revised participation terms are pending final legal review and publication approval. No current download is presented as Effective.",
   },
+  {
+    icon: FileCheck2,
+    title: "Terms of Service",
+    version: "Version 1.0",
+    status: "Review Draft - Not Effective",
+    text: "Final Terms are a later legal-publication item. No route or document is linked before approval.",
+  },
+  {
+    icon: Shield,
+    title: "Privacy Policy",
+    version: "Version 1.0",
+    status: "Review Draft - Not Effective",
+    text: "The final Privacy Policy is a later legal-publication item. No route or document is linked before approval.",
+  },
+];
+
+const faqs: [string, string][] = [
+  [
+    "How do I register?",
+    "Registration is free and native to IronClad. Sign in, complete the required profile fields, link your own Steam account, complete fresh Relic 1v1 verification, choose the eligible open Division, confirm that you are 18 or older and using your own accounts, and accept the exact governing-document versions shown. Registration remains closed until approved versions become Effective.",
+  ],
+  [
+    "How is my Division determined?",
+    "IronClad uses the highest valid current 1v1 faction ELO returned by the authoritative Relic lookup: Academy is 0-1099, Challenge is 1100-1399, and Main / Pro is 1400+. The server stores an immutable registration snapshot, so later live ELO changes do not move that Event entry.",
+  ],
+  [
+    "Is Discord required?",
+    "No. Discord is optional but recommended. IronClad notifications and the match-scoped Admin Assistance feature provide platform fallbacks. Steam may be used where reasonably available. Public Discord visibility is a separate opt-in.",
+  ],
+  [
+    "What happens if a Division is full?",
+    "Later eligible Players may join the FIFO Waitlist after the eight Active Review places are occupied. If a place opens before launch, IronClad offers it to the oldest eligible waitlisted Player until the exact displayed deadline. Acceptance returns the Player to review; it does not guarantee approval. A Division launches only with exactly eight approved Players.",
+  ],
+  [
+    "How does the map pool work?",
+    "Each Division has a published pool of at least five active 1v1 Maps. It may be republished before launch and freezes at launch. After launch, only an audited correction for a technical issue, exploit, game update, or competitive-integrity reason may replace a Map. A Poll decision does not change the pool automatically.",
+  ],
+  [
+    "How do Dice, Side and Map choices work?",
+    "Each Player initiates their own authenticated 2d6 for Games 1, 3, and 5; Games 3 and 5 may be pre-rolled, and tied totals require another authenticated round. The higher total chooses Side or an eligible unused Map, and the opponent chooses the remaining item. Each Player may use any permitted faction within the assigned Side. For Games 2 and 4, Players swap Sides and the preceding Game loser chooses a new Map. Maps normally do not repeat. IronClad stores Dice history, not Side or Map choices.",
+  ],
+  [
+    "What are the scheduling and technical expectations?",
+    "Make reasonable first contact as soon as practicable, normally within 24 hours; missing that target alone is not an automatic forfeit. Request Admin Assistance after 48 hours without a response or earlier if the deadline is at risk. Each Player may normally take one genuine pause per Game for up to five minutes. A genuine pre-10:00 disconnect normally restarts subject to the approved exceptions; at or after 10:00 there is no automatic winner, so preserve the replay and request an Admin ruling.",
+  ],
+  [
+    "Which replay files are required?",
+    "Upload one unique CoH3 `.rec` for every Game actually played, up to 10 MiB each. Replays are private. Screenshots are not accepted as substitute Match-result proof; separate supplemental material may be requested only for a dispute or integrity investigation.",
+  ],
+  [
+    "What happens after a result or no-show report?",
+    "The opponent may confirm or dispute before the displayed deadline. An undisputed report may then confirm automatically; a dispute goes to Admin review. A no-show is never self-awarded. Confirmed no-shows and other non-played advancement do not create fake played-Match statistics.",
+  ],
+  [
+    "How do standings work?",
+    "Academy and Challenge build permanent Career standings; Main / Pro uses exactly six valid qualifying Events per season. Rankings use total points, Tournament wins, rounds passed, exact genuine-Match win rate, then genuine Match wins. Players still equal on every key share the same official rank.",
+  ],
+  [
+    "What is Advisory versus Binding?",
+    "An Advisory Poll informs the final Admin decision. A Binding Poll has no quorum and determines its configured top-K outcome once at least one valid ballot exists; a zero-ballot Binding Poll is cancelled or replaced. Individual ballot attribution is private. Eligible Players see aggregate totals according to the configured live or after-close visibility, while anonymous public totals exist only when explicitly enabled. The final Published Decision may be public, but finalisation does not automatically change another subsystem.",
+  ],
+  [
+    "Does every Tournament have prizes?",
+    "No. Participation is free, and a leaderboard rank is not automatically a prize position. Before registration opens for a prize-bearing Event, its Tournament Page or Prize Terms must publish the gross amount, currency, allocation, eligibility, fees, supported payout method, and expected timeframe. Payout may be administered manually.",
+  ],
 ];
 
 export default function RulesPage() {
   const reduceMotion = useReducedMotion() ?? false;
-  const [activeTab, setActiveTab] = useState<TabName>("1v1 Rules");
+  const [activeTab, setActiveTab] = useState<TabName>("1V1 RULES");
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -287,7 +352,10 @@ export default function RulesPage() {
         reduceMotion={reduceMotion}
         tabRefs={tabRefs}
       />
-      <QuickBriefingSection reduceMotion={reduceMotion} />
+      <QuickBriefingSection
+        activeTab={activeTab}
+        reduceMotion={reduceMotion}
+      />
       <RuleExplorerSection
         activeTab={activeTab}
         openIndex={openIndex}
@@ -295,8 +363,8 @@ export default function RulesPage() {
         setOpenIndex={setOpenIndex}
       />
       <OfficialDocumentsSection reduceMotion={reduceMotion} />
+      <FaqSection reduceMotion={reduceMotion} />
       <DisclaimerSection reduceMotion={reduceMotion} />
-
     </main>
   );
 }
@@ -320,21 +388,21 @@ function HeroSection({ reduceMotion }: { reduceMotion: boolean }) {
           className="max-w-5xl"
         >
           <p className="text-sm font-black uppercase text-orange-300">
-            Official Rules Hub
+            OFFICIAL RULES HUB
           </p>
           <h1 className="mt-5 max-w-5xl text-5xl font-black leading-[0.96] text-white sm:text-6xl lg:text-8xl">
-            IronClad Tournament Rules
+            IRONCLAD COMPETITION RULES
           </h1>
           <p className="mt-7 max-w-3xl text-base leading-8 text-zinc-300 sm:text-lg">
-            The tournament operations reference for Company of Heroes 3
-            competitors. Choose your rule set, review the briefing, and download
-            the official documents before match day.
+            Start with the plain-language briefing, then use the versioned
+            Rulebook and Player Participation Agreement for the governing text.
           </p>
 
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <DocumentAction href={PDF_1V1} label="Download 1v1 Rulebook" />
-            <DocumentAction href={PDF_4V4} label="Download 4v4 Rulebook" />
-            <DocumentAction href={PDF_PPA} label="Download PPA" secondary />
+          <div
+            className="mt-9 w-fit border border-amber-300/35 bg-amber-300/10 px-4 py-3 text-sm font-black uppercase tracking-wide text-amber-100"
+            role="status"
+          >
+            Revised Review Draft - Not Effective
           </div>
         </motion.div>
 
@@ -354,11 +422,11 @@ function HeroSection({ reduceMotion }: { reduceMotion: boolean }) {
             <div className="absolute right-7 bottom-7 left-7">
               <div className="mb-5 h-1 w-24 bg-orange-400" />
               <p className="text-4xl font-black leading-none">
-                RULES READY
+                REVIEW DRAFTS
               </p>
               <p className="mt-4 text-sm leading-6 text-zinc-300">
-                Categories, rule summaries, conduct expectations, and official
-                PDF downloads are available from a single command center.
+                The governing documents are not yet Effective. Registration
+                remains closed until approved versions are published.
               </p>
             </div>
           </div>
@@ -385,7 +453,10 @@ function RuleCategorySelector({
   tabRefs: MutableRefObject<(HTMLButtonElement | null)[]>;
 }) {
   return (
-    <section className="relative isolate overflow-hidden border-b border-white/10 bg-[linear-gradient(180deg,#050505,#090909)] px-5 py-9 sm:px-8 lg:px-12">
+    <section
+      className="relative isolate overflow-hidden border-b border-white/10 bg-[linear-gradient(180deg,#050505,#090909)] px-5 py-9 sm:px-8 lg:px-12"
+      id="one-v-one-rules"
+    >
       <div
         aria-hidden="true"
         className="absolute inset-0 bg-cover bg-center"
@@ -484,7 +555,7 @@ function RuleCategorySelector({
                     {details.description}
                   </span>
                   <span className="mt-auto pt-5 text-xs font-black uppercase text-zinc-500">
-                    Primary document: {details.document}
+                    Primary draft: {details.document}
                   </span>
                 </span>
               </motion.button>
@@ -496,7 +567,16 @@ function RuleCategorySelector({
   );
 }
 
-function QuickBriefingSection({ reduceMotion }: { reduceMotion: boolean }) {
+function QuickBriefingSection({
+  activeTab,
+  reduceMotion,
+}: {
+  activeTab: TabName;
+  reduceMotion: boolean;
+}) {
+  const activeDetails = tabDetails[activeTab];
+  const ActiveIcon = activeDetails.icon;
+
   return (
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-20 sm:px-8 lg:px-12">
       <div
@@ -513,80 +593,60 @@ function QuickBriefingSection({ reduceMotion }: { reduceMotion: boolean }) {
       />
       <TacticalBackdrop muted />
       <div className="relative z-10 mx-auto max-w-7xl">
-        <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+        <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
           <SectionHeading
             eyebrow="Quick Briefing"
-            title="Read the operational summary before the detailed rules."
-            text="This overview gives players a fast understanding of format, authority, and competitive expectations without replacing the official rulebooks."
+            title="Read the selected briefing before the detailed rules."
+            text="The category summary gives you the launch facts without duplicating the full governing documents."
           />
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            {operationsBriefing.map((item, index) => {
-              const Icon = item.icon;
-
-              return (
-                <motion.article
-                  className="border border-white/12 bg-white/[0.045] p-5 backdrop-blur"
-                  initial={reduceMotion ? false : "hidden"}
-                  key={item.title}
-                  transition={{
-                    duration: reduceMotion ? 0 : 0.45,
-                    delay: reduceMotion ? 0 : index * 0.06,
-                  }}
-                  variants={fadeUp}
-                  viewport={{ once: true, margin: "-60px" }}
-                  whileInView="visible"
-                >
-                  <Icon className="text-orange-300" size={26} aria-hidden="true" />
-                  <p className="mt-5 text-xs font-black uppercase text-orange-300">
-                    {item.label}
-                  </p>
-                  <h3 className="mt-2 text-lg font-black text-white">
-                    {item.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-zinc-400">
-                    {item.text}
-                  </p>
-                </motion.article>
-              );
-            })}
-          </div>
+          <Panel className="p-6">
+            <div className="flex items-start gap-4">
+              <span className="grid h-12 w-12 shrink-0 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
+                <ActiveIcon size={23} aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-xs font-black uppercase text-orange-300">
+                  Selected Briefing
+                </p>
+                <h3 className="mt-2 text-2xl font-black text-white">
+                  {activeDetails.title}
+                </h3>
+                <p className="mt-4 text-sm leading-7 text-zinc-300 sm:text-base">
+                  {activeDetails.description}
+                </p>
+              </div>
+            </div>
+          </Panel>
         </div>
 
-        <div className="mt-12 grid gap-4 md:grid-cols-2">
-          {quickRules.map((card, index) => {
-            const Icon = card.icon;
+        <div className="mt-12 grid gap-3 sm:grid-cols-3">
+          {operationsBriefing.map((item, index) => {
+            const Icon = item.icon;
 
             return (
               <motion.article
-                className="relative overflow-hidden border border-white/12 bg-zinc-950/70 p-6 transition hover:border-orange-400/50 hover:bg-zinc-950"
+                className="border border-white/12 bg-white/[0.045] p-5 backdrop-blur"
                 initial={reduceMotion ? false : "hidden"}
-                key={card.title}
+                key={item.title}
                 transition={{
-                  duration: reduceMotion ? 0 : 0.5,
-                  delay: reduceMotion ? 0 : index * 0.08,
+                  duration: reduceMotion ? 0 : 0.45,
+                  delay: reduceMotion ? 0 : index * 0.06,
                 }}
                 variants={fadeUp}
                 viewport={{ once: true, margin: "-60px" }}
                 whileInView="visible"
               >
-                <div className="absolute inset-x-0 top-0 h-1 bg-orange-500/75" />
-                <Icon className="mb-5 h-10 w-10 text-orange-300" aria-hidden="true" />
-                <h3 className="text-2xl font-black text-white">{card.title}</h3>
-                <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                  {card.items.map((item) => (
-                    <li
-                      className="flex gap-3 text-sm leading-6 text-zinc-300"
-                      key={item}
-                    >
-                      <Shield
-                        className="mt-1 h-4 w-4 shrink-0 text-orange-300"
-                        aria-hidden="true"
-                      />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+                <Icon className="text-orange-300" size={26} aria-hidden="true" />
+                <p className="mt-5 text-xs font-black uppercase text-orange-300">
+                  {item.label}
+                </p>
+                <h3 className="mt-2 text-lg font-black text-white">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-zinc-400">
+                  {item.text}
+                </p>
               </motion.article>
             );
           })}
@@ -754,24 +814,24 @@ function OfficialDocumentsSection({ reduceMotion }: { reduceMotion: boolean }) {
         <div className="mb-12 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <SectionHeading
             eyebrow="Official Documents"
-            title="Download the source of truth."
-            text="These files remain the official authority for tournament operations, conduct standards, and dispute resolution."
+            title="Governing-document status."
+            text="The approved final versions will become the governing source of truth. Today, every document remains a Review Draft and is not Effective."
           />
           <p className="max-w-sm border-l border-orange-400/40 pl-4 text-sm leading-6 text-zinc-400">
-            Keep the relevant rulebook available before, during, and after
-            tournament matches.
+            Final artifacts, routes, and downloads will appear only after legal
+            and publication approval.
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {downloads.map((file, index) => {
-            const Icon = file.icon;
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {documentStatuses.map((document, index) => {
+            const Icon = document.icon;
 
             return (
               <motion.article
                 className="group relative flex min-h-[260px] flex-col overflow-hidden border border-white/12 bg-zinc-950/75 p-6 transition hover:border-orange-300/50 hover:bg-zinc-950"
                 initial={reduceMotion ? false : "hidden"}
-                key={file.title}
+                key={document.title}
                 transition={{
                   duration: reduceMotion ? 0 : 0.5,
                   delay: reduceMotion ? 0 : index * 0.08,
@@ -785,27 +845,124 @@ function OfficialDocumentsSection({ reduceMotion }: { reduceMotion: boolean }) {
                   <span className="grid h-12 w-12 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
                     <Icon size={23} aria-hidden="true" />
                   </span>
-                  <span className="border border-white/12 bg-white/[0.04] px-2.5 py-1 text-xs font-black uppercase text-zinc-300">
-                    Official Source
+                  <span className="border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 text-xs font-black uppercase text-amber-100">
+                    Not Effective
                   </span>
                 </div>
 
                 <h3 className="mt-7 text-2xl font-black text-white">
-                  {file.title}
+                  {document.title}
                 </h3>
-                <p className="mt-4 flex-1 text-sm leading-7 text-zinc-400">
-                  {file.text}
+                <p className="mt-2 text-xs font-black uppercase tracking-wide text-orange-300">
+                  {document.version}
                 </p>
+                <p className="mt-3 text-sm font-black uppercase leading-6 text-amber-100">
+                  {document.status}
+                </p>
+                <p className="mt-4 flex-1 text-sm leading-7 text-zinc-400">
+                  {document.text}
+                </p>
+              </motion.article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
 
-                <a
-                  aria-label={`Download ${file.title}`}
-                  className="mt-7 inline-flex min-h-11 w-fit items-center justify-center gap-2 border border-orange-400/50 bg-orange-500/10 px-4 py-2 text-sm font-black text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-                  download
-                  href={file.href}
+function FaqSection({ reduceMotion }: { reduceMotion: boolean }) {
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  return (
+    <section className="relative isolate overflow-hidden border-b border-white/10 bg-[linear-gradient(180deg,#070707,#0b0b0b)] px-5 py-20 sm:px-8 lg:px-12">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover"
+        style={{
+          backgroundImage: "url('/images/sfondi/3.jpg')",
+          backgroundPosition: "42% center",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.74)_45%,rgba(0,0,0,0.97)),linear-gradient(105deg,rgba(0,0,0,0.96),rgba(0,0,0,0.68),rgba(40,18,6,0.88))]"
+      />
+      <TacticalBackdrop muted />
+
+      <div className="relative z-10 mx-auto max-w-6xl">
+        <SectionHeading
+          eyebrow="FAQ"
+          title="Answers to the launch questions players ask most."
+          text="These concise answers follow the approved competition model without replacing the governing documents."
+        />
+
+        <div className="mt-10 space-y-3">
+          {faqs.map(([question, answer], index) => {
+            const isOpen = openFaqIndex === index;
+            const triggerId = `faq-trigger-${index}`;
+            const panelId = `faq-panel-${index}`;
+
+            return (
+              <motion.article
+                className={`overflow-hidden border transition ${
+                  isOpen
+                    ? "border-orange-300/50 bg-orange-500/[0.055]"
+                    : "border-white/12 bg-white/[0.035] hover:border-orange-300/40"
+                }`}
+                initial={reduceMotion ? false : "hidden"}
+                key={question}
+                transition={{
+                  duration: reduceMotion ? 0 : 0.4,
+                  delay: reduceMotion ? 0 : index * 0.025,
+                }}
+                variants={fadeUp}
+                viewport={{ once: true, margin: "-60px" }}
+                whileInView="visible"
+              >
+                <button
+                  aria-controls={panelId}
+                  aria-expanded={isOpen}
+                  className="flex min-h-16 w-full items-center justify-between gap-5 px-5 py-5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:px-6"
+                  id={triggerId}
+                  onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                  type="button"
                 >
-                  <FileDown className="h-4 w-4" aria-hidden="true" />
-                  Download PDF
-                </a>
+                  <span className="flex items-center gap-4">
+                    <span
+                      className={`hidden h-9 w-1 shrink-0 sm:block ${
+                        isOpen ? "bg-orange-400" : "bg-white/12"
+                      }`}
+                    />
+                    <span className="text-base font-black text-white sm:text-lg">
+                      {question}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`h-5 w-5 shrink-0 text-orange-300 transition ${
+                      isOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      id={panelId}
+                      initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+                      role="region"
+                      aria-labelledby={triggerId}
+                      transition={{ duration: reduceMotion ? 0 : 0.24 }}
+                    >
+                      <p className="border-t border-white/10 px-5 py-5 text-sm leading-7 text-zinc-300 sm:px-6 sm:text-base sm:leading-8">
+                        {answer}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.article>
             );
           })}
@@ -843,47 +1000,27 @@ function DisclaimerSection({ reduceMotion }: { reduceMotion: boolean }) {
             </span>
             <div>
               <p className="text-xs font-black uppercase text-amber-200">
-                Final Authority
+                Review Draft Status
               </p>
               <h2 className="mt-2 text-3xl font-black text-white">
-                Official Disclaimer
+                Plain-language guide
               </h2>
               <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-300 sm:text-base sm:leading-8">
-                This rules page is a simplified overview of IronClad tournament
-                regulations. In case of disputes or inconsistencies, the
-                official PDF rulebooks and Player Participation Agreement remain
-                the final authority.
+                This page is a plain-language guide. The governing-document
+                hierarchy and exact accepted versions control. Tournament Pages,
+                Published Decisions and Event Prize Terms supplement them only
+                within their stated scope.
+              </p>
+              <p className="mt-4 max-w-3xl text-sm font-bold leading-7 text-amber-100 sm:text-base sm:leading-8">
+                Every governing document is currently Review Draft / Not
+                Effective. Registration remains closed until approved versions
+                are published.
               </p>
             </div>
           </div>
         </motion.div>
       </div>
     </section>
-  );
-}
-
-function DocumentAction({
-  href,
-  label,
-  secondary = false,
-}: {
-  href: string;
-  label: string;
-  secondary?: boolean;
-}) {
-  return (
-    <a
-      className={`inline-flex min-h-12 items-center justify-center gap-2 border px-5 py-3 text-sm font-black transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${
-        secondary
-          ? "border-white/20 bg-white/[0.035] text-white backdrop-blur hover:border-orange-300/70 hover:bg-orange-500/10"
-          : "border-orange-400 bg-orange-500 text-black hover:border-orange-300 hover:bg-orange-300"
-      }`}
-      download
-      href={href}
-    >
-      {label}
-      <FileDown size={17} aria-hidden="true" />
-    </a>
   );
 }
 
