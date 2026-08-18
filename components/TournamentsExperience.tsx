@@ -3661,10 +3661,19 @@ function DocumentAgreementLabel({
   document: RegistrationDocumentSet[keyof RegistrationDocumentSet];
   label: string;
 }) {
+  const effectiveDate = new Intl.DateTimeFormat("en-AU", {
+    day: "numeric",
+    month: "long",
+    timeZone: "Australia/Sydney",
+    year: "numeric",
+  }).format(new Date(document.effectiveDate));
+  const abbreviatedSha256 = `${document.sha256.slice(0, 12)}…`;
+
   return (
     <>
       {prefix}{" "}
       <Link
+        aria-label={`${label} (version ${document.version}) (opens in a new tab)`}
         href={document.url}
         target="_blank"
         rel="noopener noreferrer"
@@ -3674,6 +3683,9 @@ function DocumentAgreementLabel({
         {label} (version {document.version})
       </Link>
       .
+      <span className="mt-1 block text-xs font-medium text-zinc-400">
+        Effective {effectiveDate} · SHA-256 {abbreviatedSha256}
+      </span>
     </>
   );
 }

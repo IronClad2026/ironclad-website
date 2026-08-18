@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-const publicRoutes = ["/", "/about", "/rules", "/rankings"];
+const publicRoutes = [
+  "/",
+  "/about",
+  "/rules",
+  "/terms",
+  "/privacy",
+  "/rankings",
+];
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/*", async (route) => {
@@ -91,9 +98,8 @@ test("Rules exposes the approved categories, document status, and accessible FAQ
     .filter({ hasText: "Official Tournament Rulebook" });
   await rulebookStatus.scrollIntoViewIfNeeded();
   await expect(rulebookStatus).toContainText("Version 3.0");
-  await expect(rulebookStatus).toContainText(
-    "Revised Review Draft - Not Effective"
-  );
+  await expect(rulebookStatus).toContainText("Effective");
+  await expect(rulebookStatus).toContainText("18 August 2026");
 
   const discordFaq = page.getByRole("button", { name: "Is Discord required?" });
   await discordFaq.scrollIntoViewIfNeeded();
@@ -105,7 +111,11 @@ test("Rules exposes the approved categories, document status, and accessible FAQ
   ).toBeVisible();
 
   await expect(page.getByText(/4V4 RULES/i)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /Download/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Download PDF" })).toHaveCount(4);
+  await expect(page.getByRole("link", { name: "Read Online" })).toHaveCount(2);
+  await expect(
+    page.getByRole("link", { name: /Read \(opens in a new tab\)/ })
+  ).toHaveCount(2);
 });
 
 test("About and Rankings use Career and season language without universal prizes", async ({

@@ -9,6 +9,8 @@ export type RegistrationDocumentPresentation = {
   kind: RegistrationDocumentKind;
   version: string;
   url: string;
+  effectiveDate: string;
+  sha256: string;
 };
 
 export type RegistrationDocumentSet = {

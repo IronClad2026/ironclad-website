@@ -1,0 +1,1348 @@
+{
+  "schemaVersion": 1,
+  "effectiveDate": "2026-08-18",
+  "effectiveDateDisplay": "18 August 2026",
+  "activationDatePolicy": "These four documents form one accepted corpus. If Production activation occurs after 18 August 2026, update effectiveDate and regenerate all four PDFs together before computing hashes or publishing any artifact.",
+  "documents": [
+    {
+      "kind": "rulebook",
+      "title": "OFFICIAL TOURNAMENT RULEBOOK",
+      "shortTitle": "Official Tournament Rulebook",
+      "subtitle": "Company of Heroes 3 - 1v1 Launch Events",
+      "version": "3.0",
+      "status": "Effective",
+      "effectiveDate": "2026-08-18",
+      "filename": "ironclad-official-tournament-rulebook-v3.0.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.0.pdf",
+      "operatorStatement": "Operated by Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy, through the IronClad Tournaments project.",
+      "introBlocks": [
+        {
+          "type": "callout",
+          "title": "DOCUMENT ROLES AND HIERARCHY",
+          "text": "Applicable mandatory law and non-excludable rights apply first. The Terms of Service govern platform use. The Player Participation Agreement governs Player participation. The Privacy Policy governs personal-information handling. This Rulebook governs competition mechanics and Event administration. Event materials may supplement the governing corpus only within their expressly permitted scope."
+        },
+        {
+          "type": "paragraph",
+          "text": "A lower-scope document, Poll result, FAQ, summary, external page or informal message cannot silently override a higher governing document. Where documents address different subjects, each controls its stated subject."
+        },
+        {
+          "type": "paragraph",
+          "text": "Launch principle: IronClad launch competition is deliberately narrow - Company of Heroes 3 1v1, eight Players per Division, Steam and Relic verification, private .rec Match-result proof, authenticated participant-initiated Dice, manually coordinated Side and Map selections, and no dependence on Battlefy as a current competition authority. Future team formats or larger brackets require separate approval and rules."
+        }
+      ],
+      "sections": [
+        {
+          "number": "1",
+          "title": "Purpose, Scope and Operators",
+          "blocks": [
+            {"type": "paragraph", "number": "1.1", "text": "This Rulebook governs Company of Heroes 3 (“CoH3”) 1v1 Tournaments conducted through IronClad."},
+            {"type": "paragraph", "text": "Its purpose is to protect competitive integrity and establish consistent registration, Match, evidence, dispute, scoring and historical-record procedures."},
+            {"type": "paragraph", "number": "1.2", "text": "“IronClad Tournaments” is the project and operating name currently used by Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy."},
+            {"type": "paragraph", "number": "1.3", "text": "“IronClad” means Marco Stucchi and Simone Vitiello acting through the IronClad Tournaments project.\n“Admin” means a person authorized by the operators to administer the Service or an Event.\nAn Admin is not a separate contracting party merely by acting in that role."},
+            {"type": "paragraph", "number": "1.4", "text": "IronClad is an independent community Tournament project. It is not sponsored, endorsed, administered by or affiliated with Relic Entertainment, Valve Corporation, Steam or SEGA unless expressly stated. Third-party games, footage, names, logos and marks remain the property of their respective owners. No third-party intellectual-property rights are claimed or granted."},
+            {"type": "paragraph", "number": "1.5", "text": "Applicable mandatory law and non-excludable rights apply first. The Terms govern platform use; the PPA governs participation; the Privacy Policy governs personal-information handling; this Rulebook governs competition mechanics; and Event-specific materials may supplement them only within their stated and permitted scope."},
+            {"type": "paragraph", "number": "1.6", "text": "Routine Match and Event rulings are final within the Event after the available Admin review. Significant suspensions or long-term exclusions may receive one written reconsideration request under section 17 and the PPA."}
+          ]
+        },
+        {
+          "number": "2",
+          "title": "Definitions",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": ["Term", "Meaning"],
+              "columnWidths": [1, 3],
+              "rows": [
+                ["IronClad", "Marco Stucchi and Simone Vitiello acting through the IronClad Tournaments project."],
+                ["Admin", "A person authorized by the operators to administer the Service or an Event; the role does not make that person a separate contracting party."],
+                ["Player", "An individual registered for or participating in an IronClad Event."],
+                ["Event / Tournament", "A published IronClad competition containing one or more independent 1v1 Division brackets."],
+                ["Division", "Academy, Challenge or Main / Pro, determined by the registration-time ELO snapshot."],
+                ["Game", "One individual CoH3 game."],
+                ["Series", "The best-of-three or best-of-five set of Games between two Players."],
+                ["Match", "The bracket fixture resolved by a played Series or an official non-played outcome."],
+                ["Side", "Axis or Allies."],
+                ["Tournament Page", "The authoritative Event page containing dates, deadlines, pools, bracket state and approved Event-specific terms."],
+                ["Active Review Cohort", "The first eight valid registrations considered for a Division's eight launch places."],
+                ["Waitlist", "Later eligible registrations held first-in, first-out for possible pre-launch vacancies."],
+                ["Registration Snapshot", "The server-recorded Steam/Relic ELO, faction, Division, verification time and related eligibility facts."],
+                ["Registration Acceptance Record", "The private, immutable, server-created record tied atomically to a successful registration and containing the accepted document facts, authenticated identity, timestamp, hashes and declarations."],
+                ["Official Result", "A result confirmed, automatically approved or approved by an Admin."],
+                ["Replay Proof", "The private .rec file required for each Game actually played."],
+                ["Dice Roll-Off", "The authenticated participant-initiated IronClad 2d6 process used for odd-Game choices."],
+                ["Poll", "A Tournament Decision or Community Feedback ballot whose scope and status are declared before voting."],
+                ["Eligible Audience", "The voting audience frozen when a Poll is published."],
+                ["Current Ballot", "An eligible Player's latest valid authenticated selections before close."],
+                ["Advisory", "A Poll whose outcome informs but does not determine the final Admin decision."],
+                ["Binding", "A Poll whose valid outcome determines the configured winning option or options."],
+                ["Published Decision", "The final Event-specific rule or outcome published through IronClad."],
+                ["Event Prize Terms", "Event-specific terms governing a prize-bearing Event."],
+                ["Effective document", "A versioned document explicitly approved, published, hashed, dated and activated in the trusted document register."],
+                ["Terminal Tournament", "A Cancelled or Void Event retained as factual read-only history."]
+              ]
+            }
+          ]
+        },
+        {
+          "number": "3",
+          "title": "Launch Tournament Model",
+          "blocks": [
+            {"type": "paragraph", "number": "3.1", "text": "Launch Events are 1v1 only. Team, captain, 2v2 and 4v4 rules do not apply."},
+            {"type": "paragraph", "number": "3.2", "text": "Each opened Division uses an independent eight-Player single-elimination bracket."},
+            {"type": "paragraph", "number": "3.3", "text": "Quarterfinals and semifinals are best-of-three. The Grand Final is best-of-five."},
+            {"type": "paragraph", "number": "3.4", "text": "Event dates do not replace bracket or season rules. IronClad does not promise a monthly completion model unless a specific Event expressly publishes one."},
+            {"type": "paragraph", "number": "3.5", "text": "Matches use the official CoH3 version identified for the Event. A patch, outage, exploit or material technical issue may justify a pause, schedule change or proportionate Published Decision."}
+          ]
+        },
+        {
+          "number": "4",
+          "title": "Eligibility, Accounts, Steam Verification and Divisions",
+          "blocks": [
+            {"type": "paragraph", "number": "4.1", "text": "A Player must:"},
+            {"type": "bullets", "items": ["be at least 18 years old and make the required declaration at registration;", "use their own legitimate IronClad and Steam accounts;", "possess lawful access to CoH3;", "link and control the Steam account used for the Event;", "provide accurate information;", "not evade an applicable IronClad, publisher or platform restriction; and", "participate only where lawful and operationally supported."]},
+            {"type": "paragraph", "number": "4.2", "text": "IronClad does not routinely request identity documents merely for free participation. Proportionate age, identity, account, prize-provider or compliance evidence may be required only because of a genuine eligibility concern or another legitimate legal or operational need."},
+            {"type": "paragraph", "number": "4.3", "text": "Steam OpenID verifies control of the linked Steam account. IronClad uses the verified SteamID64 to request current supported CoH3 1v1 data from Relic. No active COH3Stats verification process forms part of registration."},
+            {"type": "paragraph", "number": "4.4", "text": "The highest valid current 1v1 faction ELO determines Division:"},
+            {"type": "table", "headers": ["Division", "Verified ELO"], "columnWidths": [2, 1], "rows": [["Academy", "0-1099"], ["Challenge", "1100-1399"], ["Main / Pro", "1400+"]]},
+            {"type": "paragraph", "number": "4.5", "text": "Registration performs a fresh server-side Relic lookup. The ELO, faction, calculation version, verification time and Division form the immutable Registration Snapshot."},
+            {"type": "paragraph", "number": "4.6", "text": "Later live ELO changes do not move the Player to another Division in that Tournament."},
+            {"type": "paragraph", "number": "4.7", "text": "Account sharing, smurfing, impersonation, unauthorised substitution, duplicate registration and verification manipulation are prohibited."},
+            {"type": "paragraph", "number": "4.8", "text": "Discord is optional but recommended. It is not a profile-completion or registration requirement. Players must monitor IronClad notifications. Match participants may use match-scoped Admin Assistance, and Steam may be used outside IronClad where reasonably available."},
+            {"type": "paragraph", "number": "4.9", "text": "Supplying a Discord username and enabling its public visibility are separate choices. Public Discord visibility requires a separate opt-in."}
+          ]
+        },
+        {
+          "number": "5",
+          "title": "Registration, Active Cohort, Waitlist and Bracket Launch",
+          "blocks": [
+            {"type": "paragraph", "number": "5.1", "text": "Registration occurs through IronClad. Battlefy registration, payment screenshots, union codes and Discord check-in are not part of the launch process. Clearly labelled Battlefy links may remain only as historical archive references."},
+            {"type": "paragraph", "number": "5.2", "text": "Registration and participation are free. Registration uses the six controls described in section 21 and only the exact Effective document set supplied by the trusted server register."},
+            {"type": "paragraph", "number": "5.3", "text": "The first eight valid registrations form the Active Review Cohort. Entry is not final approval. Admins may approve, reject or place a registration in manual review."},
+            {"type": "paragraph", "number": "5.4", "text": "Later eligible Players may join the first-in, first-out Waitlist after acknowledging that a place is not guaranteed."},
+            {"type": "paragraph", "number": "5.5", "text": "A vacancy offer must be accepted before the exact deadline displayed by IronClad. The standard launch offer period is currently 24 hours, but the displayed deadline controls. An expired or declined offer passes to the next eligible Player."},
+            {"type": "paragraph", "number": "5.6", "text": "Accepting a vacancy offer returns the Player to review; it is not automatic approval."},
+            {"type": "paragraph", "number": "5.7", "text": "A Division may launch only with exactly eight approved registrations, no unresolved vacancy or review state, a ready bracket, a valid published map pool and all applicable Event launch requirements satisfied."},
+            {"type": "paragraph", "number": "5.8", "text": "A Player may withdraw before launch through the platform. Post-launch consequences follow the bracket, deadline, no-show and Admin rules."},
+            {"type": "paragraph", "number": "5.9", "text": "Players are responsible for monitoring registration, waitlist, review and launch notices."}
+          ]
+        },
+        {
+          "number": "6",
+          "title": "Tournament Settings, Map Pools, Polls and Published Decisions",
+          "blocks": [
+            {"type": "paragraph", "number": "6.1", "text": "The Tournament Page identifies the Event, Divisions, registration state, deadlines, format, map pool, support route and any applicable Event or Prize Terms."},
+            {"type": "paragraph", "number": "6.2", "text": "Each Division uses a published pool containing at least five distinct active 1v1 Maps. Only Maps in that pool may be used."},
+            {"type": "paragraph", "number": "6.3", "text": "The pool freezes when the Division launches. A post-launch correction is permitted only for:"},
+            {"type": "bullets", "items": ["a technical issue;", "an exploit;", "a game update; or", "competitive integrity."]},
+            {"type": "paragraph", "text": "The reason and replacement must be recorded and published through the map-pool system."},
+            {"type": "paragraph", "number": "6.4", "text": "A Map must not normally repeat in the same Series. An Admin may authorise an exceptional repeat or replacement only where the available pool has become technically unusable or insufficient."},
+            {"type": "paragraph", "number": "6.5", "text": "Before a Tournament Decision Poll opens, it must identify:"},
+            {"type": "bullets", "items": ["its Event or Division scope;", "Advisory or Binding status;", "Eligible Audience;", "permitted number of selections;", "open and close times;", "whether eligible-player aggregates are visible live, after close or otherwise hidden according to the configured setting;", "whether anonymous public totals are enabled;", "configured winner count;", "any cutoff-tie procedure; and", "the issue the Poll may affect."]},
+            {"type": "paragraph", "number": "6.6", "text": "The Eligible Audience freezes when the Poll is published. Later registration, withdrawal, Division or approval changes do not rewrite it."},
+            {"type": "paragraph", "number": "6.7", "text": "Each eligible Player maintains one authenticated Current Ballot and may revise it until close. A ballot may contain one or multiple selections up to the published maximum."},
+            {"type": "paragraph", "number": "6.8", "text": "Individual ballot attribution is private."},
+            {"type": "paragraph", "number": "6.9", "text": "Eligible Players may see aggregate totals only according to the Poll's configured live or after-close setting. Anonymous public totals exist only where public totals were explicitly enabled. Neither rule makes individual attribution public."},
+            {"type": "paragraph", "number": "6.10", "text": "An Advisory Poll informs the final Admin decision. A differing final decision should include a rationale where required."},
+            {"type": "paragraph", "number": "6.11", "text": "A Binding Poll determines the configured winner or top-K winners from valid Current Ballots. There is no quorum, but at least one valid ballot is required. A zero-ballot Binding Poll must be cancelled or replaced."},
+            {"type": "paragraph", "number": "6.12", "text": "If a tie crosses the final qualifying position, only the options tied across that cutoff may be selected in the tie resolution."},
+            {"type": "paragraph", "number": "6.13", "text": "Community Feedback Polls are Advisory."},
+            {"type": "paragraph", "number": "6.14", "text": "Final Published Decisions may be public."},
+            {"type": "paragraph", "number": "6.15", "text": "Poll finalisation does not automatically mutate a map pool, bracket, schedule, registration or another subsystem. Any required action must still be completed by an authorised process in the relevant subsystem."},
+            {"type": "paragraph", "number": "6.16", "text": "Closed Polls and Published Decisions may remain as read-only factual history."},
+            {"type": "paragraph", "number": "6.17", "text": "A Poll cannot override the Terms, PPA, Privacy Policy, replay integrity, result authority or another non-variable rule."}
+          ]
+        },
+        {
+          "number": "7",
+          "title": "Factions, Sides, Maps and Authenticated Dice Roll-Off",
+          "blocks": [
+            {"type": "paragraph", "number": "7.1", "text": "A Player may use any permitted faction belonging to the assigned Side and is not locked to one faction for the Tournament."},
+            {"type": "paragraph", "number": "7.2", "text": "Players use opposing Axis and Allies Sides."},
+            {"type": "paragraph", "number": "7.3", "text": "Games 1, 3 and 5 use authenticated IronClad Dice. Game 5 applies only in a best-of-five. Each participant initiates and completes their own 2d6 roll."},
+            {"type": "paragraph", "number": "7.4", "text": "Game 3 and Game 5 rolls may be completed in advance but apply only if the Series reaches that Game."},
+            {"type": "paragraph", "number": "7.5", "text": "After both Players roll, the higher total wins. A tie requires both Players to complete the next authenticated tie round. Tie rounds continue until a higher total exists."},
+            {"type": "paragraph", "number": "7.6", "text": "For Games 1, 3 and 5, the roll winner chooses either Axis or Allies, or one eligible unused Map from the published pool. The opponent chooses the remaining element."},
+            {"type": "paragraph", "number": "7.7", "text": "Each Player may use any permitted faction belonging to their assigned Side."},
+            {"type": "paragraph", "number": "7.8", "text": "For Games 2 and 4, Players swap Sides from the immediately preceding Game, and the immediately preceding Game's loser chooses a new eligible Map."},
+            {"type": "paragraph", "number": "7.9", "text": "Maps do not normally repeat. An Admin may authorise an exceptional repeat or replacement where the pool is technically unusable or insufficient."},
+            {"type": "paragraph", "number": "7.10", "text": "Side and Map selections are coordinated manually. IronClad stores authoritative Dice history but does not store or enforce Side or Map selection state."},
+            {"type": "paragraph", "number": "7.11", "text": "Players should record their agreement through a reasonable coordination channel and raise disagreements before the affected Game starts where reasonably possible."},
+            {"type": "paragraph", "number": "7.12", "text": "An Admin may consider IronClad Dice history, communications supplied by the Players, Replay Proof and other reliable evidence. Dice history proves the roll only, not a manual choice."},
+            {"type": "paragraph", "number": "7.13", "text": "Starting a Game normally confirms acceptance of the visible lobby, Map and Sides. A later complaint remains reviewable according to its evidence and effect on fairness."}
+          ]
+        },
+        {
+          "number": "8",
+          "title": "Game Settings, Hosting, Lobby Procedure and Spectators",
+          "blocks": [
+            {"type": "paragraph", "number": "8.1", "text": "Unless an approved Event instruction says otherwise, Players must manually create and verify:"},
+            {"type": "bullets", "items": ["mode: 1v1;", "Victory Points: 575;", "resources: Standard;", "starting positions: Random;", "cheats: Disabled; and", "the manually agreed Map and Sides."]},
+            {"type": "paragraph", "text": "IronClad does not automatically configure or validate the CoH3 lobby."},
+            {"type": "paragraph", "number": "8.2", "text": "Players must join the correct lobby and verify settings before starting."},
+            {"type": "paragraph", "number": "8.3", "text": "Hosting should be agreed in good faith, considering stability and regional latency. An Admin may nominate an arrangement if required."},
+            {"type": "paragraph", "number": "8.4", "text": "Incorrect settings should be raised before meaningful play. An Admin may order a restart or proportionate remedy."},
+            {"type": "paragraph", "number": "8.5", "text": "Only approved observers, casters or production staff may enter unless expressly permitted."},
+            {"type": "paragraph", "number": "8.6", "text": "Official broadcast and integrity requirements take priority over personal streaming or spectator requests."}
+          ]
+        },
+        {
+          "number": "9",
+          "title": "Communication, Scheduling and Match Deadlines",
+          "blocks": [
+            {"type": "paragraph", "number": "9.1", "text": "A Match becomes playable when activated. The Match page displays its deadline, reminders, holds and support routes."},
+            {"type": "paragraph", "number": "9.2", "text": "Players should make reasonable first contact as soon as practicable, normally within 24 hours after the Match becomes available. Missing that target alone is not an automatic forfeit."},
+            {"type": "paragraph", "number": "9.3", "text": "Discord is optional. Players must monitor IronClad notifications, may use Steam where reasonably available and may request match-scoped Admin Assistance."},
+            {"type": "paragraph", "number": "9.4", "text": "If an opponent has not responded within 48 hours, or earlier where the deadline may be jeopardised, the responsive Player should request Admin Assistance."},
+            {"type": "paragraph", "number": "9.5", "text": "These timings are operational expectations, not automatic-forfeit timers."},
+            {"type": "paragraph", "number": "9.6", "text": "Players must propose reasonable times, account for time zones, respond in good faith and preserve relevant coordination evidence."},
+            {"type": "paragraph", "number": "9.7", "text": "Deliberate scheduling obstruction is prohibited."},
+            {"type": "paragraph", "number": "9.8", "text": "An Admin may set a Match time, grant or deny an extension, place a Match on hold, award a walkover, issue a double forfeit or make another proportionate ruling."},
+            {"type": "paragraph", "number": "9.9", "text": "Published broadcast or final times must be respected."}
+          ]
+        },
+        {
+          "number": "10",
+          "title": "Pauses, Disconnects and Technical Failures",
+          "blocks": [
+            {"type": "paragraph", "number": "10.1", "text": "Each Player may use one reasonable pause per Game for a genuine technical or urgent issue, normally no longer than five minutes."},
+            {"type": "paragraph", "number": "10.2", "text": "Additional or longer pauses require opponent agreement or Admin approval."},
+            {"type": "paragraph", "number": "10.3", "text": "Deliberate pauses, disconnects or technical manipulation are prohibited."},
+            {"type": "paragraph", "number": "10.4", "text": "A genuine disconnect before 10:00 normally results in a restart unless the Game was clearly decided, the disconnect was deliberate or another restart would be unfair."},
+            {"type": "paragraph", "number": "10.5", "text": "At or after 10:00 there is no automatic winner. Players should preserve the replay and request an Admin ruling."},
+            {"type": "paragraph", "number": "10.6", "text": "An Admin may consider Replay Proof, Victory Points, map control, army state, technology state, timing, prior technical issues and other reliable evidence. IronClad does not automatically measure the CoH3 clock or determine Game state."},
+            {"type": "paragraph", "number": "10.7", "text": "Remedies may include continuing, restarting, replaying or awarding a Game or Series, extending a deadline, holding a Match or issuing a sanction."},
+            {"type": "paragraph", "number": "10.8", "text": "A widespread outage may justify a general pause, extension, rescheduling or recovery decision."}
+          ]
+        },
+        {
+          "number": "11",
+          "title": "Result Submission, Replay Proof and Confirmation",
+          "blocks": [
+            {"type": "paragraph", "number": "11.1", "text": "Results must be submitted through IronClad. Battlefy reports, Discord posts, Steam messages and screenshots are not the authoritative result process."},
+            {"type": "paragraph", "number": "11.2", "text": "A played Series report must identify the Series winner, final Series score and one unique CoH3 .rec file for every Game actually played."},
+            {"type": "paragraph", "number": "11.3", "text": "Replay Proof requirements are:"},
+            {"type": "bullets", "items": [".rec, case-insensitive;", "maximum 10 MiB per file;", "exactly one file per Game actually played;", "each payload unique and corresponding to the Series; and", "screenshots are not accepted as a substitute for required .rec Match-result proof."]},
+            {"type": "paragraph", "number": "11.4", "text": "An Admin may request separate supplemental material only for a dispute or integrity investigation. Supplemental material does not replace the required .rec proof."},
+            {"type": "paragraph", "number": "11.5", "text": "Replay Proof uploads to private IronClad-controlled Storage. IronClad validates the required count, size, path and content hash."},
+            {"type": "paragraph", "number": "11.6", "text": "Replay Proof is available only to authorised Match participants and Admins, subject to the Privacy Policy and lawful requirements."},
+            {"type": "paragraph", "number": "11.7", "text": "The opponent may confirm or dispute before the displayed deadline."},
+            {"type": "paragraph", "number": "11.8", "text": "If no valid dispute is submitted before expiry, IronClad may automatically approve the report."},
+            {"type": "paragraph", "number": "11.9", "text": "Disputed or exceptional submissions may enter Admin review."},
+            {"type": "paragraph", "number": "11.10", "text": "Only a confirmed, automatically approved or Admin-approved result becomes official and advances the bracket or affects scoring."},
+            {"type": "paragraph", "number": "11.11", "text": "Players should retain local replay copies until all applicable confirmation, dispute, review and reconsideration periods end."}
+          ]
+        },
+        {
+          "number": "12",
+          "title": "Disputes, No-Shows and Non-Played Outcomes",
+          "blocks": [
+            {"type": "paragraph", "number": "12.1", "text": "A dispute must be submitted through IronClad within the available window with a clear and truthful reason."},
+            {"type": "paragraph", "number": "12.2", "text": "An Admin may review Replay Proof, Match metadata, result history, communications supplied for review and separate supplemental material requested for the dispute or integrity investigation."},
+            {"type": "paragraph", "number": "12.3", "text": "False evidence, abusive disputes, evidence tampering or refusal to cooperate reasonably may result in sanctions."},
+            {"type": "paragraph", "number": "12.4", "text": "A Player cannot self-award a no-show. The report must use the platform process and is resolved through confirmation or Admin review."},
+            {"type": "paragraph", "number": "12.5", "text": "A confirmed no-show receives no participation award and does not create a genuine played Match, win, loss or win-rate entry."},
+            {"type": "paragraph", "number": "12.6", "text": "Byes, automatic progression, walkovers, empty feeders and double forfeits do not create fabricated played statistics. Valid progression may still receive round-passed points."},
+            {"type": "paragraph", "number": "12.7", "text": "If neither Player makes a reasonable effort, IronClad may issue a double forfeit or another proportionate decision."}
+          ]
+        },
+        {
+          "number": "13",
+          "title": "Leaderboard Points, Statistics and True Ties",
+          "blocks": [
+            {"type": "paragraph", "number": "13.1", "text": "Points are:"},
+            {"type": "table", "headers": ["Division", "Participation", "Round passed", "Tournament win"], "rows": [["Academy", "10", "2", "3"], ["Challenge", "10", "2", "3"], ["Main / Pro", "10", "5", "5"]]},
+            {"type": "paragraph", "number": "13.2", "text": "Confirmed no-shows receive no participation points."},
+            {"type": "paragraph", "number": "13.3", "text": "Round-passed points may follow genuine play or approved non-played progression. Non-played progression does not create played statistics."},
+            {"type": "paragraph", "number": "13.4", "text": "Tournament-win points go to the official bracket winner."},
+            {"type": "paragraph", "number": "13.5", "text": "Played-Match totals, wins, losses and win rate include only genuine completed Series between two Players."},
+            {"type": "paragraph", "number": "13.6", "text": "Ranking order is:"},
+            {"type": "numbered", "items": ["total points;", "Tournament wins;", "rounds passed;", "exact genuine-Match win rate; and", "genuine Match wins."]},
+            {"type": "paragraph", "number": "13.7", "text": "Players equal on every competitive key remain tied. Names or identifiers may order display but do not break the competitive tie."},
+            {"type": "paragraph", "number": "13.8", "text": "Admin adjustments must be auditable and must not silently transfer points between Divisions."},
+            {"type": "paragraph", "number": "13.9", "text": "A rank is not a prize position unless Event Prize Terms say so. Prize-crossing ties follow section 20."},
+            {"type": "paragraph", "number": "13.10", "text": "No underdog bonus applies."}
+          ]
+        },
+        {
+          "number": "14",
+          "title": "Career Standings and Main / Pro Seasons",
+          "blocks": [
+            {"type": "paragraph", "number": "14.1", "text": "Academy and Challenge use separate permanent Career standings."},
+            {"type": "paragraph", "number": "14.2", "text": "A Player entering Academy or Challenge may receive a one-time catch-up award:"},
+            {"type": "bullets", "items": ["+5 per prior eligible missed completed Event in that Division;", "maximum +25;", "once per Player per Division;", "never for Main / Pro;", "excluding Void Events; and", "fixed by the permanent first-entry anchor."]},
+            {"type": "paragraph", "text": "A confirmed no-show may establish the anchor without receiving participation points."},
+            {"type": "paragraph", "number": "14.3", "text": "A Main / Pro season contains exactly six valid qualifying Events: completed Tournaments with a launched, non-Void Main / Pro Division."},
+            {"type": "paragraph", "number": "14.4", "text": "Event seven begins the next season. Calendar labels do not replace the six-Event rule."},
+            {"type": "paragraph", "number": "14.5", "text": "After six valid Events are scored, final Main / Pro standings freeze."},
+            {"type": "paragraph", "number": "14.6", "text": "Later Void review places the factual season under review rather than silently rewriting it."},
+            {"type": "paragraph", "number": "14.7", "text": "Main / Pro standings are prize-bearing only where separate Event Prize Terms say so."}
+          ]
+        },
+        {
+          "number": "15",
+          "title": "Competitive Integrity, Conduct and Anti-Cheat",
+          "blocks": [
+            {"type": "paragraph", "number": "15.1", "text": "Players must act honestly, respectfully and in good faith."},
+            {"type": "paragraph", "number": "15.2", "text": "Prohibited conduct includes cheating, unauthorised tools, gameplay automation, stream sniping, real-time assistance, collusion, result manipulation, account sharing, smurfing, impersonation, exploit abuse, harassment, deliberate technical obstruction, fraudulent voting and falsified or tampered evidence."},
+            {"type": "paragraph", "number": "15.3", "text": "Good-faith criticism or reporting is not prohibited. Abuse, threats, dishonesty, retaliation and deliberate disruption are."},
+            {"type": "paragraph", "number": "15.4", "text": "An Admin may request proportionate evidence but will not require passwords, authentication codes, recovery codes or unrestricted access to unrelated private devices or accounts."}
+          ]
+        },
+        {
+          "number": "16",
+          "title": "Streaming, Broadcasting and Media",
+          "blocks": [
+            {"type": "paragraph", "number": "16.1", "text": "Personal streaming is permitted only where the Tournament Page and broadcast instructions allow it."},
+            {"type": "paragraph", "number": "16.2", "text": "A permitted personal live stream must use at least a two-minute delay unless a published Event or broadcast instruction requires a longer delay or expressly waives the default."},
+            {"type": "paragraph", "number": "16.3", "text": "Official broadcast and integrity requirements take priority."},
+            {"type": "paragraph", "number": "16.4", "text": "Players must not expose private opponent communications or use another broadcast for live competitive information."},
+            {"type": "paragraph", "number": "16.5", "text": "Media permission is governed by the PPA and any applicable Event or broadcast notice. Public or commercial gameplay recording, broadcasting, republication or promotion may occur only to the extent separately permitted by the relevant game and platform rights holders and supported by any participant permission required for identity, likeness, voice or Player-owned material."},
+            {"type": "paragraph", "number": "16.6", "text": "Private Replay Proof, private Discord, private email, private Match coordination, dispute or integrity material, identity documents and payout details are not promotional content. Private .rec files must not be used as general marketing material."},
+            {"type": "paragraph", "number": "16.7", "text": "A Player cannot grant IronClad rights in game code, assets, footage, marks or other intellectual property owned by Relic, Valve, Steam, SEGA or another third party."}
+          ]
+        },
+        {
+          "number": "17",
+          "title": "Administrator Authority, Penalties and Reconsideration",
+          "blocks": [
+            {"type": "paragraph", "number": "17.1", "text": "Admins may take proportionate action within delegated authority to apply the governing documents and preserve fairness, safety and integrity."},
+            {"type": "paragraph", "number": "17.2", "text": "Available actions include warnings, corrections, restarts, rescheduling, Game or Match loss, walkover, double forfeit, point correction, registration rejection, disqualification, suspension or long-term exclusion."},
+            {"type": "paragraph", "number": "17.3", "text": "Material rulings and sanctions should have a recorded reason."},
+            {"type": "paragraph", "number": "17.4", "text": "Routine Event rulings are final after the available designated review. Significant suspensions or long-term exclusions may receive one written reconsideration request."},
+            {"type": "paragraph", "number": "17.5", "text": "Reconsideration does not automatically suspend the original decision."},
+            {"type": "paragraph", "number": "17.6", "text": "Internal Event finality does not remove any non-excludable consumer, privacy, statutory or judicial right."}
+          ]
+        },
+        {
+          "number": "18",
+          "title": "Cancel, Void, Hard Delete and Historical Records",
+          "blocks": [
+            {"type": "paragraph", "number": "18.1", "text": "Hard Delete is reserved for disposable, unlaunched data with no protected competitive or acceptance history."},
+            {"type": "paragraph", "number": "18.2", "text": "Cancel is a terminal, non-destructive recovery action for an eligible Event without official competitive or leaderboard history."},
+            {"type": "paragraph", "number": "18.3", "text": "Void preserves factual Tournament and evidence records while reconciling approved derived scoring or season effects."},
+            {"type": "paragraph", "number": "18.4", "text": "A Void membership remains auditable and does not occupy a valid season slot."},
+            {"type": "paragraph", "number": "18.5", "text": "A finalised Main / Pro season is not silently rewritten."},
+            {"type": "paragraph", "number": "18.6", "text": "Cancelled and Void Events are read-only. Explicit historical links may display factual records subject to privacy controls."},
+            {"type": "paragraph", "number": "18.7", "text": "Registration Acceptance Records and other evidence required for lawful audit or claims may survive an otherwise authorised Tournament deletion."}
+          ]
+        },
+        {
+          "number": "19",
+          "title": "Privacy, Public Profiles and Account Closure",
+          "blocks": [
+            {"type": "paragraph", "number": "19.1", "text": "The versioned Privacy Policy governs collection, use, disclosure, security, retention, privacy requests and closure handling."},
+            {"type": "paragraph", "number": "19.2", "text": "Public player profiles are opt-in. Disabling optional profile visibility does not remove factual participation from official Competition History."},
+            {"type": "paragraph", "number": "19.3", "text": "Optional public fields, including Discord, may be masked while factual competition identity remains where permitted."},
+            {"type": "paragraph", "number": "19.4", "text": "Replay Proof, Poll ballot attribution, disputes, no-show evidence, Admin Assistance material, Admin records, acceptance records and payout details are private operational data."},
+            {"type": "paragraph", "number": "19.5", "text": "An account without protected history may be deleted. A history-bearing account may be pseudonymised as Former Competitor while factual history remains where reasonably necessary and lawful."},
+            {"type": "paragraph", "number": "19.6", "text": "Closure does not promise immediate or absolute erasure across the application, identity provider, Storage, support mailbox, logs, backups or other providers."},
+            {"type": "paragraph", "number": "19.7", "text": "Closure does not require rewriting completed results or another Player's factual record and cannot guarantee removal of every identifier embedded by users in preserved private free-text or replay evidence."}
+          ]
+        },
+        {
+          "number": "20",
+          "title": "Prizes, Payouts and Event-Specific Terms",
+          "blocks": [
+            {"type": "paragraph", "number": "20.1", "text": "Registration and participation are free."},
+            {"type": "paragraph", "number": "20.2", "text": "Not every Event offers prizes. Before registration opens for a prize-bearing Event, the Tournament Page or Event Prize Terms must publish:"},
+            {"type": "bullets", "items": ["gross amount;", "currency;", "placement allocation;", "material eligibility;", "treatment of fees and conversion;", "supported payout methods;", "expected timeframe;", "tie treatment; and", "relevant cancellation, Void or partial-completion treatment."]},
+            {"type": "paragraph", "number": "20.3", "text": "A prize is gross unless expressly stated otherwise. Disclosed transfer, conversion, intermediary, bank or provider fees may reduce the net receipt."},
+            {"type": "paragraph", "number": "20.4", "text": "Payout may be administered manually. No automated payout or tracking system is promised."},
+            {"type": "paragraph", "number": "20.5", "text": "Wise may be preferred where supported. PayPal or another published supported method may be used. No provider is universally available."},
+            {"type": "paragraph", "number": "20.6", "text": "A winner may need to provide accurate payout information and complete proportionate provider or legal verification."},
+            {"type": "paragraph", "number": "20.7", "text": "Payment follows the final result, placement, eligibility and receipt of required information. Event Prize Terms must state an expected timeframe. There is no universal 48-hour promise."},
+            {"type": "paragraph", "number": "20.8", "text": "Players remain responsible for taxes subject to applicable law."},
+            {"type": "paragraph", "number": "20.9", "text": "If a true tie crosses prize positions, a different fair method applies only if published before registration. Otherwise, combine the occupied allocations and divide the total equally among the tied Players. No unpublished leaderboard tie-break may be invented."},
+            {"type": "paragraph", "number": "20.10", "text": "Paid, sponsored or cosmetic benefits must not affect competitive fairness."}
+          ]
+        },
+        {
+          "number": "21",
+          "title": "Force Majeure, Amendments, Versioning and Acceptance",
+          "blocks": [
+            {"type": "paragraph", "number": "21.1", "text": "IronClad may pause, postpone, reschedule, modify, Cancel or Void an Event for a serious technical, security, publisher, legal, integrity or force-majeure circumstance."},
+            {"type": "paragraph", "number": "21.2", "text": "Recovery should be proportionate and preserve factual history where possible. Event Prize Terms and non-excludable law govern any prize consequence."},
+            {"type": "paragraph", "number": "21.3", "text": "Every Effective Rulebook has a version, publication date, effective date, stable versioned URL and verified SHA-256 hash."},
+            {"type": "paragraph", "number": "21.4", "text": "An Effective document must not be materially overwritten under the same version. A material revision requires a new version and artifact and may require renewed acceptance."},
+            {"type": "paragraph", "number": "21.5", "text": "Narrow emergency decisions may be issued only where reasonably necessary and must not authorise unrelated retrospective changes."},
+            {"type": "paragraph", "number": "21.6", "text": "Registration presents six separate user controls:"},
+            {"type": "numbered", "items": ["acceptance of the exact Rulebook version;", "acceptance of the exact PPA version;", "acceptance of the exact Terms version;", "acknowledgement of the exact Privacy Policy version;", "confirmation that the Player is at least 18; and", "confirmation that the Player uses their own authenticated IronClad account and that the linked Steam account belongs to them."]},
+            {"type": "paragraph", "text": "Each document control links to the exact version presented. Privacy acknowledgement is not blanket consent to optional processing."},
+            {"type": "paragraph", "number": "21.7", "text": "A successful registration atomically creates one private, immutable Registration Acceptance Record. The record preserves:"},
+            {"type": "bullets", "items": ["registration and Tournament identifiers;", "authenticated Clerk user ID;", "database-owned acceptance timestamp;", "document-register identifiers;", "exact Rulebook, PPA, Terms and Privacy versions;", "exact versioned URLs;", "exact SHA-256 hashes;", "Rulebook, PPA and Terms acceptance;", "Privacy acknowledgement;", "18+ confirmation;", "own-IronClad-account confirmation; and", "linked-Steam-account confirmation."]},
+            {"type": "paragraph", "number": "21.8", "text": "The trusted server register supplies the authoritative document identifiers, statuses, versions, URLs, dates and hashes. Browser-supplied document facts are not authoritative. Registration cannot succeed without the complete Effective document set and all required controls."},
+            {"type": "paragraph", "number": "21.9", "text": "Contact: ironclad.tournaments@gmail.com or the published platform support route."}
+          ]
+        },
+        {
+          "number": "Appendix A",
+          "title": "Quick Reference",
+          "blocks": [
+            {"type": "table", "headers": ["Division", "ELO", "Model"], "rows": [["Academy", "0-1099", "Permanent Career standings"], ["Challenge", "1100-1399", "Permanent Career standings"], ["Main / Pro", "1400+", "Six valid Events per season"]]},
+            {"type": "table", "headers": ["Division", "Participation", "Round passed", "Tournament win"], "rows": [["Academy", "10", "2", "3"], ["Challenge", "10", "2", "3"], ["Main / Pro", "10", "5", "5"]]},
+            {"type": "table", "headers": ["Replay requirement", "Rule"], "columnWidths": [1, 3], "rows": [["Format", ".rec"], ["Maximum", "10 MiB per file"], ["Count", "One per Game actually played"], ["Uniqueness", "Each replay payload must be unique"], ["Privacy", "Authorised Match participants and Admins only"], ["Screenshots", "Not accepted as substitute Match-result proof"], ["Supplemental material", "May be requested separately only for a dispute or integrity investigation"], ["Promotional use", "Private Replay Proof is excluded"]]},
+            {"type": "table", "headers": ["Game", "Dice", "Manual choice"], "columnWidths": [1, 2, 3], "rows": [["1", "Each Player initiates 2d6; both complete new tie rounds until resolved", "Higher total chooses Side or unused eligible Map; opponent chooses the remainder"], ["2", "No new roll", "Swap Sides; Game 1 loser chooses a new unused eligible Map"], ["3", "Each Player initiates 2d6; may pre-roll; applies only if reached", "Higher total chooses Side or unused eligible Map; opponent chooses the remainder"], ["4", "No new roll", "Swap Sides; Game 3 loser chooses a new unused eligible Map"], ["5", "Best-of-five only; each Player initiates 2d6; may pre-roll; applies only if reached", "Higher total chooses Side or unused eligible Map; opponent chooses the remainder"]]},
+            {"type": "paragraph", "text": "Each Player may use any permitted faction belonging to the assigned Side. Maps do not normally repeat. IronClad records Dice history, not Side or Map selection state."},
+            {"type": "table", "headers": ["Poll information", "Visibility"], "columnWidths": [1, 3], "rows": [["Individual ballot attribution", "Private"], ["Eligible-player aggregates", "According to the configured live or after-close setting"], ["Anonymous public totals", "Only where explicitly enabled"], ["Final Published Decision", "May be public"], ["Other subsystem state", "Not changed automatically by Poll finalisation"]]}
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "ppa",
+      "title": "PLAYER PARTICIPATION AGREEMENT",
+      "shortTitle": "Player Participation Agreement",
+      "subtitle": "Company of Heroes 3 - 1v1 Launch Events",
+      "version": "3.0",
+      "status": "Effective",
+      "effectiveDate": "2026-08-18",
+      "filename": "ironclad-player-participation-agreement-v3.0.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.0.pdf",
+      "operatorStatement": "Agreement between the Player and Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy.",
+      "introBlocks": [
+        {
+          "type": "callout",
+          "title": "READ WITH THE OTHER GOVERNING DOCUMENTS",
+          "text": "Applicable mandatory law and non-excludable rights apply first. The Terms of Service govern platform use. This Agreement governs Player participation. The Privacy Policy governs personal-information handling. The Rulebook governs competition mechanics. Event materials may supplement them only within their stated and permitted scope."
+        },
+        {
+          "type": "paragraph",
+          "text": "IronClad aims to keep competition obligations clear. Event-specific rules apply only within their published scope. FAQs, summaries, Poll discussions, informal messages and external pages do not silently amend the governing documents."
+        }
+      ],
+      "sections": [
+        {
+          "number": "1",
+          "title": "Purpose, Scope and Operators",
+          "blocks": [
+            {"type": "paragraph", "number": "1.1", "text": "This Agreement is between the Player and Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy."},
+            {"type": "paragraph", "number": "1.2", "text": "Those two named natural persons currently operate the Service using the project and operating name “IronClad Tournaments”."},
+            {"type": "paragraph", "number": "1.3", "text": "In this Agreement, “IronClad”, “we”, “us”, and “our” mean Marco Stucchi and Simone Vitiello acting through the IronClad Tournaments project.\n“Admin” means a person authorized by the operators to administer the Service or an Event.\nAn Admin is not a separate contracting party merely by acting in that role."},
+            {"type": "paragraph", "number": "1.4", "text": "Contact for Tournament support, legal notices, privacy enquiries, and complaints:\nironclad.tournaments@gmail.com"},
+            {"type": "paragraph", "number": "1.5", "text": "This PPA applies to IronClad-hosted CoH3 1v1 Tournaments unless a later Effective version or clearly identified permitted supplement applies."},
+            {"type": "paragraph", "number": "1.6", "text": "Registration and participation are free. An Event may offer no prize or may offer prizes under separate Event Prize Terms. Prizes, sponsorships and cosmetic benefits must not affect competitive fairness."},
+            {"type": "paragraph", "number": "1.7", "text": "IronClad is an independent community Tournament project. It is not sponsored, endorsed, administered by or affiliated with Relic Entertainment, Valve Corporation, Steam or SEGA unless expressly stated. Third-party games, footage, names, logos and marks remain the property of their respective owners. No third-party intellectual-property rights are claimed or granted."}
+          ]
+        },
+        {
+          "number": "2",
+          "title": "Definitions and Governing Documents",
+          "blocks": [
+            {"type": "paragraph", "number": "2.1", "text": "For this Agreement:"},
+            {"type": "table", "headers": ["Term", "Meaning"], "columnWidths": [1, 3], "rows": [
+              ["IronClad", "Marco Stucchi and Simone Vitiello acting through the IronClad Tournaments project."],
+              ["Admin", "A person authorized by the operators to administer the Service or an Event; the role does not make that person a separate contracting party."],
+              ["Competition History", "Factual registrations, brackets, results, standings, champions and related integrity records."],
+              ["Event / Tournament", "An IronClad competition."],
+              ["Event Prize Terms", "Terms governing a specific prize-bearing Event."],
+              ["Game", "One individual CoH3 game."],
+              ["Series", "The best-of-three or best-of-five set of Games between two Players."],
+              ["Match", "A bracket fixture resolved by a played Series or an official non-played outcome."],
+              ["Player", "An individual registering for or participating in an Event."],
+              ["Poll", "An authenticated Advisory or Binding voting process."],
+              ["Published Decision", "The final Event-specific outcome published through IronClad."],
+              ["Registration Acceptance Record", "The private, immutable, server-created record tied atomically to registration and containing exact document facts, authenticated identity, timestamp, hashes and declarations."],
+              ["Rulebook", "The Effective version identified at registration."],
+              ["Tournament Page", "The official Event or Division page."],
+              ["Tournament-Specific Rules", "Additional rules clearly published for an Event or Division."],
+              ["Tournament-public identity", "The display or in-game identity lawfully shown in brackets, official results, standings or other public Competition History."]
+            ]},
+            {"type": "paragraph", "number": "2.2", "text": "Applicable mandatory law and non-excludable rights apply first."},
+            {"type": "paragraph", "number": "2.3", "text": "The Terms govern platform use; this PPA governs participation; the Privacy Policy governs personal-information handling; the Rulebook governs competition mechanics; and Event Prize Terms govern a specific prize."},
+            {"type": "paragraph", "number": "2.4", "text": "A Tournament Page, Event supplement, approved map pool or final Published Decision may supplement the governing documents only within its stated and permitted scope."},
+            {"type": "paragraph", "number": "2.5", "text": "Informal messages, FAQs, summaries, Poll results and external pages do not silently amend a governing document."},
+            {"type": "paragraph", "number": "2.6", "text": "Tournament-Specific Rules do not permanently amend another document and cannot remove non-excludable rights."}
+          ]
+        },
+        {
+          "number": "3",
+          "title": "Eligibility and Age Requirement",
+          "blocks": [
+            {"type": "paragraph", "number": "3.1", "text": "A Player must be at least 18 at registration and make the explicit electronic declaration in section 20. A person under 18 must not register."},
+            {"type": "paragraph", "number": "3.2", "text": "IronClad does not ordinarily request identity documents merely for free participation. Proportionate evidence may be required only for a genuine eligibility concern, applicable law, provider requirement, prize requirement or another legitimate compliance need."},
+            {"type": "paragraph", "number": "3.3", "text": "A materially ineligible Player may be removed or disqualified, have prize eligibility suspended and receive the minimum necessary competition correction. Factual played-Match history may remain where reasonably necessary and lawful."},
+            {"type": "paragraph", "number": "3.4", "text": "Participation is intended globally where lawful and operationally supported. IronClad may restrict participation for a genuine legal, sanctions, publisher, payment, security or operational reason."},
+            {"type": "paragraph", "number": "3.5", "text": "Players must possess their own legitimate Steam and IronClad accounts and lawful CoH3 access."},
+            {"type": "paragraph", "number": "3.6", "text": "Knowingly false age, identity, eligibility, account or ownership information may result in rejection or sanction."}
+          ]
+        },
+        {
+          "number": "4",
+          "title": "Account Ownership, Steam Linking and ELO Verification",
+          "blocks": [
+            {"type": "paragraph", "number": "4.1", "text": "Players must use their own IronClad and Steam accounts. Account sharing, impersonation, unauthorised substitution, eligibility smurfing and duplicate evasion are prohibited."},
+            {"type": "paragraph", "number": "4.2", "text": "Steam linking establishes control of the associated Steam identity. IronClad may use the verified SteamID64 to request current supported CoH3 competitive data from Steam and Relic. No active COH3Stats verification process forms part of registration."},
+            {"type": "paragraph", "number": "4.3", "text": "Launch Divisions are:"},
+            {"type": "table", "headers": ["Division", "Verified current 1v1 ELO"], "columnWidths": [2, 1], "rows": [["Academy", "0-1099"], ["Challenge", "1100-1399"], ["Main / Pro", "1400+"]]},
+            {"type": "paragraph", "number": "4.4", "text": "Registration performs a fresh Relic verification and stores a Tournament-specific immutable ELO, faction, calculation-version, verification-time and Division snapshot."},
+            {"type": "paragraph", "number": "4.5", "text": "Later live ELO changes do not move that registration to another Division."},
+            {"type": "paragraph", "number": "4.6", "text": "Players must not manipulate account or verification information to gain a Division or competitive advantage."}
+          ]
+        },
+        {
+          "number": "5",
+          "title": "Registration and Participation",
+          "blocks": [
+            {"type": "paragraph", "number": "5.1", "text": "Registration is completed through IronClad. Battlefy is not the current registration, result-reporting or competition authority. Clearly labelled historical pages may retain factual pre-platform Battlefy links."},
+            {"type": "paragraph", "number": "5.2", "text": "Launch Events are 1v1 with independent eight-Player Division brackets."},
+            {"type": "paragraph", "number": "5.3", "text": "Registration does not guarantee approval or a place. Eligibility, fresh verification, capacity, duplicate checks and Admin review determine status."},
+            {"type": "paragraph", "number": "5.4", "text": "Players must monitor IronClad for registration decisions, Match availability, vacancy offers, deadlines, result actions, disputes and support messages."},
+            {"type": "paragraph", "number": "5.5", "text": "No separate external check-in is required unless expressly and lawfully introduced for a future Event."},
+            {"type": "paragraph", "number": "5.6", "text": "Registration requires the six user controls in section 20."},
+            {"type": "paragraph", "number": "5.7", "text": "Every successful registration and its private Registration Acceptance Record are created atomically. Neither may be created without the other."}
+          ]
+        },
+        {
+          "number": "6",
+          "title": "Communication, Availability and Match Coordination",
+          "blocks": [
+            {"type": "paragraph", "number": "6.1", "text": "Players must reasonably contact their opponent, arrange a playable time and complete the Series before the deadline. First contact should occur as soon as practicable, normally within 24 hours after the Match becomes available. Missing that target alone is not an automatic forfeit."},
+            {"type": "paragraph", "number": "6.2", "text": "Discord is optional but recommended. It is not a profile-completion or registration requirement. Supplying Discord and making it public are separate choices."},
+            {"type": "paragraph", "number": "6.3", "text": "Players must monitor IronClad notifications. Steam may be used outside IronClad where reasonably available. Match participants may request match-scoped Admin Assistance when contact cannot be established or another operational problem requires help."},
+            {"type": "paragraph", "number": "6.4", "text": "A responsive Player should request Admin Assistance after 48 hours without a response, or earlier where the deadline may be jeopardised."},
+            {"type": "paragraph", "number": "6.5", "text": "Deliberate avoidance, delay, misuse of contact details and false availability claims are prohibited."}
+          ]
+        },
+        {
+          "number": "7",
+          "title": "Tournament-Specific Rules, Polls and Published Decisions",
+          "blocks": [
+            {"type": "paragraph", "number": "7.1", "text": "IronClad may publish Event-specific map, scheduling, broadcast or technical instructions permitted by the governing documents."},
+            {"type": "paragraph", "number": "7.2", "text": "Before a Tournament Poll opens, it must identify its scope, Advisory or Binding status, Eligible Audience, permitted selections, voting period, eligible-player aggregate visibility, public-total setting, configured winner count and any cutoff-tie method. Eligibility freezes at publication."},
+            {"type": "paragraph", "number": "7.3", "text": "An eligible Player may revise their authenticated Current Ballot until close."},
+            {"type": "paragraph", "number": "7.4", "text": "Individual ballot attribution is private."},
+            {"type": "paragraph", "number": "7.5", "text": "Eligible Players may see aggregate totals according to the Poll's configured live or after-close setting. Anonymous public totals exist only where public totals were explicitly enabled."},
+            {"type": "paragraph", "number": "7.6", "text": "Advisory outcomes inform the final Admin decision. Binding outcomes follow the published method and Rulebook, including configured multiple winners and cutoff ties. A Binding Poll requires at least one valid ballot."},
+            {"type": "paragraph", "number": "7.7", "text": "Final Published Decisions may be public."},
+            {"type": "paragraph", "number": "7.8", "text": "Poll finalisation does not automatically mutate a map pool, bracket, schedule, registration or another subsystem. Any required action must still be completed through an authorised process in the relevant system."},
+            {"type": "paragraph", "number": "7.9", "text": "Emergency Event decisions must address a genuine fairness, technical, security, publisher, legal or operational need and must not rewrite unrelated completed results."}
+          ]
+        },
+        {
+          "number": "8",
+          "title": "Player Conduct and Community Standards",
+          "blocks": [
+            {"type": "paragraph", "number": "8.1", "text": "Players must act respectfully, honestly and sportsmanlike."},
+            {"type": "paragraph", "number": "8.2", "text": "Harassment, hate speech, threats, doxxing, deliberate operational disruption, impersonation, false evidence, fraudulent claims and retaliation against good-faith reporting are prohibited."},
+            {"type": "paragraph", "number": "8.3", "text": "Legitimate criticism or disagreement is not prohibited, but abuse, threats and knowingly false claims are."}
+          ]
+        },
+        {
+          "number": "9",
+          "title": "Competitive Integrity and Anti-Cheat",
+          "blocks": [
+            {"type": "paragraph", "number": "9.1", "text": "Players must compete personally and without unauthorised assistance."},
+            {"type": "paragraph", "number": "9.2", "text": "Prohibited conduct includes cheats, unauthorised tools, gameplay automation, information manipulation, stream sniping, collusion, result manipulation, deliberate disconnects, prohibited exploit use and evidence tampering."},
+            {"type": "paragraph", "number": "9.3", "text": "Players must reasonably cooperate with integrity investigations. IronClad may request proportionate evidence but will not require passwords, authentication codes, recovery codes or unrestricted device access."},
+            {"type": "paragraph", "number": "9.4", "text": "A Player, result, registration or payout may be placed under review while a serious issue is investigated."}
+          ]
+        },
+        {
+          "number": "10",
+          "title": "Match Results, Replay Evidence, Disputes and No-Shows",
+          "blocks": [
+            {"type": "paragraph", "number": "10.1", "text": "Results must be submitted through IronClad."},
+            {"type": "paragraph", "number": "10.2", "text": "The required Match-result proof for a played Series is its winner, final score and one unique .rec replay for every Game actually played, with each replay no more than 10 MiB."},
+            {"type": "paragraph", "number": "10.3", "text": "Screenshots are not accepted as a substitute for required .rec Match-result proof."},
+            {"type": "paragraph", "number": "10.4", "text": "An Admin may request separate supplemental material only for a dispute or integrity investigation. Supplemental material does not replace the required .rec proof."},
+            {"type": "paragraph", "number": "10.5", "text": "Replay Proof is private and accessible only to authorised Match participants and Admins, subject to lawful requirements and the Privacy Policy."},
+            {"type": "paragraph", "number": "10.6", "text": "The opponent may confirm or dispute within the displayed platform window. An unanswered report may auto-confirm after the applicable deadline. A disputed or exceptional report may enter Admin review."},
+            {"type": "paragraph", "number": "10.7", "text": "False reports, tampered replays, fabricated evidence and abusive disputes may result in serious sanctions."},
+            {"type": "paragraph", "number": "10.8", "text": "No-shows, byes, walkovers, empty feeders, Admin progression and double forfeits must not be presented as genuine played statistics."}
+          ]
+        },
+        {
+          "number": "11",
+          "title": "Administrator Authority, Penalties and Reconsideration",
+          "blocks": [
+            {"type": "paragraph", "number": "11.1", "text": "Admins may take proportionate action within delegated authority to apply the governing documents and preserve integrity, safety and fairness."},
+            {"type": "paragraph", "number": "11.2", "text": "Actions may include warnings, Match remedies, bracket corrections, registration rejection, disqualification, suspension, long-term exclusion and affected prize ineligibility."},
+            {"type": "paragraph", "number": "11.3", "text": "Material rulings and sanctions should have a recorded reason."},
+            {"type": "paragraph", "number": "11.4", "text": "Routine Match rulings are final after the designated review."},
+            {"type": "paragraph", "number": "11.5", "text": "Significant suspensions or long-term exclusions may receive one written reconsideration request. Reconsideration does not automatically suspend the decision."},
+            {"type": "paragraph", "number": "11.6", "text": "Internal finality does not remove non-excludable consumer, privacy, statutory or judicial rights."}
+          ]
+        },
+        {
+          "number": "12",
+          "title": "Streaming, Broadcasts and Media Permission",
+          "blocks": [
+            {"type": "paragraph", "number": "12.1", "text": "Players may stream only under the Rulebook, Tournament Page and applicable broadcast instructions."},
+            {"type": "paragraph", "number": "12.2", "text": "IronClad may designate official broadcasts and impose reasonable integrity measures, including the Rulebook's default stream-delay rule."},
+            {"type": "paragraph", "number": "12.3", "text": "To the extent the Player owns or controls the relevant rights, the Player grants IronClad a non-exclusive, worldwide, royalty-free permission to use Tournament-public identity, official results, standings, achievements, an enabled public avatar and Player-owned material knowingly contributed to an authorised Event broadcast or Player-authorised Event stream, solely as reasonably necessary to operate, report, factually archive and promote IronClad Events."},
+            {"type": "paragraph", "number": "12.4", "text": "Public or commercial recording, broadcasting, republication or promotion of gameplay or game footage may occur only to the extent separately permitted by the relevant game and platform rights holders and supported by any participant permission required for identity, likeness, voice or Player-owned material."},
+            {"type": "paragraph", "number": "12.5", "text": "The media permission does not include private .rec Replay Proof, private Discord, private email, private Match coordination, dispute or integrity material, identity documents, payment or payout details or other private personal information. Private Replay Proof is operational evidence only and must not be used as general promotional material."},
+            {"type": "paragraph", "number": "12.6", "text": "Voice or webcam material is included only where knowingly captured in an authorised official broadcast or Player-authorised Event stream and only where the required participant permission applies."},
+            {"type": "paragraph", "number": "12.7", "text": "A Player cannot grant IronClad rights in game code, assets, footage, marks or other intellectual property owned by Relic, Valve, Steam, SEGA or another third party. Nothing in this Agreement transfers ownership or waives rights that cannot lawfully be waived."},
+            {"type": "paragraph", "number": "12.8", "text": "A Player may contact IronClad about correction or future promotional reuse of Player-owned material. Completed lawful broadcasts and factual archives may remain where reasonably necessary, subject to applicable law and the Privacy Policy."}
+          ]
+        },
+        {
+          "number": "13",
+          "title": "Prizes, Payouts, Fees, True Ties and Taxes",
+          "blocks": [
+            {"type": "paragraph", "number": "13.1", "text": "Not every Event offers prizes. Before registration opens for a prize-bearing Event, the Tournament Page or Event Prize Terms must identify gross amount, currency, allocation, material eligibility, fee and conversion treatment, supported methods, expected timeframe, tie treatment and relevant cancellation or Void treatment."},
+            {"type": "paragraph", "number": "13.2", "text": "Prizes are gross unless expressly stated otherwise. Disclosed transfer, conversion, intermediary, bank or provider fees may reduce receipt."},
+            {"type": "paragraph", "number": "13.3", "text": "If a true tie crosses prize positions and no different fair method was published before registration, the occupied allocations are combined and divided equally among the tied Players. No unpublished ranking tie-break may be invented."},
+            {"type": "paragraph", "number": "13.4", "text": "Payment may be administered manually. No automated payout system is represented."},
+            {"type": "paragraph", "number": "13.5", "text": "Wise may be preferred where supported. PayPal or another published supported method may be used. Availability is not guaranteed in every country."},
+            {"type": "paragraph", "number": "13.6", "text": "Payment follows the final result, placement, eligibility and receipt of required information. Event Prize Terms state the expected timeframe. No universal 48-hour promise applies."},
+            {"type": "paragraph", "number": "13.7", "text": "Players must provide accurate payout information and complete proportionate provider or legal verification where required."},
+            {"type": "paragraph", "number": "13.8", "text": "Players remain responsible for taxes subject to applicable law."}
+          ]
+        },
+        {
+          "number": "14",
+          "title": "Privacy, Data Handling and Public Competition Records",
+          "blocks": [
+            {"type": "paragraph", "number": "14.1", "text": "Personal information is handled under the versioned Privacy Policy."},
+            {"type": "paragraph", "number": "14.2", "text": "Relevant categories may include:"},
+            {"type": "bullets", "items": ["authentication identity and verified email;", "Steam and Relic data;", "in-game name, ELO, faction and Registration Snapshot;", "country or region, profile settings, avatar and optional Discord;", "registrations and private Registration Acceptance Records;", "results, Replay Proof, disputes and no-shows;", "standings and Competition History;", "notifications and Admin Assistance;", "Poll eligibility, ballots, aggregate totals and Published Decisions; and", "prize or payout information where applicable."]},
+            {"type": "paragraph", "number": "14.3", "text": "Public-profile visibility is separate from official Competition History."},
+            {"type": "paragraph", "number": "14.4", "text": "Replay Proof, dispute and no-show material, individual ballot attribution, Admin Assistance, Admin records, acceptance records and payout details are private unless a limited disclosure is authorised, operationally necessary or legally required."},
+            {"type": "paragraph", "number": "14.5", "text": "IronClad may use disclosed providers for authentication, hosting, database and Storage, email, Steam, Relic and conditional payouts. Their own terms and privacy practices may also apply."},
+            {"type": "paragraph", "number": "14.6", "text": "Retention depends on the approved Privacy Policy, operational and integrity needs, legal requirements, claims and lawful historical purposes."}
+          ]
+        },
+        {
+          "number": "15",
+          "title": "Account Closure and Historical Records",
+          "blocks": [
+            {"type": "paragraph", "number": "15.1", "text": "Players may request closure through the platform or published support route."},
+            {"type": "paragraph", "number": "15.2", "text": "An account without protected history may be removed. Where history exists, direct identifiers and optional profile material may be removed or neutralised while factual Competition History remains."},
+            {"type": "paragraph", "number": "15.3", "text": "A closed history-bearing account may appear as Former Competitor."},
+            {"type": "paragraph", "number": "15.4", "text": "Replay Proof, disputes, no-show evidence, review records, Poll history, Dice history and Registration Acceptance Records may remain only for approved, reasonably necessary and lawful purposes."},
+            {"type": "paragraph", "number": "15.5", "text": "Closure does not require rewriting completed results or another Player's factual record."},
+            {"type": "paragraph", "number": "15.6", "text": "Closure is not a promise of immediate or absolute erasure across Clerk, the database, Storage, email, support mailboxes, logs, backups or other providers."},
+            {"type": "paragraph", "number": "15.7", "text": "IronClad cannot guarantee automatic removal of every identifier embedded by users in preserved private free-text or replay material."}
+          ]
+        },
+        {
+          "number": "16",
+          "title": "Security and Fraud Prevention",
+          "blocks": [
+            {"type": "paragraph", "number": "16.1", "text": "Players must protect their IronClad, Steam, email and payout-provider accounts. IronClad staff will not request passwords, authentication codes, recovery codes or unrestricted banking credentials."},
+            {"type": "paragraph", "number": "16.2", "text": "Legitimate communications use IronClad, the official email address, an identified payout provider or another clearly published channel."},
+            {"type": "paragraph", "number": "16.3", "text": "Impersonation, fraudulent links, credential theft and attempts to bypass platform authorisation are prohibited."},
+            {"type": "paragraph", "number": "16.4", "text": "IronClad may temporarily restrict an account where a serious security, fraud or integrity risk is reasonably suspected."}
+          ]
+        },
+        {
+          "number": "17",
+          "title": "Service Interruptions, Force Majeure and Tournament Recovery",
+          "blocks": [
+            {"type": "paragraph", "number": "17.1", "text": "IronClad depends on external game, identity, statistics, hosting, email, payment and network services, including Steam and Relic."},
+            {"type": "paragraph", "number": "17.2", "text": "IronClad may postpone, suspend, Cancel or Void an Event for a serious technical, security, publisher, legal, integrity or force-majeure circumstance."},
+            {"type": "paragraph", "number": "17.3", "text": "Cancellation, Void and Hard Delete are distinct. Factual history may remain when derived scoring changes."},
+            {"type": "paragraph", "number": "17.4", "text": "Prize consequences follow the applicable Event Prize Terms, mandatory law and non-excludable rights."},
+            {"type": "paragraph", "number": "17.5", "text": "IronClad does not guarantee uninterrupted or universally available service."}
+          ]
+        },
+        {
+          "number": "18",
+          "title": "Governing Law and Dispute Resolution",
+          "blocks": [
+            {"type": "paragraph", "number": "18.1", "text": "This Agreement is governed by the law of New South Wales, Australia."},
+            {"type": "paragraph", "number": "18.2", "text": "The parties should first attempt good-faith written resolution where reasonably possible."},
+            {"type": "paragraph", "number": "18.3", "text": "The courts of New South Wales have non-exclusive jurisdiction, subject to any mandatory law, consumer forum or local jurisdiction that cannot lawfully be displaced."},
+            {"type": "paragraph", "number": "18.4", "text": "Tournament review is separate from privacy, consumer, legal or regulatory complaint rights."},
+            {"type": "paragraph", "number": "18.5", "text": "Nothing in this section removes mandatory rights available under the law of a Player's place of residence."}
+          ]
+        },
+        {
+          "number": "19",
+          "title": "Amendments, Version Control and Tournament Changes",
+          "blocks": [
+            {"type": "paragraph", "number": "19.1", "text": "Every Effective PPA has a version, publication date, effective date, stable versioned URL and verified SHA-256 hash. The trusted server register identifies the document set available to registration."},
+            {"type": "paragraph", "number": "19.2", "text": "A successful registration records the exact identifiers, versions, URLs and SHA-256 hashes of the PPA, Rulebook, Terms and Privacy Policy."},
+            {"type": "paragraph", "number": "19.3", "text": "An Effective document must not be materially overwritten under the same version."},
+            {"type": "paragraph", "number": "19.4", "text": "A material change requires a new version, appropriate notice and renewed acceptance or acknowledgement where required. Continued browsing is not a substitute for Tournament acceptance."},
+            {"type": "paragraph", "number": "19.5", "text": "Emergency rulings must address genuine needs and cannot rewrite unrelated completed results."},
+            {"type": "paragraph", "number": "19.6", "text": "Tournament-Specific Rules and Binding decisions apply only within their stated and permitted scope."}
+          ]
+        },
+        {
+          "number": "20",
+          "title": "Electronic Acceptance",
+          "blocks": [
+            {"type": "paragraph", "number": "20.1", "text": "Registration presents six separate user controls:"},
+            {"type": "numbered", "items": ["acceptance of the exact PPA version;", "acceptance of the exact Rulebook version;", "acceptance of the exact Terms version;", "acknowledgement of the exact Privacy Policy version;", "confirmation that the Player is at least 18; and", "confirmation that the Player uses their own IronClad account and that the linked Steam account belongs to them."]},
+            {"type": "paragraph", "text": "Each document control links to the exact version presented."},
+            {"type": "paragraph", "number": "20.2", "text": "Privacy acknowledgement confirms that the Player was presented with the identified Privacy Policy. It is not blanket consent for optional public-profile, public Discord, promotional-media or other processing that requires a separate choice or lawful basis."},
+            {"type": "paragraph", "number": "20.3", "text": "Successful registration atomically creates one private, immutable Registration Acceptance Record containing:"},
+            {"type": "bullets", "items": ["acceptance, registration and Tournament identifiers;", "authenticated Clerk user ID;", "database-owned acceptance timestamp;", "Rulebook document ID, version, URL and SHA-256 hash;", "PPA document ID, version, URL and SHA-256 hash;", "Terms document ID, version, URL and SHA-256 hash;", "Privacy document ID, version, URL and SHA-256 hash;", "Rulebook, PPA and Terms acceptance;", "Privacy acknowledgement;", "18+ confirmation;", "own-IronClad-account confirmation; and", "linked-Steam-account confirmation."]},
+            {"type": "paragraph", "number": "20.4", "text": "The final combined account-and-Steam user control records the own-IronClad-account and linked-Steam-account confirmations separately in the acceptance evidence."},
+            {"type": "paragraph", "number": "20.5", "text": "Trusted server configuration supplies the authoritative document identifiers, statuses, versions, URLs, dates and hashes. Browser-supplied document facts are not authoritative."},
+            {"type": "paragraph", "number": "20.6", "text": "Registration cannot succeed unless all four documents are Effective, all required hashes are present, the complete six-control acceptance is valid and the registration and acceptance record can commit together."},
+            {"type": "paragraph", "number": "20.7", "text": "A Player who does not agree must not register."}
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "terms",
+      "title": "TERMS OF SERVICE",
+      "shortTitle": "Terms of Service",
+      "subtitle": "IronClad Tournaments Service Terms",
+      "version": "1.0",
+      "status": "Effective",
+      "effectiveDate": "2026-08-18",
+      "filename": "ironclad-terms-of-service-v1.0.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
+      "operatorStatement": "These Terms are between you and Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy.",
+      "introBlocks": [
+        {"type": "callout", "title": "CONTACT", "text": "Support, complaints, privacy enquiries and legal notices may be sent to ironclad.tournaments@gmail.com."}
+      ],
+      "sections": [
+        {
+          "number": "1",
+          "title": "Who operates IronClad",
+          "blocks": [
+            {"type": "paragraph", "text": "These Terms are between you and the following natural persons, who currently operate the Service using the project and operating name “IronClad Tournaments”:"},
+            {"type": "bullets", "items": ["Marco Stucchi, based in New South Wales, Australia; and", "Simone Vitiello, based in Italy."]},
+            {"type": "paragraph", "text": "In these Terms, “IronClad”, “we”, “us” and “our” mean Marco Stucchi and Simone Vitiello only, as the current operators of the project. An “Admin” is delegated operational personnel authorized to perform specified administration or support functions. Admins are not included in “IronClad”, “we”, “us” or “our”, are not parties to these Terms merely because of that role, and do not become operators by exercising delegated authority."},
+            {"type": "paragraph", "text": "“IronClad Tournaments” is used here as a project and operating name. These Terms do not represent it as a company, incorporated body, registered Australian business name, Australian partnership, ABN holder or other registered entity."},
+            {"type": "paragraph", "text": "Support, complaints, privacy enquiries and legal notices may be sent to ironclad.tournaments@gmail.com."}
+          ]
+        },
+        {
+          "number": "2",
+          "title": "Scope",
+          "blocks": [
+            {"type": "paragraph", "text": "These Terms govern access to and use of the IronClad website, accounts, profiles, tournament registration and administration, brackets, Matches, rankings, Polls, notifications, support and related services collectively called the Service."},
+            {"type": "paragraph", "text": "They apply to visitors, account holders and Players. Additional obligations apply when a person registers for or participates in an Event."},
+            {"type": "paragraph", "text": "The public website may be viewed without creating a Tournament acceptance record. Browsing alone is not evidence that a person accepted an Event or a new version of the Governing Documents. Features that require acceptance may be used only after the required active acceptance process is completed."}
+          ]
+        },
+        {
+          "number": "3",
+          "title": "Definitions",
+          "blocks": [
+            {"type": "paragraph", "text": "In these Terms:"},
+            {"type": "table", "headers": ["Term", "Meaning"], "columnWidths": [1, 3], "rows": [
+              ["Account", "The authenticated IronClad account associated with a Clerk identity."],
+              ["Admin", "Delegated operational personnel authorized by Marco Stucchi or Simone Vitiello to administer specified parts of the Service or an Event. An Admin is not included in IronClad, we, us or our and is not a contracting party merely because of that role."],
+              ["Competition History", "Factual records such as registrations, brackets, schedules, official results, standings, champions and related integrity records."],
+              ["Event", "A competition operated through IronClad."],
+              ["Event Prize Terms", "Terms published for a specific prize-bearing Event."],
+              ["Game", "One individual Company of Heroes 3 game."],
+              ["Governing Documents", "These Terms, the Player Participation Agreement, Privacy Policy, Rulebook, Tournament Page and applicable Event materials."],
+              ["Match or Series", "The scheduled best-of-three or best-of-five contest between two Players."],
+              ["Player", "A person who registers for or participates in an Event."],
+              ["Published Decision", "An Event-specific ruling or Poll decision formally published through IronClad."],
+              ["Rulebook", "The Effective version of the IronClad Official Tournament Rulebook presented for an Event."],
+              ["Tournament Page", "The authoritative IronClad page showing Event dates, Divisions, deadlines, format, bracket state, map pool and applicable Event terms."],
+              ["User Content", "Material submitted through the Service, including profile content, avatars, support messages, replay files and evidence."]
+            ]}
+          ]
+        },
+        {
+          "number": "4",
+          "title": "Governing-document hierarchy",
+          "blocks": [
+            {"type": "paragraph", "text": "Applicable non-excludable law applies first."},
+            {"type": "paragraph", "text": "Subject to that law:"},
+            {"type": "numbered", "items": ["these Terms govern use of the platform;", "the Player Participation Agreement governs participation obligations;", "the Rulebook governs competition mechanics;", "the Privacy Policy governs personal-information handling; and", "Event Prize Terms govern the prize offered for a specific Event."]},
+            {"type": "paragraph", "text": "A Tournament Page, Event supplement, approved map pool or Published Decision may supplement those documents only within its stated scope."},
+            {"type": "paragraph", "text": "FAQs, summaries, tooltips, informal messages, Poll discussions and external pages do not silently amend the Governing Documents. Battlefy is not a current registration or result authority."}
+          ]
+        },
+        {
+          "number": "5",
+          "title": "Event eligibility and age",
+          "blocks": [
+            {"type": "paragraph", "text": "A Player must:"},
+            {"type": "bullets", "items": ["be at least 18 years old when registering;", "use their own IronClad and Steam accounts;", "possess lawful access to Company of Heroes 3;", "provide accurate and current information;", "meet the published Division and Event requirements;", "participate only where doing so is lawful and operationally supported; and", "complete the declarations and document acceptances presented at registration."]},
+            {"type": "paragraph", "text": "IronClad does not ordinarily require identity documents for free participation. Proportionate evidence may be requested where reasonably necessary to address a genuine age, identity, account-ownership, integrity, sanctions, prize-provider or legal concern."},
+            {"type": "paragraph", "text": "Any supporting material must be limited to what is necessary and handled under the Privacy Policy."}
+          ]
+        },
+        {
+          "number": "6",
+          "title": "Accounts and security",
+          "blocks": [
+            {"type": "paragraph", "text": "Accounts are personal. A user must not sell, transfer, share or lend an Account, impersonate another person or permit another person to compete through it."},
+            {"type": "paragraph", "text": "Users must take reasonable care of their email, Clerk, IronClad, Steam and any payout-provider credentials and promptly report suspected compromise."},
+            {"type": "paragraph", "text": "IronClad staff will not ask for a password, authentication code, recovery code, payment-account password or unrestricted access to a device or financial account."},
+            {"type": "paragraph", "text": "An Account does not guarantee Tournament approval, an Event place, a particular Division, a ranking, continued Service availability or a prize."}
+          ]
+        },
+        {
+          "number": "7",
+          "title": "Steam linking and Relic verification",
+          "blocks": [
+            {"type": "paragraph", "text": "Eligibility may require a Player to link and control their own Steam account."},
+            {"type": "paragraph", "text": "IronClad uses Steam OpenID to confirm control of the linked Steam identity. It may use the verified SteamID64 to request supported public persona information from Valve/Steam and current Company of Heroes 3 competitive information from Relic."},
+            {"type": "paragraph", "text": "At registration, IronClad performs a fresh Relic verification and stores the resulting supported 1v1 ELO, faction, Division, calculation version and verification time as an immutable Event snapshot."},
+            {"type": "paragraph", "text": "IronClad does not request the Player's Steam password and does not acquire ownership of the Steam account."},
+            {"type": "paragraph", "text": "Active verification does not use COH3Stats. Historical records may retain a legacy source label, but no current registration or profile-verification request is sent to COH3Stats."},
+            {"type": "paragraph", "text": "Valve and Relic availability, response times and source-data accuracy remain outside IronClad's direct control. A Player may request review of a suspected verification error."}
+          ]
+        },
+        {
+          "number": "8",
+          "title": "Profiles, Discord and Competition History",
+          "blocks": [
+            {"type": "paragraph", "text": "Profile information must be accurate and must not impersonate another person or infringe another person's rights."},
+            {"type": "paragraph", "text": "Discord is optional but recommended. A Discord username is not required for profile completion or registration. Supplying a Discord username and making it publicly visible are separate choices. Clearing the username disables its public visibility."},
+            {"type": "paragraph", "text": "Players must monitor IronClad notifications. Steam may be used outside the Service where reasonably available. A Match participant may use IronClad's participant-scoped Admin Assistance route where coordination through optional channels is unavailable or unsuccessful."},
+            {"type": "paragraph", "text": "Public-profile visibility is separate from official Competition History. Disabling a public profile or public Discord does not automatically remove factual registrations, brackets, official results, standings or champion records. After account closure, retained history may identify the person as Former Competitor where permitted and necessary."}
+          ]
+        },
+        {
+          "number": "9",
+          "title": "Acceptable use",
+          "blocks": [
+            {"type": "paragraph", "text": "A user must not:"},
+            {"type": "bullets", "items": ["cheat, collude, manipulate a result or evade a lawful sanction;", "share accounts, smurf for eligibility or arrange unauthorized substitution;", "submit duplicate or deceptive registrations;", "falsify profiles, votes, results, replay files or evidence;", "tamper with replays, hashes, scores, Polls, brackets or rankings;", "harass, threaten, discriminate against, dox or unlawfully expose another person;", "upload malware or exploit or bypass an authorization boundary;", "scrape or automate access beyond authorized public use;", "infringe copyright, privacy, personality or other legal rights;", "send spam, commit fraud or misuse support channels;", "misuse private Match evidence or personal information; or", "knowingly assist another person to do any of those things."]},
+            {"type": "paragraph", "text": "Good-faith criticism, complaints, appeals, security reports and relevant evidence are not prohibited merely because they are unfavorable to IronClad or another participant."}
+          ]
+        },
+        {
+          "number": "10",
+          "title": "Registration and Tournament participation",
+          "blocks": [
+            {"type": "paragraph", "text": "Registration and participation are free."},
+            {"type": "paragraph", "text": "Registration does not guarantee approval or capacity. Eligibility, verified Division, available places, waitlist order, Admin review and published Event requirements may affect whether a Player is approved."},
+            {"type": "paragraph", "text": "A preliminary waitlist acknowledgement does not create a registration or acceptance record. A successful registration creates the registration and its acceptance record atomically."},
+            {"type": "paragraph", "text": "Players must monitor IronClad notifications, the Tournament Page and displayed deadlines. Players remain responsible for reasonable coordination and timely action."},
+            {"type": "paragraph", "text": "Competition mechanics - including map pools, Dice, manual Side and Map selection, replay requirements, scheduling, pauses, disconnects, confirmation, disputes, no-shows, scoring, rankings and Poll effects - are governed by the Rulebook and applicable Event materials."}
+          ]
+        },
+        {
+          "number": "11",
+          "title": "Results, replay proof, Polls and private evidence",
+          "blocks": [
+            {"type": "paragraph", "text": "The Rulebook determines the required Match-result workflow. One unique .rec replay file for each Game actually played is the required Match-result proof. Screenshots are not accepted as a substitute for required replay proof. An Admin may request separate proportionate supplemental material for a dispute or integrity investigation."},
+            {"type": "paragraph", "text": "Replay files, raw proof paths, hashes, disputes, no-show material, private review notes and similar evidence are not general public content. They may be available to the involved Match participants, authorized Admins, necessary providers and persons legally entitled to receive them."},
+            {"type": "paragraph", "text": "Individual Poll ballot attribution is private. Eligible Players may see aggregate totals according to the Poll's configured live or after-close setting. Anonymous public totals exist only where explicitly enabled. Final Published Decisions may be public. Poll finalization does not automatically modify another subsystem."}
+          ]
+        },
+        {
+          "number": "12",
+          "title": "User Content and operational licence",
+          "blocks": [
+            {"type": "paragraph", "text": "Users retain ownership of original User Content they lawfully own and must have the rights needed to submit it."},
+            {"type": "paragraph", "text": "To the extent of those rights, the user grants IronClad a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, technically transform, transmit, review and process User Content only as reasonably necessary to:"},
+            {"type": "bullets", "items": ["provide and secure the Service;", "honor selected visibility settings;", "administer Events;", "verify competitive integrity;", "confirm results and resolve disputes;", "communicate with authorized people;", "maintain lawful Competition History;", "enforce the Governing Documents; and", "comply with legal obligations."]},
+            {"type": "paragraph", "text": "This operational licence does not authorize IronClad to sell private evidence, private correspondence or personal information, or to use that material for unrelated advertising."},
+            {"type": "paragraph", "text": "IronClad may quarantine or restrict content where reasonably necessary for security, privacy, illegality, infringement or a material breach."}
+          ]
+        },
+        {
+          "number": "13",
+          "title": "Media permission",
+          "blocks": [
+            {"type": "paragraph", "text": "Competition-facing media permission is governed by the Player Participation Agreement and any specific Event or broadcast notice."},
+            {"type": "paragraph", "text": "Subject to those documents and third-party rights, IronClad may use Tournament-public identity, official results, standings, achievements, an enabled public avatar and Player-owned material knowingly contributed to an authorised Event broadcast or Player-authorised Event stream to operate, report, factually archive and promote IronClad Events."},
+            {"type": "paragraph", "text": "Public or commercial recording, broadcasting, republication or promotion of gameplay or game footage may occur only to the extent separately permitted by the relevant game and platform rights holders and supported by any participant permission required for identity, likeness, voice or Player-owned material."},
+            {"type": "paragraph", "text": "Voice or webcam material is included only where knowingly captured in an authorised official broadcast or a Player-authorized Event stream used for the Event."},
+            {"type": "paragraph", "text": "Private replay evidence, private Discord, private email, dispute notes, identity documents and payout information are not promotional content."},
+            {"type": "paragraph", "text": "A Player's permission cannot grant IronClad intellectual-property rights owned by SEGA, Relic, Valve, Steam, another platform or another person."}
+          ]
+        },
+        {
+          "number": "14",
+          "title": "Intellectual property and unofficial status",
+          "blocks": [
+            {"type": "paragraph", "text": "The IronClad site, original branding, original written material and original platform assets remain the property of their respective owners."},
+            {"type": "paragraph", "text": "Company of Heroes 3, SEGA, Relic, Valve, Steam and other third-party names, software, game content and intellectual property remain the property of their respective owners."},
+            {"type": "paragraph", "text": "IronClad is an independent community Tournament project. It is not sponsored, endorsed, administered by or affiliated with Relic Entertainment, Valve Corporation, Steam or SEGA unless expressly stated. Third-party games, footage, names, logos and marks remain the property of their respective owners. No third-party intellectual-property rights are claimed or granted."}
+          ]
+        },
+        {
+          "number": "15",
+          "title": "Providers and external services",
+          "blocks": [
+            {"type": "paragraph", "text": "The Service currently depends on:"},
+            {"type": "bullets", "items": ["Clerk for authentication and account identity;", "Supabase for database and Storage services;", "Vercel for hosting and delivery;", "Valve/Steam for Steam authentication and supported public persona information;", "Relic for supported Company of Heroes 3 competitive data;", "Resend when transactional email is enabled; and", "Google/Gmail for the published support, privacy and legal mailbox."]},
+            {"type": "paragraph", "text": "Discord is optional and no IronClad Discord API or bot integration is currently used. A user who follows a Discord link or communicates through Discord deals directly with that external service."},
+            {"type": "paragraph", "text": "Wise, PayPal or another specifically published provider may be used only for a prize-bearing Event and only as described in the applicable Event Prize Terms and privacy notice."},
+            {"type": "paragraph", "text": "External providers apply their own terms and privacy practices. IronClad remains responsible for accurately describing the information it sends and for exercising required care in provider selection and use."}
+          ]
+        },
+        {
+          "number": "16",
+          "title": "Availability and Service changes",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad will use reasonable care in operating the Service but does not promise uninterrupted, error-free or universally available access."},
+            {"type": "paragraph", "text": "Maintenance, security incidents, game updates, network problems and provider outages may affect a feature."},
+            {"type": "paragraph", "text": "IronClad may make reasonable security, reliability, legal, accessibility or compatibility changes. Such a change must not silently rewrite an accepted document version, completed official result or accrued prize entitlement."},
+            {"type": "paragraph", "text": "Where an outage affects an Event, recovery must follow the Rulebook, current platform state, published Event commitments and applicable law."}
+          ]
+        },
+        {
+          "number": "17",
+          "title": "Free participation and conditional prizes",
+          "blocks": [
+            {"type": "paragraph", "text": "Not every Event offers a prize. No prize is created merely by these Terms or by a public ranking."},
+            {"type": "paragraph", "text": "A prize exists only if Event Prize Terms are published before prize-bearing registration opens. Those terms must state at least:"},
+            {"type": "bullets", "items": ["gross amount and currency;", "placement allocation;", "eligibility and any territory restrictions;", "supported payment method;", "fee, conversion and intermediary-cost treatment;", "required verification or payout information;", "expected payment timeframe;", "tie treatment; and", "consequences of cancellation, Void or partial completion."]},
+            {"type": "paragraph", "text": "Payout may be manual. Wise may be preferred where supported. PayPal or another published supported method may be used. IronClad does not promise a universal 48-hour payment period."},
+            {"type": "paragraph", "text": "Unless another fair method is published before registration, prize allocations crossed by a true tie are combined and divided equally among the tied Players."},
+            {"type": "paragraph", "text": "Players remain responsible for personal tax obligations, subject to any withholding or reporting IronClad is legally required to perform."}
+          ]
+        },
+        {
+          "number": "18",
+          "title": "Administration, interim action and sanctions",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad may take proportionate action for a material breach, competitive-integrity risk, safety concern, fraud, security threat, unlawful conduct or binding publisher/provider restriction."},
+            {"type": "paragraph", "text": "Available action may include warning, content restriction, temporary hold, correction or replay, Match or bracket remedy, registration rejection or removal, disqualification, suspension or exclusion from future Events."},
+            {"type": "paragraph", "text": "Urgent interim action may be taken where reasonably necessary to protect people, the Service or evidence."},
+            {"type": "paragraph", "text": "A material decision should identify the basis and provide an available review or reconsideration route unless doing so would create a genuine security, privacy, legal or integrity risk. A routine Match ruling may become final after the Rulebook process is complete."},
+            {"type": "paragraph", "text": "Internal finality does not remove a non-excludable consumer, privacy, legal or regulatory right."}
+          ]
+        },
+        {
+          "number": "19",
+          "title": "Account closure",
+          "blocks": [
+            {"type": "paragraph", "text": "A user may request account closure through the available profile process or published contact route."},
+            {"type": "paragraph", "text": "Closure is not a promise that every record will be erased immediately or simultaneously."},
+            {"type": "paragraph", "text": "The current closure sequence removes the avatar, applies the database closure process and then requests Clerk deletion. Those systems are separate and partial failure is possible."},
+            {"type": "paragraph", "text": "Where no protected Competition History exists, the player record may be deleted. Where history exists, direct profile identifiers, current Steam/Relic state and optional public fields may be removed while factual history is retained in pseudonymised form."},
+            {"type": "paragraph", "text": "Private evidence and immutable registration acceptance may remain for the periods stated in the Privacy Policy. Provider, mailbox, log and backup copies may take additional time to expire. IronClad must reconcile a known partial failure and reapply deletion or pseudonymisation after a relevant backup restoration."},
+            {"type": "paragraph", "text": "Closure does not erase an accrued obligation, active dispute, lawful legal hold or another person's rights."}
+          ]
+        },
+        {
+          "number": "20",
+          "title": "Cancellation, Void and force majeure",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad may pause, postpone, reschedule, Cancel or Void an Event for a serious technical, security, publisher, legal, integrity or force-majeure reason."},
+            {"type": "paragraph", "text": "The response must be proportionate and communicated where practicable. Cancellation, Void, hard deletion and account deletion are distinct operations."},
+            {"type": "paragraph", "text": "Event Prize Terms determine prize consequences. An external failure does not automatically extinguish an entitlement where applicable law or published terms require another outcome."}
+          ]
+        },
+        {
+          "number": "21",
+          "title": "Privacy, security and necessary technologies",
+          "blocks": [
+            {"type": "paragraph", "text": "The versioned Privacy Policy explains how IronClad collects, uses, discloses, stores, retains and deletes personal information and how privacy requests are handled."},
+            {"type": "paragraph", "text": "Privacy acknowledgement records that the identified notice was presented. It is not blanket consent and does not replace a separate consent required for an optional purpose."},
+            {"type": "paragraph", "text": "IronClad uses necessary authentication and Steam-link technologies and limited Admin session storage as described in the Privacy Policy. It does not currently deploy IronClad analytics, advertising pixels or a consent-management platform."},
+            {"type": "paragraph", "text": "IronClad uses reasonable safeguards, but no online service is perfectly secure."}
+          ]
+        },
+        {
+          "number": "22",
+          "title": "Versions and electronic acceptance",
+          "blocks": [
+            {"type": "paragraph", "text": "Every Effective Governing Document must have a version, effective date and stable version-specific URL. Its accepted content must not be materially overwritten under the same version."},
+            {"type": "paragraph", "text": "Successful registration requires separate controls for:"},
+            {"type": "numbered", "items": ["Player Participation Agreement acceptance;", "Rulebook acceptance;", "Terms acceptance;", "Privacy Policy acknowledgement;", "the 18+ declaration; and", "confirmation that the person is using their own IronClad Account and linked Steam account."]},
+            {"type": "paragraph", "text": "The trusted registration process creates one private, immutable record containing the registration, authenticated Clerk identity, database-owned timestamp, exact document identifiers, versions, URLs and SHA-256 hashes, and the required declarations. The browser does not control the authoritative version, URL, status or hash."},
+            {"type": "paragraph", "text": "Privacy acknowledgement is recorded as acknowledgement, not blanket consent."},
+            {"type": "paragraph", "text": "A new version requires renewed acceptance where it materially changes participation duties, eligibility, sanctions, User Content or media permissions, liability, dispute terms, privacy purposes or recipients, or another right or obligation relevant to an existing or new registration. A clerical correction that does not alter meaning may be published without renewed acceptance if law permits."},
+            {"type": "paragraph", "text": "Continued browsing alone does not replace a required active acceptance."}
+          ]
+        },
+        {
+          "number": "23",
+          "title": "Disclaimers",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad does not guarantee that every registration, Division, Event, opponent, Match, ranking, provider response or prize will occur."},
+            {"type": "paragraph", "text": "Players remain responsible for compatible equipment, lawful access to Company of Heroes 3 and Steam, connectivity, account security and local replay copies during the applicable review period."},
+            {"type": "paragraph", "text": "Third-party game, platform and provider services may change or fail outside IronClad's control. This does not excuse IronClad from exercising care required by law or honoring an express published commitment."}
+          ]
+        },
+        {
+          "number": "24",
+          "title": "Liability and non-excludable rights",
+          "blocks": [
+            {"type": "paragraph", "text": "Nothing in these Terms excludes, restricts or modifies:"},
+            {"type": "bullets", "items": ["a consumer guarantee, statutory right or remedy that cannot lawfully be excluded;", "liability for fraud or wilful misconduct;", "liability for death or personal injury caused by negligence where it cannot be excluded;", "a privacy, confidentiality or security obligation that cannot lawfully be excluded; or", "another liability that applicable law requires."]},
+            {"type": "paragraph", "text": "IronClad remains responsible to the extent required by law for its own failure to exercise required care or honor an express obligation."},
+            {"type": "paragraph", "text": "To the extent permitted by law, a party is not responsible for loss caused by the other party's fraud, deliberate unlawful conduct, credential sharing, materially false information or material breach, or by an unavoidable external event where that party exercised reasonable care."},
+            {"type": "paragraph", "text": "Indirect or consequential loss may be excluded only to the extent that exclusion is lawful, fair and consistent with applicable foreseeability principles."},
+            {"type": "paragraph", "text": "These Terms impose no blanket user indemnity and no fixed monetary liability cap. Any future limitation must be introduced through a new version and remain subject to non-excludable rights and unfair-terms law."}
+          ]
+        },
+        {
+          "number": "25",
+          "title": "Complaints and disputes",
+          "blocks": [
+            {"type": "paragraph", "text": "A complaint may be sent to ironclad.tournaments@gmail.com. It should identify the relevant Account, Event or decision, the material facts and the requested outcome. It must not include passwords or authentication codes."},
+            {"type": "paragraph", "text": "Where reasonable, the parties should first attempt good-faith written resolution."},
+            {"type": "paragraph", "text": "Tournament review is separate from privacy, consumer, legal and regulatory complaint rights. A person may use a competent regulator, tribunal or court where applicable law permits."}
+          ]
+        },
+        {
+          "number": "26",
+          "title": "Governing law and jurisdiction",
+          "blocks": [
+            {"type": "paragraph", "text": "These Terms are governed by the law of New South Wales, Australia."},
+            {"type": "paragraph", "text": "The courts of New South Wales have non-exclusive jurisdiction, subject to any mandatory law, consumer forum or local jurisdiction that cannot lawfully be displaced."},
+            {"type": "paragraph", "text": "Nothing in this clause removes mandatory rights available under the law of a user's place of residence."}
+          ]
+        },
+        {
+          "number": "27",
+          "title": "Notices",
+          "blocks": [
+            {"type": "paragraph", "text": "Operational notices may be provided through the Service, an in-app notification or the verified email associated with the Account."},
+            {"type": "paragraph", "text": "A material Governing Document change should be notified through a durable channel reasonably likely to reach an affected user and must use renewed acceptance where section 22 or applicable law requires it."},
+            {"type": "paragraph", "text": "Notices to IronClad may be sent to ironclad.tournaments@gmail.com unless another verified notice address is published in a later version."}
+          ]
+        },
+        {
+          "number": "28",
+          "title": "General",
+          "blocks": [
+            {"type": "paragraph", "text": "Accounts and registrations are personal and non-transferable."},
+            {"type": "paragraph", "text": "IronClad may transfer operation of the Service to a genuine successor only with appropriate notice and without reducing accrued or non-excludable rights. Any successor must be accurately identified."},
+            {"type": "paragraph", "text": "Failure to enforce a provision is not a waiver."},
+            {"type": "paragraph", "text": "If a provision is invalid or unenforceable, it should be read down where lawful or severed only to the minimum extent necessary."},
+            {"type": "paragraph", "text": "The applicable Governing Documents form the complete published agreement for their respective subjects."},
+            {"type": "paragraph", "text": "Intellectual-property, evidence, Competition History, accrued-prize, liability and dispute provisions survive only for as long as reasonably necessary and lawful."},
+            {"type": "paragraph", "text": "English is the controlling language of this version. A translation is informational unless separately identified as legally authoritative. Mandatory local-language rights remain unaffected."}
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "privacy",
+      "title": "PRIVACY POLICY",
+      "shortTitle": "Privacy Policy",
+      "subtitle": "IronClad Tournaments Privacy Notice",
+      "version": "1.0",
+      "status": "Effective",
+      "effectiveDate": "2026-08-18",
+      "filename": "ironclad-privacy-policy-v1.0.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
+      "operatorStatement": "Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy, are the responsible operators of the Service.",
+      "introBlocks": [
+        {"type": "callout", "title": "PRIVACY CONTACT", "text": "Privacy requests and complaints may be sent to ironclad.tournaments@gmail.com."}
+      ],
+      "sections": [
+        {
+          "number": "1",
+          "title": "Who is responsible for this Service",
+          "blocks": [
+            {"type": "paragraph", "text": "\u201cIronClad Tournaments\u201d is the project and operating name currently used by:"},
+            {"type": "bullets", "items": ["Marco Stucchi, based in New South Wales, Australia; and", "Simone Vitiello, based in Italy."]},
+            {"type": "paragraph", "text": "Those two natural persons are the responsible operators of the Service and the people to contact about its handling of personal information. In this Policy, \u201cIronClad\u201d, \u201cwe\u201d, \u201cus\u201d and \u201cour\u201d mean Marco Stucchi and Simone Vitiello only."},
+            {"type": "paragraph", "text": "Admins are delegated operational personnel authorized to perform specified administration or support functions. Admins are not included in \u201cIronClad\u201d, \u201cwe\u201d, \u201cus\u201d or \u201cour\u201d, do not become responsible operators merely because of their role, and may handle personal information only within their delegated authority and this Policy."},
+            {"type": "paragraph", "text": "This wording does not represent IronClad Tournaments as a company, incorporated body, registered Australian business name, Australian partnership, ABN holder or other registered entity. It does not assign an unverified \u201cjoint controller\u201d or other formal legal label."},
+            {"type": "paragraph", "text": "Privacy requests and complaints may be sent to ironclad.tournaments@gmail.com."}
+          ]
+        },
+        {
+          "number": "2",
+          "title": "Scope",
+          "blocks": [
+            {"type": "paragraph", "text": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, rankings, Polls, notifications, support, account closure and prize administration where applicable."},
+            {"type": "paragraph", "text": "External providers and sites apply their own privacy notices to processing they perform independently."},
+            {"type": "paragraph", "text": "This Policy explains IronClad's practices without asserting that every privacy statute applies in every situation. Rights and obligations depend on the applicable law."}
+          ]
+        },
+        {
+          "number": "3",
+          "title": "Information we process",
+          "blocks": [
+            {"type": "paragraph", "text": "Depending on how a person uses IronClad, we may process:"},
+            {"type": "paragraph", "text": "Account and authentication information:"},
+            {"type": "bullets", "items": ["Clerk user ID;", "verified email held by Clerk;", "authentication and session state;", "role metadata;", "security and login events; and", "necessary authentication cookies and request metadata."]},
+            {"type": "paragraph", "text": "Profile and contact information:"},
+            {"type": "bullets", "items": ["display name and in-game name;", "country, region and timezone;", "biography;", "profile visibility settings;", "private avatar object path and mediated public-avatar availability;", "optional Discord username; and", "separate Discord-publication preference."]},
+            {"type": "paragraph", "text": "Steam and Relic information:"},
+            {"type": "bullets", "items": ["SteamID64;", "Steam persona name;", "Steam-link state and timestamps;", "Relic 1v1 ELO;", "faction;", "Division;", "calculation version; and", "verification timestamps."]},
+            {"type": "paragraph", "text": "Registration and acceptance information:"},
+            {"type": "bullets", "items": ["registration and Tournament identifiers;", "bracket and Division;", "registration, review and waitlist status;", "immutable registration-time ELO, faction and Division snapshot;", "exact Rulebook, Player Participation Agreement, Terms and Privacy document identifiers, versions, URLs and SHA-256 hashes;", "database-owned acceptance time;", "Rulebook, PPA and Terms acceptance;", "Privacy Policy acknowledgement;", "18+ declaration; and", "own-IronClad-account and linked-Steam-account declarations."]},
+            {"type": "paragraph", "text": "The acceptance record is private, identity-linked and immutable. It is created atomically with a successful registration. A preliminary waitlist acknowledgement creates neither registration nor acceptance."},
+            {"type": "paragraph", "text": "Privacy acknowledgement records that the Policy was presented. It is not blanket consent."},
+            {"type": "paragraph", "text": "Tournament and Competition History:"},
+            {"type": "bullets", "items": ["registrations;", "waitlist and vacancy-offer state;", "brackets and schedules;", "Match participants;", "scores and official results;", "standings and champion records;", "published statistics; and", "related integrity and audit records."]},
+            {"type": "paragraph", "text": "Match, replay and evidence information:"},
+            {"type": "bullets", "items": [".rec replay files;", "replay filename, size, path, uniqueness and SHA-256 information;", "upload-attempt and cleanup metadata;", "result submissions;", "confirmation and dispute state;", "no-show reports;", "review notes; and", "proportionate supplemental evidence requested for a genuine dispute or integrity investigation."]},
+            {"type": "paragraph", "text": "Screenshots are not accepted as a substitute for required replay proof."},
+            {"type": "paragraph", "text": "Dice and Poll information:"},
+            {"type": "bullets", "items": ["Dice values, Game and tie-round information, participants and timestamps;", "Poll eligibility;", "ballot choices and revisions;", "aggregate totals; and", "final Published Decisions."]},
+            {"type": "paragraph", "text": "Notifications and correspondence:"},
+            {"type": "bullets", "items": ["in-app notification content and related Event or Match identifiers;", "read, hidden and action state;", "email-delivery status and provider message identifier;", "Admin Assistance requests;", "support and complaint correspondence; and", "privacy, legal and security requests."]},
+            {"type": "paragraph", "text": "Prize information for a prize-bearing Event only:"},
+            {"type": "bullets", "items": ["prize amount and eligibility;", "supported payout method;", "payout status;", "necessary identity or account-match information;", "transfer and fee information; and", "strictly necessary tax, sanctions or provider-verification information."]},
+            {"type": "paragraph", "text": "IronClad does not currently operate a general payout integration or KYC repository."},
+            {"type": "paragraph", "text": "Technical and security information:"},
+            {"type": "paragraph", "text": "Necessary hosting, security and provider logs may contain IP address, device and browser information, timestamps, requested route, response or error metadata, authentication events and security diagnostics."},
+            {"type": "paragraph", "text": "IronClad does not ask for a Clerk, Steam, email or payment password."}
+          ]
+        },
+        {
+          "number": "4",
+          "title": "Sources",
+          "blocks": [
+            {"type": "paragraph", "text": "Information may come directly from the user; from a delegated Admin acting within authority; from Clerk; from Steam OpenID and Valve's supported public profile service; from Relic's Company of Heroes 3 personal-stat service; from another Player involved in the same Match; from hosting, database, Storage, security and email providers; from support or privacy correspondence; and from a payout provider for a specifically approved prize-bearing Event."},
+            {"type": "paragraph", "text": "Current profile and registration verification does not send data to COH3Stats. Historical database records may retain a legacy source label."}
+          ]
+        },
+        {
+          "number": "5",
+          "title": "Why we process information",
+          "blocks": [
+            {"type": "paragraph", "text": "We process information to authenticate users and secure Accounts; create and maintain profiles; verify control of a Steam identity; obtain supported Relic 1v1 information; determine Division eligibility; register and waitlist Players; preserve exact versioned acceptance evidence; operate brackets and Matches; process Dice and Polls; receive and confirm results; investigate disputes, no-shows, cheating and security incidents; calculate rankings and standings; publish factual Competition History; deliver notifications and transactional email; provide support and Admin Assistance; administer a lawful prize where applicable; prevent fraud and platform abuse; enforce the Governing Documents; maintain required audit and legal evidence; handle account closure and privacy requests; and comply with applicable law."},
+            {"type": "paragraph", "text": "We do not sell personal information or use private replay evidence for unrelated advertising."}
+          ]
+        },
+        {
+          "number": "6",
+          "title": "Legal grounds where applicable",
+          "blocks": [
+            {"type": "paragraph", "text": "Where a law such as the GDPR requires a legal basis, the proposed bases are:"},
+            {"type": "bullets", "items": ["contract and pre-contract steps for Accounts, registration, Event participation, document acceptance and support requested by a user;", "legitimate interests in operating a fair, secure and reliable Tournament platform, preventing fraud, resolving disputes, maintaining proportionate Competition History and protecting legal claims;", "legal obligations where applicable;", "establishment, exercise or defence of legal claims where necessary;", "vital interests only in an exceptional safety situation; and", "consent only where a genuinely optional activity requires it."]},
+            {"type": "paragraph", "text": "Public-profile visibility, public Discord and promotional media are separate choices. Withdrawing an optional choice does not invalidate processing that was already lawful and does not automatically erase factual Competition History."},
+            {"type": "paragraph", "text": "Privacy acknowledgement is not relied upon as blanket consent."},
+            {"type": "paragraph", "text": "Where legitimate interests are used, IronClad must consider necessity, proportionality, reasonable expectations and the user's rights."}
+          ]
+        },
+        {
+          "number": "7",
+          "title": "Authentication",
+          "blocks": [
+            {"type": "paragraph", "text": "Clerk provides identity, verified email, session, authentication-cookie and role services."},
+            {"type": "paragraph", "text": "IronClad stores the Clerk user ID where necessary to connect application records. The authenticated identity is derived from the session and is not accepted from an untrusted user-supplied identifier for a privileged operation."},
+            {"type": "paragraph", "text": "When transactional email is enabled, the verified primary email may be obtained from Clerk at sending time rather than duplicated in the notification table."}
+          ]
+        },
+        {
+          "number": "8",
+          "title": "Profiles, avatars and optional Discord",
+          "blocks": [
+            {"type": "paragraph", "text": "Profile data supports eligibility, identification, communication and optional public presentation."},
+            {"type": "paragraph", "text": "Avatar objects are private. The underlying path contains a Clerk user ID, so public delivery is mediated through a player-ID route rather than exposing the private object path."},
+            {"type": "paragraph", "text": "Discord is optional. A blank value is stored as absent and does not prevent profile completion or registration. Public profile and public Discord are separate opt-ins. Clearing Discord disables public Discord visibility."},
+            {"type": "paragraph", "text": "A public-profile opt-out does not make official participation anonymous."}
+          ]
+        },
+        {
+          "number": "9",
+          "title": "Steam and Relic verification",
+          "blocks": [
+            {"type": "paragraph", "text": "Steam linking uses Steam OpenID to establish control of a Steam identity."},
+            {"type": "paragraph", "text": "IronClad sends the verified SteamID64 to Valve's supported public persona lookup and to Relic's personal-stat endpoint in the form required for the current Company of Heroes 3 lookup."},
+            {"type": "paragraph", "text": "IronClad stores current verification information on the profile and an immutable ELO, faction, Division, calculation-version and verification-time snapshot when registration succeeds."},
+            {"type": "paragraph", "text": "SteamID64 is not intended for public-profile display."},
+            {"type": "paragraph", "text": "Active verification does not use COH3Stats."}
+          ]
+        },
+        {
+          "number": "10",
+          "title": "Registration and durable acceptance",
+          "blocks": [
+            {"type": "paragraph", "text": "A successful registration is created only after authentication, profile and Steam checks, fresh Relic verification, Division and capacity checks, and the required controls."},
+            {"type": "paragraph", "text": "The registration and acceptance record commit or fail together."},
+            {"type": "paragraph", "text": "The acceptance record preserves registration and Tournament identifiers; authenticated Clerk user ID; database-owned timestamp; exact Rulebook, PPA, Terms and Privacy identifiers, versions, stable URLs and SHA-256 hashes; Rulebook, PPA and Terms acceptance; Privacy acknowledgement; 18+ declaration; and own-Account and linked-Steam ownership declarations."},
+            {"type": "paragraph", "text": "Document identifiers supplied by the browser are treated only as selectors. The trusted server and database load and verify the authoritative document status, version, URL and hash."},
+            {"type": "paragraph", "text": "Acceptance evidence is private and is not a public profile or Competition History field."}
+          ]
+        },
+        {
+          "number": "11",
+          "title": "Match results and private evidence",
+          "blocks": [
+            {"type": "paragraph", "text": "One unique .rec file for each Game actually played is the required Match-result proof."},
+            {"type": "paragraph", "text": "Replay uploads use private Storage, signed upload authorization, size and filename controls, uniqueness checks and server-side metadata validation."},
+            {"type": "paragraph", "text": "Replay objects, raw paths, hashes, disputes, no-show material, private notes and supplemental evidence are limited to involved Match participants where necessary for the result and dispute process; delegated Admins acting within authority; necessary service providers; and persons legally entitled to receive them."},
+            {"type": "paragraph", "text": "Scores and official results may become public. Private evidence does not become promotional content."},
+            {"type": "paragraph", "text": "Screenshots are not accepted as a substitute for required replay proof. They may be considered only as proportionate supplemental material for a genuine dispute or integrity investigation."}
+          ]
+        },
+        {
+          "number": "12",
+          "title": "Dice and Polls",
+          "blocks": [
+            {"type": "paragraph", "text": "Dice history is available to the relevant Match participants and read-only Admin contexts."},
+            {"type": "paragraph", "text": "Poll eligibility is frozen when a Poll is published. An eligible Player may see their own choices and aggregate totals only according to the Poll's live or after-close setting."},
+            {"type": "paragraph", "text": "Individual ballot attribution is private. Anonymous public totals exist only when explicitly enabled. Final Published Decisions may be public."},
+            {"type": "paragraph", "text": "Poll finalization does not automatically mutate another subsystem."}
+          ]
+        },
+        {
+          "number": "13",
+          "title": "Notifications, email and Admin Assistance",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad stores in-app notification content, related identifiers, read or hidden state and action state."},
+            {"type": "paragraph", "text": "When transactional email is enabled, Resend receives the verified recipient email, subject, HTML or text content, sender and reply-to information, and delivery/idempotency metadata necessary to send and audit the message."},
+            {"type": "paragraph", "text": "The Gmail mailbox receives messages sent to the published support, privacy and legal address."},
+            {"type": "paragraph", "text": "A participant-scoped Admin Assistance request stores the requesting identity, relevant Match and notification state needed to prevent duplicate open requests and allow delegated Admin follow-up."}
+          ]
+        },
+        {
+          "number": "14",
+          "title": "Public information and Competition History",
+          "blocks": [
+            {"type": "paragraph", "text": "Depending on Event and visibility settings, public information may include opted-in profile fields, public avatar presentation, optional public Discord, approved or bracketed competition name, registration and bracket facts, scores and official results, standings and champion records, final Published Decisions, and explicitly enabled anonymous Poll totals."},
+            {"type": "paragraph", "text": "Turning off a public profile or closing an Account does not automatically remove factual Competition History."},
+            {"type": "paragraph", "text": "After closure, retained history may use \u201cFormer Competitor\u201d and suppress the closed player's profile identifier, location, live ELO, avatar and optional contact fields."},
+            {"type": "paragraph", "text": "Public information is accessible internationally and may be copied or indexed by others outside IronClad's control."}
+          ]
+        },
+        {
+          "number": "15",
+          "title": "Providers and recipients",
+          "blocks": [
+            {"type": "paragraph", "text": "Current and conditional providers and recipients are:"},
+            {"type": "bullets", "items": [
+              "Marco Stucchi and Simone Vitiello: the two responsible natural-person operators, with access from New South Wales and Italy as required to operate the Service.",
+              "Delegated Admins: operational personnel, not included in IronClad/we/us/our and not responsible operators merely because of their role; access is limited to authorized support, Event and integrity functions.",
+              "Clerk: current authentication, identity, verified email, sessions, role metadata and necessary authentication cookies.",
+              "Supabase PostgreSQL and Storage: current profiles, registrations, acceptances, Matches, Polls, rankings, notifications, avatars, replay evidence and audit state.",
+              "Vercel: current hosting, application delivery and request processing.",
+              "Valve/Steam: current Steam OpenID and supported public persona lookup.",
+              "Relic: current Company of Heroes 3 competitive lookup.",
+              "Resend: transactional email when enabled for a message.",
+              "Google/Gmail: the published support, privacy and legal mailbox.",
+              "Discord: optional external communication only; no current IronClad API or bot integration.",
+              "Wise, PayPal or another published provider: conditional, only for an approved prize-bearing Event."
+            ]},
+            {"type": "paragraph", "text": "COH3Stats is not a current provider for active verification."},
+            {"type": "paragraph", "text": "Battlefy is not a current registration or result authority. A clearly historical outbound link, if displayed, is an external link rather than a transfer used to administer the current Event."}
+          ]
+        },
+        {
+          "number": "16",
+          "title": "International processing",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad does not promise that personal information is stored only in Australia or only in the European Economic Area."},
+            {"type": "paragraph", "text": "The responsible operators may access Service data from New South Wales and Italy. Current providers and their subprocessors may process information in other countries according to their infrastructure, account configuration and contractual arrangements."},
+            {"type": "paragraph", "text": "Public Competition History is accessible globally."},
+            {"type": "paragraph", "text": "Where applicable law requires a transfer safeguard, IronClad must use an appropriate legal or contractual mechanism before relying on that transfer or must stop the affected processing. Disclosure in this Policy is not itself a transfer mechanism."},
+            {"type": "paragraph", "text": "Provider regions, subprocessors, data-processing terms and transfer mechanisms must be reviewed periodically and when a provider changes."}
+          ]
+        },
+        {
+          "number": "17",
+          "title": "Cookies, session storage and tracking",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad currently uses:"},
+            {"type": "bullets", "items": [
+              "Clerk authentication and session cookies for sign-in, session continuity, security and authorization. Duration is provider-managed under the configured Clerk session and cookie settings.",
+              "__Host-ironclad-steam-link, a necessary first-party cookie that binds a Steam OpenID callback to the authenticated session and linking intent. It lasts up to 10 minutes, contains random flow state, intent, session hash and expiry, is HttpOnly, Secure, SameSite=Lax and Path=/, and is cleared by the callback.",
+              "ironclad:new-tournament-draft in browser sessionStorage to recover non-file fields in the delegated Admin create-Tournament form. It is scoped to the browser tab/session and excludes the file input and stored banner image URL."
+            ]},
+            {"type": "paragraph", "text": "No IronClad application localStorage, marketing cookie, advertising pixel, first-party analytics integration or consent-management platform is currently used."},
+            {"type": "paragraph", "text": "Clerk, Vercel and other providers may create necessary security, request and diagnostic logs. Those logs are not described as advertising tracking."},
+            {"type": "paragraph", "text": "Because the current implementation uses necessary technology and does not load IronClad non-essential analytics or advertising technology, no generic marketing-cookie banner is used."},
+            {"type": "paragraph", "text": "If non-essential analytics, advertising, cross-site measurement or embedded tracking is introduced later, IronClad must update this Policy and obtain any legally required opt-in before loading that technology. Reject and withdrawal controls must be as accessible as acceptance where consent is required."}
+          ]
+        },
+        {
+          "number": "18",
+          "title": "Retention",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad retains information only for the operational, integrity, contractual, security, legal and historical purposes described below."},
+            {"type": "table", "headers": ["Information", "Retention and disposition"], "rows": [
+              ["Active profile, avatar, current Steam/Relic state and optional Discord", "For the life of the Account. On completed closure, delete or clear from live profile systems except the minimal pseudonymised historical shell."],
+              ["Rejected, withdrawn, expired-waitlist, abandoned or non-launched registration", "12 months from final status, then delete or deidentify unless an active complaint, fraud investigation or legal hold applies."],
+              ["Approved registration snapshot and factual Competition History", "Indefinite factual archive, retaining the minimum factual record and pseudonymising on closure where direct identity is no longer necessary."],
+              ["Immutable registration acceptance", "7 years from the database acceptance timestamp. Account closure does not shorten this period. Delete through controlled legal-evidence maintenance unless an active claim or legal hold requires longer retention."],
+              ["Raw .rec replay, dispute, no-show and supplemental integrity material", "24 months after the result becomes final, then delete the object and unnecessary linked metadata unless an active integrity or legal hold applies."],
+              ["Replay hash after raw-file deletion", "Delete with the replay by default; retain up to 7 years only where a documented integrity or legal-evidence purpose remains, then delete when that purpose ends."],
+              ["Upload-attempt and abandoned-object metadata", "90 days after completion, failure or cleanup, then delete."],
+              ["Dice history", "24 months after Match finalization, then delete or deidentify unless an active integrity hold applies."],
+              ["Poll voter attribution and individual choices", "12 months after the final decision, then delete or deidentify individual attribution and choices where practicable."],
+              ["Final anonymous Poll aggregates and Published Decisions", "Indefinite factual archive without individual ballot attribution."],
+              ["In-app notifications", "12 months after becoming non-actionable, then delete or deidentify unless part of another retained case record."],
+              ["Transactional-email delivery audit", "12 months after the final delivery attempt, then delete IronClad's audit copy subject to the provider's independent retention."],
+              ["Support, complaint and privacy-request cases", "24 months after case closure, then delete unless an active legal, regulatory or security hold applies."],
+              ["Security and runtime logs under IronClad control", "No more than 90 days where configurable, unless needed for an active incident."],
+              ["Backup and point-in-time-recovery copies under IronClad control", "A maximum rolling window of 90 days. Allow copies to age out, do not use expired copies for ordinary access, and reapply completed deletion and pseudonymisation after restoration."],
+              ["Prize, payment and accounting records", "7 years after payment or final resolution, or longer where law requires, then delete or deidentify non-required material."],
+              ["Identity documents collected for a necessary check", "Do not routinely collect; if temporarily received, delete within 30 days after the check finishes unless a specific law, provider requirement, dispute or legal hold requires longer retention."]
+            ]},
+            {"type": "paragraph", "text": "A legal, security or integrity hold suspends deletion only for affected information and only for as long as reasonably necessary. After a hold ends, overdue deletion should occur within 30 days."},
+            {"type": "paragraph", "text": "Time-based cleanup may be performed through documented operational review rather than an automated scheduler. The absence of automation does not lengthen the stated period."},
+            {"type": "paragraph", "text": "Providers may retain independent copies under their own lawful schedules. IronClad must send a deletion request where appropriate but cannot promise immediate deletion from every provider or backup."},
+            {"type": "paragraph", "text": "Deidentified information that can no longer reasonably identify a person may be retained for statistics, integrity analysis and historical reporting."}
+          ]
+        },
+        {
+          "number": "19",
+          "title": "Account closure and deletion",
+          "blocks": [
+            {"type": "paragraph", "text": "A user may request closure through the profile process or contact email."},
+            {"type": "paragraph", "text": "The current sequence is:"},
+            {"type": "numbered", "items": ["remove the private avatar;", "invoke the database closure process; and", "request Clerk account deletion."]},
+            {"type": "paragraph", "text": "The systems do not form one transaction. One step may succeed while another fails. IronClad must record and reconcile a known partial failure."},
+            {"type": "paragraph", "text": "Where no protected Competition History exists, the player record may be deleted. Where history exists, direct profile identifiers and optional contact fields are removed or neutralized; current Steam and Relic state is cleared; live ELO, biography, avatar and visibility preferences are removed; historical actor identifiers are pseudonymised where supported; and factual history may remain as \u201cFormer Competitor\u201d."},
+            {"type": "paragraph", "text": "Immutable acceptance remains identity-linked for its seven-year period."},
+            {"type": "paragraph", "text": "Private replay, integrity, Dice, Poll and correspondence material follows the retention schedule."},
+            {"type": "paragraph", "text": "Free-text or replay content may contain information not automatically discoverable by structured closure. IronClad will review specifically identified material where a substantiated request or legal obligation requires it."},
+            {"type": "paragraph", "text": "External providers, mailboxes, logs and backups may not disappear immediately. Completed deletion obligations must be reapplied if an older backup is restored."}
+          ]
+        },
+        {
+          "number": "20",
+          "title": "Privacy choices and rights",
+          "blocks": [
+            {"type": "paragraph", "text": "Depending on applicable law, a person may request access, correction, deletion, restriction, portability, objection, withdrawal of a genuinely optional consent, Account closure, changes to public-profile or public-Discord settings, and information about applicable disclosures or transfers."},
+            {"type": "paragraph", "text": "A request may be sent to ironclad.tournaments@gmail.com."},
+            {"type": "paragraph", "text": "IronClad may verify identity proportionately. It will not request a password or authentication code. Additional evidence should be requested only where reasonably necessary."},
+            {"type": "paragraph", "text": "A right may be limited by another person's rights, a legal obligation, security, fraud prevention, an active claim, or a justified competition-integrity or factual-history need. IronClad should explain a refusal or partial response and identify an available complaint route."},
+            {"type": "paragraph", "text": "Withdrawing public-profile, Discord or media permission does not automatically erase lawful historic publication or affect processing already completed on another valid basis."}
+          ]
+        },
+        {
+          "number": "21",
+          "title": "Rules-based processing and human review",
+          "blocks": [
+            {"type": "paragraph", "text": "IronClad uses deterministic rules for ELO-based Division, registration capacity and FIFO waitlist order, replay-count and upload checks, confirmation deadlines, result auto-confirmation, ranking calculations and Poll finalization."},
+            {"type": "paragraph", "text": "These rules use published criteria and platform state. Relevant errors, disputes and sanctions have a delegated Admin review route."},
+            {"type": "paragraph", "text": "IronClad does not use AI to make autonomous competitive, payout, sanction or moderation decisions."},
+            {"type": "paragraph", "text": "Where applicable law treats a rule as a solely automated decision with legal or similarly significant effect, IronClad will provide the notice and human-review rights that law requires."}
+          ]
+        },
+        {
+          "number": "22",
+          "title": "Security and incidents",
+          "blocks": [
+            {"type": "paragraph", "text": "Safeguards include Clerk authentication, server-side authorization, role controls, PostgreSQL row-level security, private Storage, signed uploads, mediated replay and avatar delivery, service-role isolation, SHA-256 integrity checks, restricted database grants, trusted server timestamps and server-side validation."},
+            {"type": "paragraph", "text": "Acceptance records and the legal-document register are private. Public, anonymous and ordinary authenticated database roles cannot directly mutate them."},
+            {"type": "paragraph", "text": "No system is perfectly secure. IronClad does not promise that a breach or failure can never occur."},
+            {"type": "paragraph", "text": "IronClad must maintain a proportionate incident process covering triage, containment, provider coordination, evidence preservation, risk assessment, recovery and legally required notifications."},
+            {"type": "paragraph", "text": "A suspected security incident may be reported to ironclad.tournaments@gmail.com without including passwords or authentication codes."}
+          ]
+        },
+        {
+          "number": "23",
+          "title": "Age",
+          "blocks": [
+            {"type": "paragraph", "text": "Tournament registration is restricted to persons aged at least 18."},
+            {"type": "paragraph", "text": "Registration records the Player's 18+ declaration. IronClad does not routinely collect identity documents merely to register."},
+            {"type": "paragraph", "text": "Any additional age verification must be necessary, proportionate and privately handled under the retention schedule."}
+          ]
+        },
+        {
+          "number": "24",
+          "title": "External links and services",
+          "blocks": [
+            {"type": "paragraph", "text": "Discord, Steam and clearly historical Battlefy links lead to external services. A prize provider also applies its own terms and privacy notice."},
+            {"type": "paragraph", "text": "IronClad is not responsible for unrelated processing a person initiates directly with an external service, but it remains responsible for accurately describing information IronClad itself sends to that service."}
+          ]
+        },
+        {
+          "number": "25",
+          "title": "Changes and versions",
+          "blocks": [
+            {"type": "paragraph", "text": "Every Effective Privacy Policy has a version, publication date, effective date and stable version-specific URL."},
+            {"type": "paragraph", "text": "A material change must not overwrite the existing version. IronClad must provide appropriate notice and obtain renewed acknowledgement or consent where applicable."},
+            {"type": "paragraph", "text": "A material change includes a significant new purpose, recipient, public disclosure, retention period, tracking technology, transfer arrangement or reduction in rights."},
+            {"type": "paragraph", "text": "Privacy acknowledgement records delivery of the notice. It is not blanket consent."}
+          ]
+        },
+        {
+          "number": "26",
+          "title": "Contact and complaints",
+          "blocks": [
+            {"type": "paragraph", "text": "Privacy enquiries, requests and complaints may be sent to ironclad.tournaments@gmail.com."},
+            {"type": "paragraph", "text": "A request should describe the relevant Account or activity and the requested outcome. It must not include passwords, authentication codes or unnecessary identity documents."},
+            {"type": "paragraph", "text": "IronClad should acknowledge and respond within the period required by applicable law."},
+            {"type": "paragraph", "text": "A person may complain to a competent privacy or consumer authority where applicable, including an authority connected with the person's location or the relevant responsible operator. Use of that route does not depend on first accepting IronClad's preferred outcome."},
+            {"type": "paragraph", "text": "English is the controlling language of this version. A translation is informational unless separately identified as legally authoritative. Mandatory local-language rights remain unaffected."}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -272,6 +272,8 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            effectiveDate: "value",
+            sha256: "value",
           },
         },
         ppa: {
@@ -280,6 +282,8 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            effectiveDate: "value",
+            sha256: "value",
           },
         },
         terms: {
@@ -288,6 +292,8 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            effectiveDate: "value",
+            sha256: "value",
           },
         },
         privacy: {
@@ -296,6 +302,8 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            effectiveDate: "value",
+            sha256: "value",
           },
         },
       },

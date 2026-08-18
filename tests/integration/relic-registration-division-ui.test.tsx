@@ -58,30 +58,40 @@ import {
 } from "@/components/TournamentsExperience";
 
 const TOURNAMENT_ID = "11111111-1111-4111-8111-111111111111";
+const EFFECTIVE_DATE = "2026-08-18T00:00:00.000+10:00";
+const DOCUMENT_SHA256 = "a".repeat(64);
 const registrationDocuments = {
   rulebook: {
     id: "77777777-7777-4777-8777-777777777771",
     kind: "rulebook" as const,
     version: "fixture-rulebook-v1",
     url: "https://example.test/legal/rulebook/fixture-v1",
+    effectiveDate: EFFECTIVE_DATE,
+    sha256: DOCUMENT_SHA256,
   },
   ppa: {
     id: "77777777-7777-4777-8777-777777777772",
     kind: "ppa" as const,
     version: "fixture-ppa-v1",
     url: "https://example.test/legal/ppa/fixture-v1",
+    effectiveDate: EFFECTIVE_DATE,
+    sha256: DOCUMENT_SHA256,
   },
   terms: {
     id: "77777777-7777-4777-8777-777777777773",
     kind: "terms" as const,
     version: "fixture-terms-v1",
     url: "https://example.test/legal/terms/fixture-v1",
+    effectiveDate: EFFECTIVE_DATE,
+    sha256: DOCUMENT_SHA256,
   },
   privacy: {
     id: "77777777-7777-4777-8777-777777777774",
     kind: "privacy" as const,
     version: "fixture-privacy-v1",
     url: "https://example.test/legal/privacy/fixture-v1",
+    effectiveDate: EFFECTIVE_DATE,
+    sha256: DOCUMENT_SHA256,
   },
 };
 
@@ -242,24 +252,26 @@ describe("Relic verified-division registration UI", () => {
     expect(screen.getAllByRole("checkbox")).toHaveLength(6);
     expect(
       screen.getByRole("link", {
-        name: "Player Participation Agreement (version fixture-ppa-v1)",
+        name: "Player Participation Agreement (version fixture-ppa-v1) (opens in a new tab)",
       })
     ).toHaveAttribute("href", registrationDocuments.ppa.url);
     expect(
       screen.getByRole("link", {
-        name: "Official Tournament Rulebook (version fixture-rulebook-v1)",
+        name: "Official Tournament Rulebook (version fixture-rulebook-v1) (opens in a new tab)",
       })
     ).toHaveAttribute("href", registrationDocuments.rulebook.url);
     expect(
       screen.getByRole("link", {
-        name: "Terms of Service (version fixture-terms-v1)",
+        name: "Terms of Service (version fixture-terms-v1) (opens in a new tab)",
       })
     ).toHaveAttribute("href", registrationDocuments.terms.url);
     expect(
       screen.getByRole("link", {
-        name: "Privacy Policy (version fixture-privacy-v1)",
+        name: "Privacy Policy (version fixture-privacy-v1) (opens in a new tab)",
       })
     ).toHaveAttribute("href", registrationDocuments.privacy.url);
+    expect(screen.getAllByText(/Effective 18 August 2026/)).toHaveLength(4);
+    expect(screen.getAllByText(/SHA-256 a{12}…/)).toHaveLength(4);
     expect(
       screen.getByRole("checkbox", {
         name: "I confirm that I am at least 18 years old.",
