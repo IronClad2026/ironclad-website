@@ -5,7 +5,12 @@ import RulesExperience, {
 } from "@/components/rules/RulesExperience";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
-import { getLegalDocument, legalCorpus, resolveEffectiveDateToken } from "@/lib/legal-corpus-publication";
+import {
+  getLegalDocument,
+  getLegalDocumentEffectiveDateDisplay,
+  legalCorpus,
+  resolveEffectiveDateToken,
+} from "@/lib/legal-corpus-publication";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
@@ -25,7 +30,8 @@ export default async function RulesPage() {
     title: document.shortTitle,
     version: document.version,
     status: document.status,
-    description: resolveEffectiveDateToken(document.subtitle),
+    effectiveDate: getLegalDocumentEffectiveDateDisplay(document),
+    description: resolveEffectiveDateToken(document.subtitle, document),
     href: document.publicPath,
     filename: document.filename,
     readHref:
@@ -47,7 +53,7 @@ export default async function RulesPage() {
     <RulesExperience
       copy={copy}
       documents={documents}
-      effectiveDate={legalCorpus.effectiveDateDisplay}
+      latestDocumentDate={legalCorpus.effectiveDateDisplay}
       locale={locale}
     />
   );

@@ -6,9 +6,10 @@ import type { Locale } from "@/lib/i18n/config";
 import { interpolateMessage } from "@/lib/i18n/translate";
 import {
   getLegalDocument,
-  legalCorpus,
+  getLegalDocumentEffectiveDateDisplay,
   resolveEffectiveDateToken,
   type LegalContentBlock,
+  type LegalDocument,
   type LegalDocumentKind,
 } from "@/lib/legal-corpus-publication";
 
@@ -51,7 +52,7 @@ export default function LegalDocumentPage({
             {document.title}
           </h1>
           <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300 sm:text-lg" lang="en">
-            {resolveEffectiveDateToken(document.subtitle)}
+            {resolveEffectiveDateToken(document.subtitle, document)}
           </p>
 
           <div className="mt-7 flex max-w-4xl items-start gap-3 border border-amber-300/30 bg-amber-400/[0.08] p-4 text-sm leading-6 text-amber-100" role="note">
@@ -64,7 +65,7 @@ export default function LegalDocumentPage({
             <DocumentFact label={copy.legalPage.status} value={document.status} />
             <DocumentFact
               label={copy.legalPage.effectiveDate}
-              value={legalCorpus.effectiveDateDisplay}
+              value={getLegalDocumentEffectiveDateDisplay(document)}
             />
           </dl>
 
@@ -125,14 +126,18 @@ export default function LegalDocumentPage({
               <span lang={locale}>{copy.legalPage.namedOperators}</span>
             </p>
             <p className="mt-3 text-sm leading-7 text-zinc-200 sm:text-base sm:leading-8">
-              {resolveEffectiveDateToken(document.operatorStatement)}
+              {resolveEffectiveDateToken(document.operatorStatement, document)}
             </p>
           </div>
 
           {document.introBlocks.length > 0 && (
             <div className="mt-8 space-y-5 border-b border-white/10 pb-10">
               {document.introBlocks.map((block, index) => (
-                <LegalBlock block={block} key={`intro-${index}`} />
+                <LegalBlock
+                  block={block}
+                  document={document}
+                  key={`intro-${index}`}
+                />
               ))}
             </div>
           )}
@@ -156,6 +161,7 @@ export default function LegalDocumentPage({
                   {section.blocks.map((block, index) => (
                     <LegalBlock
                       block={block}
+                      document={document}
                       key={`${section.number}-${index}`}
                     />
                   ))}
@@ -180,14 +186,20 @@ function DocumentFact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LegalBlock({ block }: { block: LegalContentBlock }) {
+function LegalBlock({
+  block,
+  document,
+}: {
+  block: LegalContentBlock;
+  document: Pick<LegalDocument, "effectiveDate">;
+}) {
   if (block.type === "paragraph") {
     return (
       <p className="text-sm leading-7 text-zinc-300 sm:text-base sm:leading-8">
         {block.number && (
           <span className="mr-2 font-black text-zinc-100">{block.number}</span>
         )}
-        {resolveEffectiveDateToken(block.text)}
+        {resolveEffectiveDateToken(block.text, document)}
       </p>
     );
   }
@@ -203,7 +215,7 @@ function LegalBlock({ block }: { block: LegalContentBlock }) {
       >
         {block.items.map((item, index) => (
           <li className="pl-1 marker:font-bold marker:text-orange-300" key={index}>
-            {resolveEffectiveDateToken(item)}
+            {resolveEffectiveDateToken(item, document)}
           </li>
         ))}
       </List>
@@ -222,7 +234,7 @@ function LegalBlock({ block }: { block: LegalContentBlock }) {
                   key={`${header}-${index}`}
                   scope="col"
                 >
-                  {resolveEffectiveDateToken(header)}
+                  {resolveEffectiveDateToken(header, document)}
                 </th>
               ))}
             </tr>
@@ -232,7 +244,7 @@ function LegalBlock({ block }: { block: LegalContentBlock }) {
               <tr className="align-top" key={rowIndex}>
                 {row.map((cell, cellIndex) => (
                   <td className="px-4 py-3 leading-6" key={cellIndex}>
-                    {resolveEffectiveDateToken(cell)}
+                    {resolveEffectiveDateToken(cell, document)}
                   </td>
                 ))}
               </tr>
@@ -246,10 +258,10 @@ function LegalBlock({ block }: { block: LegalContentBlock }) {
   return (
     <aside className="border-l-2 border-orange-400 bg-orange-500/[0.07] px-5 py-4">
       <p className="font-black text-white">
-        {resolveEffectiveDateToken(block.title)}
+        {resolveEffectiveDateToken(block.title, document)}
       </p>
       <p className="mt-2 text-sm leading-7 text-zinc-300 sm:text-base">
-        {resolveEffectiveDateToken(block.text)}
+        {resolveEffectiveDateToken(block.text, document)}
       </p>
     </aside>
   );

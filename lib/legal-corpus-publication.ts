@@ -50,9 +50,34 @@ export function getLegalDocument(kind: LegalDocumentKind) {
   return document;
 }
 
-export function resolveEffectiveDateToken(value: string) {
+export function getLegalDocumentEffectiveDateDisplay(
+  document: Pick<LegalDocument, "effectiveDate">
+) {
+  const [year, month, day] = document.effectiveDate.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    throw new Error("Invalid legal-document effective date.");
+  }
+
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(parsed);
+}
+
+export function resolveEffectiveDateToken(
+  value: string,
+  document: Pick<LegalDocument, "effectiveDate">
+) {
   return value.replaceAll(
     "{{EFFECTIVE_DATE}}",
-    legalCorpus.effectiveDateDisplay
+    getLegalDocumentEffectiveDateDisplay(document)
   );
 }

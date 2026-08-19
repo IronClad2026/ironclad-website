@@ -37,6 +37,54 @@ const dictionary = {
     success: "成功",
     error: "错误",
   },
+  analyticsConsent: {
+    label: "分析偏好设置",
+    title: "帮助改进 IronClad",
+    description:
+      "可选的网站分析可帮助我们了解访问情况和页面使用方式。只有在您允许后，分析功能才会加载。",
+    details:
+      "启用后，Vercel 可能会接收公开页面路径、访问来源、大致所在国家或地区、设备类型、浏览器和操作系统信息。IronClad 不使用分析 Cookie、广告或会话重放。",
+    required: "必要的身份验证和安全功能不受此选择影响。",
+    allow: "允许分析",
+    decline: "拒绝",
+    privacyLink: "阅读隐私政策",
+    choices: "分析选项",
+    dialogTitle: "分析偏好设置",
+    dialogDescription:
+      "您可以随时更改此浏览器的分析选择。撤回许可后，将停止今后的分析数据收集。",
+    close: "关闭分析偏好设置",
+    currentChoice: "当前选择",
+    statusGranted: "已允许分析",
+    statusDeclined: "分析已关闭",
+    statusUndecided: "尚未保存选择",
+    withdraw: "撤回分析许可",
+    saveError:
+      "无法保存您的选择。此标签页中的分析已关闭，但该更改可能无法保留。请检查浏览器存储设置后重试。",
+    savedGranted: "已允许分析。",
+    savedDeclined: "分析保持关闭。",
+  },
+  legalUpdate: {
+    eyebrow: "重要法律更新",
+    title: "请查看并接受更新后的条款",
+    description:
+      "要继续使用 IronClad 的登录功能，请查看并接受 Terms of Service v1.1，并确认知悉 Privacy Policy v1.1。分析功能仍为可选项，并需单独选择。",
+    termsLinkLabel: "阅读 Terms of Service",
+    privacyLinkLabel: "阅读 Privacy Policy",
+    termsAgreement: "我接受 Terms of Service v1.1。",
+    privacyAcknowledgement: "我确认已知悉 Privacy Policy v1.1。",
+    continueAction: "接受并继续",
+    savingAction: "正在保存接受记录…",
+    signOutAction: "退出登录",
+    retryAction: "重试",
+    unavailableTitle: "法律更新暂时不可用",
+    unavailableDescription:
+      "IronClad 目前无法验证现行法律文件。尚未记录任何接受信息。请重试或退出登录。",
+    authRequiredError: "请重新登录以继续。",
+    acceptanceRequiredError: "必须勾选两项法律确认。",
+    unavailableError:
+      "IronClad 无法记录您的接受信息。未保存任何内容。请重试。",
+    acceptedMessage: "接受信息已记录。正在加载 IronClad…",
+  },
   selector: {
     language: "语言",
     triggerAriaLabel: "选择语言。当前语言：{language}",

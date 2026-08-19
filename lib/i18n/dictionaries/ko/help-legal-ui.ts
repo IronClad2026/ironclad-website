@@ -21,9 +21,9 @@ const dictionary = {
     hero: {
       eyebrow: "공식 규칙 센터", title: "IronClad 대회 규칙",
       description: "먼저 쉬운 표현의 요약을 읽은 다음, 버전이 명시된 규칙서와 선수 참가 계약서를 공식 규정 본문으로 확인하세요.",
-      effective: "시행 · {date}", summaryAria: "규칙 운영 요약",
+      effective: "문서 세트 업데이트 · {date}", summaryAria: "규칙 운영 요약",
       operations: "토너먼트 운영", corpus: "공식 규정 체계",
-      corpusText: "승인되고 버전이 명시된 네 문서는 {date}부터 시행됩니다.",
+      corpusText: "승인되고 버전이 명시된 네 문서가 현재 시행 중이며, 각 문서에 고유한 시행일이 표시됩니다.",
     },
     category: {
       eyebrow: "규칙 세트 선택", title: "참가하는 이벤트에 적용되는 규칙부터 확인하세요.",
@@ -52,7 +52,7 @@ const dictionary = {
       eyebrow: "빠른 안내", title: "상세 규칙 전에 선택한 안내를 읽으세요.",
       description: "분류별 요약은 전체 공식 문서를 반복하지 않고 출시 단계의 핵심 사항을 안내합니다.",
       selected: "선택한 안내", documentStatusLabel: "문서 상태", documentStatusTitle: "승인된 공식 규정 체계",
-      documentStatusText: "규칙서, PPA, 이용약관 및 개인정보 처리방침은 {date}부터 시행됩니다. 참가 등록에는 각 문서의 정확한 버전 기록이 사용됩니다.",
+      documentStatusText: "현재 규칙서, PPA, 이용약관 및 개인정보 처리방침은 각각 고유한 시행일을 표시합니다. 참가 등록에는 각 문서의 정확한 버전 기록이 사용됩니다.",
       navigationLabel: "탐색", navigationTitle: "해당 규칙 세트부터 확인하세요",
       navigationText: "상세 내용을 읽기 전에 현재 분류를 선택하여 해당 이벤트에 집중하세요.",
       integrityLabel: "경쟁 공정성", integrityTitle: "쉬운 표현과 명확한 경계",
@@ -108,7 +108,7 @@ const dictionary = {
     },
     documents: {
       eyebrow: "공식 문서", title: "공식 규정 문서 상태.",
-      description: "승인된 최종 버전은 {date}부터 공식 기준입니다.",
+      description: "승인된 현행 버전이 공식 기준이며 각 카드에 해당 문서의 시행일이 표시됩니다.",
       immutable: "토너먼트 등록에 사용하는 변경 불가능한 버전별 PDF를 다운로드하세요.",
       version: "버전 {version}", effective: "{date}부터 시행", readOnline: "온라인으로 읽기", read: "읽기",
       opensNewTab: "(새 탭에서 열림)", download: "PDF 다운로드",
@@ -132,7 +132,7 @@ const dictionary = {
     disclaimer: {
       eyebrow: "공식 상태", title: "쉬운 표현의 안내",
       text: "이 페이지는 쉬운 표현의 안내입니다. 공식 문서의 우선순위와 동의한 정확한 버전이 우선합니다. 토너먼트 페이지, 게시된 결정 및 이벤트 상금 약관은 명시된 범위에서만 이를 보완합니다.",
-      effective: "규칙서, PPA, 이용약관 및 개인정보 처리방침은 {date}부터 시행됩니다. 등록에는 각 문서의 정확한 제시 버전이 기록됩니다.",
+      effective: "각 현행 규칙서, PPA, 이용약관 및 개인정보 처리방침은 고유한 시행일을 표시합니다. 등록에는 각 문서의 정확한 제시 버전이 기록됩니다.",
       english: "효력이 있는 공식 규정 본문은 영어입니다. 현재 공식 번역본은 제공되지 않습니다.",
     },
   },

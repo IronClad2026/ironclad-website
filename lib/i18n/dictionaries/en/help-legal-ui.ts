@@ -34,12 +34,12 @@ const dictionary = {
       title: "IronClad Competition Rules",
       description:
         "Start with the plain-language briefing, then use the versioned Rulebook and Player Participation Agreement for the governing text.",
-      effective: "Effective · {date}",
+      effective: "Document set updated · {date}",
       summaryAria: "Rules operations summary",
       operations: "Tournament Operations",
       corpus: "Governing Corpus",
       corpusText:
-        "Four approved, versioned documents are Effective from {date}.",
+        "Four approved, versioned documents are current. Each document shows its own Effective date.",
     },
     category: {
       eyebrow: "Choose Rule Set",
@@ -84,7 +84,7 @@ const dictionary = {
       documentStatusLabel: "Document Status",
       documentStatusTitle: "Approved governing corpus",
       documentStatusText:
-        "The Rulebook, PPA, Terms and Privacy Policy are Effective from {date}. Registration uses their exact versioned records.",
+        "The current Rulebook, PPA, Terms and Privacy Policy each show their own Effective date. Registration uses their exact versioned records.",
       navigationLabel: "Navigation",
       navigationTitle: "Start with your rule set",
       navigationText:
@@ -191,7 +191,7 @@ const dictionary = {
       eyebrow: "Official Documents",
       title: "Governing-document status.",
       description:
-        "The approved final versions are the governing source of truth from {date}.",
+        "The approved current versions are the governing source of truth. Each card shows its own Effective date.",
       immutable:
         "Download the immutable versioned PDFs used by Tournament registration.",
       version: "Version {version}",
@@ -249,7 +249,7 @@ const dictionary = {
       text:
         "This page is a plain-language guide. The governing-document hierarchy and exact accepted versions control. Tournament Pages, Published Decisions and Event Prize Terms supplement them only within their stated scope.",
       effective:
-        "The Rulebook, PPA, Terms and Privacy Policy are Effective from {date}. Registration records the exact version presented for each document.",
+        "Each current Rulebook, PPA, Terms and Privacy Policy shows its own Effective date. Registration records the exact version presented for each document.",
       english:
         "The Effective governing text is in English. No official translation is currently provided.",
     },

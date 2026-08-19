@@ -37,6 +37,54 @@ const dictionary = {
     success: "완료",
     error: "오류",
   },
+  analyticsConsent: {
+    label: "분석 설정",
+    title: "IronClad 개선에 도움을 주세요",
+    description:
+      "선택적 분석은 방문 현황과 페이지 이용 방식을 파악하는 데 도움이 됩니다. 허용한 경우에만 분석 기능이 로드됩니다.",
+    details:
+      "분석을 사용하면 Vercel이 공개 페이지 경로, 유입 경로, 대략적인 국가, 기기 유형, 브라우저 및 운영 체제 정보를 수신할 수 있습니다. IronClad는 분석 쿠키, 광고 또는 세션 재생 기능을 사용하지 않습니다.",
+    required: "필수 인증 및 보안 기능은 이 선택의 영향을 받지 않습니다.",
+    allow: "분석 허용",
+    decline: "거부",
+    privacyLink: "개인정보 처리방침 읽기",
+    choices: "분석 선택",
+    dialogTitle: "분석 설정",
+    dialogDescription:
+      "이 브라우저의 분석 선택은 언제든지 변경할 수 있습니다. 허용을 철회하면 이후의 분석 데이터 수집이 중단됩니다.",
+    close: "분석 설정 닫기",
+    currentChoice: "현재 선택",
+    statusGranted: "분석 허용됨",
+    statusDeclined: "분석 꺼짐",
+    statusUndecided: "저장된 선택 없음",
+    withdraw: "분석 허용 철회",
+    saveError:
+      "선택을 저장할 수 없습니다. 이 탭에서는 분석이 꺼져 있지만 변경 사항이 유지되지 않을 수 있습니다. 브라우저 저장소 설정을 확인하고 다시 시도하세요.",
+    savedGranted: "분석이 허용되었습니다.",
+    savedDeclined: "분석이 계속 꺼져 있습니다.",
+  },
+  legalUpdate: {
+    eyebrow: "중요 법률 업데이트",
+    title: "업데이트된 약관을 확인하고 동의해 주세요",
+    description:
+      "로그인 후 이용할 수 있는 IronClad 기능을 계속 사용하려면 Terms of Service v1.1을 확인하고 동의한 뒤 Privacy Policy v1.1을 확인했음을 표시해 주세요. 분석 기능은 계속 선택 사항이며 별도로 선택할 수 있습니다.",
+    termsLinkLabel: "문서 읽기: Terms of Service",
+    privacyLinkLabel: "문서 읽기: Privacy Policy",
+    termsAgreement: "Terms of Service v1.1에 동의합니다.",
+    privacyAcknowledgement: "Privacy Policy v1.1을 확인했습니다.",
+    continueAction: "동의하고 계속",
+    savingAction: "동의 기록 저장 중…",
+    signOutAction: "로그아웃",
+    retryAction: "다시 시도",
+    unavailableTitle: "법률 업데이트를 일시적으로 사용할 수 없습니다",
+    unavailableDescription:
+      "현재 IronClad에서 현행 법률 문서를 확인할 수 없습니다. 동의 기록은 저장되지 않았습니다. 다시 시도하거나 로그아웃하세요.",
+    authRequiredError: "계속하려면 다시 로그인하세요.",
+    acceptanceRequiredError: "두 법률 항목을 모두 확인해야 합니다.",
+    unavailableError:
+      "IronClad에서 동의 내용을 기록하지 못했습니다. 저장된 내용이 없습니다. 다시 시도하세요.",
+    acceptedMessage: "동의 내용이 기록되었습니다. IronClad를 불러오는 중…",
+  },
   selector: {
     language: "언어",
     triggerAriaLabel: "언어 선택. 현재 언어: {language}",
