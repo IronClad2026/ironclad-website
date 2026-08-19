@@ -51,7 +51,7 @@ const dictionary = {
     privacyCookie:
       "IronClad 会将您的明确语言选择保存在第一方功能性 Cookie 中，期限最长约为一年。",
     privacyClerk:
-      "如果您已登录，该选择也可能会私密存储在 Clerk 中，以便 IronClad 自有的事务性电子邮件使用相应语言。",
+      "如果您已登录，该选择也可能会私密存储在 Clerk 中，以便 IronClad 发送的服务通知邮件使用相应语言。",
     privacyNoTracking: "此偏好不会用于广告或跨站跟踪。",
     privacyNotEvidence:
       "它不能作为您的所在地、法律管辖地、同意或理解程度的证明。",
@@ -64,7 +64,7 @@ const dictionary = {
   music: { playerLabel: "IronClad 主题音乐播放器", pause: "暂停 IronClad 主题音乐", play: "播放 IronClad 主题音乐", unavailable: "音乐暂不可用" },
   legal: {
     effectiveEnglishNotice:
-      "现行有效的管辖文本为英文。目前不提供官方译文。",
+      "现行且具有约束力的文本为英文。目前不提供官方译文。",
     read: "阅读",
     download: "下载",
     continueInEnglish: "切换为英文并继续",

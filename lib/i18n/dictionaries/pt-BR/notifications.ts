@@ -16,7 +16,7 @@ const dictionary = {
     noShowConfirmationTitle: "Confirmação de ausência necessária",
     resultConfirmationTitle: "Confirmação do resultado da partida necessária",
     noShowConfirmationMessage:
-      "Seu adversário informou sua ausência em {tournamentName}.",
+      "Seu adversário informou que você não compareceu em {tournamentName}.",
     resultConfirmationMessage:
       "Seu adversário enviou um resultado para {tournamentName}. Placar informado: {score}.",
     openToRespond: "Abrir o torneio para confirmar ou contestar",
@@ -48,7 +48,7 @@ const dictionary = {
     score: "Placar",
     time: "Horário",
     unavailable: "Indisponível",
-    noShowForfeit: "Ausência / desistência",
+    noShowForfeit: "Não comparecimento / derrota por ausência",
     disputeNotes: "Observações da contestação (opcional)",
     confirmNoShow: "Confirmar ausência",
     confirmResult: "Confirmar resultado",
@@ -58,7 +58,7 @@ const dictionary = {
     match: "Partida",
     matchValue: "{roundName} · Partida {matchNumber}",
     submission: "Envio",
-    forfeitWinner: "Vencedor por desistência",
+    forfeitWinner: "Vencedor por ausência",
     reportedWinner: "Vencedor informado",
     missingPlayer: "Jogador ausente",
     reportedLoser: "Perdedor informado",
@@ -71,7 +71,7 @@ const dictionary = {
     administratorMessage: "Mensagem da administração",
     expiredNotice:
       "O prazo de confirmação terminou. A aprovação automática aguarda o processo programado.",
-    noShowReport: "Relatório de ausência",
+    noShowReport: "Relato de ausência",
     submissionNumber: "Envio nº {number}",
     resultConfirmation: "Confirmação do resultado",
     timeUnavailable: "Tempo restante indisponível",
@@ -111,24 +111,24 @@ const dictionary = {
     reset: "Redefinido",
   },
   matchContent: {
-    noShowAwaitingTitle: "Relatório de ausência aguardando confirmação",
+    noShowAwaitingTitle: "Relato de ausência aguardando confirmação",
     noShowAwaitingMessage:
-      "Seu relatório de ausência foi enviado. Seu adversário deve confirmar ou contestar antes do prazo.",
+      "Seu relato de ausência foi enviado. Seu adversário deve confirmar ou contestar antes do prazo.",
     submissionAwaitingTitle: "Envio nº {number} aguardando confirmação",
     submissionAwaitingMessage:
       "O resultado da sua partida foi enviado. Seu adversário deve confirmar ou contestar antes do prazo.",
     noShowConfirmationTitle: "Confirmação de ausência necessária",
     noShowConfirmationMessage:
-      "Seu adversário informou sua ausência em {tournamentName}. Confirme ou conteste o relatório antes que o prazo termine.",
+      "Seu adversário informou que você não compareceu em {tournamentName}. Confirme ou conteste o relato antes que o prazo termine.",
     resultConfirmationTitle: "Confirmação do resultado da partida necessária",
     resultConfirmationMessage:
       "Seu adversário enviou o resultado da sua partida em {tournamentName}. Confirme ou conteste antes que o prazo termine.",
-    noShowApprovedTitle: "Relatório de ausência aprovado",
-    noShowApprovedMessage: "O relatório de ausência foi aprovado e registrado.",
+    noShowApprovedTitle: "Relato de ausência aprovado",
+    noShowApprovedMessage: "O relato de ausência foi aprovado e registrado.",
     resultApprovedTitle: "Resultado da partida aprovado",
     resultApprovedMessage: "O resultado oficial foi aprovado e registrado.",
     noShowConfirmedTitle: "Ausência confirmada",
-    noShowConfirmedMessage: "O relatório de ausência foi confirmado e registrado.",
+    noShowConfirmedMessage: "O relato de ausência foi confirmado e registrado.",
     resultConfirmedTitle: "Resultado da partida confirmado",
     resultConfirmedMessage: "O adversário confirmou o resultado, que foi registrado.",
     noShowAutoTitle: "Ausência confirmada automaticamente",
@@ -137,15 +137,15 @@ const dictionary = {
     resultAutoTitle: "Resultado da partida aprovado automaticamente",
     resultAutoMessage:
       "O prazo de confirmação terminou sem contestação, então o resultado foi aprovado automaticamente.",
-    noShowRejectedTitle: "Relatório de ausência rejeitado",
+    noShowRejectedTitle: "Relato de ausência rejeitado",
     noShowRejectedMessage:
-      "O relatório de ausência foi rejeitado. Leia a mensagem da administração antes de continuar.",
+      "O relato de ausência foi rejeitado. Leia a mensagem da administração antes de continuar.",
     resultRejectedTitle: "Resultado da partida rejeitado",
     resultRejectedMessage:
       "Leia a mensagem da administração antes de enviar as provas corrigidas.",
     noShowDisputedTitle: "Ausência contestada",
     noShowDisputedMessage:
-      "Este relatório de ausência foi contestado e agora requer análise da administração.",
+      "Este relato de ausência foi contestado e agora requer análise da administração.",
     resultDisputedTitle: "Resultado da partida contestado",
     resultDisputedMessage:
       "Este resultado foi contestado e agora requer análise da administração.",
@@ -208,20 +208,20 @@ const dictionary = {
       "Um resultado de partida em {tournamentName} aguarda confirmação ou análise.",
     noShowReportedTitle: "Ausência informada",
     noShowReportedMessage:
-      "Um relatório de ausência em {tournamentName} aguarda confirmação ou análise.",
+      "Um relato de ausência em {tournamentName} aguarda confirmação ou análise.",
     noShowConfirmedTitle: "Ausência confirmada",
-    noShowConfirmedMessage: "O relatório de ausência em {tournamentName} foi confirmado.",
+    noShowConfirmedMessage: "O relato de ausência em {tournamentName} foi confirmado.",
     noShowDisputedTitle: "Ausência contestada",
     noShowDisputedMessage:
-      "O relatório de ausência em {tournamentName} requer análise da administração.",
+      "O relato de ausência em {tournamentName} requer análise da administração.",
     noShowApprovedTitle: "Ausência aprovada",
     noShowApprovedMessage:
-      "O relatório de ausência em {tournamentName} foi aprovado e registrado.",
+      "O relato de ausência em {tournamentName} foi aprovado e registrado.",
     noShowRejectedTitle: "Ausência rejeitada",
-    noShowRejectedMessage: "O relatório de ausência em {tournamentName} foi rejeitado.",
-    noShowReviewTitle: "Relatório de ausência requer análise",
+    noShowRejectedMessage: "O relato de ausência em {tournamentName} foi rejeitado.",
+    noShowReviewTitle: "Relato de ausência requer análise",
     noShowReviewMessage:
-      "O relatório de ausência em {tournamentName} requer análise da administração.",
+      "O relato de ausência em {tournamentName} requer análise da administração.",
     resultApprovedTitle: "Resultado da partida aprovado",
     resultApprovedMessage:
       "O resultado da partida em {tournamentName} foi aprovado e registrado.",

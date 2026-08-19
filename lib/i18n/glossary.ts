@@ -108,7 +108,7 @@ export const COMPETITION_GLOSSARY = {
     game: "Игра",
     series: "Серия",
     bracket: "Сетка",
-    waitlist: "Лист ожидания",
+    waitlist: "Список ожидания",
     vacancyOffer: "Предложение свободного места",
     registration: "Регистрация",
     replay: "Реплей",

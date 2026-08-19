@@ -51,7 +51,7 @@ const dictionary = {
     privacyCookie:
       "IronClad는 사용자가 명시적으로 선택한 언어를 자사 기능성 쿠키에 최대 약 1년 동안 저장합니다.",
     privacyClerk:
-      "로그인한 경우 IronClad가 직접 보내는 거래성 이메일에 해당 언어를 사용할 수 있도록 이 선택이 Clerk의 비공개 메타데이터에도 저장될 수 있습니다.",
+      "로그인한 경우 IronClad가 직접 보내는 서비스 알림 이메일에 해당 언어를 사용할 수 있도록 이 선택이 Clerk의 비공개 메타데이터에도 저장될 수 있습니다.",
     privacyNoTracking:
       "이 환경설정은 광고나 사이트 간 추적에 사용되지 않습니다.",
     privacyNotEvidence:

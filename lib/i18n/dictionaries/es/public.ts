@@ -60,7 +60,7 @@ const dictionary = {
       verifyCta: "VER TORNEOS",
       reportTitle: "JUEGA E INFORMA",
       reportText:
-        "Juega con el grupo de mapas publicado de la División, usa Dice autenticado en los desempates de partidas impares e informa de la serie con una repetición .rec privada por cada partida. Tu rival podrá confirmar o disputar el resultado.",
+        "Juega con la selección de mapas publicada de la División, usa Dice autenticado en los desempates de los juegos impares e informa del resultado de la serie con una repetición .rec privada por cada juego disputado. Tu rival podrá confirmar o impugnar el informe.",
       reportCta: "LEER REGLAS 1V1",
       progressTitle: "COMPITE Y PROGRESA",
       progressText:
@@ -147,7 +147,7 @@ const dictionary = {
       "Solo se muestran campos aprobados por el jugador. Los perfiles privados no aparecen.",
     commanders: "Comandantes públicos",
     directorySafe:
-      "Los datos del directorio se limitan a campos seguros del perfil público.",
+      "Los datos del directorio se limitan a los campos del perfil autorizados para mostrarse públicamente.",
     search: "Buscar jugador",
     searchPlaceholder: "Buscar por nombre",
     eloFilter: "ELO",
@@ -159,7 +159,7 @@ const dictionary = {
     noPlayers: "Aún no hay jugadores públicos.",
     noMatches: "Ningún jugador público coincide con los filtros.",
     emptyHelp:
-      "Las tarjetas aparecerán cuando haya perfiles de IronClad elegibles en el límite de datos públicos.",
+      "Las tarjetas aparecerán cuando haya perfiles de IronClad aptos y configurados como públicos.",
     allCountries: "Todos los países",
     allElo: "Todas las puntuaciones ELO",
     unrated: "Sin puntuación",
@@ -178,13 +178,13 @@ const dictionary = {
     competitiveRecord: "Historial competitivo",
     publicStats: "Estadísticas públicas",
     publicStatsText:
-      "Información competitiva aprobada por el jugador desde el límite público de IronClad.",
+      "Información competitiva que el jugador ha autorizado a mostrar públicamente en IronClad.",
     tournamentHistory: "Historial de torneos",
     tournamentHistoryText:
-      "El historial público de torneos aparecerá cuando exista un resumen seguro para el público.",
+      "El historial público de torneos aparecerá cuando haya un resumen apto para publicación.",
     matchStatistics: "Estadísticas de partidas",
     matchStatisticsText:
-      "Las estadísticas públicas aparecerán cuando victorias, derrotas e historial estén disponibles de forma segura.",
+      "Las estadísticas públicas aparecerán cuando las victorias, las derrotas y el historial de partidas estén disponibles para su publicación.",
     comingLater: "Próximamente",
     discordUnavailable: "Contacto de Discord no disponible.",
     discordUnavailableText:
@@ -208,7 +208,7 @@ const dictionary = {
     academyCareer: "Carrera de Academy",
     challengeCareer: "Carrera de Challenge",
     loadWarning:
-      "No se pudieron cargar algunos datos. Esta página muestra todos los conjuntos de datos públicos disponibles.",
+      "No se pudieron cargar algunos datos de clasificación. Esta página pública muestra todos los conjuntos de datos autorizados que están disponibles.",
     publicLeaderboard: "Clasificación pública",
     dynamicStandings: "Clasificación dinámica",
     mainDescription:
@@ -217,7 +217,7 @@ const dictionary = {
       "Los puntos y resultados de Academy permanecen en esta vista permanente de carrera.",
     challengeDescription:
       "Los puntos y resultados de Challenge permanecen en esta vista permanente de carrera.",
-    safeData: "Todas las filas proceden de vistas públicas seguras.",
+    safeData: "Todas las filas proceden de vistas de clasificación autorizadas para su publicación.",
     visibleCompetitors: "Competidores visibles",
     rankingModel: "Modelo de clasificación",
     sixEventSeason: "Temporada de seis eventos",
@@ -239,7 +239,7 @@ const dictionary = {
     underReviewNotice:
       "Los resultados están en revisión. La clasificación mostrada no es definitiva mientras siga abierta.",
     careerNoReset:
-      "Los puntos de carrera no se reinician al terminar una temporada Main / Pro y permanecen separados de la otra división.",
+      "Los puntos de carrera no se reinician al terminar una temporada Main / Pro y permanecen separados de la otra División de carrera.",
     competitors: "Competidores",
     season: "Temporada",
     state: "Estado",
@@ -265,7 +265,7 @@ const dictionary = {
       "Finalización pendiente. La puntuación y finalización automáticas deberían completarse tras el sexto evento válido.",
     inProgress: "En curso",
     inProgressDescription: "Temporada en curso.",
-    topUnavailable: "Clasificación superior Main / Pro no disponible",
+    topUnavailable: "Primeros puestos de Main / Pro no disponibles",
     topUnavailableText:
       "Los rangos oficiales aparecerán tras publicarse resultados Main / Pro válidos.",
     topAria: "Primeros puestos Main / Pro",
@@ -273,7 +273,7 @@ const dictionary = {
     currentStandings: "Clasificación actual Main / Pro",
     topStandings: "Primeros puestos",
     tieNotice:
-      "Se representa a cada competidor que comparte oficialmente los rangos 1, 2 o 3. El orden visual no cambia el rango oficial. Cada evento con premios se rige por sus Condiciones de Premios publicadas.",
+      "Se muestra a cada competidor que comparte oficialmente los puestos 1, 2 o 3 de Main / Pro. El orden visual no cambia el puesto oficial. Cada Evento con premios se rige por sus Condiciones de Premios publicadas.",
     rank: "Posición",
     player: "Jugador",
     country: "País",

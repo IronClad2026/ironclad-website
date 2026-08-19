@@ -40,7 +40,7 @@ const dictionary = {
     notificationCenter: {
       eyebrow: "Notificações",
       title: "Notificações",
-      description: "Atualizações recentes sobre torneios, inscrições, movimentação da lista de espera e decisões sobre resultados de partidas.",
+      description: "Atualizações recentes do IronClad sobre torneios, inscrições, movimentação da lista de espera e decisões sobre resultados de partidas.",
       empty: "Atualizações de torneios, inscrições e partidas aparecerão aqui.",
     },
     career: {

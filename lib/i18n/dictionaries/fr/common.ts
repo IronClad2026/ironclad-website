@@ -42,20 +42,20 @@ const dictionary = {
     triggerAriaLabel: "Choisir la langue. Langue actuelle : {language}",
     languageRowLabel: "Langue",
     title: "Choisissez votre langue",
-    description: "Sélectionnez la langue de l’expérience joueur IronClad.",
+    description: "Sélectionnez la langue de votre expérience sur IronClad.",
     closeLabel: "Fermer le sélecteur de langue",
     selectedLabel: "Sélectionné",
     savingLabel: "Enregistrement de la langue…",
     saveError: "Impossible d’enregistrer votre préférence linguistique. Réessayez.",
     privacyHeading: "Préférence linguistique",
     privacyCookie:
-      "IronClad conserve votre choix explicite dans un cookie fonctionnel déposé par IronClad pendant environ un an au maximum.",
+      "IronClad conserve votre choix explicite dans un cookie fonctionnel déposé par IronClad pendant une durée maximale d’environ un an.",
     privacyClerk:
       "Si vous êtes connecté, ce choix peut aussi être stocké de manière privée chez Clerk afin que les e-mails transactionnels envoyés par IronClad utilisent cette langue.",
     privacyNoTracking:
       "Cette préférence ne sert ni à la publicité ni au suivi intersite.",
     privacyNotEvidence:
-      "Elle ne prouve pas votre localisation, votre juridiction, votre consentement ni votre compréhension.",
+      "Elle ne constitue pas une preuve de votre localisation, du territoire juridique qui vous est applicable, de votre consentement ni de votre compréhension.",
     privacyChange: "Vous pouvez modifier cette préférence ici à tout moment.",
     privacyPolicyLink: "Lire la Politique de confidentialité",
   },
@@ -65,7 +65,7 @@ const dictionary = {
   music: { playerLabel: "Lecteur de la musique d’IronClad", pause: "Mettre le thème IronClad en pause", play: "Lire le thème IronClad", unavailable: "Musique indisponible" },
   legal: {
     effectiveEnglishNotice:
-      "Le texte régissant en vigueur est en anglais. Aucune traduction officielle n’est actuellement fournie.",
+      "Le texte applicable faisant foi est en anglais. Aucune traduction officielle n’est actuellement disponible.",
     read: "Lire",
     download: "Télécharger",
     continueInEnglish: "Continuer en anglais",

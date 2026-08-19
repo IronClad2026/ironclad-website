@@ -120,7 +120,7 @@ const dictionary = {
     eyebrow: "Identidad de juego verificada",
     title: "Conexión con Steam",
     description:
-      "Conecta Steam para demostrar que controlas tu identidad de juego. La cuenta de Steam no se usa para iniciar sesión en IronClad.",
+      "Conecta Steam para demostrar que eres titular de la cuenta asociada a tu identidad de juego. Tu cuenta de Steam no se usa para iniciar sesión en IronClad.",
     connectedResult: "Cuenta de Steam conectada correctamente.",
     refreshedResult:
       "Cuenta de Steam actualizada. Tu nombre visible está al día.",
@@ -164,7 +164,7 @@ const dictionary = {
     sessionExpired:
       "Tu sesión ha caducado. Inicia sesión de nuevo antes de verificar el ELO.",
     authRequired: "Inicia sesión antes de verificar el ELO.",
-    serviceUnavailable: "No se ha podido iniciar la verificación del ELO ahora.",
+    serviceUnavailable: "No se puede iniciar ahora la verificación del ELO.",
     profileLoadFailed: "No se ha podido cargar tu perfil de jugador.",
     profileRequired: "Completa tu perfil antes de verificar el ELO.",
     steamRequired: "Conecta Steam antes de verificar el ELO.",
@@ -195,7 +195,7 @@ const dictionary = {
     disabled: "Desactivado",
     publicTitle: "Perfil público de jugador",
     publicDescription:
-      "Muestra tus datos públicos seguros y avatar en el directorio. El contacto de Discord se controla por separado.",
+      "Muestra en el directorio el avatar y los datos del perfil que has autorizado para su publicación. La visibilidad del contacto de Discord sigue siendo una opción independiente.",
     updating: "Actualizando…",
     makePrivate: "Hacer privado",
     makePublic: "Hacer público",
@@ -233,29 +233,29 @@ const dictionary = {
     eyebrow: "Zona de peligro",
     title: "Eliminar cuenta",
     description:
-      "Elimina permanentemente tu acceso, identidad de perfil, avatar e identificadores personales directos. Los vínculos privados se eliminan o neutralizan. El historial oficial de torneos, partidas, clasificaciones y campeonatos se conserva públicamente solo como Antiguo Competidor. Las repeticiones privadas referenciadas pueden conservarse para revisión autorizada.",
+      "Elimina permanentemente tu acceso a IronClad, tu identidad de perfil, tu avatar y tus identificadores personales directos. Los vínculos privados de la cuenta se eliminan o neutralizan. El historial oficial de torneos, partidas, clasificaciones y campeonatos se conserva públicamente, pero solo te identifica como «Antiguo Competidor». Las pruebas privadas mediante repeticiones asociadas pueden conservarse para una revisión autorizada.",
     action: "Eliminar cuenta",
     permanent: "Acción permanente",
     confirmTitle: "¿Eliminar tu cuenta de IronClad?",
-    close: "Cerrar confirmación de eliminación",
+    close: "Cerrar la confirmación de eliminación de la cuenta",
     warning:
-      "No se puede deshacer. Si tienes historial competitivo oficial, se conservarán inscripciones, resultados, clasificaciones, campeonatos y pruebas privadas referenciadas. El historial público solo te identificará como Antiguo Competidor y las pruebas privadas seguirán limitadas a revisores autorizados. En caso contrario, se eliminará tu registro.",
+      "Esta acción no se puede deshacer. Si tienes historial competitivo oficial, se conservarán las inscripciones, los resultados de partidas, las clasificaciones, los registros de campeonatos y las pruebas privadas mediante repeticiones asociadas. En el historial público solo aparecerás como «Antiguo Competidor» y las pruebas privadas seguirán accesibles únicamente para revisores autorizados. Si no tienes ese historial, se eliminará tu registro de jugador.",
     typeDelete: "Escribe DELETE para confirmar",
     cancel: "Cancelar",
     deleting: "Eliminando cuenta…",
     permanentlyDelete: "Eliminar permanentemente",
     sessionExpired:
-      "Tu sesión ha caducado. Inicia sesión de nuevo antes de eliminar.",
+      "Tu sesión ha caducado. Vuelve a iniciar sesión antes de eliminar tu cuenta.",
     confirmationInvalid:
-      "Escribe DELETE exactamente para confirmar la eliminación.",
+      "Escribe DELETE exactamente para confirmar la eliminación de la cuenta.",
     notConfigured:
       "La eliminación de cuentas no está configurada. Contacta con un administrador de IronClad.",
     avatarFailed:
       "No se pudo eliminar tu avatar. Tu cuenta de Clerk no se eliminó.",
     dataFailed:
-      "No se pudieron cerrar tus datos de forma segura. Tu cuenta de Clerk no se eliminó.",
+      "No se pudo completar de forma segura el cierre de tus datos. Tu cuenta de Clerk no se eliminó.",
     clerkFailed:
-      "Tu identidad de IronClad se cerró, pero falló la eliminación en Clerk. Contacta con un administrador.",
+      "Tu identidad de IronClad se ha cerrado, pero no se pudo eliminar tu cuenta de Clerk. Contacta con un administrador.",
     success: "Tu cuenta de IronClad ha sido eliminada.",
   },
   dashboard: {
@@ -331,8 +331,8 @@ const dictionary = {
       result: "Resultado",
       finalScore: "Marcador final",
       matchDate: "Fecha de la partida",
-      replayProof: "Prueba de repetición",
-      screenshotProof: "Prueba de captura",
+      replayProof: "Prueba mediante repetición",
+      screenshotProof: "Prueba mediante captura de pantalla",
       available: "Disponible",
       notAttached: "Sin adjuntar",
       proofRetained: "La prueba oficial se conserva con el registro de auditoría del resultado de la partida.",
@@ -357,7 +357,7 @@ const dictionary = {
       offerTitle: "Hay una plaza disponible en el torneo",
       offerMessage: "La plaza queda reservada para ti hasta el plazo indicado abajo. Acéptala para volver a la revisión administrativa o recházala para liberarla.",
       declinedTitle: "Plaza de la lista de espera rechazada",
-      declinedMessage: "Esta inscripción en lista de espera está cerrada.",
+      declinedMessage: "Esta inscripción en la lista de espera está cerrada.",
       expiredTitle: "Oferta de lista de espera vencida",
       expiredMessage: "La plaza disponible ha pasado al siguiente jugador elegible.",
       waitlistClosedTitle: "Lista de espera cerrada",
@@ -366,7 +366,7 @@ const dictionary = {
       acceptedMessage: "Tu inscripción está pendiente de revisión administrativa.",
       launchedWaitlistMessage: "Esta División ya ha comenzado y no quedó ninguna plaza disponible. Gracias por apuntarte a la lista de espera.",
       waitlistedTitle: "En lista de espera",
-      waitlistedMessage: "El grupo activo está completo. Si se libera una plaza, tu inscripción seguirá el orden de envío.",
+      waitlistedMessage: "El grupo activo está completo. Si se libera una plaza, tu inscripción se tramitará por orden de envío.",
       approvedTitle: "Inscripción aprobada",
       approvedMessage: "Tu plaza ha sido aprobada. Consulta IronClad para ver novedades del cuadro y del calendario.",
       rejectedTitle: "Inscripción rechazada",

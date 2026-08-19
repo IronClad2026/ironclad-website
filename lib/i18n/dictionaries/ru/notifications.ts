@@ -16,7 +16,7 @@ const dictionary = {
     noShowConfirmationTitle: "Требуется подтверждение неявки",
     resultConfirmationTitle: "Требуется подтверждение результата матча",
     noShowConfirmationMessage:
-      "Ваш соперник сообщил о вашей неявке на турнир {tournamentName}.",
+      "Ваш соперник сообщил, что вы не явились на матч турнира {tournamentName}.",
     resultConfirmationMessage:
       "Ваш соперник отправил результат матча на турнире {tournamentName}. Указанный счёт: {score}.",
     openToRespond: "Открыть турнир, чтобы подтвердить или оспорить",
@@ -119,7 +119,7 @@ const dictionary = {
       "Результат вашего матча отправлен. Соперник должен подтвердить или оспорить его до истечения срока.",
     noShowConfirmationTitle: "Требуется подтверждение неявки",
     noShowConfirmationMessage:
-      "Ваш соперник сообщил о вашей неявке на турнир {tournamentName}. Подтвердите или оспорьте отчёт до окончания срока подтверждения.",
+      "Ваш соперник сообщил, что вы не явились на матч турнира {tournamentName}. Подтвердите или оспорьте отчёт до окончания срока подтверждения.",
     resultConfirmationTitle: "Требуется подтверждение результата матча",
     resultConfirmationMessage:
       "Ваш соперник отправил результат вашего матча на турнире {tournamentName}. Подтвердите или оспорьте его до окончания срока подтверждения.",
@@ -176,13 +176,13 @@ const dictionary = {
     waitlistOfferTitle: "На турнире освободилось место",
     waitlistOfferMessage:
       "На турнире {tournamentName} доступно место. Откройте панель игрока и примите или отклоните предложение до истечения срока.",
-    waitlistClosedTitle: "Лист ожидания закрыт",
-    waitlistClosedMessage: "Лист ожидания турнира {tournamentName} закрыт.",
+    waitlistClosedTitle: "Список ожидания закрыт",
+    waitlistClosedMessage: "Список ожидания турнира {tournamentName} закрыт.",
     registrationRejectedTitle: "Регистрация не одобрена",
     registrationRejectedMessage: "Ваша регистрация на турнир {tournamentName} не одобрена.",
-    registrationWaitlistedTitle: "Добавлено в лист ожидания",
+    registrationWaitlistedTitle: "Добавлено в список ожидания",
     registrationWaitlistedMessage:
-      "Ваша регистрация на турнир {tournamentName} находится в листе ожидания.",
+      "Ваша регистрация на турнир {tournamentName} находится в списке ожидания.",
     registrationReviewTitle: "Регистрация на рассмотрении",
     registrationReviewMessage:
       "Ваша регистрация на турнир {tournamentName} требует рассмотрения администратором.",
@@ -190,7 +190,7 @@ const dictionary = {
     matchReadyMessage: "Ваш следующий матч на турнире {tournamentName} готов.",
     automaticAdvanceTitle: "Автоматическое продвижение",
     automaticAdvanceMessage:
-      "Ваша позиция в сетке турнира {tournamentName} продвинулась автоматически.",
+      "Вы автоматически продвинулись по сетке турнира {tournamentName}.",
     deadlineUpdatedTitle: "Срок матча обновлён",
     deadlineUpdatedMessage: "Статус срока вашего матча на турнире {tournamentName} изменился.",
     deadlineReminderTitle: "Напоминание о сроке матча",

@@ -71,7 +71,7 @@ const dictionary = {
     administratorMessage: "Message de l’administration",
     expiredNotice:
       "Le délai de confirmation a expiré. L’approbation automatique attend le processus planifié.",
-    noShowReport: "Rapport d’absence",
+    noShowReport: "Signalement d’absence",
     submissionNumber: "Envoi n° {number}",
     resultConfirmation: "Confirmation du résultat",
     timeUnavailable: "Temps restant indisponible",
@@ -111,24 +111,24 @@ const dictionary = {
     reset: "Réinitialisé",
   },
   matchContent: {
-    noShowAwaitingTitle: "Rapport d’absence en attente de confirmation",
+    noShowAwaitingTitle: "Signalement d’absence en attente de confirmation",
     noShowAwaitingMessage:
-      "Votre rapport d’absence a été envoyé. Votre adversaire doit le confirmer ou le contester avant l’échéance.",
+      "Votre signalement d’absence a été envoyé. Votre adversaire doit le confirmer ou le contester avant l’échéance.",
     submissionAwaitingTitle: "Envoi n° {number} en attente de confirmation",
     submissionAwaitingMessage:
       "Le résultat de votre match a été envoyé. Votre adversaire doit le confirmer ou le contester avant l’échéance.",
     noShowConfirmationTitle: "Confirmation d’absence requise",
     noShowConfirmationMessage:
-      "Votre adversaire a signalé votre absence pour {tournamentName}. Confirmez ou contestez le rapport avant la fin du délai de confirmation.",
+      "Votre adversaire a signalé votre absence pour {tournamentName}. Confirmez ou contestez le signalement avant la fin du délai de confirmation.",
     resultConfirmationTitle: "Confirmation du résultat du match requise",
     resultConfirmationMessage:
       "Votre adversaire a soumis le résultat de votre match dans {tournamentName}. Confirmez-le ou contestez-le avant la fin du délai de confirmation.",
-    noShowApprovedTitle: "Rapport d’absence approuvé",
-    noShowApprovedMessage: "Le rapport d’absence a été approuvé et enregistré.",
+    noShowApprovedTitle: "Signalement d’absence approuvé",
+    noShowApprovedMessage: "Le signalement d’absence a été approuvé et enregistré.",
     resultApprovedTitle: "Résultat du match approuvé",
     resultApprovedMessage: "Le résultat officiel a été approuvé et enregistré.",
     noShowConfirmedTitle: "Absence confirmée",
-    noShowConfirmedMessage: "Le rapport d’absence a été confirmé et enregistré.",
+    noShowConfirmedMessage: "Le signalement d’absence a été confirmé et enregistré.",
     resultConfirmedTitle: "Résultat du match confirmé",
     resultConfirmedMessage: "L’adversaire a confirmé le résultat, qui a été enregistré.",
     noShowAutoTitle: "Absence confirmée automatiquement",
@@ -137,15 +137,15 @@ const dictionary = {
     resultAutoTitle: "Résultat du match approuvé automatiquement",
     resultAutoMessage:
       "Le délai de confirmation a expiré sans contestation ; le résultat a donc été approuvé automatiquement.",
-    noShowRejectedTitle: "Rapport d’absence rejeté",
+    noShowRejectedTitle: "Signalement d’absence rejeté",
     noShowRejectedMessage:
-      "Le rapport d’absence a été rejeté. Consultez le message de l’administration avant de continuer.",
+      "Le signalement d’absence a été rejeté. Consultez le message de l’administration avant de continuer.",
     resultRejectedTitle: "Résultat du match rejeté",
     resultRejectedMessage:
       "Consultez le message de l’administration avant d’envoyer les preuves corrigées.",
     noShowDisputedTitle: "Absence contestée",
     noShowDisputedMessage:
-      "Ce rapport d’absence a été contesté et doit maintenant être examiné par l’administration.",
+      "Ce signalement d’absence a été contesté et doit maintenant être examiné par l’administration.",
     resultDisputedTitle: "Résultat du match contesté",
     resultDisputedMessage:
       "Ce résultat a été contesté et doit maintenant être examiné par l’administration.",
@@ -190,7 +190,7 @@ const dictionary = {
       "Votre inscription à {tournamentName} doit être examinée par l’administration.",
     matchReadyTitle: "Match prêt",
     matchReadyMessage: "Votre prochain match dans {tournamentName} est prêt.",
-    automaticAdvanceTitle: "Progression automatique",
+    automaticAdvanceTitle: "Qualification automatique",
     automaticAdvanceMessage:
       "Votre position dans le tableau de {tournamentName} a progressé automatiquement.",
     deadlineUpdatedTitle: "Échéance du match mise à jour",
@@ -210,20 +210,20 @@ const dictionary = {
       "Un résultat de match dans {tournamentName} attend une confirmation ou un examen.",
     noShowReportedTitle: "Absence signalée",
     noShowReportedMessage:
-      "Un rapport d’absence dans {tournamentName} attend une confirmation ou un examen.",
+      "Un signalement d’absence dans {tournamentName} attend une confirmation ou un examen.",
     noShowConfirmedTitle: "Absence confirmée",
-    noShowConfirmedMessage: "Le rapport d’absence dans {tournamentName} a été confirmé.",
+    noShowConfirmedMessage: "Le signalement d’absence dans {tournamentName} a été confirmé.",
     noShowDisputedTitle: "Absence contestée",
     noShowDisputedMessage:
-      "Le rapport d’absence dans {tournamentName} doit être examiné par l’administration.",
+      "Le signalement d’absence dans {tournamentName} doit être examiné par l’administration.",
     noShowApprovedTitle: "Absence approuvée",
     noShowApprovedMessage:
-      "Le rapport d’absence dans {tournamentName} a été approuvé et enregistré.",
+      "Le signalement d’absence dans {tournamentName} a été approuvé et enregistré.",
     noShowRejectedTitle: "Absence rejetée",
-    noShowRejectedMessage: "Le rapport d’absence dans {tournamentName} a été rejeté.",
-    noShowReviewTitle: "Rapport d’absence à examiner",
+    noShowRejectedMessage: "Le signalement d’absence dans {tournamentName} a été rejeté.",
+    noShowReviewTitle: "Signalement d’absence à examiner",
     noShowReviewMessage:
-      "Le rapport d’absence dans {tournamentName} doit être examiné par l’administration.",
+      "Le signalement d’absence dans {tournamentName} doit être examiné par l’administration.",
     resultApprovedTitle: "Résultat du match approuvé",
     resultApprovedMessage:
       "Le résultat du match dans {tournamentName} a été approuvé et enregistré.",

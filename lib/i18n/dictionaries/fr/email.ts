@@ -22,7 +22,7 @@ const dictionary = {
     action: "Voir le match",
   },
   laterRound: {
-    subject: "Match du tour {roundName} prêt : {tournamentName}",
+    subject: "Match prêt ({roundName}) : {tournamentName}",
     heading: "Votre prochain match est prêt",
     intro: "Les deux participants officiels de ce match sont désormais définis.",
     action: "Voir le match",

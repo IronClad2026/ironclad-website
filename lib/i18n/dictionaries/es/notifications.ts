@@ -8,7 +8,7 @@ const dictionary = {
     selected: "{count} seleccionadas",
     markSelectedRead: "Marcar seleccionadas como leídas",
     deleteSelected: "Eliminar seleccionadas",
-    markAllRead: "Marcar todo como leído",
+    markAllRead: "Marcar todas como leídas",
     selectNotification: "Seleccionar «{title}»",
     new: "Nueva",
     deadline: "Fecha límite: {value}",
@@ -19,7 +19,7 @@ const dictionary = {
       "Tu rival ha notificado tu incomparecencia en {tournamentName}.",
     resultConfirmationMessage:
       "Tu rival ha enviado un resultado para {tournamentName}. Marcador indicado: {score}.",
-    openToRespond: "Abrir el torneo para confirmar o presentar una disputa",
+    openToRespond: "Abrir el torneo para confirmar o impugnar",
     unknownTime: "Hora desconocida",
   },
   dashboard: {
@@ -52,8 +52,8 @@ const dictionary = {
     disputeNotes: "Notas de la disputa (opcional)",
     confirmNoShow: "Confirmar incomparecencia",
     confirmResult: "Confirmar resultado",
-    disputeNoShow: "Disputar incomparecencia",
-    disputeResult: "Disputar resultado",
+    disputeNoShow: "Impugnar incomparecencia",
+    disputeResult: "Impugnar resultado",
     tournament: "Torneo",
     match: "Partida",
     matchValue: "{roundName} · Partida {matchNumber}",
@@ -95,7 +95,7 @@ const dictionary = {
       confirmed: "Resultado confirmado. El cuadro se ha actualizado.",
       disputeNotesTooLong: "Las notas de la disputa deben tener un máximo de 2.000 caracteres.",
       disputeFailed: "No se pudo impugnar el resultado de la partida. Inténtalo de nuevo.",
-      disputed: "Resultado en disputa. Un administrador debe revisarlo.",
+      disputed: "Resultado impugnado. Un administrador debe revisarlo.",
     },
   },
   status: {
@@ -106,23 +106,23 @@ const dictionary = {
     pendingConfirmation: "Pendiente de confirmación del rival",
     confirmed: "Confirmado",
     autoApproved: "Aprobado automáticamente",
-    disputed: "En disputa",
+    disputed: "Impugnado",
     underReview: "En revisión",
     reset: "Restablecido",
   },
   matchContent: {
     noShowAwaitingTitle: "Informe de incomparecencia pendiente de confirmación",
     noShowAwaitingMessage:
-      "Has enviado el informe de incomparecencia. Tu rival debe confirmarlo o disputarlo antes de la fecha límite.",
+      "Has enviado el informe de incomparecencia. Tu rival debe confirmarlo o impugnarlo antes de la fecha límite.",
     submissionAwaitingTitle: "Envío n.º {number} pendiente de confirmación",
     submissionAwaitingMessage:
-      "Has enviado el resultado de la partida. Tu rival debe confirmarlo o disputarlo antes de la fecha límite.",
+      "Has enviado el resultado de la partida. Tu rival debe confirmarlo o impugnarlo antes de la fecha límite.",
     noShowConfirmationTitle: "Debes confirmar la incomparecencia",
     noShowConfirmationMessage:
-      "Tu rival ha notificado tu incomparecencia en {tournamentName}. Confirma o disputa el informe antes de que venza el plazo de confirmación.",
+      "Tu rival ha notificado tu incomparecencia en {tournamentName}. Confirma o impugna el informe antes de que venza el plazo de confirmación.",
     resultConfirmationTitle: "Debes confirmar el resultado de la partida",
     resultConfirmationMessage:
-      "Tu rival ha enviado el resultado de vuestra partida en {tournamentName}. Confírmalo o dispútalo antes de que venza el plazo de confirmación.",
+      "Tu rival ha enviado el resultado de vuestra partida en {tournamentName}. Confírmalo o impúgnalo antes de que venza el plazo de confirmación.",
     noShowApprovedTitle: "Informe de incomparecencia aprobado",
     noShowApprovedMessage: "El informe de incomparecencia se ha aprobado y registrado.",
     resultApprovedTitle: "Resultado de la partida aprobado",
@@ -143,16 +143,16 @@ const dictionary = {
     resultRejectedTitle: "Resultado de la partida rechazado",
     resultRejectedMessage:
       "Revisa el mensaje del administrador antes de enviar las pruebas corregidas.",
-    noShowDisputedTitle: "Incomparecencia disputada",
+    noShowDisputedTitle: "Informe de incomparecencia impugnado",
     noShowDisputedMessage:
-      "Este informe de incomparecencia se ha disputado y requiere la revisión de un administrador.",
-    resultDisputedTitle: "Resultado de la partida disputado",
+      "Este informe de incomparecencia se ha impugnado y requiere la revisión de un administrador.",
+    resultDisputedTitle: "Resultado de la partida impugnado",
     resultDisputedMessage:
-      "Este resultado se ha disputado y requiere la revisión de un administrador.",
+      "Este resultado se ha impugnado y requiere la revisión de un administrador.",
     noShowReviewTitle: "Incomparecencia en revisión",
-    noShowReviewMessage: "Un administrador está revisando esta disputa por incomparecencia.",
+    noShowReviewMessage: "Un administrador está revisando esta impugnación de un informe de incomparecencia.",
     resultReviewTitle: "Resultado de la partida en revisión",
-    resultReviewMessage: "Un administrador está revisando este resultado disputado.",
+    resultReviewMessage: "Un administrador está revisando este resultado impugnado.",
     resubmissionTitle: "Se solicita un nuevo envío del resultado",
     resubmissionMessage:
       "Un administrador requiere un resultado corregido o pruebas adicionales.",
@@ -182,7 +182,7 @@ const dictionary = {
     waitlistClosedMessage: "La lista de espera de {tournamentName} ya está cerrada.",
     registrationRejectedTitle: "Inscripción no aprobada",
     registrationRejectedMessage: "Tu inscripción en {tournamentName} no se ha aprobado.",
-    registrationWaitlistedTitle: "Añadido a la lista de espera",
+    registrationWaitlistedTitle: "Inscripción añadida a la lista de espera",
     registrationWaitlistedMessage: "Tu inscripción en {tournamentName} está en la lista de espera.",
     registrationReviewTitle: "Inscripción en revisión",
     registrationReviewMessage:
@@ -191,7 +191,7 @@ const dictionary = {
     matchReadyMessage: "Tu próxima partida en {tournamentName} está lista.",
     automaticAdvanceTitle: "Avance automático",
     automaticAdvanceMessage:
-      "Tu posición en el cuadro de {tournamentName} ha avanzado automáticamente.",
+      "Has avanzado automáticamente en el cuadro de {tournamentName}.",
     deadlineUpdatedTitle: "Fecha límite de la partida actualizada",
     deadlineUpdatedMessage:
       "El estado de la fecha límite de tu partida en {tournamentName} ha cambiado.",
@@ -203,7 +203,7 @@ const dictionary = {
       "Se ha registrado una resolución oficial sobre la fecha límite de tu partida en {tournamentName}.",
     confirmationRequiredTitle: "Debes confirmar el resultado de la partida",
     confirmationRequiredMessage:
-      "Abre tu partida en {tournamentName} para confirmar o disputar el resultado indicado.",
+      "Abre tu partida en {tournamentName} para confirmar o impugnar el resultado indicado.",
     resultSubmittedTitle: "Resultado de la partida enviado",
     resultSubmittedMessage:
       "Un resultado de partida en {tournamentName} está pendiente de confirmación o revisión.",
@@ -213,7 +213,7 @@ const dictionary = {
     noShowConfirmedTitle: "Incomparecencia confirmada",
     noShowConfirmedMessage:
       "El informe de incomparecencia de {tournamentName} se ha confirmado.",
-    noShowDisputedTitle: "Incomparecencia disputada",
+    noShowDisputedTitle: "Informe de incomparecencia impugnado",
     noShowDisputedMessage:
       "El informe de incomparecencia de {tournamentName} requiere la revisión de un administrador.",
     noShowApprovedTitle: "Incomparecencia aprobada",

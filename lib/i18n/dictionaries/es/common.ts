@@ -49,13 +49,13 @@ const dictionary = {
     saveError: "No se pudo guardar tu preferencia de idioma. Inténtalo de nuevo.",
     privacyHeading: "Preferencia de idioma",
     privacyCookie:
-      "IronClad guarda tu elección expresa en una cookie funcional propia durante un máximo aproximado de un año.",
+      "IronClad guarda tu elección expresa en una cookie funcional propia durante un período de hasta aproximadamente un año.",
     privacyClerk:
-      "Si has iniciado sesión, la elección también puede guardarse de forma privada en Clerk para que los correos transaccionales propios de IronClad utilicen ese idioma.",
+      "Si has iniciado sesión, la elección también puede guardarse de forma privada en Clerk para que los correos electrónicos transaccionales de IronClad puedan utilizar ese idioma.",
     privacyNoTracking:
-      "Esta preferencia no se usa para publicidad ni seguimiento entre sitios.",
+      "Esta preferencia no se usa para publicidad ni seguimiento entre sitios web.",
     privacyNotEvidence:
-      "No demuestra tu ubicación, jurisdicción legal, consentimiento ni comprensión.",
+      "No constituye prueba de tu ubicación, jurisdicción legal, consentimiento ni comprensión.",
     privacyChange: "Puedes cambiar la preferencia aquí en cualquier momento.",
     privacyPolicyLink: "Leer la Política de privacidad",
   },
@@ -65,7 +65,7 @@ const dictionary = {
   music: { playerLabel: "Reproductor de música de IronClad", pause: "Pausar tema de IronClad", play: "Reproducir tema de IronClad", unavailable: "Música no disponible" },
   legal: {
     effectiveEnglishNotice:
-      "El texto normativo vigente está en inglés. Actualmente no se ofrece ninguna traducción oficial.",
+      "El texto rector vigente está en inglés. Actualmente no se ofrece ninguna traducción oficial.",
     read: "Leer",
     download: "Descargar",
     continueInEnglish: "Continuar en inglés",

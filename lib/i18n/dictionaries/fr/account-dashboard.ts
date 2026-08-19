@@ -40,7 +40,7 @@ const dictionary = {
     notificationCenter: {
       eyebrow: "Notifications",
       title: "Notifications",
-      description: "Dernières informations sur les tournois, les inscriptions, les mouvements de la liste d’attente et les décisions relatives aux résultats des matchs.",
+      description: "Dernières informations d’IronClad sur les tournois, les inscriptions, les mouvements de la liste d’attente et les décisions relatives aux résultats des matchs.",
       empty: "Les informations sur les tournois, les inscriptions et les matchs apparaîtront ici.",
     },
     career: {
@@ -78,7 +78,7 @@ const dictionary = {
       bracketRound: "Tableau {bracket} · {round}",
       close: "Fermer les détails de l’historique du match",
       opponent: "Adversaire",
-      round: "Ronde",
+      round: "Tour",
       matchNumber: "Numéro du match",
       format: "Format",
       result: "Résultat",

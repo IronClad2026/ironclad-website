@@ -65,7 +65,7 @@ const dictionary = {
   music: { playerLabel: "Reprodutor da música tema do IronClad", pause: "Pausar tema do IronClad", play: "Reproduzir tema do IronClad", unavailable: "Música indisponível" },
   legal: {
     effectiveEnglishNotice:
-      "O texto normativo vigente está em inglês. No momento, não há tradução oficial.",
+      "O texto normativo em vigor e que prevalece está em inglês. No momento, não há tradução oficial.",
     read: "Ler",
     download: "Baixar",
     continueInEnglish: "Continuar em inglês",
