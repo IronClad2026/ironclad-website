@@ -7,6 +7,11 @@ import {
   type PlayerRegistrationActionState,
 } from "@/app/dashboard/registration-actions";
 import {
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import {
   isTournamentTerminalStatus,
   type TournamentStatus,
 } from "@/lib/tournaments";
@@ -47,6 +52,7 @@ export default function PlayerRegistrationActions({
   launchedAt: string | null;
   tournamentStatus: TournamentStatus;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const [withdrawState, withdrawAction, withdrawPending] = useActionState(
     withdrawTournamentRegistrationAction,
     initialState
@@ -113,21 +119,27 @@ export default function PlayerRegistrationActions({
       {waitlistOfferStatus === "offered" && (
         <div className="border border-amber-400/45 bg-amber-500/10 p-4 text-amber-100">
           <p className="text-sm font-black uppercase tracking-wider">
-            A tournament place is available
+            {t("registrationActions.offerTitle")}
           </p>
           <p className="mt-2 text-sm leading-6">
-            Accept to return your registration to administrator review, or
-            decline to release the place to the next eligible player.
+            {t("registrationActions.offerDescription")}
           </p>
           {waitlistOfferExpiresAt && (
             <p className="mt-2 text-xs font-bold uppercase tracking-wider text-amber-200">
-              Respond before {formatOfferDeadline(waitlistOfferExpiresAt)}
+              <HydrationSafeLocalDateTime
+                value={waitlistOfferExpiresAt}
+                fallback={t("registrationActions.respondBefore", {
+                  deadline: t("registrationActions.statedDeadline"),
+                })}
+                render={(deadline) =>
+                  t("registrationActions.respondBefore", { deadline })
+                }
+              />
             </p>
           )}
           {offerExpired && (
             <p className="mt-3 text-sm font-bold text-red-200">
-              This offer deadline has passed and the offer can no longer be
-              accepted.
+              {t("registrationActions.deadlinePassed")}
             </p>
           )}
         </div>
@@ -135,23 +147,22 @@ export default function PlayerRegistrationActions({
 
       {showAcceptedStatus && (
         <p className="text-sm font-bold text-emerald-200">
-          Spot accepted — awaiting administrator review.
+          {t("registrationActions.accepted")}
         </p>
       )}
       {waitlistOfferStatus === "declined" && (
         <p className="text-sm font-bold text-zinc-300">
-          Spot declined. This waitlist registration is closed.
+          {t("registrationActions.declined")}
         </p>
       )}
       {waitlistOfferStatus === "expired" && (
         <p className="text-sm font-bold text-zinc-300">
-          This spot offer expired. The place has moved to the next eligible
-          player.
+          {t("registrationActions.expired")}
         </p>
       )}
       {waitlistOfferStatus === "cancelled" && (
         <p className="text-sm font-bold text-zinc-300">
-          This division has started and its waitlist is now closed.
+          {t("registrationActions.cancelled")}
         </p>
       )}
 
@@ -165,7 +176,9 @@ export default function PlayerRegistrationActions({
             disabled={offerPending}
             className="border border-emerald-400 bg-emerald-500 px-4 py-3 text-sm font-black uppercase tracking-wider text-black transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60"
           >
-            {offerPending ? "Updating" : "Accept Spot"}
+            {offerPending
+              ? t("registrationActions.updating")
+              : t("registrationActions.acceptSpot")}
           </button>
           <button
             type="submit"
@@ -174,7 +187,7 @@ export default function PlayerRegistrationActions({
             disabled={offerPending}
             className="border border-white/20 bg-zinc-900 px-4 py-3 text-sm font-black uppercase tracking-wider text-white transition hover:border-red-400 hover:text-red-200 disabled:cursor-wait disabled:opacity-60"
           >
-            Decline Spot
+            {t("registrationActions.declineSpot")}
           </button>
         </form>
       )}
@@ -189,7 +202,7 @@ export default function PlayerRegistrationActions({
           onSubmit={(event) => {
             if (
               !window.confirm(
-                "Withdraw from this tournament? This decision is final and you cannot register again for this tournament."
+                t("registrationActions.withdrawConfirm")
               )
             ) {
               event.preventDefault();
@@ -202,7 +215,9 @@ export default function PlayerRegistrationActions({
             disabled={withdrawPending}
             className="border border-red-500/50 bg-red-950/25 px-4 py-3 text-sm font-black uppercase tracking-wider text-red-200 transition hover:border-red-400 hover:bg-red-500/15 disabled:cursor-wait disabled:opacity-60"
           >
-            {withdrawPending ? "Withdrawing" : "Withdraw Registration"}
+            {withdrawPending
+              ? t("registrationActions.withdrawing")
+              : t("registrationActions.withdraw")}
           </button>
         </form>
       )}
@@ -215,6 +230,22 @@ export default function PlayerRegistrationActions({
 }
 
 function ActionMessage({ state }: { state: PlayerRegistrationActionState }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const paths = {
+    auth_required: "actionResults.authRequired",
+    invalid_registration: "actionResults.invalidRegistration",
+    verification_failed: "actionResults.verificationFailed",
+    registration_unavailable: "actionResults.registrationUnavailable",
+    division_started: "actionResults.divisionStarted",
+    offer_expired: "actionResults.offerExpired",
+    offer_unavailable: "actionResults.offerUnavailable",
+    withdrawal_unavailable: "actionResults.withdrawalUnavailable",
+    mutation_failed: "actionResults.mutationFailed",
+    withdrawn: "actionResults.withdrawn",
+    offer_accepted: "actionResults.offerAccepted",
+    offer_declined: "actionResults.offerDeclined",
+  } as const;
+
   return (
     <p
       role={state.status === "error" ? "alert" : "status"}
@@ -224,7 +255,7 @@ function ActionMessage({ state }: { state: PlayerRegistrationActionState }) {
           : "text-sm font-bold text-emerald-200"
       }
     >
-      {state.message}
+      {state.code ? t(paths[state.code]) : state.message}
     </p>
   );
 }
@@ -233,14 +264,4 @@ function parseTimestamp(value: string | null) {
   if (!value) return null;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
-}
-
-function formatOfferDeadline(value: string) {
-  const timestamp = parseTimestamp(value);
-  if (timestamp === null) return "the stated deadline";
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
 }

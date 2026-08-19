@@ -12,8 +12,9 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import { translate } from "@/lib/i18n/translate";
 import type { TournamentCard } from "@/lib/tournaments";
-import { WAITLIST_DISCLOSURE_MESSAGE } from "@/lib/tournaments";
 
 const refreshMock = vi.hoisted(() => vi.fn());
 const submitTournamentRegistrationMock = vi.hoisted(() => vi.fn());
@@ -236,6 +237,7 @@ describe("Relic verified-division registration UI", () => {
     submitTournamentRegistrationMock.mockReset();
     submitTournamentRegistrationMock.mockResolvedValue({
       success: true,
+      code: "REGISTRATION_SUBMITTED",
       message: "Registration submitted.",
     });
   });
@@ -270,7 +272,14 @@ describe("Relic verified-division registration UI", () => {
         name: "Privacy Policy (version fixture-privacy-v1) (opens in a new tab)",
       })
     ).toHaveAttribute("href", registrationDocuments.privacy.url);
-    expect(screen.getAllByText(/Effective 18 August 2026/)).toHaveLength(4);
+    expect(
+      screen.getAllByText(
+        translate(competitionEnglish, "registrationServer.documentEffective", {
+          date: "August 18, 2026",
+          sha256: "aaaaaaaaaaaa…",
+        })
+      )
+    ).toHaveLength(4);
     expect(screen.getAllByText(/SHA-256 a{12}…/)).toHaveLength(4);
     expect(
       screen.getByRole("checkbox", {
@@ -395,7 +404,9 @@ describe("Relic verified-division registration UI", () => {
           expect(button).toHaveAttribute("aria-disabled", "false");
           expect(button).toHaveAttribute("aria-pressed", "true");
           expect(
-            within(button).getByText("Your verified division")
+            within(button).getByText(
+              competitionEnglish.registrationModal.verifiedDivision
+            )
           ).toBeInTheDocument();
         } else {
           expect(button).toBeDisabled();
@@ -404,7 +415,7 @@ describe("Relic verified-division registration UI", () => {
           expect(button).toHaveClass("grayscale", "opacity-45");
           expect(
             within(button).getByText(
-              "Unavailable for your verified division"
+              competitionEnglish.registrationModal.unavailableForDivision
             )
           ).toBeInTheDocument();
         }
@@ -492,7 +503,9 @@ describe("Relic verified-division registration UI", () => {
     renderModal("Challenge", waitlistTournament);
     advanceToAgreements();
 
-    expect(screen.getByText(WAITLIST_DISCLOSURE_MESSAGE)).toBeInTheDocument();
+    expect(
+      screen.getByText(competitionEnglish.registrationServer.waitlistConfirmation)
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Join Waitlist" }));
 
     await waitFor(() => {
@@ -506,11 +519,14 @@ describe("Relic verified-division registration UI", () => {
     submitTournamentRegistrationMock
       .mockResolvedValueOnce({
         success: false,
-        message: `${WAITLIST_DISCLOSURE_MESSAGE} Review this notice, then press Join Waitlist to continue.`,
+        code: "WAITLIST_CONFIRMATION_REQUIRED",
+        message: "Stale server wording must not drive player-facing copy.",
         requiresWaitlistConfirmation: true,
       })
       .mockResolvedValueOnce({
         success: true,
+        code: "WAITLIST_SUBMITTED",
+        values: { position: 1 },
         message: "Registration submitted to waitlist position #1.",
       });
     renderModal("Challenge");
@@ -527,7 +543,14 @@ describe("Relic verified-division registration UI", () => {
       );
     });
     expect(refreshMock).not.toHaveBeenCalled();
-    expect(screen.getByText(WAITLIST_DISCLOSURE_MESSAGE)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        competitionEnglish.registrationServer.waitlistConfirmation
+      )
+    ).toHaveLength(2);
+    expect(
+      screen.queryByText("Stale server wording must not drive player-facing copy.")
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Join Waitlist" }));
 

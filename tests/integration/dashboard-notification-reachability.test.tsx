@@ -51,6 +51,10 @@ vi.mock("@/lib/notifications", () => ({
   loadPlayerNotifications: loadPlayerNotificationsMock,
 }));
 
+vi.mock("@/lib/i18n/request", () => ({
+  getRequestLocale: vi.fn(async () => "en"),
+}));
+
 vi.mock("@/lib/player-dashboard", () => ({
   loadPlayerCareerDashboard: loadPlayerCareerDashboardMock,
 }));

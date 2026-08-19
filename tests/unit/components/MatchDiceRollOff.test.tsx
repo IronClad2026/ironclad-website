@@ -21,6 +21,8 @@ import MatchDiceRollOff, {
   type MatchDiceRollOffSnapshot,
   type MatchDiceRollResult,
 } from "@/components/MatchDiceRollOff";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import { translate } from "@/lib/i18n/translate";
 import type { RollMatchDiceInput } from "@/lib/match-dice";
 
 const MATCH_ID = "11111111-1111-4111-8111-111111111111";
@@ -625,7 +627,15 @@ describe("MatchDiceRollOff", () => {
     });
 
     expect(screen.getByLabelText("Dice activation")).toHaveValue("4");
-    expect(screen.getByText("Activation 4 · Current")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        translate(competitionEnglish, "dice.activationStatus", {
+          version: 4,
+          status: competitionEnglish.dice.current,
+        }),
+        { selector: "span" }
+      )
+    ).toBeInTheDocument();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_000);
     });

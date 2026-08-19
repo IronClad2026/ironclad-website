@@ -1,13 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
+import { setLocalePreference } from "@/app/locale-actions";
 import InstallAppPrompt from "@/components/InstallAppPrompt";
+import LanguageSelector, {
+  LanguageSelectorTrigger,
+  type LanguageSelectorCopy,
+} from "@/components/i18n/LanguageSelector";
+import LocalePreferenceSync from "@/components/i18n/LocalePreferenceSync";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import { LOCALE_OPTIONS } from "@/lib/i18n/config";
+import englishCommon from "@/lib/i18n/dictionaries/en/common";
+import { translate } from "@/lib/i18n/translate";
+import type { MessageValues } from "@/lib/i18n/types";
 
 type CustomClaims = {
   metadata?: {
@@ -20,15 +34,6 @@ type NavItem = {
   label: string;
   emphasis?: boolean;
 };
-
-const baseNavItems: NavItem[] = [
-  { href: "/", label: "Home" },
-  { href: "/tournaments", label: "Tournaments" },
-  { href: "/players", label: "Players" },
-  { href: "/rules", label: "Rules" },
-  { href: "/rankings", label: "Leaderboard & Ranking" },
-  { href: "/about", label: "About" },
-];
 
 function isActiveRoute(pathname: string, href: string) {
   if (href === "/") {
@@ -70,19 +75,70 @@ function mobileNavLinkClass(isActive: boolean, emphasis = false) {
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);
   const pathname = usePathname();
   const { isSignedIn, sessionClaims } = useAuth();
+  const selectedLocale = useOptionalLocale();
+  const selectedTranslator = useOptionalTranslations("common", englishCommon);
+  const languageReturnFocusRef = useRef<HTMLElement | null>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const t = useMemo(
+    () =>
+      isAdminRoute
+        ? (path: string, values?: MessageValues) =>
+            translate(englishCommon, path, values)
+        : selectedTranslator,
+    [isAdminRoute, selectedTranslator]
+  );
 
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
   const isAdmin = role === "admin";
 
-  const navItems: NavItem[] = [
-    ...baseNavItems,
-    ...(isSignedIn ? [{ href: "/dashboard", label: "Dashboard" }] : []),
+  const playerNavItems: NavItem[] = [
+    { href: "/", label: t("nav.home") },
+    { href: "/tournaments", label: t("nav.tournaments") },
+    { href: "/players", label: t("nav.players") },
+    { href: "/rules", label: t("nav.rules") },
+    { href: "/rankings", label: t("nav.leaderboardAndRankings") },
+    { href: "/about", label: t("nav.about") },
+  ];
+  const accountNavItems: NavItem[] = [
+    ...(isSignedIn
+      ? [{ href: "/dashboard", label: t("nav.dashboard") }]
+      : []),
     ...(isAdmin
-      ? [{ href: "/admin", label: "Admin", emphasis: true }]
+      ? [{ href: "/admin", label: t("nav.admin"), emphasis: true }]
       : []),
   ];
+  const navItems = [...playerNavItems, ...accountNavItems];
+  const selectedLocaleLabel =
+    LOCALE_OPTIONS.find((option) => option.id === selectedLocale)?.label ??
+    LOCALE_OPTIONS[0].label;
+  const languageCopy = useMemo<LanguageSelectorCopy>(
+    () => ({
+      triggerAriaLabel: t("selector.triggerAriaLabel", {
+        language: selectedLocaleLabel,
+      }),
+      languageRowLabel: t("selector.languageRowLabel"),
+      title: t("selector.title"),
+      description: t("selector.description"),
+      closeLabel: t("selector.closeLabel"),
+      selectedLabel: t("selector.selectedLabel"),
+      savingLabel: t("selector.savingLabel"),
+      saveError: t("selector.saveError"),
+      translationReviewNotice: t("selector.translationReviewNotice"),
+      privacyHeading: t("selector.privacyHeading"),
+      privacyCookie: t("selector.privacyCookie"),
+      privacyClerk: t("selector.privacyClerk"),
+      privacyNoTracking: t("selector.privacyNoTracking"),
+      privacyNotEvidence: t("selector.privacyNotEvidence"),
+      privacyChange: t("selector.privacyChange"),
+      privacyPolicyLink: t("selector.privacyPolicyLink"),
+    }),
+    [selectedLocaleLabel, t]
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -111,7 +167,7 @@ export default function Navbar() {
       ? createPortal(
           <button
             type="button"
-            aria-label="Close mobile navigation"
+            aria-label={t("nav.closeMenu")}
             className="fixed inset-0 z-[80] block h-full w-full cursor-default bg-black/55 backdrop-blur-sm md:hidden"
             onPointerDown={() => setIsOpen(false)}
           />,
@@ -122,9 +178,28 @@ export default function Navbar() {
   return (
     <>
       {backdrop}
+      <LocalePreferenceSync
+        isSignedIn={isSignedIn === true}
+        locale={selectedLocale}
+      />
+      <LanguageSelector
+        copy={languageCopy}
+        currentLocale={selectedLocale}
+        languageBoundary={isAdminRoute ? "en" : undefined}
+        onOpenChange={setLanguageOpen}
+        open={languageOpen}
+        returnFocusRef={languageReturnFocusRef}
+        setLocalePreference={setLocalePreference}
+      />
 
-      <header className="fixed top-0 left-0 z-[90] w-full border-b border-white/10 bg-black/20 backdrop-blur-md">
-        <nav className="relative z-[95] mx-auto flex max-w-7xl items-center justify-between px-6 py-5 text-white">
+      <header
+        className="fixed top-0 left-0 z-[90] w-full border-b border-white/10 bg-black/20 backdrop-blur-md"
+        lang={isAdminRoute ? "en" : undefined}
+      >
+        <nav
+          aria-label={t("nav.primaryNavigation")}
+          className="relative z-[95] mx-auto flex max-w-7xl items-center justify-between px-6 py-5 text-white"
+        >
           <Link
             href="/"
             className="flex items-center"
@@ -140,8 +215,32 @@ export default function Navbar() {
             />
           </Link>
 
-          <div className="hidden items-center gap-8 text-sm font-medium text-zinc-300 md:flex">
-            {navItems.map((item) => {
+          <div className="hidden items-center gap-5 text-sm font-medium text-zinc-300 xl:gap-7 md:flex">
+            {playerNavItems.map((item) => {
+              const isActive = isActiveRoute(pathname, item.href);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={navLinkClass(isActive, item.emphasis)}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+            <LanguageSelectorTrigger
+              currentLocale={selectedLocale}
+              copy={languageCopy}
+              onOpen={(trigger) => {
+                languageReturnFocusRef.current = trigger;
+                setLanguageOpen(true);
+              }}
+              open={languageOpen}
+              variant="desktop"
+            />
+            {accountNavItems.map((item) => {
               const isActive = isActiveRoute(pathname, item.href);
 
               return (
@@ -158,13 +257,12 @@ export default function Navbar() {
           </div>
 
           <button
+            ref={mobileMenuButtonRef}
             type="button"
             className="border border-white/10 bg-white/[0.04] p-2 text-zinc-200 transition hover:border-orange-400/40 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 md:hidden"
             onClick={() => setIsOpen((current) => !current)}
             aria-label={
-              isOpen
-                ? "Close navigation menu"
-                : "Open navigation menu"
+              isOpen ? t("nav.closeMenu") : t("nav.openMenu")
             }
             aria-expanded={isOpen}
             aria-controls="mobile-navigation"
@@ -182,7 +280,7 @@ export default function Navbar() {
             id="mobile-navigation"
             role="dialog"
             aria-modal="true"
-            aria-label="Mobile navigation"
+            aria-label={t("nav.mobileNavigation")}
             className="relative z-[95] mx-4 mb-4 max-h-[calc(100dvh-120px)] overflow-y-auto border border-white/10 bg-black/95 p-5 text-white shadow-[0_0_60px_rgba(0,0,0,0.8)] md:hidden"
           >
             <div className="flex flex-col gap-4 text-sm font-medium">
@@ -206,6 +304,20 @@ export default function Navbar() {
               })}
 
               <div className="mt-2 border-t border-white/10 pt-4">
+                <LanguageSelectorTrigger
+                  currentLocale={selectedLocale}
+                  copy={languageCopy}
+                  onOpen={() => {
+                    languageReturnFocusRef.current = mobileMenuButtonRef.current;
+                    setIsOpen(false);
+                    setLanguageOpen(true);
+                  }}
+                  open={languageOpen}
+                  variant="mobile"
+                />
+              </div>
+
+              <div className="border-t border-white/10 pt-4">
                 <InstallAppPrompt
                   onOpenChange={(open) => {
                     if (!open) {

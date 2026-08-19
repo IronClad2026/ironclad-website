@@ -11,6 +11,9 @@ import {
 } from "@/lib/player-profile";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
 
 type SteamConnectionResult =
   | "connected"
@@ -156,6 +159,10 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
     redirect("/sign-in");
   }
 
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "account-dashboard");
+  const t = (path: string) => translate(copy, path);
+
   const { steam } = await searchParams;
   const steamConnectionResult = getSteamConnectionResult(steam);
   const supabase = await createAuthenticatedSupabaseClient();
@@ -242,30 +249,30 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
           <div className="relative z-10 max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
-              IronClad Player Account
+              {t("profilePage.eyebrow")}
             </p>
 
             <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">
-              {profile ? "Manage Player Profile" : "Complete Player Profile"}
+              {profile
+                ? t("profilePage.manageTitle")
+                : t("profilePage.completeTitle")}
             </h1>
 
             <p className="mt-5 leading-7 text-zinc-300">
-              Store your competitive identity once so future IronClad
-              tournament registrations can be faster and more consistent.
+              {t("profilePage.description")}
             </p>
 
             <div className="mt-6 inline-flex rounded-full border border-white/10 bg-black/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-300">
               {profileComplete
-                ? "Profile Complete"
-                : "Profile Setup Required"}
+                ? t("profilePage.completeStatus")
+                : t("profilePage.requiredStatus")}
             </div>
           </div>
         </div>
 
         {error ? (
           <div className="mt-8 border border-red-500/30 bg-red-500/10 p-5 text-red-300 shadow-2xl shadow-black/30 backdrop-blur">
-            Your player profile could not be loaded. Refresh the page and try
-            again.
+            {t("profilePage.loadError")}
           </div>
         ) : (
           <div className="mt-8">

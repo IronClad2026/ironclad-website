@@ -1,5 +1,16 @@
 import "server-only";
 
+import emailEnglish, {
+  type EmailDictionary,
+} from "@/lib/i18n/dictionaries/en/email";
+import {
+  DEFAULT_LOCALE,
+  toIntlLocale,
+  type Locale,
+} from "@/lib/i18n/config";
+import { localizeBracketRoundName } from "@/lib/i18n/round-display";
+import { interpolateMessage } from "@/lib/i18n/translate";
+
 export const TRANSACTIONAL_EMAIL_TEMPLATE_KEYS = [
   "registration_approved",
   "division_started_first_match",
@@ -65,21 +76,6 @@ export type RenderedTransactionalEmail = {
   replyTo: string;
 };
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
-
 function invalidTemplateData(): never {
   throw new Error("Transactional email template data is invalid.");
 }
@@ -113,7 +109,10 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
-export function formatTransactionalEmailDeadlineUtc(value: string | Date) {
+export function formatTransactionalEmailDeadlineUtc(
+  value: string | Date,
+  locale: Locale = DEFAULT_LOCALE
+) {
   if (
     typeof value === "string" &&
     !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
@@ -128,13 +127,19 @@ export function formatTransactionalEmailDeadlineUtc(value: string | Date) {
     invalidTemplateData();
   }
 
-  const day = date.getUTCDate();
-  const month = MONTH_NAMES[date.getUTCMonth()];
-  const year = date.getUTCFullYear();
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  const formatted = new Intl.DateTimeFormat(toIntlLocale(locale), {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "UTC",
+  })
+    .format(date)
+    .replace(" at ", ", ");
 
-  return `${day} ${month} ${year}, ${hours}:${minutes} UTC`;
+  return `${formatted} UTC`;
 }
 
 function buildRegistrationUrl(appOrigin: string, registrationId: string) {
@@ -156,12 +161,16 @@ function buildMatchUrl(
 }
 
 function renderLayout({
+  locale,
+  dictionary,
   heading,
   intro,
   details,
   actionLabel,
   actionUrl,
 }: {
+  locale: Locale;
+  dictionary: EmailDictionary;
   heading: string;
   intro: string;
   details: Array<[label: string, value: string]>;
@@ -181,7 +190,7 @@ function renderLayout({
     .join("\n");
 
   return {
-    html: `<!doctype html><html lang="en"><body style="margin:0;background:#18181b;color:#f4f4f5;font-family:Arial,sans-serif;"><main style="max-width:600px;margin:0 auto;padding:32px 24px;"><h1 style="color:#f97316;font-size:24px;">${escapeHtml(
+    html: `<!doctype html><html lang="${locale}"><body style="margin:0;background:#18181b;color:#f4f4f5;font-family:Arial,sans-serif;"><main style="max-width:600px;margin:0 auto;padding:32px 24px;"><h1 style="color:#f97316;font-size:24px;">${escapeHtml(
       heading
     )}</h1><p>${escapeHtml(
       intro
@@ -189,14 +198,18 @@ function renderLayout({
       actionUrl
     )}" style="display:inline-block;background:#f97316;color:#18181b;padding:12px 18px;text-decoration:none;font-weight:bold;">${escapeHtml(
       actionLabel
-    )}</a></p><p style="color:#a1a1aa;font-size:13px;">This is a transactional tournament notification from IronClad Tournaments.</p></main></body></html>`,
-    text: `${heading}\n\n${intro}\n\n${textDetails}\n\n${actionLabel}: ${actionUrl}\n\nThis is a transactional tournament notification from IronClad Tournaments.`,
+    )}</a></p><p style="color:#a1a1aa;font-size:13px;">${escapeHtml(
+      dictionary.layout.footer
+    )}</p></main></body></html>`,
+    text: `${heading}\n\n${intro}\n\n${textDetails}\n\n${actionLabel}: ${actionUrl}\n\n${dictionary.layout.footer}`,
   };
 }
 
 function renderRegistrationApproved(
   data: RegistrationApprovedTemplateData,
-  config: TransactionalEmailTemplateConfig
+  config: TransactionalEmailTemplateConfig,
+  locale: Locale,
+  dictionary: EmailDictionary
 ) {
   const tournamentName = normalizeDisplayText(data.tournamentName);
   const divisionName = normalizeDisplayText(data.divisionName);
@@ -206,44 +219,84 @@ function renderRegistrationApproved(
   );
 
   return {
-    subject: `Registration approved: ${tournamentName}`,
+    subject: interpolateMessage(dictionary.registrationApproved.subject, {
+      tournamentName,
+    }),
     ...renderLayout({
-      heading: "Your registration is approved",
-      intro: "Your tournament registration has been approved.",
+      locale,
+      dictionary,
+      heading: dictionary.registrationApproved.heading,
+      intro: dictionary.registrationApproved.intro,
       details: [
-        ["Tournament", tournamentName],
-        ["Division", divisionName],
+        [dictionary.labels.tournament, tournamentName],
+        [dictionary.labels.division, divisionName],
       ],
-      actionLabel: "View registration",
+      actionLabel: dictionary.registrationApproved.action,
       actionUrl,
     }),
   };
 }
 
-function normalizeMatchData(data: MatchTemplateData) {
+function localizeEmailRoundName(
+  roundName: string,
+  dictionary: EmailDictionary
+) {
+  return localizeBracketRoundName(roundName, (path, values) => {
+    switch (path) {
+      case "bracketPresentation.roundNames.grandFinal":
+        return dictionary.roundNames.grandFinal;
+      case "bracketPresentation.roundNames.final":
+        return dictionary.roundNames.final;
+      case "bracketPresentation.roundNames.semifinals":
+        return dictionary.roundNames.semifinals;
+      case "bracketPresentation.roundNames.quarterfinals":
+        return dictionary.roundNames.quarterfinals;
+      case "bracketPresentation.roundNames.roundOf":
+        return interpolateMessage(dictionary.roundNames.roundOf, values);
+      case "tournaments.brackets.roundRobin":
+        return dictionary.roundNames.roundRobin;
+      default:
+        return roundName;
+    }
+  });
+}
+
+function normalizeMatchData(
+  data: MatchTemplateData,
+  locale: Locale,
+  dictionary: EmailDictionary
+) {
+  const roundName = normalizeDisplayText(data.roundName);
+
   return {
     tournamentName: normalizeDisplayText(data.tournamentName),
     divisionName: normalizeDisplayText(data.divisionName),
-    roundName: normalizeDisplayText(data.roundName),
+    roundName: localizeEmailRoundName(roundName, dictionary),
     opponentName: normalizeDisplayText(data.opponentName),
-    deadline: formatTransactionalEmailDeadlineUtc(data.deadlineAt),
+    deadline: formatTransactionalEmailDeadlineUtc(data.deadlineAt, locale),
   };
 }
 
 function renderMatchEmail({
   data,
   config,
+  locale,
+  dictionary,
   subject,
   heading,
   intro,
+  actionLabel,
 }: {
   data: MatchTemplateData;
   config: TransactionalEmailTemplateConfig;
+  locale: Locale;
+  dictionary: EmailDictionary;
   subject: (normalized: ReturnType<typeof normalizeMatchData>) => string;
   heading: string;
   intro: string;
+  actionLabel: string;
 }) {
-  const normalized = normalizeMatchData(data);
+  const normalized = normalizeMatchData(data, locale, dictionary);
   const actionUrl = buildMatchUrl(
     config.appOrigin,
     data.tournamentId,
@@ -253,16 +306,18 @@ function renderMatchEmail({
   return {
     subject: subject(normalized),
     ...renderLayout({
+      locale,
+      dictionary,
       heading,
       intro,
       details: [
-        ["Tournament", normalized.tournamentName],
-        ["Division", normalized.divisionName],
-        ["Round", normalized.roundName],
-        ["Opponent", normalized.opponentName],
-        ["Deadline", normalized.deadline],
+        [dictionary.labels.tournament, normalized.tournamentName],
+        [dictionary.labels.division, normalized.divisionName],
+        [dictionary.labels.round, normalized.roundName],
+        [dictionary.labels.opponent, normalized.opponentName],
+        [dictionary.labels.deadline, normalized.deadline],
       ],
-      actionLabel: "View matchup",
+      actionLabel,
       actionUrl,
     }),
   };
@@ -270,52 +325,75 @@ function renderMatchEmail({
 
 export function renderTransactionalEmail(
   data: TransactionalEmailTemplateData,
-  config: TransactionalEmailTemplateConfig
+  config: TransactionalEmailTemplateConfig,
+  locale: Locale = DEFAULT_LOCALE,
+  dictionary: EmailDictionary = emailEnglish
 ): RenderedTransactionalEmail {
   let rendered: Omit<RenderedTransactionalEmail, "from" | "replyTo">;
 
   switch (data.templateKey) {
     case "registration_approved":
-      rendered = renderRegistrationApproved(data, config);
+      rendered = renderRegistrationApproved(data, config, locale, dictionary);
       break;
     case "division_started_first_match":
       rendered = renderMatchEmail({
         data,
         config,
+        locale,
+        dictionary,
         subject: ({ tournamentName }) =>
-          `Division started - your first matchup is ready: ${tournamentName}`,
-        heading: "Your division has started",
-        intro: "Your first matchup is ready to play.",
+          interpolateMessage(dictionary.divisionStarted.subject, {
+            tournamentName,
+          }),
+        heading: dictionary.divisionStarted.heading,
+        intro: dictionary.divisionStarted.intro,
+        actionLabel: dictionary.divisionStarted.action,
       });
       break;
     case "later_round_match_ready":
       rendered = renderMatchEmail({
         data,
         config,
+        locale,
+        dictionary,
         subject: ({ roundName, tournamentName }) =>
-          `${roundName} matchup ready: ${tournamentName}`,
-        heading: "Your next matchup is ready",
-        intro: "Both official participants are set for this matchup.",
+          interpolateMessage(dictionary.laterRound.subject, {
+            roundName,
+            tournamentName,
+          }),
+        heading: dictionary.laterRound.heading,
+        intro: dictionary.laterRound.intro,
+        actionLabel: dictionary.laterRound.action,
       });
       break;
     case "deadline_reminder_72h":
       rendered = renderMatchEmail({
         data,
         config,
+        locale,
+        dictionary,
         subject: ({ tournamentName }) =>
-          `72 hours remaining for your match: ${tournamentName}`,
-        heading: "Match deadline reminder",
-        intro: "Your current match deadline is within 72 hours.",
+          interpolateMessage(dictionary.deadline72h.subject, {
+            tournamentName,
+          }),
+        heading: dictionary.deadline72h.heading,
+        intro: dictionary.deadline72h.intro,
+        actionLabel: dictionary.deadline72h.action,
       });
       break;
     case "deadline_reminder_24h":
       rendered = renderMatchEmail({
         data,
         config,
+        locale,
+        dictionary,
         subject: ({ tournamentName }) =>
-          `24 hours remaining for your match: ${tournamentName}`,
-        heading: "Final match deadline reminder",
-        intro: "Your current match deadline is within 24 hours.",
+          interpolateMessage(dictionary.deadline24h.subject, {
+            tournamentName,
+          }),
+        heading: dictionary.deadline24h.heading,
+        intro: dictionary.deadline24h.intro,
+        actionLabel: dictionary.deadline24h.action,
       });
       break;
     default: {

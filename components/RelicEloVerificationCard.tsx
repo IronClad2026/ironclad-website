@@ -3,9 +3,19 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   type RelicEloActionResult,
+  type RelicEloResultCode,
   type RelicEloSnapshot,
   verifyRelicProfileElo,
 } from "@/app/profile/relic-elo-action";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import englishAccountDictionary from "@/lib/i18n/dictionaries/en/account-dashboard";
+import {
+  formatDateTime as formatLocalizedDateTime,
+  formatNumber,
+} from "@/lib/i18n/format";
 
 type RelicEloVerification = Omit<
   RelicEloSnapshot,
@@ -15,6 +25,23 @@ type RelicEloVerification = Omit<
   division: string;
 };
 
+const RELIC_RESULT_MESSAGE_KEYS = {
+  verified: "relic.success",
+  "steam-required": "relic.steamRequired",
+  "session-invalid": "relic.sessionExpired",
+  "auth-required": "relic.authRequired",
+  "service-unavailable": "relic.serviceUnavailable",
+  "profile-load-failed": "relic.profileLoadFailed",
+  "profile-required": "relic.profileRequired",
+  "steam-identity-invalid": "relic.steamIdentityInvalid",
+  "profile-not-found": "relic.profileNotFound",
+  "steam-identity-mismatch": "relic.steamIdentityMismatch",
+  "no-rated-data": "relic.noRatedData",
+  "provider-unavailable": "relic.providerUnavailable",
+  "save-failed": "relic.saveFailed",
+  "confirmation-failed": "relic.confirmationFailed",
+} satisfies Record<Exclude<RelicEloResultCode, "cooldown">, string>;
+
 export type RelicEloVerificationCardProps = {
   hasPlayer: boolean;
   steamConnected: boolean;
@@ -23,22 +50,24 @@ export type RelicEloVerificationCardProps = {
   initialRefreshAvailableAt: string | null;
 };
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-AU", {
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  month: "short",
-  timeZone: "Australia/Sydney",
-  timeZoneName: "short",
-  year: "numeric",
-});
-
-function formatDateTime(value: string) {
+function formatDateTime(value: string, locale: ReturnType<typeof useOptionalLocale>) {
   const timestamp = new Date(value);
 
   return Number.isNaN(timestamp.getTime())
-    ? "Time unavailable"
-    : dateTimeFormatter.format(timestamp);
+    ? null
+    : formatLocalizedDateTime(
+        timestamp,
+        locale,
+        { kind: "australia-sydney" },
+        {
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          month: "short",
+          timeZoneName: "short",
+          year: "numeric",
+        }
+      );
 }
 
 function getRefreshAvailableAt(result: RelicEloActionResult) {
@@ -54,6 +83,11 @@ export default function RelicEloVerificationCard({
   initialVerification,
   initialRefreshAvailableAt,
 }: RelicEloVerificationCardProps) {
+  const locale = useOptionalLocale();
+  const t = useOptionalTranslations(
+    "account-dashboard",
+    englishAccountDictionary
+  );
   const [verification, setVerification] =
     useState<RelicEloVerification | null>(initialVerification);
   const [refreshAvailableAt, setRefreshAvailableAt] = useState(
@@ -113,13 +147,28 @@ export default function RelicEloVerificationCard({
           setRefreshAvailableAt(nextRefreshAvailableAt);
         }
 
+        // `code` is the stable display contract. The runtime guard preserves a
+        // safe fallback for stale clients/tests without parsing server prose.
+        const resultCode: RelicEloResultCode | undefined = result.code;
+        const localizedMessage =
+          resultCode === "cooldown"
+            ? t("relic.cooldown", {
+                time: nextRefreshAvailableAt
+                  ? formatDateTime(nextRefreshAvailableAt, locale) ??
+                    t("relic.timeUnavailable")
+                  : t("relic.timeUnavailable"),
+              })
+            : resultCode
+              ? t(RELIC_RESULT_MESSAGE_KEYS[resultCode])
+              : t("relic.unexpected");
+
         setFeedback({
-          message: result.message,
+          message: locale === "en" ? result.message : localizedMessage,
           status: result.status,
         });
       } catch {
         setFeedback({
-          message: "ELO verification could not be completed right now.",
+          message: t("relic.unexpected"),
           status: "error",
         });
       } finally {
@@ -128,8 +177,10 @@ export default function RelicEloVerificationCard({
     });
   };
 
-  const buttonLabel = verification ? "Refresh ELO" : "Verify ELO";
-  const pendingLabel = verification ? "Refreshing..." : "Verifying...";
+  const buttonLabel = verification ? t("relic.refresh") : t("relic.verify");
+  const pendingLabel = verification
+    ? t("relic.refreshing")
+    : t("relic.verifying");
   const feedbackTone =
     feedback?.status === "success"
       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
@@ -143,27 +194,26 @@ export default function RelicEloVerificationCard({
 
       <div className="relative z-10">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
-          Competitive Rating
+          {t("relic.eyebrow")}
         </p>
         <h2 className="mt-3 text-2xl font-bold text-white">
-          Verified Profile ELO
+          {t("relic.title")}
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-          Verify your current rated 1v1 ELO with Relic using your connected
-          Steam game identity.
+          {t("relic.description")}
         </p>
 
         {!hasPlayer ? (
           <p className="mt-6 text-sm font-semibold text-zinc-300">
-            Save your profile before verifying ELO.
+            {t("relic.saveFirst")}
           </p>
         ) : !statusAvailable ? (
           <p className="mt-6 text-sm font-semibold text-zinc-300">
-            ELO verification status is temporarily unavailable.
+            {t("relic.statusUnavailable")}
           </p>
         ) : !steamConnected ? (
           <p className="mt-6 text-sm font-semibold text-zinc-300">
-            Connect Steam before verifying ELO.
+            {t("relic.connectFirst")}
           </p>
         ) : (
           <>
@@ -172,45 +222,50 @@ export default function RelicEloVerificationCard({
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
-                      Verified ELO
+                      {t("relic.verifiedElo")}
                     </p>
                     <p className="mt-1 text-4xl font-black text-white">
-                      {verification.elo.toLocaleString("en-AU")}
+                      {formatNumber(verification.elo, locale)}
                     </p>
                   </div>
                   <span className="border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-emerald-300">
-                    Relic verified
+                    {t("relic.verified")}
                   </span>
                 </div>
 
                 <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                   <div>
-                    <dt className="text-zinc-500">Faction</dt>
+                    <dt className="text-zinc-500">{t("relic.faction")}</dt>
                     <dd className="mt-1 font-semibold text-zinc-200">
                       {verification.faction}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-zinc-500">Division</dt>
+                    <dt className="text-zinc-500">{t("relic.division")}</dt>
                     <dd className="mt-1 font-semibold text-zinc-200">
                       {verification.division}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-zinc-500">Source</dt>
+                    <dt className="text-zinc-500">{t("relic.source")}</dt>
                     <dd className="mt-1 font-semibold text-zinc-200">Relic</dd>
                   </div>
                   <div>
-                    <dt className="text-zinc-500">Calculation version</dt>
+                    <dt className="text-zinc-500">
+                      {t("relic.calculationVersion")}
+                    </dt>
                     <dd className="mt-1 font-semibold text-zinc-200">
                       {verification.calculationVersion}
                     </dd>
                   </div>
                   <div className="sm:col-span-2">
-                    <dt className="text-zinc-500">Last verified</dt>
+                    <dt className="text-zinc-500">
+                      {t("relic.lastVerified")}
+                    </dt>
                     <dd className="mt-1 font-semibold text-zinc-200">
                       <time dateTime={verification.verifiedAt}>
-                        {formatDateTime(verification.verifiedAt)}
+                        {formatDateTime(verification.verifiedAt, locale) ??
+                          t("relic.timeUnavailable")}
                       </time>
                     </dd>
                   </div>
@@ -239,10 +294,11 @@ export default function RelicEloVerificationCard({
 
               {cooldownActive && refreshAvailableAt ? (
                 <p className="text-sm text-zinc-400">
-                  Available again at{" "}
-                  <time dateTime={refreshAvailableAt}>
-                    {formatDateTime(refreshAvailableAt)}
-                  </time>
+                  {t("relic.availableAgain", {
+                    time:
+                      formatDateTime(refreshAvailableAt, locale) ??
+                      t("relic.timeUnavailable"),
+                  })}
                 </p>
               ) : null}
             </div>

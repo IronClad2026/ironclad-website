@@ -6,6 +6,8 @@ import {
   deleteIronCladAccount,
   type DeleteAccountState,
 } from "@/app/profile/delete-account-action";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import englishAccountDictionary from "@/lib/i18n/dictionaries/en/account-dashboard";
 
 const initialDeleteAccountState: DeleteAccountState = {
   status: "idle",
@@ -16,6 +18,10 @@ const dangerPanelOverlayClass =
   "pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:56px_56px] opacity-10";
 
 export default function DeleteAccountSection() {
+  const t = useOptionalTranslations(
+    "account-dashboard",
+    englishAccountDictionary
+  );
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [state, formAction, pending] = useActionState(
@@ -39,16 +45,13 @@ export default function DeleteAccountSection() {
       <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-red-400">
-            Danger Zone
+            {t("deleteAccount.eyebrow")}
           </p>
-          <h2 className="mt-3 text-2xl font-bold text-white">Delete Account</h2>
+          <h2 className="mt-3 text-2xl font-bold text-white">
+            {t("deleteAccount.title")}
+          </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-            Permanently remove your live IronClad sign-in and profile identity,
-            avatar, and direct personal identifiers. Private account links are
-            removed or neutralized. Official tournament, match, leaderboard,
-            and champion history is preserved publicly only as Former
-            Competitor. Referenced private replay proof may remain for
-            authorized review.
+            {t("deleteAccount.description")}
           </p>
         </div>
 
@@ -58,7 +61,7 @@ export default function DeleteAccountSection() {
           className="inline-flex shrink-0 items-center justify-center gap-2 border border-red-500/40 bg-red-500/10 px-5 py-3 font-bold text-red-300 transition hover:border-red-400 hover:bg-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-300"
         >
           <Trash2 size={18} />
-          Delete Account
+          {t("deleteAccount.action")}
         </button>
       </div>
 
@@ -72,10 +75,10 @@ export default function DeleteAccountSection() {
                 <AlertTriangle className="mt-1 shrink-0 text-red-400" />
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.25em] text-red-400">
-                    Permanent Action
+                    {t("deleteAccount.permanent")}
                   </p>
                   <h3 className="mt-2 text-2xl font-black text-white">
-                    Delete your IronClad account?
+                    {t("deleteAccount.confirmTitle")}
                   </h3>
                 </div>
               </div>
@@ -86,7 +89,7 @@ export default function DeleteAccountSection() {
                   setOpen(false);
                   setConfirmation("");
                 }}
-                aria-label="Close delete account confirmation"
+                aria-label={t("deleteAccount.close")}
                 className="border border-white/10 bg-zinc-900/80 p-2 text-zinc-300 transition hover:border-red-400/45 hover:bg-red-500/10 hover:text-white disabled:opacity-50"
               >
                 <X size={18} />
@@ -94,17 +97,12 @@ export default function DeleteAccountSection() {
             </div>
 
             <p className="relative z-10 mt-5 text-sm leading-6 text-zinc-300">
-              This cannot be undone. If you have official competition history,
-              its registrations, match results, leaderboard standings, champion
-              records, and referenced private replay proof will remain. Public
-              history will identify you only as Former Competitor, and private
-              proof remains limited to authorized reviewers. Otherwise, your
-              player record will be removed.
+              {t("deleteAccount.warning")}
             </p>
 
             <form action={formAction} className="relative z-10 mt-6">
               <label htmlFor="delete-confirmation" className="text-sm font-bold text-white">
-                Type DELETE to confirm
+                {t("deleteAccount.typeDelete")}
               </label>
               <input
                 id="delete-confirmation"
@@ -126,7 +124,20 @@ export default function DeleteAccountSection() {
                       : "border-red-500/30 bg-red-500/10 text-red-300"
                   }`}
                 >
-                  {state.message}
+                  {state.code
+                    ? t(
+                        {
+                          "session-expired": "deleteAccount.sessionExpired",
+                          "confirmation-invalid":
+                            "deleteAccount.confirmationInvalid",
+                          "not-configured": "deleteAccount.notConfigured",
+                          "avatar-failed": "deleteAccount.avatarFailed",
+                          "data-failed": "deleteAccount.dataFailed",
+                          "clerk-failed": "deleteAccount.clerkFailed",
+                          deleted: "deleteAccount.success",
+                        }[state.code]
+                      )
+                    : state.message}
                 </div>
               )}
 
@@ -140,14 +151,16 @@ export default function DeleteAccountSection() {
                   }}
                   className="border border-white/10 px-5 py-3 font-bold text-zinc-300 transition hover:border-white/25 hover:text-white disabled:opacity-50"
                 >
-                  Cancel
+                  {t("deleteAccount.cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={pending || confirmation !== "DELETE"}
                   className="border border-red-500 bg-red-600 px-5 py-3 font-bold text-white transition hover:border-red-400 hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {pending ? "Deleting Account..." : "Permanently Delete"}
+                  {pending
+                    ? t("deleteAccount.deleting")
+                    : t("deleteAccount.permanentlyDelete")}
                 </button>
               </div>
             </form>

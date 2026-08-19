@@ -70,13 +70,7 @@ export type TournamentCard = {
   format: TournamentFormat;
   ruleFormat: TournamentRuleFormat;
   ruleFormatLabel: string;
-  status:
-    | "Open"
-    | "Closed"
-    | "In Progress"
-    | "Completed"
-    | "Cancelled"
-    | "Voided";
+  status: string;
   statusValue: TournamentStatus;
   image: string;
   description: string;
@@ -398,12 +392,29 @@ const statusLabels: Record<TournamentStatus, TournamentCard["status"]> = {
   voided: "Voided",
 };
 
+const statusTranslationKeys: Record<TournamentStatus, string> = {
+  upcoming: "tournaments.status.closed",
+  registration_open: "tournaments.status.open",
+  in_progress: "tournaments.status.inProgress",
+  completed: "tournaments.status.completed",
+  cancelled: "tournaments.status.cancelled",
+  voided: "tournaments.projection.voided",
+};
+
 const ruleFormatLabels: Record<TournamentRuleFormat, string> = {
   format_a: "Format A",
   format_b: "Format B",
 };
 
-export function mapTournamentRow(row: TournamentRow): TournamentCard {
+type TournamentProjectionTranslator = (
+  path: string,
+  values?: Readonly<Record<string, string | number>>
+) => string;
+
+export function mapTournamentRow(
+  row: TournamentRow,
+  localization?: { locale: string; t: TournamentProjectionTranslator }
+): TournamentCard {
   const brackets = [...(row.tournament_brackets ?? [])].sort(
     (left, right) =>
       getTournamentBracketSortOrder(left.name) -
@@ -413,11 +424,12 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
   const grandFinalDate = row.grand_final_at
     ? new Date(row.grand_final_at)
     : null;
-  const dateFormatter = new Intl.DateTimeFormat("en", {
+  const dateFormatter = new Intl.DateTimeFormat(localization?.locale ?? "en", {
     month: "long",
+    timeZone: "UTC",
     year: "numeric",
   });
-  const dateTimeFormatter = new Intl.DateTimeFormat("en", {
+  const dateTimeFormatter = new Intl.DateTimeFormat(localization?.locale ?? "en", {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "UTC",
@@ -431,20 +443,29 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
     title: row.title,
     month: grandFinalDate
       ? dateFormatter.format(grandFinalDate)
-      : "Date TBA",
+      : localization?.t("tournaments.projection.dateTba") ?? "Date TBA",
     format: row.format,
     ruleFormat,
-    ruleFormatLabel: ruleFormatLabels[ruleFormat],
-    status: statusLabels[row.status],
+    ruleFormatLabel:
+      localization?.t(`tournaments.projection.${ruleFormat}`) ??
+      ruleFormatLabels[ruleFormat],
+    status:
+      localization?.t(statusTranslationKeys[row.status]) ??
+      statusLabels[row.status],
     statusValue: row.status,
     image: row.banner_image_url,
     description: row.description,
-    organizer: "IronClad Tournaments",
+    organizer:
+      localization?.t("tournaments.projection.organizer") ??
+      "IronClad Tournaments",
     game: "Company of Heroes 3",
-    region: "Global",
+    region: localization?.t("tournaments.projection.global") ?? "Global",
     time: grandFinalDate
-      ? `Grand Final: ${dateTimeFormatter.format(grandFinalDate)} UTC`
-      : "Grand Final date to be announced",
+      ? localization?.t("tournaments.projection.grandFinal", {
+          date: dateTimeFormatter.format(grandFinalDate),
+        }) ?? `Grand Final: ${dateTimeFormatter.format(grandFinalDate)} UTC`
+      : localization?.t("tournaments.projection.grandFinalTba") ??
+        "Grand Final date to be announced",
     prizePool: row.prize_pool,
     players: brackets.reduce(
       (total, bracket) => total + (bracket.registered_players ?? 0),
@@ -458,7 +479,10 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
       id: bracket.id,
       name: getTournamentBracketDisplayName(bracket.name),
       requirement: bracket.elo_rules,
-      maxPlayers: `Max ${bracket.max_players} players`,
+      maxPlayers:
+        localization?.t("tournaments.projection.maxPlayers", {
+          count: bracket.max_players,
+        }) ?? `Max ${bracket.max_players} players`,
       registeredPlayers: bracket.registered_players ?? 0,
       activeCohortPlayers: bracket.active_cohort_players ?? 0,
       activeCohortSize: PHASE_FOUR_ACTIVE_COHORT_SIZE,
@@ -472,15 +496,28 @@ export function mapTournamentRow(row: TournamentRow): TournamentCard {
         (bracket.waitlisted_players ?? 0) > 0,
       launchedAt: bracket.launched_at,
       prize: row.prize_pool?.trim()
-        ? "Prize details are listed on this Tournament Page"
-        : "No prize is published for this Event",
+        ? localization?.t("tournaments.projection.prizeListed") ??
+          "Prize details are listed on this Tournament Page"
+        : localization?.t("tournaments.projection.noPrize") ??
+          "No prize is published for this Event",
     })),
     details: row.description,
     rules: row.rules_url
-      ? `Rule format: ${ruleFormatLabels[ruleFormat]}. Read the official tournament rules using the Rules link for this event.`
-      : `Rule format: ${ruleFormatLabels[ruleFormat]}. Tournament-specific rules and final bracket placement are managed by IronClad administrators.`,
-    schedule: buildTournamentSchedule(row, dateTimeFormatter),
+      ? localization?.t("tournaments.projection.rulesLinked", {
+          format:
+            localization?.t(`tournaments.projection.${ruleFormat}`) ??
+            ruleFormatLabels[ruleFormat],
+        }) ??
+        `Rule format: ${ruleFormatLabels[ruleFormat]}. Read the official tournament rules using the Rules link for this event.`
+      : localization?.t("tournaments.projection.rulesManaged", {
+          format:
+            localization?.t(`tournaments.projection.${ruleFormat}`) ??
+            ruleFormatLabels[ruleFormat],
+        }) ??
+        `Rule format: ${ruleFormatLabels[ruleFormat]}. Tournament-specific rules and final bracket placement are managed by IronClad administrators.`,
+    schedule: buildTournamentSchedule(row, dateTimeFormatter, localization),
     contact:
+      localization?.t("tournaments.projection.contact") ??
       "Use the IronClad website and official community channels for registration, match details, and tournament updates.",
     registrationEnabled: row.registration_enabled,
     registrationOpenAt: row.registration_open_at ?? "",
@@ -729,13 +766,18 @@ export function getEligibleBracketNames(
 
 function buildTournamentSchedule(
   row: TournamentRow,
-  formatter: Intl.DateTimeFormat
+  formatter: Intl.DateTimeFormat,
+  localization?: { locale: string; t: TournamentProjectionTranslator }
 ) {
   const schedule = [
     row.grand_final_at
-      ? `Grand Final: ${formatter.format(new Date(row.grand_final_at))} UTC`
-      : "Grand Final date to be announced",
-    "Registration remains open while the event is open. Full brackets or brackets with an existing queue accept waitlist registrations.",
+      ? localization?.t("tournaments.projection.grandFinal", {
+          date: formatter.format(new Date(row.grand_final_at)),
+        }) ?? `Grand Final: ${formatter.format(new Date(row.grand_final_at))} UTC`
+      : localization?.t("tournaments.projection.grandFinalTba") ??
+        "Grand Final date to be announced",
+    localization?.t("tournaments.projection.scheduleRegistration") ??
+      "Registration remains open while the event is open. Full brackets or brackets with an existing queue accept waitlist registrations.",
   ];
 
   return schedule;

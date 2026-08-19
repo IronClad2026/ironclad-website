@@ -13,21 +13,29 @@ import {
 
 } from "lucide-react";
 import Link from "next/link";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
+import type { PublicDictionary } from "@/lib/i18n/dictionaries/en/public";
 
 const discordUrl = "https://discord.gg/ZQSQjBNRm3";
 
-const commandStats = [
+const commandStats: Array<{
+  labelKey: string;
+  value?: string;
+  valueKey?: string;
+}> = [
   {
-    label: "Launch format",
+    labelKey: "home.hero.launchFormat",
     value: "1v1",
   },
   {
-    label: "Division size",
+    labelKey: "home.hero.divisionSize",
     value: "08",
   },
   {
-    label: "Integrity model",
-    value: "Fair play",
+    labelKey: "home.hero.integrityModel",
+    valueKey: "home.hero.fairPlay",
 
   },
 ];
@@ -35,23 +43,23 @@ const commandStats = [
 const competitionPaths = [
   {
     icon: ShieldCheck,
-    title: "VERIFIED 1V1",
-    text: "Connect Steam and verify your current Relic 1v1 ELO. IronClad places you in Academy, Challenge, or Main / Pro and locks that eligibility snapshot for the Event.",
-    cta: "VIEW TOURNAMENTS",
+    titleKey: "home.path.verifyTitle",
+    textKey: "home.path.verifyText",
+    ctaKey: "home.path.verifyCta",
     href: "/tournaments",
   },
   {
     icon: Crosshair,
-    title: "PLAY & REPORT",
-    text: "Play from the published Division map pool, use authenticated Dice for odd-Game roll-offs, and report the Series with one private .rec replay for every Game played. Your opponent can confirm or dispute the report.",
-    cta: "READ 1V1 RULES",
+    titleKey: "home.path.reportTitle",
+    textKey: "home.path.reportText",
+    ctaKey: "home.path.reportCta",
     href: "/rules#one-v-one-rules",
   },
   {
     icon: Trophy,
-    title: "COMPETE & PROGRESS",
-    text: "Earn points through valid participation and progression. Academy and Challenge build permanent Career standings; Main / Pro runs in six-Event seasons.",
-    cta: "VIEW RANKINGS",
+    titleKey: "home.path.progressTitle",
+    textKey: "home.path.progressText",
+    ctaKey: "home.path.progressCta",
     href: "/rankings",
   },
 ];
@@ -59,37 +67,40 @@ const competitionPaths = [
 const platformSignals = [
   {
     icon: ShieldCheck,
-    title: "Competitive integrity",
-
-    text: "Clear rules and admin review support fair, structured competition.",
+    titleKey: "home.command.integrityTitle",
+    textKey: "home.command.integrityText",
 
   },
   {
     icon: Trophy,
-    title: "Structured tournaments",
-
-    text: "Brackets, schedules, and tournament updates remain easy to follow.",
+    titleKey: "home.command.tournamentsTitle",
+    textKey: "home.command.tournamentsText",
   },
   {
     icon: UserRoundCheck,
-    title: "Player choice",
-    text: "Public profiles and Discord contact appear only when players choose to share them.",
+    titleKey: "home.command.choiceTitle",
+    textKey: "home.command.choiceText",
 
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "public");
+
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white">
-      <HeroSection />
+      <HeroSection copy={copy} />
       <HomeAccountSection />
-      <PlayersSection />
-      <CompetitionPathSection />
+      <PlayersSection copy={copy} />
+      <CompetitionPathSection copy={copy} />
     </main>
   );
 }
 
-function HeroSection() {
+function HeroSection({ copy }: { copy: PublicDictionary }) {
+  const t = (path: string) => translate(copy, path);
+
   return (
     <section
       className="relative isolate flex min-h-[88svh] items-end overflow-hidden border-b border-orange-500/20 bg-cover bg-center px-5 pt-32 pb-12 sm:px-8 lg:min-h-[86svh] lg:px-12"
@@ -110,19 +121,18 @@ function HeroSection() {
         <ScrollReveal className="max-w-5xl">
 
           <p className="text-sm font-black uppercase text-orange-300">
-            Competitive Company of Heroes 3 Events
+            {t("home.hero.eyebrow")}
           </p>
 
           <h1
             id="home-hero-title"
             className="mt-5 max-w-5xl text-5xl font-black leading-[0.96] text-white sm:text-6xl lg:text-8xl"
           >
-            IronClad Tournaments
+            {t("home.hero.title")}
           </h1>
 
           <p className="mt-7 max-w-2xl text-base leading-8 text-zinc-300 sm:text-lg">
-            Join native 1v1 competition built around verified Divisions, fair
-            play, permanent Career standings, and six-event Main / Pro seasons.
+            {t("home.hero.description")}
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -130,7 +140,7 @@ function HeroSection() {
               className="inline-flex min-h-12 items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
               href="/tournaments"
             >
-              View Tournaments
+              {t("home.hero.viewTournaments")}
               <ArrowRight size={17} aria-hidden="true" />
             </Link>
 
@@ -140,7 +150,7 @@ function HeroSection() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Join Discord (Optional)
+              {t("home.hero.joinDiscord")}
               <Flag size={17} aria-hidden="true" />
             </a>
           </div>
@@ -148,14 +158,14 @@ function HeroSection() {
           <dl className="mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
             {commandStats.map((stat) => (
               <div
-                key={stat.label}
+                key={stat.labelKey}
                 className="border border-white/15 bg-black/50 px-4 py-4 backdrop-blur"
               >
                 <dt className="text-xs font-bold uppercase text-zinc-500">
-                  {stat.label}
+                  {t(stat.labelKey)}
                 </dt>
                 <dd className="mt-2 text-xl font-black text-white">
-                  {stat.value}
+                  {stat.valueKey ? t(stat.valueKey) : stat.value}
                 </dd>
               </div>
             ))}
@@ -164,7 +174,7 @@ function HeroSection() {
 
         <aside
           className="hidden border border-white/15 bg-black/55 p-5 backdrop-blur lg:block"
-          aria-label="IronClad command brief"
+          aria-label={t("home.command.label")}
         >
           <div className="relative min-h-[560px] overflow-hidden border border-orange-400/30 bg-[linear-gradient(145deg,rgba(249,115,22,0.12),rgba(8,13,24,0.92))] xl:min-h-[600px]">
             <div
@@ -178,7 +188,7 @@ function HeroSection() {
 
             <div className="relative z-10 flex min-h-[560px] flex-col p-7 xl:min-h-[600px]">
               <div className="flex items-center justify-between border-b border-white/15 pb-6 text-xs font-black uppercase text-orange-200">
-                <span>Operations Online</span>
+                <span>{t("home.command.online")}</span>
                 <Radio size={16} aria-hidden="true" />
               </div>
 
@@ -188,7 +198,7 @@ function HeroSection() {
 
                   return (
                     <div
-                      key={signal.title}
+                      key={signal.titleKey}
                       className="border border-white/10 bg-black/30 p-4"
                     >
                       <div className="flex items-start gap-3">
@@ -199,10 +209,10 @@ function HeroSection() {
                         />
                         <div className="min-w-0">
                           <p className="text-sm font-black leading-6 text-white">
-                            {signal.title}
+                            {t(signal.titleKey)}
                           </p>
                           <p className="mt-2 text-sm leading-6 text-zinc-400">
-                            {signal.text}
+                            {t(signal.textKey)}
                           </p>
                         </div>
                       </div>
@@ -213,10 +223,11 @@ function HeroSection() {
 
               <div className="mt-auto pt-8">
                 <div className="border-t border-orange-400/35 pt-6">
-                  <p className="text-4xl font-black leading-none">READY</p>
+                  <p className="text-4xl font-black leading-none">
+                    {t("home.command.ready")}
+                  </p>
                   <p className="mt-4 text-sm leading-6 text-zinc-300">
-                    Tournaments, profiles, players, and rules connected for the
-                    next competitive event.
+                    {t("home.command.readyText")}
                   </p>
                 </div>
               </div>
@@ -228,7 +239,9 @@ function HeroSection() {
   );
 }
 
-function PlayersSection() {
+function PlayersSection({ copy }: { copy: PublicDictionary }) {
+  const t = (path: string) => translate(copy, path);
+
   return (
     <section
       className="relative isolate overflow-hidden border-y border-white/10 bg-cover bg-center px-5 py-24 sm:px-8 lg:px-12"
@@ -254,9 +267,9 @@ function PlayersSection() {
 
       <ScrollReveal className="relative z-10 mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_340px] lg:items-center">
         <SectionHeading
-          eyebrow="IronClad Players"
-          title="Discover the Public Roster"
-          text="Browse players who choose to appear publicly, compare ELO, view public profiles, and use Discord contact where a player has opted in."
+          eyebrow={t("home.players.eyebrow")}
+          title={t("home.players.title")}
+          text={t("home.players.description")}
           titleId="players-section-title"
         />
 
@@ -266,9 +279,11 @@ function PlayersSection() {
               <Crosshair size={23} aria-hidden="true" />
             </span>
             <div>
-              <p className="font-black text-white">Player directory</p>
+              <p className="font-black text-white">
+                {t("home.players.directory")}
+              </p>
               <p className="mt-1 text-sm text-zinc-400">
-                Public profile details are limited to player-approved fields.
+                {t("home.players.privacy")}
               </p>
             </div>
           </div>
@@ -277,7 +292,7 @@ function PlayersSection() {
             href="/players"
             className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
           >
-            Browse Players
+            {t("home.players.browse")}
             <ArrowRight size={17} aria-hidden="true" />
           </Link>
         </div>
@@ -286,7 +301,9 @@ function PlayersSection() {
   );
 }
 
-function CompetitionPathSection() {
+function CompetitionPathSection({ copy }: { copy: PublicDictionary }) {
+  const t = (path: string) => translate(copy, path);
+
   return (
     <section
       className="relative isolate overflow-hidden bg-cover bg-center px-5 py-28 sm:px-8 lg:px-12"
@@ -312,16 +329,21 @@ function CompetitionPathSection() {
       <ScrollReveal className="relative z-10 mx-auto max-w-7xl">
         <div className="mb-10">
           <SectionHeading
-            eyebrow="COMPETITION PATH"
-            title="HOW IRONCLAD COMPETITION WORKS"
-            text="Verify your Division, play through a structured eight-Player bracket, and build an official competitive record."
+            eyebrow={t("home.path.eyebrow")}
+            title={t("home.path.title")}
+            text={t("home.path.description")}
             titleId="competition-path-title"
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           {competitionPaths.map((path, index) => (
-            <CompetitionPathCard key={path.title} path={path} index={index} />
+            <CompetitionPathCard
+              key={path.titleKey}
+              path={path}
+              index={index}
+              copy={copy}
+            />
           ))}
         </div>
 
@@ -334,11 +356,14 @@ function CompetitionPathSection() {
 function CompetitionPathCard({
   path,
   index,
+  copy,
 }: {
   path: (typeof competitionPaths)[number];
   index: number;
+  copy: PublicDictionary;
 }) {
   const Icon = path.icon;
+  const t = (translationPath: string) => translate(copy, translationPath);
 
   return (
     <Link
@@ -369,13 +394,15 @@ function CompetitionPathCard({
         </div>
 
         <h3 className="mt-6 text-2xl font-black leading-tight text-white">
-          {path.title}
+          {t(path.titleKey)}
         </h3>
 
-        <p className="mt-4 text-sm leading-6 text-zinc-400">{path.text}</p>
+        <p className="mt-4 text-sm leading-6 text-zinc-400">
+          {t(path.textKey)}
+        </p>
 
         <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-black text-orange-300 transition group-hover:text-orange-200">
-          {path.cta}
+          {t(path.ctaKey)}
           <ArrowRight size={16} aria-hidden="true" />
         </span>
       </div>

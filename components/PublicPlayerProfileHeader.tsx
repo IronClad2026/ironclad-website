@@ -1,8 +1,17 @@
+"use client";
+
 import { ArrowLeft, Globe2, MapPin, Shield, UserRound } from "lucide-react";
 import Link from "next/link";
 import DiscordContactButton from "@/components/DiscordContactButton";
 import ScrollReveal from "@/components/ScrollReveal";
 import type { PublicPlayerProfile } from "@/lib/public-players";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
+import { formatNumber } from "@/lib/i18n/format";
 
 type PublicPlayerProfileHeaderProps = {
   player: PublicPlayerProfile;
@@ -11,9 +20,13 @@ type PublicPlayerProfileHeaderProps = {
 export default function PublicPlayerProfileHeader({
   player,
 }: PublicPlayerProfileHeaderProps) {
+  const t = useOptionalTranslations("public", englishPublicDictionary);
+  const locale = useOptionalLocale();
   const displayName = player.playerName || player.displayName;
   const eloLabel =
-    typeof player.currentElo === "number" ? String(player.currentElo) : "Unrated";
+    typeof player.currentElo === "number"
+      ? formatNumber(player.currentElo, locale)
+      : t("players.unrated");
 
   return (
     <section className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-12">
@@ -34,13 +47,13 @@ export default function PublicPlayerProfileHeader({
           className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/45 px-4 py-2 text-sm font-bold text-zinc-300 shadow-xl shadow-black/10 backdrop-blur transition hover:border-orange-400/45 hover:bg-orange-500/10 hover:text-white"
         >
           <ArrowLeft size={16} />
-          Back to Players
+          {t("players.back")}
         </Link>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[auto_1fr_380px] lg:items-end">
           <div
             role="img"
-            aria-label={`${displayName} avatar`}
+            aria-label={t("players.avatarLabel", { name: displayName })}
             className="grid h-36 w-36 place-items-center overflow-hidden rounded-3xl border border-orange-400/35 bg-black/55 bg-cover bg-center shadow-[0_0_24px_rgba(249,115,22,0.16)]"
             style={
               player.avatarUrl
@@ -55,7 +68,7 @@ export default function PublicPlayerProfileHeader({
 
           <div className="min-w-0">
             <p className="text-sm font-black uppercase tracking-[0.35em] text-orange-300">
-              Public Player Profile
+              {t("players.profileEyebrow")}
             </p>
             <h1 className="mt-4 break-words text-5xl font-black tracking-tight text-white md:text-7xl">
               {displayName}
@@ -70,10 +83,17 @@ export default function PublicPlayerProfileHeader({
               <Pill icon={Shield} label={`ELO ${eloLabel}`} tone="orange" />
               <Pill
                 icon={Globe2}
-                label={player.country?.trim() || "Unknown country"}
+                label={
+                  player.country?.trim()
+                    ? getLocalizedCountryName(player.country, locale)
+                    : t("players.unknownCountry")
+                }
               />
               {player.region?.trim() && (
-                <Pill icon={MapPin} label={player.region} />
+                <Pill
+                  icon={MapPin}
+                  label={getLocalizedPlayerRegion(player.region, t)}
+                />
               )}
             </div>
           </div>

@@ -5,6 +5,16 @@ import {
   TRANSACTIONAL_EMAIL_TEMPLATE_KEYS,
   type TransactionalEmailTemplateData,
 } from "@/lib/transactional-email/templates";
+import zhEmail from "@/lib/i18n/dictionaries/zh-CN/email";
+import enEmail, {
+  type EmailDictionary,
+} from "@/lib/i18n/dictionaries/en/email";
+import esEmail from "@/lib/i18n/dictionaries/es/email";
+import frEmail from "@/lib/i18n/dictionaries/fr/email";
+import koEmail from "@/lib/i18n/dictionaries/ko/email";
+import ptBrEmail from "@/lib/i18n/dictionaries/pt-BR/email";
+import ruEmail from "@/lib/i18n/dictionaries/ru/email";
+import type { Locale } from "@/lib/i18n/config";
 
 const TEMPLATE_CONFIG = {
   appOrigin: "https://preview.example.invalid",
@@ -21,6 +31,16 @@ const MATCH_DATA = {
   matchId: "match-id",
   deadlineAt: "2026-08-18T10:00:00+00:00",
 };
+
+const LOCALE_EMAIL_DICTIONARIES = [
+  ["en", enEmail],
+  ["zh-CN", zhEmail],
+  ["ru", ruEmail],
+  ["es", esEmail],
+  ["pt-BR", ptBrEmail],
+  ["ko", koEmail],
+  ["fr", frEmail],
+] as const satisfies ReadonlyArray<readonly [Locale, EmailDictionary]>;
 
 const CASES: Array<{
   data: TransactionalEmailTemplateData;
@@ -49,7 +69,7 @@ const CASES: Array<{
   },
   {
     data: { templateKey: "later_round_match_ready", ...MATCH_DATA },
-    subject: "Semifinal matchup ready: Winter Championship",
+    subject: "Semifinals matchup ready: Winter Championship",
     heading: "Your next matchup is ready",
   },
   {
@@ -122,7 +142,7 @@ describe("transactional email templates", () => {
         "Veteran Division",
         data.templateKey === "division_started_first_match"
           ? "Round 1"
-          : "Semifinal",
+          : "Semifinals",
         "Opponent Player",
         "18 August 2026, 10:00 UTC",
       ]) {
@@ -137,6 +157,91 @@ describe("transactional email templates", () => {
       formatTransactionalEmailDeadlineUtc("2026-08-18T20:00:00+10:00")
     ).toBe("18 August 2026, 10:00 UTC");
   });
+
+  it("renders selected-locale copy, lang, and UTC presentation without translating dynamic names", () => {
+    const rendered = renderTransactionalEmail(
+      CASES[0].data,
+      TEMPLATE_CONFIG,
+      "zh-CN",
+      zhEmail
+    );
+
+    expect(rendered.subject).toBe("报名已获批准：Winter Championship");
+    expect(rendered.html).toContain('<html lang="zh-CN">');
+    expect(rendered.html).toContain("Winter Championship");
+    expect(rendered.text).toContain("Veteran Division");
+  });
+
+  it.each(LOCALE_EMAIL_DICTIONARIES)(
+    "renders the complete app-owned email shell for %s",
+    (locale, dictionary) => {
+      for (const testCase of CASES) {
+        const rendered = renderTransactionalEmail(
+          testCase.data,
+          TEMPLATE_CONFIG,
+          locale,
+          dictionary
+        );
+
+        expect(rendered.subject.trim()).not.toBe("");
+        expect(rendered.html).toContain(`<html lang="${locale}">`);
+        expect(rendered.html).toContain("Winter Championship");
+        expect(rendered.text).toContain("Winter Championship");
+      }
+    }
+  );
+
+  it.each(LOCALE_EMAIL_DICTIONARIES)(
+    "localizes a canonical round alias in the %s subject and details",
+    (locale, dictionary) => {
+      const rendered = renderTransactionalEmail(
+        {
+          templateKey: "later_round_match_ready",
+          ...MATCH_DATA,
+          roundName: "Semi-Finals",
+        },
+        TEMPLATE_CONFIG,
+        locale,
+        dictionary
+      );
+
+      expect(rendered.subject).toContain(dictionary.roundNames.semifinals);
+      expect(rendered.subject).not.toContain("Semi-Finals");
+      expect(rendered.text).toContain(
+        `${dictionary.labels.round}: ${dictionary.roundNames.semifinals}`
+      );
+      expect(rendered.html).toContain(dictionary.roundNames.semifinals);
+      expect(rendered.text).toContain(MATCH_DATA.tournamentName);
+      expect(rendered.text).toContain(MATCH_DATA.divisionName);
+      expect(rendered.text).toContain(MATCH_DATA.opponentName);
+    }
+  );
+
+  it.each(LOCALE_EMAIL_DICTIONARIES)(
+    "preserves an unknown custom round in the %s subject and details",
+    (locale, dictionary) => {
+      const customRoundName = "Lower Bracket Round 2";
+      const rendered = renderTransactionalEmail(
+        {
+          templateKey: "later_round_match_ready",
+          ...MATCH_DATA,
+          roundName: customRoundName,
+        },
+        TEMPLATE_CONFIG,
+        locale,
+        dictionary
+      );
+
+      expect(rendered.subject).toContain(customRoundName);
+      expect(rendered.text).toContain(
+        `${dictionary.labels.round}: ${customRoundName}`
+      );
+      expect(rendered.html).toContain(customRoundName);
+      expect(rendered.text).toContain(MATCH_DATA.tournamentName);
+      expect(rendered.text).toContain(MATCH_DATA.divisionName);
+      expect(rendered.text).toContain(MATCH_DATA.opponentName);
+    }
+  );
 
   it("rejects a timezone-less deadline rather than using server-local time", () => {
     expect(() =>

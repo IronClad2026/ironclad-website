@@ -286,6 +286,7 @@ describe("profile Relic ELO verification action", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "auth-required",
       message: "Sign in before verifying your ELO.",
     });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
@@ -300,6 +301,7 @@ describe("profile Relic ELO verification action", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "profile-required",
       message: "Complete your player profile before verifying your ELO.",
     });
     expect(fixture.rpc).not.toHaveBeenCalled();
@@ -316,6 +318,7 @@ describe("profile Relic ELO verification action", () => {
 
     expect(result).toEqual({
       status: "requires_steam",
+      code: "steam-required",
       message: "Connect your Steam account before verifying your ELO.",
     });
     expect(fixture.rpc).not.toHaveBeenCalled();
@@ -355,6 +358,7 @@ describe("profile Relic ELO verification action", () => {
     );
     expect(result).toEqual({
       status: "success",
+      code: "verified",
       message: "Your Relic ELO has been verified.",
       snapshot: {
         elo: 1_450,
@@ -422,6 +426,7 @@ describe("profile Relic ELO verification action", () => {
 
     expect(result).toEqual({
       status: "cooldown",
+      code: "cooldown",
       message: "ELO verification is temporarily on cooldown.",
       refreshAvailableAt: REFRESH_AVAILABLE_AT,
     });
@@ -462,37 +467,48 @@ describe("profile Relic ELO verification action", () => {
     [
       "invalid_steam_input",
       "error",
+      "steam-identity-invalid",
       "Your connected Steam identity could not be verified.",
     ],
     [
       "profile_not_found",
       "error",
+      "profile-not-found",
       "No Company of Heroes 3 profile was found",
     ],
     [
       "steam_identity_mismatch",
       "error",
+      "steam-identity-mismatch",
       "Relic could not confirm your connected game identity.",
     ],
-    ["unranked", "error", "No rated 1v1 ELO is currently available."],
+    [
+      "unranked",
+      "error",
+      "no-rated-data",
+      "No rated 1v1 ELO is currently available.",
+    ],
     [
       "invalid_relic_response",
       "unavailable",
+      "provider-unavailable",
       "ELO verification could not be completed right now.",
     ],
     [
       "relic_integration_error",
       "unavailable",
+      "provider-unavailable",
       "ELO verification could not be completed right now.",
     ],
     [
       "external_relic_unavailable",
       "unavailable",
+      "provider-unavailable",
       "Relic is temporarily unavailable.",
     ],
   ] as const)(
     "maps %s to a safe %s result and preserves the previous snapshot",
-    async (relicStatus, actionStatus, message) => {
+    async (relicStatus, actionStatus, code, message) => {
       const originalPlayer = createVerifiedPlayer();
       const fixture = createVerificationClient({ player: originalPlayer });
       createSupabaseAdminClientMock.mockReturnValue(fixture.client);
@@ -502,6 +518,7 @@ describe("profile Relic ELO verification action", () => {
 
       expect(result).toMatchObject({
         status: actionStatus,
+        code,
         message: expect.stringContaining(message),
         refreshAvailableAt: REFRESH_AVAILABLE_AT,
       });
@@ -607,6 +624,7 @@ describe("profile Relic ELO verification action", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "profile-load-failed",
       message: "Your player profile could not be loaded.",
     });
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
@@ -626,6 +644,7 @@ describe("profile Relic ELO verification action", () => {
 
     expect(result).toEqual({
       status: "unavailable",
+      code: "provider-unavailable",
       message:
         "Relic is temporarily unavailable. Your previous ELO result remains unchanged.",
       refreshAvailableAt: REFRESH_AVAILABLE_AT,

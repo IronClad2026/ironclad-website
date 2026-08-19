@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import type { Metadata } from "next";
 import TournamentsExperience from "@/components/TournamentsExperience";
 import { loadEffectiveRegistrationDocumentSet } from "@/lib/legal-documents";
 import { loadTournamentPollsForRequest } from "@/lib/player-polls";
@@ -24,6 +25,10 @@ import {
   type TournamentParticipant,
   type TournamentRow,
 } from "@/lib/tournaments";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
+import type { MessageValues } from "@/lib/i18n/types";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +39,16 @@ type TournamentsPageProps = {
     tournament?: string | string[];
   }>;
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+  const dictionary = await loadDictionary(locale, "competition");
+
+  return {
+    title: translate(dictionary, "metadata.title"),
+    description: translate(dictionary, "metadata.description"),
+  };
+}
 
 function normalizeRelicVerifiedDivision(
   value: unknown
@@ -48,7 +63,13 @@ function normalizeRelicVerifiedDivision(
 export default async function TournamentsPage({
   searchParams,
 }: TournamentsPageProps = {}) {
-  const { userId, sessionClaims } = await auth();
+  const [{ userId, sessionClaims }, locale] = await Promise.all([
+    auth(),
+    getRequestLocale(),
+  ]);
+  const competition = await loadDictionary(locale, "competition");
+  const t = (path: string, values?: MessageValues) =>
+    translate(competition, path, values);
   const params = await searchParams;
   const isAdmin =
     (
@@ -379,7 +400,7 @@ export default async function TournamentsPage({
     tournamentRows
   );
   const tournaments = tournamentRows.map((row) => {
-    const tournament = mapTournamentRow(row);
+    const tournament = mapTournamentRow(row, { locale, t });
     tournament.participants = participantsByTournament.get(row.id) ?? [];
     tournament.bracketParticipants =
       bracketParticipantsByTournament.get(row.id) ?? [];
@@ -426,10 +447,9 @@ export default async function TournamentsPage({
         }}
       >
         <div className="mx-auto max-w-3xl border border-orange-500/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-10 text-center shadow-2xl shadow-black/30 backdrop-blur">
-          <h1 className="text-3xl font-black">No Tournaments Published</h1>
+          <h1 className="text-3xl font-black">{t("emptyState.title")}</h1>
           <p className="mt-4 text-zinc-400">
-            Tournament data will appear here after an administrator publishes
-            an event.
+            {t("emptyState.description")}
           </p>
         </div>
       </main>

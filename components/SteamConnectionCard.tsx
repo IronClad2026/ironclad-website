@@ -1,3 +1,8 @@
+"use client";
+
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import englishAccountDictionary from "@/lib/i18n/dictionaries/en/account-dashboard";
+
 type SteamConnectionResult =
   | "connected"
   | "cancelled"
@@ -16,37 +21,34 @@ type SteamConnectionCardProps = {
 
 const resultMessages: Record<
   SteamConnectionResult,
-  { message: string; tone: "success" | "error" | "neutral" }
+  { messageKey: string; tone: "success" | "error" | "neutral" }
 > = {
   connected: {
-    message: "Steam account connected successfully.",
+    messageKey: "steam.connectedResult",
     tone: "success",
   },
   refreshed: {
-    message:
-      "Steam account refreshed successfully. Your Steam Display Name is up to date.",
+    messageKey: "steam.refreshedResult",
     tone: "success",
   },
   "display-name-failed": {
-    message:
-      "Your Steam account is still connected, but we couldn’t refresh your Steam Display Name. Please try again later.",
+    messageKey: "steam.displayNameFailed",
     tone: "neutral",
   },
   cancelled: {
-    message: "Steam connection was cancelled.",
+    messageKey: "steam.cancelled",
     tone: "neutral",
   },
   "already-connected": {
-    message: "A Steam account is already connected to this IronClad account.",
+    messageKey: "steam.alreadyConnected",
     tone: "neutral",
   },
   duplicate: {
-    message:
-      "This Steam account is already connected to another IronClad account.",
+    messageKey: "steam.duplicate",
     tone: "error",
   },
   failed: {
-    message: "Steam could not be connected. Please try again.",
+    messageKey: "steam.failed",
     tone: "error",
   },
 };
@@ -63,6 +65,10 @@ export default function SteamConnectionCard({
   result,
   statusAvailable,
 }: SteamConnectionCardProps) {
+  const t = useOptionalTranslations(
+    "account-dashboard",
+    englishAccountDictionary
+  );
   const resultRequiresConnection =
     result === "connected" ||
     result === "refreshed" ||
@@ -78,12 +84,13 @@ export default function SteamConnectionCard({
 
       <div className="relative z-10">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
-          Verified Game Identity
+          {t("steam.eyebrow")}
         </p>
-        <h2 className="mt-3 text-2xl font-bold text-white">Steam Connection</h2>
+        <h2 className="mt-3 text-2xl font-bold text-white">
+          {t("steam.title")}
+        </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-          Connect Steam to prove ownership of your game identity. Your Steam
-          account is not used to sign in to IronClad.
+          {t("steam.description")}
         </p>
 
         {resultMessage ? (
@@ -91,18 +98,18 @@ export default function SteamConnectionCard({
             aria-live="polite"
             className={`mt-5 border p-4 text-sm ${resultToneClasses[resultMessage.tone]}`}
           >
-            {resultMessage.message}
+            {t(resultMessage.messageKey)}
           </div>
         ) : null}
 
         <div className="mt-6">
           {!hasPlayer ? (
             <p className="text-sm font-semibold text-zinc-300">
-              Save your profile before connecting Steam.
+              {t("steam.saveFirst")}
             </p>
           ) : !statusAvailable ? (
             <p className="text-sm font-semibold text-zinc-300">
-              Steam connection status is temporarily unavailable.
+              {t("steam.unavailable")}
             </p>
           ) : connected ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -111,14 +118,14 @@ export default function SteamConnectionCard({
                   aria-hidden="true"
                   className="h-2 w-2 rounded-full bg-emerald-400"
                 />
-                Steam connected
+                {t("steam.connected")}
               </div>
               <form action="/api/steam/connect" method="post">
                 <button
                   type="submit"
                   className="border border-white/15 bg-white/5 px-4 py-3 text-sm font-bold text-zinc-200 transition hover:border-orange-400/50 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
                 >
-                  Refresh Steam Display Name
+                  {t("steam.refreshName")}
                 </button>
               </form>
             </div>
@@ -128,7 +135,7 @@ export default function SteamConnectionCard({
                 type="submit"
                 className="border border-orange-500 bg-orange-600 px-5 py-3 font-bold text-white transition hover:border-orange-400 hover:bg-orange-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
               >
-                Connect Steam Account
+                {t("steam.connect")}
               </button>
             </form>
           )}

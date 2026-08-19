@@ -26,29 +26,54 @@ export type RelicEloSnapshot = {
   verifiedAt: string;
 };
 
+export type RelicEloResultCode =
+  | "verified"
+  | "cooldown"
+  | "steam-required"
+  | "session-invalid"
+  | "auth-required"
+  | "service-unavailable"
+  | "profile-load-failed"
+  | "profile-required"
+  | "steam-identity-invalid"
+  | "profile-not-found"
+  | "steam-identity-mismatch"
+  | "no-rated-data"
+  | "provider-unavailable"
+  | "save-failed"
+  | "confirmation-failed";
+
 export type RelicEloActionResult =
   | {
       status: "success";
+      code: "verified";
       message: string;
       snapshot: RelicEloSnapshot;
       refreshAvailableAt: string;
     }
   | {
       status: "cooldown";
+      code: "cooldown";
       message: string;
       refreshAvailableAt: string;
     }
   | {
       status: "requires_steam";
+      code: "steam-required";
       message: string;
     }
   | {
       status: "unavailable";
+      code: "provider-unavailable";
       message: string;
       refreshAvailableAt: string;
     }
   | {
       status: "error";
+      code: Exclude<
+        RelicEloResultCode,
+        "verified" | "cooldown" | "steam-required" | "provider-unavailable"
+      >;
       message: string;
       refreshAvailableAt?: string;
     };
@@ -71,11 +96,11 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     ({ userId } = await auth());
   } catch {
     console.error("Relic ELO authentication failed.");
-    return errorResult("Your session could not be verified. Sign in again.");
+    return errorResult("Your session could not be verified. Sign in again.", "session-invalid");
   }
 
   if (!userId) {
-    return errorResult("Sign in before verifying your ELO.");
+    return errorResult("Sign in before verifying your ELO.", "auth-required");
   }
 
   let supabase: ReturnType<typeof createSupabaseAdminClient>;
@@ -84,7 +109,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     supabase = createSupabaseAdminClient();
   } catch {
     console.error("Relic ELO service configuration failed.");
-    return errorResult("ELO verification could not be started right now.");
+    return errorResult("ELO verification could not be started right now.", "service-unavailable");
   }
 
   let playerLookup: { data: unknown; error: unknown };
@@ -97,27 +122,29 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
       .maybeSingle();
   } catch {
     console.error("Relic ELO player lookup failed unexpectedly.");
-    return errorResult("Your player profile could not be loaded.");
+    return errorResult("Your player profile could not be loaded.", "profile-load-failed");
   }
 
   const { data: rawPlayer, error: playerError } = playerLookup;
 
   if (playerError) {
     console.error("Relic ELO player lookup failed.");
-    return errorResult("Your player profile could not be loaded.");
+    return errorResult("Your player profile could not be loaded.", "profile-load-failed");
   }
 
   const player = parsePlayerRow(rawPlayer, userId);
 
   if (!player) {
     return errorResult(
-      "Complete your player profile before verifying your ELO."
+      "Complete your player profile before verifying your ELO.",
+      "profile-required"
     );
   }
 
   if (!player.steam_id64) {
     return {
       status: "requires_steam",
+      code: "steam-required",
       message: "Connect your Steam account before verifying your ELO.",
     };
   }
@@ -136,21 +163,21 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     );
   } catch {
     console.error("Relic ELO cooldown claim failed unexpectedly.");
-    return errorResult("ELO verification could not be started right now.");
+    return errorResult("ELO verification could not be started right now.", "service-unavailable");
   }
 
   const { data: rawClaim, error: claimError } = claimResult;
 
   if (claimError) {
     console.error("Relic ELO cooldown claim failed.");
-    return errorResult("ELO verification could not be started right now.");
+    return errorResult("ELO verification could not be started right now.", "service-unavailable");
   }
 
   const claim = parseClaimResult(rawClaim);
 
   if (claim.status === "invalid") {
     console.error("Relic ELO cooldown claim returned an invalid result.");
-    return errorResult("ELO verification could not be started right now.");
+    return errorResult("ELO verification could not be started right now.", "service-unavailable");
   }
 
   if (claim.status === "not_claimed") {
@@ -161,7 +188,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
 
   if (!refreshAvailableAt) {
     console.error("Relic ELO cooldown timestamp was invalid.");
-    return errorResult("ELO verification could not be started right now.");
+    return errorResult("ELO verification could not be started right now.", "service-unavailable");
   }
 
   let relicResult: RelicEloResult;
@@ -200,6 +227,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     console.error("Relic ELO result save failed unexpectedly.");
     return errorResult(
       "Your verified ELO could not be saved. Any previous result remains unchanged.",
+      "save-failed",
       refreshAvailableAt
     );
   }
@@ -210,6 +238,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     console.error("Relic ELO result save failed.");
     return errorResult(
       "Your verified ELO could not be saved. Any previous result remains unchanged.",
+      "save-failed",
       refreshAvailableAt
     );
   }
@@ -226,6 +255,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     console.error("Relic ELO result save returned an invalid result.");
     return errorResult(
       "Your verified ELO could not be confirmed. Refresh the page before trying again.",
+      "confirmation-failed",
       refreshAvailableAt
     );
   }
@@ -238,6 +268,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
 
   return {
     status: "success",
+    code: "verified",
     message: "Your Relic ELO has been verified.",
     snapshot,
     refreshAvailableAt,
@@ -262,7 +293,7 @@ async function getCooldownResult(
       .maybeSingle();
   } catch {
     console.error("Relic ELO cooldown reload failed unexpectedly.");
-    return errorResult("ELO verification could not be started right now.");
+    return errorResult("ELO verification could not be started right now.", "service-unavailable");
   }
 
   const { data, error } = cooldownLookup;
@@ -272,7 +303,7 @@ async function getCooldownResult(
       console.error("Relic ELO cooldown reload failed.");
     }
 
-    return errorResult("ELO verification could not be started right now.");
+    return errorResult("ELO verification could not be started right now.", "service-unavailable");
   }
 
   const lastAttemptAt = parseTimestamp(data.relic_elo_last_attempt_at);
@@ -282,11 +313,12 @@ async function getCooldownResult(
 
   if (!refreshAvailableAt) {
     console.error("Relic ELO cooldown reload returned an invalid result.");
-    return errorResult("ELO verification could not be started right now.");
+    return errorResult("ELO verification could not be started right now.", "service-unavailable");
   }
 
   return {
     status: "cooldown",
+    code: "cooldown",
     message: "ELO verification is temporarily on cooldown.",
     refreshAvailableAt,
   };
@@ -300,21 +332,25 @@ function mapRelicFailure(
     case "invalid_steam_input":
       return errorResult(
         "Your connected Steam identity could not be verified. Any previous ELO result remains unchanged.",
+        "steam-identity-invalid",
         refreshAvailableAt
       );
     case "profile_not_found":
       return errorResult(
         "No Company of Heroes 3 profile was found for your connected Steam account. Any previous ELO result remains unchanged.",
+        "profile-not-found",
         refreshAvailableAt
       );
     case "steam_identity_mismatch":
       return errorResult(
         "Relic could not confirm your connected game identity. Any previous ELO result remains unchanged.",
+        "steam-identity-mismatch",
         refreshAvailableAt
       );
     case "unranked":
       return errorResult(
         "No rated 1v1 ELO is currently available. Any previous ELO result remains unchanged.",
+        "no-rated-data",
         refreshAvailableAt
       );
     case "invalid_relic_response":
@@ -333,18 +369,27 @@ function mapRelicFailure(
 
 function errorResult(
   message: string,
+  code: Exclude<
+    RelicEloResultCode,
+    "verified" | "cooldown" | "steam-required" | "provider-unavailable"
+  >,
   refreshAvailableAt?: string
 ): RelicEloActionResult {
   return refreshAvailableAt
-    ? { status: "error", message, refreshAvailableAt }
-    : { status: "error", message };
+    ? { status: "error", code, message, refreshAvailableAt }
+    : { status: "error", code, message };
 }
 
 function unavailableResult(
   message: string,
   refreshAvailableAt: string
 ): RelicEloActionResult {
-  return { status: "unavailable", message, refreshAvailableAt };
+  return {
+    status: "unavailable",
+    code: "provider-unavailable",
+    message,
+    refreshAvailableAt,
+  };
 }
 
 function parsePlayerRow(value: unknown, userId: string): PlayerRow | null {

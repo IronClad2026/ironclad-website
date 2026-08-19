@@ -8,6 +8,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 
 const cleanupPreparedReplayUploadsMock = vi.hoisted(() => vi.fn());
 const finalizeMatchResultMock = vi.hoisted(() => vi.fn());
@@ -382,9 +383,7 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     );
 
     expect(
-      await screen.findByText(
-        "IronClad could not confirm the final response. Refresh this match before retrying."
-      )
+      await screen.findByText(competitionEnglish.resultForm.responseUnknown)
     ).toBeInTheDocument();
     expect(finalizeMatchResultMock).toHaveBeenCalledOnce();
     expect(cleanupPreparedReplayUploadsMock).not.toHaveBeenCalled();

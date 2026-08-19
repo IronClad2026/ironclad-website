@@ -21,34 +21,52 @@ import type {
   PublicSeasonChampion,
 } from "@/lib/leaderboard/public";
 import ScrollReveal from "@/components/ScrollReveal";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import {
+  formatDateTime,
+  formatNumber as formatLocalizedNumber,
+} from "@/lib/i18n/format";
+import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
+import type { MessageValues } from "@/lib/i18n/types";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
 
 type LeaderboardExperienceProps = {
   data: PublicLeaderboardData;
 };
 
 type PublicRankingView = "main" | "academy" | "challenge";
+type Translator = (path: string, values?: MessageValues) => string;
+
+function usePublicTranslations() {
+  return useOptionalTranslations("public", englishPublicDictionary);
+}
 
 const rankingOptions: Array<{
   value: PublicRankingView;
-  label: string;
+  labelKey: string;
 }> = [
   {
     value: "main",
-    label: "Main / Pro Season",
+    labelKey: "rankings.mainSeason",
   },
   {
     value: "academy",
-    label: "Academy Career",
+    labelKey: "rankings.academyCareer",
   },
   {
     value: "challenge",
-    label: "Challenge Career",
+    labelKey: "rankings.challengeCareer",
   },
 ];
 
 export default function LeaderboardExperience({
   data,
 }: LeaderboardExperienceProps) {
+  const t = usePublicTranslations();
+  const locale = useOptionalLocale();
   const [rankingView, setRankingView] = useState<PublicRankingView>("main");
   const isMainSeason = rankingView === "main";
   const scope: LeaderboardScope = isMainSeason ? "season" : "all_time";
@@ -85,6 +103,10 @@ export default function LeaderboardExperience({
       ),
     [data.seasonStandings]
   );
+  const translatedRankingOptions = rankingOptions.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
 
   return (
     <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#030303,#080808_42%,#030303)] text-white">
@@ -97,16 +119,15 @@ export default function LeaderboardExperience({
       <section className="relative z-10 mx-auto max-w-[1800px] space-y-10 px-4 py-10 sm:px-6 lg:px-8 xl:px-10">
         {data.errors.length > 0 && (
           <div className="border border-amber-300/30 bg-[linear-gradient(135deg,rgba(245,158,11,0.18),rgba(0,0,0,0.82))] p-5 text-sm font-semibold leading-6 text-amber-100 shadow-2xl shadow-black/30 backdrop-blur">
-            Some leaderboard data could not be loaded. The public page is
-            showing every safe dataset currently available.
+            {t("rankings.loadWarning")}
           </div>
         )}
 
         <ScrollReveal>
           <section className="border border-orange-500/20 bg-black/70 p-4 shadow-2xl shadow-black/25 backdrop-blur sm:p-5">
             <SegmentedControl
-              label="Public leaderboard"
-              options={rankingOptions}
+              label={t("rankings.publicLeaderboard")}
+              options={translatedRankingOptions}
               value={rankingView}
               onChange={setRankingView}
             />
@@ -134,16 +155,16 @@ export default function LeaderboardExperience({
               <div>
                 <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
                   <BarChart3 size={16} />
-                  Dynamic Standings
+                  {t("rankings.dynamicStandings")}
                 </p>
 
                 <h2 className="mt-3 text-3xl font-black text-white">
-                  {getRankingViewLabel(rankingView)}
+                  {getRankingViewLabel(rankingView, t)}
                 </h2>
 
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300">
-                  {getRankingViewDescription(rankingView)} All rows come from
-                  public-safe leaderboard views.
+                  {getRankingViewDescription(rankingView, t)}{" "}
+                  {t("rankings.safeData")}
                 </p>
               </div>
             </div>
@@ -152,21 +173,29 @@ export default function LeaderboardExperience({
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <MetricCard
-                label="Visible Competitors"
-                value={activeRows.length}
+                label={t("rankings.visibleCompetitors")}
+                value={formatLocalizedNumber(activeRows.length, locale)}
               />
 
               <MetricCard
-                label="Ranking Model"
-                value={isMainSeason ? "Six-event season" : "Permanent Career"}
-              />
-
-              <MetricCard
-                label={isMainSeason ? "Season State" : "Division"}
+                label={t("rankings.rankingModel")}
                 value={
                   isMainSeason
-                    ? getMainSeasonState(data.currentSeason).shortLabel
-                    : getRankingViewLabel(rankingView)
+                    ? t("rankings.sixEventSeason")
+                    : t("rankings.permanentCareer")
+                }
+              />
+
+              <MetricCard
+                label={
+                  isMainSeason
+                    ? t("rankings.seasonState")
+                    : t("rankings.division")
+                }
+                value={
+                  isMainSeason
+                    ? getMainSeasonState(data.currentSeason, t).shortLabel
+                    : getRankingViewLabel(rankingView, t)
                 }
               />
             </div>
@@ -195,8 +224,10 @@ function LeaderboardHero({
   rankingView: PublicRankingView;
   playerCount: number;
 }) {
+  const t = usePublicTranslations();
+  const locale = useOptionalLocale();
   const isMainSeason = rankingView === "main";
-  const seasonState = getMainSeasonState(currentSeason);
+  const seasonState = getMainSeasonState(currentSeason, t);
   const validEventCount = Math.min(
     Math.max(currentSeason?.validMainEventCount ?? 0, 0),
     6
@@ -223,16 +254,15 @@ function LeaderboardHero({
       <ScrollReveal className="relative z-10 mx-auto grid max-w-[1800px] gap-10 xl:grid-cols-[1.05fr_0.95fr] xl:items-end">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.36em] text-orange-300">
-            IronClad Competitive Command
+            {t("rankings.heroEyebrow")}
           </p>
 
           <h1 className="mt-5 max-w-5xl text-5xl font-black tracking-tight md:text-7xl xl:text-8xl">
-            Leaderboard & Ranking
+            {t("rankings.heroTitle")}
           </h1>
 
           <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300 md:text-lg">
-            Main / Pro is the authoritative six-valid-event season.
-            Academy and Challenge track separate permanent Career standings.
+            {t("rankings.heroDescription")}
           </p>
         </div>
 
@@ -240,23 +270,27 @@ function LeaderboardHero({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
-                {isMainSeason ? "Featured Main / Pro Season" : "Career Standings"}
+                {isMainSeason
+                  ? t("rankings.featuredSeason")
+                  : t("rankings.careerStandings")}
               </p>
 
               <h2 className="mt-2 text-2xl font-black text-white">
                 {isMainSeason
-                  ? currentSeason?.name ?? "Season not started"
-                  : getRankingViewLabel(rankingView)}
+                  ? currentSeason?.name ?? t("rankings.seasonNotStarted")
+                  : getRankingViewLabel(rankingView, t)}
               </h2>
 
               <p className="mt-2 text-sm text-zinc-400">
                 {isMainSeason && currentSeason
-                  ? `${formatDate(currentSeason.startDate)} - ${formatDate(
-                      currentSeason.endDate
+                  ? `${formatDate(currentSeason.startDate, locale, t)} - ${formatDate(
+                      currentSeason.endDate,
+                      locale,
+                      t
                     )}`
                   : isMainSeason
-                    ? "No qualifying season is underway. Standings begin with the first valid Main / Pro event."
-                    : "Points remain part of this division's permanent competitive record."}
+                    ? t("rankings.noSeason")
+                    : t("rankings.careerRecord")}
               </p>
             </div>
 
@@ -269,9 +303,10 @@ function LeaderboardHero({
             <>
               <div className="mt-6">
                 <div className="flex items-center justify-between gap-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  <span>Valid qualifying events</span>
+                  <span>{t("rankings.validEvents")}</span>
                   <span className="shrink-0 text-orange-200">
-                    {validEventCount} / 6
+                    {formatLocalizedNumber(validEventCount, locale)} /{" "}
+                    {formatLocalizedNumber(6, locale)}
                   </span>
                 </div>
 
@@ -292,35 +327,41 @@ function LeaderboardHero({
                   role="status"
                   className="mt-5 border border-amber-300/35 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100"
                 >
-                  Season results are under review. Displayed standings are not
-                  final while season review remains open.
+                  {t("rankings.underReviewNotice")}
                 </div>
               )}
             </>
           ) : (
             <p className="mt-6 border border-orange-300/20 bg-orange-500/[0.06] p-4 text-sm leading-6 text-zinc-300">
-              Career points do not reset when a Main / Pro season finishes and
-              remain separate from the other Career division.
+              {t("rankings.careerNoReset")}
             </p>
           )}
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <HeroStat label="Competitors" value={playerCount} />
+            <HeroStat
+              label={t("rankings.competitors")}
+              value={formatLocalizedNumber(playerCount, locale)}
+            />
 
             {isMainSeason ? (
               <>
                 <HeroStat
-                  label="Season"
+                  label={t("rankings.season")}
                   value={
-                    currentSeason ? `S${currentSeason.seasonNumber}` : "TBA"
+                    currentSeason
+                      ? `S${formatLocalizedNumber(
+                          currentSeason.seasonNumber,
+                          locale
+                        )}`
+                      : t("rankings.tba")
                   }
                 />
-                <HeroStat label="State" value={seasonState.shortLabel} />
+                <HeroStat label={t("rankings.state")} value={seasonState.shortLabel} />
               </>
             ) : (
               <>
-                <HeroStat label="Scope" value="Permanent" />
-                <HeroStat label="Reset" value="Never" />
+                <HeroStat label={t("rankings.scope")} value={t("rankings.permanent")} />
+                <HeroStat label={t("rankings.reset")} value={t("rankings.never")} />
               </>
             )}
           </div>
@@ -349,6 +390,7 @@ function HeroStat({
 }
 
 function CareerExplanation({ division }: { division: PublicRankingView }) {
+  const t = usePublicTranslations();
   const divisionLabel = division === "academy" ? "Academy" : "Challenge";
 
   return (
@@ -357,74 +399,74 @@ function CareerExplanation({ division }: { division: PublicRankingView }) {
       className="mt-6 border border-orange-300/20 bg-orange-500/[0.055] p-4 text-sm leading-6 text-zinc-300 sm:p-5"
     >
       <p className="font-black text-white">
-        {divisionLabel} is a permanent Career standing.
+        {t("rankings.careerTitle", { division: divisionLabel })}
       </p>
       <p className="mt-2">
-        Points do not reset when a Main / Pro season finishes. Academy history
-        remains Academy history, Challenge history remains Challenge history,
-        and neither Career standing carries into Main / Pro season standings.
+        {t("rankings.careerSeparation")}
       </p>
       <p className="mt-2 text-zinc-400">
-        New Career entrants may receive +5 points per prior eligible event,
-        awarded once per division, up to +25.
+        {t("rankings.entrantBonus")}
       </p>
     </div>
   );
 }
 
-function getRankingViewLabel(view: PublicRankingView) {
-  return (
-    rankingOptions.find((option) => option.value === view)?.label ??
-    "Main / Pro Season"
+function getRankingViewLabel(view: PublicRankingView, t: Translator) {
+  const key = rankingOptions.find((option) => option.value === view)?.labelKey;
+  return t(key ?? "rankings.mainSeason");
+}
+
+function getRankingViewDescription(view: PublicRankingView, t: Translator) {
+  if (view === "main") {
+    return t("rankings.mainDescription");
+  }
+
+  return t(
+    view === "academy"
+      ? "rankings.academyDescription"
+      : "rankings.challengeDescription"
   );
 }
 
-function getRankingViewDescription(view: PublicRankingView) {
-  if (view === "main") {
-    return "Official Main / Pro standings for the featured six-valid-event season.";
-  }
-
-  return `${view === "academy" ? "Academy" : "Challenge"} points and results remain in this permanent Career view.`;
-}
-
-function getMainSeasonState(season: PublicLeaderboardSeason | null) {
+function getMainSeasonState(
+  season: PublicLeaderboardSeason | null,
+  t: Translator
+) {
   if (!season) {
     return {
-      shortLabel: "Not started",
-      description: "Season not started.",
+      shortLabel: t("rankings.notStarted"),
+      description: t("rankings.notStartedDescription"),
       isFinal: false,
     };
   }
 
   if (season.isUnderReview) {
     return {
-      shortLabel: "Under review",
-      description:
-        "Frozen historical standings remain displayed while the finalized season is under review.",
+      shortLabel: t("rankings.underReview"),
+      description: t("rankings.underReviewDescription"),
       isFinal: true,
     };
   }
 
   if (season.isFinalized) {
     return {
-      shortLabel: "Finalized",
-      description: "Finalized. These Main / Pro standings are frozen.",
+      shortLabel: t("rankings.finalized"),
+      description: t("rankings.finalizedDescription"),
       isFinal: true,
     };
   }
 
   if (season.validMainEventCount >= 6) {
     return {
-      shortLabel: "Finalization pending",
-      description:
-        "Finalization pending. Automatic scoring and finalization should normally complete after the sixth valid event.",
+      shortLabel: t("rankings.finalizationPending"),
+      description: t("rankings.finalizationPendingDescription"),
       isFinal: false,
     };
   }
 
   return {
-    shortLabel: "In progress",
-    description: "Season in progress.",
+    shortLabel: t("rankings.inProgress"),
+    description: t("rankings.inProgressDescription"),
     isFinal: false,
   };
 }
@@ -436,38 +478,36 @@ function LeaderboardPodium({
   rows: PublicLeaderboardStanding[];
   season: PublicLeaderboardSeason | null;
 }) {
+  const t = usePublicTranslations();
   if (rows.length === 0) {
     return (
       <EmptyPanel
         icon={Crown}
-        title="Main / Pro top standings unavailable"
-        message="Official competitive ranks will appear after valid Main / Pro results are published."
+        title={t("rankings.topUnavailable")}
+        message={t("rankings.topUnavailableText")}
       />
     );
   }
 
-  const seasonState = getMainSeasonState(season);
+  const seasonState = getMainSeasonState(season, t);
 
   return (
-    <section aria-label="Main / Pro top standings">
+    <section aria-label={t("rankings.topAria")}>
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
             {seasonState.isFinal
-              ? "Final Main / Pro Standings"
-              : "Current Main / Pro Standings"}
+              ? t("rankings.finalStandings")
+              : t("rankings.currentStandings")}
           </p>
 
           <h2 className="mt-2 text-3xl font-black text-white">
-            Top Standings
+            {t("rankings.topStandings")}
           </h2>
         </div>
 
         <p className="max-w-2xl text-sm text-zinc-400">
-          Every competitor sharing official Main / Pro rank 1, 2 or 3 remains
-          represented. Display order does not change official rank. Any
-          prize-bearing Event is governed separately by its published Event
-          Prize Terms.
+          {t("rankings.tieNotice")}
         </p>
       </div>
 
@@ -491,6 +531,9 @@ function PodiumCard({
   row: PublicLeaderboardStanding;
   prominent: boolean;
 }) {
+  const t = usePublicTranslations();
+  const locale = useOptionalLocale();
+
   return (
     <PlayerProfileContainer
       playerId={row.playerId}
@@ -508,7 +551,12 @@ function PodiumCard({
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-orange-200">
             <Medal size={15} />
-            Rank #{row.rank ?? "-"}
+            {t("rankings.rankNumber", {
+              rank:
+                typeof row.rank === "number"
+                  ? formatLocalizedNumber(row.rank, locale)
+                  : "-",
+            })}
           </span>
 
           <RankMovement row={row} />
@@ -522,14 +570,29 @@ function PodiumCard({
           </h3>
 
           <p className="mt-1 text-sm font-semibold text-zinc-400">
-            {row.country || "Unknown"} - ELO {formatElo(row.currentElo)}
+            {row.country
+              ? getLocalizedCountryName(row.country, locale)
+              : t("rankings.unknown")}{" "}
+            · ELO {formatElo(row.currentElo, locale, t)}
           </p>
         </div>
 
         <div className="mt-7 grid grid-cols-3 gap-3">
-          <MiniStat label="Points" value={row.totalPoints} />
-          <MiniStat label="Wins" value={row.tournamentWins} />
-          <MiniStat label="Win Rate" value={`${formatNumber(row.winRate)}%`} />
+          <MiniStat
+            label={t("rankings.points")}
+            value={formatLocalizedNumber(row.totalPoints, locale)}
+          />
+          <MiniStat
+            label={t("rankings.wins")}
+            value={formatLocalizedNumber(row.tournamentWins, locale)}
+          />
+          <MiniStat
+            label={t("rankings.winRate")}
+            value={formatLocalizedNumber(row.winRate / 100, locale, {
+              style: "percent",
+              maximumFractionDigits: 2,
+            })}
+          />
         </div>
       </div>
     </PlayerProfileContainer>
@@ -543,12 +606,15 @@ function LeaderboardTable({
   rows: PublicLeaderboardStanding[];
   scope: LeaderboardScope;
 }) {
+  const t = usePublicTranslations();
+  const locale = useOptionalLocale();
+
   if (rows.length === 0) {
     return (
       <EmptyPanel
         icon={Target}
-        title="No standings published yet"
-        message="Leaderboard rows will appear after a valid tournament completion is automatically recalculated."
+        title={t("rankings.noStandings")}
+        message={t("rankings.noStandingsText")}
         className="mt-6"
       />
     );
@@ -560,17 +626,17 @@ function LeaderboardTable({
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead className="bg-black/72 text-xs uppercase tracking-wider text-orange-200/70">
             <tr>
-              <th className="px-4 py-4">Rank</th>
-              <th className="px-4 py-4">Player</th>
-              <th className="px-4 py-4">Country</th>
-              <th className="px-4 py-4">ELO</th>
-              <th className="px-4 py-4">Points</th>
-              <th className="px-4 py-4">Played</th>
-              <th className="px-4 py-4">Rounds</th>
-              <th className="px-4 py-4">Wins</th>
-              <th className="px-4 py-4">Win Rate</th>
-              <th className="px-4 py-4">Last Pts</th>
-              <th className="px-4 py-4">Movement</th>
+              <th className="px-4 py-4">{t("rankings.rank")}</th>
+              <th className="px-4 py-4">{t("rankings.player")}</th>
+              <th className="px-4 py-4">{t("rankings.country")}</th>
+              <th className="px-4 py-4">{t("rankings.elo")}</th>
+              <th className="px-4 py-4">{t("rankings.points")}</th>
+              <th className="px-4 py-4">{t("rankings.played")}</th>
+              <th className="px-4 py-4">{t("rankings.rounds")}</th>
+              <th className="px-4 py-4">{t("rankings.wins")}</th>
+              <th className="px-4 py-4">{t("rankings.winRate")}</th>
+              <th className="px-4 py-4">{t("rankings.lastPoints")}</th>
+              <th className="px-4 py-4">{t("rankings.movement")}</th>
             </tr>
           </thead>
 
@@ -581,7 +647,10 @@ function LeaderboardTable({
                 className="transition hover:bg-orange-500/12"
               >
                 <td className="px-4 py-4 text-lg font-black text-orange-300">
-                  #{row.rank ?? "-"}
+                  #
+                  {typeof row.rank === "number"
+                    ? formatLocalizedNumber(row.rank, locale)
+                    : "-"}
                 </td>
 
                 <td className="px-4 py-4">
@@ -598,7 +667,7 @@ function LeaderboardTable({
 
                       {row.region && (
                         <p className="truncate text-xs text-zinc-400">
-                          {row.region}
+                          {getLocalizedPlayerRegion(row.region, t)}
                         </p>
                       )}
                     </div>
@@ -606,35 +675,42 @@ function LeaderboardTable({
                 </td>
 
                 <td className="px-4 py-4 text-zinc-300">
-                  {row.country || "Unknown"}
+                  {row.country
+                    ? getLocalizedCountryName(row.country, locale)
+                    : t("rankings.unknown")}
                 </td>
 
                 <td className="px-4 py-4 font-bold text-zinc-200">
-                  {formatElo(row.currentElo)}
+                  {formatElo(row.currentElo, locale, t)}
                 </td>
 
                 <td className="px-4 py-4 text-lg font-black text-white">
-                  {row.totalPoints}
+                  {formatLocalizedNumber(row.totalPoints, locale)}
                 </td>
 
                 <td className="px-4 py-4 text-zinc-300">
-                  {row.tournamentsPlayed}
+                  {formatLocalizedNumber(row.tournamentsPlayed, locale)}
                 </td>
 
                 <td className="px-4 py-4 text-zinc-300">
-                  {row.roundsPassed}
+                  {formatLocalizedNumber(row.roundsPassed, locale)}
                 </td>
 
                 <td className="px-4 py-4 text-zinc-300">
-                  {row.tournamentWins}
+                  {formatLocalizedNumber(row.tournamentWins, locale)}
                 </td>
 
                 <td className="px-4 py-4 text-zinc-300">
-                  {formatNumber(row.winRate)}%
+                  {formatLocalizedNumber(row.winRate / 100, locale, {
+                    style: "percent",
+                    maximumFractionDigits: 2,
+                  })}
                 </td>
 
                 <td className="px-4 py-4 text-zinc-300">
-                  {scope === "season" ? row.lastTournamentPoints : "-"}
+                  {scope === "season"
+                    ? formatLocalizedNumber(row.lastTournamentPoints, locale)
+                    : "-"}
                 </td>
 
                 <td className="px-4 py-4">
@@ -706,6 +782,9 @@ function TournamentHistoryLeaderboard({
 }: {
   items: TournamentHistoryItem[];
 }) {
+  const t = usePublicTranslations();
+  const locale = useOptionalLocale();
+
   return (
     <section
       className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-6 shadow-2xl shadow-black/25 backdrop-blur"
@@ -716,17 +795,16 @@ function TournamentHistoryLeaderboard({
     >
       <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
         <CalendarDays size={16} />
-        Tournament History
+        {t("rankings.history")}
       </p>
 
       <h2 className="mt-3 text-2xl font-black text-white">
-        Published Tournament Impact
+        {t("rankings.historyTitle")}
       </h2>
 
       {items.length === 0 ? (
         <p className="mt-5 border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-5 text-sm leading-6 text-zinc-400">
-          Tournament history will appear here after leaderboard recalculations
-          are published.
+          {t("rankings.historyEmpty")}
         </p>
       ) : (
         <div className="mt-5 space-y-3">
@@ -740,20 +818,20 @@ function TournamentHistoryLeaderboard({
                   <p className="font-black text-white">{item.title}</p>
 
                   <p className="mt-1 text-xs uppercase tracking-wider text-zinc-500">
-                    {formatBracketLabel(item.bracketType)} - Date TBA
+                    {formatBracketLabel(item.bracketType, t)} ·{" "}
+                    {t("rankings.dateTba")}
                   </p>
                 </div>
 
                 <span className="rounded-full border border-orange-400/25 bg-orange-500/10 px-3 py-1 text-xs font-black text-orange-200">
-                  {item.points} pts
+                  {t("rankings.pointsShort", {
+                    points: formatLocalizedNumber(item.points, locale),
+                  })}
                 </span>
               </div>
 
               <p className="mt-3 text-sm text-zinc-300">
-                Top published scorer:{" "}
-                <span className="font-bold text-zinc-200">
-                  {item.playerName}
-                </span>
+                {t("rankings.topScorer", { name: item.playerName })}
               </p>
             </div>
           ))}
@@ -768,6 +846,9 @@ function SeasonChampionsArchive({
 }: {
   champions: PublicSeasonChampion[];
 }) {
+  const t = usePublicTranslations();
+  const locale = useOptionalLocale();
+
   return (
     <section
       className="border border-orange-500/20 bg-black/70 bg-cover bg-center p-6 shadow-2xl shadow-black/25 backdrop-blur"
@@ -778,16 +859,16 @@ function SeasonChampionsArchive({
     >
       <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-300">
         <Award size={16} />
-        Main / Pro Champion Archive
+        {t("rankings.championArchive")}
       </p>
 
       <h2 className="mt-3 text-2xl font-black text-white">
-        Latest Finalized Results
+        {t("rankings.latestFinalized")}
       </h2>
 
       {champions.length === 0 ? (
         <p className="mt-5 border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-5 text-sm leading-6 text-zinc-400">
-          Season champions will appear here when a season closes.
+          {t("rankings.championsEmpty")}
         </p>
       ) : (
         <div className="mt-5 space-y-3">
@@ -819,17 +900,21 @@ function SeasonChampionsArchive({
 
                 <p className="mt-1 text-xs text-zinc-500">
                   {champion.seasonName} -{" "}
-                  {formatBracketLabel(champion.bracketType)}
+                  {formatBracketLabel(champion.bracketType, t)}
                 </p>
               </div>
 
               <div className="text-right">
                 <p className="text-xs font-black uppercase tracking-wider text-orange-300">
-                  Rank #{champion.finalRank}
+                  {t("rankings.rankNumber", {
+                    rank: formatLocalizedNumber(champion.finalRank, locale),
+                  })}
                 </p>
 
                 <p className="mt-1 text-sm font-black text-white">
-                  {champion.finalPoints} pts
+                  {t("rankings.pointsShort", {
+                    points: formatLocalizedNumber(champion.finalPoints, locale),
+                  })}
                 </p>
               </div>
             </PlayerProfileContainer>
@@ -880,10 +965,13 @@ function RankMovement({
 }: {
   row: PublicLeaderboardStanding;
 }) {
+  const t = usePublicTranslations();
+  const locale = useOptionalLocale();
+
   if (row.previousRank === null) {
     return (
       <span className="rounded-full border border-sky-400/25 bg-sky-500/10 px-2.5 py-1 text-xs font-black text-sky-200">
-        NEW
+        {t("rankings.new")}
       </span>
     );
   }
@@ -904,11 +992,11 @@ function RankMovement({
     >
       {movedUp ? (
         <>
-          &uarr; +{Math.abs(row.rankMovement)}
+          &uarr; +{formatLocalizedNumber(Math.abs(row.rankMovement), locale)}
         </>
       ) : (
         <>
-          &darr; {Math.abs(row.rankMovement)}
+          &darr; {formatLocalizedNumber(Math.abs(row.rankMovement), locale)}
         </>
       )}
     </span>
@@ -1034,35 +1122,40 @@ function compareRows(
   );
 }
 
-function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
+function formatDate(
+  value: string,
+  locale: ReturnType<typeof useOptionalLocale>,
+  t: Translator
+) {
+  const date = new Date(`${value}T00:00:00Z`);
 
   if (!Number.isFinite(date.getTime())) {
-    return "Date TBA";
+    return t("rankings.dateTba");
   }
 
-  return new Intl.DateTimeFormat("en-AU", {
+  return formatDateTime(date, locale, { kind: "utc" }, {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(date);
+  });
 }
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-AU", {
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatElo(value: number | null) {
-  return typeof value === "number" ? String(value) : "Unrated";
+function formatElo(
+  value: number | null,
+  locale: ReturnType<typeof useOptionalLocale>,
+  t: Translator
+) {
+  return typeof value === "number"
+    ? formatLocalizedNumber(value, locale)
+    : t("rankings.unrated");
 }
 
 function formatBracketLabel(
-  bracketType: LeaderboardBracketType
+  bracketType: LeaderboardBracketType,
+  t: Translator
 ) {
   if (bracketType === "academy") {
-    return "Academy Bracket";
+    return t("rankings.academyBracket");
   }
 
   if (bracketType === "main") {
@@ -1070,10 +1163,10 @@ function formatBracketLabel(
   }
 
   if (bracketType === "challenge") {
-    return "Challenge Bracket";
+    return t("rankings.challengeBracket");
   }
 
-  return "Aggregate";
+  return t("rankings.aggregate");
 }
 
 function PlayerProfileContainer({

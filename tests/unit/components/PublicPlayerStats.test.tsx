@@ -38,7 +38,7 @@ describe("PublicPlayerStats active tournament ELO snapshot", () => {
       />
     );
 
-    expect(screen.getByText("1550")).toBeInTheDocument();
+    expect(screen.getByText("1,550")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
         name: "View active tournament ELO snapshots",
@@ -63,7 +63,7 @@ describe("PublicPlayerStats active tournament ELO snapshot", () => {
       name: "View active tournament ELO snapshots",
     });
 
-    expect(screen.getByText("1550")).toBeInTheDocument();
+    expect(screen.getByText("1,550")).toBeInTheDocument();
     fireEvent.mouseEnter(button);
     expect(screen.getByRole("tooltip")).toHaveTextContent(
       "Snapshot ELO: 1325"

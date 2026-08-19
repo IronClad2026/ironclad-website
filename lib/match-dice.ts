@@ -86,7 +86,11 @@ export type MatchDiceRollActionResult =
         roll: AuthoritativeMatchDiceRoll;
       };
     }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      code: "auth_required" | "invalid_request" | "roll_failed";
+    };
 
 const SNAPSHOT_KEYS = [
   "matchId",

@@ -7,14 +7,20 @@ import ScrollReveal from "@/components/ScrollReveal";
 import SearchableProfileSelect from "@/components/SearchableProfileSelect";
 import {
   allCountriesFilterOption,
-  countryFilterOptions,
+  getLocalizedCountryFilterOptions,
 } from "@/lib/countries";
 import {
   allEloFilterOption,
-  eloFilterOptions,
+  eloRanges,
   isEloInRange,
 } from "@/lib/elo-options";
 import type { PublicPlayerProfile } from "@/lib/public-players";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
+import { formatNumber, selectPlural } from "@/lib/i18n/format";
 
 type PublicPlayersDirectoryProps = {
   players: PublicPlayerProfile[];
@@ -23,23 +29,31 @@ type PublicPlayersDirectoryProps = {
 export default function PublicPlayersDirectory({
   players,
 }: PublicPlayersDirectoryProps) {
+  const t = useOptionalTranslations("public", englishPublicDictionary);
+  const locale = useOptionalLocale();
+  const countryOptions = getLocalizedCountryFilterOptions(
+    locale,
+    t("players.allCountries")
+  );
+  const eloOptions = [
+    { ...allEloFilterOption, label: t("players.allElo") },
+    ...eloRanges,
+  ];
   const [searchTerm, setSearchTerm] = useState("");
 
   const [countryFilter, setCountryFilter] = useState(
     allCountriesFilterOption.value
   );
 
-  const [countryFilterLabel, setCountryFilterLabel] = useState(
-    allCountriesFilterOption.label
-  );
-
   const [eloFilter, setEloFilter] = useState(
     allEloFilterOption.value
   );
-
-  const [eloFilterLabel, setEloFilterLabel] = useState(
-    allEloFilterOption.label
-  );
+  const countryFilterLabel =
+    countryOptions.find((option) => option.value === countryFilter)?.label ??
+    t("players.allCountries");
+  const eloFilterLabel =
+    eloOptions.find((option) => option.value === eloFilter)?.label ??
+    t("players.allElo");
 
   const filteredPlayers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -62,6 +76,13 @@ export default function PublicPlayersDirectory({
       return matchesSearch && matchesCountry && matchesElo;
     });
   }, [countryFilter, eloFilter, players, searchTerm]);
+  const playerPluralCategory = selectPlural(players.length, locale);
+  const playerCountLabel =
+    playerPluralCategory === "one"
+      ? t("playerCount.one")
+      : playerPluralCategory === "few"
+        ? t("playerCount.few")
+        : t("playerCount.many");
 
   return (
     <section className="relative isolate py-12 sm:py-16">
@@ -89,23 +110,22 @@ export default function PublicPlayersDirectory({
             <div>
               <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.28em] text-orange-400">
                 <UsersRound size={16} />
-                Public Commanders
+                {t("players.commanders")}
               </p>
 
               <h2 className="mt-3 text-3xl font-black text-white">
-                {players.length}{" "}
-                {players.length === 1 ? "Player" : "Players"}
+                {formatNumber(players.length, locale)} {playerCountLabel}
               </h2>
 
               <p className="mt-2 text-sm text-zinc-400">
-                Directory data is limited to public-safe player profile fields.
+                {t("players.directorySafe")}
               </p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-3 xl:min-w-[780px]">
               <label className="relative block min-w-0">
                 <span className="text-sm font-bold text-white">
-                  Search Player
+                  {t("players.search")}
                 </span>
 
                 <Search
@@ -119,34 +139,34 @@ export default function PublicPlayersDirectory({
                   onChange={(event) =>
                     setSearchTerm(event.target.value)
                   }
-                  placeholder="Search by player name"
+                  placeholder={t("players.searchPlaceholder")}
                   className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-black/40 pr-4 pl-11 text-sm font-bold text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400"
                 />
               </label>
 
               <SearchableProfileSelect
-                label="ELO"
+                label={t("players.eloFilter")}
                 value={eloFilterLabel}
                 submittedValue={eloFilter}
-                options={eloFilterOptions}
+                options={eloOptions}
                 onSelect={(option) => {
                   setEloFilter(option.value);
-                  setEloFilterLabel(option.label);
                 }}
-                placeholder="Filter by ELO"
+                placeholder={t("players.eloPlaceholder")}
+                noResultsLabel={t("select.noOptions")}
                 showSavedValueHint={false}
               />
 
               <SearchableProfileSelect
-                label="Country"
+                label={t("players.countryFilter")}
                 value={countryFilterLabel}
                 submittedValue={countryFilter}
-                options={countryFilterOptions}
+                options={countryOptions}
                 onSelect={(option) => {
                   setCountryFilter(option.value);
-                  setCountryFilterLabel(option.label);
                 }}
-                placeholder="Search countries"
+                placeholder={t("players.countryPlaceholder")}
+                noResultsLabel={t("select.noOptions")}
                 showSavedValueHint={false}
               />
             </div>
@@ -155,9 +175,9 @@ export default function PublicPlayersDirectory({
 
         <ScrollReveal>
           {players.length === 0 ? (
-            <EmptyState message="No public players available yet." />
+            <EmptyState message={t("players.noPlayers")} />
           ) : filteredPlayers.length === 0 ? (
-            <EmptyState message="No public players match those filters." />
+            <EmptyState message={t("players.noMatches")} />
           ) : (
             <div className="relative z-0 mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {filteredPlayers.map((player) => (
@@ -179,6 +199,8 @@ function EmptyState({
 }: {
   message: string;
 }) {
+  const t = useOptionalTranslations("public", englishPublicDictionary);
+
   return (
     <div className="mt-8 rounded-3xl border border-dashed border-orange-400/25 bg-orange-500/[0.04] p-10 text-center">
       <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-orange-400/25 bg-orange-500/10 text-orange-300">
@@ -190,8 +212,7 @@ function EmptyState({
       </h2>
 
       <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-zinc-500">
-        Public player cards will appear here once eligible IronClad profiles are
-        available through the public profile boundary.
+        {t("players.emptyHelp")}
       </p>
     </div>
   );

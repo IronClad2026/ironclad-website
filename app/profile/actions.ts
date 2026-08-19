@@ -36,6 +36,7 @@ export async function savePlayerProfile(
   if (!userId) {
     return {
       status: "error",
+      code: "session-expired",
       message: "Your session has expired. Sign in again before saving.",
       errors: {},
     };
@@ -46,8 +47,10 @@ export async function savePlayerProfile(
   if (!validation.data) {
     return {
       status: "error",
+      code: "review-fields",
       message: "Review the highlighted profile fields.",
       errors: validation.errors,
+      errorCodes: validation.errorCodes,
     };
   }
 
@@ -63,6 +66,7 @@ export async function savePlayerProfile(
 
     return {
       status: "error",
+      code: "save-failed",
       message: "Your profile could not be saved. Please try again.",
       errors: {},
     };
@@ -81,8 +85,10 @@ export async function savePlayerProfile(
     if (avatarError) {
       return {
         status: "error",
+        code: "review-fields",
         message: "Review the highlighted profile fields.",
-        errors: { avatar: avatarError },
+        errors: { avatar: avatarError.message },
+        errorCodes: { avatar: avatarError.errorCode },
       };
     }
 
@@ -124,9 +130,13 @@ export async function savePlayerProfile(
 
       return {
         status: "error",
+        code: "avatar-upload-failed",
         message:
           "Your avatar could not be uploaded. Check the image and try again.",
-        errors: { avatar: getAvatarUploadErrorMessage(storageError) },
+        errors: { avatar: "Avatar upload failed. Please try again." },
+        errorCodes: {
+          avatar: { code: "avatar-upload-failed" },
+        },
       };
     }
 
@@ -155,6 +165,7 @@ export async function savePlayerProfile(
 
     return {
       status: "error",
+      code: "save-failed",
       message: "Your profile could not be saved. Please try again.",
       errors: {},
     };
@@ -168,6 +179,7 @@ export async function savePlayerProfile(
 
   return {
     status: "success",
+    code: "saved",
     message: "Player profile saved successfully.",
     errors: {},
   };
@@ -234,22 +246,6 @@ function summarizeStorageError(error: unknown): StorageErrorSummary {
   };
 }
 
-function getAvatarUploadErrorMessage(error: StorageErrorSummary) {
-  if (error.errorCode === "STORAGE_BUCKET_NOT_FOUND") {
-    return 'Storage bucket "player-avatars" was not found.';
-  }
-
-  if (error.errorCode === "STORAGE_PERMISSION_DENIED") {
-    return "Storage permission denied. Check the player-avatars RLS policies.";
-  }
-
-  if (error.errorCode === "STORAGE_UNAUTHORIZED") {
-    return "Supabase did not accept the authenticated Clerk session.";
-  }
-
-  return "Avatar upload failed. Please try again.";
-}
-
 function normalizeProviderStatus(value: unknown) {
   const parsed =
     typeof value === "number"
@@ -267,17 +263,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function validateAvatar(file: File, bytes: Uint8Array) {
+function validateAvatar(
+  file: File,
+  bytes: Uint8Array
+): {
+  message: string;
+  errorCode: NonNullable<
+    ProfileActionState["errorCodes"]
+  >[ProfileField];
+} | null {
   if (!ALLOWED_AVATAR_TYPES.has(file.type)) {
-    return "Use a PNG, JPG, JPEG, or WEBP image.";
+    return {
+      message: "Use a PNG, JPG, JPEG, or WEBP image.",
+      errorCode: { code: "avatar-type" },
+    };
   }
 
   if (file.size > MAX_AVATAR_UPLOAD_SIZE_BYTES) {
-    return `Avatar image must be ${MAX_AVATAR_UPLOAD_SIZE_LABEL} or smaller.`;
+    return {
+      message: `Avatar image must be ${MAX_AVATAR_UPLOAD_SIZE_LABEL} or smaller.`,
+      errorCode: {
+        code: "avatar-too-large",
+        size: MAX_AVATAR_UPLOAD_SIZE_LABEL,
+      },
+    };
   }
 
   if (!hasValidImageSignature(file.type, bytes)) {
-    return "The selected file does not contain a valid supported image.";
+    return {
+      message: "The selected file does not contain a valid supported image.",
+      errorCode: { code: "avatar-invalid" },
+    };
   }
 
   return null;
@@ -306,6 +322,7 @@ function hasValidImageSignature(contentType: string, bytes: Uint8Array) {
 function validateProfile(formData: FormData): {
   data?: ValidatedProfile;
   errors: Partial<Record<ProfileField, string>>;
+  errorCodes: NonNullable<ProfileActionState["errorCodes"]>;
 } {
   const values = {
     displayName: getValue(formData, "displayName"),
@@ -317,29 +334,54 @@ function validateProfile(formData: FormData): {
     bio: getValue(formData, "bio"),
   };
   const errors: Partial<Record<ProfileField, string>> = {};
+  const errorCodes: NonNullable<ProfileActionState["errorCodes"]> = {};
 
-  requireText(errors, "displayName", values.displayName, "Display name", 80);
-  requireText(errors, "inGameName", values.inGameName, "In-game name", 80);
+  requireText(
+    errors,
+    errorCodes,
+    "displayName",
+    values.displayName,
+    "Display name",
+    80
+  );
+  requireText(
+    errors,
+    errorCodes,
+    "inGameName",
+    values.inGameName,
+    "In-game name",
+    80
+  );
   validateOptionalText(
     errors,
+    errorCodes,
     "discordUsername",
     values.discordUsername,
     "Discord username",
     100
   );
-  requireText(errors, "country", values.country, "Country", 100);
-  requireText(errors, "region", values.region, "Region", 100);
-  requireText(errors, "timezone", values.timezone, "Timezone", 100);
+  requireText(errors, errorCodes, "country", values.country, "Country", 100);
+  requireText(errors, errorCodes, "region", values.region, "Region", 100);
+  requireText(
+    errors,
+    errorCodes,
+    "timezone",
+    values.timezone,
+    "Timezone",
+    100
+  );
 
   if (values.bio.length > 500) {
     errors.bio = "Bio must be 500 characters or fewer.";
+    errorCodes.bio = { code: "too-long", field: "Bio", count: 500 };
   }
 
   if (Object.keys(errors).length > 0) {
-    return { errors };
+    return { errors, errorCodes };
   }
 
   return {
+    errorCodes,
     data: {
       display_name: values.displayName,
       in_game_name: values.inGameName,
@@ -359,6 +401,7 @@ function getValue(formData: FormData, field: ProfileField) {
 
 function requireText(
   errors: Partial<Record<ProfileField, string>>,
+  errorCodes: NonNullable<ProfileActionState["errorCodes"]>,
   field: ProfileField,
   value: string,
   label: string,
@@ -366,13 +409,20 @@ function requireText(
 ) {
   if (!value) {
     errors[field] = `${label} is required.`;
+    errorCodes[field] = { code: "required", field: label };
   } else if (value.length > maxLength) {
     errors[field] = `${label} must be ${maxLength} characters or fewer.`;
+    errorCodes[field] = {
+      code: "too-long",
+      field: label,
+      count: maxLength,
+    };
   }
 }
 
 function validateOptionalText(
   errors: Partial<Record<ProfileField, string>>,
+  errorCodes: NonNullable<ProfileActionState["errorCodes"]>,
   field: ProfileField,
   value: string,
   label: string,
@@ -380,5 +430,10 @@ function validateOptionalText(
 ) {
   if (value.length > maxLength) {
     errors[field] = `${label} must be ${maxLength} characters or fewer.`;
+    errorCodes[field] = {
+      code: "too-long",
+      field: label,
+      count: maxLength,
+    };
   }
 }

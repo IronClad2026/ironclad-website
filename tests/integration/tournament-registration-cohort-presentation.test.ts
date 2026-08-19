@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import {
   isTournamentBracketPublic,
   mapTournamentRow,
@@ -176,9 +177,14 @@ describe("registration cohort presentation", () => {
       "p_registration_close_at: toIsoDateTime(registrationCloseAt)"
     );
     expect(tournamentExperienceSource).toContain(
-      "Active review cohort full - waitlist only"
+      't("registrationModal.activeCohortFull")'
     );
-    expect(tournamentExperienceSource).not.toContain(
+    expect(competitionEnglish.registrationModal.activeCohortFull).toBe(
+      "Active review cohort full — waitlist only"
+    );
+    expect(
+      `${tournamentExperienceSource} ${competitionEnglish.registrationModal.activeCohortFull}`
+    ).not.toContain(
       "Approved roster full - waitlist only"
     );
   });

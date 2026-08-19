@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
 
 import LegalDocumentPage from "@/components/legal/LegalDocumentPage";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy | IronClad Tournaments",
-  description:
-    "Read the effective IronClad Tournaments Privacy Policy and download the versioned PDF.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "help-legal-ui");
 
-export default function PrivacyPage() {
-  return <LegalDocumentPage kind="privacy" />;
+  return {
+    title: copy.metadata.privacyTitle,
+    description: copy.metadata.privacyDescription,
+  };
+}
+
+export default async function PrivacyPage() {
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "help-legal-ui");
+
+  return <LegalDocumentPage copy={copy} kind="privacy" locale={locale} />;
 }

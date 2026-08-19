@@ -4,11 +4,16 @@ import Link from "next/link";
 import IronCladUserButton from "@/components/IronCladUserButton";
 import ScrollReveal from "@/components/ScrollReveal";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
+import { getLocalizedCountryName } from "@/lib/countries";
 import {
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-errors";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { formatNumber } from "@/lib/i18n/format";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
 
 const primaryActionClass =
   "inline-flex min-h-12 items-center justify-center border border-orange-400 bg-orange-500 px-5 py-3 text-center text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300";
@@ -21,20 +26,24 @@ const orangeGhostActionClass =
 
 export default async function HomeAccountSection() {
   const { userId } = await auth();
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "account-dashboard");
+  const t = (path: string, values?: Record<string, string | number>) =>
+    translate(copy, path, values);
 
   if (!userId) {
     return (
       <AccountShell
-        eyebrow="IronClad Account"
-        title="Create your competitive identity"
-        description="Sign in or create an account, complete your player profile once, and use it for faster tournament registration."
+        eyebrow={t("homeAccount.accountEyebrow")}
+        title={t("homeAccount.createTitle")}
+        description={t("homeAccount.createText")}
       >
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link href="/sign-in" className={primaryActionClass}>
-            Sign In
+            {t("homeAccount.signIn")}
           </Link>
           <Link href="/sign-up" className={secondaryActionClass}>
-            Create Account
+            {t("homeAccount.createAccount")}
           </Link>
         </div>
       </AccountShell>
@@ -55,12 +64,12 @@ export default async function HomeAccountSection() {
 
     return (
       <AccountShell
-        eyebrow="IronClad Account"
-        title="Profile status unavailable"
-        description="Your account is signed in, but IronClad could not load your player profile. Refresh the page or open your profile to try again."
+        eyebrow={t("homeAccount.accountEyebrow")}
+        title={t("homeAccount.unavailableTitle")}
+        description={t("homeAccount.unavailableText")}
       >
         <Link href="/profile" className={orangeGhostActionClass}>
-          Open Player Profile
+          {t("homeAccount.openProfile")}
         </Link>
       </AccountShell>
     );
@@ -72,14 +81,15 @@ export default async function HomeAccountSection() {
   if (!profile || !profileComplete) {
     return (
       <AccountShell
-        eyebrow="Player Profile"
-        title="Complete your player profile"
-        description="Tournament registration requires a completed IronClad player profile so your IGN, region, ELO, and verification details can be reused."
+        eyebrow={t("homeAccount.profileEyebrow")}
+        title={t("homeAccount.completeTitle")}
+        description={t("homeAccount.completeText")}
         profileComplete={false}
+        statusLabel={t("homeAccount.incomplete")}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <Link href="/profile" className={primaryActionClass}>
-            Complete Player Profile
+            {t("homeAccount.completeAction")}
           </Link>
           <IronCladUserButton />
         </div>
@@ -89,35 +99,52 @@ export default async function HomeAccountSection() {
 
   return (
     <AccountShell
-      eyebrow="Player Profile"
+      eyebrow={t("homeAccount.profileEyebrow")}
       title={profile.display_name}
-      description="Your IronClad competitive identity is ready for tournament participation."
+      description={t("homeAccount.readyText")}
       profileComplete
+      statusLabel={t("homeAccount.complete")}
     >
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
         <PlayerAvatar
           avatarUrl={getPlayerAvatarDisplayUrl(profile)}
-          displayName={profile.display_name}
+          avatarLabel={t("homeAccount.avatarLabel", {
+            name: profile.display_name,
+          })}
         />
         <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-3">
-          <ProfileValue label="IGN" value={profile.in_game_name} />
           <ProfileValue
-            label="Current ELO"
-            value={String(profile.current_elo ?? "N/A")}
+            label={t("homeAccount.inGameName")}
+            value={profile.in_game_name}
           />
-          <ProfileValue label="Country" value={profile.country ?? "N/A"} />
+          <ProfileValue
+            label={t("homeAccount.currentElo")}
+            value={
+              typeof profile.current_elo === "number"
+                ? formatNumber(profile.current_elo, locale)
+                : t("homeAccount.notAvailable")
+            }
+          />
+          <ProfileValue
+            label={t("homeAccount.country")}
+            value={
+              profile.country
+                ? getLocalizedCountryName(profile.country, locale)
+                : t("homeAccount.notAvailable")
+            }
+          />
         </div>
       </div>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link href="/dashboard" className={orangeGhostActionClass}>
-          Player Dashboard
+          {t("homeAccount.viewDashboard")}
         </Link>
         <Link href="/profile" className={secondaryActionClass}>
-          View/Edit Profile
+          {t("homeAccount.manageProfile")}
         </Link>
         <Link href="/tournaments" className={primaryActionClass}>
-          Go to Tournaments
+          {t("homeAccount.goTournaments")}
         </Link>
         <IronCladUserButton />
       </div>
@@ -127,15 +154,15 @@ export default async function HomeAccountSection() {
 
 function PlayerAvatar({
   avatarUrl,
-  displayName,
+  avatarLabel,
 }: {
   avatarUrl: string | null;
-  displayName: string;
+  avatarLabel: string;
 }) {
   return (
     <div
       role="img"
-      aria-label={`${displayName} avatar`}
+      aria-label={avatarLabel}
       className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-orange-500/50 bg-black/60 bg-cover bg-center shadow-[0_0_30px_rgba(249,115,22,0.18)]"
       style={
         avatarUrl ? { backgroundImage: `url("${avatarUrl}")` } : undefined
@@ -151,21 +178,16 @@ function AccountShell({
   title,
   description,
   profileComplete,
+  statusLabel = null,
   children,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   profileComplete?: boolean;
+  statusLabel?: string | null;
   children: React.ReactNode;
 }) {
-  const statusLabel =
-    profileComplete === undefined
-      ? null
-      : profileComplete
-        ? "Profile Completed"
-        : "Profile Incomplete";
-
   return (
     <section
       className="relative isolate overflow-hidden border-b border-white/10 bg-cover bg-center px-5 py-24 sm:px-8 lg:px-12"

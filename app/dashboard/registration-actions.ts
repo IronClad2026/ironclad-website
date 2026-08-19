@@ -7,7 +7,22 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 export type PlayerRegistrationActionState = {
   status: "idle" | "success" | "error";
   message: string;
+  code?: PlayerRegistrationActionCode;
 };
+
+export type PlayerRegistrationActionCode =
+  | "auth_required"
+  | "invalid_registration"
+  | "verification_failed"
+  | "registration_unavailable"
+  | "division_started"
+  | "offer_expired"
+  | "offer_unavailable"
+  | "withdrawal_unavailable"
+  | "mutation_failed"
+  | "withdrawn"
+  | "offer_accepted"
+  | "offer_declined";
 
 export async function withdrawTournamentRegistrationAction(
   _previousState: PlayerRegistrationActionState,
@@ -16,23 +31,23 @@ export async function withdrawTournamentRegistrationAction(
   const { userId } = await auth();
 
   if (!userId) {
-    return errorState("Sign in before withdrawing from a tournament.");
+    return errorState("Sign in before withdrawing from a tournament.", "auth_required");
   }
 
   const registrationId = getUuid(formData, "registrationId");
   if (!registrationId) {
-    return errorState("The tournament registration could not be found.");
+    return errorState("The tournament registration could not be found.", "invalid_registration");
   }
 
   const supabase = await createAuthenticatedSupabaseClient();
   const owned = await loadOwnedRegistration(supabase, registrationId, userId);
 
   if (owned === "error") {
-    return errorState("The tournament registration could not be verified.");
+    return errorState("The tournament registration could not be verified.", "verification_failed");
   }
 
   if (!owned) {
-    return errorState("The tournament registration is not available.");
+    return errorState("The tournament registration is not available.", "registration_unavailable");
   }
 
   const { data, error } = await supabase.rpc(
@@ -43,10 +58,8 @@ export async function withdrawTournamentRegistrationAction(
   if (error) {
     logPlayerRegistrationFailure("withdraw", error);
     return errorState(
-      getMutationErrorMessage(
-        error,
-        "Your tournament registration could not be withdrawn."
-      )
+      "Your tournament registration could not be withdrawn.",
+      "mutation_failed"
     );
   }
 
@@ -58,12 +71,13 @@ export async function withdrawTournamentRegistrationAction(
     typeof result.withdrawn_at !== "string"
   ) {
     logPlayerRegistrationFailure("withdraw-invalid-result");
-    return errorState("Your tournament registration could not be withdrawn.");
+    return errorState("Your tournament registration could not be withdrawn.", "mutation_failed");
   }
 
   revalidatePlayerRegistrationPaths();
   return {
     status: "success",
+    code: "withdrawn",
     message:
       "Registration withdrawn. This decision is final for this tournament.",
   };
@@ -76,29 +90,29 @@ export async function respondToWaitlistOfferAction(
   const { userId } = await auth();
 
   if (!userId) {
-    return errorState("Sign in before responding to a waitlist offer.");
+    return errorState("Sign in before responding to a waitlist offer.", "auth_required");
   }
 
   const registrationId = getUuid(formData, "registrationId");
   const response = formData.get("response");
 
   if (!registrationId) {
-    return errorState("The waitlist offer could not be found.");
+    return errorState("The waitlist offer could not be found.", "invalid_registration");
   }
 
   if (response !== "accept" && response !== "decline") {
-    return errorState("Choose Accept or Decline for this waitlist offer.");
+    return errorState("Choose Accept or Decline for this waitlist offer.", "invalid_registration");
   }
 
   const supabase = await createAuthenticatedSupabaseClient();
   const owned = await loadOwnedRegistration(supabase, registrationId, userId);
 
   if (owned === "error") {
-    return errorState("The waitlist offer could not be verified.");
+    return errorState("The waitlist offer could not be verified.", "verification_failed");
   }
 
   if (!owned) {
-    return errorState("The waitlist offer is not available.");
+    return errorState("The waitlist offer is not available.", "offer_unavailable");
   }
 
   const { data, error } = await supabase.rpc("respond_to_waitlist_offer", {
@@ -109,7 +123,8 @@ export async function respondToWaitlistOfferAction(
   if (error) {
     logPlayerRegistrationFailure(`offer-${response}`, error);
     return errorState(
-      getMutationErrorMessage(error, "The waitlist offer could not be updated.")
+      "The waitlist offer could not be updated.",
+      "mutation_failed"
     );
   }
 
@@ -126,12 +141,13 @@ export async function respondToWaitlistOfferAction(
     typeof result.waitlist_offer_resolved_at !== "string"
   ) {
     logPlayerRegistrationFailure(`offer-${response}-invalid-result`);
-    return errorState("The waitlist offer could not be updated.");
+    return errorState("The waitlist offer could not be updated.", "mutation_failed");
   }
 
   revalidatePlayerRegistrationPaths();
   return {
     status: "success",
+    code: response === "accept" ? "offer_accepted" : "offer_declined",
     message:
       response === "accept"
         ? "Spot accepted. Your registration is now awaiting administrator review."
@@ -163,40 +179,17 @@ async function loadOwnedRegistration(
   return isRecord(data) && data.id === registrationId;
 }
 
-function getMutationErrorMessage(error: unknown, fallback: string) {
-  const message = getErrorField(error, "message").toLowerCase();
-
-  if (message.includes("launched") || message.includes("already started")) {
-    return "This division has already started, so its roster is locked.";
-  }
-
-  if (message.includes("expired") || message.includes("deadline")) {
-    return "This waitlist offer has expired and can no longer be accepted.";
-  }
-
-  if (
-    message.includes("not offered") ||
-    message.includes("already resolved") ||
-    message.includes("cannot respond")
-  ) {
-    return "This waitlist offer is no longer available.";
-  }
-
-  if (message.includes("cannot withdraw") || message.includes("withdrawn")) {
-    return "This registration can no longer be withdrawn.";
-  }
-
-  return fallback;
-}
-
 function revalidatePlayerRegistrationPaths() {
   for (const path of ["/admin", "/admin/tournaments", "/dashboard", "/tournaments"]) {
     revalidatePath(path);
   }
 }
 
-function errorState(message: string): PlayerRegistrationActionState {
-  return { status: "error", message };
+function errorState(
+  message: string,
+  code: PlayerRegistrationActionCode
+): PlayerRegistrationActionState {
+  return { status: "error", message, code };
 }
 
 function getUuid(formData: FormData, field: string) {

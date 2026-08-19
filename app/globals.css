@@ -31,6 +31,18 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* CJK has no case and becomes difficult to scan with Latin display tracking. */
+.uppercase:lang(zh-CN),
+.uppercase:lang(ko) {
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+:lang(ko) {
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
 html.lenis,
 html.lenis body {
   height: auto;

@@ -20,6 +20,7 @@ const loadMatchResultDataMock = vi.hoisted(() => vi.fn());
 const mapGeneratedBracketsMock = vi.hoisted(() => vi.fn());
 const mapTournamentRowMock = vi.hoisted(() => vi.fn());
 const loadTournamentPollsForRequestMock = vi.hoisted(() => vi.fn());
+const getRequestLocaleMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -35,6 +36,10 @@ vi.mock("@/lib/match-result-data", () => ({
 
 vi.mock("@/lib/player-polls", () => ({
   loadTournamentPollsForRequest: loadTournamentPollsForRequestMock,
+}));
+
+vi.mock("@/lib/i18n/request", () => ({
+  getRequestLocale: getRequestLocaleMock,
 }));
 
 vi.mock("@/lib/platform-settings", () => ({
@@ -635,7 +640,9 @@ describe("tournament Client Component result payload", () => {
     mapGeneratedBracketsMock.mockReset();
     mapTournamentRowMock.mockReset();
     loadTournamentPollsForRequestMock.mockReset();
+    getRequestLocaleMock.mockReset();
 
+    getRequestLocaleMock.mockResolvedValue("en");
     getEloVerificationSettingMock.mockResolvedValue({
       enabled: true,
       error: null,
@@ -950,6 +957,10 @@ describe("tournament Client Component result payload", () => {
             waitlisted_players: 1,
           }),
         ],
+      }),
+      expect.objectContaining({
+        locale: "en",
+        t: expect.any(Function),
       })
     );
   });
@@ -970,6 +981,10 @@ describe("tournament Client Component result payload", () => {
             waitlisted_players: 0,
           }),
         ],
+      }),
+      expect.objectContaining({
+        locale: "en",
+        t: expect.any(Function),
       })
     );
   });

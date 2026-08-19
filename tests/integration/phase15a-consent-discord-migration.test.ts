@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 
 const migration = readFileSync(
   resolve(
@@ -314,10 +315,18 @@ describe("Phase 15A versioned consent and Discord database contract", () => {
       "Official Tournament Rulebook",
       "Terms of Service",
       "Privacy Policy",
-      "I confirm that I am at least 18 years old.",
-      "I confirm that I am using my own IronClad account and that the linked Steam account belongs to me.",
     ]) {
       expect(tournamentUi).toContain(label);
     }
+    expect(tournamentUi).toContain('t("registrationModal.ageConfirmation")');
+    expect(tournamentUi).toContain(
+      't("registrationModal.ownershipConfirmation")'
+    );
+    expect(competitionEnglish.registrationModal.ageConfirmation).toBe(
+      "I confirm that I am at least 18 years old."
+    );
+    expect(competitionEnglish.registrationModal.ownershipConfirmation).toBe(
+      "I confirm that I am using my own IronClad account and that the linked Steam account belongs to me."
+    );
   });
 });

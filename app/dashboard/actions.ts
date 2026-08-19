@@ -11,17 +11,41 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export type NotificationDismissalResult = {
   status: "success" | "error";
+  code:
+    | "sign-in-required"
+    | "selection-required"
+    | "update-failed"
+    | "unavailable"
+    | "notification-unavailable"
+    | "already-deleted"
+    | "deleted";
   message: string;
   dismissedIds: string[];
 };
 
 export type NotificationActionResult = {
   status: "success" | "error";
+  code:
+    | "sign-in-required"
+    | "result-unavailable"
+    | "confirm-failed"
+    | "confirmed"
+    | "dispute-notes-too-long"
+    | "dispute-failed"
+    | "disputed";
   message: string;
 };
 
 export type DiscordVisibilityActionResult = {
   status: "success" | "error";
+  code:
+    | "sign-in-required"
+    | "invalid-value"
+    | "update-failed"
+    | "profile-required"
+    | "username-required"
+    | "enabled"
+    | "disabled";
   message: string;
   enabled: boolean;
 };
@@ -38,7 +62,10 @@ export async function dismissDashboardNotifications(
   const { userId } = await auth();
 
   if (!userId) {
-    return errorResult("Sign in before managing notifications.");
+    return errorResult(
+      "sign-in-required",
+      "Sign in before managing notifications."
+    );
   }
 
   const deleteAll = formData.get("deleteAll") === "true";
@@ -57,18 +84,27 @@ export async function dismissDashboardNotifications(
   ];
 
   if (!deleteAll && notificationIds.length === 0) {
-    return errorResult("Select at least one notification.");
+    return errorResult(
+      "selection-required",
+      "Select at least one notification."
+    );
   }
 
   const supabase = createSupabaseAdminClient();
   const matchIds = await loadViewerMatchIds(supabase, userId);
 
   if (matchIds === null) {
-    return errorResult("Your notifications could not be updated.");
+    return errorResult(
+      "update-failed",
+      "Your notifications could not be updated."
+    );
   }
 
   if (matchIds.length === 0) {
-    return errorResult("No player notifications are available.");
+    return errorResult(
+      "unavailable",
+      "No player notifications are available."
+    );
   }
 
   const requestedSubmissionIds = notificationIds
@@ -94,7 +130,10 @@ export async function dismissDashboardNotifications(
   const lookupError = submissionResult.error ?? reportGroupResult.error;
   if (lookupError) {
     logDashboardResultFailure("load-notifications", lookupError);
-    return errorResult("Your notifications could not be updated.");
+    return errorResult(
+      "update-failed",
+      "Your notifications could not be updated."
+    );
   }
 
   const authorizedSubmissions = submissionResult.data;
@@ -105,7 +144,10 @@ export async function dismissDashboardNotifications(
     authorizedSubmissions.length + authorizedReportGroups.length !==
       notificationIds.length
   ) {
-    return errorResult("One or more notifications are not available.");
+    return errorResult(
+      "notification-unavailable",
+      "One or more notifications are not available."
+    );
   }
 
   let targetSubmissions = authorizedSubmissions;
@@ -120,7 +162,10 @@ export async function dismissDashboardNotifications(
     );
 
     if (filtered === null) {
-      return errorResult("Your notifications could not be updated.");
+      return errorResult(
+        "update-failed",
+        "Your notifications could not be updated."
+      );
     }
 
     targetSubmissions = filtered.submissions;
@@ -130,6 +175,7 @@ export async function dismissDashboardNotifications(
   if (targetSubmissions.length === 0 && targetReportGroups.length === 0) {
     return {
       status: "success",
+      code: "already-deleted",
       message: "All notifications are already deleted.",
       dismissedIds: [],
     };
@@ -172,7 +218,10 @@ export async function dismissDashboardNotifications(
     submissionDismissalResult.error ?? groupDismissalResult.error;
   if (dismissalError) {
     logDashboardResultFailure("dismiss-notifications", dismissalError);
-    return errorResult("Your notifications could not be deleted.");
+    return errorResult(
+      "update-failed",
+      "Your notifications could not be deleted."
+    );
   }
 
   const dismissedIds = [
@@ -183,6 +232,7 @@ export async function dismissDashboardNotifications(
   revalidatePath("/dashboard");
   return {
     status: "success",
+    code: "deleted",
     message:
       dismissedIds.length === 1
         ? "Notification deleted."
@@ -197,12 +247,18 @@ export async function confirmDashboardMatchResult(
   const { userId } = await auth();
 
   if (!userId) {
-    return actionErrorResult("Sign in before confirming a match result.");
+    return actionErrorResult(
+      "sign-in-required",
+      "Sign in before confirming a match result."
+    );
   }
 
   const reportGroupId = getUuid(formData, "reportGroupId");
   if (!reportGroupId) {
-    return actionErrorResult("The match result confirmation could not be found.");
+    return actionErrorResult(
+      "result-unavailable",
+      "The match result confirmation could not be found."
+    );
   }
 
   const supabase = createSupabaseAdminClient();
@@ -214,10 +270,8 @@ export async function confirmDashboardMatchResult(
   if (error) {
     logDashboardResultFailure("confirm-match-result", error);
     return actionErrorResult(
-      getDashboardResultMessage(
-        error,
-        "The match result could not be confirmed. Please try again."
-      )
+      "confirm-failed",
+      "The match result could not be confirmed. Please try again."
     );
   }
 
@@ -229,6 +283,7 @@ export async function confirmDashboardMatchResult(
   revalidateDashboardPaths();
   return {
     status: "success",
+    code: "confirmed",
     message: "Result confirmed. The bracket has been updated.",
   };
 }
@@ -239,18 +294,27 @@ export async function disputeDashboardMatchResult(
   const { userId } = await auth();
 
   if (!userId) {
-    return actionErrorResult("Sign in before disputing a match result.");
+    return actionErrorResult(
+      "sign-in-required",
+      "Sign in before disputing a match result."
+    );
   }
 
   const reportGroupId = getUuid(formData, "reportGroupId");
   const disputeNotes = String(formData.get("disputeNotes") ?? "").trim();
 
   if (!reportGroupId) {
-    return actionErrorResult("The match result confirmation could not be found.");
+    return actionErrorResult(
+      "result-unavailable",
+      "The match result confirmation could not be found."
+    );
   }
 
   if (disputeNotes.length > 2000) {
-    return actionErrorResult("Dispute notes must be 2000 characters or fewer.");
+    return actionErrorResult(
+      "dispute-notes-too-long",
+      "Dispute notes must be 2000 characters or fewer."
+    );
   }
 
   const supabase = createSupabaseAdminClient();
@@ -263,10 +327,8 @@ export async function disputeDashboardMatchResult(
   if (error) {
     logDashboardResultFailure("dispute-match-result", error);
     return actionErrorResult(
-      getDashboardResultMessage(
-        error,
-        "The match result could not be disputed. Please try again."
-      )
+      "dispute-failed",
+      "The match result could not be disputed. Please try again."
     );
   }
 
@@ -279,6 +341,7 @@ export async function disputeDashboardMatchResult(
   revalidateDashboardPaths();
   return {
     status: "success",
+    code: "disputed",
     message: "Result disputed. An administrator must review it.",
   };
 }
@@ -291,6 +354,7 @@ export async function updateDiscordPublicEnabled(
   if (!userId) {
     return {
       status: "error",
+      code: "sign-in-required",
       message: "Sign in before updating Discord contact visibility.",
       enabled: false,
     };
@@ -299,6 +363,7 @@ export async function updateDiscordPublicEnabled(
   if (typeof enabled !== "boolean") {
     return {
       status: "error",
+      code: "invalid-value",
       message: "Choose whether Discord contact should be public.",
       enabled: false,
     };
@@ -319,6 +384,7 @@ export async function updateDiscordPublicEnabled(
     );
     return {
       status: "error",
+      code: "update-failed",
       message: "Discord contact visibility could not be updated.",
       enabled: !nextEnabled,
     };
@@ -327,6 +393,7 @@ export async function updateDiscordPublicEnabled(
   if (!profile) {
     return {
       status: "error",
+      code: "profile-required",
       message: "Complete your player profile before changing this setting.",
       enabled: false,
     };
@@ -354,6 +421,7 @@ export async function updateDiscordPublicEnabled(
 
     return {
       status: "error",
+      code: "username-required",
       message:
         "Add an optional Discord username to your profile before making it public.",
       enabled: false,
@@ -371,6 +439,7 @@ export async function updateDiscordPublicEnabled(
     console.error("Discord contact visibility update failed:", error);
     return {
       status: "error",
+      code: "update-failed",
       message: "Discord contact visibility could not be updated.",
       enabled: !nextEnabled,
     };
@@ -379,6 +448,7 @@ export async function updateDiscordPublicEnabled(
   if (!data) {
     return {
       status: "error",
+      code: "update-failed",
       message: "Discord contact visibility could not be updated.",
       enabled: Boolean(profile.discord_public_enabled),
     };
@@ -388,6 +458,7 @@ export async function updateDiscordPublicEnabled(
 
   return {
     status: "success",
+    code: nextEnabled ? "enabled" : "disabled",
     message: nextEnabled
       ? "Discord contact is visible on your public profile."
       : "Discord contact is hidden from your public profile.",
@@ -618,105 +689,27 @@ function revalidateDashboardPaths() {
   revalidatePath("/admin/tournaments");
 }
 
-function errorResult(message: string): NotificationDismissalResult {
+function errorResult(
+  code: NotificationDismissalResult["code"],
+  message: string
+): NotificationDismissalResult {
   return {
     status: "error",
+    code,
     message,
     dismissedIds: [],
   };
 }
 
-function actionErrorResult(message: string): NotificationActionResult {
+function actionErrorResult(
+  code: NotificationActionResult["code"],
+  message: string
+): NotificationActionResult {
   return {
     status: "error",
+    code,
     message,
   };
-}
-
-function getDashboardResultMessage(error: unknown, fallback: string) {
-  const message =
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
-      ? error.message.toLowerCase()
-      : "";
-  const safeMessages: Array<[string, string]> = [
-    [
-      "confirmation window has expired",
-      "The confirmation window has expired.",
-    ],
-    [
-      "only the opponent can confirm",
-      "Only the opposing player can confirm this result.",
-    ],
-    [
-      "only the opponent can dispute",
-      "Only the opposing player can dispute this result.",
-    ],
-    [
-      "not awaiting confirmation",
-      "This result is no longer awaiting confirmation.",
-    ],
-    [
-      "can no longer be finalized",
-      "This result can no longer be finalized.",
-    ],
-    [
-      "already has an official result",
-      "This match already has an official result.",
-    ],
-    [
-      "player is not a participant",
-      "You can only manage results for matches you are participating in.",
-    ],
-    [
-      "both match participants must be assigned",
-      "Both match participants must be assigned before recording a result.",
-    ],
-    [
-      "score does not satisfy the match format",
-      "The reported score does not satisfy this match's series format.",
-    ],
-    [
-      "this final score requires exactly",
-      "The number of replay files does not match the reported score.",
-    ],
-    [
-      "at least one replay file is required",
-      "This result cannot be finalized because its replay proof is missing.",
-    ],
-    [
-      "duplicate replay storage paths",
-      "Each completed game requires a unique replay file.",
-    ],
-    [
-      "duplicate replay payloads",
-      "Each completed game requires a unique replay file.",
-    ],
-    [
-      "replay hash audit data is incomplete",
-      "The replay files could not be verified.",
-    ],
-    [
-      "completed downstream match prevents changing this winner",
-      "A completed downstream match prevents changing this winner.",
-    ],
-    [
-      "winner correction blocked because the downstream match already has",
-      "This result cannot be finalized because a downstream match already has result activity. An administrator must resolve it first.",
-    ],
-    [
-      "match result report group not found",
-      "The match result could not be found.",
-    ],
-    ["tournament match not found", "The tournament match could not be found."],
-  ];
-
-  return (
-    safeMessages.find(([fragment]) => message.includes(fragment))?.[1] ??
-    fallback
-  );
 }
 
 function logDashboardResultFailure(operation: string, error: unknown) {

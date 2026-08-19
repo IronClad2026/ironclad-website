@@ -14,7 +14,11 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { submitTournamentRegistration } from "@/app/tournaments/actions";
+import {
+  submitTournamentRegistration,
+  type TournamentRegistrationResult,
+} from "@/app/tournaments/actions";
+import { setLocalePreference } from "@/app/locale-actions";
 import { rollMatchDice } from "@/app/tournaments/dice-actions";
 import MatchDiceRollOff, {
   type MatchDiceLoadResult,
@@ -29,8 +33,23 @@ import MatchResultControls, {
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import ScrollReveal from "@/components/ScrollReveal";
 import TournamentMapPools from "@/components/TournamentMapPools";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import {
+  formatDateTime as formatLocalizedDateTime,
+  formatNumber,
+  selectPlural,
+} from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/config";
+import { localizeBracketRoundName } from "@/lib/i18n/round-display";
+import { translate } from "@/lib/i18n/translate";
+import type { MessageValues } from "@/lib/i18n/types";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { RegistrationDocumentSet } from "@/lib/legal-document-types";
 import { parseMatchDiceSnapshot } from "@/lib/match-dice";
@@ -39,12 +58,9 @@ import type { PollViewerProjection } from "@/lib/polls";
 import {
   getPublicTournamentNavigation,
   getTournamentBracketDisplayName,
-  getTournamentTerminalPublicMessage,
-  formatTournamentParticipantFact,
   isTournamentTerminalStatus,
   isTournamentRegistrationOpen,
   tournamentParticipantMatchesQuery,
-  WAITLIST_DISCLOSURE_MESSAGE,
 } from "@/lib/tournaments";
 import type {
   GeneratedTournamentBracket,
@@ -93,7 +109,7 @@ type OverviewPanelKey = "details" | "rules" | "prizes" | "schedule" | "contact";
 type ArchiveEvent = {
   title: string;
   image: string;
-  description?: string;
+  descriptionKey: string;
   battlefy: string;
 };
 
@@ -116,37 +132,37 @@ const archiveEvents: ArchiveEvent[] = [
   {
     title: "Beta Blitz Tournament",
     image: "/images/tournaments/1v1-beta-blitz-tournament.png",
-    description: "An early IronClad 1v1 tournament from the Battlefy era.",
+    descriptionKey: "tournaments.archive.betaBlitz",
     battlefy: "https://battlefy.com/ironclad-tournaments/beta-blitz-tournament/695bc9ee265bc4002fd64e4d/info?infoTab=details",
   },
   {
     title: "Council of War",
     image: "/images/tournaments/1v1-council-of-war.jpeg",
-    description: "A completed IronClad 1v1 event preserved on Battlefy.",
+    descriptionKey: "tournaments.archive.councilOfWar",
     battlefy: "https://battlefy.com/ironclad-tournaments/council-of-war/69839d804b1a19002fe7533f/info?infoTab=details",
   },
   {
     title: "Shadow War",
     image: "/images/tournaments/1v1-shadow-war.jpeg",
-    description: "A completed monthly IronClad 1v1 tournament.",
+    descriptionKey: "tournaments.archive.shadowWar",
     battlefy: "https://battlefy.com/ironclad-tournaments/shadow-war/69a8514962c9f7002f97d606/info?infoTab=details",
   },
   {
     title: "The Art of War",
     image: "/images/tournaments/1v1-the-art-of-war.jpeg",
-    description: "A completed IronClad 1v1 event with its original details on Battlefy.",
+    descriptionKey: "tournaments.archive.artOfWar",
     battlefy: "https://battlefy.com/ironclad-tournaments/the-art-of-war/69cbf56ac45e5100728854a9/info?infoTab=details",
   },
   {
     title: "Operation Skyfall",
     image: "/images/tournaments/1v1-operation-skyfall.jpeg",
-    description: "The final featured 1v1 event from the pre-launch Battlefy archive.",
+    descriptionKey: "tournaments.archive.operationSkyfall",
     battlefy: "https://battlefy.com/ironclad-tournaments/operation-skyfall/69ebc7641259b1002120aeb0/info?infoTab=details",
   },
   {
     title: "4v4 Beta Tournament",
     image: "/images/tournaments/4v4-beta-tournament.jpeg",
-    description: "IronClad's original team-format beta tournament.",
+    descriptionKey: "tournaments.archive.teamBeta",
     battlefy: "https://battlefy.com/ironclad-tournaments/4-vs-4-beta-tournament/69fba46252cae7002ffb6701/info?infoTab=details",
   },
 ];
@@ -199,6 +215,33 @@ function classNames(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
 }
 
+function localizeTournamentStatus(
+  status: string,
+  t: ReturnType<typeof useOptionalTranslations>
+) {
+  const normalized = status.trim().toLowerCase().replaceAll("_", " ");
+  const keys: Record<string, string> = {
+    open: "tournaments.status.open",
+    "in progress": "tournaments.status.inProgress",
+    completed: "tournaments.status.completed",
+    cancelled: "tournaments.status.cancelled",
+    closed: "tournaments.status.closed",
+    generated: "tournaments.status.generated",
+    "awaiting generation": "tournaments.status.awaitingGeneration",
+    "pending review": "tournaments.status.pendingReview",
+    upcoming: "tournaments.status.upcoming",
+  };
+
+  return keys[normalized] ? t(keys[normalized]) : status;
+}
+
+type CompetitionTranslator = ReturnType<typeof useOptionalTranslations>;
+
+const translateCompetitionEnglish: CompetitionTranslator = (
+  path: string,
+  values?: MessageValues
+) => translate(competitionEnglish, path, values);
+
 const interactiveHover = "transform-gpu transition-all duration-300 ease-out hover:scale-[1.03] hover:border-orange-500/70 hover:shadow-lg hover:shadow-orange-950/20 active:scale-[0.99]";
 const tournamentCardClass =
   "group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100";
@@ -229,6 +272,7 @@ function Sidebar({
   onSelectTournament: (tournament: TournamentCard) => void;
 }) {
   const [eventsOpen, setEventsOpen] = useState(true);
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const eventsByMonth = Array.from(
     tournaments.reduce((groups, tournament) => {
       const group = groups.get(tournament.month) ?? [];
@@ -244,9 +288,9 @@ function Sidebar({
         <div className="border-b border-orange-500/15 p-5">
           <div className="h-32 border border-white/12 bg-center bg-no-repeat shadow-xl shadow-black/20" style={{ backgroundImage: "linear-gradient(135deg,rgba(0,0,0,0.42),rgba(0,0,0,0.84)),url(/images/ironclad-background.jpg)", backgroundSize: "100% auto" }} />
           <div className="mt-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Organizer</p>
-            <h2 className="mt-1 text-lg font-black text-white">IronClad Tournaments</h2>
-            <p className="mt-1 text-sm text-zinc-400">Company of Heroes 3 Events</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">{t("tournaments.organizer")}</p>
+            <h2 className="mt-1 text-lg font-black text-white">{t("tournaments.organizerName")}</h2>
+            <p className="mt-1 text-sm text-zinc-400">{t("tournaments.companyEvents")}</p>
           </div>
         </div>
 
@@ -257,7 +301,7 @@ function Sidebar({
           >
             <span className="flex items-center gap-3">
               <CalendarDays size={17} className="text-orange-400" />
-              Events
+              {t("tournaments.events")}
             </span>
             <ChevronDown size={14} className={classNames("text-zinc-500 transition", eventsOpen && "rotate-180")} />
           </button>
@@ -278,7 +322,7 @@ function Sidebar({
                           style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
                         >
                           <p className="break-words text-sm font-black text-white">{event.title}</p>
-                          <p className="mt-1 text-xs text-zinc-300">{event.format} - {event.status}</p>
+                          <p className="mt-1 text-xs text-zinc-300">{event.format} - {localizeTournamentStatus(event.status, t)}</p>
                         </button>
                       );
                     })}
@@ -306,6 +350,7 @@ function MobileTournamentDrawer({
   onClose: () => void;
   onSelectTournament: (tournament: TournamentCard) => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const eventsByMonth = Array.from(
     tournaments.reduce((groups, tournament) => {
       const group = groups.get(tournament.month) ?? [];
@@ -337,7 +382,7 @@ function MobileTournamentDrawer({
         <div className="fixed inset-0 z-[80] lg:hidden">
           <motion.button
             type="button"
-            aria-label="Close tournament menu"
+            aria-label={t("tournaments.closeMenu")}
             onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -368,23 +413,23 @@ function MobileTournamentDrawer({
                   id="mobile-tournament-menu-title"
                   className="mt-1 break-words text-xl font-black text-white"
                 >
-                  Tournament Menu
+                  {t("tournaments.tournamentMenu")}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/12 bg-white/10 text-zinc-200 shadow-xl shadow-black/25 transition hover:border-orange-300/55 hover:bg-orange-500/15 hover:text-white"
-                aria-label="Close tournament menu"
+                aria-label={t("tournaments.closeMenu")}
               >
                 <X size={20} />
               </button>
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto pt-5">
-              <nav aria-label="Tournament navigation">
+              <nav aria-label={t("tournaments.tournamentNavigation")}>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-zinc-500">
-                  Tournaments
+                  {t("tournaments.tournaments")}
                 </p>
                 <div className="mt-3 space-y-5">
                   {eventsByMonth.map((group) => (
@@ -419,7 +464,7 @@ function MobileTournamentDrawer({
                                   {event.title}
                                 </span>
                                 <span className="mt-1 block break-words text-xs text-zinc-500">
-                                  {event.format} - {event.status}
+                                  {event.format} - {localizeTournamentStatus(event.status, t)}
                                 </span>
                               </span>
                             </button>
@@ -449,6 +494,8 @@ function Hero({
   verifiedDivision: RelicVerifiedDivision | null;
   onRegisterClick: () => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const registrationAvailability = getRegistrationDivisionAvailability(
     tournament,
     verifiedDivision
@@ -460,14 +507,14 @@ function Hero({
   const publicStatus = getPublicTournamentStatus(tournament);
   const registrationIsWaitlistOnly = registrationAvailability === "waitlist";
   const actionLabel = divisionLaunched
-    ? "Registration closed — this division has started."
+    ? t("tournaments.actions.registrationClosed")
     : registrationOpen
       ? registrationIsWaitlistOnly
-      ? "Join Waitlist"
-      : "Register"
-    : publicStatus;
+      ? t("tournaments.actions.joinWaitlist")
+      : t("tournaments.actions.register")
+    : localizeTournamentStatus(publicStatus, t);
   const registrationState = viewerRegistration
-    ? getViewerRegistrationDisplay(tournament, viewerRegistration)
+    ? getViewerRegistrationDisplay(tournament, viewerRegistration, t, locale)
     : null;
   const terminalTournament = isTournamentTerminalStatus(
     tournament.statusValue
@@ -494,13 +541,13 @@ function Hero({
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
                 tone={
-                  publicStatus === "Open" ||
-                  publicStatus === "In Progress"
+                  tournament.statusValue === "registration_open" ||
+                  tournament.statusValue === "in_progress"
                     ? "green"
                     : "gray"
                 }
               >
-                {publicStatus}
+                {localizeTournamentStatus(publicStatus, t)}
               </StatusPill>
               <StatusPill tone="neutral">{tournament.format}</StatusPill>
               <StatusPill tone="amber">{tournament.ruleFormatLabel}</StatusPill>
@@ -539,9 +586,9 @@ function Hero({
                 </svg>
                 {tournament.game}
               </span>
-              <span className="flex items-center gap-2"><CalendarDays size={16} className="text-orange-300" /> {tournament.month} Tournament</span>
+              <span className="flex items-center gap-2"><CalendarDays size={16} className="text-orange-300" /> {t("heroMetadata.date", { date: tournament.month })}</span>
               <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.time}</span>
-              <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {tournament.players}/{tournament.maxPlayers} approved slots</span>
+              <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {t("heroMetadata.approvedSlots", { players: formatNumber(tournament.players, locale), maximum: formatNumber(tournament.maxPlayers, locale) })}</span>
             </div>
           </ScrollReveal>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
@@ -554,12 +601,12 @@ function Hero({
                 label={actionLabel}
                 description={
                   divisionLaunched
-                    ? "Division in progress"
+                    ? t("tournaments.hero.divisionInProgress")
                     : registrationOpen
                     ? registrationIsWaitlistOnly
-                      ? "Waitlist open"
-                      : "Open events"
-                    : "Check the tournament schedule"
+                      ? t("tournaments.hero.waitlistOpen")
+                      : t("tournaments.hero.openEvents")
+                    : t("tournaments.hero.scheduleHint")
                 }
                 icon={registrationOpen ? CheckCircle2 : Clock3}
                 onClick={onRegisterClick}
@@ -578,7 +625,13 @@ function TournamentTerminalBanner({
 }: {
   tournament: TournamentCard;
 }) {
-  const message = getTournamentTerminalPublicMessage(tournament.statusValue);
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const message =
+    tournament.statusValue === "cancelled"
+      ? t("tournaments.terminal.cancelledMessage")
+      : tournament.statusValue === "voided"
+        ? t("tournaments.terminal.voidedMessage")
+        : null;
 
   if (!message) {
     return null;
@@ -591,29 +644,30 @@ function TournamentTerminalBanner({
     >
       <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-200">
         {tournament.statusValue === "cancelled"
-          ? "Cancelled Tournament"
-          : "Voided Tournament"}
+          ? t("tournaments.terminal.cancelled")
+          : t("tournaments.terminal.voided")}
       </p>
       <p className="mt-2 max-w-4xl text-sm leading-6 text-zinc-100">
         {message}
       </p>
       <p className="mt-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
-        Read-only historical record
+        {t("tournaments.terminal.historical")}
       </p>
     </div>
   );
 }
 
 function TournamentReadOnlyCard() {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className="min-h-[104px] w-full min-w-0 border border-amber-300/35 bg-black/65 p-4 text-left shadow-xl shadow-black/20 backdrop-blur">
       <Info size={18} className="text-amber-200" />
       <p className="mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider text-white">
-        Historical record
+        {t("tournaments.terminal.historicalTitle")}
       </p>
       <p className="mt-1 break-words text-xs font-semibold leading-5 text-zinc-300">
-        Registration and result actions are unavailable for terminal
-        tournaments.
+        {t("tournaments.terminal.unavailable")}
       </p>
     </div>
   );
@@ -624,7 +678,7 @@ export type ViewerRegistrationDisplay = {
   description: string;
   tone: "green" | "amber" | "red" | "neutral";
   icon: ElementType;
-  details: string[];
+  details: ReactNode[];
 };
 
 function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) {
@@ -652,8 +706,8 @@ function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) 
       </p>
       {state.details.length > 0 && (
         <div className="mt-3 space-y-1 text-[11px] font-semibold leading-4 opacity-80">
-          {state.details.map((detail) => (
-            <p key={detail}>{detail}</p>
+          {state.details.map((detail, index) => (
+            <p key={`registration-detail-${index}`}>{detail}</p>
           ))}
         </div>
       )}
@@ -663,20 +717,52 @@ function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) 
 
 export function getViewerRegistrationDisplay(
   tournament: TournamentCard,
-  registration: TournamentViewerRegistration
+  registration: TournamentViewerRegistration,
+  t: CompetitionTranslator = translateCompetitionEnglish,
+  locale: Locale = "en"
 ): ViewerRegistrationDisplay {
+  const statusKeys: Record<TournamentViewerRegistration["status"], string> = {
+    approved: "approved",
+    waitlisted: "waitlisted",
+    rejected: "rejected",
+    withdrawn: "withdrawn",
+    manual_review: "manualReview",
+    pending: "pending",
+  };
   const details = [
-    `Registration Status: ${formatRegistrationStatus(registration.status)}`,
-    registration.bracketName ? `Bracket: ${registration.bracketName}` : null,
+    t("tournaments.registrationState.statusDetail", {
+      status: t(
+        `tournaments.registrationState.statuses.${statusKeys[registration.status]}`
+      ),
+    }),
+    registration.bracketName
+      ? t("tournaments.registrationState.bracketDetail", {
+          bracket: registration.bracketName,
+        })
+      : null,
     registration.createdAt
-      ? `Registration Date: ${new Date(registration.createdAt).toLocaleDateString()}`
+      ? <HydrationSafeLocalDateTime
+          value={registration.createdAt}
+          fallback={t("tournaments.registrationState.dateDetail", {
+            date: t("deadlines.unavailable"),
+          })}
+          locale={locale}
+          options={{ dateStyle: "medium" }}
+          render={(date) =>
+            t("tournaments.registrationState.dateDetail", { date })
+          }
+        />
       : null,
   ].filter((detail) => detail !== null);
 
   if (registration.status === "approved") {
     return {
-      title: `Registered - ${tournament.title}`,
-      description: `You are registered for ${tournament.title}.`,
+      title: t("tournaments.registrationState.registeredTitle", {
+        tournament: tournament.title,
+      }),
+      description: t("tournaments.registrationState.registeredDescription", {
+        tournament: tournament.title,
+      }),
       tone: "green",
       icon: CheckCircle2,
       details,
@@ -692,9 +778,8 @@ export function getViewerRegistrationDisplay(
 
     if (divisionLaunched) {
       return {
-        title: "Waitlist Closed",
-        description:
-          "This division launched before a place became available. Your waitlist registration is now closed.",
+        title: t("tournaments.registrationState.waitlistClosed"),
+        description: t("tournaments.registrationState.waitlistClosedDescription"),
         tone: "neutral",
         icon: X,
         details,
@@ -708,19 +793,16 @@ export function getViewerRegistrationDisplay(
     ) {
       const terminalOfferCopy = {
         declined: {
-          title: "Waitlist Offer Declined",
-          description:
-            "You declined the available place. This waitlist registration is now closed.",
+          title: t("tournaments.registrationState.offerDeclined"),
+          description: t("tournaments.registrationState.offerDeclinedDescription"),
         },
         expired: {
-          title: "Waitlist Offer Expired",
-          description:
-            "The deadline to accept the available place has passed. This waitlist registration is now closed.",
+          title: t("tournaments.registrationState.offerExpired"),
+          description: t("tournaments.registrationState.offerExpiredDescription"),
         },
         cancelled: {
-          title: "Waitlist Offer Cancelled",
-          description:
-            "The available place was cancelled. This waitlist registration is now closed.",
+          title: t("tournaments.registrationState.offerCancelled"),
+          description: t("tournaments.registrationState.offerCancelledDescription"),
         },
       }[registration.waitlistOfferStatus];
 
@@ -734,9 +816,8 @@ export function getViewerRegistrationDisplay(
 
     if (registration.waitlistOfferStatus === "accepted") {
       return {
-        title: "Waitlist Offer Accepted",
-        description:
-          "Your accepted place is awaiting tournament administrator review.",
+        title: t("tournaments.registrationState.offerAccepted"),
+        description: t("tournaments.registrationState.offerAcceptedDescription"),
         tone: "neutral",
         icon: Info,
         details,
@@ -746,17 +827,25 @@ export function getViewerRegistrationDisplay(
     const offerAvailable = registration.waitlistOfferStatus === "offered";
     return {
       title: offerAvailable
-        ? `Spot Available - ${tournament.title}`
-        : `Waitlisted - ${tournament.title}`,
+        ? t("tournaments.registrationState.spotAvailableTitle", {
+            tournament: tournament.title,
+          })
+        : t("tournaments.registrationState.waitlistedTitle", {
+            tournament: tournament.title,
+          }),
       description: offerAvailable
-        ? "A tournament place is available. Open your dashboard before the offer deadline to accept or decline."
-        : `You are currently on the waitlist for ${tournament.title}.`,
+        ? t("tournaments.registrationState.offerAvailable")
+        : t("tournaments.registrationState.waitlistedDescription", {
+            tournament: tournament.title,
+          }),
       tone: "amber",
       icon: Clock3,
       details: [
         ...details,
         registration.waitlistPosition !== null
-          ? `Waitlist Position: #${registration.waitlistPosition}`
+          ? t("tournaments.registrationState.waitlistPosition", {
+              position: registration.waitlistPosition,
+            })
           : null,
       ].filter((detail) => detail !== null),
     };
@@ -764,9 +853,8 @@ export function getViewerRegistrationDisplay(
 
   if (registration.status === "rejected") {
     return {
-      title: "Registration Not Approved",
-      description:
-        "This registration was not approved by tournament administration.",
+      title: t("tournaments.registrationState.notApproved"),
+      description: t("tournaments.registrationState.notApprovedDescription"),
       tone: "red",
       icon: X,
       details,
@@ -775,9 +863,8 @@ export function getViewerRegistrationDisplay(
 
   if (registration.status === "withdrawn") {
     return {
-      title: "Registration Withdrawn",
-      description:
-        "You withdrew from this tournament. This registration is final and cannot be reopened.",
+      title: t("tournaments.registrationState.withdrawn"),
+      description: t("tournaments.registrationState.withdrawnDescription"),
       tone: "neutral",
       icon: X,
       details,
@@ -786,9 +873,8 @@ export function getViewerRegistrationDisplay(
 
   if (registration.status === "manual_review") {
     return {
-      title: "Registration Under Manual Review",
-      description:
-        "Tournament administration is reviewing your registration details.",
+      title: t("tournaments.registrationState.manualReview"),
+      description: t("tournaments.registrationState.manualReviewDescription"),
       tone: "neutral",
       icon: Info,
       details,
@@ -796,19 +882,12 @@ export function getViewerRegistrationDisplay(
   }
 
   return {
-    title: "Registration Submitted - Awaiting Review",
-    description:
-      "Your tournament registration has been submitted and is awaiting administrator review.",
+    title: t("tournaments.registrationState.submitted"),
+    description: t("tournaments.registrationState.submittedDescription"),
     tone: "neutral",
     icon: Clock3,
     details,
   };
-}
-
-function formatRegistrationStatus(status: TournamentViewerRegistration["status"]) {
-  return status
-    .replace("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function ActionCard({ label, description, icon: Icon, onClick, disabled = false }: { label: string; description: string; icon: ElementType; onClick: () => void; disabled?: boolean }) {
@@ -822,6 +901,8 @@ function ActionCard({ label, description, icon: Icon, onClick, disabled = false 
 }
 
 function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab: (tab: TabKey) => void }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className="overflow-visible border-b border-orange-500/20 bg-black/70 px-5 py-2 shadow-xl shadow-black/20 backdrop-blur-xl lg:px-8">
       <div className="flex gap-8 overflow-x-auto overflow-y-visible px-1 py-2">
@@ -836,7 +917,7 @@ function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab:
                 selected ? "text-white" : "text-zinc-500 hover:text-zinc-200"
               )}
             >
-              {tab.label}
+              {t(`tournaments.tabs.${tab.key}`)}
               {selected && <motion.span layoutId="active-tab" className="absolute inset-x-0 bottom-0 h-0.5 bg-orange-500" />}
             </button>
           );
@@ -857,6 +938,8 @@ function Overview({
   activePanel: OverviewPanelKey;
   setActivePanel: (panel: OverviewPanelKey) => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const panels = overviewPanels.filter(
     (item) => item.key !== "prizes" || hasPrize(tournament)
   );
@@ -872,7 +955,7 @@ function Overview({
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center border border-orange-400/25 bg-orange-500/10 text-orange-300"><Info size={20} /></div>
             <div>
-              <h2 className="text-xl font-black text-white">IronClad Company of Heroes 3 Tournaments</h2>
+              <h2 className="text-xl font-black text-white">{t("tournaments.overview.title")}</h2>
               <p className="mt-2 leading-7 text-zinc-300">{tournament.details}</p>
             </div>
           </div>
@@ -890,17 +973,19 @@ function Overview({
                 onClick={() => setActivePanel(item.key)}
                 className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, visiblePanel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-zinc-400 hover:text-white")}
               >
-                {item.label}
+                {t(`tournaments.panels.${item.key}`)}
               </button>
             ))}
           </div>
-          <div className="mt-5">{renderOverviewPanel(visiblePanel, tournament)}</div>
+          <div className="mt-5">
+            {renderOverviewPanel(visiblePanel, tournament, t, locale)}
+          </div>
         </Card>
       </div>
 
       <div className="space-y-6">
         <Card>
-          <h3 className="text-sm font-black uppercase tracking-wider text-white">Published Tournaments</h3>
+          <h3 className="text-sm font-black uppercase tracking-wider text-white">{t("tournaments.overview.published")}</h3>
           <div className="mt-4 space-y-3">
             {tournaments.map((item) => (
               <TournamentLinkCard key={item.title} item={item} />
@@ -908,9 +993,9 @@ function Overview({
           </div>
         </Card>
         <Card>
-          <h3 className="text-sm font-black uppercase tracking-wider text-white">Tournament Archive</h3>
+          <h3 className="text-sm font-black uppercase tracking-wider text-white">{t("tournaments.overview.archive")}</h3>
           <p className="mt-2 text-xs leading-5 text-zinc-400">
-            Battlefy remains the historical reference for events held before the new IronClad platform launch.
+            {t("tournaments.overview.archiveDescription")}
           </p>
           <div className="mt-4 space-y-3">
             {archiveEvents.map((item) => (
@@ -918,8 +1003,10 @@ function Overview({
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-white">{item.title}</p>
-                    {item.description && <p className="mt-1 text-xs leading-5 text-zinc-300">{item.description}</p>}
-                    <p className="mt-3 text-xs font-black uppercase tracking-wider text-orange-300">View on Battlefy</p>
+                    <p className="mt-1 text-xs leading-5 text-zinc-300">
+                      {t(item.descriptionKey)}
+                    </p>
+                    <p className="mt-3 text-xs font-black uppercase tracking-wider text-orange-300">{t("tournaments.actions.viewBattlefy")}</p>
                   </div>
                   <MessageCircle size={16} className="mt-1 shrink-0 text-orange-300" />
                 </div>
@@ -947,12 +1034,17 @@ function TournamentLinkCard({ item }: { item: TournamentCard }) {
   );
 }
 
-function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard) {
+function renderOverviewPanel(
+  panel: OverviewPanelKey,
+  tournament: TournamentCard,
+  t: CompetitionTranslator,
+  locale: Locale
+) {
   const shared = "leading-7 text-zinc-300";
   if (panel === "rules") {
     return (
       <div className="space-y-4">
-        <Detail label="Tournament Rule Format" value={tournament.ruleFormatLabel} />
+        <Detail label={t("tournaments.overview.tournamentRuleFormat")} value={tournament.ruleFormatLabel} />
         <p className={shared}>{tournament.rules}</p>
       </div>
     );
@@ -962,7 +1054,7 @@ function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard
       <div className={classNames("p-5", tournamentInsetCardClass)}>
         <Trophy className="text-amber-300" size={24} />
         <p className="mt-4 text-sm font-black uppercase tracking-wider text-amber-200">
-          Prizes
+          {t("tournaments.overview.prizes")}
         </p>
         <p className="mt-3 whitespace-pre-line break-words text-lg font-bold leading-8 text-white">
           {tournament.prizePool}
@@ -978,17 +1070,17 @@ function renderOverviewPanel(panel: OverviewPanelKey, tournament: TournamentCard
   }
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <Detail label="Event" value={tournament.title} />
-      <Detail label="Format" value={tournament.format} />
-      <Detail label="Rule Format" value={tournament.ruleFormatLabel} />
-      <Detail label="Registration Status" value={getPublicTournamentStatus(tournament)} />
-      <Detail label="Registration Opens" value={formatOptionalDateTime(tournament.registrationOpenAt, "When status is Open")} />
-      <Detail label="Registration Closes" value={formatOptionalDateTime(tournament.registrationCloseAt, "Until closed by an administrator")} />
-      <Detail label="Grand Final" value={formatOptionalDateTime(tournament.grandFinalAt, "Grand Final TBA")} />
-      {hasPrize(tournament) && <Detail label="Prize Pool" value={tournament.prizePool} />}
-      <Detail label="Approved Participants" value={`${tournament.players} / ${tournament.maxPlayers}`} />
+      <Detail label={t("tournaments.overview.event")} value={tournament.title} />
+      <Detail label={t("tournaments.overview.format")} value={tournament.format} />
+      <Detail label={t("tournaments.overview.ruleFormat")} value={tournament.ruleFormatLabel} />
+      <Detail label={t("tournaments.overview.registrationStatus")} value={localizeTournamentStatus(getPublicTournamentStatus(tournament), t)} />
+      <Detail label={t("tournaments.overview.registrationOpens")} value={formatOptionalDateTime(tournament.registrationOpenAt, t("tournaments.overview.registrationOpenStatus"), locale)} />
+      <Detail label={t("tournaments.overview.registrationCloses")} value={formatOptionalDateTime(tournament.registrationCloseAt, t("tournaments.overview.registrationCloseAdmin"), locale)} />
+      <Detail label={t("tournaments.overview.grandFinal")} value={formatOptionalDateTime(tournament.grandFinalAt, t("tournaments.overview.grandFinalTba"), locale)} />
+      {hasPrize(tournament) && <Detail label={t("tournaments.overview.prizePool")} value={tournament.prizePool} />}
+      <Detail label={t("tournaments.overview.approvedParticipants")} value={`${tournament.players} / ${tournament.maxPlayers}`} />
       {tournament.brackets.map((bracket) => (
-        <Detail key={bracket.name} label={bracket.name} value={`${bracket.requirement} - active review cohort ${bracket.activeCohortPlayers} / ${bracket.activeCohortSize} - ${bracket.registeredPlayers} approved - ${bracket.waitlistedPlayers} waitlisted`} />
+        <Detail key={bracket.name} label={bracket.name} value={t("tournaments.overview.cohortSummary", { requirement: bracket.requirement, active: bracket.activeCohortPlayers, capacity: bracket.activeCohortSize, approved: bracket.registeredPlayers, waitlisted: bracket.waitlistedPlayers })} />
       ))}
     </div>
   );
@@ -1003,6 +1095,7 @@ function Timeline({ tournament }: { tournament: TournamentCard }) {
 }
 
 function Participants({ tournament }: { tournament: TournamentCard }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const [query, setQuery] = useState("");
   const participantSections = useMemo(
     () =>
@@ -1032,18 +1125,18 @@ function Participants({ tournament }: { tournament: TournamentCard }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-xl font-black text-white">{tournament.title} Entries</h2>
-          <p className="mt-1 text-sm text-zinc-400">Approved participants separated by their ELO-eligible bracket.</p>
+          <h2 className="text-xl font-black text-white">{t("tournaments.participants.title", { tournament: tournament.title })}</h2>
+          <p className="mt-1 text-sm text-zinc-400">{t("tournaments.participants.description")}</p>
         </div>
         <div className="relative w-full md:w-80">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search entries" className="w-full rounded border border-white/12 bg-black/55 py-2 pl-10 pr-3 text-sm text-white outline-none transition focus:border-orange-400" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("tournaments.participants.search")} className="w-full rounded border border-white/12 bg-black/55 py-2 pl-10 pr-3 text-sm text-white outline-none transition focus:border-orange-400" />
         </div>
       </div>
       {filteredByBracket.map((section) => (
         <ParticipantSection
           key={section.bracket.id}
-          title={`${section.bracket.name} Participants`}
+          title={t("tournaments.participants.bracketTitle", { bracket: section.bracket.name })}
           requirement={section.bracket.requirement}
           participants={section.participants}
           totalCount={section.totalCount}
@@ -1064,6 +1157,9 @@ function ParticipantSection({
   participants: TournamentParticipant[];
   totalCount: number;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
+
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1072,17 +1168,17 @@ function ParticipantSection({
           <p className="mt-1 text-sm text-zinc-500">{requirement}</p>
         </div>
         <StatusPill tone="neutral">
-          {totalCount} Approved
+          {t("tournaments.participants.approvedCount", { count: totalCount })}
         </StatusPill>
       </div>
       <div className={classNames("mt-5", tournamentTableClass)}>
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-black/72 text-xs uppercase tracking-wider text-zinc-500">
-            <tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Player</th><th className="px-4 py-3">Country</th><th className="px-4 py-3">ELO</th><th className="px-4 py-3">Status</th></tr>
+            <tr><th className="px-4 py-3">#</th><th className="px-4 py-3">{t("tournaments.participants.player")}</th><th className="px-4 py-3">{t("tournaments.participants.country")}</th><th className="px-4 py-3">ELO</th><th className="px-4 py-3">{t("tournaments.participants.status")}</th></tr>
           </thead>
           <tbody className="divide-y divide-white/10 bg-black/30">
-            {participants.map((participant, index) => <tr key={participant.registrationId} className="transition hover:bg-orange-500/12"><td className="px-4 py-3 font-mono text-zinc-400">#{index + 1}</td><td className="px-4 py-3 font-bold text-white">{participant.name}</td><td className="px-4 py-3 text-zinc-300">{formatTournamentParticipantFact(participant.country)}</td><td className="px-4 py-3 text-zinc-300">{formatTournamentParticipantFact(participant.elo)}</td><td className="px-4 py-3"><StatusPill tone="green">Approved</StatusPill></td></tr>)}
-            {participants.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-zinc-500">No approved participants in this bracket.</td></tr>}
+            {participants.map((participant, index) => <tr key={participant.registrationId} className="transition hover:bg-orange-500/12"><td className="px-4 py-3 font-mono text-zinc-400">#{formatNumber(index + 1, locale)}</td><td className="px-4 py-3 font-bold text-white">{participant.name}</td><td className="px-4 py-3 text-zinc-300">{formatParticipantFact(participant.country, locale)}</td><td className="px-4 py-3 text-zinc-300">{formatParticipantFact(participant.elo, locale)}</td><td className="px-4 py-3"><StatusPill tone="green">{t("tournaments.participants.approved")}</StatusPill></td></tr>)}
+            {participants.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-zinc-500">{t("tournaments.participants.empty")}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1097,6 +1193,7 @@ function AuthenticatedMatchDiceRollOff({
   matchId: string;
   forceReadOnly?: boolean;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const { getToken, isSignedIn } = useAuth();
   const supabase = useMemo(
     () => createAuthenticatedBrowserSupabaseClient(getToken),
@@ -1110,7 +1207,7 @@ function AuthenticatedMatchDiceRollOff({
       if (!isSignedIn) {
         return {
           ok: false,
-          message: "Sign in to open this private Match workspace.",
+          message: t("tournaments.brackets.signInWorkspace"),
         };
       }
 
@@ -1125,7 +1222,7 @@ function AuthenticatedMatchDiceRollOff({
         if (error) {
           return {
             ok: false,
-            message: "Dice Roll-Off history is unavailable right now.",
+            message: t("dice.historyUnavailable"),
           };
         }
 
@@ -1133,7 +1230,7 @@ function AuthenticatedMatchDiceRollOff({
         if (!snapshot) {
           return {
             ok: false,
-            message: "Dice Roll-Off returned an invalid response.",
+            message: t("dice.loadError"),
           };
         }
 
@@ -1142,12 +1239,12 @@ function AuthenticatedMatchDiceRollOff({
         return {
           ok: false,
           message: signal?.aborted
-            ? "Dice Roll-Off request was cancelled."
-            : "Dice Roll-Off history is unavailable right now.",
+            ? t("dice.loadError")
+            : t("dice.historyUnavailable"),
         };
       }
     },
-    [isSignedIn, supabase]
+    [isSignedIn, supabase, t]
   );
 
   return (
@@ -1173,6 +1270,8 @@ function Brackets({
   matchResultReportGroups: MatchResultReportGroup[];
   focusedMatchId: string | null;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
       participant.registrationId,
@@ -1240,13 +1339,13 @@ function Brackets({
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-black text-white">{tournament.title} Brackets</h2>
+          <h2 className="text-2xl font-black text-white">{tournament.title} — {t("tournaments.brackets.title")}</h2>
           <p className="mt-1 text-sm text-zinc-400">{tournament.brackets.map((bracket) => `${bracket.name}: ${bracket.requirement}`).join(" - ")}</p>
         </div>
         <StatusPill tone={tournament.generatedBrackets.length > 0 ? "green" : "amber"}>
           {tournament.generatedBrackets.length > 0
-            ? "Generated"
-            : "Awaiting Generation"}
+            ? t("tournaments.brackets.generated")
+            : t("tournaments.brackets.awaitingGeneration")}
         </StatusPill>
       </div>
       {tournament.brackets.map((bracket) => {
@@ -1321,13 +1420,18 @@ function Brackets({
                 </div>
                 <p className="mt-1 text-sm text-zinc-400">
                   {generated
-                      ? `${formatCompetitionFormat(generated.format)} - ${generated.slotCount} empty player slots`
-                      : `${approvedCount} approved - at least 2 required`}
+                    ? t("bracketSummary.emptySlots", {
+                        format: formatCompetitionFormat(generated.format, t),
+                        count: formatNumber(generated.slotCount, locale),
+                      })
+                    : t("bracketSummary.approvedMinimum", {
+                        count: formatNumber(approvedCount, locale),
+                      })}
                 </p>
               </div>
               {generated && (
                 <span className="text-xs uppercase tracking-wider text-zinc-500">
-                  Generated {formatDateTime(generated.generatedAt)}
+                  {t("tournaments.brackets.generated")} {formatDateTime(generated.generatedAt, locale)}
                 </span>
               )}
             </div>
@@ -1342,8 +1446,7 @@ function Brackets({
             )}
             {!generated ? (
               <p className="mt-6 border border-white/12 p-8 text-center text-zinc-500">
-                The empty bracket structure will generate automatically when
-                this bracket has at least two approved participants.
+                {t("tournaments.brackets.empty")}
               </p>
             ) : generated.format === "round_robin" ? (
               <RoundRobinBracket
@@ -1422,6 +1525,8 @@ export function BracketMatchResultsWorkspace({
   selectedMatchId?: string | null;
   onSelectedMatchChange?: (matchId: string | null) => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const [manualOpen, setManualOpen] = useState(false);
   const dialogTitleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1530,7 +1635,7 @@ export function BracketMatchResultsWorkspace({
         className="inline-flex items-center gap-2 rounded-xl border border-orange-400/40 bg-orange-500/10 px-4 py-2 text-xs font-black uppercase tracking-wider text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 hover:shadow-[0_0_24px_rgba(249,115,22,0.15)]"
       >
         <Swords size={15} />
-        Match Results
+        {t("tournaments.brackets.matchResults")}
         {pendingCount > 0 && (
           <span className="grid h-5 min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] text-black">
             {pendingCount}
@@ -1545,7 +1650,7 @@ export function BracketMatchResultsWorkspace({
               <div className="fixed inset-x-0 top-0 z-[9999] grid h-[100dvh] place-items-center p-2 [padding-bottom:max(0.5rem,env(safe-area-inset-bottom))] [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))] [padding-top:max(0.5rem,env(safe-area-inset-top))] sm:p-6">
                 <motion.button
                   type="button"
-                  aria-label="Close match result workspace"
+                  aria-label={t("tournaments.brackets.closeMatchWorkspace")}
                   onClick={closeWorkspace}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -1569,21 +1674,21 @@ export function BracketMatchResultsWorkspace({
                       <div>
                         <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">
                           {readOnly
-                            ? "Tournament Match History"
-                            : "Match Workspace"}
+                            ? t("tournaments.brackets.matchHistory")
+                            : t("tournaments.brackets.matchWorkspace")}
                         </p>
                         <h2
                           id={dialogTitleId}
                           className="mt-2 text-2xl font-black text-white sm:text-3xl"
                         >
-                          {bracketName} Match Workspace
+                          {bracketName} — {t("tournaments.brackets.matchWorkspace")}
                         </h2>
                         <p className="mt-2 text-sm text-zinc-400">
                           {readOnly
-                            ? "Review authorized Dice Roll-Off, score, and replay history from this Match record."
+                            ? t("tournaments.brackets.matchWorkspaceDescription")
                             : bracketFormat === "single_elimination"
-                              ? "Complete the private Dice Roll-Off, then use the established Series result and replay controls below."
-                              : "Use the established Series result and replay controls below. Dice Roll-Off is unavailable for round-robin Matches."}
+                              ? t("tournaments.brackets.matchWorkspacePlayer")
+                              : t("tournaments.brackets.matchWorkspaceRoundRobin")}
                         </p>
                       </div>
                       <button
@@ -1591,17 +1696,27 @@ export function BracketMatchResultsWorkspace({
                         type="button"
                         onClick={closeWorkspace}
                         className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
-                        aria-label="Close match result workspace"
+                        aria-label={t("tournaments.brackets.closeMatchWorkspace")}
                       >
                         <X size={20} />
                       </button>
                     </div>
                     <div className="mt-5 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wider text-zinc-400">
                       <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                        {workspaceMatches.length} matches
+                        {t(
+                          selectPlural(workspaceMatches.length, locale) === "one"
+                            ? "tournaments.workspace.matchCount"
+                            : "tournaments.workspace.matchCountPlural",
+                          { count: workspaceMatches.length }
+                        )}
                       </span>
                       <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-amber-200">
-                        {pendingCount} pending reviews
+                        {t(
+                          selectPlural(pendingCount, locale) === "one"
+                            ? "tournaments.workspace.pendingCount"
+                            : "tournaments.workspace.pendingCountPlural",
+                          { count: pendingCount }
+                        )}
                       </span>
                     </div>
                   </header>
@@ -1627,15 +1742,20 @@ export function BracketMatchResultsWorkspace({
                             <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
                               <div>
                                 <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
-                  {match.roundName} - Match{" "}
-                                  {match.matchNumber}
+                                  {t("tournaments.workspace.matchup", {
+                                    round: localizeBracketRoundName(
+                                      match.roundName,
+                                      t
+                                    ),
+                                    number: match.matchNumber,
+                                  })}
                                 </p>
                                 <h3 className="mt-2 text-xl font-black text-white">
-                                  {playerOne?.name ?? "TBD"}{" "}
+                                  {playerOne?.name ?? t("tournaments.workspace.tbd")}{" "}
                                   <span className="px-2 text-orange-300">
-                                    vs
+                                    {t("tournaments.workspace.versus")}
                                   </span>{" "}
-                                  {playerTwo?.name ?? "TBD"}
+                                  {playerTwo?.name ?? t("tournaments.workspace.tbd")}
                                 </h3>
                               </div>
                               <MatchStatus
@@ -2059,6 +2179,7 @@ function ChampionPresentation({
   bracketName: string;
   champion: TournamentParticipant;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const sparks = Array.from({ length: 18 }, (_, index) => ({
     left: `${6 + ((index * 17) % 88)}%`,
     delay: (index % 6) * 0.18,
@@ -2110,17 +2231,17 @@ function ChampionPresentation({
       </motion.div>
 
       <p className="mt-5 text-xs font-black uppercase tracking-[0.42em] text-orange-300">
-        Tournament Winner
+        {t("bracketPresentation.tournamentWinner")}
       </p>
       <h3 className="mt-3 break-words text-4xl font-black uppercase tracking-tight text-white drop-shadow-[0_0_18px_rgba(251,146,60,0.5)] sm:text-5xl">
         {champion.name}
       </h3>
       <p className="mt-3 text-sm font-black uppercase tracking-[0.28em] text-orange-100">
-        Victorious Commander
+        {t("bracketPresentation.victoriousCommander")}
       </p>
       <div className="mx-auto mt-5 h-px max-w-md bg-gradient-to-r from-transparent via-orange-300/80 to-transparent" />
       <p className="mt-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
-        {bracketName} Champion
+        {t("bracketPresentation.champion", { bracket: bracketName })}
       </p>
     </motion.section>
   );
@@ -2197,16 +2318,20 @@ function isBracketCompletedWithoutChampion(
 }
 
 function NoChampionPresentation({ bracketName }: { bracketName: string }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <section className="mt-6 border border-zinc-500/30 bg-zinc-500/[0.06] px-5 py-6 text-center">
       <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400">
-        Division Complete
+        {t("bracketPresentation.divisionComplete")}
       </p>
       <h3 className="mt-2 text-xl font-black text-white">
-        No champion was awarded
+        {t("bracketPresentation.noChampion")}
       </h3>
       <p className="mt-2 text-sm leading-6 text-zinc-400">
-        {bracketName} ended without an eligible player advancing from the Final.
+        {t("bracketPresentation.noChampionDescription", {
+          bracket: bracketName,
+        })}
       </p>
     </section>
   );
@@ -2231,6 +2356,8 @@ function SingleEliminationBracket({
   focusedMatchId: string | null;
   anchorPrefix: "match-desktop" | "match-mobile";
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const rounds = Array.from(
     matches.reduce((groups, match) => {
       const group = groups.get(match.roundName) ?? [];
@@ -2266,20 +2393,20 @@ function SingleEliminationBracket({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
-            Live Bracket
+            {t("bracketPresentation.liveBracket")}
           </p>
           <p className="mt-1 text-sm text-zinc-400">
-            Winners advance from left to right toward the Grand Final.
+            {t("bracketPresentation.liveBracketDescription")}
           </p>
         </div>
         <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
           <span className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.8)]" />
-            Active Round
+            {t("bracketPresentation.activeRound")}
           </span>
           <span className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Completed
+            {t("bracketPresentation.completed")}
           </span>
         </div>
       </div>
@@ -2309,13 +2436,19 @@ function SingleEliminationBracket({
                 )}
               >
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">
-                  Round {round.number}
+                  {t("bracketPresentation.roundNumber", {
+                    number: formatNumber(round.number, locale),
+                  })}
                 </p>
                 <div className="mt-1 flex items-center justify-between gap-3">
                   <h4 className={classNames("font-black", isActive ? "text-orange-200" : "text-white")}>
-                    {round.name}
+                    {localizeBracketRoundName(round.name, t)}
                   </h4>
-                  {isActive && <StatusPill tone="amber">Active</StatusPill>}
+                  {isActive && (
+                    <StatusPill tone="amber">
+                      {t("bracketPresentation.active")}
+                    </StatusPill>
+                  )}
                 </div>
               </div>
 
@@ -2386,6 +2519,7 @@ function ModernBracketMatch({
   onAdminSelect?: () => void;
   onPlayerSelect?: () => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const card = (
     <div
       id={anchorId}
@@ -2407,7 +2541,9 @@ function ModernBracketMatch({
     >
       <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
         <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-          Match {match.id}
+          {onAdminSelect && !onPlayerSelect
+            ? `Match ${match.id}`
+            : t("tournaments.brackets.matchLabel", { id: match.id })}
         </span>
         <div className="flex items-center gap-2">
           {onAdminSelect && (
@@ -2417,7 +2553,7 @@ function ModernBracketMatch({
           )}
           {onPlayerSelect && (
             <span className="rounded border border-orange-300/40 bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-100">
-              Your Match
+              {t("tournaments.brackets.openMatch")}
             </span>
           )}
           <MatchStatus status={match.status} />
@@ -2467,7 +2603,7 @@ function ModernBracketMatch({
           className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 border border-orange-400/45 bg-orange-500/10 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
         >
           <Swords size={15} aria-hidden="true" />
-          Open Match
+          {t("tournaments.brackets.openMatch")}
         </button>
       )}
     </motion.div>
@@ -2475,6 +2611,7 @@ function ModernBracketMatch({
 }
 
 function MatchStatus({ status }: { status: Match["status"] }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const styles = {
     upcoming: "text-zinc-400",
     live: "text-orange-300",
@@ -2497,10 +2634,12 @@ function MatchStatus({ status }: { status: Match["status"] }) {
         )}
       />
       {status === "complete"
-        ? "Completed"
+        ? t("tournaments.status.completed")
         : status === "pending_review"
-          ? "Pending Review"
-          : status}
+          ? t("tournaments.status.pendingReview")
+          : status === "live"
+            ? t("tournaments.status.inProgress")
+            : t("tournaments.status.upcoming")}
     </span>
   );
 }
@@ -2512,8 +2651,13 @@ export function MatchDeadlinePresentation({
   match: GeneratedTournamentMatch;
   compact?: boolean;
 }) {
-  const [now, setNow] = useState<number | null>(null);
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
+  const now = useHydrationSafeNow({
+    enabled: match.status === "in_progress" && !holdActive,
+    intervalMs: 30_000,
+  });
   const extensionAppliesToCurrentActivation = timestampFallsInActivation(
     match.extendedAt,
     match.activatedAt
@@ -2530,43 +2674,31 @@ export function MatchDeadlinePresentation({
   let label: ReactNode = null;
   let tone = "border-white/10 bg-black/25 text-zinc-400";
 
-  useEffect(() => {
-    if (match.status !== "in_progress" || holdActive) return;
-
-    const updateNow = () => setNow(Date.now());
-    const initialTimer = window.setTimeout(updateNow, 0);
-    const interval = window.setInterval(updateNow, 30_000);
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
-    };
-  }, [holdActive, match.status]);
-
   if (match.outcomeType === "deadline_double_forfeit") {
-    label = formatDoubleForfeitLabel(match.roundName);
+    label = formatDoubleForfeitLabel(match.roundName, t);
     tone = "border-red-400/25 bg-red-500/10 text-red-200";
   } else if (match.outcomeType === "automatic_bye") {
-    label = formatAutomaticAdvanceLabel(match.roundName);
+    label = formatAutomaticAdvanceLabel(match.roundName, t);
     tone = "border-sky-400/25 bg-sky-500/10 text-sky-200";
   } else if (match.outcomeType === "empty_feeder") {
-    label = formatEmptyFeederLabel(match.roundName);
+    label = formatEmptyFeederLabel(match.roundName, t);
     tone = "border-zinc-400/20 bg-zinc-500/10 text-zinc-300";
   } else if (holdActive) {
-    label = "Deadline paused by an administrator";
+    label = t("tournaments.brackets.deadlinePaused");
     tone = "border-amber-400/25 bg-amber-500/10 text-amber-100";
   } else if (match.status === "pending_review") {
-    label = "Result or ruling under review — deadline enforcement is paused";
+    label = t("tournaments.brackets.reviewPaused");
     tone = "border-amber-400/25 bg-amber-500/10 text-amber-100";
   } else if (overdue) {
-    label = "Deadline passed — awaiting authoritative ruling";
+    label = t("tournaments.brackets.deadlinePassed");
     tone = "border-red-400/25 bg-red-500/10 text-red-200";
   } else if (match.status === "in_progress" && match.deadlineAt) {
     label = (
       <>
-        Deadline{" "}
+        {t("tournaments.brackets.deadlinePrefix", { date: "" })}{" "}
         <HydrationSafeLocalDateTime
           value={match.deadlineAt}
-          fallback="unavailable"
+          fallback={t("deadlines.unavailable")}
         />
       </>
     );
@@ -2575,7 +2707,7 @@ export function MatchDeadlinePresentation({
     match.status === "scheduled" &&
     Boolean(match.playerOneRegistrationId) !== Boolean(match.playerTwoRegistrationId)
   ) {
-    label = "Waiting for opponent — your deadline has not started";
+    label = t("tournaments.brackets.waitingOpponent");
     tone = "border-sky-400/20 bg-sky-500/[0.08] text-sky-200";
   }
 
@@ -2596,17 +2728,35 @@ export function MatchDeadlinePresentation({
         !holdActive &&
         extensionAppliesToCurrentActivation && (
         <p className="mt-1 opacity-80">
-          Includes a {formatMatchDuration(match.extensionMinutes)} extension.
+          {t("deadlines.extension", {
+            duration: formatMatchDuration(match.extensionMinutes, t, locale),
+          })}
         </p>
       )}
     </div>
   );
 }
 
-function formatMatchDuration(minutes: number) {
-  if (minutes % 60 !== 0) return `${minutes} minutes`;
+function formatMatchDuration(
+  minutes: number,
+  t: CompetitionTranslator,
+  locale: Locale
+) {
+  if (minutes % 60 !== 0) {
+    return t(
+      selectPlural(minutes, locale) === "one"
+        ? "deadlines.minute"
+        : "deadlines.minutes",
+      { count: minutes }
+    );
+  }
   const hours = minutes / 60;
-  return `${hours} hour${hours === 1 ? "" : "s"}`;
+  return t(
+    selectPlural(hours, locale) === "one"
+      ? "deadlines.hour"
+      : "deadlines.hours",
+    { count: hours }
+  );
 }
 
 function timestampFallsInActivation(
@@ -2624,37 +2774,46 @@ function timestampFallsInActivation(
   );
 }
 
-function formatDoubleForfeitLabel(roundName: string) {
+function formatDoubleForfeitLabel(
+  roundName: string,
+  t: CompetitionTranslator
+) {
   const normalized = roundName.trim().toLowerCase();
   if (normalized === "final" || normalized === "grand final") {
-    return "Final double forfeit — division completed without a champion";
+    return t("tournaments.brackets.finalDoubleForfeit");
   }
   if (normalized.includes("semi")) {
-    return "Semifinal double forfeit — no player advances from this matchup";
+    return t("tournaments.brackets.semifinalDoubleForfeit");
   }
-  return "Quarterfinal double forfeit — no player advances from this feeder";
+  return t("tournaments.brackets.quarterfinalDoubleForfeit");
 }
 
-function formatAutomaticAdvanceLabel(roundName: string) {
+function formatAutomaticAdvanceLabel(
+  roundName: string,
+  t: CompetitionTranslator
+) {
   const normalized = roundName.trim().toLowerCase();
   if (normalized === "final" || normalized === "grand final") {
-    return "Final walkover — champion advanced without a played match";
+    return t("tournaments.brackets.finalWalkover");
   }
   if (normalized.includes("semi")) {
-    return "Semifinal automatic bye — sole eligible player advances to the Final";
+    return t("tournaments.brackets.semifinalBye");
   }
-  return "Automatic bye — sole eligible player advances without a played match";
+  return t("tournaments.brackets.automaticByeDetail");
 }
 
-function formatEmptyFeederLabel(roundName: string) {
+function formatEmptyFeederLabel(
+  roundName: string,
+  t: CompetitionTranslator
+) {
   const normalized = roundName.trim().toLowerCase();
   if (normalized === "final" || normalized === "grand final") {
-    return "Final closed — division completed without a champion";
+    return t("tournaments.brackets.finalClosed");
   }
   if (normalized.includes("semi")) {
-    return "Semifinal closed — no eligible player advances";
+    return t("tournaments.brackets.semifinalClosed");
   }
-  return "Match closed — no eligible player advances";
+  return t("tournaments.brackets.matchClosed");
 }
 
 function BroadcastTeamRow({ team }: { team: MatchTeam }) {
@@ -2708,6 +2867,8 @@ function RoundRobinBracket({
   adminReadOnly: boolean;
   onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
       <div className="grid gap-4 md:grid-cols-2">
@@ -2723,7 +2884,7 @@ function RoundRobinBracket({
         ))}
       </div>
       <div className={classNames("p-4", tournamentInsetCardClass)}>
-        <h4 className="font-black text-white">Standings</h4>
+        <h4 className="font-black text-white">{t("tournaments.brackets.standings")}</h4>
         <div className="mt-4 space-y-2">
           {standings
             .slice()
@@ -2742,16 +2903,16 @@ function RoundRobinBracket({
                 </span>
                 <span className="font-bold text-white">
                   {participantsById.get(standing.registrationId)?.name ??
-                    "Participant"}
+                    t("tournaments.brackets.participant")}
                 </span>
                 <span className="text-zinc-400">
-                      {standing.wins}W {standing.losses}L - {standing.points} pts
+                      {standing.wins}{t("tournaments.brackets.win")} {standing.losses}{t("tournaments.brackets.loss")} — {standing.points} {t("tournaments.brackets.points")}
                 </span>
               </div>
             ))}
           {standings.length === 0 && (
             <p className="border border-white/12 p-4 text-sm text-zinc-500">
-              Standings will appear after admins assign players and results are recorded.
+              {t("tournaments.brackets.standingsEmpty")}
             </p>
           )}
         </div>
@@ -2814,29 +2975,35 @@ function toMatchTeam(
 }
 
 function formatCompetitionFormat(
-  value: "single_elimination" | "round_robin"
+  value: "single_elimination" | "round_robin",
+  t: CompetitionTranslator = translateCompetitionEnglish
 ) {
   return value === "single_elimination"
-    ? "Single Elimination"
-    : "Round Robin";
+    ? t("tournaments.brackets.singleElimination")
+    : t("tournaments.brackets.roundRobin");
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(new Date(value));
+function formatDateTime(value: string, locale: Locale = "en") {
+  return formatLocalizedDateTime(value, locale, { kind: "utc" });
+}
+
+function formatParticipantFact(
+  value: string | number | null,
+  locale: Locale
+) {
+  if (value === null || value === "") return "—";
+  return typeof value === "number" ? formatNumber(value, locale) : value;
 }
 
 function formatOptionalDateTime(
   value: string | null | undefined,
-  fallback: string
+  fallback: string,
+  locale: Locale = "en"
 ) {
   if (!value) return fallback;
 
   const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? formatDateTime(value) : fallback;
+  return Number.isFinite(timestamp) ? formatDateTime(value, locale) : fallback;
 }
 
 function hasPrize(tournament: TournamentCard) {
@@ -2852,6 +3019,7 @@ function MatchCard({
   adminReadOnly: boolean;
   onAdminSelect?: () => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const card = (
     <div
       className={classNames(
@@ -2865,7 +3033,7 @@ function MatchCard({
       )}
     >
       <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">Match {match.id}</span>
+        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500">{onAdminSelect ? `Match ${match.id}` : t("tournaments.brackets.matchLabel", { id: match.id })}</span>
         <div className="flex items-center gap-2">
           {onAdminSelect && (
             <span className="rounded border border-orange-400/25 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">
@@ -2905,22 +3073,21 @@ function TeamRow({ team }: { team: MatchTeam }) {
 }
 
 function Media({ tournament }: { tournament: TournamentCard }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const links = [
     tournament.rulesUrl
-      ? { label: "Official Rules", url: tournament.rulesUrl }
+      ? { label: t("tournaments.resources.officialRules"), url: tournament.rulesUrl }
       : null,
   ].filter((link) => link !== null);
 
-  return <Card><h2 className="text-xl font-black text-white">{tournament.title} Resources</h2>{links.length > 0 ? <div className="mt-5 grid gap-4 md:grid-cols-2">{links.map((link) => <a key={link.label} href={link.url} target="_blank" rel="noreferrer" className="group relative aspect-video overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100" style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${tournament.image})` }}><PlayCircle className="text-white opacity-90" /><p className="mt-20 text-sm font-bold text-white">{link.label}</p><p className="text-xs text-zinc-300">Open tournament resource</p></a>)}</div> : <p className="mt-5 border border-white/12 p-8 text-center text-zinc-500">No tournament resources have been published.</p>}</Card>;
+  return <Card><h2 className="text-xl font-black text-white">{tournament.title} — {t("tournaments.resources.title")}</h2>{links.length > 0 ? <div className="mt-5 grid gap-4 md:grid-cols-2">{links.map((link) => <a key={link.label} href={link.url} target="_blank" rel="noreferrer" className="group relative aspect-video overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100" style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${tournament.image})` }}><PlayCircle className="text-white opacity-90" /><p className="mt-20 text-sm font-bold text-white">{link.label}</p><p className="text-xs text-zinc-300">{t("tournaments.resources.open")}</p></a>)}</div> : <p className="mt-5 border border-white/12 p-8 text-center text-zinc-500">{t("tournaments.resources.empty")}</p>}</Card>;
 }
 
 function Announcements({ tournament }: { tournament: TournamentCard }) {
-  const messages = [
-    `${tournament.title} is currently ${tournament.status.toLowerCase()}.`,
-    `Grand Final: ${formatOptionalDateTime(tournament.grandFinalAt, "TBA")}.`,
-    `${tournament.players} approved participants are currently listed across ${tournament.brackets.length} bracket${tournament.brackets.length === 1 ? "" : "s"}. Full brackets and brackets with an existing queue accept waitlist registrations while registration remains open.`,
-  ];
-  return <div className="space-y-4">{messages.map((text, index) => <Card key={text}><div className="flex gap-3"><Radio size={18} className="mt-1 text-orange-300" /><div><p className="text-xs font-black uppercase tracking-wider text-zinc-500">IronClad Update {index + 1}</p><p className="mt-1 text-zinc-200">{text}</p></div></div></Card>)}</div>;
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
+  const messages = getAnnouncementMessages(tournament, t, locale);
+  return <div className="space-y-4">{messages.map((text, index) => <Card key={text}><div className="flex gap-3"><Radio size={18} className="mt-1 text-orange-300" /><div><p className="text-xs font-black uppercase tracking-wider text-zinc-500">{t("announcements.update", { number: formatNumber(index + 1, locale) })}</p><p className="mt-1 text-zinc-200">{text}</p></div></div></Card>)}</div>;
 }
 
 function Card({ children, className }: { children: ReactNode; className?: string }) {
@@ -2937,9 +3104,6 @@ export type RelicVerifiedDivision =
   | "Academy"
   | "Challenge"
   | "Main / Pro";
-
-const MISSING_VERIFIED_DIVISION_MESSAGE =
-  "Verify your ELO from the Profile page before registering.";
 
 export function getVerifiedDivisionBracketName(
   verifiedDivision: RelicVerifiedDivision | null
@@ -3046,6 +3210,7 @@ type RegistrationPlayerProfile = Pick<
 
 export function RegisterModal({
   onClose,
+  onLocaleGate,
   profile,
   tournaments,
   initialTournamentId,
@@ -3053,12 +3218,15 @@ export function RegisterModal({
   registrationDocuments,
 }: {
   onClose: () => void;
+  onLocaleGate?: () => void;
   profile: RegistrationPlayerProfile;
   tournaments: TournamentCard[];
   initialTournamentId: string;
   verifiedDivision: RelicVerifiedDivision | null;
   registrationDocuments: RegistrationDocumentSet;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const router = useRouter();
   const initialTournament =
     tournaments.find((tournament) => tournament.id === initialTournamentId) ??
@@ -3078,7 +3246,9 @@ export function RegisterModal({
   const [submissionError, setSubmissionError] = useState("");
   const [waitlistConfirmationRequired, setWaitlistConfirmationRequired] =
     useState(false);
-  const [successMessage, setSuccessMessage] = useState("Registration submitted.");
+  const [successMessage, setSuccessMessage] = useState(
+    t("registrationServer.submitted")
+  );
   const [selectedTournament, setSelectedTournament] =
     useState<TournamentCard>(initialTournament);
   const [form, setForm] = useState<RegistrationFormState>({
@@ -3135,13 +3305,15 @@ export function RegisterModal({
       );
 
       if (availability === "launched") {
-        nextErrors.tournamentTitle =
-          "Registration closed — this division has started.";
+        nextErrors.tournamentTitle = t("tournaments.actions.registrationClosed");
       } else if (availability === "closed") {
-        nextErrors.tournamentTitle =
-          "Registration is not currently available for this division.";
+        nextErrors.tournamentTitle = t(
+          "registrationModal.errors.registrationUnavailable"
+        );
       } else if (!form.tournamentTitle.trim()) {
-        nextErrors.tournamentTitle = "Please select a tournament.";
+        nextErrors.tournamentTitle = t(
+          "registrationModal.errors.selectTournament"
+        );
       }
 
       const selectedBracket = selectedTournament.brackets.find(
@@ -3149,40 +3321,59 @@ export function RegisterModal({
       );
 
       if (!verifiedDivision) {
-        nextErrors.bracketName = MISSING_VERIFIED_DIVISION_MESSAGE;
+        nextErrors.bracketName = t(
+          "registrationModal.errors.verifiedDivisionRequired"
+        );
       } else if (
         !form.bracketName.trim() ||
         !selectedBracket ||
         !isVerifiedDivisionBracket(form.bracketName, verifiedDivision)
       ) {
-        nextErrors.bracketName =
-          "Your verified division is not available for this tournament.";
+        nextErrors.bracketName = t(
+          "registrationModal.errors.verifiedDivisionUnavailable"
+        );
       }
     }
 
     if (targetStep === "agreements") {
       if (!form.playerParticipationAgreement) {
-        nextErrors.playerParticipationAgreement = "You must agree to the Player Participation Agreement.";
+        nextErrors.playerParticipationAgreement = t(
+          "registrationModal.errors.agreementRequired",
+          { document: "Player Participation Agreement" }
+        );
       }
 
       if (!form.rulebookAgreement) {
-        nextErrors.rulebookAgreement = "You must agree to the Official Tournament Rulebook.";
+        nextErrors.rulebookAgreement = t(
+          "registrationModal.errors.agreementRequired",
+          { document: "Official Tournament Rulebook" }
+        );
       }
 
       if (!form.termsAgreement) {
-        nextErrors.termsAgreement = "You must agree to the Terms of Service.";
+        nextErrors.termsAgreement = t(
+          "registrationModal.errors.agreementRequired",
+          { document: "Terms of Service" }
+        );
       }
 
       if (!form.privacyAcknowledgement) {
-        nextErrors.privacyAcknowledgement = "You must acknowledge the Privacy Policy.";
+        nextErrors.privacyAcknowledgement = t(
+          "registrationModal.errors.acknowledgementRequired",
+          { document: "Privacy Policy" }
+        );
       }
 
       if (!form.age18Confirmation) {
-        nextErrors.age18Confirmation = "You must confirm that you are at least 18 years old.";
+        nextErrors.age18Confirmation = t(
+          "registrationModal.errors.ageRequired"
+        );
       }
 
       if (!form.accountAndSteamOwnershipConfirmation) {
-        nextErrors.accountAndSteamOwnershipConfirmation = "You must confirm ownership of your IronClad account and linked Steam account.";
+        nextErrors.accountAndSteamOwnershipConfirmation = t(
+          "registrationModal.errors.ownershipRequired"
+        );
       }
     }
 
@@ -3214,8 +3405,8 @@ export function RegisterModal({
     ) {
       setSubmissionError(
         registrationAvailability === "launched"
-          ? "Registration closed — this division has started."
-          : "Registration is not currently available for this division."
+          ? t("tournaments.actions.registrationClosed")
+          : t("registrationModal.errors.registrationUnavailable")
       );
       setStep("tournament");
       return;
@@ -3265,7 +3456,13 @@ export function RegisterModal({
     setIsSubmitting(false);
 
     if (!result.success) {
-      setSubmissionError(result.message);
+      if (result.code === "LOCALE_REGISTRATION_GATE") {
+        onClose();
+        onLocaleGate?.();
+        return;
+      }
+
+      setSubmissionError(getRegistrationResultMessage(result, t));
       if (result.requiresWaitlistConfirmation) {
         setWaitlistConfirmationRequired(true);
       }
@@ -3274,7 +3471,7 @@ export function RegisterModal({
 
     router.refresh();
     setStep("submitted");
-    setSuccessMessage(result.message);
+    setSuccessMessage(getRegistrationResultMessage(result, t));
   };
 
   const steps: RegistrationStep[] = [
@@ -3300,10 +3497,18 @@ export function RegisterModal({
         <div className="sticky top-0 z-10 border-b border-white/10 bg-black/90 p-5 backdrop-blur">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-300">IronClad Registration</p>
-              <h3 className="mt-1 break-words text-2xl font-black text-white">Esports Player Registration</h3>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-300">
+                {t("registrationModal.eyebrow")}
+              </p>
+              <h3 className="mt-1 break-words text-2xl font-black text-white">
+                {t("registrationModal.title")}
+              </h3>
             </div>
-            <button onClick={onClose} className="shrink-0 rounded bg-slate-800 p-2 text-zinc-200 transition hover:bg-slate-700">
+            <button
+              aria-label={t("registrationModal.closeAria")}
+              onClick={onClose}
+              className="shrink-0 rounded bg-slate-800 p-2 text-zinc-200 transition hover:bg-slate-700"
+            >
               <X size={18} />
             </button>
           </div>
@@ -3317,8 +3522,12 @@ export function RegisterModal({
           {step === "tournament" && (
             <div className="space-y-5">
               <div>
-                <h4 className="text-xl font-black text-white">Tournament Selection</h4>
-                <p className="mt-2 text-sm leading-6 text-zinc-300">Select the tournament and bracket/event type you want to join.</p>
+                <h4 className="text-xl font-black text-white">
+                  {t("registrationModal.tournamentSelection")}
+                </h4>
+                <p className="mt-2 text-sm leading-6 text-zinc-300">
+                  {t("registrationModal.tournamentSelectionDescription")}
+                </p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
@@ -3342,11 +3551,11 @@ export function RegisterModal({
                       style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
                     >
                       <p className="break-words text-lg font-black text-white">{event.title}</p>
-                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{event.month} - {event.format} - {event.status}</p>
+                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{event.month} - {event.format} - {localizeTournamentStatus(event.status, t)}</p>
                       <p className="mt-3 break-words text-sm leading-6 text-zinc-300">{event.description}</p>
                       {!registrationAvailable && (
                         <p className="mt-3 text-xs font-black uppercase tracking-wider text-red-300">
-                          Registration unavailable
+                          {t("tournaments.gatePrompt.closedEyebrow")}
                         </p>
                       )}
                     </button>
@@ -3361,13 +3570,13 @@ export function RegisterModal({
                   <div className="min-w-0">
                     <h5 className="break-words text-lg font-black text-white">{selectedTournament.title}</h5>
                     <div className="mt-3 grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
-                      <p><span className="font-bold text-zinc-500">Format:</span> {selectedTournament.format}</p>
-                      <p><span className="font-bold text-zinc-500">Rule Format:</span> {selectedTournament.ruleFormatLabel}</p>
-                      <p><span className="font-bold text-zinc-500">Status:</span> {selectedTournament.status}</p>
+                      <p><span className="font-bold text-zinc-500">{t("tournaments.overview.format")}:</span> {selectedTournament.format}</p>
+                      <p><span className="font-bold text-zinc-500">{t("tournaments.overview.ruleFormat")}:</span> {selectedTournament.ruleFormatLabel}</p>
+                      <p><span className="font-bold text-zinc-500">{t("tournaments.participants.status")}:</span> {localizeTournamentStatus(selectedTournament.status, t)}</p>
                       {hasPrize(selectedTournament) && (
-                        <p><span className="font-bold text-zinc-500">Prize Pool:</span> {selectedTournament.prizePool}</p>
+                        <p><span className="font-bold text-zinc-500">{t("tournaments.overview.prizePool")}:</span> {selectedTournament.prizePool}</p>
                       )}
-                      <p><span className="font-bold text-zinc-500">Grand Final:</span> {formatOptionalDateTime(selectedTournament.grandFinalAt, "TBA")}</p>
+                      <p><span className="font-bold text-zinc-500">{t("tournaments.overview.grandFinal")}:</span> {formatOptionalDateTime(selectedTournament.grandFinalAt, t("tournaments.projection.dateTba"), locale)}</p>
                     </div>
                   </div>
                 </div>
@@ -3405,7 +3614,21 @@ export function RegisterModal({
                           {bracket.name}
                         </p>
                         <p className="mt-1 break-words text-xs text-zinc-400">
-                          {bracket.requirement} - active review cohort {bracket.activeCohortPlayers}/{bracket.activeCohortSize} - {bracket.waitlistedPlayers} waitlisted
+                          {t("registrationModal.cohortSummary", {
+                            requirement: bracket.requirement,
+                            active: formatNumber(
+                              bracket.activeCohortPlayers,
+                              locale
+                            ),
+                            capacity: formatNumber(
+                              bracket.activeCohortSize,
+                              locale
+                            ),
+                            waitlisted: formatNumber(
+                              bracket.waitlistedPlayers,
+                              locale
+                            ),
+                          })}
                         </p>
                         <p
                           className={classNames(
@@ -3415,18 +3638,18 @@ export function RegisterModal({
                         >
                           {bracket.isWaitlistOnly
                             ? bracket.isFull
-                              ? "Active review cohort full - waitlist only"
-                              : "Waitlist active - queued registrations first"
+                              ? t("registrationModal.activeCohortFull")
+                              : t("registrationModal.waitlistActive")
                             : bracket.prize}
                         </p>
                         {bracket.isWaitlistOnly && (
                           <p className="mt-2 text-xs font-black uppercase tracking-wider text-amber-300">
-                            Waitlist Only
+                            {t("registrationModal.waitlistOnly")}
                           </p>
                         )}
                         {bracket.launchedAt && (
                           <p className="mt-2 text-xs font-black uppercase tracking-wider text-zinc-400">
-                            Registration closed — this division has started.
+                            {t("tournaments.actions.registrationClosed")}
                           </p>
                         )}
                         <p
@@ -3436,8 +3659,8 @@ export function RegisterModal({
                           )}
                         >
                           {selectable
-                            ? "Your verified division"
-                            : "Unavailable for your verified division"}
+                            ? t("registrationModal.verifiedDivision")
+                            : t("registrationModal.unavailableForDivision")}
                         </p>
                       </button>
                     );
@@ -3449,21 +3672,18 @@ export function RegisterModal({
                     className="mt-4 border border-orange-500/40 bg-orange-500/10 p-4"
                   >
                     <p className="text-sm font-bold text-orange-200">
-                      {MISSING_VERIFIED_DIVISION_MESSAGE}
+                      {t("registrationModal.errors.verifiedDivisionRequired")}
                     </p>
                     <Link
                       href="/profile"
                       className="mt-3 inline-flex text-sm font-bold text-orange-300 transition hover:text-orange-200"
                     >
-                      Open Profile
+                      {t("tournaments.actions.openProfile")}
                     </Link>
                   </div>
                 )}
                 <p className="mt-3 text-sm leading-6 text-zinc-400">
-                  Your verified profile division determines the selectable
-                  bracket. On submission, IronClad still performs one fresh
-                  Relic 1v1 ELO lookup, and the server accepts only the division
-                  that matches that fresh result.
+                  {t("registrationModal.divisionExplanation")}
                 </p>
                 {errors.bracketName && <FieldError message={errors.bracketName} />}
               </div>
@@ -3483,36 +3703,38 @@ export function RegisterModal({
           {step === "profile" && (
             <div className="space-y-5">
               <div>
-                <h4 className="text-xl font-black text-white">Player Profile Confirmation</h4>
-                <p className="mt-2 text-sm leading-6 text-zinc-300">Registration uses your saved IronClad player profile. Update your profile before continuing if any information is outdated.</p>
+                <h4 className="text-xl font-black text-white">
+                  {t("registrationModal.profileTitle")}
+                </h4>
+                <p className="mt-2 text-sm leading-6 text-zinc-300">
+                  {t("registrationModal.profileDescription")}
+                </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <RegistrationProfileValue label="Display Name" value={profile.display_name} />
-                <RegistrationProfileValue label="IGN" value={profile.in_game_name} />
-                <RegistrationProfileValue label="Discord (optional)" value={profile.discord_username} />
-                <RegistrationProfileValue label="Steam" value={profile.steam_username} />
-                <RegistrationProfileValue label="Country" value={profile.country} />
-                <RegistrationProfileValue label="Region" value={profile.region} />
-                <RegistrationProfileValue label="Timezone" value={profile.timezone} />
+                <RegistrationProfileValue label={t("registrationModal.displayName")} value={profile.display_name} />
+                <RegistrationProfileValue label={t("registrationModal.ign")} value={profile.in_game_name} />
+                <RegistrationProfileValue label={t("registrationModal.discordOptional")} value={profile.discord_username} />
+                <RegistrationProfileValue label={t("registrationModal.steam")} value={profile.steam_username} />
+                <RegistrationProfileValue label={t("registrationModal.country")} value={profile.country} />
+                <RegistrationProfileValue label={t("registrationModal.region")} value={profile.region} />
+                <RegistrationProfileValue label={t("registrationModal.timezone")} value={profile.timezone} />
                 <RegistrationProfileValue
-                  label="Intended Division"
-                  value={form.bracketName || "Not selected"}
+                  label={t("registrationModal.intendedDivision")}
+                  value={form.bracketName || t("registrationModal.notSelected")}
                 />
               </div>
 
               <div className="border border-emerald-500/40 bg-emerald-950/25 p-4">
-                <p className="text-sm font-black uppercase tracking-wider text-emerald-300">Fresh Relic 1v1 Verification</p>
+                <p className="text-sm font-black uppercase tracking-wider text-emerald-300">
+                  {t("registrationModal.freshVerification")}
+                </p>
                 <p className="mt-2 text-sm leading-6 text-zinc-200">
-                  Submitting securely loads your connected Steam identity and
-                  checks your current Relic 1v1 ELO. The server calculates your
-                  division, verifies it matches your intended division, and
-                  saves the tournament ELO snapshot. Saved profile ELO and
-                  earlier profile checks are not used for eligibility.
+                  {t("registrationModal.freshVerificationDescription")}
                 </p>
               </div>
 
-              <Link href="/profile" className="inline-flex text-sm font-bold text-orange-300 transition hover:text-orange-200">Update Player Profile</Link>
+              <Link href="/profile" className="inline-flex text-sm font-bold text-orange-300 transition hover:text-orange-200">{t("registrationModal.updateProfile")}</Link>
 
               <ModalButtons onBack={() => setStep("tournament")} onNext={goToAgreementsStep} />
             </div>
@@ -3521,15 +3743,19 @@ export function RegisterModal({
           {step === "agreements" && (
             <div className="space-y-5">
               <div>
-                <h4 className="text-xl font-black text-white">Rules & Agreements</h4>
-                <p className="mt-2 text-sm leading-6 text-zinc-300">Confirm all required agreements before submitting your registration.</p>
+                <h4 className="text-xl font-black text-white">
+                  {t("registrationModal.agreementsTitle")}
+                </h4>
+                <p className="mt-2 text-sm leading-6 text-zinc-300">
+                  {t("registrationModal.agreementsDescription")}
+                </p>
               </div>
 
               <div className="space-y-3">
                 <AgreementCheckbox
                   label={
                     <DocumentAgreementLabel
-                      prefix="I accept the"
+                      prefix={t("registrationModal.acceptPrefix")}
                       document={registrationDocuments.ppa}
                       label="Player Participation Agreement"
                     />
@@ -3541,7 +3767,7 @@ export function RegisterModal({
                 <AgreementCheckbox
                   label={
                     <DocumentAgreementLabel
-                      prefix="I accept the"
+                      prefix={t("registrationModal.acceptPrefix")}
                       document={registrationDocuments.rulebook}
                       label="Official Tournament Rulebook"
                     />
@@ -3553,7 +3779,7 @@ export function RegisterModal({
                 <AgreementCheckbox
                   label={
                     <DocumentAgreementLabel
-                      prefix="I accept the"
+                      prefix={t("registrationModal.acceptPrefix")}
                       document={registrationDocuments.terms}
                       label="Terms of Service"
                     />
@@ -3565,7 +3791,7 @@ export function RegisterModal({
                 <AgreementCheckbox
                   label={
                     <DocumentAgreementLabel
-                      prefix="I acknowledge the"
+                      prefix={t("registrationModal.acknowledgePrefix")}
                       document={registrationDocuments.privacy}
                       label="Privacy Policy"
                     />
@@ -3575,13 +3801,13 @@ export function RegisterModal({
                   error={errors.privacyAcknowledgement}
                 />
                 <AgreementCheckbox
-                  label="I confirm that I am at least 18 years old."
+                  label={t("registrationModal.ageConfirmation")}
                   checked={form.age18Confirmation}
                   onChange={(checked) => updateField("age18Confirmation", checked)}
                   error={errors.age18Confirmation}
                 />
                 <AgreementCheckbox
-                  label="I confirm that I am using my own IronClad account and that the linked Steam account belongs to me."
+                  label={t("registrationModal.ownershipConfirmation")}
                   checked={form.accountAndSteamOwnershipConfirmation}
                   onChange={(checked) => updateField("accountAndSteamOwnershipConfirmation", checked)}
                   error={errors.accountAndSteamOwnershipConfirmation}
@@ -3594,10 +3820,10 @@ export function RegisterModal({
                   className="border border-amber-400/45 bg-amber-500/10 p-4"
                 >
                   <p className="text-sm font-black uppercase tracking-wider text-amber-200">
-                    Join Waitlist
+                    {t("tournaments.actions.joinWaitlist")}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-amber-100">
-                    {WAITLIST_DISCLOSURE_MESSAGE}
+                    {t("registrationServer.waitlistConfirmation")}
                   </p>
                 </div>
               )}
@@ -3608,7 +3834,7 @@ export function RegisterModal({
                 </div>
               )}
 
-              <ModalButtons onBack={() => setStep("profile")} onNext={submitRegistration} nextLabel={waitlistSubmission ? "Join Waitlist" : "Submit Registration"} isLoading={isSubmitting} />
+              <ModalButtons onBack={() => setStep("profile")} onNext={submitRegistration} nextLabel={waitlistSubmission ? t("tournaments.actions.joinWaitlist") : t("registrationModal.submitRegistration")} isLoading={isSubmitting} />
             </div>
           )}
 
@@ -3617,16 +3843,61 @@ export function RegisterModal({
               <div className="grid h-16 w-16 place-items-center rounded-full border border-emerald-400/70 bg-emerald-950/40 shadow-[0_0_32px_rgba(16,185,129,0.35)]">
                 <CheckCircle2 className="text-emerald-300" size={30} />
               </div>
-              <h4 className="mt-5 text-2xl font-black text-white">Registration Submitted</h4>
+              <h4 className="mt-5 text-2xl font-black text-white">
+                {t("registrationModal.submittedTitle")}
+              </h4>
               <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">{successMessage}</p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-300">Registrations are reviewed within 24 hours.</p>
-              <button onClick={onClose} className="mt-6 rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400">Close</button>
+              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-300">
+                {t("registrationModal.reviewTime")}
+              </p>
+              <button onClick={onClose} className="mt-6 rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400">{t("tournaments.actions.close")}</button>
             </div>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+function getRegistrationResultMessage(
+  result: TournamentRegistrationResult,
+  t: CompetitionTranslator
+) {
+  const keyByCode: Partial<
+    Record<TournamentRegistrationResult["code"], string>
+  > = {
+    AUTH_REQUIRED: "registrationServer.authRequired",
+    INVALID_INPUT: "registrationServer.invalidInput",
+    SERVICE_UNAVAILABLE: "registrationServer.serviceUnavailable",
+    PROFILE_VERIFICATION_FAILED: "registrationServer.profileVerificationFailed",
+    PROFILE_REQUIRED: "registrationServer.profileRequired",
+    STEAM_REQUIRED: "registrationServer.steamRequired",
+    DUPLICATE_REGISTRATION: "registrationServer.duplicate",
+    TOURNAMENT_UNAVAILABLE: "registrationServer.tournamentUnavailable",
+    REGISTRATION_UNAVAILABLE: "registrationServer.registrationUnavailable",
+    RELIC_UNAVAILABLE: "registrationServer.relicUnavailable",
+    STEAM_IDENTITY_INVALID: "registrationServer.steamIdentityInvalid",
+    RELIC_PROFILE_NOT_FOUND: "registrationServer.relicProfileNotFound",
+    STEAM_IDENTITY_MISMATCH: "registrationServer.steamIdentityMismatch",
+    ELO_UNAVAILABLE: "registrationServer.eloUnavailable",
+    ELO_VERIFICATION_FAILED: "registrationServer.eloVerificationFailed",
+    DIVISION_MISMATCH: "registrationServer.divisionMismatch",
+    LEGAL_DOCUMENTS_UNAVAILABLE: "registrationServer.legalUnavailable",
+    WAITLIST_QUEUE_ACTIVE: "registrationServer.waitlistQueueActive",
+    BRACKET_FULL: "registrationServer.bracketFull",
+    WAITLIST_CONFIRMATION_REQUIRED: "registrationServer.waitlistConfirmation",
+    REGISTRATION_FAILED: "registrationServer.failed",
+    REGISTRATION_SUBMITTED: "registrationServer.submitted",
+    WAITLIST_SUBMITTED: result.values?.position
+      ? "registrationServer.waitlistSubmittedPosition"
+      : "registrationServer.waitlistSubmitted",
+  };
+  const key = keyByCode[result.code];
+  return key
+    ? t(key, {
+        position: result.values?.position ?? "",
+      })
+    : result.message;
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -3644,10 +3915,14 @@ function RegistrationProfileValue({
   value: string | null;
   className?: string;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className={classNames("min-w-0 p-4", tournamentInsetCardClass, className)}>
       <p className="text-xs font-black uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-2 break-words text-sm font-bold text-white">{value || "N/A"}</p>
+      <p className="mt-2 break-words text-sm font-bold text-white">
+        {value || t("registrationServer.notAvailable")}
+      </p>
     </div>
   );
 }
@@ -3661,7 +3936,9 @@ function DocumentAgreementLabel({
   document: RegistrationDocumentSet[keyof RegistrationDocumentSet];
   label: string;
 }) {
-  const effectiveDate = new Intl.DateTimeFormat("en-AU", {
+  const locale = useOptionalLocale();
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const effectiveDate = new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "long",
     timeZone: "Australia/Sydney",
@@ -3673,18 +3950,27 @@ function DocumentAgreementLabel({
     <>
       {prefix}{" "}
       <Link
-        aria-label={`${label} (version ${document.version}) (opens in a new tab)`}
+        aria-label={t("registrationServer.documentLinkAria", {
+          label,
+          version: document.version,
+        })}
         href={document.url}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => event.stopPropagation()}
         className="text-orange-300 underline decoration-orange-500/60 underline-offset-4 transition hover:text-orange-200"
       >
-        {label} (version {document.version})
+        {t("registrationServer.documentVersion", {
+          label,
+          version: document.version,
+        })}
       </Link>
       .
       <span className="mt-1 block text-xs font-medium text-zinc-400">
-        Effective {effectiveDate} · SHA-256 {abbreviatedSha256}
+        {t("registrationServer.documentEffective", {
+          date: effectiveDate,
+          sha256: abbreviatedSha256,
+        })}
       </span>
     </>
   );
@@ -3708,14 +3994,16 @@ function AgreementCheckbox({ label, checked, onChange, error }: { label: ReactNo
   );
 }
 
-function ModalButtons({ onClose, onBack, onNext, nextLabel = "Continue", isLoading = false, isDisabled = false }: { onClose?: () => void; onBack?: () => void; onNext: () => void | Promise<void>; nextLabel?: string; isLoading?: boolean; isDisabled?: boolean }) {
+function ModalButtons({ onClose, onBack, onNext, nextLabel, isLoading = false, isDisabled = false }: { onClose?: () => void; onBack?: () => void; onNext: () => void | Promise<void>; nextLabel?: string; isLoading?: boolean; isDisabled?: boolean }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-between">
       <div>
-        {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Back</button>}
-        {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">Cancel</button>}
+        {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">{t("registrationModal.back")}</button>}
+        {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">{t("registrationModal.cancel")}</button>}
       </div>
-      <button disabled={isLoading || isDisabled} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? "Submitting..." : nextLabel}</button>
+      <button disabled={isLoading || isDisabled} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? t("registrationModal.submitting") : nextLabel ?? t("registrationModal.continue")}</button>
     </div>
   );
 }
@@ -3751,6 +4039,8 @@ function MobileHero({
   verifiedDivision: RelicVerifiedDivision | null;
   onRegisterClick: () => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const registrationAvailability = getRegistrationDivisionAvailability(
     tournament,
     verifiedDivision
@@ -3762,14 +4052,14 @@ function MobileHero({
   const publicStatus = getPublicTournamentStatus(tournament);
   const registrationIsWaitlistOnly = registrationAvailability === "waitlist";
   const actionLabel = divisionLaunched
-    ? "Registration closed — this division has started."
+    ? t("tournaments.actions.registrationClosed")
     : registrationOpen
       ? registrationIsWaitlistOnly
-      ? "Join Waitlist"
-      : "Register"
-    : publicStatus;
+      ? t("tournaments.actions.joinWaitlist")
+      : t("tournaments.actions.register")
+    : localizeTournamentStatus(publicStatus, t);
   const registrationState = viewerRegistration
-    ? getViewerRegistrationDisplay(tournament, viewerRegistration)
+    ? getViewerRegistrationDisplay(tournament, viewerRegistration, t, locale)
     : null;
   const terminalTournament = isTournamentTerminalStatus(
     tournament.statusValue
@@ -3781,7 +4071,7 @@ function MobileHero({
     },
     {
       icon: CalendarDays,
-      label: `${tournament.month} Tournament`,
+      label: t("heroMetadata.date", { date: tournament.month }),
     },
     {
       icon: Clock3,
@@ -3789,7 +4079,10 @@ function MobileHero({
     },
     {
       icon: Users,
-      label: `${tournament.players}/${tournament.maxPlayers} approved slots`,
+      label: t("heroMetadata.approvedSlots", {
+        players: formatNumber(tournament.players, locale),
+        maximum: formatNumber(tournament.maxPlayers, locale),
+      }),
     },
   ];
 
@@ -3811,12 +4104,13 @@ function MobileHero({
         <div className="flex max-w-full flex-wrap items-center gap-2">
           <StatusPill
             tone={
-              publicStatus === "Open" || publicStatus === "In Progress"
+              tournament.statusValue === "registration_open" ||
+              tournament.statusValue === "in_progress"
                 ? "green"
                 : "gray"
             }
           >
-            {publicStatus}
+            {localizeTournamentStatus(publicStatus, t)}
           </StatusPill>
           <StatusPill tone="neutral">{tournament.format}</StatusPill>
           <StatusPill tone="amber">{tournament.ruleFormatLabel}</StatusPill>
@@ -3884,12 +4178,12 @@ function MobileHero({
               label={actionLabel}
               description={
                 divisionLaunched
-                  ? "Division in progress"
+                  ? t("tournaments.hero.divisionInProgress")
                   : registrationOpen
                   ? registrationIsWaitlistOnly
-                    ? "Waitlist open"
-                    : "Open events"
-                  : "Check the tournament schedule"
+                    ? t("tournaments.hero.waitlistOpen")
+                    : t("tournaments.hero.openEvents")
+                  : t("tournaments.hero.scheduleHint")
               }
               icon={registrationOpen ? CheckCircle2 : Clock3}
               onClick={onRegisterClick}
@@ -3903,6 +4197,8 @@ function MobileHero({
 }
 
 function MobileTournamentMenuButton({ onClick }: { onClick: () => void }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className="w-full max-w-full min-w-0 px-4 py-4 sm:px-5">
       <button
@@ -3912,7 +4208,7 @@ function MobileTournamentMenuButton({ onClick }: { onClick: () => void }) {
       >
         <span className="flex min-w-0 items-center gap-3">
           <CalendarDays size={18} className="shrink-0 text-orange-300" />
-          <span className="min-w-0 break-words">Tournament Menu</span>
+          <span className="min-w-0 break-words">{t("tournaments.tournamentMenu")}</span>
         </span>
         <ChevronDown size={17} className="-rotate-90 shrink-0 text-orange-300" />
       </button>
@@ -3927,9 +4223,11 @@ function MobileTabs({
   activeTab: TabKey;
   setActiveTab: (tab: TabKey) => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <nav
-      aria-label="Tournament sections"
+      aria-label={t("tournaments.tournamentNavigation")}
       className="w-full max-w-full min-w-0 border-y border-orange-500/20 bg-black/72 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl sm:px-5"
     >
       <div className="grid w-full max-w-full min-w-0 grid-cols-3 gap-2">
@@ -3952,7 +4250,7 @@ function MobileTabs({
             >
               <Icon size={15} className="shrink-0 text-orange-300" />
               <span className="min-w-0 max-w-full break-words">
-                {tab.label}
+                {t(`tournaments.tabs.${tab.key}`)}
               </span>
             </button>
           );
@@ -3973,6 +4271,8 @@ function MobileOverview({
   activePanel: OverviewPanelKey;
   setActivePanel: (panel: OverviewPanelKey) => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const panels = overviewPanels.filter(
     (item) => item.key !== "prizes" || hasPrize(tournament)
   );
@@ -3996,7 +4296,7 @@ function MobileOverview({
           </div>
           <div className="min-w-0">
             <h2 className="break-words text-xl font-black text-white">
-              IronClad Company of Heroes 3 Tournaments
+              {t("tournaments.overview.title")}
             </h2>
             <p className="mt-2 break-words leading-7 text-zinc-300">
               {tournament.details}
@@ -4037,18 +4337,18 @@ function MobileOverview({
                 )}
               >
                 <span className="block min-w-0 break-words">
-                  {item.label}
+                  {t(`tournaments.panels.${item.key}`)}
                 </span>
               </button>
             );
           })}
         </div>
-        <div className="mt-5">{renderMobileOverviewPanel(visiblePanel, tournament)}</div>
+        <div className="mt-5">{renderMobileOverviewPanel(visiblePanel, tournament, t, locale)}</div>
       </MobileCard>
 
       <MobileCard>
         <h3 className="text-sm font-black uppercase tracking-wider text-white">
-          Published Tournaments
+          {t("tournaments.overview.published")}
         </h3>
         <div className="mt-4 space-y-3">
           {tournaments.map((item) => (
@@ -4059,11 +4359,10 @@ function MobileOverview({
 
       <MobileCard>
         <h3 className="text-sm font-black uppercase tracking-wider text-white">
-          Tournament Archive
+          {t("tournaments.overview.archive")}
         </h3>
         <p className="mt-2 break-words text-xs leading-5 text-zinc-400">
-          Battlefy remains the historical reference for events held before the
-          new IronClad platform launch.
+          {t("tournaments.overview.archiveDescription")}
         </p>
         <div className="mt-4 space-y-3">
           {archiveEvents.map((item) => (
@@ -4080,13 +4379,11 @@ function MobileOverview({
               <div className="flex min-w-0 items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="break-words font-bold text-white">{item.title}</p>
-                  {item.description && (
-                    <p className="mt-1 break-words text-xs leading-5 text-zinc-300">
-                      {item.description}
-                    </p>
-                  )}
+                  <p className="mt-1 break-words text-xs leading-5 text-zinc-300">
+                    {t(item.descriptionKey)}
+                  </p>
                   <p className="mt-3 text-xs font-black uppercase tracking-wider text-orange-300">
-                    View on Battlefy
+                    {t("tournaments.actions.viewBattlefy")}
                   </p>
                 </div>
                 <MessageCircle size={16} className="mt-1 shrink-0 text-orange-300" />
@@ -4123,7 +4420,9 @@ function MobileTournamentLinkCard({ item }: { item: TournamentCard }) {
 
 function renderMobileOverviewPanel(
   panel: OverviewPanelKey,
-  tournament: TournamentCard
+  tournament: TournamentCard,
+  t: CompetitionTranslator,
+  locale: Locale
 ) {
   const shared = "break-words leading-7 text-zinc-300";
 
@@ -4131,7 +4430,7 @@ function renderMobileOverviewPanel(
     return (
       <div className="space-y-4">
         <MobileDetail
-          label="Tournament Rule Format"
+          label={t("tournaments.overview.tournamentRuleFormat")}
           value={tournament.ruleFormatLabel}
         />
         <p className={shared}>{tournament.rules}</p>
@@ -4144,7 +4443,7 @@ function renderMobileOverviewPanel(
       <div className={classNames("w-full max-w-full min-w-0 p-5", tournamentInsetCardClass)}>
         <Trophy className="text-amber-300" size={24} />
         <p className="mt-4 text-sm font-black uppercase tracking-wider text-amber-200">
-          Prizes
+          {t("tournaments.overview.prizes")}
         </p>
         <p className="mt-3 whitespace-pre-line break-words text-lg font-bold leading-8 text-white">
           {tournament.prizePool}
@@ -4179,46 +4478,49 @@ function renderMobileOverviewPanel(
 
   return (
     <div className="grid gap-3">
-      <MobileDetail label="Event" value={tournament.title} />
-      <MobileDetail label="Format" value={tournament.format} />
-      <MobileDetail label="Rule Format" value={tournament.ruleFormatLabel} />
+      <MobileDetail label={t("tournaments.overview.event")} value={tournament.title} />
+      <MobileDetail label={t("tournaments.overview.format")} value={tournament.format} />
+      <MobileDetail label={t("tournaments.overview.ruleFormat")} value={tournament.ruleFormatLabel} />
       <MobileDetail
-        label="Registration Status"
-        value={getPublicTournamentStatus(tournament)}
+        label={t("tournaments.overview.registrationStatus")}
+        value={localizeTournamentStatus(getPublicTournamentStatus(tournament), t)}
       />
       <MobileDetail
-        label="Registration Opens"
+        label={t("tournaments.overview.registrationOpens")}
         value={formatOptionalDateTime(
           tournament.registrationOpenAt,
-          "When status is Open"
+          t("tournaments.overview.registrationOpenStatus"),
+          locale
         )}
       />
       <MobileDetail
-        label="Registration Closes"
+        label={t("tournaments.overview.registrationCloses")}
         value={formatOptionalDateTime(
           tournament.registrationCloseAt,
-          "Until closed by an administrator"
+          t("tournaments.overview.registrationCloseAdmin"),
+          locale
         )}
       />
       <MobileDetail
-        label="Grand Final"
+        label={t("tournaments.overview.grandFinal")}
         value={formatOptionalDateTime(
           tournament.grandFinalAt,
-          "Grand Final TBA"
+          t("tournaments.overview.grandFinalTba"),
+          locale
         )}
       />
       {hasPrize(tournament) && (
-        <MobileDetail label="Prize Pool" value={tournament.prizePool} />
+        <MobileDetail label={t("tournaments.overview.prizePool")} value={tournament.prizePool} />
       )}
       <MobileDetail
-        label="Approved Participants"
+        label={t("tournaments.overview.approvedParticipants")}
         value={`${tournament.players} / ${tournament.maxPlayers}`}
       />
       {tournament.brackets.map((bracket) => (
         <MobileDetail
           key={bracket.name}
           label={bracket.name}
-          value={`${bracket.requirement} - active review cohort ${bracket.activeCohortPlayers} / ${bracket.activeCohortSize} - ${bracket.registeredPlayers} approved - ${bracket.waitlistedPlayers} waitlisted`}
+          value={t("tournaments.overview.cohortSummary", { requirement: bracket.requirement, active: bracket.activeCohortPlayers, capacity: bracket.activeCohortSize, approved: bracket.registeredPlayers, waitlisted: bracket.waitlistedPlayers })}
         />
       ))}
     </div>
@@ -4237,6 +4539,7 @@ function MobileDetail({ label, value }: { label: string; value: string }) {
 }
 
 function MobileParticipants({ tournament }: { tournament: TournamentCard }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const [query, setQuery] = useState("");
   const participantSections = useMemo(
     () =>
@@ -4267,10 +4570,10 @@ function MobileParticipants({ tournament }: { tournament: TournamentCard }) {
       <div className="space-y-4">
         <div>
           <h2 className="break-words text-xl font-black text-white">
-            {tournament.title} Entries
+            {t("tournaments.participants.title", { tournament: tournament.title })}
           </h2>
           <p className="mt-1 break-words text-sm text-zinc-400">
-            Approved participants separated by their ELO-eligible bracket.
+            {t("tournaments.participants.description")}
           </p>
         </div>
         <div className="relative w-full max-w-full">
@@ -4281,7 +4584,7 @@ function MobileParticipants({ tournament }: { tournament: TournamentCard }) {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search entries"
+            placeholder={t("tournaments.participants.search")}
             className="min-h-11 w-full rounded border border-white/12 bg-black/55 py-2.5 pl-10 pr-3 text-sm text-white outline-none transition focus:border-orange-400"
           />
         </div>
@@ -4290,7 +4593,7 @@ function MobileParticipants({ tournament }: { tournament: TournamentCard }) {
       {filteredByBracket.map((section) => (
         <MobileParticipantSection
           key={section.bracket.id}
-          title={`${section.bracket.name} Participants`}
+          title={t("tournaments.participants.bracketTitle", { bracket: section.bracket.name })}
           requirement={section.bracket.requirement}
           participants={section.participants}
           totalCount={section.totalCount}
@@ -4311,6 +4614,9 @@ function MobileParticipantSection({
   participants: TournamentParticipant[];
   totalCount: number;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
+
   return (
     <MobileCard>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
@@ -4318,7 +4624,7 @@ function MobileParticipantSection({
           <h3 className="break-words text-lg font-black text-white">{title}</h3>
           <p className="mt-1 break-words text-sm text-zinc-500">{requirement}</p>
         </div>
-        <StatusPill tone="neutral">{totalCount} Approved</StatusPill>
+        <StatusPill tone="neutral">{t("tournaments.participants.approvedCount", { count: totalCount })}</StatusPill>
       </div>
 
       <div className="mt-5 space-y-3">
@@ -4334,15 +4640,15 @@ function MobileParticipantSection({
                   {participant.name}
                 </h4>
               </div>
-              <StatusPill tone="green">Approved</StatusPill>
+              <StatusPill tone="green">{t("tournaments.participants.approved")}</StatusPill>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
-                  Country
+                  {t("tournaments.participants.country")}
                 </p>
                 <p className="mt-1 break-words font-bold text-zinc-200">
-                  {formatTournamentParticipantFact(participant.country)}
+                  {formatParticipantFact(participant.country, locale)}
                 </p>
               </div>
               <div className="min-w-0">
@@ -4350,7 +4656,7 @@ function MobileParticipantSection({
                   ELO
                 </p>
                 <p className="mt-1 break-words font-bold text-zinc-200">
-                  {formatTournamentParticipantFact(participant.elo)}
+                  {formatParticipantFact(participant.elo, locale)}
                 </p>
               </div>
             </div>
@@ -4358,7 +4664,7 @@ function MobileParticipantSection({
         ))}
         {participants.length === 0 && (
           <p className="border border-white/12 bg-black/30 p-6 text-center text-sm text-zinc-500">
-            No approved participants in this bracket.
+            {t("tournaments.participants.empty")}
           </p>
         )}
       </div>
@@ -4379,6 +4685,8 @@ function MobileBrackets({
   matchResultReportGroups: MatchResultReportGroup[];
   focusedMatchId: string | null;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
       participant.registrationId,
@@ -4446,7 +4754,7 @@ function MobileBrackets({
     <div className="w-full max-w-full min-w-0 space-y-5">
       <div className="min-w-0">
         <h2 className="break-words text-2xl font-black text-white">
-          {tournament.title} Brackets
+          {tournament.title} — {t("tournaments.brackets.title")}
         </h2>
         <p className="mt-1 break-words text-sm text-zinc-400">
           {tournament.brackets
@@ -4528,13 +4836,18 @@ function MobileBrackets({
                 </div>
                 <p className="mt-1 break-words text-sm text-zinc-400">
                   {generated
-                    ? `${formatCompetitionFormat(generated.format)} - ${generated.slotCount} empty player slots`
-                    : `${approvedCount} approved - at least 2 required`}
+                    ? t("bracketSummary.emptySlots", {
+                        format: formatCompetitionFormat(generated.format, t),
+                        count: formatNumber(generated.slotCount, locale),
+                      })
+                    : t("bracketSummary.approvedMinimum", {
+                        count: formatNumber(approvedCount, locale),
+                      })}
                 </p>
               </div>
               {generated && (
                 <span className="break-words text-xs uppercase tracking-wider text-zinc-500">
-                  Generated {formatDateTime(generated.generatedAt)}
+                  {t("tournaments.brackets.generated")} {formatDateTime(generated.generatedAt, locale)}
                 </span>
               )}
             </div>
@@ -4551,8 +4864,7 @@ function MobileBrackets({
 
             {!generated ? (
               <p className="mt-6 border border-white/12 p-6 text-center text-zinc-500">
-                The empty bracket structure will generate automatically when
-                this bracket has at least two approved participants.
+                {t("tournaments.brackets.empty")}
               </p>
             ) : generated.format === "round_robin" ? (
               <MobileRoundRobinBracket
@@ -4624,6 +4936,8 @@ function MobileRoundRobinBracket({
   adminReadOnly: boolean;
   onAdminMatchSelect?: (match: GeneratedTournamentMatch) => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className="mt-6 grid w-full max-w-full min-w-0 gap-5">
       <div className="grid gap-4">
@@ -4639,7 +4953,7 @@ function MobileRoundRobinBracket({
         ))}
       </div>
       <div className={classNames("w-full max-w-full min-w-0 p-4", tournamentInsetCardClass)}>
-        <h4 className="font-black text-white">Standings</h4>
+        <h4 className="font-black text-white">{t("tournaments.brackets.standings")}</h4>
         <div className="mt-4 space-y-2">
           {standings
             .slice()
@@ -4660,16 +4974,16 @@ function MobileRoundRobinBracket({
                 </span>
                 <span className="min-w-0 break-words font-bold text-white">
                   {participantsById.get(standing.registrationId)?.name ??
-                    "Participant"}
+                    t("tournaments.brackets.participant")}
                 </span>
                 <span className="col-start-2 text-zinc-400">
-                  {standing.wins}W {standing.losses}L - {standing.points} pts
+                  {standing.wins}{t("tournaments.brackets.win")} {standing.losses}{t("tournaments.brackets.loss")} — {standing.points} {t("tournaments.brackets.points")}
                 </span>
               </div>
             ))}
           {standings.length === 0 && (
             <p className="border border-white/12 p-4 text-sm text-zinc-500">
-              Standings will appear after admins assign players and results are recorded.
+              {t("tournaments.brackets.standingsEmpty")}
             </p>
           )}
         </div>
@@ -4679,16 +4993,17 @@ function MobileRoundRobinBracket({
 }
 
 function MobileMedia({ tournament }: { tournament: TournamentCard }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const links = [
     tournament.rulesUrl
-      ? { label: "Official Rules", url: tournament.rulesUrl }
+      ? { label: t("tournaments.resources.officialRules"), url: tournament.rulesUrl }
       : null,
   ].filter((link) => link !== null);
 
   return (
     <MobileCard>
       <h2 className="break-words text-xl font-black text-white">
-        {tournament.title} Resources
+        {tournament.title} — {t("tournaments.resources.title")}
       </h2>
       {links.length > 0 ? (
         <div className="mt-5 grid w-full max-w-full min-w-0 gap-4">
@@ -4708,14 +5023,14 @@ function MobileMedia({ tournament }: { tournament: TournamentCard }) {
                 {link.label}
               </p>
               <p className="break-words text-xs text-zinc-300">
-                Open tournament resource
+                {t("tournaments.resources.open")}
               </p>
             </a>
           ))}
         </div>
       ) : (
         <p className="mt-5 border border-white/12 p-8 text-center text-zinc-500">
-          No tournament resources have been published.
+          {t("tournaments.resources.empty")}
         </p>
       )}
     </MobileCard>
@@ -4723,11 +5038,9 @@ function MobileMedia({ tournament }: { tournament: TournamentCard }) {
 }
 
 function MobileAnnouncements({ tournament }: { tournament: TournamentCard }) {
-  const messages = [
-    `${tournament.title} is currently ${tournament.status.toLowerCase()}.`,
-    `Grand Final: ${formatOptionalDateTime(tournament.grandFinalAt, "TBA")}.`,
-    `${tournament.players} approved participants are currently listed across ${tournament.brackets.length} bracket${tournament.brackets.length === 1 ? "" : "s"}. Full brackets and brackets with an existing queue accept waitlist registrations while registration remains open.`,
-  ];
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
+  const messages = getAnnouncementMessages(tournament, t, locale);
 
   return (
     <div className="space-y-4">
@@ -4737,7 +5050,9 @@ function MobileAnnouncements({ tournament }: { tournament: TournamentCard }) {
             <Radio size={18} className="mt-1 shrink-0 text-orange-300" />
             <div className="min-w-0">
               <p className="break-words text-xs font-black uppercase tracking-wider text-zinc-500">
-                IronClad Update {index + 1}
+                {t("announcements.update", {
+                  number: formatNumber(index + 1, locale),
+                })}
               </p>
               <p className="mt-1 break-words text-zinc-200">{text}</p>
             </div>
@@ -4746,6 +5061,30 @@ function MobileAnnouncements({ tournament }: { tournament: TournamentCard }) {
       ))}
     </div>
   );
+}
+
+function getAnnouncementMessages(
+  tournament: TournamentCard,
+  t: CompetitionTranslator,
+  locale: Locale
+) {
+  return [
+    t("announcements.status", {
+      title: tournament.title,
+      status: tournament.status,
+    }),
+    t("announcements.grandFinal", {
+      date: formatOptionalDateTime(
+        tournament.grandFinalAt,
+        t("tournaments.overview.grandFinalTba"),
+        locale
+      ),
+    }),
+    t("announcements.participants", {
+      players: formatNumber(tournament.players, locale),
+      brackets: formatNumber(tournament.brackets.length, locale),
+    }),
+  ];
 }
 
 function MobileMainContent({
@@ -4878,86 +5217,187 @@ function MainContent({
   );
 }
 
-type RegistrationGate = "account" | "profile" | "documents" | "closed" | "error";
+type RegistrationGate =
+  | "locale"
+  | "account"
+  | "profile"
+  | "documents"
+  | "closed"
+  | "error";
 
 function RegistrationGatePrompt({
   type,
   onClose,
+  onContinueEnglish,
+  continueEnglishPending = false,
 }: {
   type: RegistrationGate;
   onClose: () => void;
+  onContinueEnglish?: () => void;
+  continueEnglishPending?: boolean;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const titleId = useId();
+  const descriptionId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const initialFocusRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
   const content = {
+    locale: {
+      eyebrow: t("gate.title"),
+      title: t("gate.title"),
+      description: t("gate.description"),
+    },
     account: {
-      eyebrow: "IronClad Account Required",
-      title: "Do you already have an IronClad account?",
-      description:
-        "Sign in to continue, or create an account and complete your player profile before registering.",
+      eyebrow: t("tournaments.gatePrompt.accountEyebrow"),
+      title: t("tournaments.gatePrompt.accountTitle"),
+      description: t("tournaments.gatePrompt.accountDescription"),
     },
     profile: {
-      eyebrow: "Player Profile Required",
-      title: "Please complete your player profile before registering.",
-      description:
-        "IronClad uses your saved IGN, region, ELO, and verification details for tournament participation.",
+      eyebrow: t("tournaments.gatePrompt.profileEyebrow"),
+      title: t("tournaments.gatePrompt.profileTitle"),
+      description: t("tournaments.gatePrompt.profileDescription"),
     },
     documents: {
-      eyebrow: "Registration Documents Pending",
-      title: "Registration is not accepting legal consent yet.",
-      description:
-        "The governing documents are still under review. Registration will reopen after one approved, versioned document set is made effective.",
+      eyebrow: t("tournaments.gatePrompt.documentsEyebrow"),
+      title: t("tournaments.gatePrompt.documentsTitle"),
+      description: t("tournaments.gatePrompt.documentsDescription"),
     },
     closed: {
-      eyebrow: "Registration Unavailable",
-      title: "This tournament is full or already in progress.",
-      description:
-        "We hope to see you in the next one.",
+      eyebrow: t("tournaments.gatePrompt.closedEyebrow"),
+      title: t("tournaments.gatePrompt.closedTitle"),
+      description: t("tournaments.gatePrompt.closedDescription"),
     },
     error: {
-      eyebrow: "Profile Check Unavailable",
-      title: "IronClad could not verify your player profile.",
-      description:
-        "Close this message and try again. If the problem continues, open your profile to confirm your account details.",
+      eyebrow: t("tournaments.gatePrompt.errorEyebrow"),
+      title: t("tournaments.gatePrompt.errorTitle"),
+      description: t("tournaments.gatePrompt.errorDescription"),
     },
   }[type];
 
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const focusable = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      );
+    window.requestAnimationFrame(() =>
+      (initialFocusRef.current ?? focusable()[0])?.focus()
+    );
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !continueEnglishPending) {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [continueEnglishPending, onClose]);
+
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-black/85 px-4 py-6 backdrop-blur">
-      <div className="w-full max-w-lg border border-orange-500/30 bg-[linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] p-6 shadow-2xl shadow-black/50">
+    <div
+      className="fixed inset-0 z-[70] grid place-items-center bg-black/85 px-4 py-6 backdrop-blur"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !continueEnglishPending) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className="w-full max-w-lg border border-orange-500/30 bg-[linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] p-6 shadow-2xl shadow-black/50"
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
               {content.eyebrow}
             </p>
-            <h2 className="mt-3 text-2xl font-black text-white">
+            <h2 id={titleId} className="mt-3 text-2xl font-black text-white">
               {content.title}
             </h2>
           </div>
           <button
             type="button"
+            ref={type === "locale" ? undefined : initialFocusRef}
             onClick={onClose}
             className="shrink-0 rounded-lg bg-slate-800 p-2 text-zinc-300 transition hover:bg-slate-700 hover:text-white"
-            aria-label="Close registration prompt"
+            aria-label={t("tournaments.gatePrompt.closeAria")}
           >
             <X size={18} />
           </button>
         </div>
 
-        <p className="mt-4 leading-7 text-zinc-300">{content.description}</p>
+        <p id={descriptionId} className="mt-4 leading-7 text-zinc-300">
+          {content.description}
+        </p>
+
+        {type === "locale" && (
+          <p className="mt-3 text-sm leading-6 text-zinc-400">
+            {t("gate.notEvidence")}
+          </p>
+        )}
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {type === "locale" && (
+            <>
+              <button
+                type="button"
+                ref={initialFocusRef}
+                onClick={onContinueEnglish}
+                disabled={continueEnglishPending}
+                className="rounded-xl bg-orange-500 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-wait disabled:opacity-60"
+              >
+                {continueEnglishPending
+                  ? t("registrationActions.updating")
+                  : t("gate.continueEnglish")}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={continueEnglishPending}
+                className="rounded-xl border border-white/12 bg-black/45 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:border-orange-500 disabled:opacity-60"
+              >
+                {t("gate.goBack")}
+              </button>
+            </>
+          )}
           {type === "account" && (
             <>
               <Link
                 href="/sign-in"
                 className="rounded-xl border border-white/12 bg-black/45 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:border-orange-500"
               >
-                Sign In
+                {t("tournaments.actions.signIn")}
               </Link>
               <Link
                 href="/sign-up"
                 className="rounded-xl bg-orange-500 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:bg-orange-400"
               >
-                Create Account
+                {t("tournaments.actions.createAccount")}
               </Link>
             </>
           )}
@@ -4967,7 +5407,9 @@ function RegistrationGatePrompt({
               href="/profile"
               className="rounded-xl bg-orange-500 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-white transition hover:bg-orange-400 sm:col-span-2"
             >
-              {type === "profile" ? "Complete Profile" : "Open Profile"}
+              {type === "profile"
+                ? t("tournaments.actions.completeProfile")
+                : t("tournaments.actions.openProfile")}
             </Link>
           )}
         </div>
@@ -5024,6 +5466,8 @@ export default function TournamentsExperience({
   registrationDocuments?: RegistrationDocumentSet | null;
   eloVerificationEnabled: boolean;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -5071,6 +5515,7 @@ export default function TournamentsExperience({
   const [registrationGate, setRegistrationGate] =
     useState<RegistrationGate | null>(null);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
+  const [isContinuingEnglish, setIsContinuingEnglish] = useState(false);
   const { getToken, isSignedIn, userId } = useAuth();
   const authenticatedSupabase = useMemo(() => {
     if (typeof window === "undefined") {
@@ -5227,11 +5672,7 @@ export default function TournamentsExperience({
     });
   };
 
-  const handleRegisterClick = async () => {
-    if (selectedViewerRegistration) {
-      return;
-    }
-
+  const beginRegistration = async () => {
     const registrationAvailability = getRegistrationDivisionAvailability(
       selectedTournament,
       viewer.relicVerifiedDivision
@@ -5294,6 +5735,35 @@ export default function TournamentsExperience({
       console.error("Tournament profile eligibility check failed unexpectedly.");
       setRegistrationGate("error");
     }
+  };
+
+  const handleRegisterClick = async () => {
+    if (selectedViewerRegistration) return;
+
+    if (locale !== "en") {
+      setRegistrationGate("locale");
+      return;
+    }
+
+    await beginRegistration();
+  };
+
+  const continueRegistrationInEnglish = async () => {
+    if (isContinuingEnglish) return;
+
+    setIsContinuingEnglish(true);
+    const result = await setLocalePreference("en");
+
+    if (!result.ok) {
+      setIsContinuingEnglish(false);
+      return;
+    }
+
+    setRegistrationGate(null);
+    setShowRegisterModal(false);
+    await beginRegistration();
+    router.refresh();
+    setIsContinuingEnglish(false);
   };
 
   return (
@@ -5390,18 +5860,21 @@ export default function TournamentsExperience({
           verifiedDivision={viewer.relicVerifiedDivision}
           registrationDocuments={registrationDocuments}
           onClose={() => setShowRegisterModal(false)}
+          onLocaleGate={() => setRegistrationGate("locale")}
         />
       )}
       {registrationGate && (
         <RegistrationGatePrompt
           type={registrationGate}
           onClose={() => setRegistrationGate(null)}
+          onContinueEnglish={() => void continueRegistrationInEnglish()}
+          continueEnglishPending={isContinuingEnglish}
         />
       )}
 
       {isCheckingProfile && (
         <div className="fixed inset-x-0 bottom-5 z-[65] mx-auto w-fit rounded-full border border-orange-500/30 bg-black/90 px-5 py-3 text-xs font-black uppercase tracking-wider text-orange-300 shadow-2xl">
-          Checking Player Profile
+          {t("tournaments.gatePrompt.checkingProfile")}
         </div>
       )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import {
   resetAdminMatch,
   saveAdminMatchResult,
@@ -9,7 +9,18 @@ import {
   type MatchResultActionState,
 } from "@/app/tournaments/match-actions";
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import PlayerMatchResultForm from "@/components/PlayerMatchResultForm";
+import useHydrationSafeNow from "@/components/useHydrationSafeNow";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import type { Locale } from "@/lib/i18n/config";
+import { localizeBracketRoundName } from "@/lib/i18n/round-display";
+import { translate } from "@/lib/i18n/translate";
+import type { MessageValues } from "@/lib/i18n/types";
 import type {
   GeneratedTournamentMatch,
   MatchResultReportGroup,
@@ -21,6 +32,10 @@ const initialState: MatchResultActionState = {
   status: "idle",
   message: "",
 };
+
+type CompetitionTranslator = (path: string, values?: MessageValues) => string;
+const translateCompetitionEnglish: CompetitionTranslator = (path, values) =>
+  translate(competitionEnglish, path, values);
 
 export default function MatchResultControls({
   match,
@@ -43,6 +58,10 @@ export default function MatchResultControls({
   showDirectAdminControls?: boolean;
   presentation?: "inline" | "workspace";
 }) {
+  const selectedT = useOptionalTranslations("competition", competitionEnglish);
+  const selectedLocale = useOptionalLocale();
+  const t = isAdmin ? translateCompetitionEnglish : selectedT;
+  const locale = isAdmin ? "en" : selectedLocale;
   const [expanded, setExpanded] = useState(false);
   const playerOne = match.playerOneRegistrationId
     ? participantsById.get(match.playerOneRegistrationId)
@@ -62,27 +81,16 @@ export default function MatchResultControls({
       )
   );
   const canOpenForReportGroups = reportGroups.length > 0;
-  const [now, setNow] = useState<number | null>(null);
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
+  const now = useHydrationSafeNow({
+    enabled: deadlineManaged && match.status === "in_progress" && !holdActive,
+  });
   const deadlineOpen = Boolean(
     match.deadlineAt &&
       now !== null &&
       now < new Date(match.deadlineAt).getTime()
   );
 
-  useEffect(() => {
-    if (!deadlineManaged || match.status !== "in_progress" || holdActive) {
-      return;
-    }
-
-    const updateNow = () => setNow(Date.now());
-    const initialTimer = window.setTimeout(updateNow, 0);
-    const interval = window.setInterval(updateNow, 1_000);
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
-    };
-  }, [deadlineManaged, holdActive, match.status]);
   const canSubmitNewReport =
     canSubmit &&
     hasParticipants &&
@@ -106,6 +114,7 @@ export default function MatchResultControls({
     deadlineOpen,
     hasActiveReportGroup: Boolean(activeReportGroup),
     hasPendingSubmission: Boolean(pendingSubmission),
+    t,
   });
   const adminControlLabel = getAdminControlLabel({
     match,
@@ -148,11 +157,11 @@ export default function MatchResultControls({
               <p>
                 Decided at:{" "}
                 <span className="text-slate-200">
-                  {match.officialResultDecidedAt
-                    ? new Date(
-                        match.officialResultDecidedAt
-                      ).toLocaleString()
-                    : "Not recorded"}
+                  <HydrationSafeLocalDateTime
+                    value={match.officialResultDecidedAt}
+                    fallback="Not recorded"
+                    locale="en"
+                  />
                 </span>
               </p>
             </div>
@@ -190,11 +199,11 @@ export default function MatchResultControls({
               <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
                 {activeReportGroup.submittedByViewer
                   ? activeReportGroup.resultType === "no_show"
-                    ? "Your no-show report is awaiting opponent confirmation."
-                    : "Your result is awaiting opponent confirmation."
+                    ? t("matchControls.yourNoShowPending")
+                    : t("matchControls.yourResultPending")
                   : activeReportGroup.resultType === "no_show"
-                    ? "Your opponent reported a no-show. Confirm or dispute it from your dashboard notification."
-                    : "Your opponent submitted a result. Confirm or dispute it from your dashboard notification."}
+                    ? t("matchControls.opponentNoShowPending")
+                    : t("matchControls.opponentResultPending")}
               </div>
             )}
 
@@ -203,7 +212,7 @@ export default function MatchResultControls({
             match.status !== "completed" &&
             !activeReportGroup && (
               <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
-                This match has a legacy report awaiting administrator review.
+                {t("matchControls.legacyPending")}
               </div>
             )}
 
@@ -216,6 +225,8 @@ export default function MatchResultControls({
                   match={match}
                   isAdmin={isAdmin}
                   participantsById={participantsById}
+                  t={t}
+                  locale={locale}
                 />
               ))}
             </div>
@@ -237,6 +248,8 @@ export default function MatchResultControls({
                     submission={submission}
                     isAdmin={false}
                     participantsById={participantsById}
+                    t={t}
+                    locale={locale}
                   />
                 ))
               )}
@@ -247,16 +260,15 @@ export default function MatchResultControls({
             <p className="text-xs text-slate-500">
               {deadlineManaged &&
               (match.playerOneRegistrationId || match.playerTwoRegistrationId)
-                ? "Waiting for opponent — your deadline has not started."
-                : "Both participants must be assigned before a result can be recorded."}
+                ? t("matchControls.waitingOpponent")
+                : t("matchControls.participantsRequired")}
             </p>
           )}
           {deadlineManaged &&
             hasParticipants &&
             holdActive && (
               <p className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
-                This match is on an administrative hold. Result submission and
-                deadline enforcement resume after the hold is released.
+                {t("matchControls.hold")}
               </p>
             )}
           {deadlineManaged &&
@@ -264,9 +276,7 @@ export default function MatchResultControls({
             hasParticipants &&
             match.status === "scheduled" && (
               <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-400">
-                This matchup has not activated. Result and no-show controls
-                become available only after the division launches and both
-                official participants are ready.
+                {t("matchControls.notActivated")}
               </p>
             )}
           {deadlineManaged &&
@@ -284,13 +294,12 @@ export default function MatchResultControls({
             !holdActive &&
             !deadlineOpen && (
               <p className="rounded-xl border border-red-400/20 bg-red-500/5 p-4 text-xs leading-5 text-red-100/80">
-                The effective deadline has passed. New player reports are
-                closed while the authoritative deadline ruling is processed.
+                {t("matchControls.deadlinePassedMessage")}
               </p>
             )}
           {canSubmit && match.status === "completed" && match.outcomeType && (
             <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-300">
-              {formatTerminalOutcome(match)}
+              {formatTerminalOutcome(match, t)}
             </p>
           )}
     </div>
@@ -312,7 +321,15 @@ export default function MatchResultControls({
         <span>
           {isAdmin ? adminControlLabel : playerControlLabel}
         </span>
-        <span className="text-slate-500">{expanded ? "Hide" : "Open"}</span>
+        <span className="text-slate-500">
+          {expanded
+            ? isAdmin
+              ? "Hide"
+              : t("matchControls.hide")
+            : isAdmin
+              ? "Open"
+              : t("matchControls.open")}
+        </span>
       </button>
 
       {expanded && (
@@ -330,6 +347,7 @@ function getPlayerControlLabel({
   deadlineOpen,
   hasActiveReportGroup,
   hasPendingSubmission,
+  t,
 }: {
   match: GeneratedTournamentMatch;
   deadlineManaged: boolean;
@@ -338,35 +356,40 @@ function getPlayerControlLabel({
   deadlineOpen: boolean;
   hasActiveReportGroup: boolean;
   hasPendingSubmission: boolean;
+  t: CompetitionTranslator;
 }) {
   if (!deadlineManaged) {
-    if (hasActiveReportGroup) return "Result Pending Confirmation";
-    if (hasPendingSubmission) return "Result Pending Review";
-    return "Submit Match Result";
+    if (hasActiveReportGroup) return t("matchControls.pendingConfirmation");
+    if (hasPendingSubmission) return t("matchControls.pendingReview");
+    return t("matchControls.submitResult");
   }
 
   if (match.outcomeType === "deadline_double_forfeit") {
-    return "Double Forfeit Ruling";
+    return t("matchControls.doubleForfeit");
   }
   if (match.outcomeType === "automatic_bye") {
-    return "Automatic Advancement";
+    return t("matchControls.automaticAdvancement");
   }
   if (match.outcomeType === "empty_feeder") {
-    return "No Eligible Player Advanced";
+    return t("matchControls.noEligiblePlayer");
   }
-  if (match.status === "completed") return "Match Completed";
+  if (match.status === "completed") return t("matchControls.completed");
   if (match.status === "scheduled") {
-    return hasParticipants ? "Match Not Active" : "Waiting for Opponent";
+    return hasParticipants
+      ? t("matchControls.notActive")
+      : t("matchControls.waitingOpponentShort");
   }
-  if (holdActive) return "Match Deadline Paused";
+  if (holdActive) return t("matchControls.deadlinePaused");
   if (match.status === "in_progress" && !deadlineOpen) {
-    return match.deadlineAt ? "Deadline Passed" : "Match Not Active";
+    return match.deadlineAt
+      ? t("matchControls.deadlinePassed")
+      : t("matchControls.notActive");
   }
   if (match.status === "pending_review" || hasPendingSubmission) {
-    return "Result Pending Review";
+    return t("matchControls.pendingReview");
   }
-  if (hasActiveReportGroup) return "Result Pending Confirmation";
-  return "Submit Match Result";
+  if (hasActiveReportGroup) return t("matchControls.pendingConfirmation");
+  return t("matchControls.submitResult");
 }
 
 function getAdminControlLabel({
@@ -409,14 +432,17 @@ function getAdminControlLabel({
   return "Result Controls";
 }
 
-function formatTerminalOutcome(match: GeneratedTournamentMatch) {
+function formatTerminalOutcome(
+  match: GeneratedTournamentMatch,
+  t: CompetitionTranslator
+) {
   if (match.outcomeType === "deadline_double_forfeit") {
-    return "The deadline ruling eliminated both players. No result may be submitted.";
+    return t("matchControls.outcomeDoubleForfeit");
   }
   if (match.outcomeType === "automatic_bye") {
-    return "The sole eligible player advanced automatically. No match was played and no result is required.";
+    return t("matchControls.outcomeAutomaticBye");
   }
-  return "This feeder closed without an eligible participant. No result may be submitted.";
+  return t("matchControls.outcomeEmptyFeeder");
 }
 
 export function ResultEntryForm({
@@ -579,11 +605,15 @@ export function ReportGroupReview({
   match,
   isAdmin,
   participantsById,
+  t = translateCompetitionEnglish,
+  locale = "en",
 }: {
   reportGroup: MatchResultReportGroup;
   match: GeneratedTournamentMatch;
   isAdmin: boolean;
   participantsById: Map<string, TournamentParticipant>;
+  t?: CompetitionTranslator;
+  locale?: Locale;
 }) {
   const [state, formAction, pending] = useActionState(
     reviewMatchResultReportGroup,
@@ -610,7 +640,7 @@ export function ReportGroupReview({
     reportGroup.noShowRegistrationId ?? loserRegistrationId;
   const loser = loserRegistrationId
     ? participantName(participantsById, loserRegistrationId)
-    : "Participant";
+    : t("matchControls.participant");
   const missingPlayer = noShowRegistrationId
     ? participantName(participantsById, noShowRegistrationId)
     : loser;
@@ -625,8 +655,10 @@ export function ReportGroupReview({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className={isAdmin ? "min-w-0" : undefined}>
           <p className="text-xs font-black uppercase tracking-wider text-sky-200">
-            {isNoShow ? "No-Show Report" : "Confirmation Package"} -{" "}
-            {formatReportGroupStatus(reportGroup.status)}
+            {isNoShow
+              ? t("matchControls.noShowReport")
+              : t("matchControls.confirmationPackage")} -{" "}
+            {formatReportGroupStatus(reportGroup.status, t)}
           </p>
           <p
             className={`mt-2 text-sm text-white ${
@@ -634,44 +666,75 @@ export function ReportGroupReview({
             }`}
           >
             {isNoShow
-              ? `${winner} reported ${missingPlayer} as a no-show`
-              : `${reportGroup.playerOneScore}-${reportGroup.playerTwoScore} reported for ${winner}`}
+              ? t("matchControls.noShowReported", {
+                  reporter: winner,
+                  player: missingPlayer,
+                })
+              : t("matchControls.scoreReported", {
+                  score: `${reportGroup.playerOneScore}-${reportGroup.playerTwoScore}`,
+                  winner,
+                })}
           </p>
         </div>
         <span className="text-[10px] text-slate-500">
-          {new Date(reportGroup.createdAt).toLocaleString()}
+          <HydrationSafeLocalDateTime
+            value={reportGroup.createdAt}
+            fallback={t("deadlines.unavailable")}
+            locale={locale}
+            options={{ dateStyle: "medium", timeStyle: "short" }}
+          />
         </span>
       </div>
 
       <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-slate-300 sm:grid-cols-2">
         <SummaryValue
-          label="Match"
-          value={`${match.roundName} - Match ${match.matchNumber}`}
+          label={t("matchControls.match")}
+          value={t("matchControls.matchReference", {
+            round: isAdmin
+              ? match.roundName
+              : localizeBracketRoundName(match.roundName, t),
+            number: match.matchNumber,
+          })}
         />
-        <SummaryValue label="Reporting Player" value={reporter} />
-        <SummaryValue label="Opponent" value={opponent} />
+        <SummaryValue label={t("matchControls.reportingPlayer")} value={reporter} />
+        <SummaryValue label={t("matchControls.opponent")} value={opponent} />
         <SummaryValue
-          label={isNoShow ? "Forfeit Winner" : "Reported Winner"}
+          label={
+            isNoShow
+              ? t("matchControls.forfeitWinner")
+              : t("matchControls.reportedWinner")
+          }
           value={winner}
         />
         <SummaryValue
-          label={isNoShow ? "Missing Player" : "Reported Loser"}
+          label={
+            isNoShow
+              ? t("matchControls.missingPlayer")
+              : t("matchControls.reportedLoser")
+          }
           value={isNoShow ? missingPlayer : loser}
         />
         {isNoShow && (
           <SummaryValue
-            label="No-Show Status"
-            value={formatNoShowStatus(reportGroup.noShowStatus)}
+            label={t("matchControls.noShowStatus")}
+            value={formatNoShowStatus(reportGroup.noShowStatus, t)}
           />
         )}
         <SummaryValue
-          label="Confirmation Deadline"
-          value={new Date(reportGroup.confirmationDeadlineAt).toLocaleString()}
+          label={t("matchControls.confirmationDeadline")}
+          value={
+            <HydrationSafeLocalDateTime
+              value={reportGroup.confirmationDeadlineAt}
+              fallback={t("deadlines.unavailable")}
+              locale={locale}
+              options={{ dateStyle: "medium", timeStyle: "short" }}
+            />
+          }
         />
         {reportGroup.finalizedSource && (
           <SummaryValue
-            label="Finalized By"
-            value={formatFinalizedSource(reportGroup.finalizedSource)}
+            label={t("matchControls.finalizedBy")}
+            value={formatFinalizedSource(reportGroup.finalizedSource, t)}
           />
         )}
       </div>
@@ -679,7 +742,7 @@ export function ReportGroupReview({
       {reportGroup.disputeNotes && (
         <div className="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 p-3">
           <p className="text-[10px] font-black uppercase tracking-wider text-red-200">
-            Dispute Notes
+            {t("matchControls.disputeNotes")}
           </p>
           <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-red-100/80">
             {reportGroup.disputeNotes}
@@ -690,7 +753,7 @@ export function ReportGroupReview({
       {reportGroup.noShowNote && (
         <div className="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 p-3">
           <p className="text-[10px] font-black uppercase tracking-wider text-red-200">
-            No-Show Note
+            {t("matchControls.noShowNote")}
           </p>
           <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-red-100/80">
             {reportGroup.noShowNote}
@@ -701,7 +764,7 @@ export function ReportGroupReview({
       {reportGroup.reviewNotes && (
         <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
           <p className="text-[10px] font-black uppercase tracking-wider text-orange-300">
-            Review Notes
+            {t("matchControls.reviewNotes")}
           </p>
           <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-300">
             {reportGroup.reviewNotes}
@@ -712,7 +775,7 @@ export function ReportGroupReview({
       <div className="mt-3 flex flex-wrap gap-2">
         {isNoShow ? (
           <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-200">
-            No replay required for no-show report
+            {t("matchControls.noReplayNoShow")}
           </span>
         ) : reportGroup.replayProofs.length > 0 ? (
           reportGroup.replayProofs.map((proof) =>
@@ -728,20 +791,22 @@ export function ReportGroupReview({
                     : "px-2 py-1"
                 }`}
               >
-                Game {proof.gameNumber} Replay
+                {t("matchControls.gameReplay", { number: proof.gameNumber })}
               </a>
             ) : (
               <span
                 key={proof.id}
                 className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200"
               >
-                Game {proof.gameNumber} replay unavailable
+                {t("matchControls.gameReplayUnavailable", {
+                  number: proof.gameNumber,
+                })}
               </span>
             )
           )
         ) : (
           <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200">
-            Replay unavailable
+            {t("matchControls.replayUnavailable")}
           </span>
         )}
       </div>
@@ -812,11 +877,15 @@ function SubmissionReview({
   submission,
   isAdmin,
   participantsById,
+  t = translateCompetitionEnglish,
+  locale = "en",
 }: {
   match: GeneratedTournamentMatch;
   submission: MatchResultSubmission;
   isAdmin: boolean;
   participantsById: Map<string, TournamentParticipant>;
+  t?: CompetitionTranslator;
+  locale?: Locale;
 }) {
   const [state, formAction, pending] = useActionState(
     reviewMatchResult,
@@ -824,51 +893,68 @@ function SubmissionReview({
   );
   const winner =
     participantsById.get(submission.claimedWinnerRegistrationId)?.name ??
-    "Participant";
+    t("matchControls.participant");
   const loserRegistrationId =
     submission.claimedWinnerRegistrationId === match.playerOneRegistrationId
       ? match.playerTwoRegistrationId
       : match.playerOneRegistrationId;
   const loser = loserRegistrationId
-    ? participantsById.get(loserRegistrationId)?.name ?? "Participant"
-    : "Participant";
+    ? participantsById.get(loserRegistrationId)?.name ??
+      t("matchControls.participant")
+    : t("matchControls.participant");
   const reporter = submission.submittedByRegistrationId
     ? participantsById.get(submission.submittedByRegistrationId)?.name ??
-      "Participant"
-    : "Participant";
+      t("matchControls.participant")
+    : t("matchControls.participant");
 
   return (
     <div className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-black uppercase tracking-wider text-amber-200">
-          Submission #{submission.submissionNumber} ·{" "}
-          {formatSubmissionStatus(submission.status)}
+          {t("matchControls.submission", {
+            number: submission.submissionNumber,
+          })} · {formatSubmissionStatus(submission.status, t)}
         </p>
         <span className="text-[10px] text-slate-500">
-          {new Date(submission.createdAt).toLocaleString()}
+          <HydrationSafeLocalDateTime
+            value={submission.createdAt}
+            fallback={t("deadlines.unavailable")}
+            locale={locale}
+            options={{ dateStyle: "medium", timeStyle: "short" }}
+          />
         </span>
       </div>
       <div className="mt-3 grid gap-2 text-xs text-slate-300 sm:grid-cols-2">
         <p>
-          Match:{" "}
+          {t("matchControls.match")}: {" "}
           <strong className="text-white">
-            {match.roundName} · Match {match.matchNumber}
+            {t("matchControls.matchReference", {
+              round: isAdmin
+                ? match.roundName
+                : localizeBracketRoundName(match.roundName, t),
+              number: match.matchNumber,
+            })}
           </strong>
         </p>
         <p>
-          Reporting player: <strong className="text-white">{reporter}</strong>
+          {t("matchControls.reportingPlayer")}: {" "}
+          <strong className="text-white">{reporter}</strong>
         </p>
         <p>
-          Reported winner: <strong className="text-white">{winner}</strong>
+          {t("matchControls.reportedWinner")}: {" "}
+          <strong className="text-white">{winner}</strong>
         </p>
         <p>
-          Reported loser: <strong className="text-white">{loser}</strong>
+          {t("matchControls.reportedLoser")}: {" "}
+          <strong className="text-white">{loser}</strong>
         </p>
       </div>
       <p className="mt-2 text-xs text-slate-300">
-        Claimed winner: <strong className="text-white">{winner}</strong>
+        {t("matchControls.claimedWinner")}: {" "}
+        <strong className="text-white">{winner}</strong>
         {" · "}
-        Score {submission.playerOneScore}-{submission.playerTwoScore}
+        {t("matchControls.score")} {submission.playerOneScore}-
+        {submission.playerTwoScore}
       </p>
       {isAdmin && (
         <div className="mt-3 grid gap-2 rounded-lg border border-white/10 bg-black/30 p-3 text-[10px] text-slate-400 sm:grid-cols-2">
@@ -891,9 +977,11 @@ function SubmissionReview({
           <p>
             Reviewed at:{" "}
             <span className="text-slate-200">
-              {submission.reviewedAt
-                ? new Date(submission.reviewedAt).toLocaleString()
-                : "Pending"}
+              <HydrationSafeLocalDateTime
+                value={submission.reviewedAt}
+                fallback="Pending"
+                locale="en"
+              />
             </span>
           </p>
         </div>
@@ -906,7 +994,7 @@ function SubmissionReview({
       {submission.reviewNotes && (
         <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
           <p className="text-[10px] font-black uppercase tracking-wider text-orange-300">
-            Administrator Message
+            {isAdmin ? "Administrator Message" : t("matchControls.adminMessage")}
           </p>
           <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-300">
             {submission.reviewNotes}
@@ -925,7 +1013,7 @@ function SubmissionReview({
                 : "px-2 py-1"
             }`}
           >
-            Download Replay Proof
+            {isAdmin ? "Download Replay Proof" : t("matchControls.downloadReplay")}
           </a>
         )}
         {submission.screenshotAccessHref && (
@@ -939,7 +1027,9 @@ function SubmissionReview({
                 : "px-2 py-1"
             }`}
           >
-            View Legacy Screenshot Attachment
+            {isAdmin
+              ? "View Legacy Screenshot Attachment"
+              : t("matchControls.viewLegacyScreenshot")}
           </a>
         )}
       </div>
@@ -1037,7 +1127,7 @@ function ActionMessage({ state }: { state: MatchResultActionState }) {
   );
 }
 
-function SummaryValue({ label, value }: { label: string; value: string }) {
+function SummaryValue({ label, value }: { label: string; value: ReactNode }) {
   return (
     <p>
       <span className="text-slate-500">{label}:</span>{" "}
@@ -1053,47 +1143,56 @@ function participantName(
   return participantsById.get(registrationId)?.name ?? "Participant";
 }
 
-function formatSubmissionStatus(status: MatchResultSubmission["status"]) {
+function formatSubmissionStatus(
+  status: MatchResultSubmission["status"],
+  t: CompetitionTranslator
+) {
   return {
-    pending: "Under Review",
-    approved: "Approved",
-    rejected: "Rejected",
-    resubmission_requested: "Resubmission Requested",
+    pending: t("matchControls.statusUnderReview"),
+    approved: t("matchControls.statusApproved"),
+    rejected: t("matchControls.statusRejected"),
+    resubmission_requested: t("matchControls.statusResubmission"),
   }[status];
 }
 
-function formatReportGroupStatus(status: MatchResultReportGroup["status"]) {
+function formatReportGroupStatus(
+  status: MatchResultReportGroup["status"],
+  t: CompetitionTranslator
+) {
   return {
-    pending_confirmation: "Pending Opponent Confirmation",
-    confirmed: "Confirmed",
-    auto_approved: "Auto-Approved",
-    disputed: "Disputed",
-    under_review: "Under Review",
-    approved: "Approved",
-    rejected: "Rejected",
-    reset: "Reset",
+    pending_confirmation: t("matchControls.statusPendingConfirmation"),
+    confirmed: t("matchControls.statusConfirmed"),
+    auto_approved: t("matchControls.statusAutoApproved"),
+    disputed: t("matchControls.statusDisputed"),
+    under_review: t("matchControls.statusUnderReview"),
+    approved: t("matchControls.statusApproved"),
+    rejected: t("matchControls.statusRejected"),
+    reset: t("matchControls.statusReset"),
   }[status];
 }
 
-function formatNoShowStatus(status: MatchResultReportGroup["noShowStatus"]) {
-  if (!status) return "Not a no-show";
+function formatNoShowStatus(
+  status: MatchResultReportGroup["noShowStatus"],
+  t: CompetitionTranslator
+) {
+  if (!status) return t("matchControls.statusNotNoShow");
 
   return {
-    pending: "Waiting for Opponent",
-    confirmed: "Confirmed",
-    disputed: "Disputed",
-    approved: "Approved by Admin",
-    rejected: "Rejected",
-    auto_confirmed: "Auto-Confirmed",
+    pending: t("matchControls.statusWaitingOpponent"),
+    confirmed: t("matchControls.statusConfirmed"),
+    disputed: t("matchControls.statusDisputed"),
+    approved: t("matchControls.statusApprovedAdmin"),
+    rejected: t("matchControls.statusRejected"),
+    auto_confirmed: t("matchControls.statusAutoConfirmed"),
   }[status];
 }
 
-function formatFinalizedSource(source: string) {
+function formatFinalizedSource(source: string, t: CompetitionTranslator) {
   return {
-    opponent_confirmation: "Opponent Confirmation",
-    cron_auto_approval: "Automatic Approval",
-    admin_approval: "Admin Approval",
-    admin_override: "Admin Override",
-    reset: "Reset",
+    opponent_confirmation: t("matchControls.sourceOpponent"),
+    cron_auto_approval: t("matchControls.sourceAutomatic"),
+    admin_approval: t("matchControls.sourceAdminApproval"),
+    admin_override: t("matchControls.sourceAdminOverride"),
+    reset: t("matchControls.statusReset"),
   }[source] ?? source.replaceAll("_", " ");
 }

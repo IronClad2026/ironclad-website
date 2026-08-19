@@ -112,6 +112,7 @@ describe("match admin-assistance fallback", () => {
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
 
     expect(result.success).toBe(false);
+    expect(result.code).toBe("auth_required");
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
     expect(createInAppNotificationMock).not.toHaveBeenCalled();
   });
@@ -125,6 +126,7 @@ describe("match admin-assistance fallback", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "participant_only",
       message: "Only a participant in this match can request assistance.",
     });
     expect(createInAppNotificationMock).not.toHaveBeenCalled();
@@ -136,6 +138,7 @@ describe("match admin-assistance fallback", () => {
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
 
     expect(result.success).toBe(true);
+    expect(result.code).toBe("requested");
     expect(createInAppNotificationMock).toHaveBeenCalledWith({
       recipientRole: "admin",
       type: "match.admin_assistance_requested",
@@ -160,6 +163,7 @@ describe("match admin-assistance fallback", () => {
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
 
     expect(result.success).toBe(true);
+    expect(result.code).toBe("requested");
     expect(createInAppNotificationMock).not.toHaveBeenCalled();
   });
 });

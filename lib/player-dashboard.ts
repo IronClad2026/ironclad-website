@@ -1,5 +1,8 @@
 import "server-only";
 
+import type { Locale } from "@/lib/i18n/config";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { translate } from "@/lib/i18n/translate";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type DashboardNotification = {
@@ -70,7 +73,7 @@ export type MatchHistoryEntry = {
   tournamentName: string;
   bracketName: string;
   opponentName: string;
-  result: "Win" | "Loss";
+  result: "win" | "loss";
   score: string;
   playedAt: string;
   roundName: string;
@@ -85,7 +88,7 @@ export type PlayerCareerDashboard = {
   champions: ChampionAchievement[];
   statistics: PlayerStatistics;
   matchHistory: MatchHistoryEntry[];
-  error: string | null;
+  error: "load-failed" | "partial-details" | null;
 };
 
 type RegistrationRow = {
@@ -217,8 +220,11 @@ const emptyCareer: PlayerCareerDashboard = {
 };
 
 export async function loadPlayerCareerDashboard(
-  clerkUserId: string
+  clerkUserId: string,
+  locale: Locale = "en"
 ): Promise<PlayerCareerDashboard> {
+  const dictionary = await loadDictionary(locale, "account-dashboard");
+  const t = (path: string) => translate(dictionary, path);
   const supabase = createSupabaseAdminClient();
   const { data: registrationData, error: registrationError } = await supabase
     .from("registrations")
@@ -231,7 +237,7 @@ export async function loadPlayerCareerDashboard(
     logDashboardCareerFailure("load-registrations");
     return {
       ...emptyCareer,
-      error: "Your competitive history could not be loaded.",
+      error: "load-failed",
     };
   }
 
@@ -280,7 +286,7 @@ export async function loadPlayerCareerDashboard(
         ...emptyCareer.statistics,
         tournamentsParticipated: approvedTournamentIds.size,
       },
-      error: "Your competitive history could not be loaded.",
+      error: "load-failed",
     };
   }
 
@@ -378,7 +384,7 @@ export async function loadPlayerCareerDashboard(
         ...emptyCareer.statistics,
         tournamentsParticipated: approvedTournamentIds.size,
       },
-      error: "Your competitive history could not be loaded.",
+      error: "load-failed",
     };
   }
 
@@ -417,7 +423,7 @@ export async function loadPlayerCareerDashboard(
         ...emptyCareer.statistics,
         tournamentsParticipated: approvedTournamentIds.size,
       },
-      error: "Your competitive history could not be loaded.",
+      error: "load-failed",
     };
   }
 
@@ -511,6 +517,7 @@ export async function loadPlayerCareerDashboard(
   );
 
   return buildCareerDashboard({
+    t,
     clerkUserId,
     registrations,
     matches: launchedMatches,
@@ -548,6 +555,7 @@ export async function loadPlayerCareerDashboard(
 }
 
 function buildCareerDashboard({
+  t,
   clerkUserId,
   registrations,
   matches,
@@ -565,6 +573,7 @@ function buildCareerDashboard({
   dismissedReportGroupNotifications,
   metadataIncomplete,
 }: {
+  t: (path: string) => string;
   clerkUserId: string;
   registrations: RegistrationRow[];
   matches: MatchRow[];
@@ -713,12 +722,12 @@ function buildCareerDashboard({
       tournamentName:
         context?.tournament?.title ??
         registrationsById.get(viewerRegistrationId ?? "")?.tournament_title ??
-        "IronClad Tournament",
-      roundName: round?.name ?? "Tournament Match",
+        t("dashboard.fallbackTournament"),
+      roundName: round?.name ?? t("dashboard.fallbackMatch"),
       matchNumber: match?.match_number ?? 0,
-      opponentName: registrationName(registrationsById, opponentId),
-      reportedWinner: registrationName(registrationsById, winnerId),
-      reportedLoser: registrationName(registrationsById, loserId),
+      opponentName: registrationName(registrationsById, opponentId, t),
+      reportedWinner: registrationName(registrationsById, winnerId, t),
+      reportedLoser: registrationName(registrationsById, loserId, t),
       reportedScore: `${playerOneWins}-${playerTwoWins}`,
       status: submission.status,
       reviewNotes: submission.review_notes,
@@ -784,12 +793,12 @@ function buildCareerDashboard({
         tournamentName:
           context?.tournament?.title ??
           registrationsById.get(participantOneId ?? "")?.tournament_title ??
-          "IronClad Tournament",
-        roundName: round?.name ?? "Tournament Match",
+          t("dashboard.fallbackTournament"),
+        roundName: round?.name ?? t("dashboard.fallbackMatch"),
         matchNumber: match?.match_number ?? 0,
-        opponentName: registrationName(registrationsById, opponentId),
-        reportedWinner: registrationName(registrationsById, winnerId),
-        reportedLoser: registrationName(registrationsById, loserId),
+        opponentName: registrationName(registrationsById, opponentId, t),
+        reportedWinner: registrationName(registrationsById, winnerId, t),
+        reportedLoser: registrationName(registrationsById, loserId, t),
         reportedScore: `${reportGroup.player_one_score}-${reportGroup.player_two_score}`,
         status: reportGroup.status,
         reviewNotes:
@@ -853,13 +862,14 @@ function buildCareerDashboard({
       tournamentName:
         tournament?.title ??
         registrationsById.get(match.winner_registration_id)?.tournament_title ??
-        "IronClad Tournament",
+        t("dashboard.fallbackTournament"),
       bracketName: bracket.name,
       bannerImageUrl: tournament?.banner_image_url ?? null,
       wonAt: match.updated_at,
       winnerName: registrationName(
         registrationsById,
-        match.winner_registration_id
+        match.winner_registration_id,
+        t
       ),
     });
   }
@@ -883,13 +893,14 @@ function buildCareerDashboard({
       tournamentName:
         tournament?.title ??
         registrationsById.get(standing.registration_id)?.tournament_title ??
-        "IronClad Tournament",
+        t("dashboard.fallbackTournament"),
       bracketName: bracket.name,
       bannerImageUrl: tournament?.banner_image_url ?? null,
       wonAt: standing.updated_at,
       winnerName: registrationName(
         registrationsById,
-        standing.registration_id
+        standing.registration_id,
+        t
       ),
     });
   }
@@ -934,7 +945,7 @@ function buildCareerDashboard({
               ? match.player_one_registration_id ?? ""
               : match.player_two_registration_id ?? ""
           )?.tournament_title ??
-          "IronClad Tournament",
+          t("dashboard.fallbackTournament"),
         bracketName:
           bracket?.name ??
           registrationsById.get(
@@ -942,16 +953,16 @@ function buildCareerDashboard({
               ? match.player_one_registration_id ?? ""
               : match.player_two_registration_id ?? ""
           )?.bracket_name ??
-          "Tournament",
-        opponentName: registrationName(registrationsById, opponentId),
+          t("dashboard.fallbackBracket"),
+        opponentName: registrationName(registrationsById, opponentId, t),
         result:
           match.winner_registration_id &&
           viewerRegistrationIds.has(match.winner_registration_id)
-            ? "Win"
-            : "Loss",
+            ? "win"
+            : "loss",
         score: `${viewerScore ?? 0}-${opponentScore ?? 0}`,
         playedAt: match.updated_at,
-        roundName: round?.name ?? "Tournament Match",
+        roundName: round?.name ?? t("dashboard.fallbackMatch"),
         matchNumber: match.match_number,
         seriesBestOf: match.series_best_of,
         replayAvailable: Boolean(proofSubmission?.replay_storage_path),
@@ -983,21 +994,23 @@ function buildCareerDashboard({
       ).size,
     },
     matchHistory,
-    error: metadataIncomplete
-      ? "Some tournament presentation details could not be loaded."
-      : null,
+    error: metadataIncomplete ? "partial-details" : null,
   };
 }
 
 function registrationName(
   registrationsById: Map<string, RegistrationRow>,
-  registrationId: string | null
+  registrationId: string | null,
+  t: (path: string) => string
 ) {
   if (!registrationId) {
-    return "Opponent";
+    return t("dashboard.fallbackOpponent");
   }
 
-  return registrationsById.get(registrationId)?.player_name || "Opponent";
+  return (
+    registrationsById.get(registrationId)?.player_name ||
+    t("dashboard.fallbackOpponent")
+  );
 }
 
 function logDashboardCareerFailure(operation: string) {

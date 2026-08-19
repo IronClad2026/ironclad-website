@@ -143,7 +143,9 @@ describe("match-result workflow contracts", () => {
       )
     ).resolves.toEqual({
       status: "success",
+      code: "confirmed",
       message: "Result confirmed. The winner has been advanced.",
+      values: undefined,
     });
 
     expect(service.rpc).toHaveBeenCalledWith(
@@ -179,7 +181,9 @@ describe("match-result workflow contracts", () => {
       )
     ).resolves.toEqual({
       status: "success",
+      code: "disputed",
       message: "Result disputed. An administrator must review it.",
+      values: undefined,
     });
 
     expect(service.rpc).toHaveBeenCalledWith(
@@ -265,7 +269,10 @@ describe("match-result workflow contracts", () => {
           noShowNotes: "Opponent did not arrive.",
         })
       )
-    ).resolves.toMatchObject({ status: "success" });
+    ).resolves.toMatchObject({
+      status: "success",
+      code: "no_show_submitted",
+    });
 
     expect(rpc).toHaveBeenCalledWith("submit_match_no_show_report", {
       p_match_id: "match-1",
@@ -331,6 +338,7 @@ describe("match-result workflow contracts", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "match_unavailable",
       message: "This tournament match is no longer available.",
     });
     expect(rpc).not.toHaveBeenCalled();
@@ -430,6 +438,7 @@ describe("match-result workflow contracts", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "operation_failed",
       message: "The match result could not be confirmed. Please try again.",
     });
     expect(visibleOutput).not.toContain(secretPath);
@@ -458,6 +467,7 @@ describe("match-result workflow contracts", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "confirm-failed",
       message: "The match result could not be confirmed. Please try again.",
     });
     expect(visibleOutput).not.toContain(secretPath);
@@ -529,6 +539,7 @@ describe("match-result workflow contracts", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "update-failed",
       message: "Your notifications could not be updated.",
       dismissedIds: [],
     });
@@ -589,7 +600,7 @@ describe("match-result workflow contracts", () => {
     });
   });
 
-  it("preserves a safe replay-count error on dashboard confirmation", async () => {
+  it("returns a stable generic dashboard code instead of parsing a replay-count error", async () => {
     const service = createRpcClient({
       rpcError: {
         message: "This final score requires exactly 3 replay files",
@@ -604,23 +615,17 @@ describe("match-result workflow contracts", () => {
       )
     ).resolves.toEqual({
       status: "error",
-      message:
-        "The number of replay files does not match the reported score.",
+      code: "confirm-failed",
+      message: "The match result could not be confirmed. Please try again.",
     });
   });
 
   it.each([
-    [
-      "At least one replay file is required",
-      "This result cannot be finalized because its replay proof is missing.",
-    ],
-    [
-      "Winner correction blocked because the downstream match already has review activity, submissions, proof, or an official result.",
-      "This result cannot be finalized because a downstream match already has result activity. An administrator must resolve it first.",
-    ],
+    "At least one replay file is required",
+    "Winner correction blocked because the downstream match already has review activity, submissions, proof, or an official result.",
   ])(
-    "keeps the database business error path-free: %s",
-    async (databaseMessage, expectedMessage) => {
+    "does not derive player copy from database prose: %s",
+    async (databaseMessage) => {
       const service = createRpcClient({
         rpcError: { message: databaseMessage },
       });
@@ -633,7 +638,8 @@ describe("match-result workflow contracts", () => {
         )
       ).resolves.toEqual({
         status: "error",
-        message: expectedMessage,
+        code: "confirm-failed",
+        message: "The match result could not be confirmed. Please try again.",
       });
     }
   );

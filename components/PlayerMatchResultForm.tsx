@@ -19,6 +19,9 @@ import {
   type MatchResultActionState,
 } from "@/app/tournaments/match-actions";
 import InfoTooltip from "@/components/InfoTooltip";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import type { MessageValues } from "@/lib/i18n/types";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { GeneratedTournamentMatch } from "@/lib/tournaments";
 
@@ -35,6 +38,11 @@ type ReplaySubmissionPhase =
   | "uploading"
   | "finalizing";
 
+type CompetitionTranslator = (
+  path: string,
+  values?: MessageValues
+) => string;
+
 export default function PlayerMatchResultForm({
   match,
   playerOneName,
@@ -44,6 +52,7 @@ export default function PlayerMatchResultForm({
   playerOneName: string;
   playerTwoName: string;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const [noShowState, noShowFormAction, noShowPending] = useActionState(
     submitNoShowReport,
     initialState
@@ -77,9 +86,10 @@ export default function PlayerMatchResultForm({
         playerOneScore,
         playerTwoScore,
         winsRequired,
-        match.seriesBestOf
+        match.seriesBestOf,
+        t
       ),
-    [match.seriesBestOf, playerOneScore, playerTwoScore, winsRequired]
+    [match.seriesBestOf, playerOneScore, playerTwoScore, t, winsRequired]
   );
   const selectedReplayCount = selectedReplays.length;
   const replayCountMatches =
@@ -105,7 +115,7 @@ export default function PlayerMatchResultForm({
 
     const parsedPlayerOneScore = parseScore(playerOneScore);
     const parsedPlayerTwoScore = parseScore(playerTwoScore);
-    const selectionError = validateReplaySelection(selectedReplays);
+    const selectionError = validateReplaySelection(selectedReplays, t);
 
     if (
       parsedPlayerOneScore === null ||
@@ -115,7 +125,7 @@ export default function PlayerMatchResultForm({
     ) {
       setState({
         status: "error",
-        message: "Enter the final score and select the match winner.",
+        message: t("resultForm.finalScoreRequired"),
       });
       return;
     }
@@ -129,9 +139,12 @@ export default function PlayerMatchResultForm({
     if (selectedReplays.length !== scoreInfo.requiredReplayCount) {
       setState({
         status: "error",
-        message: `This score requires exactly ${scoreInfo.requiredReplayCount} replay file${
-          scoreInfo.requiredReplayCount === 1 ? "" : "s"
-        }.`,
+        message: t(
+          scoreInfo.requiredReplayCount === 1
+            ? "resultForm.uploadExact"
+            : "resultForm.uploadExactPlural",
+          { count: scoreInfo.requiredReplayCount }
+        ),
       });
       return;
     }
@@ -158,7 +171,10 @@ export default function PlayerMatchResultForm({
       });
 
       if (preparation.status === "error") {
-        setState(preparation);
+        setState({
+          ...preparation,
+          message: getMatchActionMessage(preparation, t),
+        });
         return;
       }
 
@@ -197,7 +213,7 @@ export default function PlayerMatchResultForm({
         notes,
       });
 
-      setState(result);
+      setState({ ...result, message: getMatchActionMessage(result, t) });
       if (result.status === "error" && result.requiresRefresh) {
         setFinalizationUncertain(true);
       }
@@ -227,8 +243,8 @@ export default function PlayerMatchResultForm({
       setState({
         status: "error",
         message: reachedFinalization
-          ? "IronClad could not confirm the final response. Refresh this match before retrying."
-          : "The replay upload failed. Your selected files are still available; please try again.",
+          ? t("resultForm.responseUnknown")
+          : t("resultForm.uploadFailed"),
       });
       if (reachedFinalization) setFinalizationUncertain(true);
     } finally {
@@ -244,19 +260,16 @@ export default function PlayerMatchResultForm({
       <form onSubmit={submitMatchResult} className="space-y-5">
         <div>
           <p className="text-xs font-black uppercase tracking-wider text-white">
-            Submit Match Result
+            {t("resultForm.title")}
           </p>
           <p className="mt-1 text-[11px] text-slate-500">
-            Enter the final BO{match.seriesBestOf} score and upload one .rec
-            replay for every game played. Your opponent will be asked to confirm
-            or dispute the result. Screenshots are not accepted as substitute
-            Match-result proof.
+            {t("resultForm.instructions", { bestOf: match.seriesBestOf })}
           </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <PlayerLabel label="Player A" name={playerOneName} />
-          <PlayerLabel label="Player B" name={playerTwoName} />
+          <PlayerLabel label={t("resultForm.playerA")} name={playerOneName} />
+          <PlayerLabel label={t("resultForm.playerB")} name={playerTwoName} />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
@@ -275,12 +288,14 @@ export default function PlayerMatchResultForm({
             onChange={setPlayerTwoScore}
           />
           <div className="rounded-xl border border-orange-400/20 bg-orange-500/10 p-4 text-xs text-orange-100/80">
-            Winner must finish on {winsRequired} wins.
+            {t("resultForm.winnerNeedsWins", { count: winsRequired })}
           </div>
         </div>
 
         <label className="block">
-          <span className="text-xs font-bold text-slate-300">Winner</span>
+          <span className="text-xs font-bold text-slate-300">
+            {t("resultForm.winner")}
+          </span>
           <select
             name="winnerRegistrationId"
             required
@@ -288,7 +303,7 @@ export default function PlayerMatchResultForm({
             onChange={(event) => setWinnerRegistrationId(event.target.value)}
             className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-orange-400"
           >
-            <option value="">Select winner</option>
+            <option value="">{t("resultForm.selectWinner")}</option>
             <option value={match.playerOneRegistrationId ?? ""}>
               {playerOneName}
             </option>
@@ -301,12 +316,12 @@ export default function PlayerMatchResultForm({
         <div className="block">
           <div className="inline-flex items-center gap-2 text-xs font-bold text-slate-300">
             <span id={replayInputLabelId}>
-              Replay proofs (.rec required)
+              {t("resultForm.replayProofs")}
             </span>
             <InfoTooltip
               align="start"
-              label="About replay uploads"
-              content="Upload one unique CoH3 .rec for each Game actually played. Each file may be up to 10 MiB. Replays are private, and screenshots are not accepted as substitute Match-result proof."
+              label={t("resultForm.replayHelpLabel")}
+              content={t("resultForm.replayHelp")}
             />
           </div>
           <input
@@ -319,7 +334,7 @@ export default function PlayerMatchResultForm({
             onChange={(event) => {
               const files = Array.from(event.currentTarget.files ?? []);
               setSelectedReplays(files);
-              setReplaySelectionError(validateReplaySelection(files));
+              setReplaySelectionError(validateReplaySelection(files, t));
             }}
             className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
           />
@@ -327,15 +342,21 @@ export default function PlayerMatchResultForm({
         <div className="rounded-xl border border-white/10 bg-slate-950/70 p-3 text-[11px] leading-5 text-slate-400">
           <p>
             {scoreInfo.message ??
-              `Required replays: ${scoreInfo.requiredReplayCount}. Selected: ${selectedReplayCount}.`}
+              t("resultForm.replaySummary", {
+                required: scoreInfo.requiredReplayCount,
+                selected: selectedReplayCount,
+              })}
           </p>
           {scoreInfo.requiredReplayCount !== null &&
             selectedReplayCount > 0 &&
             selectedReplayCount !== scoreInfo.requiredReplayCount && (
               <p className="mt-1 font-bold text-orange-200">
-                Upload exactly {scoreInfo.requiredReplayCount} replay file
-                {scoreInfo.requiredReplayCount === 1 ? "" : "s"} for this
-                score.
+                {t(
+                  scoreInfo.requiredReplayCount === 1
+                    ? "resultForm.uploadExact"
+                    : "resultForm.uploadExactPlural",
+                  { count: scoreInfo.requiredReplayCount }
+                )}
               </p>
             )}
           {replaySelectionError && (
@@ -346,7 +367,7 @@ export default function PlayerMatchResultForm({
         </div>
         <label className="block">
           <span className="text-xs font-bold text-slate-300">
-            Notes (optional)
+            {t("resultForm.notesOptional")}
           </span>
           <textarea
             name="notes"
@@ -366,7 +387,8 @@ export default function PlayerMatchResultForm({
             {getSubmissionPhaseLabel(
               submissionPhase,
               uploadGameNumber,
-              selectedReplayCount
+              selectedReplayCount,
+              t
             )}
           </p>
         )}
@@ -380,7 +402,7 @@ export default function PlayerMatchResultForm({
                 : "border-red-400/30 bg-red-500/10 text-red-200"
             }`}
           >
-            {state.message}
+            {getMatchActionMessage(state, t)}
           </p>
         )}
         <button
@@ -392,9 +414,10 @@ export default function PlayerMatchResultForm({
             ? getSubmissionPhaseLabel(
                 submissionPhase,
                 uploadGameNumber,
-                selectedReplayCount
+                selectedReplayCount,
+                t
               )
-            : "Submit for Opponent Confirmation"}
+            : t("resultForm.submitConfirmation")}
         </button>
       </form>
 
@@ -407,15 +430,14 @@ export default function PlayerMatchResultForm({
         >
           <span>
             <span className="block text-xs font-black uppercase tracking-wider text-red-200">
-              Report No-Show
+              {t("resultForm.noShowTitle")}
             </span>
             <span className="mt-1 block text-[11px] leading-5 text-slate-500">
-              Use this only if your opponent did not appear. They will be
-              notified and may confirm or dispute the report.
+              {t("resultForm.noShowHelp")}
             </span>
           </span>
           <span className="rounded-lg border border-red-400/30 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-red-200">
-            {noShowOpen ? "Close" : "Open"}
+            {noShowOpen ? t("resultForm.close") : t("resultForm.open")}
           </span>
         </button>
 
@@ -424,7 +446,7 @@ export default function PlayerMatchResultForm({
             <input type="hidden" name="matchId" value={match.id} />
             <label className="block">
               <span className="text-xs font-bold text-slate-300">
-                Missing Player
+                {t("resultForm.missingPlayer")}
               </span>
               <select
                 name="noShowRegistrationId"
@@ -432,7 +454,7 @@ export default function PlayerMatchResultForm({
                 defaultValue=""
                 className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-red-400"
               >
-                <option value="">Select opponent</option>
+                <option value="">{t("resultForm.selectOpponent")}</option>
                 <option value={match.playerOneRegistrationId ?? ""}>
                   {playerOneName}
                 </option>
@@ -443,19 +465,18 @@ export default function PlayerMatchResultForm({
             </label>
             <label className="block">
               <span className="text-xs font-bold text-slate-300">
-                Note or evidence reference (optional)
+                {t("resultForm.evidenceOptional")}
               </span>
               <textarea
                 name="noShowNotes"
                 maxLength={2000}
                 rows={3}
-                placeholder="Example: waited 15 minutes in lobby, opponent did not respond."
+                placeholder={t("resultForm.evidencePlaceholder")}
                 className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-red-400"
               />
             </label>
             <p className="rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-[11px] leading-5 text-red-100/80">
-              Confirm this only when your opponent failed to show up. A
-              confirmed no-show may affect leaderboard participation points.
+              {t("resultForm.noShowWarning")}
             </p>
             {noShowState.status !== "idle" && (
               <p
@@ -465,7 +486,7 @@ export default function PlayerMatchResultForm({
                     : "border-red-400/30 bg-red-500/10 text-red-200"
                 }`}
               >
-                {noShowState.message}
+                {getMatchActionMessage(noShowState, t)}
               </p>
             )}
             <button
@@ -473,7 +494,9 @@ export default function PlayerMatchResultForm({
               disabled={noShowPending || pending || finalizationUncertain}
               className="w-full rounded-xl bg-red-700 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
             >
-              {noShowPending ? "Submitting..." : "Submit No-Show Report"}
+              {noShowPending
+                ? t("resultForm.submitting")
+                : t("resultForm.submitNoShow")}
             </button>
           </form>
         )}
@@ -529,7 +552,8 @@ function getScoreInfo(
   playerOneScore: string,
   playerTwoScore: string,
   winsRequired: number,
-  seriesBestOf: number
+  seriesBestOf: number,
+  t: CompetitionTranslator
 ) {
   const playerOne = parseScore(playerOneScore);
   const playerTwo = parseScore(playerTwoScore);
@@ -537,14 +561,14 @@ function getScoreInfo(
   if (playerOne === null || playerTwo === null) {
     return {
       requiredReplayCount: null,
-      message: "Enter the final score to calculate required replay count.",
+      message: t("resultForm.scoreFirst"),
     };
   }
 
   if (playerOne === playerTwo) {
     return {
       requiredReplayCount: null,
-      message: "Final score cannot be tied.",
+      message: t("resultForm.scoreTie"),
     };
   }
 
@@ -554,7 +578,10 @@ function getScoreInfo(
   if (winnerScore !== winsRequired || loserScore >= winsRequired) {
     return {
       requiredReplayCount: null,
-      message: `BO${seriesBestOf} requires the winner to finish on ${winsRequired} wins.`,
+      message: t("resultForm.bestOfWins", {
+        bestOf: seriesBestOf,
+        count: winsRequired,
+      }),
     };
   }
 
@@ -571,21 +598,21 @@ function parseScore(value: string) {
   return Number.isInteger(score) && score >= 0 ? score : null;
 }
 
-function validateReplaySelection(files: File[]) {
+function validateReplaySelection(files: File[], t: CompetitionTranslator) {
   if (files.length === 0) {
-    return "Upload the match replay files before submitting.";
+    return t("resultForm.replayMissing");
   }
 
   if (files.some((file) => file.size <= 0)) {
-    return "Replay files cannot be empty.";
+    return t("resultForm.replayEmpty");
   }
 
   if (files.some((file) => file.size > maxReplayBytes)) {
-    return "Replay files must be 10 MiB or smaller.";
+    return t("resultForm.replayTooLarge");
   }
 
   if (files.some((file) => !file.name.toLowerCase().endsWith(".rec"))) {
-    return "Every replay file must use the .rec extension.";
+    return t("resultForm.replayExtension");
   }
 
   return "";
@@ -594,12 +621,67 @@ function validateReplaySelection(files: File[]) {
 function getSubmissionPhaseLabel(
   phase: ReplaySubmissionPhase,
   uploadGameNumber: number,
-  replayCount: number
+  replayCount: number,
+  t: CompetitionTranslator
 ) {
-  if (phase === "preparing") return "Preparing replay upload…";
+  if (phase === "preparing") return t("resultForm.preparing");
   if (phase === "uploading") {
-    return `Uploading replay ${uploadGameNumber} of ${replayCount}…`;
+    return t("resultForm.uploading", {
+      current: uploadGameNumber,
+      total: replayCount,
+    });
   }
-  if (phase === "finalizing") return "Verifying and submitting result…";
-  return "Verifying and submitting result…";
+  if (phase === "finalizing") return t("resultForm.finalizing");
+  return t("resultForm.finalizing");
+}
+
+function getMatchActionMessage(
+  state: Pick<MatchResultActionState, "code" | "message" | "values">,
+  t: CompetitionTranslator
+) {
+  switch (state.code) {
+    case "auth_required":
+      return t("actionResults.authRequired");
+    case "prepare_failed":
+      return t("matchAction.prepareFailed");
+    case "cleanup_failed":
+      return t("matchAction.cleanupFailed");
+    case "operation_failed":
+      return t("matchAction.operationFailed");
+    case "result_submitted":
+      return t(
+        Number(state.values?.warning) === 1
+          ? "matchAction.resultSubmittedWarning"
+          : "matchAction.resultSubmitted",
+        { submission: state.values?.submission ?? "new" }
+      );
+    case "opponent_required":
+      return t("matchAction.opponentRequired");
+    case "notes_too_long":
+      return t("matchAction.notesTooLong");
+    case "match_unavailable":
+      return t("matchAction.matchUnavailable");
+    case "participants_unavailable":
+      return t("matchAction.participantsUnavailable");
+    case "participant_only":
+      return t("matchAction.participantOnly");
+    case "self_no_show":
+      return t("matchAction.selfNoShow");
+    case "invalid_participant":
+      return t("matchAction.invalidParticipant");
+    case "no_show_submitted":
+      return t("matchAction.noShowSubmitted", {
+        player: state.values?.player ?? "",
+      });
+    case "report_unavailable":
+      return t("matchAction.reportUnavailable");
+    case "confirmed":
+      return t("matchAction.confirmed");
+    case "dispute_notes_too_long":
+      return t("matchAction.disputeNotesTooLong");
+    case "disputed":
+      return t("matchAction.disputed");
+    default:
+      return state.message;
+  }
 }

@@ -133,6 +133,7 @@ describe("rollMatchDice", () => {
       })
     ).resolves.toEqual({
       ok: false,
+      code: "auth_required",
       error: "Sign in before using the Dice Roll-Off.",
     });
     expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
@@ -152,6 +153,7 @@ describe("rollMatchDice", () => {
 
     expect(result).toEqual({
       ok: false,
+      code: "invalid_request",
       error: "The Dice Roll-Off request is invalid.",
     });
     expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
@@ -203,6 +205,7 @@ describe("rollMatchDice", () => {
       })
     ).resolves.toEqual({
       ok: false,
+      code: "roll_failed",
       error: "Dice Roll-Off could not be completed. Refresh the Match and try again.",
     });
   });
@@ -223,6 +226,7 @@ describe("rollMatchDice", () => {
 
     expect(result).toEqual({
       ok: false,
+      code: "roll_failed",
       error: "Dice Roll-Off could not be completed. Refresh the Match and try again.",
     });
     expect(JSON.stringify(result)).not.toContain("secret detail");

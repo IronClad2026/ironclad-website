@@ -21,15 +21,15 @@ export async function rollMatchDice(
     ({ userId } = await auth());
   } catch {
     console.error("Match dice authentication failed.");
-    return { ok: false, error: "Your session could not be verified. Sign in again." };
+    return { ok: false, error: "Your session could not be verified. Sign in again.", code: "auth_required" };
   }
 
   if (!userId) {
-    return { ok: false, error: "Sign in before using the Dice Roll-Off." };
+    return { ok: false, error: "Sign in before using the Dice Roll-Off.", code: "auth_required" };
   }
 
   if (!isRollMatchDiceInput(input)) {
-    return { ok: false, error: "The Dice Roll-Off request is invalid." };
+    return { ok: false, error: "The Dice Roll-Off request is invalid.", code: "invalid_request" };
   }
 
   let supabase: Awaited<ReturnType<typeof createAuthenticatedSupabaseClient>>;
@@ -38,7 +38,7 @@ export async function rollMatchDice(
     supabase = await createAuthenticatedSupabaseClient();
   } catch {
     console.error("Match dice authenticated client creation failed.");
-    return { ok: false, error: GENERIC_ROLL_ERROR };
+    return { ok: false, error: GENERIC_ROLL_ERROR, code: "roll_failed" };
   }
 
   let result: { data: unknown; error: unknown };
@@ -52,18 +52,18 @@ export async function rollMatchDice(
     });
   } catch {
     console.error("Match dice roll RPC failed unexpectedly.");
-    return { ok: false, error: GENERIC_ROLL_ERROR };
+    return { ok: false, error: GENERIC_ROLL_ERROR, code: "roll_failed" };
   }
 
   if (result.error) {
     console.error("Match dice roll RPC rejected the request.");
-    return { ok: false, error: GENERIC_ROLL_ERROR };
+    return { ok: false, error: GENERIC_ROLL_ERROR, code: "roll_failed" };
   }
 
   const parsed = parseMatchDiceRollRpcResult(result.data, input.matchId);
   if (!parsed) {
     console.error("Match dice roll RPC returned an invalid projection.");
-    return { ok: false, error: GENERIC_ROLL_ERROR };
+    return { ok: false, error: GENERIC_ROLL_ERROR, code: "roll_failed" };
   }
 
   return { ok: true, data: parsed };

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import accountDashboardEnglish from "@/lib/i18n/dictionaries/en/account-dashboard";
 import { anonymousIdentity, playerIdentity } from "@/tests/fixtures/auth";
 
 const authMock = vi.hoisted(() => vi.fn());
@@ -46,6 +47,7 @@ describe("player registration lifecycle actions", () => {
     );
 
     expect(result.status).toBe("error");
+    expect(result.code).toBe("auth_required");
     expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
   });
 
@@ -60,6 +62,7 @@ describe("player registration lifecycle actions", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "registration_unavailable",
       message: "The tournament registration is not available.",
     });
     expect(client.ownershipFilters).toEqual([
@@ -90,6 +93,7 @@ describe("player registration lifecycle actions", () => {
 
     expect(result).toEqual({
       status: "success",
+      code: "withdrawn",
       message:
         "Registration withdrawn. This decision is final for this tournament.",
     });
@@ -127,11 +131,63 @@ describe("player registration lifecycle actions", () => {
       );
 
       expect(result.status).toBe("success");
+      expect(result.code).toBe(
+        response === "accept" ? "offer_accepted" : "offer_declined"
+      );
       expect(client.rpc).toHaveBeenCalledWith("respond_to_waitlist_offer", {
         p_registration_id: REGISTRATION_ID,
         p_response: response,
       });
       expect(JSON.stringify(client.rpc.mock.calls)).not.toContain("approved");
+    }
+  );
+
+  it.each([
+    {
+      operation: "withdraw",
+      message: "The deadline expired after the Division launched.",
+      expectedMessage: "Your tournament registration could not be withdrawn.",
+    },
+    {
+      operation: "withdraw",
+      message: "La inscripción ya fue retirada.",
+      expectedMessage: "Your tournament registration could not be withdrawn.",
+    },
+    {
+      operation: "accept",
+      message: "Already resolved: offer cannot respond after deadline.",
+      expectedMessage: "The waitlist offer could not be updated.",
+    },
+    {
+      operation: "accept",
+      message: "Срок предложения истёк.",
+      expectedMessage: "The waitlist offer could not be updated.",
+    },
+  ])(
+    "maps unstructured $operation RPC prose to the safe generic failure",
+    async ({ operation, message, expectedMessage }) => {
+      const client = createClient({
+        rpcError: { code: "P0001", message },
+      });
+      createAuthenticatedSupabaseClientMock.mockResolvedValue(client.client);
+
+      const result =
+        operation === "withdraw"
+          ? await withdrawTournamentRegistrationAction(
+              initialState,
+              formData({ registrationId: REGISTRATION_ID })
+            )
+          : await respondToWaitlistOfferAction(
+              initialState,
+              formData({ registrationId: REGISTRATION_ID, response: operation })
+            );
+
+      expect(result).toEqual({
+        status: "error",
+        code: "mutation_failed",
+        message: expectedMessage,
+      });
+      expect(revalidatePathMock).not.toHaveBeenCalled();
     }
   );
 
@@ -146,6 +202,7 @@ describe("player registration lifecycle actions", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "invalid_registration",
       message: "Choose Accept or Decline for this waitlist offer.",
     });
     expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
@@ -170,7 +227,14 @@ describe("player registration lifecycle actions", () => {
     );
 
     expect(source).toContain("waiting: registration.launched_at");
-    expect(source).toContain("This division has started, and no place became available.");
+    expect(source).toContain(
+      't("dashboard.registrations.launchedWaitlistMessage")'
+    );
+    expect(
+      accountDashboardEnglish.dashboard.registrations.launchedWaitlistMessage
+    ).toBe(
+      "This Division has started, and no place became available. Thank you for joining the Waitlist."
+    );
   });
 });
 

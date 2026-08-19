@@ -1,9 +1,18 @@
+"use client";
+
 import { Globe2, MapPin, Shield, Swords, Trophy, UsersRound } from "lucide-react";
 import ActiveTournamentEloSnapshotIndicator, {
   type ActiveTournamentEloSnapshot,
 } from "@/components/ActiveTournamentEloSnapshotIndicator";
 import ScrollReveal from "@/components/ScrollReveal";
 import type { PublicPlayerProfile } from "@/lib/public-players";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
+import { formatNumber } from "@/lib/i18n/format";
 
 type PublicPlayerStatsProps = {
   player: PublicPlayerProfile;
@@ -14,25 +23,31 @@ export default function PublicPlayerStats({
   player,
   activeTournamentEloSnapshots,
 }: PublicPlayerStatsProps) {
+  const t = useOptionalTranslations("public", englishPublicDictionary);
+  const locale = useOptionalLocale();
   const stats = [
     {
-      label: "Current ELO",
+      label: t("players.currentElo"),
       value:
         typeof player.currentElo === "number"
-          ? String(player.currentElo)
-          : "Unrated",
+          ? formatNumber(player.currentElo, locale)
+          : t("players.unrated"),
       icon: Shield,
       showsSnapshotIndicator: true,
     },
     {
-      label: "Country",
-      value: player.country?.trim() || "Unknown",
+      label: t("players.country"),
+      value: player.country?.trim()
+        ? getLocalizedCountryName(player.country, locale)
+        : t("players.unknown"),
       icon: Globe2,
       showsSnapshotIndicator: false,
     },
     {
-      label: "Region",
-      value: player.region?.trim() || "Region unknown",
+      label: t("players.region"),
+      value: player.region?.trim()
+        ? getLocalizedPlayerRegion(player.region, t)
+        : t("players.regionUnknown"),
       icon: MapPin,
       showsSnapshotIndicator: false,
     },
@@ -44,9 +59,11 @@ export default function PublicPlayerStats({
         <div>
           <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-orange-300">
             <Swords size={15} />
-            Competitive Record
+            {t("players.competitiveRecord")}
           </p>
-          <h2 className="mt-3 text-3xl font-black text-white">Public Stats</h2>
+          <h2 className="mt-3 text-3xl font-black text-white">
+            {t("players.publicStats")}
+          </h2>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -85,13 +102,13 @@ export default function PublicPlayerStats({
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <PlaceholderCard
             icon={Trophy}
-            title="Tournament History"
-            description="Public tournament history will appear here once a public-safe tournament summary loader is available."
+            title={t("players.tournamentHistory")}
+            description={t("players.tournamentHistoryText")}
           />
           <PlaceholderCard
             icon={UsersRound}
-            title="Match Statistics"
-            description="Public match statistics will appear here once wins, losses, and match history are available through the public data boundary."
+            title={t("players.matchStatistics")}
+            description={t("players.matchStatisticsText")}
           />
         </div>
       </ScrollReveal>

@@ -3,16 +3,33 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { Pause, Play } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import englishCommon from "@/lib/i18n/dictionaries/en/common";
+import { translate } from "@/lib/i18n/translate";
+import type { MessageValues } from "@/lib/i18n/types";
 
 const audioSource = "/audio/ironclad-theme.mp3";
 const inactivityDelay = 7000;
 const defaultVolume = 0.72;
 
 export default function SiteMusicPlayer() {
+  const pathname = usePathname();
+  const selectedTranslator = useOptionalTranslations("common", englishCommon);
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const t = useMemo(
+    () =>
+      isAdminRoute
+        ? (path: string, values?: MessageValues) =>
+            translate(englishCommon, path, values)
+        : selectedTranslator,
+    [isAdminRoute, selectedTranslator]
+  );
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasActivePointerRef = useRef(false);
@@ -180,7 +197,8 @@ export default function SiteMusicPlayer() {
 
   return (
     <aside
-      aria-label="IronClad theme music player"
+      aria-label={t("music.playerLabel")}
+      lang={isAdminRoute ? "en" : undefined}
       className={
         isCollapsed
           ? "fixed right-4 bottom-4 z-30 grid place-items-center border border-orange-400/30 bg-black/78 p-2 text-white shadow-2xl shadow-black/40 backdrop-blur-md motion-safe:transition-all motion-safe:duration-300 sm:right-6 sm:bottom-6"
@@ -198,7 +216,7 @@ export default function SiteMusicPlayer() {
       <button
         type="button"
         onClick={togglePlayback}
-        aria-label={isPlaying ? "Pause IronClad theme" : "Play IronClad theme"}
+        aria-label={isPlaying ? t("music.pause") : t("music.play")}
         aria-pressed={isPlaying}
         className="grid h-12 w-12 place-items-center border border-orange-400/45 bg-orange-500/10 text-orange-200 transition hover:border-orange-300/70 hover:bg-orange-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:h-11 sm:w-11"
       >
@@ -215,7 +233,7 @@ export default function SiteMusicPlayer() {
           aria-live="polite"
           className="mt-2 max-w-28 text-center text-xs leading-5 text-amber-200"
         >
-          Music unavailable
+          {t("music.unavailable")}
         </span>
       )}
     </aside>

@@ -28,6 +28,12 @@ import {
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import InfoTooltip from "@/components/InfoTooltip";
 import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import { formatNumber, selectPlural } from "@/lib/i18n/format";
+import {
   parseSinglePollProjection,
   type PollOptionProjection,
   type PollViewerProjection,
@@ -57,6 +63,11 @@ export type PollsAndDecisionsProps = {
 const DEFAULT_POLL_INTERVAL_MS = 7_000;
 const MAX_TIMER_MS = 2_147_000_000;
 
+type PollMessage = {
+  text: string;
+  role: "status" | "alert";
+};
+
 function isVisibleAndOnline() {
   return (
     document.visibilityState !== "hidden" &&
@@ -85,15 +96,20 @@ export default function PollsAndDecisions({
   loadPolls,
   castBallot = castPollBallotAction,
 }: PollsAndDecisionsProps) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
   const { getToken, isSignedIn } = useAuth();
   const headingId = useId();
   const [polls, setPolls] = useState(initialPolls);
   const [draftSelections, setDraftSelections] = useState<
     Record<string, string[]>
   >(() => buildInitialSelections(initialPolls));
-  const [messages, setMessages] = useState<Record<string, string>>({});
+  const [messages, setMessages] = useState<Record<string, PollMessage | null>>(
+    {}
+  );
   const [pendingPollId, setPendingPollId] = useState<string | null>(null);
-  const [refreshMessage, setRefreshMessage] = useState<string | null>(initialError);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(
+    initialError ? t("polls.refreshError") : null
+  );
   const [viewportActive, setViewportActive] = useState(() =>
     getInitialViewportActivity(presentation)
   );
@@ -135,7 +151,7 @@ export default function PollsAndDecisions({
   const loadFromDatabase = useCallback(
     async (signal?: AbortSignal): Promise<PollLoadResult> => {
       if (!browserClient) {
-        return { ok: false, message: "Polls could not be refreshed." };
+        return { ok: false, message: t("polls.refreshError") };
       }
 
       if (!isSignedIn) return { ok: true, polls: pollsRef.current };
@@ -160,7 +176,7 @@ export default function PollsAndDecisions({
         })
       );
       if (refreshed.some((poll) => poll === null)) {
-        return { ok: false, message: "Polls could not be refreshed." };
+        return { ok: false, message: t("polls.refreshError") };
       }
 
       const merged = new Map(pollsRef.current.map((poll) => [poll.id, poll]));
@@ -168,7 +184,7 @@ export default function PollsAndDecisions({
         if (poll) merged.set(poll.id, poll);
       }
       return { ok: true, polls: [...merged.values()] };
-    }, [browserClient, isSignedIn]
+    }, [browserClient, isSignedIn, t]
   );
 
   const performLoad = loadPolls ?? loadFromDatabase;
@@ -217,7 +233,7 @@ export default function PollsAndDecisions({
         appliedSequenceRef.current = sequence;
         if (!result.ok) {
           failureCountRef.current = Math.min(failureCountRef.current + 1, 3);
-          setRefreshMessage(result.message);
+          setRefreshMessage(t("polls.refreshError"));
           return false;
         }
 
@@ -228,7 +244,7 @@ export default function PollsAndDecisions({
       } catch {
         if (!controller.signal.aborted && mountedRef.current) {
           failureCountRef.current = Math.min(failureCountRef.current + 1, 3);
-          setRefreshMessage("Polls could not be refreshed.");
+          setRefreshMessage(t("polls.refreshError"));
         }
         return false;
       } finally {
@@ -237,7 +253,7 @@ export default function PollsAndDecisions({
           inFlightRef.current = false;
         }
       }
-    }, [applyPolls, performLoad, viewportActive]
+    }, [applyPolls, performLoad, t, viewportActive]
   );
 
   useEffect(() => {
@@ -341,7 +357,7 @@ export default function PollsAndDecisions({
     optionId: string,
     checked: boolean
   ) => {
-    setMessages((current) => ({ ...current, [poll.id]: "" }));
+    setMessages((current) => ({ ...current, [poll.id]: null }));
     dirtyPollsRef.current.add(poll.id);
     setDraftSelections((current) => {
       const selected = current[poll.id] ?? poll.selectedOptionIds ?? [];
@@ -366,7 +382,10 @@ export default function PollsAndDecisions({
     if (selectedOptionIds.length < 1) return;
 
     setPendingPollId(poll.id);
-    setMessages((current) => ({ ...current, [poll.id]: "Saving your ballot…" }));
+    setMessages((current) => ({
+      ...current,
+      [poll.id]: { text: t("polls.savingBallot"), role: "status" },
+    }));
     startTransition(async () => {
       const result = await castBallot({
         pollId: poll.id,
@@ -374,7 +393,18 @@ export default function PollsAndDecisions({
         selectedOptionIds,
       });
       if (!result.ok) {
-        setMessages((current) => ({ ...current, [poll.id]: result.error }));
+        setMessages((current) => ({
+          ...current,
+          [poll.id]: {
+            text:
+              result.code === "auth_required"
+                ? t("actionResults.authRequired")
+                : result.code === "invalid_request"
+                  ? t("pollAction.invalid")
+                  : t("pollAction.failed"),
+            role: "alert",
+          },
+        }));
         setPendingPollId(null);
         await refreshPolls({ force: true });
         return;
@@ -401,20 +431,26 @@ export default function PollsAndDecisions({
       }));
       setMessages((current) => ({
         ...current,
-        [poll.id]: result.data.idempotent
-          ? "Your existing ballot is confirmed."
-          : "Your ballot is saved. You may change it until the Poll closes.",
+        [poll.id]: {
+          text: result.data.idempotent
+            ? t("polls.ballotConfirmed")
+            : t("polls.ballotSaved"),
+          role: "status",
+        },
       }));
       setPendingPollId(null);
       await refreshPolls({ force: true });
     });
   };
 
-  const heading = surface === "community" ? "Community Polls" : "Polls & Decisions";
+  const heading =
+    surface === "community"
+      ? t("polls.communityTitle")
+      : t("polls.tournamentTitle");
   const description =
     surface === "community"
-      ? "Share feedback on IronClad priorities through private, authenticated Advisory ballots."
-      : "Vote in Decisions for which you are eligible and review final published outcomes.";
+      ? t("polls.communityDescription")
+      : t("polls.tournamentDescription");
 
   return (
     <section
@@ -424,7 +460,9 @@ export default function PollsAndDecisions({
       <header className="flex min-w-0 flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-400">
-            {surface === "community" ? "Authenticated Feedback" : "Tournament Governance"}
+            {surface === "community"
+              ? t("polls.communityEyebrow")
+              : t("polls.tournamentEyebrow")}
           </p>
           <h2
             id={headingId}
@@ -448,8 +486,8 @@ export default function PollsAndDecisions({
       {orderedPolls.length === 0 ? (
         <div className="mt-5 border border-white/10 bg-black/35 p-6 text-sm leading-6 text-zinc-400">
           {surface === "community"
-            ? "No Community Polls are available to you right now."
-            : "No private Polls or final published Decisions are available for this Tournament."}
+            ? t("polls.communityEmpty")
+            : t("polls.tournamentEmpty")}
         </div>
       ) : (
         <div className="mt-5 grid min-w-0 gap-5">
@@ -461,7 +499,7 @@ export default function PollsAndDecisions({
                 poll={poll}
                 selectedOptionIds={selected}
                 pending={pendingPollId === poll.id}
-                message={messages[poll.id] || null}
+                message={messages[poll.id] ?? null}
                 highlighted={poll.id === highlightedPollId}
                 setRef={(node) => {
                   if (node) pollCardRefs.current.set(poll.id, node);
@@ -493,12 +531,14 @@ function PollCard({
   poll: PollViewerProjection;
   selectedOptionIds: string[];
   pending: boolean;
-  message: string | null;
+  message: PollMessage | null;
   highlighted: boolean;
   setRef: (node: HTMLElement | null) => void;
   onToggle: (optionId: string, checked: boolean) => void;
   onSubmit: () => void;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const radioGroupName = useId();
   const canVote = poll.status === "open" && typeof poll.ballotRevision === "number";
   const hasSavedBallot = (poll.selectedOptionIds?.length ?? 0) > 0;
@@ -530,19 +570,32 @@ function PollCard({
       }`}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <Badge>{poll.authority === "binding" ? "Binding" : "Advisory"}</Badge>
+        <Badge>
+          {poll.authority === "binding"
+            ? t("polls.binding")
+            : t("polls.advisory")}
+        </Badge>
         <InfoTooltip
           align="start"
-          label={`About ${poll.authority} Polls`}
+          label={t("polls.aboutAuthority", {
+            authority:
+              poll.authority === "binding"
+                ? t("polls.binding")
+                : t("polls.advisory"),
+          })}
           content={
             poll.authority === "binding"
-              ? "Eligible votes determine the configured top-K outcome once at least one valid ballot exists. A zero-ballot Poll is cancelled or replaced. Finalisation does not automatically change another subsystem."
-              : "Eligible votes inform the final Admin decision. The Published Decision may differ where the required rationale is provided."
+              ? t("polls.bindingHelp")
+              : t("polls.advisoryHelp")
           }
         />
-        <Badge>{formatStatus(poll.status)}</Badge>
-        {poll.maxSelections > 1 && <Badge>Choose up to {poll.maxSelections}</Badge>}
-        {poll.winnerCount > 1 && <Badge>{poll.winnerCount} winners</Badge>}
+        <Badge>{formatStatus(poll.status, t)}</Badge>
+        {poll.maxSelections > 1 && (
+          <Badge>{t("polls.chooseUpTo", { count: poll.maxSelections })}</Badge>
+        )}
+        {poll.winnerCount > 1 && (
+          <Badge>{t("polls.winnerCount", { count: poll.winnerCount })}</Badge>
+        )}
       </div>
 
       <h3 className="mt-4 break-words text-xl font-black text-white sm:text-2xl">
@@ -557,29 +610,49 @@ function PollCard({
       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-zinc-400">
         <span className="inline-flex items-center gap-2">
           <Clock3 className="h-4 w-4 text-orange-400" />
-          {poll.status === "scheduled" ? "Opens" : "Closes"}{" "}
-          <HydrationSafeLocalDateTime
+          <LocalizedPollDateTime
+            message={t(
+              poll.status === "scheduled"
+                ? "pollDates.opensAt"
+                : "pollDates.closesAt",
+              { date: "__DATE__" }
+            )}
             value={poll.status === "scheduled" ? poll.opensAt : poll.closesAt}
-            fallback="Time unavailable"
+            fallback={t("dice.timeUnavailable")}
           />
         </span>
         {typeof poll.submittedBallotCount === "number" && (
           <span>
-            {poll.submittedBallotCount} submitted ballot
-            {poll.submittedBallotCount === 1 ? "" : "s"}
             {typeof poll.eligibleCount === "number"
-              ? ` / ${poll.eligibleCount} eligible`
-              : ""}
+              ? t("pollCounts.ballotEligibility", {
+                  ballots: formatPollCount(
+                    "ballotCount",
+                    poll.submittedBallotCount,
+                    locale,
+                    t
+                  ),
+                  eligible: t("polls.eligibleCount", {
+                    count: formatNumber(poll.eligibleCount, locale),
+                  }),
+                })
+              : formatPollCount(
+                  "ballotCount",
+                  poll.submittedBallotCount,
+                  locale,
+                  t
+                )}
           </span>
         )}
         {poll.status === "final_decision_published" &&
           poll.finalDecisionPublishedAt && (
             <span className="inline-flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-orange-400" />
-              Decision published{" "}
-              <HydrationSafeLocalDateTime
+              <LocalizedPollDateTime
+                message={t("pollDates.decisionPublishedAt", {
+                  date: "__DATE__",
+                })}
                 value={poll.finalDecisionPublishedAt}
-                fallback="Time unavailable"
+                fallback={t("dice.timeUnavailable")}
               />
             </span>
           )}
@@ -587,7 +660,7 @@ function PollCard({
 
       {poll.authority === "binding" && poll.status === "open" && (
         <p className="mt-4 border border-orange-400/25 bg-orange-500/10 p-3 text-xs font-bold leading-5 text-orange-100">
-          Binding results apply regardless of turnout once at least one valid ballot is submitted.
+          {t("polls.bindingTurnout")}
         </p>
       )}
 
@@ -596,7 +669,7 @@ function PollCard({
           <legend className="sr-only">{poll.question}</legend>
           {showTotals && poll.maxSelections > 1 && (
             <p className="mb-3 text-xs leading-5 text-zinc-500">
-              Percentages show the share of submitted ballots selecting each option.
+              {t("polls.percentageHelp")}
             </p>
           )}
           <div className="grid min-w-0 gap-2">
@@ -634,7 +707,10 @@ function PollCard({
 
           <div className="mt-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs font-bold text-zinc-400">
-              {selectedOptionIds.length} selected / maximum {poll.maxSelections}
+              {t("polls.selectedMaximum", {
+                selected: selectedOptionIds.length,
+                maximum: poll.maxSelections,
+              })}
             </p>
             <button
               type="button"
@@ -648,14 +724,14 @@ function PollCard({
               className="min-h-11 border border-orange-400 bg-orange-500 px-5 py-2.5 text-sm font-black uppercase tracking-wide text-black transition hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               {pending
-                ? "Saving…"
+                ? t("polls.saving")
                 : hasSavedBallot
-                  ? "Update vote"
-                  : "Submit vote"}
+                  ? t("polls.updateVote")
+                  : t("polls.submitVote")}
             </button>
           </div>
           <p className="mt-3 text-xs leading-5 text-zinc-500">
-            You may change your ballot until the database close time shown above.
+            {t("polls.changeUntilClose")}
           </p>
         </fieldset>
       ) : (
@@ -665,18 +741,22 @@ function PollCard({
       {canVote && !showTotals && poll.resultVisibility === "after_close" && (
         <p className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-zinc-400">
           <ShieldCheck className="h-4 w-4 text-orange-400" />
-          Results available after close
+          {t("polls.afterClose")}
         </p>
       )}
 
       {poll.status === "final_decision_published" && (
         <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
-          <DecisionList title="Poll result" options={pollResult} rank="poll" />
+          <DecisionList
+            title={t("polls.resultTitle")}
+            options={pollResult}
+            rank="poll"
+          />
           <DecisionList
             title={
               poll.authority === "advisory"
-                ? "Admin final decision"
-                : "Authoritative decision"
+                ? t("polls.adminFinalDecision")
+                : t("polls.authoritativeDecision")
             }
             options={finalDecision}
             rank="final"
@@ -687,7 +767,7 @@ function PollCard({
       {poll.finalRationale && poll.status === "final_decision_published" && (
         <div className="mt-4 border border-white/10 bg-black/35 p-4">
           <p className="text-xs font-black uppercase tracking-wider text-orange-300">
-            Final rationale
+            {t("polls.finalRationale")}
           </p>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">
             {poll.finalRationale}
@@ -699,26 +779,25 @@ function PollCard({
         poll.status === "final_decision_published" && (
         <p className="mt-4 inline-flex items-start gap-2 text-xs leading-5 text-zinc-400">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" />
-          Cutoff tie rule: Admin tie-breaking is limited to options tied across the
-          qualifying cutoff. {poll.bindingTieRuleUsed
-            ? "The tie rule was used for this Decision."
-            : "The tie rule was not needed for this Decision."}
+          {t("polls.cutoffRule")} {poll.bindingTieRuleUsed
+            ? t("polls.tieUsed")
+            : t("polls.tieNotNeeded")}
         </p>
       )}
 
       {poll.status === "cancelled" && (
         <p className="mt-5 inline-flex items-start gap-2 border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">
           <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          {poll.cancellationReason || "This Poll was cancelled and cannot accept ballots."}
+          {poll.cancellationReason || t("polls.cancelled")}
         </p>
       )}
 
       {message && (
         <p
-          role={message.includes("saved") || message.includes("confirmed") ? "status" : "alert"}
+          role={message.role}
           className="mt-4 border border-white/10 bg-black/35 p-3 text-sm font-bold text-zinc-200"
         >
-          {message}
+          {message.text}
         </p>
       )}
     </article>
@@ -732,27 +811,29 @@ function PollResults({
   poll: PollViewerProjection;
   showTotals: boolean;
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   if (!showTotals) {
     return (
       <p className="mt-5 inline-flex items-center gap-2 text-sm text-zinc-400">
         <ShieldCheck className="h-4 w-4 text-orange-400" />
         {poll.status === "scheduled"
-          ? "Voting has not opened yet."
+          ? t("polls.notOpen")
           : poll.status === "open"
-            ? "Results available after close"
-            : "Aggregate totals were not published on this surface."}
+            ? t("polls.afterClose")
+            : t("polls.aggregatesNotPublished")}
       </p>
     );
   }
 
   return (
-    <div className="mt-5" aria-label="Aggregate Poll results">
+    <div className="mt-5" aria-label={t("polls.aggregateAria")}>
       <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-orange-300">
-        <BarChart3 className="h-4 w-4" /> Aggregate results
+        <BarChart3 className="h-4 w-4" /> {t("polls.aggregateTitle")}
       </p>
       {poll.maxSelections > 1 && (
         <p className="mt-2 text-xs leading-5 text-zinc-500">
-          Percentages show the share of submitted ballots selecting each option.
+          {t("polls.percentageHelp")}
         </p>
       )}
       <div className="mt-3 grid min-w-0 gap-2">
@@ -779,14 +860,24 @@ function OptionAggregate({
   option: PollOptionProjection;
   multi: boolean;
 }) {
+  const locale = useOptionalLocale();
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const voteCount = option.voteCount ?? 0;
+
   return (
     <span className="shrink-0 text-right text-xs font-bold text-zinc-400">
       <span className="block text-sm text-white">
-        {option.voteCount} vote{option.voteCount === 1 ? "" : "s"}
+        {formatPollCount("voteCount", voteCount, locale, t)}
       </span>
       <span>
-        {formatPercentage(option.selectionSharePercent)}
-        {multi ? " of ballots" : ""}
+        {multi
+          ? t("polls.ballotShare", {
+              percentage: formatPercentage(
+                option.selectionSharePercent,
+                locale
+              ),
+            })
+          : formatPercentage(option.selectionSharePercent, locale)}
       </span>
     </span>
   );
@@ -801,6 +892,8 @@ function DecisionList({
   options: PollOptionProjection[];
   rank: "poll" | "final";
 }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <section className="min-w-0 border border-white/10 bg-black/35 p-4">
       <h4 className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-orange-300">
@@ -819,7 +912,9 @@ function DecisionList({
           ))}
         </ol>
       ) : (
-        <p className="mt-3 text-sm text-zinc-500">No outcome is available.</p>
+        <p className="mt-3 text-sm text-zinc-500">
+          {t("polls.noOutcome")}
+        </p>
       )}
     </section>
   );
@@ -833,15 +928,63 @@ function Badge({ children }: { children: ReactNode }) {
   );
 }
 
-function formatStatus(status: PollViewerProjection["status"]) {
-  return status === "final_decision_published"
-    ? "Decision published"
-    : status.charAt(0).toUpperCase() + status.slice(1);
+function formatStatus(
+  status: PollViewerProjection["status"],
+  t: ReturnType<typeof useOptionalTranslations>
+) {
+  if (status === "final_decision_published") {
+    return t("polls.decisionPublished");
+  }
+
+  const labels = {
+    draft: t("polls.statusDraft"),
+    scheduled: t("polls.statusScheduled"),
+    open: t("polls.statusOpen"),
+    closed: t("polls.statusClosed"),
+    cancelled: t("polls.statusCancelled"),
+  } as const;
+
+  return labels[status];
 }
 
-function formatPercentage(value: number | undefined) {
+function formatPollCount(
+  key: "ballotCount" | "voteCount",
+  count: number,
+  locale: ReturnType<typeof useOptionalLocale>,
+  t: ReturnType<typeof useOptionalTranslations>
+) {
+  const category = selectPlural(count, locale);
+  const suffix = `${category[0].toUpperCase()}${category.slice(1)}`;
+  return t(`pollCounts.${key}${suffix}`, {
+    count: formatNumber(count, locale),
+  });
+}
+
+function LocalizedPollDateTime({
+  message,
+  value,
+  fallback,
+}: {
+  message: string;
+  value: string;
+  fallback: string;
+}) {
+  const [before, after = ""] = message.split("__DATE__");
+  return (
+    <>
+      {before}
+      <HydrationSafeLocalDateTime value={value} fallback={fallback} />
+      {after}
+    </>
+  );
+}
+
+function formatPercentage(
+  value: number | undefined,
+  locale: ReturnType<typeof useOptionalLocale>
+) {
   if (typeof value !== "number") return "—";
-  return `${new Intl.NumberFormat("en-AU", { maximumFractionDigits: 1 }).format(value)}%`;
+  return `${formatNumber(value, locale, { maximumFractionDigits: 1 })}%`;
 }
 
 function getPollResultOptions(poll: PollViewerProjection) {

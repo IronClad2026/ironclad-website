@@ -13,10 +13,17 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { dismissDashboardNotifications } from "@/app/dashboard/actions";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import {
   deleteSelectedInAppNotifications,
   markAllInAppNotificationsRead,
@@ -24,6 +31,9 @@ import {
   markVisibleInAppNotificationsRead,
 } from "@/app/notifications/actions";
 import type { DashboardNotification } from "@/lib/player-dashboard";
+import notificationsEnglish from "@/lib/i18n/dictionaries/en/notifications";
+import type { MessageValues } from "@/lib/i18n/types";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
 import type {
   InAppNotification,
   NotificationScope,
@@ -42,6 +52,11 @@ type InAppNotificationCenterProps = {
   className?: string;
   matchNotifications?: DashboardNotification[];
 };
+
+type NotificationTranslator = (
+  path: string,
+  values?: MessageValues
+) => string;
 
 export default function InAppNotificationCenter({
   scope,
@@ -73,6 +88,10 @@ export default function InAppNotificationCenter({
   >(new Set());
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const t = useOptionalTranslations(
+    "notifications",
+    notificationsEnglish
+  );
   const selectedNotification =
     notifications.find((notification) => notification.id === selectedId) ??
     notifications[0] ??
@@ -403,7 +422,10 @@ export default function InAppNotificationCenter({
           <span className="min-w-0">
             <span className="block text-xl font-black text-white">{title}</span>
             <span className="mt-1 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              {displayTotalCount} total - {displayUnreadCount} unread
+              {t("center.totalSummary", {
+                total: displayTotalCount,
+                unread: displayUnreadCount,
+              })}
             </span>
           </span>
         </span>
@@ -441,6 +463,7 @@ export default function InAppNotificationCenter({
                       selectedVisibleCount={selectedVisibleCount}
                       selectedReadableCount={selectedDurableCount}
                       pending={pending}
+                      t={t}
                       onToggleSelectAll={toggleSelectAllVisible}
                       onMarkSelectedRead={markSelectedRead}
                       onDeleteSelected={deleteSelected}
@@ -453,6 +476,7 @@ export default function InAppNotificationCenter({
                       notification={notification}
                       checked={selectedNotificationIds.has(notification.id)}
                       pending={pending}
+                      t={t}
                       onToggleSelected={() =>
                         toggleNotificationSelection(notification.id)
                       }
@@ -466,6 +490,7 @@ export default function InAppNotificationCenter({
                       notification={notification}
                       checked={selectedNotificationIds.has(notification.id)}
                       pending={pending}
+                      t={t}
                       onToggleSelected={() =>
                         toggleNotificationSelection(notification.id)
                       }
@@ -483,7 +508,7 @@ export default function InAppNotificationCenter({
                   className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-zinc-300 transition hover:border-orange-400/40 hover:text-white disabled:opacity-50"
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  Mark All Read
+                  {t("center.markAllRead")}
                 </button>
               )}
             </div>
@@ -502,6 +527,7 @@ function BulkActionBar({
   onToggleSelectAll,
   onMarkSelectedRead,
   onDeleteSelected,
+  t,
 }: {
   allVisibleSelected: boolean;
   selectedVisibleCount: number;
@@ -510,6 +536,7 @@ function BulkActionBar({
   onToggleSelectAll: () => void;
   onMarkSelectedRead: () => void;
   onDeleteSelected: () => void;
+  t: NotificationTranslator;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 p-3">
@@ -521,10 +548,10 @@ function BulkActionBar({
           disabled={pending}
           className="h-4 w-4 accent-orange-500"
         />
-        Select All
+        {t("center.selectAll")}
         {selectedVisibleCount > 0 && (
           <span className="text-orange-300">
-            {selectedVisibleCount} selected
+            {t("center.selected", { count: selectedVisibleCount })}
           </span>
         )}
       </label>
@@ -537,7 +564,7 @@ function BulkActionBar({
           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-zinc-300 transition hover:border-orange-400/40 hover:text-white disabled:opacity-40"
         >
           <CheckCircle2 className="h-4 w-4" />
-          Mark Selected Read
+          {t("center.markSelectedRead")}
         </button>
         <button
           type="button"
@@ -546,7 +573,7 @@ function BulkActionBar({
           className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-red-200 transition hover:border-red-400/60 hover:bg-red-500/20 disabled:opacity-40"
         >
           <Trash2 className="h-4 w-4" />
-          Delete Selected
+          {t("center.deleteSelected")}
         </button>
       </div>
     </div>
@@ -734,7 +761,16 @@ function AdminNotificationModal({
                         {notification.message}
                       </span>
                       <span className="mt-2 block text-[10px] font-bold uppercase tracking-wider text-zinc-600">
-                        {formatTimestamp(notification.createdAt)}
+                        <HydrationSafeLocalDateTime
+                          value={notification.createdAt}
+                          fallback="Unknown time"
+                          options={{
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }}
+                        />
                       </span>
                     </button>
                   </div>
@@ -795,14 +831,26 @@ function AdminNotificationDetail({
         </p>
         {notification.deadlineAt && (
           <p className="mt-4 rounded-xl border border-orange-400/20 bg-orange-500/10 px-4 py-3 text-xs font-bold text-orange-100">
-            Match deadline: {formatFullTimestamp(notification.deadlineAt)}
+            Match deadline:{" "}
+            <HydrationSafeLocalDateTime
+              value={notification.deadlineAt}
+              fallback="Unknown time"
+            />
           </p>
         )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Detail label="Type" value={notification.type} />
-        <Detail label="Created" value={formatFullTimestamp(notification.createdAt)} />
+        <Detail
+          label="Created"
+          value={
+            <HydrationSafeLocalDateTime
+              value={notification.createdAt}
+              fallback="Unknown time"
+            />
+          }
+        />
         <Detail
           label="Actor"
           value={notification.actorDisplayName || "System"}
@@ -851,12 +899,14 @@ function PlayerNotificationItem({
   notification,
   checked,
   pending,
+  t,
   onToggleSelected,
   onOpen,
 }: {
   notification: InAppNotification;
   checked: boolean;
   pending: boolean;
+  t: NotificationTranslator;
   onToggleSelected: () => void;
   onOpen: () => void;
 }) {
@@ -874,7 +924,9 @@ function PlayerNotificationItem({
           checked={checked}
           onChange={onToggleSelected}
           disabled={pending}
-          aria-label={`Select ${notification.title}`}
+          aria-label={t("center.selectNotification", {
+            title: notification.title,
+          })}
           className="h-4 w-4 accent-orange-500"
         />
       </label>
@@ -893,7 +945,7 @@ function PlayerNotificationItem({
           </span>
           {notification.readAt === null && (
             <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white">
-              New
+              {t("center.new")}
             </span>
           )}
         </span>
@@ -902,12 +954,27 @@ function PlayerNotificationItem({
         </span>
         {notification.deadlineAt && (
           <span className="mt-2 block text-xs font-bold text-orange-200">
-            Deadline: {formatFullTimestamp(notification.deadlineAt)}
+            <LocalizedDateTimeMessage
+              message={t("center.deadline", {
+                value: "__IRONCLAD_DATETIME__",
+              })}
+              value={notification.deadlineAt}
+              fallback={t("center.unknownTime")}
+            />
           </span>
         )}
         <span className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
           <Clock3 className="h-3.5 w-3.5" />
-          {formatTimestamp(notification.createdAt)}
+          <HydrationSafeLocalDateTime
+            value={notification.createdAt}
+            fallback={t("center.unknownTime")}
+            options={{
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            }}
+          />
           {notification.tournamentTitle ? (
             <>
               <span>-</span>
@@ -924,12 +991,14 @@ function MatchActionNotificationItem({
   notification,
   checked,
   pending,
+  t,
   onToggleSelected,
   onOpen,
 }: {
   notification: DashboardNotification;
   checked: boolean;
   pending: boolean;
+  t: NotificationTranslator;
   onToggleSelected: () => void;
   onOpen: () => void;
 }) {
@@ -943,7 +1012,7 @@ function MatchActionNotificationItem({
           checked={checked}
           onChange={onToggleSelected}
           disabled={pending}
-          aria-label="Select match result confirmation notification"
+          aria-label={t("center.selectMatchConfirmation")}
           className="h-4 w-4 accent-orange-500"
         />
       </label>
@@ -958,16 +1027,21 @@ function MatchActionNotificationItem({
       >
         <span className="text-sm font-black text-white">
           {notification.resultType === "no_show"
-            ? "No-Show Confirmation Required"
-            : "Match Result Confirmation Required"}
+            ? t("center.noShowConfirmationTitle")
+            : t("center.resultConfirmationTitle")}
         </span>
         <span className="mt-1 block text-sm leading-5 text-zinc-300">
           {notification.resultType === "no_show"
-            ? `Your opponent reported a no-show for ${notification.tournamentName}.`
-            : `Your opponent submitted a result for ${notification.tournamentName}. Reported score: ${notification.reportedScore}.`}
+            ? t("center.noShowConfirmationMessage", {
+                tournamentName: notification.tournamentName,
+              })
+            : t("center.resultConfirmationMessage", {
+                tournamentName: notification.tournamentName,
+                score: notification.reportedScore,
+              })}
         </span>
         <span className="mt-2 block text-[10px] font-black uppercase tracking-wider text-orange-300">
-          Open tournament to confirm or dispute
+          {t("center.openToRespond")}
         </span>
       </button>
     </div>
@@ -999,7 +1073,7 @@ function CountPill({
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0 rounded-xl border border-white/10 bg-black/25 p-3">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
@@ -1051,34 +1125,34 @@ function NotificationIcon({ type }: { type: string }) {
 }
 
 function isPlayerMatchConfirmationNotification(notification: InAppNotification) {
-  return (
-    notification.type === "match.confirmation_required" ||
-    notification.title.toLowerCase() === "match result confirmation required"
-  );
+  return notification.type === "match.confirmation_required";
 }
 
 function isPlayerWaitlistOfferNotification(notification: InAppNotification) {
   return notification.type === "registration.waitlist_offer";
 }
 
-function formatTimestamp(value: string) {
-  const timestamp = new Date(value);
-  if (!Number.isFinite(timestamp.getTime())) return "Unknown time";
+function LocalizedDateTimeMessage({
+  message,
+  value,
+  fallback,
+}: {
+  message: string;
+  value: string;
+  fallback: string;
+}) {
+  const marker = "__IRONCLAD_DATETIME__";
+  const markerIndex = message.indexOf(marker);
 
-  return new Intl.DateTimeFormat("en-AU", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(timestamp);
-}
+  if (markerIndex < 0) {
+    return <HydrationSafeLocalDateTime value={value} fallback={fallback} />;
+  }
 
-function formatFullTimestamp(value: string) {
-  const timestamp = new Date(value);
-  if (!Number.isFinite(timestamp.getTime())) return "Unknown time";
-
-  return new Intl.DateTimeFormat("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
+  return (
+    <>
+      {message.slice(0, markerIndex)}
+      <HydrationSafeLocalDateTime value={value} fallback={fallback} />
+      {message.slice(markerIndex + marker.length)}
+    </>
+  );
 }

@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { Download, FileCheck2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Download, FileCheck2, ShieldCheck } from "lucide-react";
 
+import type { HelpLegalUiDictionary } from "@/lib/i18n/dictionaries/en/help-legal-ui";
+import type { Locale } from "@/lib/i18n/config";
+import { interpolateMessage } from "@/lib/i18n/translate";
 import {
   getLegalDocument,
   legalCorpus,
@@ -11,13 +14,17 @@ import {
 
 export default function LegalDocumentPage({
   kind,
+  copy,
+  locale,
 }: {
   kind: Extract<LegalDocumentKind, "terms" | "privacy">;
+  copy: HelpLegalUiDictionary;
+  locale: Locale;
 }) {
   const document = getLegalDocument(kind);
   const companionRoute = kind === "terms" ? "/privacy" : "/terms";
   const companionLabel =
-    kind === "terms" ? "Privacy Policy" : "Terms of Service";
+    kind === "terms" ? copy.legalPage.terms : copy.legalPage.privacy;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -38,20 +45,25 @@ export default function LegalDocumentPage({
 
         <div className="relative z-10 mx-auto max-w-6xl">
           <p className="text-sm font-black uppercase tracking-[0.2em] text-orange-300">
-            IronClad Tournaments legal corpus
+            {copy.legalPage.corpusEyebrow}
           </p>
-          <h1 className="mt-5 max-w-5xl text-5xl font-black leading-[0.96] sm:text-6xl lg:text-7xl">
+          <h1 className="mt-5 max-w-5xl text-5xl font-black leading-[0.96] sm:text-6xl lg:text-7xl" lang="en">
             {document.title}
           </h1>
-          <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300 sm:text-lg">
+          <p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300 sm:text-lg" lang="en">
             {resolveEffectiveDateToken(document.subtitle)}
           </p>
 
+          <div className="mt-7 flex max-w-4xl items-start gap-3 border border-amber-300/30 bg-amber-400/[0.08] p-4 text-sm leading-6 text-amber-100" role="note">
+            <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={18} />
+            <p>{copy.legalPage.effectiveEnglishNotice}</p>
+          </div>
+
           <dl className="mt-9 grid max-w-4xl gap-px border border-white/12 bg-white/12 sm:grid-cols-3">
-            <DocumentFact label="Version" value={document.version} />
-            <DocumentFact label="Status" value={document.status} />
+            <DocumentFact label={copy.legalPage.version} value={document.version} />
+            <DocumentFact label={copy.legalPage.status} value={document.status} />
             <DocumentFact
-              label="Effective date"
+              label={copy.legalPage.effectiveDate}
               value={legalCorpus.effectiveDateDisplay}
             />
           </dl>
@@ -62,14 +74,18 @@ export default function LegalDocumentPage({
               download={document.filename}
               href={document.publicPath}
             >
-              Download version {document.version} PDF
+              {interpolateMessage(copy.legalPage.downloadVersion, {
+                version: document.version,
+              })}
               <Download aria-hidden="true" size={18} />
             </a>
             <Link
               className="inline-flex min-h-12 items-center justify-center border border-white/18 bg-white/[0.04] px-5 py-3 text-sm font-black text-white transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
               href={companionRoute}
             >
-              Read the {companionLabel}
+              {interpolateMessage(copy.legalPage.readCompanion, {
+                document: companionLabel,
+              })}
             </Link>
           </div>
         </div>
@@ -78,14 +94,16 @@ export default function LegalDocumentPage({
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-12 lg:py-20">
         <aside className="lg:sticky lg:top-28 lg:self-start">
           <nav
-            aria-label={`${document.title} contents`}
+            aria-label={interpolateMessage(copy.legalPage.contentsAria, {
+              document: document.title,
+            })}
             className="border border-white/12 bg-zinc-950/90 p-5"
           >
             <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-orange-300">
               <FileCheck2 aria-hidden="true" size={17} />
-              Contents
+              {copy.legalPage.contents}
             </p>
-            <ol className="mt-5 max-h-[60vh] space-y-2 overflow-y-auto pr-2 text-sm text-zinc-400">
+            <ol className="mt-5 max-h-[60vh] space-y-2 overflow-y-auto pr-2 text-sm text-zinc-400" lang="en">
               {document.sections.map((section) => (
                 <li key={section.number}>
                   <a
@@ -100,11 +118,11 @@ export default function LegalDocumentPage({
           </nav>
         </aside>
 
-        <article className="min-w-0">
+        <article className="min-w-0" lang="en">
           <div className="border border-orange-400/25 bg-orange-500/[0.07] p-5 sm:p-6">
             <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-orange-300">
               <ShieldCheck aria-hidden="true" size={18} />
-              Named operators
+              <span lang={locale}>{copy.legalPage.namedOperators}</span>
             </p>
             <p className="mt-3 text-sm leading-7 text-zinc-200 sm:text-base sm:leading-8">
               {resolveEffectiveDateToken(document.operatorStatement)}
@@ -126,8 +144,10 @@ export default function LegalDocumentPage({
                 id={getSectionId(section.number)}
                 key={section.number}
               >
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-300">
-                  Section {section.number}
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-300" lang={locale}>
+                  {interpolateMessage(copy.legalPage.section, {
+                    number: section.number,
+                  })}
                 </p>
                 <h2 className="mt-3 text-2xl font-black leading-tight text-white sm:text-3xl">
                   {section.title}
@@ -155,7 +175,7 @@ function DocumentFact({ label, value }: { label: string; value: string }) {
       <dt className="text-xs font-black uppercase tracking-wide text-zinc-500">
         {label}
       </dt>
-      <dd className="mt-2 font-bold text-white">{value}</dd>
+      <dd className="mt-2 font-bold text-white" lang="en">{value}</dd>
     </div>
   );
 }

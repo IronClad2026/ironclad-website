@@ -8,6 +8,7 @@ const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const getRelic1v1EloMock = vi.hoisted(() => vi.fn());
 const createInAppNotificationMock = vi.hoisted(() => vi.fn());
+const getRequestLocaleMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -24,6 +25,10 @@ vi.mock("@/lib/elo-verification/relic", () => ({
 
 vi.mock("@/lib/notifications", () => ({
   createInAppNotification: createInAppNotificationMock,
+}));
+
+vi.mock("@/lib/i18n/request", () => ({
+  getRequestLocale: getRequestLocaleMock,
 }));
 
 vi.mock("next/cache", () => ({
@@ -277,6 +282,7 @@ describe("Relic-authoritative tournament registration action", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW));
     authMock.mockResolvedValue(playerIdentity);
+    getRequestLocaleMock.mockResolvedValue("en");
     getRelic1v1EloMock.mockResolvedValue(ratedResult());
     createInAppNotificationMock.mockResolvedValue(true);
   });
@@ -292,11 +298,42 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "AUTH_REQUIRED",
       message: "Sign in before registering for a tournament.",
     });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
   });
+
+  it.each(
+    (["zh-CN", "ru", "es", "pt-BR", "ko", "fr"] as const).flatMap(
+      (locale) => [
+        { locale, journey: "Register", waitlistConfirmed: false },
+        { locale, journey: "Join Waitlist", waitlistConfirmed: true },
+      ]
+    )
+  )(
+    "rejects the $locale $journey journey before protected processing",
+    async ({ locale, waitlistConfirmed }) => {
+      getRequestLocaleMock.mockResolvedValue(locale);
+
+      const result = await submitTournamentRegistration(
+        registrationInput({ waitlistConfirmed })
+      );
+
+      expect(result).toEqual({
+        success: false,
+        code: "LOCALE_REGISTRATION_GATE",
+        message:
+          "Registration is currently available only through the Effective English governing corpus.",
+      });
+      expect(authMock).not.toHaveBeenCalled();
+      expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+      expect(getRelic1v1EloMock).not.toHaveBeenCalled();
+      expect(createInAppNotificationMock).not.toHaveBeenCalled();
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     "rulebookAgreement",
@@ -312,6 +349,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "INVALID_INPUT",
       message: "Complete the tournament selection and required agreements.",
     });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
@@ -331,6 +369,7 @@ describe("Relic-authoritative tournament registration action", () => {
     );
 
     expect(result.success).toBe(true);
+    expect(result.code).toBe("REGISTRATION_SUBMITTED");
     const rpcArguments = client.rpc.mock.calls[0][1];
     expect(rpcArguments).not.toHaveProperty("rulebookVersion");
     expect(rpcArguments).not.toHaveProperty("termsUrl");
@@ -348,6 +387,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "PROFILE_REQUIRED",
       message: "Complete your player profile before registering.",
       requiresProfile: true,
     });
@@ -368,6 +408,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "STEAM_REQUIRED",
       message: "Connect your Steam account before registering for a tournament.",
     });
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
@@ -384,6 +425,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "DUPLICATE_REGISTRATION",
       message: "You are already registered for this tournament.",
     });
     expect(client.queries.map((query) => query.table)).toEqual([
@@ -406,6 +448,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "REGISTRATION_UNAVAILABLE",
       message:
         "This tournament is full or already in progress. We hope to see you in the next one.",
     });
@@ -428,6 +471,8 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: true,
+      code: "WAITLIST_SUBMITTED",
+      values: { position: 1 },
       message: "Registration submitted to waitlist position #1.",
     });
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
@@ -455,6 +500,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toMatchObject({
       success: false,
+      code: "WAITLIST_CONFIRMATION_REQUIRED",
       requiresWaitlistConfirmation: true,
     });
     expect(result.message).toContain("Your place is not guaranteed");
@@ -486,6 +532,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "REGISTRATION_UNAVAILABLE",
       message:
         "This tournament is full or already in progress. We hope to see you in the next one.",
     });
@@ -539,6 +586,8 @@ describe("Relic-authoritative tournament registration action", () => {
 
       expect(result).toEqual({
         success: true,
+        code: "REGISTRATION_SUBMITTED",
+        values: undefined,
         message: "Registration submitted.",
       });
       expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
@@ -607,7 +656,9 @@ describe("Relic-authoritative tournament registration action", () => {
     );
 
     expect(firstResult.success).toBe(true);
+    expect(firstResult.code).toBe("REGISTRATION_SUBMITTED");
     expect(secondResult.success).toBe(true);
+    expect(secondResult.code).toBe("REGISTRATION_SUBMITTED");
     expect(getRelic1v1EloMock).toHaveBeenCalledTimes(2);
     expect(getRelic1v1EloMock).toHaveBeenNthCalledWith(1, STEAM_ID64);
     expect(getRelic1v1EloMock).toHaveBeenNthCalledWith(2, STEAM_ID64);
@@ -643,6 +694,7 @@ describe("Relic-authoritative tournament registration action", () => {
     );
 
     expect(result.success).toBe(true);
+    expect(result.code).toBe("REGISTRATION_SUBMITTED");
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
     expect(client.rpc.mock.calls[0]?.[1]).toMatchObject({
       p_relic_elo: 1_250,
@@ -663,6 +715,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "DIVISION_MISMATCH",
       message:
         "Your ELO division has changed. Refresh your verified ELO from the Profile page and try again.",
     });
@@ -683,6 +736,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "DIVISION_MISMATCH",
       message:
         "Your ELO division has changed. Refresh your verified ELO from the Profile page and try again.",
     });
@@ -694,36 +748,42 @@ describe("Relic-authoritative tournament registration action", () => {
     [
       "invalid_steam_input",
       "Your connected Steam identity could not be verified.",
+      "STEAM_IDENTITY_INVALID",
     ],
     [
       "profile_not_found",
       "No Company of Heroes 3 profile was found for your connected Steam account.",
+      "RELIC_PROFILE_NOT_FOUND",
     ],
     [
       "steam_identity_mismatch",
       "Relic could not confirm your connected game identity.",
+      "STEAM_IDENTITY_MISMATCH",
     ],
-    ["unranked", "No rated 1v1 ELO is currently available."],
+    ["unranked", "No rated 1v1 ELO is currently available.", "ELO_UNAVAILABLE"],
     [
       "invalid_relic_response",
       "ELO verification could not be completed right now.",
+      "ELO_VERIFICATION_FAILED",
     ],
     [
       "relic_integration_error",
       "ELO verification could not be completed right now.",
+      "ELO_VERIFICATION_FAILED",
     ],
     [
       "external_relic_unavailable",
       "Relic is temporarily unavailable. Please try registering again later.",
+      "RELIC_UNAVAILABLE",
     ],
-  ])("maps the %s Relic failure without a database mutation", async (status, message) => {
+  ])("maps the %s Relic failure without a database mutation", async (status, message, code) => {
     const client = createRegistrationClient();
     createSupabaseAdminClientMock.mockReturnValue(client.client);
     getRelic1v1EloMock.mockResolvedValue({ status });
 
     const result = await submitTournamentRegistration(registrationInput());
 
-    expect(result).toEqual({ success: false, message });
+    expect(result).toEqual({ success: false, message, code });
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
     expect(client.rpc).not.toHaveBeenCalled();
   });
@@ -746,11 +806,45 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "DUPLICATE_REGISTRATION",
       message: "You are already registered for this tournament.",
     });
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
     expect(client.rpc).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    "Already registered for this tournament",
+    "verified elo does not match selected bracket",
+    "registration document set is unavailable",
+    "older waitlisted registrations exist; bracket is full",
+    "La inscripción está llena y no está disponible",
+    "FULL: reordered database detail says already registered",
+  ])(
+    "never derives a business result from unstructured database prose: %s",
+    async (message) => {
+      const client = createRegistrationClient({
+        rpcResults: [
+          {
+            data: null,
+            error: { code: "P0001", message },
+          },
+        ],
+      });
+      createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+      const result = await submitTournamentRegistration(registrationInput());
+
+      expect(result).toEqual({
+        success: false,
+        code: "REGISTRATION_FAILED",
+        message:
+          "Registration could not be submitted. Please try again or contact an admin.",
+      });
+      expect(client.rpc).toHaveBeenCalledOnce();
+      expect(createInAppNotificationMock).not.toHaveBeenCalled();
+    }
+  );
 
   it("allows at most one success when concurrent requests pass the duplicate precheck", async () => {
     const client = createRegistrationClient({
@@ -776,6 +870,7 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(results.filter((result) => !result.success)).toEqual([
       {
         success: false,
+        code: "DUPLICATE_REGISTRATION",
         message: "You are already registered for this tournament.",
       },
     ]);
@@ -799,6 +894,8 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: true,
+      code: "WAITLIST_SUBMITTED",
+      values: { position: 2 },
       message: "Registration submitted to waitlist position #2.",
     });
     expect(client.rpc).toHaveBeenCalledWith(
@@ -844,6 +941,8 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: true,
+      code: "REGISTRATION_SUBMITTED",
+      values: undefined,
       message: "Registration submitted.",
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
@@ -874,6 +973,7 @@ describe("Relic-authoritative tournament registration action", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "REGISTRATION_FAILED",
       message:
         "Registration could not be submitted. Please try again or contact an admin.",
     });
@@ -903,5 +1003,6 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(result.message).toBe(
       "Registration could not be submitted. Please try again or contact an admin."
     );
+    expect(result.code).toBe("REGISTRATION_FAILED");
   });
 });

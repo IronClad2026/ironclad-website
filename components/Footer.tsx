@@ -1,52 +1,83 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { getLegalDocument } from "@/lib/legal-corpus-publication";
+import englishCommon, {
+  type CommonDictionary,
+} from "@/lib/i18n/dictionaries/en/common";
+import { interpolateMessage } from "@/lib/i18n/translate";
 
-export default function Footer() {
-  const rulebook = getLegalDocument("rulebook");
-  const ppa = getLegalDocument("ppa");
+type FooterProps = {
+  dictionary?: CommonDictionary;
+  rulebookPath: string;
+  ppaPath: string;
+};
+
+export default function Footer({
+  dictionary = englishCommon,
+  rulebookPath,
+  ppaPath,
+}: FooterProps) {
+  const pathname = usePathname();
+  const adminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const copy = (adminRoute ? englishCommon : dictionary).footer;
 
   return (
-    <footer className="border-t border-white/10 bg-black px-6 py-8 text-zinc-400">
+    <footer
+      className="border-t border-white/10 bg-black px-6 py-8 text-zinc-400"
+      lang={adminRoute ? "en" : undefined}
+    >
       <div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm md:flex-row md:items-center md:justify-between">
-        <p>© 2026 IronClad Tournaments. All rights reserved.</p>
+        <p>
+          {interpolateMessage(copy.copyright, {
+            year: new Date().getFullYear(),
+          })}
+        </p>
 
-        <nav aria-label="Legal and rules" className="flex flex-wrap gap-x-5 gap-y-3">
+        <nav
+          aria-label={copy.legalAndRules}
+          className="flex flex-wrap gap-x-5 gap-y-3"
+        >
           <Link
             className="transition hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
             href="/rules"
           >
-            Rules
+            {copy.rules}
           </Link>
           <a
-            aria-label="Official Tournament Rulebook (opens in a new tab)"
+            aria-label={interpolateMessage(copy.opensInNewTab, {
+              label: copy.rulebook,
+            })}
             className="transition hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-            href={rulebook.publicPath}
+            href={rulebookPath}
             rel="noopener noreferrer"
             target="_blank"
           >
-            Rulebook
+            {copy.rulebook}
           </a>
           <a
-            aria-label="Player Participation Agreement (opens in a new tab)"
+            aria-label={interpolateMessage(copy.opensInNewTab, {
+              label: copy.participationAgreement,
+            })}
             className="transition hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-            href={ppa.publicPath}
+            href={ppaPath}
             rel="noopener noreferrer"
             target="_blank"
           >
-            PPA
+            {copy.participationAgreementShort}
           </a>
           <Link
             className="transition hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
             href="/terms"
           >
-            Terms of Service
+            {copy.terms}
           </Link>
           <Link
             className="transition hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
             href="/privacy"
           >
-            Privacy Policy
+            {copy.privacy}
           </Link>
         </nav>
       </div>
