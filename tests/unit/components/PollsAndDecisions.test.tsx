@@ -3,6 +3,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import { translate } from "@/lib/i18n/translate";
 import type {
   PollOptionProjection,
   PollViewerProjection,
@@ -84,7 +86,14 @@ describe("PollsAndDecisions", () => {
     expect(checkboxes).toHaveLength(3);
     fireEvent.click(checkboxes[0]);
     fireEvent.click(checkboxes[1]);
-    expect(within(card).getByText("2 selected / maximum 2")).toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        translate(competitionEnglish, "polls.selectedMaximum", {
+          selected: 2,
+          maximum: 2,
+        })
+      )
+    ).toBeInTheDocument();
     expect(checkboxes[2]).toBeDisabled();
   });
 

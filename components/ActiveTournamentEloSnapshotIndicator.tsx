@@ -9,6 +9,8 @@ import {
   type FocusEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import englishAccountDictionary from "@/lib/i18n/dictionaries/en/account-dashboard";
 
 export type ActiveTournamentEloSnapshot = {
   tournamentTitle: string;
@@ -23,6 +25,10 @@ type ActiveTournamentEloSnapshotIndicatorProps = {
 export default function ActiveTournamentEloSnapshotIndicator({
   snapshots,
 }: ActiveTournamentEloSnapshotIndicatorProps) {
+  const t = useOptionalTranslations(
+    "account-dashboard",
+    englishAccountDictionary
+  );
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
   const hoveredRef = useRef(false);
@@ -108,7 +114,7 @@ export default function ActiveTournamentEloSnapshotIndicator({
     >
       <button
         type="button"
-        aria-label="View active tournament ELO snapshots"
+        aria-label={t("snapshots.open")}
         aria-expanded={open}
         aria-controls={tooltipId}
         aria-describedby={open ? tooltipId : undefined}
@@ -126,7 +132,7 @@ export default function ActiveTournamentEloSnapshotIndicator({
           className="absolute top-full right-0 z-[1500] mt-2 block w-72 max-w-[calc(100vw-3rem)] border border-orange-400/35 bg-zinc-950/98 p-4 text-left shadow-[0_20px_55px_rgba(0,0,0,0.75)] backdrop-blur-xl"
         >
           <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">
-            Tournament ELO Snapshot
+            {t("snapshots.title")}
           </span>
 
           <span className="mt-3 block space-y-3">
@@ -139,13 +145,18 @@ export default function ActiveTournamentEloSnapshotIndicator({
                   {snapshot.tournamentTitle}
                 </span>
                 <span className="mt-1 block text-xs leading-5 text-zinc-300">
-                  Snapshot ELO: {snapshot.elo ?? "N/A"}
+                  {t("snapshots.elo", {
+                    elo: snapshot.elo ?? t("snapshots.notAvailable"),
+                  })}
                 </span>
                 <span className="block text-xs leading-5 text-zinc-300">
-                  Division: {snapshot.division ?? "N/A"}
+                  {t("snapshots.division", {
+                    division:
+                      snapshot.division ?? t("snapshots.notAvailable"),
+                  })}
                 </span>
                 <span className="mt-1 block text-[11px] leading-4 text-zinc-500">
-                  {"Locked for this tournament's duration."}
+                  {t("snapshots.locked")}
                 </span>
               </span>
             ))}

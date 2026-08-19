@@ -66,6 +66,7 @@ describe("public profile visibility action", () => {
 
     await expect(updatePublicProfileEnabled(true)).resolves.toEqual({
       status: "success",
+      code: "enabled",
       message: "Your player profile is now public.",
       enabled: true,
     });
@@ -103,6 +104,7 @@ describe("public profile visibility action", () => {
 
     await expect(updatePublicProfileEnabled(false)).resolves.toEqual({
       status: "success",
+      code: "disabled",
       message: "Your player profile is now private.",
       enabled: false,
     });
@@ -126,6 +128,7 @@ describe("public profile visibility action", () => {
 
     await expect(updatePublicProfileEnabled(false)).resolves.toEqual({
       status: "error",
+      code: "verification-failed",
       message: "Public profile visibility could not be verified.",
       enabled: true,
     });

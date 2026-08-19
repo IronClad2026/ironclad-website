@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import accountDashboardEnglish from "@/lib/i18n/dictionaries/en/account-dashboard";
 
 const deleteAccountSource = readFileSync(
   resolve(process.cwd(), "components/DeleteAccountSection.tsx"),
@@ -17,24 +18,22 @@ const dashboardSource = readFileSync(
 
 describe("Phase 7 terminal recovery copy", () => {
   it("explains competition-history-safe account closure truthfully", () => {
-    expect(deleteAccountSource).toContain(
-      "live IronClad sign-in and profile identity"
+    expect(deleteAccountSource).toContain('t("deleteAccount.description")');
+    expect(deleteAccountSource).toContain('t("deleteAccount.warning")');
+    expect(deleteAccountSource).toContain('t("deleteAccount.typeDelete")');
+
+    const { description, warning, typeDelete } =
+      accountDashboardEnglish.deleteAccount;
+    expect(description).toContain("live IronClad sign-in and profile identity");
+    expect(description).toContain("Private account links are removed or neutralized");
+    expect(description).toContain("champion history");
+    expect(description).toContain("Former Competitor");
+    expect(`${description} ${warning}`).toMatch(
+      /referenced private Replay proof .* remain/i
     );
-    expect(deleteAccountSource).toContain(
-      "Private account links are\n            removed or neutralized"
-    );
-    expect(deleteAccountSource).toContain(
-      "leaderboard,\n            and champion history"
-    );
-    expect(deleteAccountSource).toContain("Former Competitor");
-    expect(deleteAccountSource).toContain(
-      "referenced private replay proof will remain"
-    );
-    expect(deleteAccountSource).toContain(
-      "Otherwise, your\n              player record will be removed"
-    );
-    expect(deleteAccountSource).toContain("Type DELETE to confirm");
-    expect(deleteAccountSource).not.toContain(
+    expect(warning).toContain("Otherwise, your player record will be removed");
+    expect(typeDelete).toBe("Type DELETE to confirm");
+    expect(`${description} ${warning}`).not.toContain(
       "Permanently remove your Clerk account, player profile, and avatar"
     );
   });
@@ -63,10 +62,14 @@ describe("Phase 7 terminal recovery copy", () => {
 
   it("includes tournament lifecycle events in dashboard notification wording", () => {
     expect(dashboardSource).toContain(
-      "Recent IronClad updates for tournaments, registrations, waitlist movement, and match result decisions."
+      't("dashboard.notificationCenter.description")'
     );
-    expect(dashboardSource).toContain(
-      "Tournament, registration, and match updates will appear here."
+    expect(dashboardSource).toContain('t("dashboard.notificationCenter.empty")');
+    expect(accountDashboardEnglish.dashboard.notificationCenter.description).toBe(
+      "Recent IronClad updates for Tournaments, Registrations, waitlist movement, and Match-result decisions."
+    );
+    expect(accountDashboardEnglish.dashboard.notificationCenter.empty).toBe(
+      "Tournament, Registration, and Match updates will appear here."
     );
   });
 });

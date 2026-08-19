@@ -126,6 +126,7 @@ describe("Steam identity account-deletion regression", () => {
         )
       ).resolves.toEqual({
         status: "success",
+        code: "deleted",
         message: "Your IronClad account has been deleted.",
       });
 
@@ -211,6 +212,7 @@ describe("Steam identity account-deletion regression", () => {
       )
     ).resolves.toEqual({
       status: "error",
+      code: "clerk-failed",
       message:
         "Your IronClad identity was closed, but Clerk account deletion failed. Contact an administrator.",
     });

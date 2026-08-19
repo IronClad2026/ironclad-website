@@ -10,6 +10,13 @@ const REQUEST_FAILED_MESSAGE =
 export type MatchAdminAssistanceResult = {
   success: boolean;
   message: string;
+  code:
+    | "auth_required"
+    | "invalid_request"
+    | "unavailable"
+    | "participant_only"
+    | "request_failed"
+    | "requested";
 };
 
 export async function requestMatchAdminAssistance(input: {
@@ -20,15 +27,15 @@ export async function requestMatchAdminAssistance(input: {
   try {
     ({ userId } = await auth());
   } catch {
-    return failure("Your session could not be verified. Sign in again.");
+    return failure("Your session could not be verified. Sign in again.", "auth_required");
   }
 
   if (!userId) {
-    return failure("Sign in before requesting admin assistance.");
+    return failure("Sign in before requesting admin assistance.", "auth_required");
   }
 
   if (!isRecord(input) || !isUuid(input.matchId)) {
-    return failure(REQUEST_FAILED_MESSAGE);
+    return failure(REQUEST_FAILED_MESSAGE, "invalid_request");
   }
 
   let supabase: ReturnType<typeof createSupabaseAdminClient>;
@@ -36,7 +43,7 @@ export async function requestMatchAdminAssistance(input: {
   try {
     supabase = createSupabaseAdminClient();
   } catch {
-    return failure(REQUEST_FAILED_MESSAGE);
+    return failure(REQUEST_FAILED_MESSAGE, "request_failed");
   }
 
   try {
@@ -53,7 +60,7 @@ export async function requestMatchAdminAssistance(input: {
       !isMatchRow(matchData) ||
       matchData.status === "completed"
     ) {
-      return failure("Admin assistance is not available for this match.");
+      return failure("Admin assistance is not available for this match.", "unavailable");
     }
 
     const participantIds = [
@@ -62,7 +69,7 @@ export async function requestMatchAdminAssistance(input: {
     ].filter((value): value is string => typeof value === "string");
 
     if (participantIds.length === 0) {
-      return failure("Admin assistance is not available for this match.");
+      return failure("Admin assistance is not available for this match.", "unavailable");
     }
 
     const { data: registrationData, error: registrationError } = await supabase
@@ -75,7 +82,8 @@ export async function requestMatchAdminAssistance(input: {
 
     if (registrationError || !isRegistrationRow(registrationData)) {
       return failure(
-        "Only a participant in this match can request assistance."
+        "Only a participant in this match can request assistance.",
+        "participant_only"
       );
     }
 
@@ -92,7 +100,7 @@ export async function requestMatchAdminAssistance(input: {
         .limit(1);
 
     if (existingRequestError) {
-      return failure(REQUEST_FAILED_MESSAGE);
+      return failure(REQUEST_FAILED_MESSAGE, "request_failed");
     }
 
     if (Array.isArray(existingRequest) && existingRequest.length > 0) {
@@ -116,22 +124,26 @@ export async function requestMatchAdminAssistance(input: {
       },
     });
 
-    return created ? success() : failure(REQUEST_FAILED_MESSAGE);
+    return created ? success() : failure(REQUEST_FAILED_MESSAGE, "request_failed");
   } catch {
     console.error("Match admin assistance request failed unexpectedly.");
-    return failure(REQUEST_FAILED_MESSAGE);
+    return failure(REQUEST_FAILED_MESSAGE, "request_failed");
   }
 }
 
 function success(): MatchAdminAssistanceResult {
   return {
     success: true,
+    code: "requested",
     message: "Admin assistance requested. The Tournament team has been notified.",
   };
 }
 
-function failure(message: string): MatchAdminAssistanceResult {
-  return { success: false, message };
+function failure(
+  message: string,
+  code: MatchAdminAssistanceResult["code"]
+): MatchAdminAssistanceResult {
+  return { success: false, message, code };
 }
 
 function isMatchRow(value: unknown): value is {

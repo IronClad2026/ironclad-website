@@ -2,6 +2,9 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { Crown, Trophy } from "lucide-react";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import accountDashboardEnglish from "@/lib/i18n/dictionaries/en/account-dashboard";
 import type { ChampionAchievement } from "@/lib/player-dashboard";
 
 const EMBERS = Array.from({ length: 18 }, (_, index) => ({
@@ -17,23 +20,27 @@ export default function DashboardChampionHistory({
   champions: ChampionAchievement[];
 }) {
   const reduceMotion = useReducedMotion();
+  const t = useOptionalTranslations(
+    "account-dashboard",
+    accountDashboardEnglish
+  );
 
   return (
     <section className="mt-10">
       <div>
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
           <Crown size={15} />
-          Victory Archive
+          {t("dashboard.champions.eyebrow")}
         </p>
 
         <h2 className="mt-3 text-3xl font-bold text-white">
-          Tournament Champions
+          {t("dashboard.champions.title")}
         </h2>
       </div>
 
       {champions.length === 0 ? (
         <div className="mt-5 border border-dashed border-orange-400/25 bg-black/55 p-6 text-sm text-zinc-500 shadow-xl shadow-black/15 backdrop-blur">
-          Tournament victories will be permanently displayed here.
+          {t("dashboard.champions.empty")}
         </div>
       ) : (
         <div className="mt-5 grid gap-6 lg:grid-cols-2">
@@ -147,7 +154,7 @@ export default function DashboardChampionHistory({
                 </motion.span>
 
                 <p className="text-xs font-black uppercase tracking-[0.34em] text-orange-300 drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
-                  Tournament Champion
+                  {t("dashboard.champions.champion")}
                 </p>
 
                 <h3 className="mt-3 text-3xl font-black text-white drop-shadow-[0_3px_12px_rgba(0,0,0,1)]">
@@ -159,8 +166,15 @@ export default function DashboardChampionHistory({
                 </p>
 
                 <p className="mt-3 text-xs font-bold uppercase tracking-wider text-zinc-300 drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
-                  {champion.bracketName} Bracket · Won{" "}
-                  {formatDate(champion.wonAt)}
+                  {t("dashboard.champions.bracket", {
+                    name: champion.bracketName,
+                  })}{" "}
+                  · {t("dashboard.champions.won")}{" "}
+                  <HydrationSafeLocalDateTime
+                    value={champion.wonAt}
+                    fallback={t("dashboard.notAvailable")}
+                    options={{ dateStyle: "medium" }}
+                  />
                 </p>
               </div>
             </motion.article>
@@ -169,10 +183,4 @@ export default function DashboardChampionHistory({
       )}
     </section>
   );
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-  }).format(new Date(value));
 }

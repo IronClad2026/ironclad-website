@@ -11,6 +11,14 @@ import {
   type KeyboardEvent,
 } from "react";
 import PhysicalDice, { type DiceValue } from "@/components/PhysicalDice";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import { formatDateTime } from "@/lib/i18n/format";
+import { translate } from "@/lib/i18n/translate";
+import type { MessageValues } from "@/lib/i18n/types";
 import type {
   AuthoritativeMatchDiceRoll,
   MatchDiceActivation,
@@ -46,18 +54,16 @@ export type MatchDiceRollOffProps = {
 };
 
 const GAME_NUMBERS: MatchDiceGameNumber[] = [1, 3, 5];
-const READ_ONLY_COPY: Record<MatchDiceReadOnlyReason, string> = {
-  unsupported_format:
-    "Dice Roll-Off is available only for launched single-elimination Matches.",
-  division_not_launched: "This Division has not launched.",
-  tournament_not_in_progress:
-    "Tournament is not in progress. Dice history is read-only.",
-  match_not_in_progress: "This Match is not in progress. Dice history is read-only.",
-  participants_unavailable: "Both Match participants must be assigned.",
-  activation_unavailable: "This Match does not have a current activation.",
-  official_outcome: "The official Match outcome is already recorded.",
-  admin_hold: "This Match is on an administrative hold.",
-  deadline_elapsed: "The Match deadline has elapsed.",
+const READ_ONLY_COPY_KEYS: Record<MatchDiceReadOnlyReason, string> = {
+  unsupported_format: "dice.unavailableSingleElimination",
+  division_not_launched: "dice.divisionNotLaunched",
+  tournament_not_in_progress: "dice.tournamentReadOnly",
+  match_not_in_progress: "dice.matchReadOnly",
+  participants_unavailable: "dice.participantsRequired",
+  activation_unavailable: "dice.activationRequired",
+  official_outcome: "dice.outcomeRecorded",
+  admin_hold: "dice.adminHold",
+  deadline_elapsed: "dice.deadlineElapsed",
 };
 const DUST_PARTICLES = [
   { x: "-48px", drift: "-22px" },
@@ -137,58 +143,71 @@ function getParticipantLabel(
   );
 }
 
-function getReadOnlyCopy(reason: MatchDiceReadOnlyReason | null) {
-  return reason ? READ_ONLY_COPY[reason] : "Dice history is read-only.";
+type CompetitionTranslator = (
+  path: string,
+  values?: MessageValues
+) => string;
+
+const translateCompetitionEnglish: CompetitionTranslator = (path, values) =>
+  translate(competitionEnglish, path, values);
+
+function getReadOnlyCopy(
+  reason: MatchDiceReadOnlyReason | null,
+  t: CompetitionTranslator
+) {
+  return reason ? t(READ_ONLY_COPY_KEYS[reason]) : t("dice.genericReadOnly");
 }
 
 function getGameStatusLabel(
   game: MatchDiceGame,
   viewerSlot: MatchDiceParticipantSlot | null,
-  rollingUnavailable: boolean
+  rollingUnavailable: boolean,
+  t: CompetitionTranslator
 ) {
-  if (game.state === "complete") return "Complete";
+  if (game.state === "complete") return t("dice.complete");
   if (game.state === "tied") {
-    return rollingUnavailable ? "Tie" : "Tie — reroll";
+    return rollingUnavailable ? t("dice.tie") : t("dice.tieReroll");
   }
   if (game.state === "waiting") {
-    if (rollingUnavailable) return "Waiting";
+    if (rollingUnavailable) return t("dice.waiting");
     const currentRound = game.rounds.find(
       (round) => round.tieRound === game.currentTieRound
     );
     const viewerHasRolled = currentRound?.rolls.some(
       (roll) => roll.participantSlot === viewerSlot
     );
-    return viewerHasRolled ? "Waiting" : "Your roll";
+    return viewerHasRolled ? t("dice.waiting") : t("dice.yourRoll");
   }
-  if (rollingUnavailable) return "Open";
-  return game.canRoll ? "Ready" : "Open";
+  if (rollingUnavailable) return t("dice.open");
+  return game.canRoll ? t("dice.ready") : t("dice.open");
 }
 
 function getLiveStatus(
   snapshot: MatchDiceRollOffSnapshot,
   activation: MatchDiceActivation | null,
   game: MatchDiceGame | null,
-  forceReadOnly: boolean
+  forceReadOnly: boolean,
+  t: CompetitionTranslator
 ) {
-  if (!activation || !game) return "Dice history unavailable";
-  if (!activation.isCurrent) return "Archived activation — read-only";
+  if (!activation || !game) return t("dice.historyUnavailable");
+  if (!activation.isCurrent) return t("dice.archivedReadOnly");
   if (game.state === "complete") {
     return snapshot.viewerSlot && game.winnerSlot === snapshot.viewerSlot
-      ? "Roll-off won"
+      ? t("dice.won")
       : snapshot.viewerSlot
-        ? "Roll-off lost"
-        : "Roll-off complete";
+        ? t("dice.lost")
+        : t("dice.rollOffComplete");
   }
   if (snapshot.viewerRole === "admin") {
-    return "Admin read-only inspection";
+    return t("dice.adminInspection");
   }
   if (forceReadOnly) {
-    return getReadOnlyCopy(snapshot.readOnlyReason);
+    return getReadOnlyCopy(snapshot.readOnlyReason, t);
   }
   if (!snapshot.isActionable) {
-    return getReadOnlyCopy(snapshot.readOnlyReason);
+    return getReadOnlyCopy(snapshot.readOnlyReason, t);
   }
-  if (game.state === "tied") return "Tie — reroll required";
+  if (game.state === "tied") return t("dice.tieRerollRequired");
   if (game.state === "waiting") {
     const currentRound = game.rounds.find(
       (round) => round.tieRound === game.currentTieRound
@@ -196,20 +215,21 @@ function getLiveStatus(
     return currentRound?.rolls.some(
       (roll) => roll.participantSlot === snapshot.viewerSlot
     )
-      ? "Waiting for opponent"
-      : "Your roll is ready";
+      ? t("dice.waitingOpponent")
+      : t("dice.yourRollReady");
   }
-  return game.canRoll ? "Ready to roll" : "Waiting for opponent";
+  return game.canRoll ? t("dice.readyToRoll") : t("dice.waitingOpponent");
 }
 
-function formatRollTimestamp(value: string) {
+function formatRollTimestamp(
+  value: string,
+  locale: Parameters<typeof formatDateTime>[1],
+  fallback: string
+) {
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Time unavailable";
+  if (Number.isNaN(parsed.getTime())) return fallback;
 
-  return new Intl.DateTimeFormat("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(parsed);
+  return formatDateTime(parsed, locale, { kind: "local" });
 }
 
 export default function MatchDiceRollOff({
@@ -221,9 +241,16 @@ export default function MatchDiceRollOff({
   forceReadOnly = false,
   onSnapshotChange,
 }: MatchDiceRollOffProps) {
+  const selectedLocale = useOptionalLocale();
+  const localizedT = useOptionalTranslations("competition", competitionEnglish);
   const reduceMotion = useReducedMotion() ?? false;
   const [snapshot, setSnapshot] =
     useState<MatchDiceRollOffSnapshot | null>(initialSnapshot);
+  const adminMode = snapshot?.viewerRole === "admin";
+  const locale = adminMode ? "en" : selectedLocale;
+  const t: CompetitionTranslator = adminMode
+    ? translateCompetitionEnglish
+    : localizedT;
   const [selectedActivationVersion, setSelectedActivationVersion] = useState<
     number | null
   >(initialSnapshot?.currentActivationVersion ?? null);
@@ -323,7 +350,7 @@ export default function MatchDiceRollOff({
       } catch {
         if (controller.signal.aborted) return null;
         if (surfaceError && mountedRef.current) {
-          setMessage("Dice history could not be loaded. Please try again.");
+          setMessage(t("dice.loadError"));
         }
         return false;
       } finally {
@@ -334,7 +361,7 @@ export default function MatchDiceRollOff({
         }
       }
     },
-    [applySnapshot, loadSnapshot, matchId]
+    [applySnapshot, loadSnapshot, matchId, t]
   );
 
   useEffect(() => {
@@ -534,7 +561,13 @@ export default function MatchDiceRollOff({
       const result = await rollDice(input);
       if (!mountedRef.current) return;
       if (!result.ok) {
-        setMessage(result.error);
+        setMessage(
+          result.code === "auth_required"
+            ? t("actionResults.authRequired")
+            : result.code === "invalid_request"
+              ? t("dice.responseUnknown")
+              : t("dice.loadError")
+        );
         void refreshSnapshot({ force: true });
         return;
       }
@@ -564,7 +597,7 @@ export default function MatchDiceRollOff({
     } catch {
       if (mountedRef.current) {
         setMessage(
-          "IronClad could not confirm the roll response. Refresh this Match before retrying."
+          t("dice.responseUnknown")
         );
       }
     } finally {
@@ -579,7 +612,7 @@ export default function MatchDiceRollOff({
         role="status"
         className="min-h-48 border border-orange-400/20 bg-black/60 p-6 text-sm text-zinc-300"
       >
-        Loading Dice Roll-Off…
+        {t("dice.loading")}
       </div>
     );
   }
@@ -587,14 +620,14 @@ export default function MatchDiceRollOff({
   if (snapshot?.activations.length === 0 && snapshot.readOnlyReason) {
     return (
       <section
-        aria-label="Match Dice Roll-Off"
+        aria-label={t("dice.ariaLabel")}
         className="border border-zinc-700 bg-black/60 p-6"
       >
         <p className="font-mono text-xs font-black uppercase tracking-wider text-orange-200">
-          Dice Roll-Off unavailable
+          {t("dice.unavailable")}
         </p>
         <p role="status" className="mt-3 text-sm text-zinc-300">
-          {getReadOnlyCopy(snapshot.readOnlyReason)}
+          {getReadOnlyCopy(snapshot.readOnlyReason, t)}
         </p>
       </section>
     );
@@ -603,18 +636,18 @@ export default function MatchDiceRollOff({
   if (!snapshot || !selectedActivation || !selectedGame) {
     return (
       <section
-        aria-label="Match Dice Roll-Off"
+        aria-label={t("dice.ariaLabel")}
         className="border border-zinc-700 bg-black/60 p-6"
       >
         <p role="alert" className="text-sm text-amber-200">
-          {message ?? "Dice history is unavailable for this Match."}
+          {message ?? t("dice.unavailableForMatch")}
         </p>
         <button
           type="button"
           onClick={() => void refreshSnapshot({ force: true, surfaceError: true })}
           className="mt-4 min-h-11 border border-orange-400/40 px-4 text-xs font-black uppercase tracking-wider text-orange-100"
         >
-          Retry
+          {t("dice.retry")}
         </button>
       </section>
     );
@@ -649,7 +682,8 @@ export default function MatchDiceRollOff({
     snapshot,
     selectedActivation,
     selectedGame,
-    forceReadOnly
+    forceReadOnly,
+    t
   );
   const rollingUnavailable = Boolean(
     forceReadOnly ||
@@ -670,47 +704,50 @@ export default function MatchDiceRollOff({
 
   return (
     <section
-      aria-label="Match Dice Roll-Off"
+      aria-label={t("dice.ariaLabel")}
       className={`${styles.commandTable} p-4 sm:p-6 lg:p-8`}
     >
       <div className="relative z-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-orange-400">
-              Authenticated Match Tool
+              {t("dice.eyebrow")}
             </p>
             <h2 className="mt-2 text-xl font-black uppercase tracking-tight text-white sm:text-2xl">
-              Dice Roll-Off
+              {t("dice.title")}
             </h2>
             <p className="mt-2 max-w-2xl text-xs leading-5 text-zinc-400 sm:text-sm">
-              Server-generated 2d6. Stored results are immutable Match facts and
-              do not change the official Series result.
+              {t("dice.description")}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {snapshot.viewerRole === "admin" && (
               <span className="border border-sky-400/30 bg-sky-400/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-sky-200">
-                Admin read-only inspection
+                {competitionEnglish.dice.adminInspection}
               </span>
             )}
             {forceReadOnly && snapshot.viewerRole !== "admin" && (
               <span className="border border-sky-400/30 bg-sky-400/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-sky-200">
-                Read-only Match history
+                {t("dice.readOnlyHistory")}
               </span>
             )}
             <span className="border border-orange-400/25 bg-orange-400/[0.07] px-3 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-orange-200">
-              Activation {selectedActivation.activationVersion}
-              {selectedActivation.isCurrent ? " · Current" : " · Archived"}
+              {t("dice.activationStatus", {
+                version: selectedActivation.activationVersion,
+                status: selectedActivation.isCurrent
+                  ? t("dice.current")
+                  : t("dice.archived"),
+              })}
             </span>
           </div>
         </div>
 
         {snapshot.activations.length > 1 && (
           <label className="mt-5 block max-w-xs text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-            Dice activation
+            {t("dice.activationAria")}
             <select
-              aria-label="Dice activation"
+              aria-label={t("dice.activationAria")}
               value={selectedActivation.activationVersion}
               onChange={(event) => {
                 clearActiveAnimation();
@@ -729,8 +766,12 @@ export default function MatchDiceRollOff({
                     key={activation.activationVersion}
                     value={activation.activationVersion}
                   >
-                    Activation {activation.activationVersion}
-                    {activation.isCurrent ? " — Current" : " — Archived"}
+                    {t("dice.activationStatus", {
+                      version: activation.activationVersion,
+                      status: activation.isCurrent
+                        ? t("dice.current")
+                        : t("dice.archived"),
+                    })}
                   </option>
                 ))}
             </select>
@@ -739,18 +780,19 @@ export default function MatchDiceRollOff({
 
         <div
           role="tablist"
-          aria-label="Dice Roll-Off Games"
+          aria-label={t("dice.gamesAria")}
           className={`mt-6 grid gap-2 ${availableGames.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}
         >
           {availableGames.map((game) => {
             const selected = game.gameNumber === selectedGame.gameNumber;
             const status =
               selected && animationMatchesSelection
-                ? "Rolling"
+                ? t("dice.rolling")
                 : getGameStatusLabel(
                     game,
                     snapshot.viewerSlot,
-                    rollingUnavailable
+                    rollingUnavailable,
+                    t
                   );
             return (
               <button
@@ -775,7 +817,7 @@ export default function MatchDiceRollOff({
                 }`}
               >
                 <span className="block font-mono text-xs font-black uppercase tracking-wider">
-                  Game {game.gameNumber}
+                  {t("dice.game", { number: game.gameNumber })}
                 </span>
                 <span className="mt-1 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider">
                   <span
@@ -808,15 +850,15 @@ export default function MatchDiceRollOff({
           {selectedGame.gameNumber === 3 && (
             <p className="mb-4 border-l-2 border-amber-400/60 bg-amber-400/[0.06] px-4 py-3 text-xs leading-5 text-amber-100/85">
               {rollingUnavailable
-                ? "Any stored roll-off applies only if the Series reaches Game 3."
-                : "You may roll now or later. This result applies only if the Series reaches Game 3."}
+                ? t("dice.conditionalGameThree")
+                : t("dice.optionalGameThree")}
             </p>
           )}
           {selectedGame.gameNumber === 5 && (
             <p className="mb-4 border-l-2 border-amber-400/60 bg-amber-400/[0.06] px-4 py-3 text-xs leading-5 text-amber-100/85">
               {rollingUnavailable
-                ? "Any stored roll-off applies only if the Series reaches Game 5."
-                : "You may roll now or later. This result applies only if the Series reaches Game 5."}
+                ? t("dice.conditionalGameFive")
+                : t("dice.optionalGameFive")}
             </p>
           )}
 
@@ -824,20 +866,22 @@ export default function MatchDiceRollOff({
             className={`${styles.tray} ${animationMatchesSelection && !reduceMotion ? styles.trayImpact : ""}`}
           >
             <div className="absolute left-4 top-4 z-10 font-mono text-[9px] font-bold uppercase tracking-[0.24em] text-zinc-500">
-              G-{selectedGame.gameNumber} / R-
-              {trayRoll?.tieRound ?? selectedGame.currentTieRound}
+              {t("dice.gameRound", {
+                game: selectedGame.gameNumber,
+                round: trayRoll?.tieRound ?? selectedGame.currentTieRound,
+              })}
             </div>
             {trayRoll ? (
               <div className={styles.dicePair}>
                 <PhysicalDice
                   value={trayRoll.die1 as DiceValue}
-                  label="First die"
+                  label={t("dice.firstDie")}
                   animationKey={animationMatchesSelection ? animationKey : null}
                   dieIndex={0}
                 />
                 <PhysicalDice
                   value={trayRoll.die2 as DiceValue}
-                  label="Second die"
+                  label={t("dice.secondDie")}
                   animationKey={animationMatchesSelection ? animationKey : null}
                   dieIndex={1}
                 />
@@ -847,8 +891,8 @@ export default function MatchDiceRollOff({
                 <span className="mx-auto block h-14 w-14 rounded-full border border-dashed border-orange-400/25" />
                 <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-500">
                   {rollingUnavailable
-                    ? "No roll recorded"
-                    : "Awaiting roll authorization"}
+                    ? t("dice.noRoll")
+                    : t("dice.awaitingAuthorization")}
                 </p>
               </div>
             )}
@@ -873,7 +917,7 @@ export default function MatchDiceRollOff({
             <div role="status" aria-live="polite" aria-atomic="true">
               <p className="font-mono text-sm font-black uppercase tracking-wider text-orange-100">
                 {animationMatchesSelection
-                  ? "Authoritative dice received. Rolling."
+                  ? t("dice.received")
                   : liveStatus}
               </p>
               {!animationMatchesSelection && latestRoll && (
@@ -885,8 +929,7 @@ export default function MatchDiceRollOff({
                 selectedGame.state === "complete" &&
                 winningLabel && (
                   <p className="mt-1 text-xs text-zinc-400">
-                    Roll-off winner: {winningLabel}. This is not the Series
-                    result.
+                    {t("dice.winner", { name: winningLabel })}
                   </p>
                 )}
             </div>
@@ -898,7 +941,7 @@ export default function MatchDiceRollOff({
                 disabled={rolling}
                 className="min-h-12 min-w-40 border border-orange-300/60 bg-orange-500 px-5 font-mono text-xs font-black uppercase tracking-[0.18em] text-black shadow-[0_0_24px_rgba(249,115,22,0.2)] transition hover:bg-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 disabled:cursor-wait disabled:opacity-60"
               >
-                {rolling ? "Authorizing…" : "Roll Dice"}
+                {rolling ? t("dice.authorizing") : t("dice.roll")}
               </button>
             )}
           </div>
@@ -906,8 +949,8 @@ export default function MatchDiceRollOff({
           {(snapshot.readOnlyReason || !selectedActivation.isCurrent) && (
             <p className="mt-3 border border-zinc-700 bg-zinc-900/70 px-4 py-3 text-xs leading-5 text-zinc-300">
               {!selectedActivation.isCurrent
-                ? "Archived activation. Stored rolls are read-only."
-                : getReadOnlyCopy(snapshot.readOnlyReason)}
+                ? t("dice.archivedNote")
+                : getReadOnlyCopy(snapshot.readOnlyReason, t)}
             </p>
           )}
           {message && (
@@ -919,19 +962,22 @@ export default function MatchDiceRollOff({
             </p>
           )}
 
-          <div className="mt-6 space-y-3" aria-label="Immutable roll history">
+          <div
+            className="mt-6 space-y-3"
+            aria-label={t("dice.historyAria")}
+          >
             <div className="flex items-center justify-between gap-4">
               <h3 className="font-mono text-xs font-black uppercase tracking-[0.2em] text-zinc-200">
-                Immutable roll history
+                {t("dice.immutableHistory")}
               </h3>
               <span className="text-[10px] uppercase tracking-wider text-zinc-500">
-                Server timestamped
+                {t("dice.serverTimestamped")}
               </span>
             </div>
 
             {visibleRounds.length === 0 ? (
               <p className="border border-dashed border-zinc-700 p-4 text-xs text-zinc-500">
-                No rolls have been stored for this Game and activation.
+                {t("dice.noStoredRolls")}
               </p>
             ) : (
               [...visibleRounds]
@@ -947,11 +993,11 @@ export default function MatchDiceRollOff({
                     >
                       <div className="flex items-center justify-between gap-4">
                         <h4 className="font-mono text-[11px] font-black uppercase tracking-wider text-orange-200">
-                          Tie round {round.tieRound}
+                          {t("dice.tieRound")} {round.tieRound}
                         </h4>
                         {isTie && (
                           <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
-                            Tied — next round unlocked
+                            {t("dice.tiedUnlocked")}
                           </span>
                         )}
                       </div>
@@ -978,12 +1024,16 @@ export default function MatchDiceRollOff({
                                     dateTime={roll.rolledAt}
                                     className="mt-1 block text-[10px] text-zinc-500"
                                   >
-                                    {formatRollTimestamp(roll.rolledAt)}
+                                    {formatRollTimestamp(
+                                      roll.rolledAt,
+                                      locale,
+                                      t("dice.timeUnavailable")
+                                    )}
                                   </time>
                                 </>
                               ) : (
                                 <p className="mt-2 text-xs text-zinc-600">
-                                  Awaiting roll
+                                  {t("dice.awaitingRoll")}
                                 </p>
                               )}
                             </div>

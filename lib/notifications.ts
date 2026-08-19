@@ -1,5 +1,9 @@
 import "server-only";
 
+import type { Locale } from "@/lib/i18n/config";
+import type { NotificationsDictionary } from "@/lib/i18n/dictionaries/en/notifications";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { localizePlayerNotificationCopy } from "@/lib/i18n/notification-copy";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type NotificationScope = "player" | "admin";
@@ -149,10 +153,11 @@ export async function createInAppNotifications(
 
 export async function loadPlayerNotifications(
   clerkUserId: string,
-  limit = 8
+  limit = 8,
+  locale: Locale = "en"
 ): Promise<NotificationLoadResult> {
   const supabase = createSupabaseAdminClient();
-  const [notificationResult, totalResult, unreadResult] = await Promise.all([
+  const [notificationResult, totalResult, unreadResult, dictionary] = await Promise.all([
     supabase
       .from("notifications")
       .select(NOTIFICATION_SELECT)
@@ -171,6 +176,7 @@ export async function loadPlayerNotifications(
       .eq("recipient_clerk_user_id", clerkUserId)
       .is("in_app_hidden_at", null)
       .is("read_at", null),
+    loadDictionary(locale, "notifications"),
   ]);
 
   if (notificationResult.error || totalResult.error || unreadResult.error) {
@@ -182,13 +188,13 @@ export async function loadPlayerNotifications(
       notifications: [],
       totalCount: 0,
       unreadCount: 0,
-      error: "Notifications could not be loaded.",
+      error: dictionary.server.loadError,
     };
   }
 
   return {
     notifications: ((notificationResult.data ?? []) as NotificationRow[]).map(
-      (notification) => mapNotification(notification, "player")
+      (notification) => mapNotification(notification, "player", dictionary)
     ),
     totalCount: totalResult.count ?? 0,
     unreadCount: unreadResult.count ?? 0,
@@ -393,14 +399,23 @@ export async function deleteNotifications({
 
 function mapNotification(
   row: NotificationRow,
-  scope: NotificationScope
+  scope: NotificationScope,
+  dictionary?: NotificationsDictionary
 ): InAppNotification {
+  const localizedCopy =
+    scope === "player" && dictionary
+      ? localizePlayerNotificationCopy(
+          { type: row.type, tournamentTitle: row.tournament_title },
+          dictionary
+        )
+      : null;
+
   return {
     id: row.id,
     recipientRole: row.recipient_role,
     type: row.type,
-    title: row.title,
-    message: row.message,
+    title: localizedCopy?.title ?? row.title,
+    message: localizedCopy?.message ?? row.message,
     actorDisplayName: row.actor_display_name,
     tournamentId: row.tournament_id,
     tournamentTitle: row.tournament_title,
@@ -540,7 +555,10 @@ function getPublicDeadlineAt(
     return null;
   }
 
-  const value = metadata?.deadlineAt;
+  const value =
+    type === "registration.waitlist_offer"
+      ? metadata?.offerExpiresAt
+      : metadata?.deadlineAt;
 
   if (typeof value !== "string") return null;
 

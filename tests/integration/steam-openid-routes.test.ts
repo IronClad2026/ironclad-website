@@ -36,6 +36,7 @@ vi.mock("@/lib/steam-openid", () => ({
 
 import { GET as callbackGET } from "@/app/api/steam/callback/route";
 import { POST as connectPOST } from "@/app/api/steam/connect/route";
+import zhAccountDashboard from "@/lib/i18n/dictionaries/zh-CN/account-dashboard";
 
 const ORIGIN = "https://ironclad.example";
 const CALLBACK_URL = `${ORIGIN}/api/steam/callback?state=opaque-state`;
@@ -212,10 +213,11 @@ function createCallbackClient({
   };
 }
 
-function createConnectRequest(origin = ORIGIN) {
+function createConnectRequest(origin = ORIGIN, locale?: string) {
   return new Request(`${ORIGIN}/api/steam/connect`, {
     headers: {
       origin,
+      ...(locale ? { cookie: `ironclad_locale=${locale}` } : {}),
     },
     method: "POST",
   });
@@ -223,10 +225,12 @@ function createConnectRequest(origin = ORIGIN) {
 
 function createCallbackRequest({
   cookieValue = "flow-cookie",
+  locale,
   mode = "id_res",
   state = "opaque-state",
 }: {
   cookieValue?: string | null;
+  locale?: string;
   mode?: string;
   state?: string | null;
 } = {}) {
@@ -238,12 +242,15 @@ function createCallbackRequest({
 
   url.searchParams.set("openid.mode", mode);
 
+  const cookie = [
+    cookieValue ? `${FLOW_COOKIE_NAME}=${cookieValue}` : null,
+    locale ? `ironclad_locale=${locale}` : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
+
   return new NextRequest(url, {
-    headers: cookieValue
-      ? {
-          cookie: `${FLOW_COOKIE_NAME}=${cookieValue}`,
-        }
-      : undefined,
+    headers: cookie ? { cookie } : undefined,
   });
 }
 
@@ -297,6 +304,17 @@ describe("Steam connection start route", () => {
 
     expect(response.status).toBe(401);
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("localizes a direct unauthenticated start response from the allowlisted cookie", async () => {
+    authMock.mockResolvedValue({ sessionId: null, userId: null });
+
+    const response = await connectPOST(createConnectRequest(ORIGIN, "zh-CN"));
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe(
+      zhAccountDashboard.steam.authenticationRequired
+    );
   });
 
   it("rejects a request whose Origin is not the configured origin", async () => {
@@ -408,6 +426,20 @@ describe("Steam connection callback route", () => {
     expect(response.status).toBe(401);
     expectFlowCookieConsumed(response);
     expect(verifySteamOpenIdAssertionMock).not.toHaveBeenCalled();
+  });
+
+  it("localizes a direct unauthenticated callback response and still consumes the flow cookie", async () => {
+    authMock.mockResolvedValue({ sessionId: null, userId: null });
+
+    const response = await callbackGET(
+      createCallbackRequest({ locale: "zh-CN" })
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe(
+      zhAccountDashboard.steam.authenticationRequired
+    );
+    expectFlowCookieConsumed(response);
   });
 
   it("rejects a callback received on an unexpected origin", async () => {

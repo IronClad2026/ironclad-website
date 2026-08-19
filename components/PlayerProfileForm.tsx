@@ -13,12 +13,17 @@ import {
   MAX_AVATAR_UPLOAD_SIZE_BYTES,
   MAX_AVATAR_UPLOAD_SIZE_LABEL,
 } from "@/lib/avatar";
-import { countrySelectOptions } from "@/lib/countries";
 import {
   initialProfileActionState,
   type PlayerProfile,
   type ProfileField,
 } from "@/lib/player-profile";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import { getLocalizedCountrySelectOptions } from "@/lib/countries";
+import englishAccountDictionary from "@/lib/i18n/dictionaries/en/account-dashboard";
 
 type PlayerProfileFormProfile = Omit<
   PlayerProfile,
@@ -41,14 +46,13 @@ const regions = [
   "Africa",
   "Global",
 ];
-const regionSelectOptions = regions.map((region) => ({
-  label: region,
-  value: region,
-}));
-function getExactRegionOption(value: string) {
+function getExactRegionOption(
+  value: string,
+  options: Array<{ label: string; value: string }>
+) {
   const normalizedValue = value.trim().toLowerCase();
 
-  return regionSelectOptions.find(
+  return options.find(
     (option) =>
       option.label.toLowerCase() === normalizedValue ||
       option.value.toLowerCase() === normalizedValue
@@ -116,10 +120,73 @@ export default function PlayerProfileForm({
   verifiedCurrentElo,
   activeTournamentEloSnapshots,
 }: PlayerProfileFormProps) {
+  const t = useOptionalTranslations("account-dashboard", englishAccountDictionary);
+  const locale = useOptionalLocale();
   const [state, formAction, pending] = useActionState(
     savePlayerProfile,
     initialProfileActionState
   );
+  const regionLabels = [
+    "europe",
+    "northAmerica",
+    "southAmerica",
+    "oceania",
+    "asia",
+    "middleEast",
+    "africa",
+    "global",
+  ] as const;
+  const regionSelectOptions = regions.map((region, index) => ({
+    label: t(`regions.${regionLabels[index]}`),
+    value: region,
+  }));
+  const countryOptions = getLocalizedCountrySelectOptions(locale);
+  const fieldLabels: Record<ProfileField, string> = {
+    avatar: t("profileForm.avatarTitle"),
+    displayName: t("profileActions.displayName"),
+    inGameName: t("profileActions.inGameName"),
+    discordUsername: t("profileActions.discordUsername"),
+    country: t("profileActions.country"),
+    region: t("profileActions.region"),
+    timezone: t("profileActions.timezone"),
+    bio: t("profileActions.bio"),
+  };
+  const getFieldError = (field: ProfileField) => {
+    const error = state.errorCodes?.[field];
+
+    if (!error) return state.errors[field];
+
+    switch (error.code) {
+      case "required":
+        return t("profileActions.required", { field: fieldLabels[field] });
+      case "too-long":
+        return t("profileActions.tooLong", {
+          field: fieldLabels[field],
+          count: error.count ?? 0,
+        });
+      case "avatar-type":
+        return t("profileForm.invalidAvatarType");
+      case "avatar-too-large":
+        return t("profileForm.avatarTooLarge", {
+          size: error.size ?? MAX_AVATAR_UPLOAD_SIZE_LABEL,
+        });
+      case "avatar-invalid":
+        return t("profileActions.avatarInvalid");
+      case "avatar-upload-failed":
+        return t("profileActions.avatarUploadFailed");
+    }
+  };
+  const actionMessage = state.code
+    ? t(
+        {
+          "session-expired": "profileActions.sessionExpired",
+          "review-fields": "profileActions.reviewFields",
+          "save-failed": "profileActions.saveFailed",
+          "avatar-upload-failed": "profileActions.avatarUploadFailed",
+          saved: "profileActions.saved",
+        }[state.code]
+      )
+    : state.message;
   const [country, setCountry] = useState(profile?.country ?? "");
   const [region, setRegion] = useState(profile?.region ?? "");
   const [timezone, setTimezone] = useState(profile?.timezone ?? "");
@@ -146,21 +213,20 @@ export default function PlayerProfileForm({
 
         <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
-            Player Avatar
+            {t("profileForm.avatarEyebrow")}
           </p>
           <h2 className="mt-3 text-2xl font-bold text-white">
-            Profile image
+            {t("profileForm.avatarTitle")}
           </h2>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
-            Upload an image that represents you across IronClad player and
-            tournament experiences.
+            {t("profileForm.avatarDescription")}
           </p>
         </div>
 
         <div className="relative z-10 mt-7 flex flex-col gap-6 sm:flex-row sm:items-center">
           <div
             role="img"
-            aria-label="Player avatar preview"
+            aria-label={t("profileForm.avatarPreview")}
             className="grid h-32 w-32 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-orange-500/50 bg-black/60 bg-cover bg-center shadow-[0_0_35px_rgba(249,115,22,0.2)]"
             style={
               avatarPreview
@@ -174,7 +240,9 @@ export default function PlayerProfileForm({
           <div className="min-w-0 flex-1">
             <label className="inline-flex cursor-pointer items-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-within:outline focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-orange-300">
               <Camera size={18} />
-              {avatarPreview ? "Replace Avatar" : "Choose Avatar"}
+              {avatarPreview
+                ? t("profileForm.replaceAvatar")
+                : t("profileForm.chooseAvatar")}
               <input
                 name="avatar"
                 type="file"
@@ -196,7 +264,7 @@ export default function PlayerProfileForm({
                   ) {
                     event.target.value = "";
                     setAvatarClientError(
-                      "Use a PNG, JPG, JPEG, or WEBP image."
+                      t("profileForm.invalidAvatarType")
                     );
                     return;
                   }
@@ -204,7 +272,9 @@ export default function PlayerProfileForm({
                   if (file.size > MAX_AVATAR_UPLOAD_SIZE_BYTES) {
                     event.target.value = "";
                     setAvatarClientError(
-                      `Avatar image must be ${MAX_AVATAR_UPLOAD_SIZE_LABEL} or smaller.`
+                      t("profileForm.avatarTooLarge", {
+                        size: MAX_AVATAR_UPLOAD_SIZE_LABEL,
+                      })
                     );
                     return;
                   }
@@ -215,11 +285,12 @@ export default function PlayerProfileForm({
             </label>
 
             <p className="mt-3 text-xs leading-5 text-zinc-500">
-              PNG, JPG, JPEG, or WEBP. Maximum file size{" "}
-              {MAX_AVATAR_UPLOAD_SIZE_LABEL}.
+              {t("profileForm.avatarHelp", {
+                size: MAX_AVATAR_UPLOAD_SIZE_LABEL,
+              })}
             </p>
             <FieldError
-              message={avatarClientError || state.errors.avatar}
+              message={avatarClientError || getFieldError("avatar")}
             />
           </div>
         </div>
@@ -233,52 +304,51 @@ export default function PlayerProfileForm({
 
         <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
-            Player Identity
+            {t("profileForm.identityEyebrow")}
           </p>
           <h2 className="mt-3 text-2xl font-bold text-white">
-            Core account details
+            {t("profileForm.identityTitle")}
           </h2>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
-            These details will be reused for future IronClad tournament
-            registrations.
+            {t("profileForm.identityDescription")}
           </p>
         </div>
 
         <div className="relative z-10 mt-7 grid gap-5 md:grid-cols-2">
           <ProfileInput
-            label="Display Name"
+            label={t("profileForm.displayName")}
             name="displayName"
             defaultValue={profile?.display_name}
-            error={state.errors.displayName}
+            error={getFieldError("displayName")}
             required
           />
           <ProfileInput
-            label="In-Game Name / IGN"
+            label={t("profileForm.inGameName")}
             name="inGameName"
             defaultValue={profile?.in_game_name}
-            error={state.errors.inGameName}
+            error={getFieldError("inGameName")}
             required
           />
           <ProfileInput
-            label="Discord Username (optional)"
+            label={t("profileForm.discordUsername")}
             name="discordUsername"
             defaultValue={profile?.discord_username}
-            error={state.errors.discordUsername}
-            description="Discord is optional but strongly recommended for coordination. Public visibility is controlled separately from your dashboard."
+            error={getFieldError("discordUsername")}
+            description={t("profileForm.discordDescription")}
             maxLength={100}
           />
           <div>
             <span className="text-sm font-bold text-white">
-              Steam Display Name
+              {t("profileForm.steamDisplayName")}
             </span>
             <output
-              aria-label="Steam Display Name"
+              aria-label={t("profileForm.steamDisplayName")}
               className={`${profileInputClass} flex min-h-12 items-center border-white/10 text-zinc-200`}
             >
-              {profile?.steam_username?.trim() || "Not synced"}
+              {profile?.steam_username?.trim() || t("profileForm.notSynced")}
             </output>
             <span className="mt-1 block text-xs leading-5 text-zinc-500">
-              Connect or refresh Steam below to sync this read-only value.
+              {t("profileForm.steamSyncHelp")}
             </span>
           </div>
         </div>
@@ -292,42 +362,48 @@ export default function PlayerProfileForm({
 
         <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
-            Competitive Profile
+            {t("profileForm.competitiveEyebrow")}
           </p>
           <h2 className="mt-3 text-2xl font-bold text-white">
-            Region and ranking
+            {t("profileForm.competitiveTitle")}
           </h2>
         </div>
 
         <div className="relative z-10 mt-7 grid gap-5 md:grid-cols-2">
           <SearchableProfileSelect
-            label="Country"
+            label={t("profileForm.country")}
             name="country"
             value={country}
             submittedValue={country}
-            options={countrySelectOptions}
+            options={countryOptions}
             onSelect={(option) => setCountry(option.value)}
-            error={state.errors.country}
+            error={getFieldError("country")}
+            noResultsLabel={t("profileForm.noResults")}
+            savedValueTemplate={t("profileForm.savesValue")}
             required
             variant="ironclad"
           />
           <SearchableProfileSelect
-            label="Region"
+            label={t("profileForm.region")}
             name="region"
             value={region}
             submittedValue={region}
             options={regionSelectOptions}
             onCustomValueChange={(value) => {
-              setRegion(getExactRegionOption(value)?.value ?? "");
+              setRegion(
+                getExactRegionOption(value, regionSelectOptions)?.value ?? ""
+              );
             }}
             onSelect={(option) => setRegion(option.value)}
-            error={state.errors.region}
-            placeholder="Search regions"
+            error={getFieldError("region")}
+            placeholder={t("profileForm.searchRegions")}
+            noResultsLabel={t("profileForm.noResults")}
+            savedValueTemplate={t("profileForm.savesValue")}
             required
             variant="ironclad"
           />
           <SearchableProfileSelect
-            label="Timezone"
+            label={t("profileForm.timezone")}
             name="timezone"
             value={timezone}
             submittedValue={timezone}
@@ -336,26 +412,30 @@ export default function PlayerProfileForm({
               value: timezoneOption,
             }))}
             onSelect={(option) => setTimezone(option.value)}
-            error={state.errors.timezone}
-            placeholder="Search by city, region, or UTC offset"
+            error={getFieldError("timezone")}
+            placeholder={t("profileForm.searchTimezone")}
+            noResultsLabel={t("profileForm.noResults")}
+            savedValueTemplate={t("profileForm.savesValue")}
             required
             variant="ironclad"
           />
           <div className="relative">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">Current ELO</span>
+              <span className="text-sm font-bold text-white">
+                {t("profileForm.currentElo")}
+              </span>
               <ActiveTournamentEloSnapshotIndicator
                 snapshots={activeTournamentEloSnapshots}
               />
             </div>
             <output
-              aria-label="Current ELO"
+              aria-label={t("profileForm.currentElo")}
               className={`${profileInputClass} block border-white/10 text-zinc-200`}
             >
-              {verifiedCurrentElo ?? "N/A"}
+              {verifiedCurrentElo ?? t("profileForm.notAvailable")}
             </output>
             <span className="mt-1 block text-xs leading-5 text-zinc-500">
-              Updated only after successful Relic ELO verification.
+              {t("profileForm.eloHelp")}
             </span>
           </div>
         </div>
@@ -368,9 +448,11 @@ export default function PlayerProfileForm({
         </div>
 
         <label htmlFor="bio" className="relative z-10 block">
-          <span className="text-sm font-bold text-white">Short Bio</span>
+          <span className="text-sm font-bold text-white">
+            {t("profileForm.shortBio")}
+          </span>
           <span className="ml-2 text-xs uppercase tracking-wider text-zinc-500">
-            Optional
+            {t("profileForm.optional")}
           </span>
         </label>
         <textarea
@@ -380,14 +462,14 @@ export default function PlayerProfileForm({
           defaultValue={profile?.bio ?? ""}
           rows={5}
           className={`relative z-10 ${profileInputClass} ${
-            state.errors.bio ? "border-red-500/70" : "border-white/10"
+            getFieldError("bio") ? "border-red-500/70" : "border-white/10"
           }`}
-          placeholder="Tell the IronClad community a little about your competitive background."
+          placeholder={t("profileForm.bioPlaceholder")}
         />
-        <FieldError message={state.errors.bio} />
+        <FieldError message={getFieldError("bio")} />
       </section>
 
-      {state.message && (
+      {actionMessage && (
         <div
           aria-live="polite"
           className={`border p-4 text-sm shadow-xl shadow-black/20 backdrop-blur ${
@@ -396,13 +478,13 @@ export default function PlayerProfileForm({
               : "border-red-500/30 bg-red-500/10 text-red-300"
           }`}
         >
-          {state.message}
+          {actionMessage}
         </div>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-zinc-500">
-          Your profile data and avatar are protected by your signed-in account.
+          {t("profileForm.protected")}
         </p>
         <button
           type="submit"
@@ -410,10 +492,10 @@ export default function PlayerProfileForm({
           className="border border-orange-400 bg-orange-500 px-6 py-3 font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
         >
           {pending
-            ? "Saving Profile..."
+            ? t("profileForm.saving")
             : profile
-              ? "Save Profile Changes"
-              : "Complete Player Profile"}
+              ? t("profileForm.saveChanges")
+              : t("profileForm.completeProfile")}
         </button>
       </div>
     </form>

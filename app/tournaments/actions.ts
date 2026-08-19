@@ -12,6 +12,7 @@ import {
 } from "@/lib/elo-verification/relic";
 import { createInAppNotification } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { getRequestLocale } from "@/lib/i18n/request";
 import { WAITLIST_DISCLOSURE_MESSAGE } from "@/lib/tournaments";
 
 const REGISTRATION_UNAVAILABLE_MESSAGE =
@@ -61,9 +62,37 @@ type TournamentRegistrationInput = {
 export type TournamentRegistrationResult = {
   success: boolean;
   message: string;
+  code: TournamentRegistrationCode;
+  values?: Record<string, string | number>;
   requiresProfile?: boolean;
   requiresWaitlistConfirmation?: boolean;
 };
+
+export type TournamentRegistrationCode =
+  | "LOCALE_REGISTRATION_GATE"
+  | "AUTH_REQUIRED"
+  | "INVALID_INPUT"
+  | "SERVICE_UNAVAILABLE"
+  | "PROFILE_VERIFICATION_FAILED"
+  | "PROFILE_REQUIRED"
+  | "STEAM_REQUIRED"
+  | "DUPLICATE_REGISTRATION"
+  | "TOURNAMENT_UNAVAILABLE"
+  | "REGISTRATION_UNAVAILABLE"
+  | "RELIC_UNAVAILABLE"
+  | "STEAM_IDENTITY_INVALID"
+  | "RELIC_PROFILE_NOT_FOUND"
+  | "STEAM_IDENTITY_MISMATCH"
+  | "ELO_UNAVAILABLE"
+  | "ELO_VERIFICATION_FAILED"
+  | "DIVISION_MISMATCH"
+  | "LEGAL_DOCUMENTS_UNAVAILABLE"
+  | "WAITLIST_QUEUE_ACTIVE"
+  | "BRACKET_FULL"
+  | "WAITLIST_CONFIRMATION_REQUIRED"
+  | "REGISTRATION_FAILED"
+  | "REGISTRATION_SUBMITTED"
+  | "WAITLIST_SUBMITTED";
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 type RegistrationIdentity = {
@@ -103,22 +132,34 @@ type RegistrationTransactionResult =
 export async function submitTournamentRegistration(
   input: TournamentRegistrationInput
 ): Promise<TournamentRegistrationResult> {
+  const locale = await getRequestLocale();
+
+  if (locale !== "en") {
+    return {
+      success: false,
+      code: "LOCALE_REGISTRATION_GATE",
+      message:
+        "Registration is currently available only through the Effective English governing corpus.",
+    };
+  }
+
   let userId: string | null;
 
   try {
     ({ userId } = await auth());
   } catch {
     console.error("Tournament registration authentication failed.");
-    return failure("Your session could not be verified. Sign in again.");
+    return failure("Your session could not be verified. Sign in again.", "AUTH_REQUIRED");
   }
 
   if (!userId) {
-    return failure("Sign in before registering for a tournament.");
+    return failure("Sign in before registering for a tournament.", "AUTH_REQUIRED");
   }
 
   if (!isValidRegistrationInput(input)) {
     return failure(
-      "Complete the tournament selection and required agreements."
+      "Complete the tournament selection and required agreements.",
+      "INVALID_INPUT"
     );
   }
 
@@ -128,18 +169,22 @@ export async function submitTournamentRegistration(
     supabase = createSupabaseAdminClient();
   } catch {
     console.error("Tournament registration service configuration failed.");
-    return failure(REGISTRATION_FAILED_MESSAGE);
+    return failure(REGISTRATION_FAILED_MESSAGE, "SERVICE_UNAVAILABLE");
   }
 
   const identity = await loadRegistrationIdentity(supabase, userId);
 
   if (identity.status === "error") {
-    return failure("IronClad could not verify your player profile.");
+    return failure(
+      "IronClad could not verify your player profile.",
+      "PROFILE_VERIFICATION_FAILED"
+    );
   }
 
   if (identity.status === "missing") {
     return {
       success: false,
+      code: "PROFILE_REQUIRED",
       message: "Complete your player profile before registering.",
       requiresProfile: true,
     };
@@ -147,7 +192,8 @@ export async function submitTournamentRegistration(
 
   if (!identity.player.steamId64) {
     return failure(
-      "Connect your Steam account before registering for a tournament."
+      "Connect your Steam account before registering for a tournament.",
+      "STEAM_REQUIRED"
     );
   }
 
@@ -158,11 +204,11 @@ export async function submitTournamentRegistration(
   );
 
   if (duplicateCheck === "error") {
-    return failure(REGISTRATION_FAILED_MESSAGE);
+    return failure(REGISTRATION_FAILED_MESSAGE, "REGISTRATION_FAILED");
   }
 
   if (duplicateCheck) {
-    return failure(DUPLICATE_REGISTRATION_MESSAGE);
+    return failure(DUPLICATE_REGISTRATION_MESSAGE, "DUPLICATE_REGISTRATION");
   }
 
   const tournamentResult = await loadRegistrationTournament(
@@ -173,20 +219,22 @@ export async function submitTournamentRegistration(
 
   if (tournamentResult.status === "error") {
     return failure(
-      "The selected tournament or bracket is no longer available."
+      "The selected tournament or bracket is no longer available.",
+      "TOURNAMENT_UNAVAILABLE"
     );
   }
 
   if (tournamentResult.status === "missing") {
     return failure(
-      "The selected tournament or bracket is no longer available."
+      "The selected tournament or bracket is no longer available.",
+      "TOURNAMENT_UNAVAILABLE"
     );
   }
 
   const tournament = tournamentResult.tournament;
 
   if (!isTournamentRegistrationOpen(tournament)) {
-    return failure(REGISTRATION_UNAVAILABLE_MESSAGE);
+    return failure(REGISTRATION_UNAVAILABLE_MESSAGE, "REGISTRATION_UNAVAILABLE");
   }
 
   let relicResult: RelicEloResult;
@@ -196,7 +244,8 @@ export async function submitTournamentRegistration(
   } catch {
     console.error("Tournament registration Relic request failed unexpectedly.");
     return failure(
-      "Relic is temporarily unavailable. Please try registering again later."
+      "Relic is temporarily unavailable. Please try registering again later.",
+      "RELIC_UNAVAILABLE"
     );
   }
 
@@ -211,7 +260,7 @@ export async function submitTournamentRegistration(
     calculatedDivision.division !== relicResult.division ||
     calculatedDivision.division !== tournament.bracket.division
   ) {
-    return failure(WRONG_DIVISION_MESSAGE);
+    return failure(WRONG_DIVISION_MESSAGE, "DIVISION_MISMATCH");
   }
 
   let registrationResult: { data: unknown; error: unknown };
@@ -245,12 +294,13 @@ export async function submitTournamentRegistration(
     );
   } catch {
     console.error("Tournament registration transaction failed unexpectedly.");
-    return failure(REGISTRATION_FAILED_MESSAGE);
+    return failure(REGISTRATION_FAILED_MESSAGE, "REGISTRATION_FAILED");
   }
 
   if (registrationResult.error) {
     console.error("Tournament registration transaction failed.");
-    return failure(getRegistrationErrorMessage(registrationResult.error));
+    const registrationFailure = getRegistrationFailure(registrationResult.error);
+    return failure(registrationFailure.message, registrationFailure.code);
   }
 
   const transactionResult = parseRegistrationTransactionResult(
@@ -262,12 +312,13 @@ export async function submitTournamentRegistration(
 
   if (!transactionResult) {
     console.error("Tournament registration transaction returned an invalid result.");
-    return failure(REGISTRATION_FAILED_MESSAGE);
+    return failure(REGISTRATION_FAILED_MESSAGE, "REGISTRATION_FAILED");
   }
 
   if (transactionResult.waitlistConfirmationRequired) {
     return {
       success: false,
+      code: "WAITLIST_CONFIRMATION_REQUIRED",
       message: WAITLIST_CONFIRMATION_REQUIRED_MESSAGE,
       requiresWaitlistConfirmation: true,
     };
@@ -310,6 +361,11 @@ export async function submitTournamentRegistration(
 
   return {
     success: true,
+    code:
+      savedRegistration.registrationStatus === "waitlisted"
+        ? "WAITLIST_SUBMITTED"
+        : "REGISTRATION_SUBMITTED",
+    values: waitlistPosition ? { position: waitlistPosition } : undefined,
     message:
       savedRegistration.registrationStatus === "waitlisted"
         ? `Registration submitted to waitlist${
@@ -660,42 +716,66 @@ function mapRelicFailure(
 ): TournamentRegistrationResult {
   switch (result.status) {
     case "invalid_steam_input":
-      return failure("Your connected Steam identity could not be verified.");
+      return failure(
+        "Your connected Steam identity could not be verified.",
+        "STEAM_IDENTITY_INVALID"
+      );
     case "profile_not_found":
       return failure(
-        "No Company of Heroes 3 profile was found for your connected Steam account."
+        "No Company of Heroes 3 profile was found for your connected Steam account.",
+        "RELIC_PROFILE_NOT_FOUND"
       );
     case "steam_identity_mismatch":
-      return failure("Relic could not confirm your connected game identity.");
+      return failure(
+        "Relic could not confirm your connected game identity.",
+        "STEAM_IDENTITY_MISMATCH"
+      );
     case "unranked":
-      return failure("No rated 1v1 ELO is currently available.");
+      return failure(
+        "No rated 1v1 ELO is currently available.",
+        "ELO_UNAVAILABLE"
+      );
     case "invalid_relic_response":
     case "relic_integration_error":
-      return failure("ELO verification could not be completed right now.");
+      return failure(
+        "ELO verification could not be completed right now.",
+        "ELO_VERIFICATION_FAILED"
+      );
     case "external_relic_unavailable":
       return failure(
-        "Relic is temporarily unavailable. Please try registering again later."
+        "Relic is temporarily unavailable. Please try registering again later.",
+        "RELIC_UNAVAILABLE"
       );
   }
 }
 
-function getRegistrationErrorMessage(error: unknown) {
+function getRegistrationFailure(error: unknown): {
+  message: string;
+  code: TournamentRegistrationCode;
+} {
   const code = getErrorField(error, "code").toUpperCase();
   const message = getErrorField(error, "message").toLowerCase();
 
   if (code === "23505" || message.includes("already registered")) {
-    return DUPLICATE_REGISTRATION_MESSAGE;
+    return {
+      message: DUPLICATE_REGISTRATION_MESSAGE,
+      code: "DUPLICATE_REGISTRATION",
+    };
   }
 
   if (message.includes("verified elo does not match")) {
-    return WRONG_DIVISION_MESSAGE;
+    return { message: WRONG_DIVISION_MESSAGE, code: "DIVISION_MISMATCH" };
   }
 
   if (
     message.includes("registration document set is unavailable") ||
     message.includes("registration consent is invalid")
   ) {
-    return "Registration is unavailable until the approved governing documents are effective.";
+    return {
+      message:
+        "Registration is unavailable until the approved governing documents are effective.",
+      code: "LEGAL_DOCUMENTS_UNAVAILABLE",
+    };
   }
 
   if (
@@ -703,18 +783,29 @@ function getRegistrationErrorMessage(error: unknown) {
     message.includes("roster is locked") ||
     message.includes("bracket generation")
   ) {
-    return REGISTRATION_UNAVAILABLE_MESSAGE;
+    return {
+      message: REGISTRATION_UNAVAILABLE_MESSAGE,
+      code: "REGISTRATION_UNAVAILABLE",
+    };
   }
 
   if (message.includes("older waitlisted")) {
-    return "This bracket already has a waitlist. New registrations are added behind existing queued players.";
+    return {
+      message:
+        "This bracket already has a waitlist. New registrations are added behind existing queued players.",
+      code: "WAITLIST_QUEUE_ACTIVE",
+    };
   }
 
   if (message.includes("full")) {
-    return "The selected bracket cannot accept another registration right now.";
+    return {
+      message:
+        "The selected bracket cannot accept another registration right now.",
+      code: "BRACKET_FULL",
+    };
   }
 
-  return REGISTRATION_FAILED_MESSAGE;
+  return { message: REGISTRATION_FAILED_MESSAGE, code: "REGISTRATION_FAILED" };
 }
 
 function getErrorField(error: unknown, field: string) {
@@ -723,8 +814,11 @@ function getErrorField(error: unknown, field: string) {
     : "";
 }
 
-function failure(message: string): TournamentRegistrationResult {
-  return { success: false, message };
+function failure(
+  message: string,
+  code: TournamentRegistrationCode
+): TournamentRegistrationResult {
+  return { success: false, message, code };
 }
 
 function revalidateRegistrationPaths() {

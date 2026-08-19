@@ -35,7 +35,28 @@ export type MatchResultActionState = {
   status: "idle" | "success" | "error";
   message: string;
   requiresRefresh?: boolean;
+  code?: MatchResultActionCode;
+  values?: Record<string, string | number>;
 };
+
+export type MatchResultActionCode =
+  | "auth_required"
+  | "prepare_failed"
+  | "cleanup_failed"
+  | "operation_failed"
+  | "result_submitted"
+  | "opponent_required"
+  | "notes_too_long"
+  | "match_unavailable"
+  | "participants_unavailable"
+  | "participant_only"
+  | "self_no_show"
+  | "invalid_participant"
+  | "no_show_submitted"
+  | "report_unavailable"
+  | "confirmed"
+  | "dispute_notes_too_long"
+  | "disputed";
 
 export type PrepareMatchReplayUploadsState =
   | {
@@ -47,6 +68,7 @@ export type PrepareMatchReplayUploadsState =
   | {
       status: "error";
       message: string;
+      code: "auth_required" | "prepare_failed";
     };
 
 export type CleanupPreparedReplayUploadsState =
@@ -57,6 +79,7 @@ export type CleanupPreparedReplayUploadsState =
   | {
       status: "error";
       message: string;
+      code: "auth_required" | "cleanup_failed";
     };
 
 export async function prepareMatchReplayUploads(
@@ -68,6 +91,7 @@ export async function prepareMatchReplayUploads(
     return {
       status: "error",
       message: "Sign in before preparing replay uploads.",
+      code: "auth_required",
     };
   }
 
@@ -89,6 +113,7 @@ export async function prepareMatchReplayUploads(
     logMatchResultFailure("prepare-replay-uploads", error);
     return {
       status: "error",
+      code: "prepare_failed",
       message: getReplayUploadMessage(
         error,
         "The replay upload could not be prepared. Please try again."
@@ -103,7 +128,7 @@ export async function finalizeMatchResult(
   const { userId } = await auth();
 
   if (!userId) {
-    return errorState("Sign in before submitting a match result.");
+    return errorState("Sign in before submitting a match result.", "auth_required");
   }
 
   const supabase = createSupabaseAdminClient();
@@ -124,7 +149,8 @@ export async function finalizeMatchResult(
         getReplayUploadMessage(
           error,
           "The match result could not be submitted. Please try again."
-        )
+        ),
+        "operation_failed"
       ),
       requiresRefresh:
         error instanceof MatchReplayUploadError &&
@@ -189,7 +215,13 @@ export async function finalizeMatchResult(
       followUpWarning
         ? " The result was saved, but one follow-up update could not be completed. Refresh this match before taking another action."
         : ""
-    }`
+    }`,
+    "result_submitted",
+    {
+      submission: reportDetails.submissionNumber ?? "new",
+      deadline: reportDetails.confirmationDeadlineAt ?? "",
+      warning: followUpWarning ? 1 : 0,
+    }
   );
 }
 
@@ -202,6 +234,7 @@ export async function cleanupPreparedReplayUploads(
     return {
       status: "error",
       message: "Sign in before cleaning up replay uploads.",
+      code: "auth_required",
     };
   }
 
@@ -218,6 +251,7 @@ export async function cleanupPreparedReplayUploads(
     return {
       status: "error",
       message: "Replay cleanup could not be completed safely.",
+      code: "cleanup_failed",
     };
   }
 }
@@ -229,7 +263,7 @@ export async function submitNoShowReport(
   const { userId } = await auth();
 
   if (!userId) {
-    return errorState("Sign in before reporting a no-show.");
+    return errorState("Sign in before reporting a no-show.", "auth_required");
   }
 
   const matchId = getText(formData, "matchId");
@@ -237,18 +271,18 @@ export async function submitNoShowReport(
   const notes = getText(formData, "noShowNotes");
 
   if (!matchId || !noShowRegistrationId) {
-    return errorState("Choose the opponent who did not show up.");
+    return errorState("Choose the opponent who did not show up.", "opponent_required");
   }
 
   if (notes.length > 2000) {
-    return errorState("No-show notes must be 2000 characters or fewer.");
+    return errorState("No-show notes must be 2000 characters or fewer.", "notes_too_long");
   }
 
   const supabase = createSupabaseAdminClient();
   const match = await loadMatchForMutation(supabase, matchId);
 
   if (!match) {
-    return errorState("This tournament match is no longer available.");
+    return errorState("This tournament match is no longer available.", "match_unavailable");
   }
 
   const participantRegistrationIds = [
@@ -257,7 +291,7 @@ export async function submitNoShowReport(
   ].filter((value): value is string => Boolean(value));
 
   if (participantRegistrationIds.length !== 2) {
-    return errorState("Both match participants must be assigned.");
+    return errorState("Both match participants must be assigned.", "participants_unavailable");
   }
 
   const { data: registrations, error: registrationError } = await supabase
@@ -267,7 +301,7 @@ export async function submitNoShowReport(
 
   if (registrationError) {
     logMatchResultFailure("load-no-show-participants", registrationError);
-    return errorState("The match participants could not be verified.");
+    return errorState("The match participants could not be verified.", "participants_unavailable");
   }
 
   const registrationById = new Map(
@@ -282,16 +316,17 @@ export async function submitNoShowReport(
 
   if (!ownedRegistration) {
     return errorState(
-      "You can only report a no-show for matches you are participating in."
+      "You can only report a no-show for matches you are participating in.",
+      "participant_only"
     );
   }
 
   if (ownedRegistration.id === noShowRegistrationId) {
-    return errorState("You cannot report yourself as a no-show.");
+    return errorState("You cannot report yourself as a no-show.", "self_no_show");
   }
 
   if (!participantRegistrationIds.includes(noShowRegistrationId)) {
-    return errorState("The reported player is not a participant in this match.");
+    return errorState("The reported player is not a participant in this match.", "invalid_participant");
   }
 
   const { data: report, error } = await supabase.rpc(
@@ -310,7 +345,8 @@ export async function submitNoShowReport(
       getDatabaseMessage(
         error,
         "The no-show report could not be submitted. Please try again."
-      )
+      ),
+      "operation_failed"
     );
   }
 
@@ -355,7 +391,12 @@ export async function submitNoShowReport(
       reportDetails?.confirmation_deadline_at
         ? ` by ${formatDeadline(reportDetails.confirmation_deadline_at)}`
         : ""
-    }.`
+    }.`,
+    "no_show_submitted",
+    {
+      player: missingName,
+      deadline: reportDetails?.confirmation_deadline_at ?? "",
+    }
   );
 }
 
@@ -366,12 +407,12 @@ export async function confirmMatchResultReportGroup(
   const { userId } = await auth();
 
   if (!userId) {
-    return errorState("Sign in before confirming a match result.");
+    return errorState("Sign in before confirming a match result.", "auth_required");
   }
 
   const reportGroupId = getText(formData, "reportGroupId");
   if (!reportGroupId) {
-    return errorState("The match result confirmation could not be found.");
+    return errorState("The match result confirmation could not be found.", "report_unavailable");
   }
 
   const supabase = createSupabaseAdminClient();
@@ -386,7 +427,8 @@ export async function confirmMatchResultReportGroup(
       getDatabaseMessage(
         error,
         "The match result could not be confirmed. Please try again."
-      )
+      ),
+      "operation_failed"
     );
   }
 
@@ -396,7 +438,7 @@ export async function confirmMatchResultReportGroup(
   });
 
   revalidateTournamentPaths();
-  return successState("Result confirmed. The winner has been advanced.");
+  return successState("Result confirmed. The winner has been advanced.", "confirmed");
 }
 
 export async function disputeMatchResultReportGroup(
@@ -406,18 +448,18 @@ export async function disputeMatchResultReportGroup(
   const { userId } = await auth();
 
   if (!userId) {
-    return errorState("Sign in before disputing a match result.");
+    return errorState("Sign in before disputing a match result.", "auth_required");
   }
 
   const reportGroupId = getText(formData, "reportGroupId");
   const disputeNotes = getText(formData, "disputeNotes");
 
   if (!reportGroupId) {
-    return errorState("The match result confirmation could not be found.");
+    return errorState("The match result confirmation could not be found.", "report_unavailable");
   }
 
   if (disputeNotes.length > 2000) {
-    return errorState("Dispute notes must be 2000 characters or fewer.");
+    return errorState("Dispute notes must be 2000 characters or fewer.", "dispute_notes_too_long");
   }
 
   const supabase = createSupabaseAdminClient();
@@ -433,7 +475,8 @@ export async function disputeMatchResultReportGroup(
       getDatabaseMessage(
         error,
         "The match result could not be disputed. Please try again."
-      )
+      ),
+      "operation_failed"
     );
   }
 
@@ -444,7 +487,7 @@ export async function disputeMatchResultReportGroup(
   });
 
   revalidateTournamentPaths();
-  return successState("Result disputed. An administrator must review it.");
+  return successState("Result disputed. An administrator must review it.", "disputed");
 }
 
 export async function reviewMatchResultReportGroup(
@@ -1310,13 +1353,21 @@ function formatDeadline(value: string) {
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "UTC",
   }).format(new Date(value));
 }
 
-function successState(message: string): MatchResultActionState {
-  return { status: "success", message };
+function successState(
+  message: string,
+  code?: MatchResultActionCode,
+  values?: Record<string, string | number>
+): MatchResultActionState {
+  return { status: "success", message, code, values };
 }
 
-function errorState(message: string): MatchResultActionState {
-  return { status: "error", message };
+function errorState(
+  message: string,
+  code?: MatchResultActionCode
+): MatchResultActionState {
+  return { status: "error", message, code };
 }

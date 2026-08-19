@@ -3,10 +3,12 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import {
   CheckCircle2,
   Download,
@@ -17,6 +19,10 @@ import {
   SquarePlus,
   X,
 } from "lucide-react";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import englishCommon from "@/lib/i18n/dictionaries/en/common";
+import { translate } from "@/lib/i18n/translate";
+import type { MessageValues } from "@/lib/i18n/types";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -78,6 +84,17 @@ function detectIosDevice() {
 export default function InstallAppPrompt({
   onOpenChange,
 }: InstallAppPromptProps) {
+  const pathname = usePathname();
+  const selectedTranslator = useOptionalTranslations("common", englishCommon);
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const t = useMemo(
+    () =>
+      isAdminRoute
+        ? (path: string, values?: MessageValues) =>
+            translate(englishCommon, path, values)
+        : selectedTranslator,
+    [isAdminRoute, selectedTranslator]
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [installPrompt, setInstallPrompt] =
@@ -159,8 +176,8 @@ export default function InstallAppPrompt({
 
       setInstallPrompt(null);
       closeDialog();
-    } catch (error) {
-      console.error("IronClad app installation prompt failed.", error);
+    } catch {
+      console.error("IronClad app installation prompt failed.");
     }
   };
 
@@ -171,6 +188,7 @@ export default function InstallAppPrompt({
   const dialog = isOpen
     ? createPortal(
         <div
+          lang={isAdminRoute ? "en" : undefined}
           className="fixed inset-0 z-[200] flex min-h-[100dvh] items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-sm"
           role="presentation"
           onPointerDown={(event) => {
@@ -193,14 +211,14 @@ export default function InstallAppPrompt({
             <div className="flex shrink-0 items-start justify-between gap-5 border-b border-white/10 p-6">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-400">
-                  IronClad Mobile
+                  {t("install.mobile")}
                 </p>
 
                 <h2
                   id="install-app-title"
                   className="mt-2 text-2xl font-black text-white"
                 >
-                  Install IronClad
+                  {t("install.title")}
                 </h2>
               </div>
 
@@ -208,7 +226,7 @@ export default function InstallAppPrompt({
                 type="button"
                 onClick={closeDialog}
                 className="grid h-10 w-10 shrink-0 place-items-center border border-white/10 bg-white/[0.04] text-zinc-300 transition hover:border-orange-400/50 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
-                aria-label="Close installation instructions"
+                aria-label={t("install.close")}
               >
                 <X size={20} aria-hidden="true" />
               </button>
@@ -216,8 +234,7 @@ export default function InstallAppPrompt({
 
             <div className="min-h-0 overflow-y-auto p-6">
               <p className="leading-7 text-zinc-300">
-                Add IronClad to your Home Screen for faster access and an
-                app-like full-screen experience.
+                {t("install.description")}
               </p>
 
               {installPrompt ? (
@@ -228,64 +245,64 @@ export default function InstallAppPrompt({
                     className="flex w-full items-center justify-center gap-3 border border-orange-400 bg-orange-500 px-5 py-4 font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
                   >
                     <Download size={19} aria-hidden="true" />
-                    Install now
+                    {t("install.now")}
                   </button>
 
                   <p className="mt-4 text-center text-xs leading-5 text-zinc-500">
-                    Your browser will open the secure installation prompt.
+                    {t("install.promptHelp")}
                   </p>
                 </div>
               ) : isIos ? (
                 <ol className="mt-6 space-y-4">
                   <Instruction
                     icon={Ellipsis}
-                    number="1"
-                    title="Open the menu"
-                    description="Tap the ⋯ (More) button in Safari."
+                    title={t("install.iosMenuTitle")}
+                    description={t("install.iosMenuText")}
+                    stepLabel={t("install.step", { number: "1" })}
                   />
 
                   <Instruction
                     icon={Share}
-                    number="2"
-                    title="Share"
-                    description="Tap Share."
+                    title={t("install.shareTitle")}
+                    description={t("install.shareText")}
+                    stepLabel={t("install.step", { number: "2" })}
                   />
 
                   <Instruction
                     icon={SquarePlus}
-                    number="3"
-                    title="Add to Home Screen"
-                    description={'Select "Add to Home Screen". If you don\'t see it, tap "More" and look for it in the list.'}
+                    title={t("install.homeTitle")}
+                    description={t("install.homeText")}
+                    stepLabel={t("install.step", { number: "3" })}
                   />
 
                   <Instruction
                     icon={CheckCircle2}
-                    number="4"
-                    title="Install"
-                    description={'Tap "Add".'}
+                    title={t("install.addTitle")}
+                    description={t("install.addText")}
+                    stepLabel={t("install.step", { number: "4" })}
                   />
                 </ol>
               ) : (
                 <ol className="mt-6 space-y-4">
                   <Instruction
                     icon={MoreVertical}
-                    number="1"
-                    title="Open the browser menu"
-                    description="Tap the menu button in Chrome, Edge, or your browser."
+                    title={t("install.browserMenuTitle")}
+                    description={t("install.browserMenuText")}
+                    stepLabel={t("install.step", { number: "1" })}
                   />
 
                   <Instruction
                     icon={Download}
-                    number="2"
-                    title="Install the app"
-                    description='Choose “Install app” or “Add to Home screen”.'
+                    title={t("install.appTitle")}
+                    description={t("install.appText")}
+                    stepLabel={t("install.step", { number: "2" })}
                   />
 
                   <Instruction
                     icon={PlusSquare}
-                    number="3"
-                    title="Confirm"
-                    description="Confirm the installation when prompted."
+                    title={t("install.confirmTitle")}
+                    description={t("install.confirmText")}
+                    stepLabel={t("install.step", { number: "3" })}
                   />
                 </ol>
               )}
@@ -300,12 +317,13 @@ export default function InstallAppPrompt({
     <>
       <button
         type="button"
+        lang={isAdminRoute ? "en" : undefined}
         onClick={openDialog}
         className="flex w-full items-center justify-between border border-orange-400/35 bg-orange-500/10 px-4 py-3 text-left text-sm font-black uppercase tracking-[0.14em] text-orange-200 transition hover:border-orange-300/70 hover:bg-orange-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
       >
         <span className="flex items-center gap-3">
           <Download size={18} aria-hidden="true" />
-          Download our app
+          {t("install.download")}
         </span>
 
         <span className="text-lg leading-none" aria-hidden="true">
@@ -320,14 +338,14 @@ export default function InstallAppPrompt({
 
 function Instruction({
   icon: Icon,
-  number,
   title,
   description,
+  stepLabel,
 }: {
   icon: typeof Share;
-  number: string;
   title: string;
   description: string;
+  stepLabel: string;
 }) {
   return (
     <li className="grid grid-cols-[44px_1fr] gap-4 border border-white/10 bg-white/[0.03] p-4">
@@ -337,7 +355,7 @@ function Instruction({
 
       <div>
         <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-400">
-          Step {number}
+          {stepLabel}
         </p>
 
         <p className="mt-1 font-black text-white">{title}</p>

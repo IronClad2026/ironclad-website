@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
+import { interpolateMessage } from "@/lib/i18n/translate";
 
 export type SearchableProfileSelectOption = {
   label: string;
@@ -20,6 +21,8 @@ type SearchableProfileSelectProps = {
   error?: string;
   description?: string;
   placeholder?: string;
+  noResultsLabel?: string;
+  savedValueTemplate?: string;
   required?: boolean;
   className?: string;
   showSavedValueHint?: boolean;
@@ -37,6 +40,8 @@ export default function SearchableProfileSelect({
   error,
   description,
   placeholder,
+  noResultsLabel,
+  savedValueTemplate,
   required = false,
   className = "",
   showSavedValueHint = true,
@@ -150,14 +155,17 @@ export default function SearchableProfileSelect({
                   <span>{option.label}</span>
                   {showSavedValueHint && option.value !== option.label && (
                     <span className="ml-2 text-xs text-orange-300">
-                      Saves {option.value}
+                      {interpolateMessage(
+                        savedValueTemplate ?? "Saves {value}",
+                        { value: option.value }
+                      )}
                     </span>
                   )}
                 </button>
               ))
             ) : (
               <p className="px-3 py-4 text-center text-sm text-zinc-500">
-                No results found
+                {noResultsLabel ?? "No results found"}
               </p>
             )}
           </div>

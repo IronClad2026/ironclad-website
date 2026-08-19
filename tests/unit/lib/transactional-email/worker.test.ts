@@ -99,7 +99,10 @@ function eligibleResult() {
   };
 }
 
-function verifiedUser(emailAddress = "recipient@example.test") {
+function verifiedUser(
+  emailAddress = "recipient@example.test",
+  privateMetadata: Record<string, unknown> = {}
+) {
   return {
     primaryEmailAddressId: "email_primary",
     emailAddresses: [
@@ -109,6 +112,7 @@ function verifiedUser(emailAddress = "recipient@example.test") {
         verification: { status: "verified" },
       },
     ],
+    privateMetadata,
   };
 }
 
@@ -330,6 +334,49 @@ describe("transactional email worker", () => {
       p_provider_message_id: "provider-message-id",
     });
     expect(JSON.stringify(completionCalls())).not.toContain(rawEmail);
+  });
+
+  it("uses the validated Clerk private-metadata locale during the existing user lookup", async () => {
+    mocks.getUser.mockResolvedValue(
+      verifiedUser("recipient@example.test", {
+        ironcladLocale: "pt-BR",
+      })
+    );
+
+    await runTransactionalEmailWorker();
+
+    expect(mocks.renderEmail).toHaveBeenCalledWith(
+      eligibleResult().data,
+      {
+        appOrigin: "https://ironclad.example.test",
+        from: "IronClad <sender@example.test>",
+        replyTo: "operations@example.test",
+      },
+      "pt-BR",
+      expect.objectContaining({
+        registrationApproved: expect.objectContaining({
+          heading: "Sua inscrição foi aprovada",
+        }),
+      })
+    );
+    expect(mocks.getUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to English for invalid Clerk locale metadata", async () => {
+    mocks.getUser.mockResolvedValue(
+      verifiedUser("recipient@example.test", {
+        ironcladLocale: "not-a-launch-locale",
+      })
+    );
+
+    await runTransactionalEmailWorker();
+
+    expect(mocks.renderEmail.mock.calls[0][2]).toBe("en");
+    expect(mocks.renderEmail.mock.calls[0][3]).toMatchObject({
+      registrationApproved: {
+        heading: "Your registration is approved",
+      },
+    });
   });
 
   it.each([

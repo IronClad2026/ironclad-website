@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import revealStyles from "@/components/ScrollReveal.module.css";
 import { sectionReveal } from "@/lib/animations";
+import { useTranslations } from "@/components/i18n/LocaleProvider";
 
 gsap.registerPlugin(useGSAP);
 
@@ -30,35 +31,35 @@ const discordUrl = "https://discord.gg/ZQSQjBNRm3";
 const tournamentBrackets = [
   {
     label: "Academy",
-    range: "Below 1100 ELO",
-    text: "For players building competitive fundamentals in a protected skill range.",
+    rangeKey: "about.academyRange",
+    textKey: "about.academyText",
   },
   {
     label: "Challenge",
-    range: "1100-1399 ELO",
-    text: "For rising competitors pushing into sharper brackets and stronger opponents.",
+    rangeKey: "about.challengeRange",
+    textKey: "about.challengeText",
   },
   {
     label: "Main / Pro",
-    range: "1400+ ELO",
-    text: "For top competitors fighting for the highest IronClad placements.",
+    rangeKey: "about.mainRange",
+    textKey: "about.mainText",
   },
 ];
 
 const integrityHighlights = [
-  { label: "ELO verification", icon: ShieldCheck },
-  { label: "Admin approval", icon: UserCheck },
-  { label: "Proof-based match results", icon: Upload },
-  { label: "Career and season standings", icon: BarChart3 },
-  { label: "Anti-impersonation checks", icon: FileCheck2 },
-  { label: "Clear tournament rules", icon: BookOpen },
+  { labelKey: "about.eloVerification", icon: ShieldCheck },
+  { labelKey: "about.adminApproval", icon: UserCheck },
+  { labelKey: "about.proofResults", icon: Upload },
+  { labelKey: "about.careerStandings", icon: BarChart3 },
+  { labelKey: "about.impersonationChecks", icon: FileCheck2 },
+  { labelKey: "about.clearTournamentRules", icon: BookOpen },
 ];
 
 const visionItems = [
-  "Better events",
-  "Stronger community tools",
-  "Career and season rankings",
-  "Professional tournament experiences",
+  "about.betterEvents",
+  "about.strongerTools",
+  "about.careerRankings",
+  "about.professionalExperiences",
 ];
 
 type SectionBackground = {
@@ -111,6 +112,8 @@ export default function AboutPage() {
 }
 
 function HeroSection() {
+  const t = useTranslations("public");
+
   return (
     <section className="relative isolate flex min-h-[92vh] items-end overflow-hidden border-b border-orange-500/20 px-5 pt-32 pb-12 sm:px-8 lg:px-12">
       <div
@@ -129,21 +132,23 @@ function HeroSection() {
           className={`${revealStyles.reveal} max-w-5xl`}
         >
           <p className="text-sm font-black uppercase text-orange-300">
-            Built for Competitive Company of Heroes 3
+            {t("about.heroEyebrow")}
           </p>
           <h1 className="mt-5 max-w-5xl text-5xl font-black leading-[0.94] text-white sm:text-6xl lg:text-8xl">
-            IronClad Tournaments
+            {t("about.heroTitle")}
           </h1>
           <p className="mt-7 max-w-2xl text-base leading-8 text-zinc-300 sm:text-lg">
-            A community-driven tournament platform built to give Company of
-            Heroes 3 players a structured, competitive, and fair place to
-            compete.
+            {t("about.heroDescription")}
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <PrimaryLink href="/tournaments">Join Tournament</PrimaryLink>
-            <SecondaryLink href="/rankings">View Rankings</SecondaryLink>
+            <PrimaryLink href="/tournaments">
+              {t("about.joinTournament")}
+            </PrimaryLink>
+            <SecondaryLink href="/rankings">
+              {t("about.viewRankings")}
+            </SecondaryLink>
             <SecondaryLink href={discordUrl} external>
-              Join Discord
+              {t("about.joinDiscord")}
             </SecondaryLink>
           </div>
         </motion.div>
@@ -158,15 +163,16 @@ function HeroSection() {
             <div className="about-scanline absolute inset-y-0 left-[-30%] w-1/2 skew-x-[-14deg] bg-[linear-gradient(90deg,transparent,rgba(249,115,22,0.22),transparent)]" />
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:40px_40px]" />
             <div className="absolute inset-x-8 top-8 flex items-center justify-between text-xs font-black text-orange-200">
-              <span>TACTICAL EVENT SYSTEM</span>
+              <span>{t("about.tacticalSystem")}</span>
               <Radio size={16} />
             </div>
             <div className="absolute inset-x-8 bottom-8">
               <div className="about-signal mb-4 h-1 w-24 bg-orange-400" />
-              <p className="text-4xl font-black leading-none">SEASON READY</p>
+              <p className="text-4xl font-black leading-none">
+                {t("about.seasonReady")}
+              </p>
               <p className="mt-3 text-sm leading-6 text-zinc-300">
-                Brackets, verification, match reporting, and rankings prepared
-                for competitive play.
+                {t("about.seasonReadyText")}
               </p>
             </div>
           </div>
@@ -177,11 +183,13 @@ function HeroSection() {
 }
 
 function MissionSection() {
+  const t = useTranslations("public");
+
   return (
     <CinematicSection
-      eyebrow="Mission"
-      title="A Competitive Home for CoH3 Players"
-      text="IronClad exists to support the Company of Heroes 3 competitive scene with organised tournaments, clear rules, fair brackets, Career and season rankings, and a serious community environment."
+      eyebrow={t("about.missionEyebrow")}
+      title={t("about.missionTitle")}
+      text={t("about.missionText")}
       background={{
         image: "/images/sfondi/1.jpg",
         position: "center 52%",
@@ -192,11 +200,11 @@ function MissionSection() {
       visual={
         <div className="grid gap-3 sm:grid-cols-3">
           {[
-            ["Clear Rules", "Every event starts from visible expectations."],
-            ["Fair Brackets", "Players compete inside defined ELO ranges."],
+            [t("about.clearRules"), t("about.clearRulesText")],
+            [t("about.fairBrackets"), t("about.fairBracketsText")],
             [
-              "Competitive Progress",
-              "Results build permanent Career standings or a six-Event Main / Pro season.",
+              t("about.competitiveProgress"),
+              t("about.competitiveProgressText"),
             ],
           ].map(([title, text]) => (
             <GlassPanel key={title}>
@@ -211,6 +219,8 @@ function MissionSection() {
 }
 
 function TournamentStructureSection() {
+  const t = useTranslations("public");
+
   return (
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-24 sm:px-8 lg:px-12">
       <SectionImageBackdrop
@@ -222,9 +232,9 @@ function TournamentStructureSection() {
       <TacticalBackdrop muted />
       <div className="relative z-10 mx-auto max-w-7xl">
         <SectionHeading
-          eyebrow="Tournament Structure"
-          title="Structured Events. Clear Progression."
-          text="We run community tournaments designed for different skill levels, from new competitive players to elite competitors. Each event is built around clear rules, bracket integrity, match reporting, and competitive progression."
+          eyebrow={t("about.structureEyebrow")}
+          title={t("about.structureTitle")}
+          text={t("about.structureText")}
         />
 
         <div className="mt-12 grid gap-4 lg:grid-cols-3">
@@ -240,11 +250,11 @@ function TournamentStructureSection() {
             >
               <div className="absolute inset-x-0 top-0 h-1 bg-orange-500 opacity-70" />
               <p className="text-sm font-black uppercase text-orange-300">
-                {bracket.range}
+                {t(bracket.rangeKey)}
               </p>
               <h3 className="mt-5 text-4xl font-black">{bracket.label}</h3>
               <p className="mt-5 max-w-sm text-sm leading-7 text-zinc-400">
-                {bracket.text}
+                {t(bracket.textKey)}
               </p>
               <div className="absolute right-5 bottom-5 text-orange-400/35 transition group-hover:text-orange-300">
                 <Trophy size={54} strokeWidth={1.4} />
@@ -258,6 +268,8 @@ function TournamentStructureSection() {
 }
 
 function FairCompetitionSection() {
+  const t = useTranslations("public");
+
   return (
     <section className="relative isolate overflow-hidden border-b border-orange-500/15 bg-[linear-gradient(180deg,#050505,#0b0b0b)] px-5 py-24 sm:px-8 lg:px-12">
       <SectionImageBackdrop
@@ -269,9 +281,9 @@ function FairCompetitionSection() {
       <div className="absolute inset-y-0 left-0 w-px bg-orange-500/40" />
       <div className="relative z-10 mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
         <SectionHeading
-          eyebrow="Integrity"
-          title="Fair Competition Comes First"
-          text="IronClad uses ELO verification, profile checks, admin review, structured match reporting, proof uploads, and leaderboard controls to protect tournament integrity."
+          eyebrow={t("about.integrityEyebrow")}
+          title={t("about.integrityTitle")}
+          text={t("about.integrityText")}
         />
 
         <motion.div
@@ -286,12 +298,12 @@ function FairCompetitionSection() {
             const Icon = item.icon;
 
             return (
-              <GlassPanel key={item.label}>
+              <GlassPanel key={item.labelKey}>
                 <div className="flex items-center gap-4">
                   <span className="grid h-11 w-11 shrink-0 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
                     <Icon size={20} />
                   </span>
-                  <p className="font-black text-white">{item.label}</p>
+                  <p className="font-black text-white">{t(item.labelKey)}</p>
                 </div>
               </GlassPanel>
             );
@@ -303,11 +315,13 @@ function FairCompetitionSection() {
 }
 
 function CommunitySection() {
+  const t = useTranslations("public");
+
   return (
     <CinematicSection
-      eyebrow="Community"
-      title="Built by the Community. For the Community."
-      text="IronClad is built around players, admins, casters, and the wider Company of Heroes 3 community. The goal is to create a competitive environment where players can improve, compete, and be recognised."
+      eyebrow={t("about.communityEyebrow")}
+      title={t("about.communityTitle")}
+      text={t("about.communityText")}
       background={{
         image: "/images/sfondi/3.jpg",
         position: "58% center",
@@ -319,16 +333,16 @@ function CommunitySection() {
         <div className="grid gap-4 sm:grid-cols-2">
           <GlassPanel>
             <Users className="text-orange-300" size={34} />
-            <p className="mt-5 text-2xl font-black">Players</p>
+            <p className="mt-5 text-2xl font-black">{t("about.players")}</p>
             <p className="mt-3 text-sm leading-6 text-zinc-400">
-              A place to test skill, track progress, and earn recognition.
+              {t("about.playersText")}
             </p>
           </GlassPanel>
           <GlassPanel>
             <Crosshair className="text-orange-300" size={34} />
-            <p className="mt-5 text-2xl font-black">Competitive Staff</p>
+            <p className="mt-5 text-2xl font-black">{t("about.staff")}</p>
             <p className="mt-3 text-sm leading-6 text-zinc-400">
-              Admins and casters supporting clear outcomes and better events.
+              {t("about.staffText")}
             </p>
           </GlassPanel>
         </div>
@@ -338,6 +352,8 @@ function CommunitySection() {
 }
 
 function FutureVisionSection() {
+  const t = useTranslations("public");
+
   return (
     <section className="relative isolate min-h-[88vh] overflow-hidden px-5 py-24 sm:px-8 lg:px-12">
       <SectionImageBackdrop
@@ -358,16 +374,13 @@ function FutureVisionSection() {
           className={`${revealStyles.reveal} max-w-5xl`}
         >
           <p className="text-sm font-black uppercase text-orange-300">
-            Future Vision
+            {t("about.futureEyebrow")}
           </p>
           <h2 className="mt-5 text-5xl font-black leading-[0.98] sm:text-6xl lg:text-8xl">
-            Building the Future of CoH3 Competition
+            {t("about.futureTitle")}
           </h2>
           <p className="mt-7 max-w-3xl text-base leading-8 text-zinc-300 sm:text-lg">
-            IronClad is more than a tournament website. It is a long-term
-            project built to grow the Company of Heroes 3 competitive scene
-            through better events, stronger community tools, Career and season
-            rankings, and professional tournament experiences.
+            {t("about.futureText")}
           </p>
         </motion.div>
 
@@ -377,23 +390,25 @@ function FutureVisionSection() {
               key={item}
               className="border border-white/12 bg-white/[0.04] px-4 py-4 text-sm font-black text-zinc-200 backdrop-blur"
             >
-              {item}
+              {t(item)}
             </div>
           ))}
         </div>
 
         <div className="mt-12 border-t border-white/12 pt-8">
           <p className="text-3xl font-black text-white">
-            Enter the Battlefield
+            {t("about.enterBattlefield")}
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <PrimaryLink href="/tournaments">
-              Register for a Tournament
+              {t("about.registerTournament")}
             </PrimaryLink>
             <SecondaryLink href={discordUrl} external>
-              Join Discord
+              {t("about.joinDiscord")}
             </SecondaryLink>
-            <SecondaryLink href="/rankings">View Leaderboard</SecondaryLink>
+            <SecondaryLink href="/rankings">
+              {t("about.viewLeaderboard")}
+            </SecondaryLink>
           </div>
         </div>
       </div>

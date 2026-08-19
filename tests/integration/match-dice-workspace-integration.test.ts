@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 
 const source = readFileSync(
   resolve(process.cwd(), "components/TournamentsExperience.tsx"),
@@ -22,8 +23,8 @@ describe("authenticated match dice workspace integration", () => {
   it("adds an own-match affordance without making unrelated cards interactive", () => {
     expect(source).toContain("selectedPlayerMatchId");
     expect(source).toContain("onPlayerMatchSelect");
-    expect(source).toContain("Your Match");
-    expect(source).toContain("Open Match");
+    expect(source).toContain('t("tournaments.brackets.openMatch")');
+    expect(competitionEnglish.tournaments.brackets.openMatch).toBe("Open Match");
     expect(source).toContain("viewerRegistrationIds");
   });
 

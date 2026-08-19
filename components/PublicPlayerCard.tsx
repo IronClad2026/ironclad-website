@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ChevronRight,
   Globe2,
@@ -9,15 +11,31 @@ import {
 import Link from "next/link";
 import type { PublicPlayerProfile } from "@/lib/public-players";
 
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
+import { formatNumber } from "@/lib/i18n/format";
+
 type PublicPlayerCardProps = {
   player: PublicPlayerProfile;
 };
 
 export default function PublicPlayerCard({ player }: PublicPlayerCardProps) {
+  const t = useOptionalTranslations("public", englishPublicDictionary);
+  const locale = useOptionalLocale();
   const eloLabel =
-    typeof player.currentElo === "number" ? String(player.currentElo) : "Unrated";
-  const countryLabel = player.country?.trim() || "Unknown";
-  const regionLabel = player.region?.trim() || "Region unknown";
+    typeof player.currentElo === "number"
+      ? formatNumber(player.currentElo, locale)
+      : t("players.unrated");
+  const countryLabel = player.country?.trim()
+    ? getLocalizedCountryName(player.country, locale)
+    : t("players.unknown");
+  const regionLabel = player.region?.trim()
+    ? getLocalizedPlayerRegion(player.region, t)
+    : t("players.regionUnknown");
   const displayName = player.playerName || player.displayName;
 
   return (
@@ -32,7 +50,7 @@ export default function PublicPlayerCard({ player }: PublicPlayerCardProps) {
       <div className="relative z-10 flex items-start gap-4">
         <div
           role="img"
-          aria-label={`${displayName} avatar`}
+          aria-label={t("players.avatarLabel", { name: displayName })}
           className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-orange-400/35 bg-black/55 bg-cover bg-center shadow-[0_0_24px_rgba(249,115,22,0.16)]"
           style={
             player.avatarUrl
@@ -45,7 +63,7 @@ export default function PublicPlayerCard({ player }: PublicPlayerCardProps) {
 
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-orange-300">
-            Public Profile
+            {t("players.viewProfile")}
           </p>
           <h2 className="mt-2 truncate text-2xl font-black text-white">
             {displayName}
@@ -68,21 +86,29 @@ export default function PublicPlayerCard({ player }: PublicPlayerCardProps) {
           <div className="flex items-center gap-2 text-orange-200">
             <Shield size={16} />
             <span className="text-[10px] font-black uppercase tracking-[0.22em]">
-              Current ELO
+              {t("players.currentElo")}
             </span>
           </div>
           <p className="mt-2 text-3xl font-black text-white">{eloLabel}</p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Detail icon={Globe2} label="Country" value={countryLabel} />
-          <Detail icon={MapPin} label="Region" value={regionLabel} />
+          <Detail
+            icon={Globe2}
+            label={t("players.country")}
+            value={countryLabel}
+          />
+          <Detail
+            icon={MapPin}
+            label={t("players.region")}
+            value={regionLabel}
+          />
         </div>
 
         {player.discordPublicEnabled && (
           <div className="flex items-center gap-2 border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm font-bold text-sky-200">
             <MessageCircle size={16} />
-            Discord contact available
+            {t("players.discordAvailable")}
           </div>
         )}
       </div>

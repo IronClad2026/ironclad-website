@@ -81,6 +81,7 @@ describe("Discord public-visibility guard", () => {
       updateDiscordPublicEnabled("true" as unknown as boolean)
     ).resolves.toEqual({
       status: "error",
+      code: "invalid-value",
       message: "Choose whether Discord contact should be public.",
       enabled: false,
     });
@@ -100,6 +101,7 @@ describe("Discord public-visibility guard", () => {
 
     await expect(updateDiscordPublicEnabled(true)).resolves.toEqual({
       status: "error",
+      code: "username-required",
       message:
         "Add an optional Discord username to your profile before making it public.",
       enabled: false,
@@ -136,6 +138,7 @@ describe("Discord public-visibility guard", () => {
 
     await expect(updateDiscordPublicEnabled(true)).resolves.toEqual({
       status: "success",
+      code: "enabled",
       message: "Discord contact is visible on your public profile.",
       enabled: true,
     });

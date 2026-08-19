@@ -7,6 +7,14 @@ const AVATAR_BUCKET = "player-avatars";
 
 export type DeleteAccountState = {
   status: "idle" | "error" | "success";
+  code?:
+    | "session-expired"
+    | "confirmation-invalid"
+    | "not-configured"
+    | "avatar-failed"
+    | "data-failed"
+    | "clerk-failed"
+    | "deleted";
   message: string;
 };
 
@@ -22,6 +30,7 @@ export async function deleteIronCladAccount(
   if (!userId) {
     return {
       status: "error",
+      code: "session-expired",
       message: "Your session has expired. Sign in again before deleting.",
     };
   }
@@ -29,6 +38,7 @@ export async function deleteIronCladAccount(
   if (confirmation !== "DELETE") {
     return {
       status: "error",
+      code: "confirmation-invalid",
       message: "Type DELETE exactly to confirm account deletion.",
     };
   }
@@ -42,6 +52,7 @@ export async function deleteIronCladAccount(
 
     return {
       status: "error",
+      code: "not-configured",
       message:
         "Account deletion is not configured. Contact an IronClad administrator.",
     };
@@ -56,6 +67,7 @@ export async function deleteIronCladAccount(
 
     return {
       status: "error",
+      code: "avatar-failed",
       message:
         "Your avatar could not be removed. Your Clerk account was not deleted.",
     };
@@ -76,6 +88,7 @@ export async function deleteIronCladAccount(
 
     return {
       status: "error",
+      code: "data-failed",
       message:
         "Your IronClad data could not be safely closed. Your Clerk account was not deleted.",
     };
@@ -89,6 +102,7 @@ export async function deleteIronCladAccount(
 
     return {
       status: "error",
+      code: "clerk-failed",
       message:
         "Your IronClad identity was closed, but Clerk account deletion failed. Contact an administrator.",
     };
@@ -96,6 +110,7 @@ export async function deleteIronCladAccount(
 
   return {
     status: "success",
+    code: "deleted",
     message: "Your IronClad account has been deleted.",
   };
 }

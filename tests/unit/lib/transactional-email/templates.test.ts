@@ -5,6 +5,16 @@ import {
   TRANSACTIONAL_EMAIL_TEMPLATE_KEYS,
   type TransactionalEmailTemplateData,
 } from "@/lib/transactional-email/templates";
+import zhEmail from "@/lib/i18n/dictionaries/zh-CN/email";
+import enEmail, {
+  type EmailDictionary,
+} from "@/lib/i18n/dictionaries/en/email";
+import esEmail from "@/lib/i18n/dictionaries/es/email";
+import frEmail from "@/lib/i18n/dictionaries/fr/email";
+import koEmail from "@/lib/i18n/dictionaries/ko/email";
+import ptBrEmail from "@/lib/i18n/dictionaries/pt-BR/email";
+import ruEmail from "@/lib/i18n/dictionaries/ru/email";
+import type { Locale } from "@/lib/i18n/config";
 
 const TEMPLATE_CONFIG = {
   appOrigin: "https://preview.example.invalid",
@@ -21,6 +31,16 @@ const MATCH_DATA = {
   matchId: "match-id",
   deadlineAt: "2026-08-18T10:00:00+00:00",
 };
+
+const LOCALE_EMAIL_DICTIONARIES = [
+  ["en", enEmail],
+  ["zh-CN", zhEmail],
+  ["ru", ruEmail],
+  ["es", esEmail],
+  ["pt-BR", ptBrEmail],
+  ["ko", koEmail],
+  ["fr", frEmail],
+] as const satisfies ReadonlyArray<readonly [Locale, EmailDictionary]>;
 
 const CASES: Array<{
   data: TransactionalEmailTemplateData;
@@ -137,6 +157,39 @@ describe("transactional email templates", () => {
       formatTransactionalEmailDeadlineUtc("2026-08-18T20:00:00+10:00")
     ).toBe("18 August 2026, 10:00 UTC");
   });
+
+  it("renders selected-locale copy, lang, and UTC presentation without translating dynamic names", () => {
+    const rendered = renderTransactionalEmail(
+      CASES[0].data,
+      TEMPLATE_CONFIG,
+      "zh-CN",
+      zhEmail
+    );
+
+    expect(rendered.subject).toBe("报名已获批准：Winter Championship");
+    expect(rendered.html).toContain('<html lang="zh-CN">');
+    expect(rendered.html).toContain("Winter Championship");
+    expect(rendered.text).toContain("Veteran Division");
+  });
+
+  it.each(LOCALE_EMAIL_DICTIONARIES)(
+    "renders the complete app-owned email shell for %s",
+    (locale, dictionary) => {
+      for (const testCase of CASES) {
+        const rendered = renderTransactionalEmail(
+          testCase.data,
+          TEMPLATE_CONFIG,
+          locale,
+          dictionary
+        );
+
+        expect(rendered.subject.trim()).not.toBe("");
+        expect(rendered.html).toContain(`<html lang="${locale}">`);
+        expect(rendered.html).toContain("Winter Championship");
+        expect(rendered.text).toContain("Winter Championship");
+      }
+    }
+  );
 
   it("rejects a timezone-less deadline rather than using server-local time", () => {
     expect(() =>

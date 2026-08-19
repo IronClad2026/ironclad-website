@@ -11,6 +11,8 @@ import {
   validateSteamOpenIdFlowCookie,
   verifySteamOpenIdAssertion,
 } from "@/lib/steam-openid";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { LOCALE_COOKIE_NAME, resolveLocale } from "@/lib/i18n/config";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type ProfileResult =
@@ -30,13 +32,13 @@ export async function GET(request: NextRequest) {
     ({ sessionId, userId } = await auth());
   } catch {
     return terminalResponse(
-      new Response("Authentication required.", { status: 401 })
+      await steamErrorResponse(request, "authentication", 401)
     );
   }
 
   if (!userId || !sessionId) {
     return terminalResponse(
-      new Response("Authentication required.", { status: 401 })
+      await steamErrorResponse(request, "authentication", 401)
     );
   }
 
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest) {
     origin = normalizeSteamOpenIdOrigin();
   } catch {
     return terminalResponse(
-      new Response("Steam connection is unavailable.", { status: 503 })
+      await steamErrorResponse(request, "unavailable", 503)
     );
   }
 
@@ -301,6 +303,27 @@ function getDatabaseErrorCode(error: unknown) {
   }
 
   return null;
+}
+
+async function steamErrorResponse(
+  request: NextRequest,
+  kind: "authentication" | "unavailable",
+  status: number
+) {
+  const locale = resolveLocale(request.cookies.get(LOCALE_COOKIE_NAME)?.value);
+  const dictionary = await loadDictionary(locale, "account-dashboard");
+  const message =
+    kind === "authentication"
+      ? dictionary.steam.authenticationRequired
+      : dictionary.steam.unavailable;
+
+  return new Response(message, {
+    status,
+    headers: {
+      "Cache-Control": "private, no-store, max-age=0",
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  });
 }
 
 function redirectToProfile(origin: string, result: ProfileResult) {

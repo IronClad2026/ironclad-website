@@ -6,6 +6,14 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export type PublicProfileVisibilityActionResult = {
   status: "success" | "error";
+  code:
+    | "sign-in-required"
+    | "invalid-value"
+    | "update-failed"
+    | "profile-required"
+    | "verification-failed"
+    | "enabled"
+    | "disabled";
   message: string;
   enabled: boolean;
 };
@@ -18,6 +26,7 @@ export async function updatePublicProfileEnabled(
   if (!userId) {
     return {
       status: "error",
+      code: "sign-in-required",
       message: "Sign in before updating public profile visibility.",
       enabled: false,
     };
@@ -26,6 +35,7 @@ export async function updatePublicProfileEnabled(
   if (typeof enabled !== "boolean") {
     return {
       status: "error",
+      code: "invalid-value",
       message: "Public profile visibility must be enabled or disabled.",
       enabled: false,
     };
@@ -43,6 +53,7 @@ export async function updatePublicProfileEnabled(
     console.error("Public profile visibility update failed:", updateError);
     return {
       status: "error",
+      code: "update-failed",
       message: "Public profile visibility could not be updated.",
       enabled: !enabled,
     };
@@ -51,6 +62,7 @@ export async function updatePublicProfileEnabled(
   if (!updatedPlayer) {
     return {
       status: "error",
+      code: "profile-required",
       message: "Complete your player profile before changing this setting.",
       enabled: false,
     };
@@ -81,6 +93,7 @@ export async function updatePublicProfileEnabled(
 
     return {
       status: "error",
+      code: "verification-failed",
       message: "Public profile visibility could not be verified.",
       enabled: !enabled,
     };
@@ -93,6 +106,7 @@ export async function updatePublicProfileEnabled(
 
   return {
     status: "success",
+    code: enabled ? "enabled" : "disabled",
     message: enabled
       ? "Your player profile is now public."
       : "Your player profile is now private.",

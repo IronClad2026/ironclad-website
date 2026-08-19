@@ -3,6 +3,9 @@ import PublicPlayerProfileHeader from "@/components/PublicPlayerProfileHeader";
 import PublicPlayerStats from "@/components/PublicPlayerStats";
 import { getPublicActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
 import { getPublicPlayerById } from "@/lib/public-players";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
 
 export const dynamic = "force-dynamic";
 
@@ -13,18 +16,24 @@ type PublicPlayerPageProps = {
 export async function generateMetadata({ params }: PublicPlayerPageProps) {
   const { playerId } = await params;
   const player = await getPublicPlayerById(playerId);
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "public");
 
   if (!player) {
     return {
-      title: "Player Not Found | IronClad",
+      title: translate(copy, "players.notFoundTitle"),
     };
   }
 
   const displayName = player.playerName || player.displayName;
 
   return {
-    title: `${displayName} | IronClad Player Profile`,
-    description: `Public IronClad player profile for ${displayName}.`,
+    title: translate(copy, "players.profileMetadataTitle", {
+      name: displayName,
+    }),
+    description: translate(copy, "players.profileMetadataDescription", {
+      name: displayName,
+    }),
   };
 }
 

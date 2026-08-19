@@ -48,6 +48,10 @@ vi.mock("@/lib/active-tournament-elo-snapshots", () => ({
     getOwnActiveTournamentEloSnapshotsMock,
 }));
 
+vi.mock("@/lib/i18n/request", () => ({
+  getRequestLocale: vi.fn(async () => "en"),
+}));
+
 import ProfilePage from "@/app/profile/page";
 
 const PLAYER_ID = "11111111-1111-4111-8111-111111111111";

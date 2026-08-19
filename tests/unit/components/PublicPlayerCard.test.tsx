@@ -28,7 +28,7 @@ describe("PublicPlayerCard", () => {
       screen.getByRole("link", { name: /IronTester avatar/i })
     ).toHaveAttribute("href", `/players/${player.id}`);
     expect(screen.getByText("IronTester")).toBeInTheDocument();
-    expect(screen.getByText("1450")).toBeInTheDocument();
+    expect(screen.getByText("1,450")).toBeInTheDocument();
     expect(
       screen.queryByText("Discord contact available")
     ).not.toBeInTheDocument();

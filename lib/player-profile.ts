@@ -73,8 +73,31 @@ export type ProfileField =
 
 export type ProfileActionState = {
   status: "idle" | "error" | "success";
+  code?:
+    | "session-expired"
+    | "review-fields"
+    | "save-failed"
+    | "avatar-upload-failed"
+    | "saved";
   message: string;
   errors: Partial<Record<ProfileField, string>>;
+  errorCodes?: Partial<
+    Record<
+      ProfileField,
+      {
+        code:
+          | "required"
+          | "too-long"
+          | "avatar-type"
+          | "avatar-too-large"
+          | "avatar-invalid"
+          | "avatar-upload-failed";
+        field?: string;
+        count?: number;
+        size?: string;
+      }
+    >
+  >;
 };
 
 export const initialProfileActionState: ProfileActionState = {

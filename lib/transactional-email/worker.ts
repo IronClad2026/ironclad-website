@@ -2,6 +2,12 @@ import "server-only";
 
 import { clerkClient } from "@clerk/nextjs/server";
 
+import {
+  CLERK_LOCALE_METADATA_KEY,
+  resolveLocale,
+  type Locale,
+} from "@/lib/i18n/config";
+import { loadDictionary } from "@/lib/i18n/loaders";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   loadTransactionalEmailConfig,
@@ -201,7 +207,7 @@ function isClerkUserMissing(error: unknown) {
 }
 
 type ClerkEmailResolution =
-  | { ok: true; emailAddress: string }
+  | { ok: true; emailAddress: string; locale: Locale }
   | {
       ok: false;
       outcome: "retryable_failure" | "permanent_failure";
@@ -260,7 +266,13 @@ async function resolveVerifiedPrimaryEmail(
     };
   }
 
-  return { ok: true, emailAddress: primaryEmail.emailAddress };
+  return {
+    ok: true,
+    emailAddress: primaryEmail.emailAddress,
+    locale: resolveLocale(
+      user.privateMetadata?.[CLERK_LOCALE_METADATA_KEY]
+    ),
+  };
 }
 
 async function processClaim(
@@ -340,11 +352,15 @@ async function processClaim(
 
   let rendered: ReturnType<typeof renderTransactionalEmail>;
   try {
+    const emailDictionary = await loadDictionary(
+      emailResolution.locale,
+      "email"
+    );
     rendered = renderTransactionalEmail(eligibility.data, {
       appOrigin: config.appOrigin,
       from: config.from,
       replyTo: config.replyTo,
-    });
+    }, emailResolution.locale, emailDictionary);
   } catch {
     return completeFailure(
       supabase,

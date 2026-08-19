@@ -7,67 +7,100 @@ import "./globals.css";
 import Footer from "@/components/Footer";
 import GlobalSmoke from "@/components/GlobalSmoke";
 import Navbar from "@/components/Navbar";
+import LocaleProvider from "@/components/i18n/LocaleProvider";
 import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
+import { loadClerkLocalization } from "@/lib/i18n/clerk";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { getLegalDocument } from "@/lib/legal-corpus-publication";
 
-export const metadata: Metadata = {
-  title: "IronClad Tournaments",
-  description:
-    "Competitive Company of Heroes 3 tournaments organized by IronClad.",
-  applicationName: "IronClad Tournaments",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "IronClad",
-  },
-  icons: {
-    icon: [
-      {
-        url: "/icons/icon-32x32.png",
-        sizes: "32x32",
-        type: "image/png",
-      },
-      {
-        url: "/icons/icon-192x192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        url: "/icons/icon-512x512.png",
-        sizes: "512x512",
-        type: "image/png",
-      },
-    ],
-    apple: [
-      {
-        url: "/icons/apple-touch-icon.png",
-        sizes: "180x180",
-        type: "image/png",
-      },
-    ],
-    shortcut: "/favicon.ico",
-  },
+const icons: Metadata["icons"] = {
+  icon: [
+    {
+      url: "/icons/icon-32x32.png",
+      sizes: "32x32",
+      type: "image/png",
+    },
+    {
+      url: "/icons/icon-192x192.png",
+      sizes: "192x192",
+      type: "image/png",
+    },
+    {
+      url: "/icons/icon-512x512.png",
+      sizes: "512x512",
+      type: "image/png",
+    },
+  ],
+  apple: [
+    {
+      url: "/icons/apple-touch-icon.png",
+      sizes: "180x180",
+      type: "image/png",
+    },
+  ],
+  shortcut: "/favicon.ico",
 };
 
-export default function RootLayout({
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+  const publicCopy = await loadDictionary(locale, "public");
+  const title = publicCopy.metadata.rootTitle;
+  const description = publicCopy.metadata.rootDescription;
+
+  return {
+    title,
+    description,
+    applicationName: title,
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: "IronClad",
+    },
+    icons,
+    openGraph: {
+      title,
+      description,
+      siteName: "IronClad",
+      type: "website",
+    },
+  };
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
+  const locale = await getRequestLocale();
+  const [common, clerkLocalization] = await Promise.all([
+    loadDictionary(locale, "common"),
+    loadClerkLocalization(locale),
+  ]);
+  const rulebook = getLegalDocument("rulebook");
+  const ppa = getLegalDocument("ppa");
+
   return (
-    <ClerkProvider>
-      <html lang="en">
+    <ClerkProvider localization={clerkLocalization}>
+      <html lang={locale}>
         <body>
-          <SmoothScrollProvider>
-            <GlobalSmoke />
-            <Navbar />
+          <LocaleProvider locale={locale} dictionaries={{ common }}>
+            <SmoothScrollProvider>
+              <GlobalSmoke />
+              <Navbar />
 
-            <div>{children}</div>
+              <div>{children}</div>
 
-            <Footer />
-            <SiteMusicPlayer />
-          </SmoothScrollProvider>
+              <Footer
+                dictionary={common}
+                rulebookPath={rulebook.publicPath}
+                ppaPath={ppa.publicPath}
+              />
+              <SiteMusicPlayer />
+            </SmoothScrollProvider>
+          </LocaleProvider>
         </body>
       </html>
     </ClerkProvider>

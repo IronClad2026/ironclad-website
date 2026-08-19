@@ -11,7 +11,11 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export type PollBallotActionResult =
   | { ok: true; data: PollVoteResult }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      code: "auth_required" | "invalid_request" | "save_failed";
+    };
 
 const GENERIC_BALLOT_ERROR =
   "Your ballot could not be saved. Refresh the Poll and try again.";
@@ -28,15 +32,16 @@ export async function castPollBallot(
     return {
       ok: false,
       error: "Your session could not be verified. Sign in again.",
+      code: "auth_required",
     };
   }
 
   if (!userId) {
-    return { ok: false, error: "Sign in before voting in this Poll." };
+    return { ok: false, error: "Sign in before voting in this Poll.", code: "auth_required" };
   }
 
   if (!isSubmitPollVoteInput(input)) {
-    return { ok: false, error: "The Poll ballot request is invalid." };
+    return { ok: false, error: "The Poll ballot request is invalid.", code: "invalid_request" };
   }
 
   let supabase: Awaited<ReturnType<typeof createAuthenticatedSupabaseClient>>;
@@ -45,7 +50,7 @@ export async function castPollBallot(
     supabase = await createAuthenticatedSupabaseClient();
   } catch {
     console.error("Poll ballot authenticated client creation failed.");
-    return { ok: false, error: GENERIC_BALLOT_ERROR };
+    return { ok: false, error: GENERIC_BALLOT_ERROR, code: "save_failed" };
   }
 
   let result: { data: unknown; error: unknown };
@@ -58,18 +63,18 @@ export async function castPollBallot(
     });
   } catch {
     console.error("Poll ballot RPC failed unexpectedly.");
-    return { ok: false, error: GENERIC_BALLOT_ERROR };
+    return { ok: false, error: GENERIC_BALLOT_ERROR, code: "save_failed" };
   }
 
   if (result.error) {
     console.error("Poll ballot RPC rejected the request.");
-    return { ok: false, error: GENERIC_BALLOT_ERROR };
+    return { ok: false, error: GENERIC_BALLOT_ERROR, code: "save_failed" };
   }
 
   const parsed = parsePollVoteResult(result.data, input.pollId);
   if (!parsed) {
     console.error("Poll ballot RPC returned an invalid projection.");
-    return { ok: false, error: GENERIC_BALLOT_ERROR };
+    return { ok: false, error: GENERIC_BALLOT_ERROR, code: "save_failed" };
   }
 
   return { ok: true, data: parsed };

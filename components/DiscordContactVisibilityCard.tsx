@@ -3,7 +3,22 @@
 import { Eye, EyeOff, MessageCircle, ShieldCheck } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateDiscordPublicEnabled } from "@/app/dashboard/actions";
+import {
+  updateDiscordPublicEnabled,
+  type DiscordVisibilityActionResult,
+} from "@/app/dashboard/actions";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import englishAccountDictionary from "@/lib/i18n/dictionaries/en/account-dashboard";
+
+const resultKeys: Record<DiscordVisibilityActionResult["code"], string> = {
+  "sign-in-required": "visibility.signInDiscord",
+  "invalid-value": "visibility.invalidDiscord",
+  "update-failed": "visibility.discordUpdateFailed",
+  "profile-required": "visibility.profileRequired",
+  "username-required": "visibility.discordUsernameRequired",
+  enabled: "visibility.discordNowPublic",
+  disabled: "visibility.discordNowPrivate",
+};
 
 type DiscordContactVisibilityCardProps = {
   initialEnabled: boolean;
@@ -14,6 +29,10 @@ export default function DiscordContactVisibilityCard({
   initialEnabled,
   hasDiscordUsername,
 }: DiscordContactVisibilityCardProps) {
+  const t = useOptionalTranslations(
+    "account-dashboard",
+    englishAccountDictionary
+  );
   const [enabled, setEnabled] = useState(initialEnabled && hasDiscordUsername);
   const [message, setMessage] = useState("");
   const [messageStatus, setMessageStatus] = useState<
@@ -34,14 +53,16 @@ export default function DiscordContactVisibilityCard({
 
       if (result.status === "success") {
         setEnabled(result.enabled);
-        setMessage(result.message);
+        const resultKey = resultKeys[result.code];
+        setMessage(resultKey ? t(resultKey) : result.message);
         setMessageStatus(result.status);
         router.refresh();
         return;
       }
 
       setEnabled(result.enabled);
-      setMessage(result.message);
+      const resultKey = resultKeys[result.code];
+      setMessage(resultKey ? t(resultKey) : result.message);
       setMessageStatus(result.status);
     });
   };
@@ -60,25 +81,22 @@ export default function DiscordContactVisibilityCard({
               : "border-zinc-500/30 bg-zinc-500/10 text-zinc-400"
           }`}
         >
-          {enabled ? "Enabled" : "Disabled"}
+          {enabled ? t("visibility.enabled") : t("visibility.disabled")}
         </span>
       </div>
 
       <div className="mt-5">
         <p className="text-sm font-black uppercase tracking-[0.18em] text-white">
-          Discord Contact
+          {t("visibility.discordTitle")}
         </p>
         <p className="mt-3 text-sm leading-6 text-zinc-400">
-          Discord is optional but strongly recommended for coordination. If you
-          add a username, you can separately choose whether it appears on your
-          public IronClad profile.
+          {t("visibility.discordDescription")}
         </p>
       </div>
 
       {!hasDiscordUsername && (
         <div className="mt-4 border border-amber-400/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80">
-          Discord contact is unavailable until you add an optional username to
-          your player profile.
+          {t("visibility.discordMissing")}
         </div>
       )}
 
@@ -97,12 +115,12 @@ export default function DiscordContactVisibilityCard({
             <EyeOff size={17} className="text-zinc-500" />
           )}
           {pending
-            ? "Updating..."
+            ? t("visibility.updating")
             : !hasDiscordUsername
-              ? "Add Discord in Profile"
+              ? t("visibility.addDiscord")
               : enabled
-                ? "Turn Off"
-                : "Turn On"}
+                ? t("visibility.turnOff")
+                : t("visibility.turnOn")}
         </span>
 
         <span

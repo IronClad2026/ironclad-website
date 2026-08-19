@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import type { PollViewerProjection } from "@/lib/polls";
 import type { TournamentCard } from "@/lib/tournaments";
 
@@ -102,7 +103,7 @@ describe("Tournament Polls & Decisions surface", () => {
     );
 
     const navigation = screen.getByRole("navigation", {
-      name: "Tournament sections",
+      name: competitionEnglish.tournaments.tournamentNavigation,
     });
     expect(within(navigation).getAllByRole("button")).toHaveLength(6);
     expect(navigation.firstElementChild).toHaveClass("grid-cols-3");

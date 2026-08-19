@@ -1,3 +1,6 @@
+import type { Locale } from "@/lib/i18n/config";
+import { formatRegionName } from "@/lib/i18n/format";
+
 export const countries = [
   "Aland Islands",
   "Afghanistan",
@@ -272,3 +275,102 @@ export const countryFilterOptions = [
   allCountriesFilterOption,
   ...countrySelectOptions,
 ];
+
+const ISO_REGION_CODES = (
+  "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW"
+).split(" ");
+
+const COUNTRY_CODE_OVERRIDES: Record<string, string> = {
+  "bolivia plurinational state of": "BO",
+  "brunei darussalam": "BN",
+  "cabo verde": "CV",
+  "congo democratic republic of the": "CD",
+  "cote divoire": "CI",
+  "iran islamic republic of": "IR",
+  "korea democratic peoples republic of": "KP",
+  "korea republic of": "KR",
+  "lao peoples democratic republic": "LA",
+  "micronesia federated states of": "FM",
+  "moldova republic of": "MD",
+  "palestine state of": "PS",
+  "russian federation": "RU",
+  "saint martin french part": "MF",
+  "sint maarten dutch part": "SX",
+  "syrian arab republic": "SY",
+  "taiwan province of china": "TW",
+  "tanzania united republic of": "TZ",
+  "timor leste": "TL",
+  "united states minor outlying islands": "UM",
+  "venezuela bolivarian republic of": "VE",
+  "virgin islands british": "VG",
+  "virgin islands us": "VI",
+};
+
+function normalizeCountryName(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const countryCodeByEnglishName = (() => {
+  const names = new Intl.DisplayNames(["en"], { type: "region" });
+  const entries = ISO_REGION_CODES.map((code): [string, string] => [
+    normalizeCountryName(names.of(code) ?? code),
+    code,
+  ]);
+
+  return new Map<string, string>([
+    ...entries,
+    ...Object.entries(COUNTRY_CODE_OVERRIDES),
+  ]);
+})();
+
+export function getLocalizedCountryName(country: string, locale: Locale) {
+  const normalized = normalizeCountryName(country);
+  const code = countryCodeByEnglishName.get(normalized);
+
+  return code ? formatRegionName(code, locale, country) : country;
+}
+
+export function getLocalizedCountrySelectOptions(locale: Locale) {
+  return countrySelectOptions.map((option) => ({
+    ...option,
+    label: getLocalizedCountryName(option.value, locale),
+    aliases: [
+      option.label,
+      ...(option.aliases ?? []),
+    ],
+  }));
+}
+
+export function getLocalizedCountryFilterOptions(
+  locale: Locale,
+  allCountriesLabel: string
+) {
+  return [
+    { label: allCountriesLabel, value: allCountriesFilterOption.value },
+    ...getLocalizedCountrySelectOptions(locale),
+  ];
+}
+
+const REGION_TRANSLATION_KEYS: Readonly<Record<string, string>> = {
+  Europe: "regions.europe",
+  "North America": "regions.northAmerica",
+  "South America": "regions.southAmerica",
+  Oceania: "regions.oceania",
+  Asia: "regions.asia",
+  "Middle East": "regions.middleEast",
+  Africa: "regions.africa",
+  Global: "regions.global",
+};
+
+export function getLocalizedPlayerRegion(
+  region: string,
+  translateRegion: (path: string) => string
+) {
+  const key = REGION_TRANSLATION_KEYS[region.trim()];
+  return key ? translateRegion(key) : region;
+}

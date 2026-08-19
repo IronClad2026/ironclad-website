@@ -1,12 +1,16 @@
 import type { MetadataRoute } from "next";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "public");
+
   return {
     id: "/",
-    name: "IronClad Tournaments",
+    name: copy.metadata.manifestName,
     short_name: "IronClad",
-    description:
-      "Competitive Company of Heroes 3 tournaments organized by IronClad.",
+    description: copy.metadata.manifestDescription,
     start_url: "/",
     scope: "/",
     display: "standalone",

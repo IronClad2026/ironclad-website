@@ -1,17 +1,28 @@
 import PublicPlayersDirectory from "@/components/PublicPlayersDirectory";
 import ScrollReveal from "@/components/ScrollReveal";
 import { getPublicPlayers } from "@/lib/public-players";
+import type { Metadata } from "next";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Players Directory | IronClad",
-  description:
-    "Browse public IronClad Company of Heroes 3 player profiles and competitive ratings.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "public");
+
+  return {
+    title: translate(copy, "players.metadataTitle"),
+    description: translate(copy, "players.metadataDescription"),
+  };
+}
 
 export default async function PlayersPage() {
   const players = await getPublicPlayers();
+  const locale = await getRequestLocale();
+  const copy = await loadDictionary(locale, "public");
+  const t = (path: string) => translate(copy, path);
 
   return (
     <main
@@ -39,14 +50,13 @@ export default async function PlayersPage() {
 
         <ScrollReveal className="relative z-10 mx-auto max-w-7xl">
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
-            IronClad Roster
+            {t("players.eyebrow")}
           </p>
           <h1 className="mt-5 max-w-4xl text-5xl font-black tracking-tight md:text-7xl">
-            Players Directory
+            {t("players.title")}
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
-            Browse public IronClad commanders, competitive ELO ratings, regions,
-            and opt-in Discord availability.
+            {t("players.description")}
           </p>
         </ScrollReveal>
       </section>

@@ -32,6 +32,7 @@ describe("castPollBallot", () => {
       })
     ).resolves.toEqual({
       ok: false,
+      code: "auth_required",
       error: "Sign in before voting in this Poll.",
     });
     expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
@@ -76,6 +77,7 @@ describe("castPollBallot", () => {
       castPollBallot(input as Parameters<typeof castPollBallot>[0])
     ).resolves.toEqual({
       ok: false,
+      code: "invalid_request",
       error: "The Poll ballot request is invalid.",
     });
     expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
@@ -146,6 +148,7 @@ describe("castPollBallot", () => {
       })
     ).resolves.toEqual({
       ok: false,
+      code: "save_failed",
       error: "Your ballot could not be saved. Refresh the Poll and try again.",
     });
   });
@@ -166,6 +169,7 @@ describe("castPollBallot", () => {
 
     expect(result).toEqual({
       ok: false,
+      code: "save_failed",
       error: "Your ballot could not be saved. Refresh the Poll and try again.",
     });
     expect(JSON.stringify(result)).not.toMatch(/eligibility|stale revision/i);

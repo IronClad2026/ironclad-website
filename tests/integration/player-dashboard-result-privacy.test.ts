@@ -109,9 +109,7 @@ describe("player dashboard result privacy", () => {
       logs: vi.mocked(console.error).mock.calls,
     });
 
-    expect(dashboard.error).toBe(
-      "Your competitive history could not be loaded."
-    );
+    expect(dashboard.error).toBe("load-failed");
     expect(vi.mocked(console.error)).toHaveBeenCalledWith(
       "Dashboard career load failed.",
       {

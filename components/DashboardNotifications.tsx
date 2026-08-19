@@ -14,14 +14,30 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   confirmDashboardMatchResult,
   dismissDashboardNotifications,
   disputeDashboardMatchResult,
+  type NotificationActionResult,
+  type NotificationDismissalResult,
 } from "@/app/dashboard/actions";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import type { Locale } from "@/lib/i18n/config";
+import notificationsEnglish from "@/lib/i18n/dictionaries/en/notifications";
+import { formatNumber, selectPlural } from "@/lib/i18n/format";
+import type { MessageValues } from "@/lib/i18n/types";
 import type { DashboardNotification } from "@/lib/player-dashboard";
+
+type NotificationTranslator = (
+  path: string,
+  values?: MessageValues
+) => string;
 
 export default function DashboardNotifications({
   notifications: initialNotifications,
@@ -36,6 +52,8 @@ export default function DashboardNotifications({
   const [now, setNow] = useState(() => Date.now());
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const locale = useOptionalLocale();
+  const t = useOptionalTranslations("notifications", notificationsEnglish);
   const actionRequired = notifications.filter(
     (notification) =>
       notification.canConfirm ||
@@ -90,7 +108,7 @@ export default function DashboardNotifications({
       if (deleteAll) formData.set("deleteAll", "true");
 
       const result = await dismissDashboardNotifications(formData);
-      setMessage(result.message);
+      setMessage(localizeDismissalResult(result, locale, t));
 
       if (result.status === "error") return;
 
@@ -127,7 +145,7 @@ export default function DashboardNotifications({
         decision === "confirm"
           ? await confirmDashboardMatchResult(formData)
           : await disputeDashboardMatchResult(formData);
-      setMessage(result.message);
+      setMessage(localizeNotificationActionResult(result, t));
 
       if (result.status === "success") {
         setSelected(null);
@@ -162,16 +180,24 @@ export default function DashboardNotifications({
           </span>
           <span className="min-w-0">
             <span className="block text-sm font-black uppercase tracking-[0.18em] text-white">
-              Notifications
+              {t("dashboard.title")}
             </span>
             <span className="mt-1 block truncate text-xs text-zinc-400">
               {notifications.length === 0
-                ? "No match messages"
-                : `${notifications.length} match ${
-                    notifications.length === 1 ? "message" : "messages"
-                  }`}
+                ? t("dashboard.noMessages")
+                : pluralMessage(
+                    notifications.length,
+                    locale,
+                    t,
+                    "message"
+                  )}
               {actionRequired > 0
-                ? ` - ${actionRequired} require action`
+                ? ` · ${pluralMessage(
+                    actionRequired,
+                    locale,
+                    t,
+                    "actionRequired"
+                  )}`
                 : ""}
             </span>
           </span>
@@ -194,7 +220,7 @@ export default function DashboardNotifications({
           >
             {notifications.length === 0 ? (
               <p className="p-5 text-sm text-zinc-500">
-                Match submissions and administrator decisions will appear here.
+                {t("dashboard.empty")}
               </p>
             ) : (
               <>
@@ -216,7 +242,9 @@ export default function DashboardNotifications({
                     className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-zinc-300 transition hover:border-orange-400/30 hover:text-white disabled:opacity-50"
                   >
                     <CheckSquare2 size={14} />
-                    {allSelected ? "Clear Selection" : "Select All"}
+                    {allSelected
+                      ? t("dashboard.clearSelection")
+                      : t("dashboard.selectAll")}
                   </button>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -227,7 +255,7 @@ export default function DashboardNotifications({
                       disabled={pending || selectedIds.size === 0}
                       className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-red-200 transition hover:bg-red-500/20 disabled:opacity-40"
                     >
-                      Delete Selected
+                      {t("dashboard.deleteSelected")}
                     </button>
                     <button
                       type="button"
@@ -237,7 +265,7 @@ export default function DashboardNotifications({
                       disabled={pending}
                       className="rounded-lg bg-red-700 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
                     >
-                      Delete All
+                      {t("dashboard.deleteAll")}
                     </button>
                   </div>
                 </div>
@@ -250,6 +278,8 @@ export default function DashboardNotifications({
                       checked={selectedIds.has(notification.id)}
                       now={now}
                       pending={pending}
+                      locale={locale}
+                      t={t}
                       onToggle={() => toggleSelected(notification.id)}
                       onOpen={() => setSelected(notification)}
                       onDelete={() =>
@@ -266,7 +296,7 @@ export default function DashboardNotifications({
                 aria-live="polite"
                 className="border-t border-white/10 px-4 py-3 text-xs text-zinc-400"
               >
-                {pending ? "Updating notifications..." : message}
+                {pending ? t("dashboard.updating") : message}
               </p>
             )}
           </motion.div>
@@ -279,6 +309,8 @@ export default function DashboardNotifications({
             notification={selected}
             now={now}
             pending={pending}
+            locale={locale}
+            t={t}
             onRespond={respondToReportGroup}
             onClose={() => setSelected(null)}
           />
@@ -293,6 +325,8 @@ function NotificationRow({
   checked,
   now,
   pending,
+  locale,
+  t,
   onToggle,
   onOpen,
   onDelete,
@@ -301,11 +335,13 @@ function NotificationRow({
   checked: boolean;
   now: number;
   pending: boolean;
+  locale: Locale;
+  t: NotificationTranslator;
   onToggle: () => void;
   onOpen: () => void;
   onDelete: () => void;
 }) {
-  const content = notificationContent(notification);
+  const content = notificationContent(notification, t);
   const Icon = content.icon;
 
   return (
@@ -316,7 +352,9 @@ function NotificationRow({
           checked={checked}
           onChange={onToggle}
           disabled={pending}
-          aria-label={`Select notification ${notificationLabel(notification)}`}
+          aria-label={t("dashboard.selectNotification", {
+            label: notificationLabel(notification, t),
+          })}
           className="h-4 w-4 accent-orange-500"
         />
       </label>
@@ -333,26 +371,35 @@ function NotificationRow({
             {content.title}
           </span>
           <span className="mt-1 block truncate text-xs text-zinc-500">
-            {notification.tournamentName} - {notificationLabel(notification)}
+            {notification.tournamentName} · {notificationLabel(notification, t)}
           </span>
           {notification.confirmationDeadlineAt &&
             notification.status === "pending_confirmation" && (
               <span className="mt-1 block text-[10px] font-bold uppercase tracking-wider text-orange-300">
-                {formatTimeRemaining(notification.confirmationDeadlineAt, now)}
+                {formatTimeRemaining(
+                  notification.confirmationDeadlineAt,
+                  now,
+                  locale,
+                  t
+                )}
               </span>
             )}
         </span>
         <span className="shrink-0 text-[10px] text-zinc-600">
-          {formatCompactDate(
-            notification.reviewedAt ?? notification.submittedAt
-          )}
+          <HydrationSafeLocalDateTime
+            value={notification.reviewedAt ?? notification.submittedAt}
+            fallback={t("dashboard.unavailable")}
+            options={{ month: "short", day: "numeric" }}
+          />
         </span>
       </button>
       <button
         type="button"
         onClick={onDelete}
         disabled={pending}
-        aria-label={`Delete notification ${notificationLabel(notification)}`}
+        aria-label={t("dashboard.deleteNotification", {
+          label: notificationLabel(notification, t),
+        })}
         className="mt-0.5 shrink-0 rounded-lg p-2 text-zinc-600 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
       >
         <Trash2 size={15} />
@@ -365,12 +412,16 @@ function NotificationModal({
   notification,
   now,
   pending,
+  locale,
+  t,
   onRespond,
   onClose,
 }: {
   notification: DashboardNotification;
   now: number;
   pending: boolean;
+  locale: Locale;
+  t: NotificationTranslator;
   onRespond: (
     notification: DashboardNotification,
     decision: "confirm" | "dispute",
@@ -379,7 +430,7 @@ function NotificationModal({
   onClose: () => void;
 }) {
   const [disputeNotes, setDisputeNotes] = useState("");
-  const content = notificationContent(notification);
+  const content = notificationContent(notification, t);
   const Icon = content.icon;
   const responseAvailable =
     notification.canConfirm &&
@@ -394,7 +445,7 @@ function NotificationModal({
     <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
       <motion.button
         type="button"
-        aria-label="Close notification"
+        aria-label={t("dashboard.close")}
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -419,7 +470,7 @@ function NotificationModal({
             </span>
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
-                Match Notification
+                {t("dashboard.modalEyebrow")}
               </p>
               <h2
                 id={`notification-${notification.sourceId}`}
@@ -435,7 +486,7 @@ function NotificationModal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close notification"
+            aria-label={t("dashboard.close")}
             className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 transition hover:border-orange-400/40 hover:text-white"
           >
             <X size={17} />
@@ -446,22 +497,30 @@ function NotificationModal({
           <div className="space-y-3 border-b border-white/10 p-4 sm:p-5">
             <div className="grid gap-2 text-xs sm:grid-cols-3">
               <CompactDetail
-                label="Opponent"
+                label={t("dashboard.opponent")}
                 value={notification.opponentName}
               />
               <CompactDetail
-                label={isNoShow ? "Report" : "Score"}
-                value={isNoShow ? "No-show / forfeit" : notification.reportedScore}
+                label={
+                  isNoShow ? t("dashboard.report") : t("dashboard.score")
+                }
+                value={
+                  isNoShow
+                    ? t("dashboard.noShowForfeit")
+                    : notification.reportedScore
+                }
               />
               <CompactDetail
-                label="Time"
+                label={t("dashboard.time")}
                 value={
                   notification.confirmationDeadlineAt
                     ? formatTimeRemaining(
                         notification.confirmationDeadlineAt,
-                        now
+                        now,
+                        locale,
+                        t
                       )
-                    : "Unavailable"
+                    : t("dashboard.unavailable")
                 }
               />
             </div>
@@ -473,7 +532,7 @@ function NotificationModal({
                   onChange={(event) => setDisputeNotes(event.target.value)}
                   maxLength={2000}
                   rows={2}
-                  placeholder="Optional dispute notes"
+                  placeholder={t("dashboard.disputeNotes")}
                   className="w-full resize-none rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
                 />
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -483,7 +542,9 @@ function NotificationModal({
                     onClick={() => onRespond(notification, "confirm")}
                     className="rounded-lg bg-emerald-600 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-emerald-500 disabled:opacity-50"
                   >
-                    {isNoShow ? "Confirm No-Show" : "Confirm Result"}
+                    {isNoShow
+                      ? t("dashboard.confirmNoShow")
+                      : t("dashboard.confirmResult")}
                   </button>
                   <button
                     type="button"
@@ -493,7 +554,9 @@ function NotificationModal({
                     }
                     className="rounded-lg bg-red-700 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
                   >
-                    {isNoShow ? "Dispute No-Show" : "Dispute Result"}
+                    {isNoShow
+                      ? t("dashboard.disputeNoShow")
+                      : t("dashboard.disputeResult")}
                   </button>
                 </div>
               </div>
@@ -502,37 +565,80 @@ function NotificationModal({
         )}
 
         <div className="grid gap-2 p-4 sm:grid-cols-2 sm:p-5">
-          <Detail label="Tournament" value={notification.tournamentName} />
           <Detail
-            label="Match"
-            value={`${notification.roundName} - Match ${notification.matchNumber}`}
+            label={t("dashboard.tournament")}
+            value={notification.tournamentName}
           />
-          <Detail label="Submission" value={notificationLabel(notification)} />
-          <Detail label="Opponent" value={notification.opponentName} />
           <Detail
-            label={isNoShow ? "Forfeit Winner" : "Reported Winner"}
+            label={t("dashboard.match")}
+            value={t("dashboard.matchValue", {
+              roundName: notification.roundName,
+              matchNumber: notification.matchNumber,
+            })}
+          />
+          <Detail
+            label={t("dashboard.submission")}
+            value={notificationLabel(notification, t)}
+          />
+          <Detail
+            label={t("dashboard.opponent")}
+            value={notification.opponentName}
+          />
+          <Detail
+            label={
+              isNoShow
+                ? t("dashboard.forfeitWinner")
+                : t("dashboard.reportedWinner")
+            }
             value={notification.reportedWinner}
           />
           <Detail
-            label={isNoShow ? "Missing Player" : "Reported Loser"}
+            label={
+              isNoShow
+                ? t("dashboard.missingPlayer")
+                : t("dashboard.reportedLoser")
+            }
             value={notification.reportedLoser}
           />
           <Detail
-            label={isNoShow ? "Report Type" : "Reported Score"}
-            value={isNoShow ? "No-show / forfeit" : notification.reportedScore}
+            label={
+              isNoShow
+                ? t("dashboard.reportType")
+                : t("dashboard.reportedScore")
+            }
+            value={
+              isNoShow
+                ? t("dashboard.noShowForfeit")
+                : notification.reportedScore
+            }
           />
-          <Detail label="Status" value={formatStatus(notification.status)} />
+          <Detail
+            label={t("dashboard.status")}
+            value={formatStatus(notification.status, t)}
+          />
           {notification.confirmationDeadlineAt && (
             <Detail
-              label="Time Remaining"
-              value={formatTimeRemaining(notification.confirmationDeadlineAt, now)}
+              label={t("dashboard.timeRemaining")}
+              value={formatTimeRemaining(
+                notification.confirmationDeadlineAt,
+                now,
+                locale,
+                t
+              )}
             />
           )}
           <Detail
-            label={notification.reviewedAt ? "Reviewed" : "Submitted"}
-            value={formatDate(
-              notification.reviewedAt ?? notification.submittedAt
-            )}
+            label={
+              notification.reviewedAt
+                ? t("dashboard.reviewed")
+                : t("dashboard.submitted")
+            }
+            value={
+              <HydrationSafeLocalDateTime
+                value={notification.reviewedAt ?? notification.submittedAt}
+                fallback={t("dashboard.unavailable")}
+              />
+            }
           />
         </div>
 
@@ -540,7 +646,7 @@ function NotificationModal({
           <div className="mx-6 mb-6 rounded-2xl border border-orange-400/20 bg-orange-500/5 p-5 sm:mx-8 sm:mb-8">
             <p className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-orange-200">
               <MessageSquareText size={15} />
-              Administrator Message
+              {t("dashboard.administratorMessage")}
             </p>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-300">
               {notification.reviewNotes}
@@ -553,8 +659,7 @@ function NotificationModal({
           !responseAvailable &&
           !notification.submittedByViewer && (
             <div className="mx-4 mb-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80 sm:mx-5 sm:mb-5">
-              The confirmation window has expired. Automatic approval is
-              waiting for the scheduled job to process this result.
+              {t("dashboard.expiredNotice")}
             </div>
           )}
       </motion.article>
@@ -562,7 +667,7 @@ function NotificationModal({
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0 rounded-lg border border-white/10 bg-black/25 p-3">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
@@ -584,23 +689,26 @@ function CompactDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
-function notificationContent(notification: DashboardNotification) {
+function notificationContent(
+  notification: DashboardNotification,
+  t: NotificationTranslator
+) {
   if (notification.status === "pending_confirmation") {
     if (notification.submittedByViewer) {
       if (notification.resultType === "no_show") {
         return {
-          title: "No-show report awaiting confirmation",
-          message:
-            "Your no-show report was submitted successfully. Your opponent must confirm or dispute before the deadline.",
+          title: t("matchContent.noShowAwaitingTitle"),
+          message: t("matchContent.noShowAwaitingMessage"),
           icon: Clock3,
           iconClassName: "text-sky-300",
         };
       }
 
       return {
-        title: `Submission #${notification.submissionNumber} awaiting confirmation`,
-        message:
-          "Your match result was submitted successfully. Your opponent must confirm or dispute before the deadline.",
+        title: t("matchContent.submissionAwaitingTitle", {
+          number: notification.submissionNumber,
+        }),
+        message: t("matchContent.submissionAwaitingMessage"),
         icon: Clock3,
         iconClassName: "text-sky-300",
       };
@@ -608,16 +716,20 @@ function notificationContent(notification: DashboardNotification) {
 
     if (notification.resultType === "no_show") {
       return {
-        title: "No-Show Confirmation Required",
-        message: `Your opponent reported you as a no-show in ${notification.tournamentName}. Confirm or dispute this report before the confirmation window expires.`,
+        title: t("matchContent.noShowConfirmationTitle"),
+        message: t("matchContent.noShowConfirmationMessage", {
+          tournamentName: notification.tournamentName,
+        }),
         icon: ShieldAlert,
         iconClassName: "text-orange-300",
       };
     }
 
     return {
-      title: "Match Result Confirmation Required",
-      message: `Your opponent has submitted the result for your match in ${notification.tournamentName}. Please confirm or dispute this result before the confirmation window expires.`,
+      title: t("matchContent.resultConfirmationTitle"),
+      message: t("matchContent.resultConfirmationMessage", {
+        tournamentName: notification.tournamentName,
+      }),
       icon: Bell,
       iconClassName: "text-orange-300",
     };
@@ -625,16 +737,16 @@ function notificationContent(notification: DashboardNotification) {
   if (notification.status === "approved") {
     if (notification.resultType === "no_show") {
       return {
-        title: "No-show report approved",
-        message: "The no-show report has been approved and recorded.",
+        title: t("matchContent.noShowApprovedTitle"),
+        message: t("matchContent.noShowApprovedMessage"),
         icon: CheckCircle2,
         iconClassName: "text-emerald-300",
       };
     }
 
     return {
-      title: "Match result approved",
-      message: "The official result has been approved and recorded.",
+      title: t("matchContent.resultApprovedTitle"),
+      message: t("matchContent.resultApprovedMessage"),
       icon: CheckCircle2,
       iconClassName: "text-emerald-300",
     };
@@ -642,16 +754,16 @@ function notificationContent(notification: DashboardNotification) {
   if (notification.status === "confirmed") {
     if (notification.resultType === "no_show") {
       return {
-        title: "No-show confirmed",
-        message: "The no-show report was confirmed and recorded.",
+        title: t("matchContent.noShowConfirmedTitle"),
+        message: t("matchContent.noShowConfirmedMessage"),
         icon: CheckCircle2,
         iconClassName: "text-emerald-300",
       };
     }
 
     return {
-      title: "Match result confirmed",
-      message: "The result was confirmed by the opponent and recorded.",
+      title: t("matchContent.resultConfirmedTitle"),
+      message: t("matchContent.resultConfirmedMessage"),
       icon: CheckCircle2,
       iconClassName: "text-emerald-300",
     };
@@ -659,18 +771,16 @@ function notificationContent(notification: DashboardNotification) {
   if (notification.status === "auto_approved") {
     if (notification.resultType === "no_show") {
       return {
-        title: "No-show auto-confirmed",
-        message:
-          "The confirmation window expired without a dispute, so the no-show was automatically confirmed.",
+        title: t("matchContent.noShowAutoTitle"),
+        message: t("matchContent.noShowAutoMessage"),
         icon: CheckCircle2,
         iconClassName: "text-emerald-300",
       };
     }
 
     return {
-      title: "Match result auto-approved",
-      message:
-        "The confirmation window expired without a dispute, so the result was automatically approved.",
+      title: t("matchContent.resultAutoTitle"),
+      message: t("matchContent.resultAutoMessage"),
       icon: CheckCircle2,
       iconClassName: "text-emerald-300",
     };
@@ -678,18 +788,16 @@ function notificationContent(notification: DashboardNotification) {
   if (notification.status === "rejected") {
     if (notification.resultType === "no_show") {
       return {
-        title: "No-show report rejected",
-        message:
-          "The no-show report was rejected. Review the administrator message before continuing the match flow.",
+        title: t("matchContent.noShowRejectedTitle"),
+        message: t("matchContent.noShowRejectedMessage"),
         icon: XCircle,
         iconClassName: "text-red-300",
       };
     }
 
     return {
-      title: "Match result rejected",
-      message:
-        "Review the administrator message before submitting corrected evidence.",
+      title: t("matchContent.resultRejectedTitle"),
+      message: t("matchContent.resultRejectedMessage"),
       icon: XCircle,
       iconClassName: "text-red-300",
     };
@@ -697,18 +805,16 @@ function notificationContent(notification: DashboardNotification) {
   if (notification.status === "disputed") {
     if (notification.resultType === "no_show") {
       return {
-        title: "No-show disputed",
-        message:
-          "This no-show report has been disputed and now requires administrator review.",
+        title: t("matchContent.noShowDisputedTitle"),
+        message: t("matchContent.noShowDisputedMessage"),
         icon: ShieldAlert,
         iconClassName: "text-red-300",
       };
     }
 
     return {
-      title: "Match result disputed",
-      message:
-        "This result has been disputed and now requires administrator review.",
+      title: t("matchContent.resultDisputedTitle"),
+      message: t("matchContent.resultDisputedMessage"),
       icon: ShieldAlert,
       iconClassName: "text-red-300",
     };
@@ -716,117 +822,203 @@ function notificationContent(notification: DashboardNotification) {
   if (notification.status === "under_review") {
     if (notification.resultType === "no_show") {
       return {
-        title: "No-show under review",
-        message: "An administrator is reviewing this no-show dispute.",
+        title: t("matchContent.noShowReviewTitle"),
+        message: t("matchContent.noShowReviewMessage"),
         icon: Clock3,
         iconClassName: "text-amber-300",
       };
     }
 
     return {
-      title: "Match result under review",
-      message: "An administrator is reviewing this disputed result.",
+      title: t("matchContent.resultReviewTitle"),
+      message: t("matchContent.resultReviewMessage"),
       icon: Clock3,
       iconClassName: "text-amber-300",
     };
   }
   if (notification.status === "resubmission_requested") {
     return {
-      title: "Result resubmission requested",
-      message:
-        "The administrator requires a corrected result or additional proof.",
+      title: t("matchContent.resubmissionTitle"),
+      message: t("matchContent.resubmissionMessage"),
       icon: RotateCcw,
       iconClassName: "text-amber-300",
     };
   }
   if (notification.status === "reset") {
     return {
-      title: "Match result reset",
-      message: "The result report was reset and the match remains unresolved.",
+      title: t("matchContent.resetTitle"),
+      message: t("matchContent.resetMessage"),
       icon: RotateCcw,
       iconClassName: "text-amber-300",
     };
   }
   if (notification.submittedByViewer) {
     return {
-      title: `Submission #${notification.submissionNumber} is under review`,
-      message: "Your match result was submitted successfully.",
+      title: t("matchContent.submittedReviewTitle", {
+        number: notification.submissionNumber,
+      }),
+      message: t("matchContent.submittedReviewMessage"),
       icon: Clock3,
       iconClassName: "text-sky-300",
     };
   }
 
   return {
-    title: "Your opponent submitted a match result",
-    message:
-      "The reported result is now under administrator review. Open this message to inspect the report.",
+    title: t("matchContent.opponentSubmittedTitle"),
+    message: t("matchContent.opponentSubmittedMessage"),
     icon: Bell,
     iconClassName: "text-orange-300",
   };
 }
 
-function notificationLabel(notification: DashboardNotification) {
+function notificationLabel(
+  notification: DashboardNotification,
+  t: NotificationTranslator
+) {
   if (notification.resultType === "no_show") {
-    return "No-Show Report";
+    return t("dashboard.noShowReport");
   }
 
   return notification.submissionNumber > 0
-    ? `Submission #${notification.submissionNumber}`
-    : "Result Confirmation";
+    ? t("dashboard.submissionNumber", {
+        number: notification.submissionNumber,
+      })
+    : t("dashboard.resultConfirmation");
 }
 
-function formatStatus(status: DashboardNotification["status"]) {
+function formatStatus(
+  status: DashboardNotification["status"],
+  t: NotificationTranslator
+) {
   return {
-    pending: "Under Review",
-    approved: "Approved",
-    rejected: "Rejected",
-    resubmission_requested: "Resubmission Requested",
-    pending_confirmation: "Pending Opponent Confirmation",
-    confirmed: "Confirmed",
-    auto_approved: "Auto-Approved",
-    disputed: "Disputed",
-    under_review: "Under Review",
-    reset: "Reset",
+    pending: t("status.pending"),
+    approved: t("status.approved"),
+    rejected: t("status.rejected"),
+    resubmission_requested: t("status.resubmissionRequested"),
+    pending_confirmation: t("status.pendingConfirmation"),
+    confirmed: t("status.confirmed"),
+    auto_approved: t("status.autoApproved"),
+    disputed: t("status.disputed"),
+    under_review: t("status.underReview"),
+    reset: t("status.reset"),
   }[status];
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function formatCompactDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(value));
-}
-
-function formatTimeRemaining(value: string, now = Date.now()) {
+function formatTimeRemaining(
+  value: string,
+  now: number,
+  locale: Locale,
+  t: NotificationTranslator
+) {
   const remainingMs = new Date(value).getTime() - now;
 
   if (!Number.isFinite(remainingMs)) {
-    return "Time remaining unavailable";
+    return t("dashboard.timeUnavailable");
   }
 
   if (remainingMs <= 0) {
-    return "Expired - awaiting automation";
+    return t("dashboard.expired");
   }
 
   const totalSeconds = Math.ceil(remainingMs / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+  const formattedHours = formatNumber(hours, locale);
+  const formattedMinutes = formatNumber(minutes, locale);
+  const formattedSeconds = formatNumber(seconds, locale);
 
   if (hours > 0) {
-    return `${hours}h ${minutes}m remaining`;
+    return t("dashboard.hoursRemaining", {
+      hours: formattedHours,
+      minutes: formattedMinutes,
+    });
   }
 
   if (minutes > 0) {
-    return `${minutes}m ${seconds}s remaining`;
+    return t("dashboard.minutesRemaining", {
+      minutes: formattedMinutes,
+      seconds: formattedSeconds,
+    });
   }
 
-  return `${seconds}s remaining`;
+  return t("dashboard.secondsRemaining", { seconds: formattedSeconds });
+}
+
+function pluralMessage(
+  count: number,
+  locale: Locale,
+  t: NotificationTranslator,
+  prefix: "message" | "actionRequired"
+) {
+  const category = selectPlural(count, locale);
+  const supportedCategory =
+    category === "one" || category === "few" || category === "many"
+      ? category
+      : "other";
+
+  const categoryKey = {
+    one: "One",
+    few: "Few",
+    many: "Many",
+    other: "Other",
+  }[supportedCategory];
+
+  return t(`dashboard.${prefix}${categoryKey}`, {
+    count: formatNumber(count, locale),
+  });
+}
+
+function localizeDismissalResult(
+  result: NotificationDismissalResult,
+  locale: Locale,
+  t: NotificationTranslator
+) {
+  if (result.code === "deleted") {
+    const count = result.dismissedIds.length;
+    const category = selectPlural(count, locale);
+    const supportedCategory =
+      category === "one" || category === "few" || category === "many"
+        ? category
+        : "other";
+    const categoryKey = {
+      one: "One",
+      few: "Few",
+      many: "Many",
+      other: "Other",
+    }[supportedCategory];
+
+    return t(`dashboard.actions.deleted${categoryKey}`, {
+      count: formatNumber(count, locale),
+    });
+  }
+
+  return t(
+    {
+      "sign-in-required": "dashboard.actions.signInRequired",
+      "selection-required": "dashboard.actions.selectionRequired",
+      "update-failed": "dashboard.actions.updateFailed",
+      unavailable: "dashboard.actions.unavailable",
+      "notification-unavailable":
+        "dashboard.actions.notificationUnavailable",
+      "already-deleted": "dashboard.actions.alreadyDeleted",
+    }[result.code]
+  );
+}
+
+function localizeNotificationActionResult(
+  result: NotificationActionResult,
+  t: NotificationTranslator
+) {
+  return t(
+    {
+      "sign-in-required": "dashboard.actions.signInRequired",
+      "result-unavailable": "dashboard.actions.resultUnavailable",
+      "confirm-failed": "dashboard.actions.confirmFailed",
+      confirmed: "dashboard.actions.confirmed",
+      "dispute-notes-too-long": "dashboard.actions.disputeNotesTooLong",
+      "dispute-failed": "dashboard.actions.disputeFailed",
+      disputed: "dashboard.actions.disputed",
+    }[result.code]
+  );
 }

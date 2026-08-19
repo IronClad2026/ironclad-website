@@ -1,27 +1,34 @@
 import Image from "next/image";
 import { ImageIcon, LockKeyhole, MapPinned } from "lucide-react";
 import InfoTooltip from "@/components/InfoTooltip";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import { formatNumber, selectPlural } from "@/lib/i18n/format";
 import type { PublishedTournamentMapPool } from "@/lib/tournament-map-pools";
 
 type TournamentMapPoolsProps = {
   pools: PublishedTournamentMapPool[];
 };
 
-const sourceTypeLabels = {
-  official: "Official",
-  community: "Community",
-} as const;
-
-const statusLabels = {
-  active: "Active",
-  retired: "Retired",
-  temporarily_disabled: "Temporarily disabled",
-} as const;
-
 export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
+  const sourceTypeLabels = {
+    official: t("mapPools.official"),
+    community: t("mapPools.community"),
+  } as const;
+  const statusLabels = {
+    active: t("mapPools.active"),
+    retired: t("mapPools.retired"),
+    temporarily_disabled: t("mapPools.temporarilyDisabled"),
+  } as const;
+
   return (
     <section
-      aria-label="Published division map pools"
+      aria-label={t("mapPools.ariaLabel")}
       className="overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.9))] p-5 shadow-2xl shadow-black/30 backdrop-blur sm:p-6"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -31,14 +38,13 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
           </span>
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-300">
-              Competitive Map Pools
+              {t("mapPools.eyebrow")}
             </p>
             <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">
-              Published by Division
+              {t("mapPools.title")}
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
-              Only the published 1v1 maps listed for a Division are eligible for
-              its tournament Series.
+              {t("mapPools.description")}
             </p>
           </div>
         </div>
@@ -53,7 +59,7 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
               className="mx-auto text-zinc-600"
             />
             <p className="mt-3 text-sm font-bold text-zinc-400">
-              No Division map pools have been published yet.
+              {t("mapPools.empty")}
             </p>
           </div>
         </div>
@@ -68,7 +74,7 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-300">
-                      Division Pool
+                      {t("mapPools.divisionPool")}
                     </p>
                     <h3 className="mt-1 break-words text-xl font-black text-white">
                       {pool.divisionName}
@@ -79,21 +85,32 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                       {pool.launchedAt ? (
                         <LockKeyhole size={12} aria-hidden="true" />
                       ) : null}
-                      {pool.launchedAt ? "Frozen" : "Published"}
+                      {pool.launchedAt
+                        ? t("mapPools.frozen")
+                        : t("mapPools.published")}
                     </span>
                     <InfoTooltip
                       align="end"
-                      label={`About the ${pool.launchedAt ? "frozen" : "published"} map pool`}
+                      label={
+                        pool.launchedAt
+                          ? t("mapPools.aboutFrozen")
+                          : t("mapPools.aboutPublished")
+                      }
                       content={
                         pool.launchedAt
-                          ? "Launch has locked this Division's map pool. Only an audited Admin correction for a technical issue, exploit, game update or competitive-integrity reason may replace a Map."
-                          : "This Division's map pool is public but may still be republished before launch. Launch freezes the pool."
+                          ? t("mapPools.frozenHelp")
+                          : t("mapPools.publishedHelp")
                       }
                     />
                   </span>
                 </div>
                 <p className="mt-3 text-xs font-bold text-zinc-400">
-                  {pool.maps.length} {pool.maps.length === 1 ? "map" : "maps"}
+                  {t(
+                    `mapPools.mapCount${pluralSuffix(
+                      selectPlural(pool.maps.length, locale)
+                    )}`,
+                    { count: formatNumber(pool.maps.length, locale) }
+                  )}
                 </p>
               </header>
 
@@ -107,7 +124,9 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                       {map.thumbnailPath ? (
                         <Image
                           src={map.thumbnailPath}
-                          alt={`${map.displayName} map thumbnail`}
+                          alt={t("mapPools.thumbnail", {
+                            name: map.displayName,
+                          })}
                           fill
                           sizes="(min-width: 1536px) 14rem, (min-width: 1024px) 22rem, (min-width: 640px) 45vw, 90vw"
                           className="object-cover"
@@ -115,7 +134,9 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                       ) : (
                         <span
                           role="img"
-                          aria-label={`${map.displayName} thumbnail unavailable`}
+                          aria-label={t("mapPools.thumbnailUnavailable", {
+                            name: map.displayName,
+                          })}
                           className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-black/35 text-zinc-600"
                         >
                           <MapPinned size={24} aria-hidden="true" />
@@ -149,7 +170,9 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                       </p>
                       {map.creatorName ? (
                         <p className="mt-1 break-words text-xs text-zinc-500">
-                          Created by {map.creatorName}
+                          {t("mapPools.createdBy", {
+                            name: map.creatorName,
+                          })}
                         </p>
                       ) : null}
                     </div>
@@ -162,4 +185,8 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
       )}
     </section>
   );
+}
+
+function pluralSuffix(category: Intl.LDMLPluralRule) {
+  return `${category[0].toUpperCase()}${category.slice(1)}`;
 }

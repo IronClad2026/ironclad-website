@@ -3,7 +3,25 @@
 import { Eye, EyeOff, ShieldCheck, UserRound } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updatePublicProfileEnabled } from "@/app/dashboard/public-profile-actions";
+import {
+  updatePublicProfileEnabled,
+  type PublicProfileVisibilityActionResult,
+} from "@/app/dashboard/public-profile-actions";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import englishAccountDictionary from "@/lib/i18n/dictionaries/en/account-dashboard";
+
+const resultKeys: Record<
+  PublicProfileVisibilityActionResult["code"],
+  string
+> = {
+  "sign-in-required": "visibility.signInProfile",
+  "invalid-value": "visibility.invalidProfile",
+  "update-failed": "visibility.profileUpdateFailed",
+  "profile-required": "visibility.profileRequired",
+  "verification-failed": "visibility.profileVerifyFailed",
+  enabled: "visibility.profileNowPublic",
+  disabled: "visibility.profileNowPrivate",
+};
 
 type PublicProfileVisibilityCardProps = {
   initialEnabled: boolean;
@@ -12,6 +30,10 @@ type PublicProfileVisibilityCardProps = {
 export default function PublicProfileVisibilityCard({
   initialEnabled,
 }: PublicProfileVisibilityCardProps) {
+  const t = useOptionalTranslations(
+    "account-dashboard",
+    englishAccountDictionary
+  );
   const [enabled, setEnabled] = useState(initialEnabled);
   const [feedback, setFeedback] = useState<{
     message: string;
@@ -34,8 +56,9 @@ export default function PublicProfileVisibilityCard({
         router.refresh();
       }
 
+      const resultKey = resultKeys[result.code];
       setFeedback({
-        message: result.message,
+        message: resultKey ? t(resultKey) : result.message,
         status: result.status,
       });
     });
@@ -55,17 +78,16 @@ export default function PublicProfileVisibilityCard({
               : "border-zinc-500/30 bg-zinc-500/10 text-zinc-400"
           }`}
         >
-          {enabled ? "Public" : "Private"}
+          {enabled ? t("visibility.public") : t("visibility.private")}
         </span>
       </div>
 
       <div className="mt-5">
         <p className="text-sm font-black uppercase tracking-[0.18em] text-white">
-          Public Player Profile
+          {t("visibility.publicTitle")}
         </p>
         <p className="mt-3 text-sm leading-6 text-zinc-400">
-          Show your public-safe player details and avatar in the IronClad
-          directory. Discord contact visibility remains a separate setting.
+          {t("visibility.publicDescription")}
         </p>
       </div>
 
@@ -83,7 +105,11 @@ export default function PublicProfileVisibilityCard({
           ) : (
             <EyeOff size={17} className="text-zinc-500" />
           )}
-          {pending ? "Updating..." : enabled ? "Make Private" : "Make Public"}
+          {pending
+            ? t("visibility.updating")
+            : enabled
+              ? t("visibility.makePrivate")
+              : t("visibility.makePublic")}
         </span>
 
         <span

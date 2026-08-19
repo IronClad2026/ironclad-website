@@ -120,6 +120,7 @@ describe("profile save validation and Steam identity regression", () => {
       )
     ).resolves.toEqual({
       status: "success",
+      code: "saved",
       message: "Player profile saved successfully.",
       errors: {},
     });
@@ -197,9 +198,17 @@ describe("profile save validation and Steam identity regression", () => {
       )
     ).resolves.toEqual({
       status: "error",
+      code: "review-fields",
       message: "Review the highlighted profile fields.",
       errors: {
         discordUsername: "Discord username must be 100 characters or fewer.",
+      },
+      errorCodes: {
+        discordUsername: {
+          code: "too-long",
+          count: 100,
+          field: "Discord username",
+        },
       },
     });
 
@@ -274,8 +283,12 @@ describe("profile save validation and Steam identity regression", () => {
       )
     ).resolves.toEqual({
       status: "error",
+      code: "review-fields",
       message: "Review the highlighted profile fields.",
       errors: { avatar: "Avatar image must be 4 MiB or smaller." },
+      errorCodes: {
+        avatar: { code: "avatar-too-large", size: "4 MiB" },
+      },
     });
 
     expect(fixture.upload).not.toHaveBeenCalled();
@@ -302,8 +315,10 @@ describe("profile save validation and Steam identity regression", () => {
       )
     ).resolves.toEqual({
       status: "error",
+      code: "review-fields",
       message: "Review the highlighted profile fields.",
       errors: { avatar: "Use a PNG, JPG, JPEG, or WEBP image." },
+      errorCodes: { avatar: { code: "avatar-type" } },
     });
 
     expect(fixture.upload).not.toHaveBeenCalled();
@@ -330,10 +345,12 @@ describe("profile save validation and Steam identity regression", () => {
       )
     ).resolves.toEqual({
       status: "error",
+      code: "review-fields",
       message: "Review the highlighted profile fields.",
       errors: {
         avatar: "The selected file does not contain a valid supported image.",
       },
+      errorCodes: { avatar: { code: "avatar-invalid" } },
     });
 
     expect(fixture.upload).not.toHaveBeenCalled();
@@ -430,10 +447,12 @@ describe("profile save validation and Steam identity regression", () => {
 
     expect(result).toEqual({
       status: "error",
+      code: "avatar-upload-failed",
       message: "Your avatar could not be uploaded. Check the image and try again.",
       errors: {
         avatar: "Avatar upload failed. Please try again.",
       },
+      errorCodes: { avatar: { code: "avatar-upload-failed" } },
     });
     expect(consoleInfo).toHaveBeenCalledWith(
       "Player avatar upload attempt:",

@@ -3,6 +3,9 @@
 import { useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
+import { useOptionalLocale } from "@/components/i18n/LocaleProvider";
+import { formatDateTime } from "@/lib/i18n/format";
+
 const subscribe = () => () => {};
 
 function getClientSnapshot() {
@@ -21,37 +24,17 @@ function useHydrated() {
   );
 }
 
-function formatDeterministicUtc(timestamp: Date) {
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const hours = timestamp.getUTCHours();
-  const displayHours = hours % 12 || 12;
-  const minutes = timestamp.getUTCMinutes().toString().padStart(2, "0");
-  const period = hours >= 12 ? "pm" : "am";
-
-  return `${timestamp.getUTCDate()} ${months[timestamp.getUTCMonth()]} ${timestamp.getUTCFullYear()}, ${displayHours}:${minutes} ${period}`;
-}
-
 export default function HydrationSafeLocalDateTime({
   value,
   fallback,
+  options,
 }: {
   value: string | null | undefined;
   fallback: ReactNode;
+  options?: Intl.DateTimeFormatOptions;
 }) {
   const hydrated = useHydrated();
+  const locale = useOptionalLocale();
 
   if (!value) return fallback;
 
@@ -59,11 +42,8 @@ export default function HydrationSafeLocalDateTime({
   if (!Number.isFinite(timestamp.getTime())) return fallback;
 
   const formatted = hydrated
-    ? new Intl.DateTimeFormat("en-AU", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(timestamp)
-    : formatDeterministicUtc(timestamp);
+    ? formatDateTime(timestamp, locale, { kind: "local" }, options)
+    : formatDateTime(timestamp, locale, { kind: "utc" }, options);
 
   return <time dateTime={value}>{formatted}</time>;
 }

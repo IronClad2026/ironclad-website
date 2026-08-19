@@ -1,4 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale, type LocaleScope } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -48,11 +52,17 @@ export async function GET(
   }
 ) {
   let safeRecordId: string | null = null;
+  let localeScope: LocaleScope = "player";
+  const unavailableResponse = () => proofUnavailable(localeScope);
 
   try {
     const { userId, sessionClaims } = await auth();
+    localeScope =
+      (sessionClaims as CustomClaims | null)?.metadata?.role === "admin"
+        ? "admin"
+        : "player";
     if (!userId) {
-      return proofUnavailable();
+      return unavailableResponse();
     }
 
     const rawParams = await params;
@@ -72,11 +82,10 @@ export async function GET(
       !recordId ||
       (source === "report-group" && kind !== "replay")
     ) {
-      return proofUnavailable();
+      return unavailableResponse();
     }
     safeRecordId = recordId;
-    const isAdmin =
-      (sessionClaims as CustomClaims | null)?.metadata?.role === "admin";
+    const isAdmin = localeScope === "admin";
 
     const authenticatedSupabase = await createAuthenticatedSupabaseClient();
     const { data: authorizedMatch, error: authorizationError } =
@@ -94,7 +103,7 @@ export async function GET(
     );
 
     if (authorizationError || !matchDescriptor) {
-      return proofUnavailable();
+      return unavailableResponse();
     }
 
     if (!isAdmin) {
@@ -104,7 +113,7 @@ export async function GET(
       ].filter((value): value is string => Boolean(value));
 
       if (participantRegistrationIds.length === 0) {
-        return proofUnavailable();
+        return unavailableResponse();
       }
 
       const {
@@ -125,7 +134,7 @@ export async function GET(
           participantRegistrationIds
         )
       ) {
-        return proofUnavailable();
+        return unavailableResponse();
       }
     }
 
@@ -146,7 +155,7 @@ export async function GET(
       (proofRecord.tournamentId !== null &&
         proofRecord.tournamentId !== matchScope.tournamentId)
     ) {
-      return proofUnavailable();
+      return unavailableResponse();
     }
 
     if (!isAdmin) {
@@ -154,7 +163,7 @@ export async function GET(
         matchScope.participantRegistrationIds;
 
       if (authorizedRegistrationIds.length === 0) {
-        return proofUnavailable();
+        return unavailableResponse();
       }
 
       const { data: viewerRegistration, error: viewerRegistrationError } =
@@ -167,13 +176,13 @@ export async function GET(
           .maybeSingle();
 
       if (viewerRegistrationError || !viewerRegistration) {
-        return proofUnavailable();
+        return unavailableResponse();
       }
     }
 
     if (!isSafeStoragePath(proofRecord.storagePath, matchScope.matchId)) {
       logProofFailure("unsafe_storage_path", recordId);
-      return proofUnavailable();
+      return unavailableResponse();
     }
 
     const responseMetadata = getProofResponseMetadata(
@@ -181,7 +190,7 @@ export async function GET(
       kind
     );
     if (!responseMetadata) {
-      return proofUnavailable();
+      return unavailableResponse();
     }
 
     const { data: proofStream, error: storageError } = await supabase.storage
@@ -198,7 +207,7 @@ export async function GET(
 
     if (storageError || !proofStream) {
       logProofFailure("storage_unavailable", recordId);
-      return proofUnavailable();
+      return unavailableResponse();
     }
 
     return new Response(
@@ -217,7 +226,7 @@ export async function GET(
     if (safeRecordId) {
       logProofFailure("internal_unavailable", safeRecordId);
     }
-    return proofUnavailable();
+    return unavailableResponse();
   }
 }
 
@@ -492,8 +501,18 @@ function enforceMaximumStreamSize(
   });
 }
 
-function proofUnavailable() {
-  return new Response("Proof unavailable.", {
+async function proofUnavailable(scope: LocaleScope) {
+  let message = translate(competitionEnglish, "proof.unavailable");
+
+  try {
+    const locale = await getRequestLocale(scope);
+    const dictionary = await loadDictionary(locale, "competition");
+    message = translate(dictionary, "proof.unavailable");
+  } catch {
+    // Keep the English fallback when locale resolution is unavailable.
+  }
+
+  return new Response(message, {
     status: 404,
     headers: {
       "Cache-Control": PROOF_CACHE_CONTROL,

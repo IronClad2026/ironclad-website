@@ -2,8 +2,22 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, FileCheck2, Swords, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import {
+  useOptionalLocale,
+  useOptionalTranslations,
+} from "@/components/i18n/LocaleProvider";
+import type { Locale } from "@/lib/i18n/config";
+import accountDashboardEnglish from "@/lib/i18n/dictionaries/en/account-dashboard";
+import { formatNumber, selectPlural } from "@/lib/i18n/format";
+import type { MessageValues } from "@/lib/i18n/types";
 import type { MatchHistoryEntry } from "@/lib/player-dashboard";
+
+type DashboardTranslator = (
+  path: string,
+  values?: MessageValues
+) => string;
 
 export default function DashboardMatchHistory({
   matches,
@@ -12,6 +26,11 @@ export default function DashboardMatchHistory({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<MatchHistoryEntry | null>(null);
+  const locale = useOptionalLocale();
+  const t = useOptionalTranslations(
+    "account-dashboard",
+    accountDashboardEnglish
+  );
 
   useEffect(() => {
     if (!selected) return;
@@ -43,14 +62,12 @@ export default function DashboardMatchHistory({
           </span>
           <span className="min-w-0">
             <span className="block text-sm font-black uppercase tracking-[0.18em] text-white">
-              Match History
+              {t("dashboard.matchHistory.title")}
             </span>
             <span className="mt-1 block truncate text-xs text-zinc-400">
               {matches.length === 0
-                ? "No completed matches"
-                : `${matches.length} completed ${
-                    matches.length === 1 ? "match" : "matches"
-                  }`}
+                ? t("dashboard.matchHistory.noCompleted")
+                : completedMatchSummary(matches.length, locale, t)}
             </span>
           </span>
         </span>
@@ -72,7 +89,7 @@ export default function DashboardMatchHistory({
           >
             {matches.length === 0 ? (
               <p className="p-5 text-sm text-zinc-500">
-                Completed tournament matches will appear here.
+                {t("dashboard.matchHistory.empty")}
               </p>
             ) : (
               <div className="max-h-80 overflow-y-auto p-2">
@@ -88,18 +105,21 @@ export default function DashboardMatchHistory({
                         {match.tournamentName}
                       </span>
                       <span className="mt-1 block truncate text-xs text-zinc-500">
-                        vs {match.opponentName} · {match.roundName}
+                        {t("dashboard.matchHistory.versus", {
+                          opponent: match.opponentName,
+                          round: match.roundName,
+                        })}
                       </span>
                     </span>
                     <span className="flex items-center gap-3">
                       <span
                         className={
-                          match.result === "Win"
+                          match.result === "win"
                             ? "text-xs font-black text-emerald-300"
                             : "text-xs font-black text-red-300"
                         }
                       >
-                        {match.result}
+                        {t(`dashboard.matchHistory.${match.result}`)}
                       </span>
                       <span className="min-w-10 text-right font-black text-white">
                         {match.score}
@@ -117,6 +137,8 @@ export default function DashboardMatchHistory({
         {selected && (
           <MatchHistoryModal
             match={selected}
+            locale={locale}
+            t={t}
             onClose={() => setSelected(null)}
           />
         )}
@@ -127,16 +149,20 @@ export default function DashboardMatchHistory({
 
 function MatchHistoryModal({
   match,
+  locale,
+  t,
   onClose,
 }: {
   match: MatchHistoryEntry;
+  locale: Locale;
+  t: DashboardTranslator;
   onClose: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
       <motion.button
         type="button"
-        aria-label="Close match history details"
+        aria-label={t("dashboard.matchHistory.close")}
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -155,7 +181,7 @@ function MatchHistoryModal({
         <header className="flex items-start justify-between gap-5 border-b border-white/10 p-6 sm:p-8">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
-              Competitive Match Record
+              {t("dashboard.matchHistory.detailEyebrow")}
             </p>
             <h2
               id={`match-history-${match.id}`}
@@ -164,13 +190,16 @@ function MatchHistoryModal({
               {match.tournamentName}
             </h2>
             <p className="mt-2 text-sm text-zinc-400">
-              {match.bracketName} Bracket · {match.roundName}
+              {t("dashboard.matchHistory.bracketRound", {
+                bracket: match.bracketName,
+                round: match.roundName,
+              })}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close match history details"
+            aria-label={t("dashboard.matchHistory.close")}
             className="shrink-0 border border-white/10 bg-white/5 p-2.5 text-zinc-400 transition hover:border-orange-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
           >
             <X size={19} />
@@ -178,27 +207,61 @@ function MatchHistoryModal({
         </header>
 
         <div className="grid gap-3 p-6 sm:grid-cols-2 sm:p-8">
-          <Detail label="Opponent" value={match.opponentName} />
-          <Detail label="Round" value={match.roundName} />
-          <Detail label="Match Number" value={String(match.matchNumber)} />
-          <Detail label="Format" value={`BO${match.seriesBestOf}`} />
-          <Detail label="Result" value={match.result} />
-          <Detail label="Final Score" value={match.score} />
-          <Detail label="Match Date" value={formatDate(match.playedAt)} />
           <Detail
-            label="Replay Proof"
-            value={match.replayAvailable ? "Available" : "Not attached"}
+            label={t("dashboard.matchHistory.opponent")}
+            value={match.opponentName}
           />
           <Detail
-            label="Screenshot Proof"
-            value={match.screenshotAvailable ? "Available" : "Not attached"}
+            label={t("dashboard.matchHistory.round")}
+            value={match.roundName}
+          />
+          <Detail
+            label={t("dashboard.matchHistory.matchNumber")}
+            value={formatNumber(match.matchNumber, locale)}
+          />
+          <Detail
+            label={t("dashboard.matchHistory.format")}
+            value={`BO${match.seriesBestOf}`}
+          />
+          <Detail
+            label={t("dashboard.matchHistory.result")}
+            value={t(`dashboard.matchHistory.${match.result}`)}
+          />
+          <Detail
+            label={t("dashboard.matchHistory.finalScore")}
+            value={match.score}
+          />
+          <Detail
+            label={t("dashboard.matchHistory.matchDate")}
+            value={
+              <HydrationSafeLocalDateTime
+                value={match.playedAt}
+                fallback={t("dashboard.notAvailable")}
+              />
+            }
+          />
+          <Detail
+            label={t("dashboard.matchHistory.replayProof")}
+            value={
+              match.replayAvailable
+                ? t("dashboard.matchHistory.available")
+                : t("dashboard.matchHistory.notAttached")
+            }
+          />
+          <Detail
+            label={t("dashboard.matchHistory.screenshotProof")}
+            value={
+              match.screenshotAvailable
+                ? t("dashboard.matchHistory.available")
+                : t("dashboard.matchHistory.notAttached")
+            }
           />
         </div>
 
         {(match.replayAvailable || match.screenshotAvailable) && (
           <div className="mx-6 mb-6 flex items-center gap-3 border border-sky-400/20 bg-sky-500/5 p-4 text-sm text-sky-200 sm:mx-8 sm:mb-8">
             <FileCheck2 size={18} className="shrink-0" />
-            Official proof is retained with the match result audit record.
+            {t("dashboard.matchHistory.proofRetained")}
           </div>
         )}
       </motion.article>
@@ -206,7 +269,7 @@ function MatchHistoryModal({
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="border border-white/10 bg-black/30 p-4">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
@@ -217,9 +280,18 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+function completedMatchSummary(
+  count: number,
+  locale: Locale,
+  t: DashboardTranslator
+) {
+  const category = selectPlural(count, locale);
+  const suffix =
+    category === "one" || category === "few" || category === "many"
+      ? `${category[0].toUpperCase()}${category.slice(1)}`
+      : "Other";
+
+  return t(`dashboard.matchHistory.count${suffix}`, {
+    count: formatNumber(count, locale),
+  });
 }

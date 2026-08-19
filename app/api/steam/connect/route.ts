@@ -6,6 +6,12 @@ import {
   normalizeSteamOpenIdOrigin,
   STEAM_OPENID_FLOW_COOKIE_NAME,
 } from "@/lib/steam-openid";
+import { loadDictionary } from "@/lib/i18n/loaders";
+import {
+  LOCALE_COOKIE_NAME,
+  resolveLocale,
+  type Locale,
+} from "@/lib/i18n/config";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export async function POST(request: Request) {
@@ -15,11 +21,11 @@ export async function POST(request: Request) {
   try {
     ({ sessionId, userId } = await auth());
   } catch {
-    return new Response("Authentication required.", { status: 401 });
+    return steamErrorResponse(request, "authentication", 401);
   }
 
   if (!userId || !sessionId) {
-    return new Response("Authentication required.", { status: 401 });
+    return steamErrorResponse(request, "authentication", 401);
   }
 
   let origin: string;
@@ -27,11 +33,11 @@ export async function POST(request: Request) {
   try {
     origin = normalizeSteamOpenIdOrigin();
   } catch {
-    return new Response("Steam connection is unavailable.", { status: 503 });
+    return steamErrorResponse(request, "unavailable", 503);
   }
 
   if (request.headers.get("origin") !== origin) {
-    return new Response("Invalid request origin.", { status: 403 });
+    return steamErrorResponse(request, "failed", 403);
   }
 
   let supabase;
@@ -95,6 +101,45 @@ export async function POST(request: Request) {
   response.headers.set("Referrer-Policy", "no-referrer");
 
   return response;
+}
+
+async function steamErrorResponse(
+  request: Request,
+  kind: "authentication" | "unavailable" | "failed",
+  status: number
+) {
+  const locale = getRequestLocale(request);
+  const dictionary = await loadDictionary(locale, "account-dashboard");
+  const message =
+    kind === "authentication"
+      ? dictionary.steam.authenticationRequired
+      : kind === "unavailable"
+        ? dictionary.steam.unavailable
+        : dictionary.steam.failed;
+
+  return new Response(message, {
+    status,
+    headers: {
+      "Cache-Control": "private, no-store, max-age=0",
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  });
+}
+
+function getRequestLocale(request: Request): Locale {
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const encodedValue = cookieHeader
+    .split(";")
+    .map((part) => part.trim().split("="))
+    .find(([name]) => name === LOCALE_COOKIE_NAME)?.[1];
+
+  if (!encodedValue) return resolveLocale(undefined);
+
+  try {
+    return resolveLocale(decodeURIComponent(encodedValue));
+  } catch {
+    return resolveLocale(undefined);
+  }
 }
 
 function redirectToProfile(

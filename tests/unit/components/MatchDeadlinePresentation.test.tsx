@@ -6,6 +6,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import type {
   GeneratedTournamentMatch,
   TournamentParticipant,
@@ -72,6 +73,8 @@ const participantTwo: TournamentParticipant = {
   bracketId: "bracket-1",
   bracketName: "Academy",
 };
+const bracketCopy = competitionEnglish.tournaments.brackets;
+const matchControlsCopy = competitionEnglish.matchControls;
 
 function matchFixture(
   overrides: Partial<GeneratedTournamentMatch> = {}
@@ -199,11 +202,12 @@ describe("matchup deadline player and administrator presentation", () => {
           }
         );
       });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
 
       expect(recoverableErrors).toEqual([]);
-      expect(container).toHaveTextContent(
-        "Deadline passed — awaiting authoritative ruling"
-      );
+      expect(container).toHaveTextContent(bracketCopy.deadlinePassed);
     } finally {
       if (root) {
         await act(async () => root?.unmount());
@@ -458,11 +462,11 @@ describe("matchup deadline player and administrator presentation", () => {
     fireEvent.click(opener);
 
     const dialog = screen.getByRole("dialog", {
-      name: "Main / Pro Bracket Match Workspace",
+      name: `Main / Pro Bracket — ${bracketCopy.matchWorkspace}`,
     });
     expect(dialog.parentElement).toHaveClass("h-[100dvh]");
     const dialogCloseButton = screen
-      .getAllByRole("button", { name: "Close match result workspace" })
+      .getAllByRole("button", { name: bracketCopy.closeMatchWorkspace })
       .find((button) => dialog.contains(button));
     expect(dialogCloseButton).toHaveFocus();
 
@@ -609,84 +613,84 @@ describe("matchup deadline player and administrator presentation", () => {
       "Quarter Finals",
       "deadline_double_forfeit",
       "Quarter Finals double forfeit — no player advanced",
-      "Quarterfinal double forfeit — no player advances from this feeder",
+      bracketCopy.quarterfinalDoubleForfeit,
       /^Final double forfeit/,
     ],
     [
       "Semi Finals",
       "deadline_double_forfeit",
       "Semi Finals double forfeit — no player advanced",
-      "Semifinal double forfeit — no player advances from this matchup",
+      bracketCopy.semifinalDoubleForfeit,
       /^Final double forfeit/,
     ],
     [
       "Final",
       "deadline_double_forfeit",
       "Final double forfeit — completed without a champion",
-      "Final double forfeit — division completed without a champion",
+      bracketCopy.finalDoubleForfeit,
       null,
     ],
     [
       "Grand Final",
       "deadline_double_forfeit",
       "Final double forfeit — completed without a champion",
-      "Final double forfeit — division completed without a champion",
+      bracketCopy.finalDoubleForfeit,
       null,
     ],
     [
       "Quarter Finals",
       "automatic_bye",
       "Quarter Finals automatic bye — no match was played",
-      "Automatic bye — sole eligible player advances without a played match",
+      bracketCopy.automaticByeDetail,
       /^Final walkover/,
     ],
     [
       "Semi Finals",
       "automatic_bye",
       "Semi Finals automatic bye — no match was played",
-      "Semifinal automatic bye — sole eligible player advances to the Final",
+      bracketCopy.semifinalBye,
       /^Final walkover/,
     ],
     [
       "Final",
       "automatic_bye",
       "Final walkover — champion advanced without a played match",
-      "Final walkover — champion advanced without a played match",
+      bracketCopy.finalWalkover,
       null,
     ],
     [
       "Grand Final",
       "automatic_bye",
       "Final walkover — champion advanced without a played match",
-      "Final walkover — champion advanced without a played match",
+      bracketCopy.finalWalkover,
       null,
     ],
     [
       "Quarter Finals",
       "empty_feeder",
       "Quarter Finals closed — no eligible player advanced",
-      "Match closed — no eligible player advances",
+      bracketCopy.matchClosed,
       /^Final closed/,
     ],
     [
       "Semi Finals",
       "empty_feeder",
       "Semi Finals closed — no eligible player advanced",
-      "Semifinal closed — no eligible player advances",
+      bracketCopy.semifinalClosed,
       /^Final closed/,
     ],
     [
       "Final",
       "empty_feeder",
       "Final closed — completed without a champion",
-      "Final closed — division completed without a champion",
+      bracketCopy.finalClosed,
       null,
     ],
     [
       "Grand Final",
       "empty_feeder",
       "Final closed — completed without a champion",
-      "Final closed — division completed without a champion",
+      bracketCopy.finalClosed,
       null,
     ],
   ] as const)(
@@ -778,9 +782,7 @@ describe("matchup deadline player and administrator presentation", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /Match Deadline Paused/ })
     );
-    expect(
-      screen.getByText(/This match is on an administrative hold/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(matchControlsCopy.hold)).toBeInTheDocument();
     expect(screen.queryByText("Player result form marker")).not.toBeInTheDocument();
   });
 
@@ -833,7 +835,7 @@ describe("matchup deadline player and administrator presentation", () => {
       screen.getByRole("button", { name: /Match Not Active/ })
     );
     expect(screen.queryByText("Player result form marker")).not.toBeInTheDocument();
-    expect(screen.getByText(/This matchup has not activated/)).toBeInTheDocument();
+    expect(screen.getByText(matchControlsCopy.notActivated)).toBeInTheDocument();
   });
 
   it("keeps direct match focus and aggregate outcome handling in the existing bracket surface", () => {
@@ -845,11 +847,18 @@ describe("matchup deadline player and administrator presentation", () => {
     expect(source).toContain('searchParams.get("match")');
     expect(source).toContain("match-desktop-${focusedMatchId}");
     expect(source).toContain("match-mobile-${focusedMatchId}");
-    expect(source).toContain(
+    expect(source).toContain('t("tournaments.brackets.waitingOpponent")');
+    expect(source).toContain('t("tournaments.brackets.deadlinePassed")');
+    expect(source).toContain('t("bracketPresentation.noChampion")');
+    expect(bracketCopy.waitingOpponent).toBe(
       "Waiting for opponent — your deadline has not started"
     );
-    expect(source).toContain("Deadline passed — awaiting authoritative ruling");
-    expect(source).toContain("No champion was awarded");
+    expect(bracketCopy.deadlinePassed).toBe(
+      "Deadline passed — awaiting authoritative ruling"
+    );
+    expect(competitionEnglish.bracketPresentation.noChampion).toBe(
+      "No champion was awarded"
+    );
     expect(source).toContain(
       '["deadline_double_forfeit", "empty_feeder"].includes'
     );
