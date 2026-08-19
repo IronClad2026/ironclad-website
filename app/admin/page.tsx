@@ -43,6 +43,7 @@ import {
   type AdminWaitlistOfferStatus,
 } from "@/lib/admin-registration-review";
 import {
+  Activity,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -1374,6 +1375,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               and the full IronClad tournament workflow.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link
+                href="/admin/operations"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/50 bg-orange-500/10 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20"
+              >
+                <Activity className="h-4 w-4" />
+                Operations &amp; Analytics
+              </Link>
               <Link
                 href="/admin/tournaments"
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 font-bold text-white transition hover:bg-orange-400"

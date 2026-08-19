@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -11,8 +10,6 @@ import { Pause, Play } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
 import englishCommon from "@/lib/i18n/dictionaries/en/common";
-import { translate } from "@/lib/i18n/translate";
-import type { MessageValues } from "@/lib/i18n/types";
 
 const audioSource = "/audio/ironclad-theme.mp3";
 const inactivityDelay = 7000;
@@ -20,16 +17,13 @@ const defaultVolume = 0.72;
 
 export default function SiteMusicPlayer() {
   const pathname = usePathname();
-  const selectedTranslator = useOptionalTranslations("common", englishCommon);
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
-  const t = useMemo(
-    () =>
-      isAdminRoute
-        ? (path: string, values?: MessageValues) =>
-            translate(englishCommon, path, values)
-        : selectedTranslator,
-    [isAdminRoute, selectedTranslator]
-  );
+
+  return isAdminRoute ? null : <SiteMusicControls />;
+}
+
+function SiteMusicControls() {
+  const t = useOptionalTranslations("common", englishCommon);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasActivePointerRef = useRef(false);
@@ -198,7 +192,6 @@ export default function SiteMusicPlayer() {
   return (
     <aside
       aria-label={t("music.playerLabel")}
-      lang={isAdminRoute ? "en" : undefined}
       className={
         isCollapsed
           ? "fixed right-4 bottom-4 z-30 grid place-items-center border border-orange-400/30 bg-black/78 p-2 text-white shadow-2xl shadow-black/40 backdrop-blur-md motion-safe:transition-all motion-safe:duration-300 sm:right-6 sm:bottom-6"
