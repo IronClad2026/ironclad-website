@@ -61,12 +61,16 @@ describe("help and legal localization contract", () => {
     }
   });
 
-  it("keeps the complete Effective legal corpus byte-for-byte unchanged", () => {
+  it("keeps the complete Effective legal corpus byte-for-byte unchanged across checkout line endings", () => {
     const bytes = readFileSync(join(root, "content", "legal-corpus.json"));
+    const normalizedBytes = Buffer.from(
+      bytes.toString("utf8").replace(/\r\n/g, "\n"),
+      "utf8"
+    );
 
-    expect(bytes).toHaveLength(155_615);
-    expect(createHash("sha256").update(bytes).digest("hex")).toBe(
-      "28052da569e7bd6c8d1a623b048e1ac75749000689505b05a6ad5b5b5c2626b8"
+    expect(normalizedBytes).toHaveLength(154_267);
+    expect(createHash("sha256").update(normalizedBytes).digest("hex")).toBe(
+      "5ceec8dc27ac5ae53699e0551058b699b153bb61c17970777299103cfd8b38de"
     );
   });
 

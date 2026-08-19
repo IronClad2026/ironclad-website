@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import PublicPlayerCard from "@/components/PublicPlayerCard";
 import type { PublicPlayerProfile } from "@/lib/public-players";
 
@@ -21,6 +21,10 @@ const player: PublicPlayerProfile = {
 };
 
 describe("PublicPlayerCard", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders the public projection without advertising private Discord data", () => {
     render(<PublicPlayerCard player={player} />);
 
