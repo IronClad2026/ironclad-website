@@ -11,6 +11,8 @@ const PUBLIC_ROUTE_ROOTS = [
   "/players",
 ] as const;
 
+const DEVELOPMENT_PUBLIC_EXACT_PATHS = ["/dev/badges"] as const;
+
 const SELF_AUTHENTICATED_API_ROOTS = ["/api/match-proofs"] as const;
 
 const SELF_AUTHENTICATED_EXACT_API_PATHS = [
@@ -19,6 +21,13 @@ const SELF_AUTHENTICATED_EXACT_API_PATHS = [
 
 export function isPublicPathname(pathname: string) {
   if (pathname === "/") {
+    return true;
+  }
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    DEVELOPMENT_PUBLIC_EXACT_PATHS.some((routePath) => pathname === routePath)
+  ) {
     return true;
   }
 

@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Sparkles, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import PremiumBadgeEffects from "@/components/badges/PremiumBadgeEffects";
 import {
@@ -44,6 +45,8 @@ export default function BadgeRevealOverlay({
   const premium = entitlement.premiumEffectsEnabled;
   const tokens = BADGE_RARITY_TOKENS[item.definition.rarity];
   const rarityLabel = getBadgeRarityLabel(item.definition.rarity);
+  const portalTarget =
+    typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
     if (!open) {
@@ -66,7 +69,11 @@ export default function BadgeRevealOverlay({
     };
   }, [onClose, open]);
 
-  return (
+  if (!portalTarget) {
+    return null;
+  }
+
+  return createPortal(
     <AnimatePresence>
       {open ? (
         <div
@@ -75,7 +82,7 @@ export default function BadgeRevealOverlay({
         >
           <motion.button
             type="button"
-            aria-label="Close badge reveal"
+            aria-label="Dismiss badge reveal"
             onClick={onClose}
             className="absolute inset-0 h-full w-full cursor-default bg-black/88 backdrop-blur-md"
             initial={shouldReduceMotion ? false : { opacity: 0 }}
@@ -157,6 +164,7 @@ export default function BadgeRevealOverlay({
           </motion.article>
         </div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    portalTarget
   );
 }

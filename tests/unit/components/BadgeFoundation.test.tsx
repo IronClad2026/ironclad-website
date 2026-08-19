@@ -9,6 +9,7 @@ import BadgeGrid from "@/components/badges/BadgeGrid";
 import BadgeQueue from "@/components/badges/BadgeQueue";
 import BadgeRevealOverlay from "@/components/badges/BadgeRevealOverlay";
 import BadgeSlot from "@/components/badges/BadgeSlot";
+import Phase10PreviewPanel from "@/components/badges/Phase10PreviewPanel";
 import {
   mockEarnedBadge,
   mockFreeBadgeEntitlement,
@@ -118,6 +119,8 @@ describe("badge foundation components", () => {
     render(<BadgeDetailModal item={mockEarnedBadge} onClose={onClose} />);
 
     expect(screen.getByRole("dialog")).toHaveTextContent("IronClad Recruit");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Badge 01");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Original awarded");
     fireEvent.keyDown(window, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalledOnce();
@@ -194,5 +197,38 @@ describe("badge foundation components", () => {
         name: "IronClad Recruit, Common, earned",
       })
     ).toBeInTheDocument();
+  });
+
+  it("renders the Phase 10 preview controls without production data hooks", () => {
+    render(<Phase10PreviewPanel />);
+
+    expect(screen.getByText("30 / 30 badge slots")).toBeInTheDocument();
+    expect(screen.getByText("Rarity coverage")).toBeInTheDocument();
+    expect(screen.getByText("Phase 10 pilot badges")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(30);
+    expect(
+      screen.getByRole("button", { name: "Free reveal" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Premium reveal" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Multi-badge queue" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Reduced motion" })
+    ).toBeInTheDocument();
+  });
+
+  it("opens a reduced-motion reveal from the Phase 10 preview lab", () => {
+    render(<Phase10PreviewPanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reduced motion" }));
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("First Victory");
+    expect(screen.getByRole("dialog").closest("[data-motion]")).toHaveAttribute(
+      "data-motion",
+      "reduced"
+    );
   });
 });

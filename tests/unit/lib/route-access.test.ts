@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   isPublicPathname,
   isSelfAuthenticatedApiPathname,
 } from "@/lib/route-access";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("public route access", () => {
   it.each([
@@ -21,6 +25,7 @@ describe("public route access", () => {
     "/players",
     "/players/11111111-1111-4111-8111-111111111111",
     "/players/11111111-1111-4111-8111-111111111111/avatar",
+    "/dev/badges",
   ])("allows the intended public pathname %s", (pathname) => {
     expect(isPublicPathname(pathname)).toBe(true);
   });
@@ -34,6 +39,9 @@ describe("public route access", () => {
     "/api/match-proofs",
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
     "/unknown",
+    "/dev",
+    "/dev/badges/extra",
+    "/dev-badges",
     "/players-private",
     "/players.example",
     "/aboutness",
@@ -44,6 +52,12 @@ describe("public route access", () => {
     "/documents-rules-ppa-private/ironclad-privacy-policy-v1.0.pdf",
   ])("keeps the pathname %s protected", (pathname) => {
     expect(isPublicPathname(pathname)).toBe(false);
+  });
+
+  it("does not expose the badge preview path as public in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    expect(isPublicPathname("/dev/badges")).toBe(false);
   });
 });
 

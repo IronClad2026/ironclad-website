@@ -3,6 +3,7 @@
 import { CalendarDays, LockKeyhole, ShieldCheck, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import PremiumBadgeEffects from "@/components/badges/PremiumBadgeEffects";
 import {
@@ -38,6 +39,8 @@ export default function BadgeDetailModal({
   const rarityLabel = getBadgeRarityLabel(item.definition.rarity);
   const presentation = getBadgeSlotPresentation(item, entitlement);
   const awardDate = getAwardDisplayDate(item);
+  const portalTarget =
+    typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -57,11 +60,15 @@ export default function BadgeDetailModal({
     };
   }, [onClose]);
 
-  return (
+  if (!portalTarget) {
+    return null;
+  }
+
+  return createPortal(
     <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
       <button
         type="button"
-        aria-label="Close badge details"
+        aria-label="Dismiss badge details"
         onClick={onClose}
         className="absolute inset-0 h-full w-full cursor-default bg-black/82 backdrop-blur-md"
       />
@@ -80,6 +87,9 @@ export default function BadgeDetailModal({
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
               IronClad badge
+            </p>
+            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+              Badge {getBadgeFallbackLabel(item.definition)}
             </p>
             <h2
               id={`badge-detail-${item.definition.slug}`}
@@ -172,7 +182,8 @@ export default function BadgeDetailModal({
           </div>
         </div>
       </article>
-    </div>
+    </div>,
+    portalTarget
   );
 }
 
