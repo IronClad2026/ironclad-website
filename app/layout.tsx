@@ -82,10 +82,9 @@ export default async function RootLayout({
   ]);
   const rulebook = getLegalDocument("rulebook");
   const ppa = getLegalDocument("ppa");
-  const terms = getLegalDocument("terms");
-  const privacy = getLegalDocument("privacy");
-  const analyticsConsentAvailable =
-    terms.version === "1.1" && privacy.version === "1.1";
+  // PR B1 keeps the preference surface dormant. PR B2 may enable it only
+  // after the deployed corpus and authoritative legal register are aligned.
+  const analyticsConsentAvailable = false;
 
   return (
     <ClerkProvider localization={clerkLocalization}>

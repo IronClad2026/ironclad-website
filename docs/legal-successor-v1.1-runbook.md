@@ -85,6 +85,14 @@ requires rollback to leave no residue. It cannot apply to Staging.
 After owner authorization, exact-head review, squash merge and the Ready
 Production deployment from the resulting `master`, run a dry run first:
 
+The Ready deployment intentionally precedes the register transaction so its
+immutable PDF bytes can be verified. During that bounded version-skew window,
+the account legal gate compares the deployed Terms/Privacy pair with the two
+Effective database rows. Signed-in users fail closed on the existing legal
+update unavailable screen until both sources identify the same supported pair;
+anonymous public browsing remains available. The analytics-consent surface
+also remains dormant throughout PR B1 and Vercel Web Analytics remains disabled.
+
 ```powershell
 node scripts/legal-successor/legal-document-successor.mjs --target production --base-url https://www.ironcladtournaments.com --activation-date YYYY-MM-DD --expected-head EXACT_MASTER_HEAD
 ```

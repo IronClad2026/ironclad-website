@@ -27,6 +27,7 @@ describe("account legal update root-layout contract", () => {
     expect(layoutSource).toContain(
       "analyticsConsentAvailable={analyticsConsentAvailable}"
     );
+    expect(layoutSource).toContain("const analyticsConsentAvailable = false");
     expect(music).toBeGreaterThan(footer);
     expect(smoothScrollEnd).toBeGreaterThan(music);
     expect(gateEnd).toBeGreaterThan(smoothScrollEnd);

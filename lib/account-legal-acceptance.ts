@@ -1,6 +1,7 @@
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
+import { legalCorpus } from "@/lib/legal-corpus-publication";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const ACCOUNT_LEGAL_SUCCESSOR_VERSIONS = Object.freeze({
@@ -38,6 +39,12 @@ type EffectiveLegalDocument = AccountLegalGateDocument & {
   sha256: string;
 };
 
+type DeployedLegalDocument = {
+  kind: "terms" | "privacy";
+  version: string;
+  path: string;
+};
+
 export async function loadAccountLegalGateState(): Promise<AccountLegalGateState> {
   let userId: string | null;
 
@@ -50,6 +57,13 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
 
   if (!userId) {
     return { status: "inactive", reason: "anonymous" };
+  }
+
+  const deployedDocuments = readDeployedDocumentPair();
+
+  if (!deployedDocuments) {
+    console.error("Account legal gate deployed document set was invalid.");
+    return { status: "unavailable" };
   }
 
   let supabase: ReturnType<typeof createSupabaseAdminClient>;
@@ -85,6 +99,11 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
 
   if (!documents) {
     console.error("Account legal gate document set was invalid.");
+    return { status: "unavailable" };
+  }
+
+  if (!documentPairsMatch(deployedDocuments, documents)) {
+    console.error("Account legal gate document sources were not aligned.");
     return { status: "unavailable" };
   }
 
@@ -142,9 +161,138 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
 
   return {
     status: "required",
-    terms: presentDocument(documents.terms),
-    privacy: presentDocument(documents.privacy),
+    terms: presentDocument(documents.terms, deployedDocuments.terms.path),
+    privacy: presentDocument(documents.privacy, deployedDocuments.privacy.path),
   };
+}
+
+function readDeployedDocumentPair(): {
+  terms: DeployedLegalDocument;
+  privacy: DeployedLegalDocument;
+} | null {
+  try {
+    const corpus: unknown = legalCorpus;
+
+    if (!isRecord(corpus) || !Array.isArray(corpus.documents)) {
+      return null;
+    }
+
+    const termsCandidates = corpus.documents.filter(
+      (document) => isRecord(document) && document.kind === "terms"
+    );
+    const privacyCandidates = corpus.documents.filter(
+      (document) => isRecord(document) && document.kind === "privacy"
+    );
+
+    if (termsCandidates.length !== 1 || privacyCandidates.length !== 1) {
+      return null;
+    }
+
+    const terms = parseDeployedDocument(termsCandidates[0], "terms");
+    const privacy = parseDeployedDocument(privacyCandidates[0], "privacy");
+
+    if (!terms || !privacy || !isSupportedVersionPair(terms, privacy)) {
+      return null;
+    }
+
+    return { terms, privacy };
+  } catch {
+    return null;
+  }
+}
+
+function parseDeployedDocument(
+  value: unknown,
+  expectedKind: "terms" | "privacy"
+): DeployedLegalDocument | null {
+  if (
+    !isRecord(value) ||
+    value.kind !== expectedKind ||
+    value.status !== "Effective" ||
+    !isBoundedText(value.version, 120) ||
+    !isBoundedText(value.publicPath, 2_048)
+  ) {
+    return null;
+  }
+
+  const path = parseDeployedDocumentPath(value.publicPath);
+
+  return path
+    ? {
+        kind: expectedKind,
+        version: value.version,
+        path,
+      }
+    : null;
+}
+
+function isSupportedVersionPair(
+  terms: Pick<DeployedLegalDocument, "version">,
+  privacy: Pick<DeployedLegalDocument, "version">
+) {
+  return (
+    (terms.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.terms &&
+      privacy.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.privacy) ||
+    (terms.version === ACCOUNT_LEGAL_SUCCESSOR_VERSIONS.terms &&
+      privacy.version === ACCOUNT_LEGAL_SUCCESSOR_VERSIONS.privacy)
+  );
+}
+
+function documentPairsMatch(
+  deployed: { terms: DeployedLegalDocument; privacy: DeployedLegalDocument },
+  effective: { terms: EffectiveLegalDocument; privacy: EffectiveLegalDocument }
+) {
+  return (
+    deployed.terms.version === effective.terms.version &&
+    deployed.privacy.version === effective.privacy.version &&
+    deployed.terms.path === parseEffectiveDocumentPath(effective.terms.url) &&
+    deployed.privacy.path === parseEffectiveDocumentPath(effective.privacy.url)
+  );
+}
+
+function parseDeployedDocumentPath(value: string) {
+  try {
+    if (!value.startsWith("/") || value.startsWith("//")) {
+      return null;
+    }
+
+    const baseUrl = "https://ironclad.invalid";
+    const url = new URL(value, baseUrl);
+
+    if (
+      url.origin !== baseUrl ||
+      url.search ||
+      url.hash ||
+      url.pathname !== value
+    ) {
+      return null;
+    }
+
+    return url.pathname;
+  } catch {
+    return null;
+  }
+}
+
+function parseEffectiveDocumentPath(value: string) {
+  try {
+    const url = new URL(value);
+
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      !url.hostname
+    ) {
+      return null;
+    }
+
+    return url.pathname;
+  } catch {
+    return null;
+  }
 }
 
 function parseEffectiveDocumentPair(value: unknown): {
@@ -214,12 +362,13 @@ function isSatisfiedAcceptance(
 }
 
 function presentDocument(
-  document: EffectiveLegalDocument
+  document: EffectiveLegalDocument,
+  deployedPath: string
 ): AccountLegalGateDocument {
   return {
     id: document.id,
     version: document.version,
-    url: document.url,
+    url: deployedPath,
   };
 }
 

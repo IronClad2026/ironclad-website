@@ -3,8 +3,12 @@ import { anonymousIdentity, playerIdentity } from "@/tests/fixtures/auth";
 
 const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
+const legalCorpusMock = vi.hoisted(() => ({ documents: [] as unknown[] }));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/lib/legal-corpus-publication", () => ({
+  legalCorpus: legalCorpusMock,
+}));
 vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
 }));
@@ -16,13 +20,38 @@ const PRIVACY_ID = "22222222-2222-4222-8222-222222222222";
 const ACCEPTANCE_ID = "33333333-3333-4333-8333-333333333333";
 const HASH = "a".repeat(64);
 
+function documentPath(kind: "terms" | "privacy", version: string) {
+  return kind === "terms"
+    ? `/documents-rules-ppa/ironclad-terms-of-service-v${version}.pdf`
+    : `/documents-rules-ppa/ironclad-privacy-policy-v${version}.pdf`;
+}
+
+function deployedDocument(kind: "terms" | "privacy", version: string) {
+  return {
+    kind,
+    version,
+    status: "Effective",
+    publicPath: documentPath(kind, version),
+  };
+}
+
+function setDeployedDocumentPair(termsVersion: string, privacyVersion: string) {
+  legalCorpusMock.documents = [
+    deployedDocument("terms", termsVersion),
+    deployedDocument("privacy", privacyVersion),
+  ];
+}
+
 function documentRows(termsVersion: string, privacyVersion: string) {
   return [
     {
       id: TERMS_ID,
       document_kind: "terms",
       version: termsVersion,
-      immutable_url: `/documents-rules-ppa/terms-v${termsVersion}.pdf`,
+      immutable_url: `https://www.ironcladtournaments.com${documentPath(
+        "terms",
+        termsVersion
+      )}`,
       status: "effective",
       effective_at: "2026-08-19T00:00:00.000Z",
       sha256: HASH,
@@ -31,7 +60,10 @@ function documentRows(termsVersion: string, privacyVersion: string) {
       id: PRIVACY_ID,
       document_kind: "privacy",
       version: privacyVersion,
-      immutable_url: `/documents-rules-ppa/privacy-v${privacyVersion}.pdf`,
+      immutable_url: `https://www.ironcladtournaments.com${documentPath(
+        "privacy",
+        privacyVersion
+      )}`,
       status: "effective",
       effective_at: "2026-08-19T00:00:00.000Z",
       sha256: HASH,
@@ -78,6 +110,7 @@ describe("account legal acceptance gate loader", () => {
   beforeEach(() => {
     authMock.mockReset();
     createSupabaseAdminClientMock.mockReset();
+    setDeployedDocumentPair("1.0", "1.0");
     vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
@@ -117,8 +150,96 @@ describe("account legal acceptance gate loader", () => {
     });
   });
 
+  it.each([
+    ["successor web with predecessor database", "1.1", "1.1", "1.0", "1.0"],
+    ["predecessor web with successor database", "1.0", "1.0", "1.1", "1.1"],
+    ["mixed deployed Terms successor", "1.1", "1.0", "1.1", "1.0"],
+    ["mixed deployed Privacy successor", "1.0", "1.1", "1.0", "1.1"],
+  ])(
+    "fails closed for %s",
+    async (_, webTerms, webPrivacy, databaseTerms, databasePrivacy) => {
+      authMock.mockResolvedValue(playerIdentity);
+      setDeployedDocumentPair(webTerms, webPrivacy);
+      const fixture = clientFixture({
+        documents: documentRows(databaseTerms, databasePrivacy),
+      });
+
+      await expect(loadAccountLegalGateState()).resolves.toEqual({
+        status: "unavailable",
+      });
+      expect(fixture.from).toHaveBeenCalledTimes(
+        webTerms === webPrivacy ? 1 : 0
+      );
+    }
+  );
+
+  it.each([
+    ["missing deployed document", [deployedDocument("terms", "1.1")]],
+    [
+      "duplicate deployed document",
+      [
+        deployedDocument("terms", "1.1"),
+        deployedDocument("terms", "1.1"),
+        deployedDocument("privacy", "1.1"),
+      ],
+    ],
+    [
+      "malformed deployed path",
+      [
+        {
+          ...deployedDocument("terms", "1.1"),
+          publicPath:
+            "https://example.test/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+        },
+        deployedDocument("privacy", "1.1"),
+      ],
+    ],
+  ])("fails closed for a %s", async (_, deployedDocuments) => {
+    authMock.mockResolvedValue(playerIdentity);
+    legalCorpusMock.documents = deployedDocuments;
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["partial database pair", documentRows("1.1", "1.1").slice(0, 1)],
+    [
+      "duplicate database pair",
+      [
+        ...documentRows("1.1", "1.1"),
+        { ...documentRows("1.1", "1.1")[0], id: ACCEPTANCE_ID },
+      ],
+    ],
+    [
+      "malformed database URL",
+      documentRows("1.1", "1.1").map((document, index) =>
+        index === 0
+          ? {
+              ...document,
+              immutable_url: `http://example.test${documentPath(
+                "terms",
+                "1.1"
+              )}`,
+            }
+          : document
+      ),
+    ],
+  ])("fails closed for a %s", async (_, documents) => {
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({ documents });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
+  });
+
   it("does not let an old or absent acceptance satisfy the v1.1 pair", async () => {
     authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
     const fixture = clientFixture({ documents: documentRows("1.1", "1.1") });
 
     await expect(loadAccountLegalGateState()).resolves.toEqual({
@@ -126,12 +247,12 @@ describe("account legal acceptance gate loader", () => {
       terms: {
         id: TERMS_ID,
         version: "1.1",
-        url: "/documents-rules-ppa/terms-v1.1.pdf",
+        url: documentPath("terms", "1.1"),
       },
       privacy: {
         id: PRIVACY_ID,
         version: "1.1",
-        url: "/documents-rules-ppa/privacy-v1.1.pdf",
+        url: documentPath("privacy", "1.1"),
       },
     });
     expect(fixture.acceptanceQuery.eq).toHaveBeenCalledWith(
@@ -146,6 +267,7 @@ describe("account legal acceptance gate loader", () => {
 
   it("accepts only an exact v1.1 account-wide evidence row", async () => {
     authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
     clientFixture({
       documents: documentRows("1.1", "1.1"),
       acceptance: {
@@ -164,6 +286,7 @@ describe("account legal acceptance gate loader", () => {
 
   it("fails closed and does not expose provider failures", async () => {
     authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
     const privateMessage = "private relation and credential detail";
     clientFixture({
       documents: documentRows("1.1", "1.1"),
