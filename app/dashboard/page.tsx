@@ -29,7 +29,8 @@ import {
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import { loadPlayerNotifications } from "@/lib/notifications";
 import type { Locale } from "@/lib/i18n/config";
-import { formatNumber, selectPlural } from "@/lib/i18n/format";
+import { formatDashboardRegistrationCount } from "@/lib/i18n/dashboard-count";
+import { formatNumber } from "@/lib/i18n/format";
 import { loadDictionaries } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
@@ -380,7 +381,11 @@ export default async function PlayerDashboardPage() {
               </h2>
             </div>
             <p className="text-sm text-zinc-500">
-              {registrationCount(registrations.length, locale, t)}
+              {formatDashboardRegistrationCount(
+                registrations.length,
+                locale,
+                t
+              )}
             </p>
           </div>
 
@@ -845,22 +850,6 @@ function eloStatusLabel(status: string, t: DashboardTranslator) {
   }[status.trim().toLowerCase()];
 
   return t(path ?? "dashboard.registrations.eloUnavailable");
-}
-
-function registrationCount(
-  count: number,
-  locale: Locale,
-  t: DashboardTranslator
-) {
-  const category = selectPlural(count, locale);
-  const suffix =
-    category === "one" || category === "few" || category === "many"
-      ? `${category[0].toUpperCase()}${category.slice(1)}`
-      : "Other";
-
-  return t(`dashboard.registrations.count${suffix}`, {
-    count: formatNumber(count, locale),
-  });
 }
 
 function first<T>(value: T | T[] | null | undefined): T | null {

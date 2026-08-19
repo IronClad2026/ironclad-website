@@ -33,6 +33,7 @@ import MatchResultControls, {
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import AdminMatchDeadlineControls from "@/components/AdminMatchDeadlineControls";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import ScrollReveal from "@/components/ScrollReveal";
 import TournamentMapPools from "@/components/TournamentMapPools";
 import {
@@ -46,6 +47,7 @@ import {
   selectPlural,
 } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/config";
+import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
@@ -676,7 +678,7 @@ export type ViewerRegistrationDisplay = {
   description: string;
   tone: "green" | "amber" | "red" | "neutral";
   icon: ElementType;
-  details: string[];
+  details: ReactNode[];
 };
 
 function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) {
@@ -704,8 +706,8 @@ function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) 
       </p>
       {state.details.length > 0 && (
         <div className="mt-3 space-y-1 text-[11px] font-semibold leading-4 opacity-80">
-          {state.details.map((detail) => (
-            <p key={detail}>{detail}</p>
+          {state.details.map((detail, index) => (
+            <p key={`registration-detail-${index}`}>{detail}</p>
           ))}
         </div>
       )}
@@ -739,14 +741,17 @@ export function getViewerRegistrationDisplay(
         })
       : null,
     registration.createdAt
-      ? t("tournaments.registrationState.dateDetail", {
-          date: formatLocalizedDateTime(
-            registration.createdAt,
-            locale,
-            { kind: "local" },
-            { dateStyle: "medium" }
-          ),
-        })
+      ? <HydrationSafeLocalDateTime
+          value={registration.createdAt}
+          fallback={t("tournaments.registrationState.dateDetail", {
+            date: t("deadlines.unavailable"),
+          })}
+          locale={locale}
+          options={{ dateStyle: "medium" }}
+          render={(date) =>
+            t("tournaments.registrationState.dateDetail", { date })
+          }
+        />
       : null,
   ].filter((detail) => detail !== null);
 
@@ -1738,7 +1743,10 @@ export function BracketMatchResultsWorkspace({
                               <div>
                                 <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
                                   {t("tournaments.workspace.matchup", {
-                                    round: localizeRoundName(match.roundName, t),
+                                    round: localizeBracketRoundName(
+                                      match.roundName,
+                                      t
+                                    ),
                                     number: match.matchNumber,
                                   })}
                                 </p>
@@ -2434,7 +2442,7 @@ function SingleEliminationBracket({
                 </p>
                 <div className="mt-1 flex items-center justify-between gap-3">
                   <h4 className={classNames("font-black", isActive ? "text-orange-200" : "text-white")}>
-                    {localizeRoundName(round.name, t)}
+                    {localizeBracketRoundName(round.name, t)}
                   </h4>
                   {isActive && (
                     <StatusPill tone="amber">
@@ -2645,8 +2653,11 @@ export function MatchDeadlinePresentation({
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
-  const [now, setNow] = useState<number | null>(null);
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
+  const now = useHydrationSafeNow({
+    enabled: match.status === "in_progress" && !holdActive,
+    intervalMs: 30_000,
+  });
   const extensionAppliesToCurrentActivation = timestampFallsInActivation(
     match.extendedAt,
     match.activatedAt
@@ -2662,18 +2673,6 @@ export function MatchDeadlinePresentation({
     now >= deadlineTimestamp;
   let label: ReactNode = null;
   let tone = "border-white/10 bg-black/25 text-zinc-400";
-
-  useEffect(() => {
-    if (match.status !== "in_progress" || holdActive) return;
-
-    const updateNow = () => setNow(Date.now());
-    const initialTimer = window.setTimeout(updateNow, 0);
-    const interval = window.setInterval(updateNow, 30_000);
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
-    };
-  }, [holdActive, match.status]);
 
   if (match.outcomeType === "deadline_double_forfeit") {
     label = formatDoubleForfeitLabel(match.roundName, t);
@@ -2982,33 +2981,6 @@ function formatCompetitionFormat(
   return value === "single_elimination"
     ? t("tournaments.brackets.singleElimination")
     : t("tournaments.brackets.roundRobin");
-}
-
-function localizeRoundName(
-  roundName: string,
-  t: CompetitionTranslator = translateCompetitionEnglish
-) {
-  const normalized = roundName.trim().toLowerCase();
-
-  if (normalized === "grand final") {
-    return t("bracketPresentation.roundNames.grandFinal");
-  }
-  if (normalized === "final") {
-    return t("bracketPresentation.roundNames.final");
-  }
-  if (normalized === "semifinal" || normalized === "semifinals") {
-    return t("bracketPresentation.roundNames.semifinals");
-  }
-  if (normalized === "quarterfinal" || normalized === "quarterfinals") {
-    return t("bracketPresentation.roundNames.quarterfinals");
-  }
-
-  const roundOfMatch = normalized.match(/^round of (\d+)$/);
-  return roundOfMatch
-    ? t("bracketPresentation.roundNames.roundOf", {
-        count: roundOfMatch[1],
-      })
-    : roundName;
 }
 
 function formatDateTime(value: string, locale: Locale = "en") {

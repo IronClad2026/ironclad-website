@@ -136,6 +136,7 @@ describe("matchup deadline player and administrator presentation", () => {
       expect(utcMarkup).toContain(`dateTime="${value}"`);
 
       container.innerHTML = utcMarkup;
+      const initialClientSnapshot = container.innerHTML;
       await act(async () => {
         root = hydrateRoot(
           container,
@@ -144,6 +145,7 @@ describe("matchup deadline player and administrator presentation", () => {
             onRecoverableError: (error) => recoverableErrors.push(error),
           }
         );
+        expect(container.innerHTML).toBe(initialClientSnapshot);
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 

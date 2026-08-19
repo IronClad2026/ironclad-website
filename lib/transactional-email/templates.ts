@@ -8,6 +8,7 @@ import {
   toIntlLocale,
   type Locale,
 } from "@/lib/i18n/config";
+import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import { interpolateMessage } from "@/lib/i18n/translate";
 
 export const TRANSACTIONAL_EMAIL_TEMPLATE_KEYS = [
@@ -236,11 +237,41 @@ function renderRegistrationApproved(
   };
 }
 
-function normalizeMatchData(data: MatchTemplateData, locale: Locale) {
+function localizeEmailRoundName(
+  roundName: string,
+  dictionary: EmailDictionary
+) {
+  return localizeBracketRoundName(roundName, (path, values) => {
+    switch (path) {
+      case "bracketPresentation.roundNames.grandFinal":
+        return dictionary.roundNames.grandFinal;
+      case "bracketPresentation.roundNames.final":
+        return dictionary.roundNames.final;
+      case "bracketPresentation.roundNames.semifinals":
+        return dictionary.roundNames.semifinals;
+      case "bracketPresentation.roundNames.quarterfinals":
+        return dictionary.roundNames.quarterfinals;
+      case "bracketPresentation.roundNames.roundOf":
+        return interpolateMessage(dictionary.roundNames.roundOf, values);
+      case "tournaments.brackets.roundRobin":
+        return dictionary.roundNames.roundRobin;
+      default:
+        return roundName;
+    }
+  });
+}
+
+function normalizeMatchData(
+  data: MatchTemplateData,
+  locale: Locale,
+  dictionary: EmailDictionary
+) {
+  const roundName = normalizeDisplayText(data.roundName);
+
   return {
     tournamentName: normalizeDisplayText(data.tournamentName),
     divisionName: normalizeDisplayText(data.divisionName),
-    roundName: normalizeDisplayText(data.roundName),
+    roundName: localizeEmailRoundName(roundName, dictionary),
     opponentName: normalizeDisplayText(data.opponentName),
     deadline: formatTransactionalEmailDeadlineUtc(data.deadlineAt, locale),
   };
@@ -265,7 +296,7 @@ function renderMatchEmail({
   intro: string;
   actionLabel: string;
 }) {
-  const normalized = normalizeMatchData(data, locale);
+  const normalized = normalizeMatchData(data, locale, dictionary);
   const actionUrl = buildMatchUrl(
     config.appOrigin,
     data.tournamentId,

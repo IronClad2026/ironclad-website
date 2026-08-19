@@ -47,6 +47,8 @@ const dictionary = {
     selectedLabel: "Selected",
     savingLabel: "Saving language…",
     saveError: "We couldn't save your language preference. Try again.",
+    translationReviewNotice:
+      "Translations are provided for convenience and have been carefully reviewed, but may not have been reviewed by a native speaker. English remains the source language.",
     privacyHeading: "Language preference",
     privacyCookie:
       "IronClad stores your explicit choice in a first-party functional cookie for up to approximately one year.",

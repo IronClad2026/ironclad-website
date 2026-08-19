@@ -11,12 +11,12 @@ import {
   type KeyboardEvent,
 } from "react";
 import PhysicalDice, { type DiceValue } from "@/components/PhysicalDice";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import {
   useOptionalLocale,
   useOptionalTranslations,
 } from "@/components/i18n/LocaleProvider";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
-import { formatDateTime } from "@/lib/i18n/format";
 import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
 import type {
@@ -219,17 +219,6 @@ function getLiveStatus(
       : t("dice.yourRollReady");
   }
   return game.canRoll ? t("dice.readyToRoll") : t("dice.waitingOpponent");
-}
-
-function formatRollTimestamp(
-  value: string,
-  locale: Parameters<typeof formatDateTime>[1],
-  fallback: string
-) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return fallback;
-
-  return formatDateTime(parsed, locale, { kind: "local" });
 }
 
 export default function MatchDiceRollOff({
@@ -1020,16 +1009,12 @@ export default function MatchDiceRollOff({
                                   <p className="mt-2 font-mono text-base font-black tabular-nums text-white">
                                     {roll.die1} + {roll.die2} = {roll.total}
                                   </p>
-                                  <time
-                                    dateTime={roll.rolledAt}
+                                  <HydrationSafeLocalDateTime
+                                    value={roll.rolledAt}
+                                    fallback={t("dice.timeUnavailable")}
+                                    locale={locale}
                                     className="mt-1 block text-[10px] text-zinc-500"
-                                  >
-                                    {formatRollTimestamp(
-                                      roll.rolledAt,
-                                      locale,
-                                      t("dice.timeUnavailable")
-                                    )}
-                                  </time>
+                                  />
                                 </>
                               ) : (
                                 <p className="mt-2 text-xs text-zinc-600">

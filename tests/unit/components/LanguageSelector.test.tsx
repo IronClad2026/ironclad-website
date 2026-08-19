@@ -20,6 +20,8 @@ const COPY: LanguageSelectorCopy = {
   selectedLabel: "Selected",
   savingLabel: "Saving…",
   saveError: "The language preference could not be saved. Try again.",
+  translationReviewNotice:
+    "Translations are provided for convenience and have been carefully reviewed, but may not have been reviewed by a native speaker. English remains the source language.",
   privacyHeading: "About your language preference",
   privacyCookie:
     "IronClad stores your explicit language choice in a first-party functional cookie for up to approximately one year.",
@@ -124,6 +126,7 @@ describe("LanguageSelector", () => {
     expect(screen.getByText(COPY.privacyNoTracking)).toBeVisible();
     expect(screen.getByText(COPY.privacyNotEvidence)).toBeVisible();
     expect(screen.getByText(COPY.privacyChange)).toBeVisible();
+    expect(screen.getByText(COPY.translationReviewNotice)).toBeVisible();
     expect(
       screen.getByRole("link", { name: COPY.privacyPolicyLink })
     ).toHaveAttribute("href", "/privacy");
@@ -138,6 +141,22 @@ describe("LanguageSelector", () => {
     expect(screen.getByRole("dialog", { name: COPY.title })).toHaveAttribute(
       "lang",
       "en"
+    );
+    expect(screen.getByText(COPY.translationReviewNotice)).toHaveAttribute(
+      "lang",
+      "en"
+    );
+  });
+
+  it("marks the review notice with the selected player locale", () => {
+    render(<Harness locale="ko" />);
+    fireEvent.click(
+      screen.getByRole("button", { name: COPY.triggerAriaLabel })
+    );
+
+    expect(screen.getByText(COPY.translationReviewNotice)).toHaveAttribute(
+      "lang",
+      "ko"
     );
   });
 

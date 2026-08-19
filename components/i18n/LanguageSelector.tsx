@@ -24,6 +24,7 @@ export type LanguageSelectorCopy = {
   selectedLabel: string;
   savingLabel: string;
   saveError: string;
+  translationReviewNotice: string;
   privacyHeading: string;
   privacyCookie: string;
   privacyClerk: string;
@@ -154,6 +155,7 @@ export default function LanguageSelector({
   const onOpenChangeRef = useRef(onOpenChange);
   const titleId = useId();
   const descriptionId = useId();
+  const translationReviewId = useId();
   const privacyId = useId();
 
   useEffect(() => {
@@ -289,7 +291,7 @@ export default function LanguageSelector({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={`${descriptionId} ${privacyId}`}
+        aria-describedby={`${descriptionId} ${translationReviewId} ${privacyId}`}
         tabIndex={-1}
         className="max-h-[min(92dvh,54rem)] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-white/15 bg-[linear-gradient(145deg,rgba(24,24,27,0.99),rgba(9,9,11,0.99))] px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white shadow-[0_0_80px_rgba(0,0,0,0.85)] sm:rounded-2xl sm:p-6"
       >
@@ -380,6 +382,14 @@ export default function LanguageSelector({
             );
           })}
         </div>
+
+        <p
+          id={translationReviewId}
+          lang={languageBoundary ?? currentLocale}
+          className="mt-4 border-t border-white/[0.07] pt-3 text-[11px] leading-relaxed text-zinc-400 sm:text-xs"
+        >
+          {copy.translationReviewNotice}
+        </p>
 
         {saveError && (
           <p

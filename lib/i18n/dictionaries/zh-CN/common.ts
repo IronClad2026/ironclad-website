@@ -47,6 +47,8 @@ const dictionary = {
     selectedLabel: "已选择",
     savingLabel: "正在保存语言…",
     saveError: "无法保存您的语言偏好。请重试。",
+    translationReviewNotice:
+      "网站译文旨在方便您使用，且已经过认真审核，但不一定由母语人士审校。英文仍为源语言。",
     privacyHeading: "语言偏好",
     privacyCookie:
       "IronClad 会将您的明确语言选择保存在第一方功能性 Cookie 中，期限最长约为一年。",

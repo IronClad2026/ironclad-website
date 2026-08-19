@@ -47,6 +47,8 @@ const dictionary = {
     selectedLabel: "선택됨",
     savingLabel: "언어 저장 중…",
     saveError: "언어 환경설정을 저장하지 못했습니다. 다시 시도하세요.",
+    translationReviewNotice:
+      "번역은 편의를 위해 제공되며 꼼꼼히 검토되었지만, 원어민의 검수를 거치지 않았을 수 있습니다. 영어가 원문 언어입니다.",
     privacyHeading: "언어 환경설정",
     privacyCookie:
       "IronClad는 사용자가 명시적으로 선택한 언어를 자사 기능성 쿠키에 최대 약 1년 동안 저장합니다.",

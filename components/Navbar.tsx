@@ -13,6 +13,7 @@ import LanguageSelector, {
   LanguageSelectorTrigger,
   type LanguageSelectorCopy,
 } from "@/components/i18n/LanguageSelector";
+import LocalePreferenceSync from "@/components/i18n/LocalePreferenceSync";
 import {
   useOptionalLocale,
   useOptionalTranslations,
@@ -127,6 +128,7 @@ export default function Navbar() {
       selectedLabel: t("selector.selectedLabel"),
       savingLabel: t("selector.savingLabel"),
       saveError: t("selector.saveError"),
+      translationReviewNotice: t("selector.translationReviewNotice"),
       privacyHeading: t("selector.privacyHeading"),
       privacyCookie: t("selector.privacyCookie"),
       privacyClerk: t("selector.privacyClerk"),
@@ -176,6 +178,10 @@ export default function Navbar() {
   return (
     <>
       {backdrop}
+      <LocalePreferenceSync
+        isSignedIn={isSignedIn === true}
+        locale={selectedLocale}
+      />
       <LanguageSelector
         copy={languageCopy}
         currentLocale={selectedLocale}

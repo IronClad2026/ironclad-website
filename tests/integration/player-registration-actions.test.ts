@@ -142,6 +142,55 @@ describe("player registration lifecycle actions", () => {
     }
   );
 
+  it.each([
+    {
+      operation: "withdraw",
+      message: "The deadline expired after the Division launched.",
+      expectedMessage: "Your tournament registration could not be withdrawn.",
+    },
+    {
+      operation: "withdraw",
+      message: "La inscripción ya fue retirada.",
+      expectedMessage: "Your tournament registration could not be withdrawn.",
+    },
+    {
+      operation: "accept",
+      message: "Already resolved: offer cannot respond after deadline.",
+      expectedMessage: "The waitlist offer could not be updated.",
+    },
+    {
+      operation: "accept",
+      message: "Срок предложения истёк.",
+      expectedMessage: "The waitlist offer could not be updated.",
+    },
+  ])(
+    "maps unstructured $operation RPC prose to the safe generic failure",
+    async ({ operation, message, expectedMessage }) => {
+      const client = createClient({
+        rpcError: { code: "P0001", message },
+      });
+      createAuthenticatedSupabaseClientMock.mockResolvedValue(client.client);
+
+      const result =
+        operation === "withdraw"
+          ? await withdrawTournamentRegistrationAction(
+              initialState,
+              formData({ registrationId: REGISTRATION_ID })
+            )
+          : await respondToWaitlistOfferAction(
+              initialState,
+              formData({ registrationId: REGISTRATION_ID, response: operation })
+            );
+
+      expect(result).toEqual({
+        status: "error",
+        code: "mutation_failed",
+        message: expectedMessage,
+      });
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    }
+  );
+
   it("validates the response before loading owner data", async () => {
     const client = createClient();
     createAuthenticatedSupabaseClientMock.mockResolvedValue(client.client);

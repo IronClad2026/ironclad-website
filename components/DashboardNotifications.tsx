@@ -24,13 +24,16 @@ import {
   type NotificationDismissalResult,
 } from "@/app/dashboard/actions";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import {
   useOptionalLocale,
   useOptionalTranslations,
 } from "@/components/i18n/LocaleProvider";
 import type { Locale } from "@/lib/i18n/config";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import notificationsEnglish from "@/lib/i18n/dictionaries/en/notifications";
 import { formatNumber, selectPlural } from "@/lib/i18n/format";
+import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import type { MessageValues } from "@/lib/i18n/types";
 import type { DashboardNotification } from "@/lib/player-dashboard";
 
@@ -49,11 +52,19 @@ export default function DashboardNotifications({
   const [selected, setSelected] = useState<DashboardNotification | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
-  const [now, setNow] = useState(() => Date.now());
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const locale = useOptionalLocale();
   const t = useOptionalTranslations("notifications", notificationsEnglish);
+  const competitionT = useOptionalTranslations(
+    "competition",
+    competitionEnglish
+  );
+  const now = useHydrationSafeNow({
+    enabled: notifications.some(
+      (notification) => notification.confirmationDeadlineAt !== null
+    ),
+  });
   const actionRequired = notifications.filter(
     (notification) =>
       notification.canConfirm ||
@@ -79,19 +90,6 @@ export default function DashboardNotifications({
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [selected]);
-
-  useEffect(() => {
-    if (
-      notifications.every(
-        (notification) => notification.confirmationDeadlineAt === null
-      )
-    ) {
-      return;
-    }
-
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [notifications]);
 
   const deleteNotifications = (
     notificationIds: string[],
@@ -311,6 +309,10 @@ export default function DashboardNotifications({
             pending={pending}
             locale={locale}
             t={t}
+            roundName={localizeBracketRoundName(
+              selected.roundName,
+              competitionT
+            )}
             onRespond={respondToReportGroup}
             onClose={() => setSelected(null)}
           />
@@ -333,7 +335,7 @@ function NotificationRow({
 }: {
   notification: DashboardNotification;
   checked: boolean;
-  now: number;
+  now: number | null;
   pending: boolean;
   locale: Locale;
   t: NotificationTranslator;
@@ -414,14 +416,16 @@ function NotificationModal({
   pending,
   locale,
   t,
+  roundName,
   onRespond,
   onClose,
 }: {
   notification: DashboardNotification;
-  now: number;
+  now: number | null;
   pending: boolean;
   locale: Locale;
   t: NotificationTranslator;
+  roundName: string;
   onRespond: (
     notification: DashboardNotification,
     decision: "confirm" | "dispute",
@@ -435,6 +439,7 @@ function NotificationModal({
   const responseAvailable =
     notification.canConfirm &&
     notification.confirmationDeadlineAt !== null &&
+    now !== null &&
     now < new Date(notification.confirmationDeadlineAt).getTime();
   const showConfirmationSummary =
     notification.source === "report_group" &&
@@ -572,7 +577,7 @@ function NotificationModal({
           <Detail
             label={t("dashboard.match")}
             value={t("dashboard.matchValue", {
-              roundName: notification.roundName,
+              roundName,
               matchNumber: notification.matchNumber,
             })}
           />
@@ -904,12 +909,16 @@ function formatStatus(
   }[status];
 }
 
-function formatTimeRemaining(
+export function formatTimeRemaining(
   value: string,
-  now: number,
+  now: number | null,
   locale: Locale,
   t: NotificationTranslator
 ) {
+  if (now === null) {
+    return t("dashboard.timeUnavailable");
+  }
+
   const remainingMs = new Date(value).getTime() - now;
 
   if (!Number.isFinite(remainingMs)) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import {
   resetAdminMatch,
   saveAdminMatchResult,
@@ -9,14 +9,16 @@ import {
   type MatchResultActionState,
 } from "@/app/tournaments/match-actions";
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import PlayerMatchResultForm from "@/components/PlayerMatchResultForm";
+import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import {
   useOptionalLocale,
   useOptionalTranslations,
 } from "@/components/i18n/LocaleProvider";
-import { formatDateTime } from "@/lib/i18n/format";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import type { Locale } from "@/lib/i18n/config";
+import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
 import type {
@@ -34,30 +36,6 @@ const initialState: MatchResultActionState = {
 type CompetitionTranslator = (path: string, values?: MessageValues) => string;
 const translateCompetitionEnglish: CompetitionTranslator = (path, values) =>
   translate(competitionEnglish, path, values);
-
-function localizeRoundName(roundName: string, t: CompetitionTranslator) {
-  const normalized = roundName.trim().toLowerCase();
-
-  if (normalized === "grand final") {
-    return t("bracketPresentation.roundNames.grandFinal");
-  }
-  if (normalized === "final") {
-    return t("bracketPresentation.roundNames.final");
-  }
-  if (normalized === "semifinal" || normalized === "semifinals") {
-    return t("bracketPresentation.roundNames.semifinals");
-  }
-  if (normalized === "quarterfinal" || normalized === "quarterfinals") {
-    return t("bracketPresentation.roundNames.quarterfinals");
-  }
-
-  const roundOfMatch = normalized.match(/^round of (\d+)$/);
-  return roundOfMatch
-    ? t("bracketPresentation.roundNames.roundOf", {
-        count: roundOfMatch[1],
-      })
-    : roundName;
-}
 
 export default function MatchResultControls({
   match,
@@ -103,27 +81,16 @@ export default function MatchResultControls({
       )
   );
   const canOpenForReportGroups = reportGroups.length > 0;
-  const [now, setNow] = useState<number | null>(null);
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
+  const now = useHydrationSafeNow({
+    enabled: deadlineManaged && match.status === "in_progress" && !holdActive,
+  });
   const deadlineOpen = Boolean(
     match.deadlineAt &&
       now !== null &&
       now < new Date(match.deadlineAt).getTime()
   );
 
-  useEffect(() => {
-    if (!deadlineManaged || match.status !== "in_progress" || holdActive) {
-      return;
-    }
-
-    const updateNow = () => setNow(Date.now());
-    const initialTimer = window.setTimeout(updateNow, 0);
-    const interval = window.setInterval(updateNow, 1_000);
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
-    };
-  }, [deadlineManaged, holdActive, match.status]);
   const canSubmitNewReport =
     canSubmit &&
     hasParticipants &&
@@ -190,11 +157,11 @@ export default function MatchResultControls({
               <p>
                 Decided at:{" "}
                 <span className="text-slate-200">
-                  {match.officialResultDecidedAt
-                    ? new Date(
-                        match.officialResultDecidedAt
-                      ).toLocaleString()
-                    : "Not recorded"}
+                  <HydrationSafeLocalDateTime
+                    value={match.officialResultDecidedAt}
+                    fallback="Not recorded"
+                    locale="en"
+                  />
                 </span>
               </p>
             </div>
@@ -710,12 +677,12 @@ export function ReportGroupReview({
           </p>
         </div>
         <span className="text-[10px] text-slate-500">
-          {formatDateTime(reportGroup.createdAt, locale, {
-            kind: "local",
-          }, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
+          <HydrationSafeLocalDateTime
+            value={reportGroup.createdAt}
+            fallback={t("deadlines.unavailable")}
+            locale={locale}
+            options={{ dateStyle: "medium", timeStyle: "short" }}
+          />
         </span>
       </div>
 
@@ -723,7 +690,9 @@ export function ReportGroupReview({
         <SummaryValue
           label={t("matchControls.match")}
           value={t("matchControls.matchReference", {
-            round: isAdmin ? match.roundName : localizeRoundName(match.roundName, t),
+            round: isAdmin
+              ? match.roundName
+              : localizeBracketRoundName(match.roundName, t),
             number: match.matchNumber,
           })}
         />
@@ -753,12 +722,14 @@ export function ReportGroupReview({
         )}
         <SummaryValue
           label={t("matchControls.confirmationDeadline")}
-          value={formatDateTime(reportGroup.confirmationDeadlineAt, locale, {
-            kind: "local",
-          }, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
+          value={
+            <HydrationSafeLocalDateTime
+              value={reportGroup.confirmationDeadlineAt}
+              fallback={t("deadlines.unavailable")}
+              locale={locale}
+              options={{ dateStyle: "medium", timeStyle: "short" }}
+            />
+          }
         />
         {reportGroup.finalizedSource && (
           <SummaryValue
@@ -945,12 +916,12 @@ function SubmissionReview({
           })} · {formatSubmissionStatus(submission.status, t)}
         </p>
         <span className="text-[10px] text-slate-500">
-          {formatDateTime(submission.createdAt, locale, {
-            kind: "local",
-          }, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
+          <HydrationSafeLocalDateTime
+            value={submission.createdAt}
+            fallback={t("deadlines.unavailable")}
+            locale={locale}
+            options={{ dateStyle: "medium", timeStyle: "short" }}
+          />
         </span>
       </div>
       <div className="mt-3 grid gap-2 text-xs text-slate-300 sm:grid-cols-2">
@@ -958,7 +929,9 @@ function SubmissionReview({
           {t("matchControls.match")}: {" "}
           <strong className="text-white">
             {t("matchControls.matchReference", {
-              round: isAdmin ? match.roundName : localizeRoundName(match.roundName, t),
+              round: isAdmin
+                ? match.roundName
+                : localizeBracketRoundName(match.roundName, t),
               number: match.matchNumber,
             })}
           </strong>
@@ -1004,9 +977,11 @@ function SubmissionReview({
           <p>
             Reviewed at:{" "}
             <span className="text-slate-200">
-              {submission.reviewedAt
-                ? new Date(submission.reviewedAt).toLocaleString()
-                : "Pending"}
+              <HydrationSafeLocalDateTime
+                value={submission.reviewedAt}
+                fallback="Pending"
+                locale="en"
+              />
             </span>
           </p>
         </div>
@@ -1152,7 +1127,7 @@ function ActionMessage({ state }: { state: MatchResultActionState }) {
   );
 }
 
-function SummaryValue({ label, value }: { label: string; value: string }) {
+function SummaryValue({ label, value }: { label: string; value: ReactNode }) {
   return (
     <p>
       <span className="text-slate-500">{label}:</span>{" "}

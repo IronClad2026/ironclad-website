@@ -47,6 +47,8 @@ const dictionary = {
     selectedLabel: "Sélectionné",
     savingLabel: "Enregistrement de la langue…",
     saveError: "Impossible d’enregistrer votre préférence linguistique. Réessayez.",
+    translationReviewNotice:
+      "Les traductions sont fournies pour faciliter l’utilisation et ont été relues avec soin, mais elles n’ont pas nécessairement été relues par une personne de langue maternelle. L’anglais reste la langue source.",
     privacyHeading: "Préférence linguistique",
     privacyCookie:
       "IronClad conserve votre choix explicite dans un cookie fonctionnel déposé par IronClad pendant une durée maximale d’environ un an.",

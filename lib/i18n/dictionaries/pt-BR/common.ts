@@ -47,6 +47,8 @@ const dictionary = {
     selectedLabel: "Selecionado",
     savingLabel: "Salvando idioma…",
     saveError: "Não foi possível salvar sua preferência de idioma. Tente novamente.",
+    translationReviewNotice:
+      "As traduções são fornecidas por conveniência e foram revisadas com cuidado, mas podem não ter sido revisadas por um falante nativo. O inglês continua sendo o idioma de origem.",
     privacyHeading: "Preferência de idioma",
     privacyCookie:
       "O IronClad armazena sua escolha explícita em um cookie funcional próprio por até aproximadamente um ano.",

@@ -7,11 +7,10 @@ import {
   type PlayerRegistrationActionState,
 } from "@/app/dashboard/registration-actions";
 import {
-  useOptionalLocale,
   useOptionalTranslations,
 } from "@/components/i18n/LocaleProvider";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
-import { formatDateTime } from "@/lib/i18n/format";
 import {
   isTournamentTerminalStatus,
   type TournamentStatus,
@@ -53,7 +52,6 @@ export default function PlayerRegistrationActions({
   launchedAt: string | null;
   tournamentStatus: TournamentStatus;
 }) {
-  const locale = useOptionalLocale();
   const t = useOptionalTranslations("competition", competitionEnglish);
   const [withdrawState, withdrawAction, withdrawPending] = useActionState(
     withdrawTournamentRegistrationAction,
@@ -128,13 +126,15 @@ export default function PlayerRegistrationActions({
           </p>
           {waitlistOfferExpiresAt && (
             <p className="mt-2 text-xs font-bold uppercase tracking-wider text-amber-200">
-              {t("registrationActions.respondBefore", {
-                deadline: formatOfferDeadline(
-                  waitlistOfferExpiresAt,
-                  locale,
-                  t("registrationActions.statedDeadline")
-                ),
-              })}
+              <HydrationSafeLocalDateTime
+                value={waitlistOfferExpiresAt}
+                fallback={t("registrationActions.respondBefore", {
+                  deadline: t("registrationActions.statedDeadline"),
+                })}
+                render={(deadline) =>
+                  t("registrationActions.respondBefore", { deadline })
+                }
+              />
             </p>
           )}
           {offerExpired && (
@@ -264,15 +264,4 @@ function parseTimestamp(value: string | null) {
   if (!value) return null;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
-}
-
-function formatOfferDeadline(
-  value: string,
-  locale: Parameters<typeof formatDateTime>[1],
-  fallback: string
-) {
-  const timestamp = parseTimestamp(value);
-  if (timestamp === null) return fallback;
-
-  return formatDateTime(timestamp, locale, { kind: "local" });
 }

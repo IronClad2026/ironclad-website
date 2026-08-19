@@ -69,7 +69,7 @@ const CASES: Array<{
   },
   {
     data: { templateKey: "later_round_match_ready", ...MATCH_DATA },
-    subject: "Semifinal matchup ready: Winter Championship",
+    subject: "Semifinals matchup ready: Winter Championship",
     heading: "Your next matchup is ready",
   },
   {
@@ -142,7 +142,7 @@ describe("transactional email templates", () => {
         "Veteran Division",
         data.templateKey === "division_started_first_match"
           ? "Round 1"
-          : "Semifinal",
+          : "Semifinals",
         "Opponent Player",
         "18 August 2026, 10:00 UTC",
       ]) {
@@ -188,6 +188,58 @@ describe("transactional email templates", () => {
         expect(rendered.html).toContain("Winter Championship");
         expect(rendered.text).toContain("Winter Championship");
       }
+    }
+  );
+
+  it.each(LOCALE_EMAIL_DICTIONARIES)(
+    "localizes a canonical round alias in the %s subject and details",
+    (locale, dictionary) => {
+      const rendered = renderTransactionalEmail(
+        {
+          templateKey: "later_round_match_ready",
+          ...MATCH_DATA,
+          roundName: "Semi-Finals",
+        },
+        TEMPLATE_CONFIG,
+        locale,
+        dictionary
+      );
+
+      expect(rendered.subject).toContain(dictionary.roundNames.semifinals);
+      expect(rendered.subject).not.toContain("Semi-Finals");
+      expect(rendered.text).toContain(
+        `${dictionary.labels.round}: ${dictionary.roundNames.semifinals}`
+      );
+      expect(rendered.html).toContain(dictionary.roundNames.semifinals);
+      expect(rendered.text).toContain(MATCH_DATA.tournamentName);
+      expect(rendered.text).toContain(MATCH_DATA.divisionName);
+      expect(rendered.text).toContain(MATCH_DATA.opponentName);
+    }
+  );
+
+  it.each(LOCALE_EMAIL_DICTIONARIES)(
+    "preserves an unknown custom round in the %s subject and details",
+    (locale, dictionary) => {
+      const customRoundName = "Lower Bracket Round 2";
+      const rendered = renderTransactionalEmail(
+        {
+          templateKey: "later_round_match_ready",
+          ...MATCH_DATA,
+          roundName: customRoundName,
+        },
+        TEMPLATE_CONFIG,
+        locale,
+        dictionary
+      );
+
+      expect(rendered.subject).toContain(customRoundName);
+      expect(rendered.text).toContain(
+        `${dictionary.labels.round}: ${customRoundName}`
+      );
+      expect(rendered.html).toContain(customRoundName);
+      expect(rendered.text).toContain(MATCH_DATA.tournamentName);
+      expect(rendered.text).toContain(MATCH_DATA.divisionName);
+      expect(rendered.text).toContain(MATCH_DATA.opponentName);
     }
   );
 

@@ -10,7 +10,9 @@ import {
 } from "@/components/i18n/LocaleProvider";
 import type { Locale } from "@/lib/i18n/config";
 import accountDashboardEnglish from "@/lib/i18n/dictionaries/en/account-dashboard";
+import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import { formatNumber, selectPlural } from "@/lib/i18n/format";
+import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import type { MessageValues } from "@/lib/i18n/types";
 import type { MatchHistoryEntry } from "@/lib/player-dashboard";
 
@@ -31,6 +33,7 @@ export default function DashboardMatchHistory({
     "account-dashboard",
     accountDashboardEnglish
   );
+  const roundT = useOptionalTranslations("competition", competitionEnglish);
 
   useEffect(() => {
     if (!selected) return;
@@ -107,7 +110,10 @@ export default function DashboardMatchHistory({
                       <span className="mt-1 block truncate text-xs text-zinc-500">
                         {t("dashboard.matchHistory.versus", {
                           opponent: match.opponentName,
-                          round: match.roundName,
+                          round: localizeBracketRoundName(
+                            match.roundName,
+                            roundT
+                          ),
                         })}
                       </span>
                     </span>
@@ -139,6 +145,7 @@ export default function DashboardMatchHistory({
             match={selected}
             locale={locale}
             t={t}
+            roundT={roundT}
             onClose={() => setSelected(null)}
           />
         )}
@@ -151,13 +158,17 @@ function MatchHistoryModal({
   match,
   locale,
   t,
+  roundT,
   onClose,
 }: {
   match: MatchHistoryEntry;
   locale: Locale;
   t: DashboardTranslator;
+  roundT: DashboardTranslator;
   onClose: () => void;
 }) {
+  const localizedRoundName = localizeBracketRoundName(match.roundName, roundT);
+
   return (
     <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
       <motion.button
@@ -192,7 +203,7 @@ function MatchHistoryModal({
             <p className="mt-2 text-sm text-zinc-400">
               {t("dashboard.matchHistory.bracketRound", {
                 bracket: match.bracketName,
-                round: match.roundName,
+                round: localizedRoundName,
               })}
             </p>
           </div>
@@ -213,7 +224,7 @@ function MatchHistoryModal({
           />
           <Detail
             label={t("dashboard.matchHistory.round")}
-            value={match.roundName}
+            value={localizedRoundName}
           />
           <Detail
             label={t("dashboard.matchHistory.matchNumber")}

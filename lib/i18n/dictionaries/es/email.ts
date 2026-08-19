@@ -9,6 +9,14 @@ const dictionary = {
     opponent: "Rival",
     deadline: "Fecha límite",
   },
+  roundNames: {
+    grandFinal: "Gran final",
+    final: "Final",
+    semifinals: "Semifinales",
+    quarterfinals: "Cuartos de final",
+    roundOf: "Ronda de {count}",
+    roundRobin: "Todos contra todos",
+  },
   registrationApproved: {
     subject: "Inscripción aprobada: {tournamentName}",
     heading: "Tu inscripción ha sido aprobada",

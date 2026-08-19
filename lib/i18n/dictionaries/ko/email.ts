@@ -9,6 +9,14 @@ const dictionary = {
     opponent: "상대",
     deadline: "마감 시각",
   },
+  roundNames: {
+    grandFinal: "그랜드 파이널",
+    final: "결승",
+    semifinals: "준결승",
+    quarterfinals: "8강",
+    roundOf: "{count}강",
+    roundRobin: "라운드 로빈",
+  },
   registrationApproved: {
     subject: "등록 승인: {tournamentName}",
     heading: "등록이 승인되었습니다",

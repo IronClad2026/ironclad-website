@@ -305,6 +305,36 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
   });
 
+  it.each(
+    (["zh-CN", "ru", "es", "pt-BR", "ko", "fr"] as const).flatMap(
+      (locale) => [
+        { locale, journey: "Register", waitlistConfirmed: false },
+        { locale, journey: "Join Waitlist", waitlistConfirmed: true },
+      ]
+    )
+  )(
+    "rejects the $locale $journey journey before protected processing",
+    async ({ locale, waitlistConfirmed }) => {
+      getRequestLocaleMock.mockResolvedValue(locale);
+
+      const result = await submitTournamentRegistration(
+        registrationInput({ waitlistConfirmed })
+      );
+
+      expect(result).toEqual({
+        success: false,
+        code: "LOCALE_REGISTRATION_GATE",
+        message:
+          "Registration is currently available only through the Effective English governing corpus.",
+      });
+      expect(authMock).not.toHaveBeenCalled();
+      expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+      expect(getRelic1v1EloMock).not.toHaveBeenCalled();
+      expect(createInAppNotificationMock).not.toHaveBeenCalled();
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    }
+  );
+
   it.each([
     "rulebookAgreement",
     "playerParticipationAgreement",
@@ -782,6 +812,39 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
     expect(client.rpc).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    "Already registered for this tournament",
+    "verified elo does not match selected bracket",
+    "registration document set is unavailable",
+    "older waitlisted registrations exist; bracket is full",
+    "La inscripción está llena y no está disponible",
+    "FULL: reordered database detail says already registered",
+  ])(
+    "never derives a business result from unstructured database prose: %s",
+    async (message) => {
+      const client = createRegistrationClient({
+        rpcResults: [
+          {
+            data: null,
+            error: { code: "P0001", message },
+          },
+        ],
+      });
+      createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+      const result = await submitTournamentRegistration(registrationInput());
+
+      expect(result).toEqual({
+        success: false,
+        code: "REGISTRATION_FAILED",
+        message:
+          "Registration could not be submitted. Please try again or contact an admin.",
+      });
+      expect(client.rpc).toHaveBeenCalledOnce();
+      expect(createInAppNotificationMock).not.toHaveBeenCalled();
+    }
+  );
 
   it("allows at most one success when concurrent requests pass the duplicate precheck", async () => {
     const client = createRegistrationClient({

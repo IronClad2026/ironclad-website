@@ -58,8 +58,8 @@ export async function withdrawTournamentRegistrationAction(
   if (error) {
     logPlayerRegistrationFailure("withdraw", error);
     return errorState(
-      getMutationErrorMessage(error, "Your tournament registration could not be withdrawn."),
-      getMutationErrorCode(error, "mutation_failed")
+      "Your tournament registration could not be withdrawn.",
+      "mutation_failed"
     );
   }
 
@@ -123,8 +123,8 @@ export async function respondToWaitlistOfferAction(
   if (error) {
     logPlayerRegistrationFailure(`offer-${response}`, error);
     return errorState(
-      getMutationErrorMessage(error, "The waitlist offer could not be updated."),
-      getMutationErrorCode(error, "mutation_failed")
+      "The waitlist offer could not be updated.",
+      "mutation_failed"
     );
   }
 
@@ -177,45 +177,6 @@ async function loadOwnedRegistration(
   }
 
   return isRecord(data) && data.id === registrationId;
-}
-
-function getMutationErrorMessage(error: unknown, fallback: string) {
-  const message = getErrorField(error, "message").toLowerCase();
-
-  if (message.includes("launched") || message.includes("already started")) {
-    return "This division has already started, so its roster is locked.";
-  }
-
-  if (message.includes("expired") || message.includes("deadline")) {
-    return "This waitlist offer has expired and can no longer be accepted.";
-  }
-
-  if (
-    message.includes("not offered") ||
-    message.includes("already resolved") ||
-    message.includes("cannot respond")
-  ) {
-    return "This waitlist offer is no longer available.";
-  }
-
-  if (message.includes("cannot withdraw") || message.includes("withdrawn")) {
-    return "This registration can no longer be withdrawn.";
-  }
-
-  return fallback;
-}
-
-function getMutationErrorCode(
-  error: unknown,
-  fallback: PlayerRegistrationActionCode
-): PlayerRegistrationActionCode {
-  const message = getErrorField(error, "message").toLowerCase();
-
-  if (message.includes("launched") || message.includes("already started")) return "division_started";
-  if (message.includes("expired") || message.includes("deadline")) return "offer_expired";
-  if (message.includes("not offered") || message.includes("already resolved") || message.includes("cannot respond")) return "offer_unavailable";
-  if (message.includes("cannot withdraw") || message.includes("withdrawn")) return "withdrawal_unavailable";
-  return fallback;
 }
 
 function revalidatePlayerRegistrationPaths() {

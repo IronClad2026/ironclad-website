@@ -9,6 +9,14 @@ const dictionary = {
     opponent: "对手",
     deadline: "截止时间",
   },
+  roundNames: {
+    grandFinal: "总决赛",
+    final: "决赛",
+    semifinals: "半决赛",
+    quarterfinals: "四分之一决赛",
+    roundOf: "{count} 强赛",
+    roundRobin: "循环赛",
+  },
   registrationApproved: {
     subject: "报名已获批准：{tournamentName}",
     heading: "你的报名已获批准",

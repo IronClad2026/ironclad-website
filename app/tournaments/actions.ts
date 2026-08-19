@@ -754,54 +754,11 @@ function getRegistrationFailure(error: unknown): {
   code: TournamentRegistrationCode;
 } {
   const code = getErrorField(error, "code").toUpperCase();
-  const message = getErrorField(error, "message").toLowerCase();
 
-  if (code === "23505" || message.includes("already registered")) {
+  if (code === "23505") {
     return {
       message: DUPLICATE_REGISTRATION_MESSAGE,
       code: "DUPLICATE_REGISTRATION",
-    };
-  }
-
-  if (message.includes("verified elo does not match")) {
-    return { message: WRONG_DIVISION_MESSAGE, code: "DIVISION_MISMATCH" };
-  }
-
-  if (
-    message.includes("registration document set is unavailable") ||
-    message.includes("registration consent is invalid")
-  ) {
-    return {
-      message:
-        "Registration is unavailable until the approved governing documents are effective.",
-      code: "LEGAL_DOCUMENTS_UNAVAILABLE",
-    };
-  }
-
-  if (
-    message.includes("registration is not available") ||
-    message.includes("roster is locked") ||
-    message.includes("bracket generation")
-  ) {
-    return {
-      message: REGISTRATION_UNAVAILABLE_MESSAGE,
-      code: "REGISTRATION_UNAVAILABLE",
-    };
-  }
-
-  if (message.includes("older waitlisted")) {
-    return {
-      message:
-        "This bracket already has a waitlist. New registrations are added behind existing queued players.",
-      code: "WAITLIST_QUEUE_ACTIVE",
-    };
-  }
-
-  if (message.includes("full")) {
-    return {
-      message:
-        "The selected bracket cannot accept another registration right now.",
-      code: "BRACKET_FULL",
     };
   }
 

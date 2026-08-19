@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { getLocalizedCountryName, getLocalizedCountrySelectOptions } from "@/lib/countries";
-import type { Locale } from "@/lib/i18n/config";
+import {
+  countryCodeByCanonicalName,
+  countrySelectOptions,
+  getCountryPresentationCode,
+  getLocalizedCountryName,
+  getLocalizedCountrySelectOptions,
+} from "@/lib/countries";
+import {
+  SUPPORTED_LOCALES,
+  toIntlLocale,
+  type Locale,
+} from "@/lib/i18n/config";
+import { formatDashboardRegistrationCount } from "@/lib/i18n/dashboard-count";
 import enAccount from "@/lib/i18n/dictionaries/en/account-dashboard";
 import enCommon from "@/lib/i18n/dictionaries/en/common";
 import enPublic from "@/lib/i18n/dictionaries/en/public";
@@ -12,6 +23,7 @@ import frAccount from "@/lib/i18n/dictionaries/fr/account-dashboard";
 import frCommon from "@/lib/i18n/dictionaries/fr/common";
 import frPublic from "@/lib/i18n/dictionaries/fr/public";
 import { selectPlural } from "@/lib/i18n/format";
+import { translate } from "@/lib/i18n/translate";
 import koAccount from "@/lib/i18n/dictionaries/ko/account-dashboard";
 import koCommon from "@/lib/i18n/dictionaries/ko/common";
 import koPublic from "@/lib/i18n/dictionaries/ko/public";
@@ -54,6 +66,64 @@ describe("public and account localization", () => {
     );
     expect(values).toContain("Germany");
     expect(values).toContain("Korea, Republic of");
+  });
+
+  it.each(SUPPORTED_LOCALES)(
+    "%s localizes every canonical country through an explicit ISO code",
+    (locale) => {
+      const displayNames = new Intl.DisplayNames([toIntlLocale(locale)], {
+        type: "region",
+      });
+
+      for (const option of countrySelectOptions) {
+        const code = getCountryPresentationCode(option.value);
+        expect(code, option.value).toMatch(/^[A-Z]{2}$/);
+        expect(getLocalizedCountryName(option.value, locale)).toBe(
+          displayNames.of(code!) ?? option.value
+        );
+      }
+
+      expect(countrySelectOptions).toHaveLength(250);
+      expect(
+        new Set(Object.values(countryCodeByCanonicalName)).size
+      ).toBe(countrySelectOptions.length);
+    }
+  );
+
+  it("maps the previously missed canonical country values to their ISO codes", () => {
+    expect(getCountryPresentationCode("Democratic Republic of the Congo")).toBe("CD");
+    expect(getCountryPresentationCode("Republic of the Congo")).toBe("CG");
+    expect(getCountryPresentationCode("Hong Kong")).toBe("HK");
+    expect(getCountryPresentationCode("Ivory Coast")).toBe("CI");
+    expect(getCountryPresentationCode("Macau")).toBe("MO");
+    expect(getCountryPresentationCode("Myanmar")).toBe("MM");
+    expect(getCountryPresentationCode("Palestine")).toBe("PS");
+    expect(getCountryPresentationCode("Turkey")).toBe("TR");
+    expect(getCountryPresentationCode("United States Virgin Islands")).toBe("VI");
+  });
+
+  it.each([
+    ["pt-BR", ptBrAccount],
+    ["fr", frAccount],
+  ] as const)(
+    "%s registration counts always display the actual 0, 1, and 2 values",
+    (locale, dictionary) => {
+      const t = (path: string, values?: Record<string, string | number>) =>
+        translate(dictionary, path, values);
+
+      expect(formatDashboardRegistrationCount(0, locale, t)).toMatch(/^0\b/);
+      expect(formatDashboardRegistrationCount(1, locale, t)).toMatch(/^1\b/);
+      expect(formatDashboardRegistrationCount(2, locale, t)).toMatch(/^2\b/);
+    }
+  );
+
+  it("preserves the Russian many form for a zero registration count", () => {
+    const t = (path: string, values?: Record<string, string | number>) =>
+      translate(ruAccount, path, values);
+
+    expect(formatDashboardRegistrationCount(0, "ru", t)).toBe(
+      "0 регистраций"
+    );
   });
 
   it("preserves Russian few and many player-count forms", () => {

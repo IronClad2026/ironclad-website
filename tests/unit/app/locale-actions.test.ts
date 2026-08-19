@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.hoisted(() => vi.fn());
 const clerkClientMock = vi.hoisted(() => vi.fn());
 const cookiesMock = vi.hoisted(() => vi.fn());
+const cookieGetMock = vi.hoisted(() => vi.fn());
 const cookieSetMock = vi.hoisted(() => vi.fn());
+const getUserMock = vi.hoisted(() => vi.fn());
 const updateUserMetadataMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -13,18 +15,26 @@ vi.mock("@clerk/nextjs/server", () => ({
 
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
 
-import { setLocalePreference } from "@/app/locale-actions";
+import {
+  setLocalePreference,
+  syncLocalePreferenceAfterAuth,
+} from "@/app/locale-actions";
 
 describe("locale preference Server Action", () => {
   beforeEach(() => {
     authMock.mockReset();
     clerkClientMock.mockReset();
     cookiesMock.mockReset();
+    cookieGetMock.mockReset();
     cookieSetMock.mockReset();
+    getUserMock.mockReset();
     updateUserMetadataMock.mockReset();
-    cookiesMock.mockResolvedValue({ set: cookieSetMock });
+    cookiesMock.mockResolvedValue({ get: cookieGetMock, set: cookieSetMock });
     clerkClientMock.mockResolvedValue({
-      users: { updateUserMetadata: updateUserMetadataMock },
+      users: {
+        getUser: getUserMock,
+        updateUserMetadata: updateUserMetadataMock,
+      },
     });
   });
 
@@ -101,6 +111,91 @@ describe("locale preference Server Action", () => {
     expect(JSON.stringify(result)).not.toContain("private detail");
     expect(errorSpy).toHaveBeenCalledWith(
       "Unable to mirror the locale preference to Clerk."
+    );
+  });
+
+  it("synchronizes an anonymous cookie preference after the player signs in", async () => {
+    cookieGetMock.mockReturnValue({ value: "zh-CN" });
+    authMock.mockResolvedValue({ userId: "user_test" });
+    getUserMock.mockResolvedValue({ privateMetadata: {} });
+
+    await expect(syncLocalePreferenceAfterAuth()).resolves.toEqual({
+      ok: true,
+      status: "updated",
+    });
+    expect(updateUserMetadataMock).toHaveBeenCalledTimes(1);
+    expect(updateUserMetadataMock).toHaveBeenCalledWith("user_test", {
+      privateMetadata: { ironcladLocale: "zh-CN" },
+    });
+    expect(cookieSetMock).not.toHaveBeenCalled();
+  });
+
+  it("does not rewrite already-matching Clerk metadata", async () => {
+    cookieGetMock.mockReturnValue({ value: "fr" });
+    authMock.mockResolvedValue({ userId: "user_test" });
+    getUserMock.mockResolvedValue({
+      privateMetadata: { ironcladLocale: "fr" },
+    });
+
+    await expect(syncLocalePreferenceAfterAuth()).resolves.toEqual({
+      ok: true,
+      status: "already-matched",
+    });
+    expect(updateUserMetadataMock).not.toHaveBeenCalled();
+  });
+
+  it("replaces invalid Clerk locale metadata with the validated cookie preference", async () => {
+    cookieGetMock.mockReturnValue({ value: "ko" });
+    authMock.mockResolvedValue({ userId: "user_test" });
+    getUserMock.mockResolvedValue({
+      privateMetadata: { ironcladLocale: "invalid" },
+    });
+
+    await expect(syncLocalePreferenceAfterAuth()).resolves.toEqual({
+      ok: true,
+      status: "updated",
+    });
+    expect(updateUserMetadataMock).toHaveBeenCalledWith("user_test", {
+      privateMetadata: { ironcladLocale: "ko" },
+    });
+  });
+
+  it("ignores a missing or invalid cookie before authentication or Clerk access", async () => {
+    cookieGetMock.mockReturnValue({ value: "de" });
+
+    await expect(syncLocalePreferenceAfterAuth()).resolves.toEqual({
+      ok: true,
+      status: "no-valid-cookie",
+    });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(clerkClientMock).not.toHaveBeenCalled();
+  });
+
+  it("leaves a valid anonymous preference in the cookie until sign-in", async () => {
+    cookieGetMock.mockReturnValue({ value: "pt-BR" });
+    authMock.mockResolvedValue({ userId: null });
+
+    await expect(syncLocalePreferenceAfterAuth()).resolves.toEqual({
+      ok: true,
+      status: "not-signed-in",
+    });
+    expect(clerkClientMock).not.toHaveBeenCalled();
+    expect(cookieSetMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a safe failure without changing the UI cookie when Clerk synchronization fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    cookieGetMock.mockReturnValue({ value: "es" });
+    authMock.mockResolvedValue({ userId: "user_test" });
+    getUserMock.mockRejectedValue(new Error("private provider detail"));
+
+    const result = await syncLocalePreferenceAfterAuth();
+
+    expect(result).toEqual({ ok: false, code: "SYNC_FAILED" });
+    expect(JSON.stringify(result)).not.toContain("private provider detail");
+    expect(cookieSetMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Unable to synchronize the locale preference with Clerk."
     );
   });
 });
