@@ -63,6 +63,7 @@ type FakeAuthorityClientOptions = {
   summaries?: Record<string, Record<string, unknown>>;
   matchExcellenceSummaries?: Record<string, Record<string, unknown>>;
   reliableCompetitorSummaries?: Record<string, Record<string, unknown>>;
+  comebackCommanderSummaries?: Record<string, Array<Record<string, unknown>>>;
   tournamentSummaries?: Record<string, Record<string, unknown>>;
   bracketProgressionSummaries?: Record<string, Record<string, unknown>>;
   tournamentPrestigeSummaries?: Record<string, Record<string, unknown>>;
@@ -138,6 +139,20 @@ function reliableCompetitorSummary(overrides: Record<string, unknown> = {}) {
     best_run: 0,
     tenth_match_id: null,
     tenth_at: null,
+    ...overrides,
+  };
+}
+
+function comebackCommanderSummary(
+  overrides: Record<string, unknown> = {}
+) {
+  return {
+    match_id: FIRST_MATCH_ID,
+    game1_winner_registration_id: "99999999-9999-4999-8999-999999999999",
+    series_winner_registration_id: PLAYER_ID,
+    series_best_of: 3,
+    finalized_game_count: 3,
+    finalized_at: "2026-08-10T12:00:00.000Z",
     ...overrides,
   };
 }
@@ -233,6 +248,12 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
     options.reliableCompetitorSummaries ?? {
       [PLAYER_ID]: reliableCompetitorSummary(),
     };
+  const comebackCommanderSummaries: Record<
+    string,
+    Array<Record<string, unknown>>
+  > = options.comebackCommanderSummaries ?? {
+    [PLAYER_ID]: [],
+  };
   const tournamentSummaries: Record<string, Record<string, unknown>> =
     options.tournamentSummaries ?? {
       [PLAYER_ID]: tournamentSummary(),
@@ -373,6 +394,14 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
       };
     }
 
+    if (name === "get_player_badge_comeback_commander_summary") {
+      return {
+        data:
+          comebackCommanderSummaries[String(args.p_player_id)] ?? [],
+        error: null,
+      };
+    }
+
     if (name === "get_player_badge_tournament_for_match") {
       return {
         data:
@@ -474,6 +503,7 @@ describe("badge authority evaluators", () => {
       "first-victory",
       "battle-tested",
       "reliable-competitor",
+      "comeback-commander",
       "first-campaign",
       "iron-regular",
       "tournament-veteran",
@@ -498,9 +528,6 @@ describe("badge authority evaluators", () => {
       "season-podium",
       "season-champion",
     ]);
-    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
-      "comeback-commander"
-    );
     expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
       "flawless-campaign"
     );
@@ -632,6 +659,7 @@ describe("badge authority evaluators", () => {
       "clean-sweep",
       "giant-slayer",
       "giant-hunter",
+      "comeback-commander",
     ]);
     expect(result.skippedReasons).toEqual([
       "first-deployment_threshold_not_met",
@@ -646,6 +674,7 @@ describe("badge authority evaluators", () => {
       "clean-sweep_threshold_not_met",
       "giant-slayer_threshold_not_met",
       "giant-hunter_threshold_not_met",
+      "comeback_commander_evidence_unavailable",
     ]);
     expect(fixture.upsert).not.toHaveBeenCalled();
   });
@@ -792,6 +821,52 @@ describe("badge authority evaluators", () => {
         (payload) => payload.badge_slug === "reliable-competitor"
       )
     ).toHaveLength(2);
+  });
+
+  it("awards Comeback Commander only from complete durable Game 1 loss and series win evidence", async () => {
+    const fixture = createAuthorityClient({
+      comebackCommanderSummaries: {
+        [PLAYER_ID]: [comebackCommanderSummary()],
+      },
+    });
+
+    const result = await evaluateMatchBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).toContain("comeback-commander");
+    expect(fixture.upsertPayloads).toContainEqual(
+      expect.objectContaining({
+        badge_slug: "comeback-commander",
+        source_type: "match",
+        source_id: FIRST_MATCH_ID,
+        original_unlocked_at: "2026-08-10T12:00:00.000Z",
+        source_metadata: expect.objectContaining({
+          evaluator: "comeback-commander",
+          seriesBestOf: 3,
+          finalizedGameCount: 3,
+        }),
+      })
+    );
+  });
+
+  it("keeps Comeback Commander locked when durable complete-series evidence is absent", async () => {
+    const fixture = createAuthorityClient({
+      comebackCommanderSummaries: {
+        [PLAYER_ID]: [],
+      },
+    });
+
+    const result = await evaluateMatchBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).not.toContain("comeback-commander");
+    expect(result.skippedReasons).toContain(
+      "comeback_commander_evidence_unavailable"
+    );
   });
 
   it("requires five qualifying wins for Five Victories", async () => {
@@ -2371,6 +2446,7 @@ describe("badge authority evaluators", () => {
       "first-victory": 1,
       "battle-tested": 1,
       "reliable-competitor": 0,
+      "comeback-commander": 0,
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,
@@ -2483,6 +2559,7 @@ describe("badge authority evaluators", () => {
       "first-victory": 1,
       "battle-tested": 1,
       "reliable-competitor": 0,
+      "comeback-commander": 0,
       "first-campaign": 1,
       "iron-regular": 1,
       "tournament-veteran": 1,
@@ -2534,6 +2611,7 @@ describe("badge authority evaluators", () => {
       "first-victory": 0,
       "battle-tested": 0,
       "reliable-competitor": 0,
+      "comeback-commander": 0,
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,

@@ -10,6 +10,7 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "first-victory",
   "battle-tested",
   "reliable-competitor",
+  "comeback-commander",
   "first-campaign",
   "iron-regular",
   "tournament-veteran",
@@ -126,6 +127,15 @@ type ReliableCompetitorSummaryRow = {
   best_run: unknown;
   tenth_match_id: unknown;
   tenth_at: unknown;
+};
+
+type ComebackCommanderSummaryRow = {
+  match_id: unknown;
+  game1_winner_registration_id: unknown;
+  series_winner_registration_id: unknown;
+  series_best_of: unknown;
+  finalized_game_count: unknown;
+  finalized_at: unknown;
 };
 
 type TournamentBadgeParticipantRow = {
@@ -1243,6 +1253,11 @@ export async function evaluateMatchBadgeAwardsForPlayer({
       supabase,
       evaluationMode,
     }),
+    await evaluateComebackCommanderBadgeAwardsForPlayer({
+      playerId,
+      supabase,
+      evaluationMode,
+    }),
   ]);
 }
 
@@ -1299,6 +1314,51 @@ export async function evaluateReliableCompetitorBadgeAwardsForPlayer({
     createdCount: created ? 1 : 0,
     createdSlugs: created ? ["reliable-competitor"] : [],
     evaluatedSlugs: ["reliable-competitor"],
+    skippedReasons: created ? [] : ["award_already_exists"],
+  };
+}
+
+export async function evaluateComebackCommanderBadgeAwardsForPlayer({
+  playerId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  playerId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const summary = await loadComebackCommanderBadgeSummary(supabase, playerId);
+  const evidence = summary?.[0];
+
+  if (!evidence) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: ["comeback-commander"],
+      skippedReasons: ["comeback_commander_evidence_unavailable"],
+    };
+  }
+
+  const created = await persistBadgeAward(supabase, {
+    playerId,
+    badgeSlug: "comeback-commander",
+    sourceType: "match",
+    sourceId: evidence.matchId,
+    originalUnlockedAt: evidence.finalizedAt,
+    sourceMetadata: {
+      evaluator: "comeback-commander",
+      evaluationMode,
+      game1WinnerRegistrationId: evidence.game1WinnerRegistrationId,
+      seriesWinnerRegistrationId: evidence.seriesWinnerRegistrationId,
+      seriesBestOf: evidence.seriesBestOf,
+      finalizedGameCount: evidence.finalizedGameCount,
+      originalUnlockedAtBasis: "official_series_result_decided_at",
+    },
+  });
+
+  return {
+    createdCount: created ? 1 : 0,
+    createdSlugs: created ? ["comeback-commander"] : [],
+    evaluatedSlugs: ["comeback-commander"],
     skippedReasons: created ? [] : ["award_already_exists"],
   };
 }
@@ -1597,6 +1657,55 @@ async function loadReliableCompetitorBadgeSummary(
     tenthMatchId: stringOrNull(row.tenth_match_id),
     tenthAt: isoOrNull(row.tenth_at),
   };
+}
+
+async function loadComebackCommanderBadgeSummary(
+  supabase: BadgeAuthorityClient,
+  playerId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_comeback_commander_summary",
+    {
+      p_player_id: playerId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "COMEBACK_COMMANDER_SUMMARY_LOAD_FAILED",
+      "Badge comeback evaluation could not load durable game authority."
+    );
+  }
+
+  return rowsOf<ComebackCommanderSummaryRow>(data)
+    .map((row) => ({
+      matchId: stringOrNull(row.match_id),
+      game1WinnerRegistrationId: stringOrNull(
+        row.game1_winner_registration_id
+      ),
+      seriesWinnerRegistrationId: stringOrNull(
+        row.series_winner_registration_id
+      ),
+      seriesBestOf: integerOrNull(row.series_best_of),
+      finalizedGameCount: integerOrNull(row.finalized_game_count),
+      finalizedAt: isoOrNull(row.finalized_at),
+    }))
+    .filter(
+      (row): row is {
+        matchId: string;
+        game1WinnerRegistrationId: string;
+        seriesWinnerRegistrationId: string;
+        seriesBestOf: number;
+        finalizedGameCount: number;
+        finalizedAt: string;
+      } =>
+        row.matchId !== null &&
+        row.game1WinnerRegistrationId !== null &&
+        row.seriesWinnerRegistrationId !== null &&
+        row.seriesBestOf !== null &&
+        row.finalizedGameCount !== null &&
+        row.finalizedAt !== null
+    );
 }
 
 async function loadMatchExcellenceBadgeSummary(
