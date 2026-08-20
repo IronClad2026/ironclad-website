@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import { translate } from "@/lib/i18n/translate";
+import * as supabaseBrowser from "@/lib/supabase-browser";
 import type {
   PollOptionProjection,
   PollViewerProjection,
@@ -33,6 +35,36 @@ afterEach(() => {
 });
 
 describe("PollsAndDecisions", () => {
+  it("does not create the authenticated browser Supabase client during server render", () => {
+    const createClient = vi.spyOn(
+      supabaseBrowser,
+      "createAuthenticatedBrowserSupabaseClient"
+    );
+    const originalWindow = globalThis.window;
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: undefined,
+    });
+
+    try {
+      renderToString(
+        <PollsAndDecisions
+          surface="community"
+          initialPolls={[]}
+          castBallot={vi.fn()}
+        />
+      );
+    } finally {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: originalWindow,
+      });
+    }
+
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
   it("submits one authenticated single-choice ballot using the current revision", async () => {
     const castBallot = vi.fn(async () => ({
       ok: true as const,

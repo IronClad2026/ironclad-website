@@ -142,7 +142,7 @@ export default function PollsAndDecisions({
 
   const browserClient = useMemo(
     () =>
-      loadPolls === undefined
+      loadPolls === undefined && typeof window !== "undefined"
         ? createAuthenticatedBrowserSupabaseClient(getToken)
         : null,
     [getToken, loadPolls]
