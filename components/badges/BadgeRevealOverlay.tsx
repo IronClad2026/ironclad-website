@@ -2,15 +2,13 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Sparkles, X } from "lucide-react";
-import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
+import BadgeArtwork from "@/components/badges/BadgeArtwork";
 import PremiumBadgeEffects from "@/components/badges/PremiumBadgeEffects";
 import {
   BADGE_RARITY_TOKENS,
-  getBadgeAssetPath,
-  getBadgeFallbackLabel,
   getBadgeRarityLabel,
 } from "@/lib/badges/presentation";
 import type {
@@ -39,7 +37,6 @@ export default function BadgeRevealOverlay({
   onClose,
   reducedMotion,
 }: BadgeRevealOverlayProps) {
-  const [imageFailed, setImageFailed] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const shouldReduceMotion = reducedMotion ?? Boolean(prefersReducedMotion);
   const premium = entitlement.premiumEffectsEnabled;
@@ -84,7 +81,7 @@ export default function BadgeRevealOverlay({
             type="button"
             aria-label="Dismiss badge reveal"
             onClick={onClose}
-            className="absolute inset-0 h-full w-full cursor-default bg-black/88 backdrop-blur-md"
+            className="absolute inset-0 h-full w-full cursor-default bg-black/82 backdrop-blur-md"
             initial={shouldReduceMotion ? false : { opacity: 0 }}
             animate={shouldReduceMotion ? undefined : { opacity: 1 }}
             exit={shouldReduceMotion ? undefined : { opacity: 0 }}
@@ -94,7 +91,7 @@ export default function BadgeRevealOverlay({
             role="dialog"
             aria-modal="true"
             aria-labelledby={`badge-reveal-${item.definition.slug}`}
-            className={`relative w-full max-w-md overflow-hidden rounded-lg border bg-[linear-gradient(145deg,#18181b,#030712)] p-5 text-center shadow-2xl shadow-black/70 sm:p-7 ${tokens.borderClassName}`}
+            className={`relative w-full max-w-lg overflow-hidden rounded-lg border bg-[linear-gradient(145deg,rgba(31,31,35,0.98),rgba(7,7,8,0.98))] p-5 text-center shadow-2xl shadow-black/60 sm:p-7 ${tokens.borderClassName}`}
             initial={
               shouldReduceMotion ? false : { opacity: 0, scale: 0.96, y: 18 }
             }
@@ -120,26 +117,11 @@ export default function BadgeRevealOverlay({
               <X size={18} aria-hidden="true" />
             </button>
 
-            <div className="relative z-10 mx-auto grid h-40 w-40 place-items-center overflow-hidden rounded-lg border border-white/10 bg-black/45">
-              {!imageFailed ? (
-                <Image
-                  src={getBadgeAssetPath(item, "static")}
-                  alt={`${item.definition.name} badge artwork`}
-                  width={160}
-                  height={160}
-                  unoptimized
-                  className="h-full w-full object-contain p-5"
-                  onError={() => setImageFailed(true)}
-                />
-              ) : (
-                <span
-                  data-testid="badge-reveal-asset-fallback"
-                  className={`grid h-24 w-24 place-items-center rounded-lg border text-3xl font-black ${tokens.badgeClassName}`}
-                >
-                  {getBadgeFallbackLabel(item.definition)}
-                </span>
-              )}
-            </div>
+            <BadgeArtwork
+              item={item}
+              variant="reveal"
+              className="relative z-10 mx-auto"
+            />
 
             <p className="relative z-10 mt-6 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.24em] text-orange-300">
               <Sparkles size={15} aria-hidden="true" />

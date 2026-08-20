@@ -14,12 +14,10 @@ export const PILOT_BADGE_SLUGS = [
 ] as const satisfies readonly BadgeSlug[];
 
 function badgeAssetPaths(number: BadgeNumber, slug: BadgeSlug) {
-  const prefix = `${String(number).padStart(2, "0")}-${slug}`;
+  void slug;
 
   return {
-    static: `/assets/badges/static/${prefix}.png`,
-    locked: `/assets/badges/locked/${prefix}.png`,
-    thumbnail: `/assets/badges/thumbnails/${prefix}.png`,
+    artwork: `/assets/badges/${number}.png`,
   };
 }
 

@@ -3,6 +3,7 @@ import type {
   BadgeCollection,
   BadgeCollectionItem,
   BadgeDefinition,
+  BadgeNumber,
   BadgePresentationEntitlement,
   BadgeRarity,
   BadgeSlug,
@@ -17,6 +18,24 @@ export const BADGE_RARITY_LABELS: Record<BadgeRarity, string> = {
   epic: "Epic",
   legendary: "Legendary",
 };
+
+export const BADGE_REAL_ARTWORK_NUMBERS = [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  26,
+] as const satisfies readonly BadgeNumber[];
+
+const badgeRealArtworkNumberSet = new Set<BadgeNumber>(
+  BADGE_REAL_ARTWORK_NUMBERS
+);
 
 export const BADGE_RARITY_TOKENS: Record<
   BadgeRarity,
@@ -128,13 +147,28 @@ export function getBadgeAssetPath(
   item: BadgeCollectionItem,
   preferred: "static" | "thumbnail" = "thumbnail"
 ) {
-  return item.state === "locked"
-    ? item.definition.assets.locked
-    : item.definition.assets[preferred];
+  void preferred;
+
+  return getBadgeArtworkAsset(item.definition)?.src ?? null;
 }
 
 export function getBadgeFallbackLabel(definition: BadgeDefinition) {
   return String(definition.number).padStart(2, "0");
+}
+
+export function hasBadgeArtwork(definition: BadgeDefinition) {
+  return badgeRealArtworkNumberSet.has(definition.number);
+}
+
+export function getBadgeArtworkAsset(definition: BadgeDefinition) {
+  if (!hasBadgeArtwork(definition)) {
+    return null;
+  }
+
+  return {
+    src: definition.assets.artwork,
+    alt: `${definition.name} badge artwork`,
+  };
 }
 
 export function getBadgeRarityLabel(rarity: BadgeRarity) {

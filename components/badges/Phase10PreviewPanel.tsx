@@ -6,6 +6,7 @@ import { useState } from "react";
 import BadgeDetailModal from "@/components/badges/BadgeDetailModal";
 import BadgeGrid from "@/components/badges/BadgeGrid";
 import BadgeQueue from "@/components/badges/BadgeQueue";
+import BadgeRevealOverlay from "@/components/badges/BadgeRevealOverlay";
 import BadgeSlot from "@/components/badges/BadgeSlot";
 import {
   mockBadgeRevealQueue,
@@ -123,6 +124,11 @@ export default function Phase10PreviewPanel() {
     kind: RevealPreviewKind;
     runId: number;
   } | null>(null);
+  const [manualReveal, setManualReveal] = useState<{
+    item: EarnedBadgeCollectionItem;
+    entitlement: BadgePresentationEntitlement;
+    runId: number;
+  } | null>(null);
   const [selectedItem, setSelectedItem] = useState<BadgeCollectionItem | null>(
     null
   );
@@ -195,10 +201,22 @@ export default function Phase10PreviewPanel() {
           title={`${
             mode === "premium" ? "Premium" : "Free"
           } fixture collection`}
+          onSelect={setSelectedItem}
         />
       </div>
 
-      <PilotBadgeLab onSelect={setSelectedItem} />
+      <PilotBadgeLab
+        onSelect={setSelectedItem}
+        onReveal={(item, revealEntitlement) => {
+          setActiveReveal(null);
+          setSeenItems([]);
+          setManualReveal({
+            item,
+            entitlement: revealEntitlement,
+            runId: Date.now(),
+          });
+        }}
+      />
 
       <div className="mt-5 rounded-lg border border-white/10 bg-black/35 p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -233,6 +251,7 @@ export default function Phase10PreviewPanel() {
                 type="button"
                 onClick={() => {
                   setSeenItems([]);
+                  setManualReveal(null);
                   setActiveReveal({
                     kind,
                     runId: Date.now(),
@@ -256,6 +275,15 @@ export default function Phase10PreviewPanel() {
             setSeenItems((current) => [...current, item])
           }
           reducedMotion={activeRevealConfig.reducedMotion}
+        />
+      ) : null}
+
+      {manualReveal ? (
+        <BadgeRevealOverlay
+          key={`${manualReveal.item.definition.slug}-${manualReveal.runId}`}
+          item={manualReveal.item}
+          entitlement={manualReveal.entitlement}
+          onClose={() => setManualReveal(null)}
         />
       ) : null}
 
@@ -296,8 +324,13 @@ function RarityLegend() {
 
 function PilotBadgeLab({
   onSelect,
+  onReveal,
 }: {
   onSelect: (item: BadgeCollectionItem) => void;
+  onReveal: (
+    item: EarnedBadgeCollectionItem,
+    entitlement: BadgePresentationEntitlement
+  ) => void;
 }) {
   return (
     <div className="mt-5 rounded-lg border border-white/10 bg-black/35 p-4">
@@ -323,6 +356,7 @@ function PilotBadgeLab({
             key={slug}
             slug={slug}
             onSelect={onSelect}
+            onReveal={onReveal}
           />
         ))}
       </div>
@@ -333,9 +367,14 @@ function PilotBadgeLab({
 function PilotBadgePreview({
   slug,
   onSelect,
+  onReveal,
 }: {
   slug: BadgeSlug;
   onSelect: (item: BadgeCollectionItem) => void;
+  onReveal: (
+    item: EarnedBadgeCollectionItem,
+    entitlement: BadgePresentationEntitlement
+  ) => void;
 }) {
   const lockedItem = requirePreviewItem(
     lockedPilotCollection.items,
@@ -383,6 +422,27 @@ function PilotBadgePreview({
           onSelect={onSelect}
         />
       </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          aria-label={`${earnedItem.definition.name} free reveal`}
+          onClick={() => onReveal(earnedItem, mockFreeBadgeEntitlement)}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/35 px-3 py-2 text-xs font-black uppercase tracking-wider text-zinc-200 transition hover:border-orange-400/35 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+        >
+          <Play size={14} aria-hidden="true" />
+          Free reveal
+        </button>
+        <button
+          type="button"
+          aria-label={`${earnedItem.definition.name} premium reveal`}
+          onClick={() => onReveal(earnedItem, mockPremiumBadgeEntitlement)}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-orange-400/35 bg-orange-500/10 px-3 py-2 text-xs font-black uppercase tracking-wider text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+        >
+          <Sparkles size={14} aria-hidden="true" />
+          Premium reveal
+        </button>
+      </div>
     </article>
   );
 }
@@ -413,7 +473,7 @@ function PilotStateColumn({
         item={item}
         entitlement={entitlement}
         onSelect={onSelect}
-        className="min-h-48"
+        className="min-h-56"
       />
     </div>
   );

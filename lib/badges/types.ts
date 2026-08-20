@@ -70,9 +70,7 @@ export type BadgeRarity =
   | "legendary";
 
 export type BadgeAssetPaths = {
-  static: string;
-  locked: string;
-  thumbnail: string;
+  artwork: string;
 };
 
 export type BadgeDefinition = {

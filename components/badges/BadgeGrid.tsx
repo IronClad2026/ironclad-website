@@ -20,6 +20,7 @@ export type BadgeGridProps = {
   entitlement?: BadgePresentationEntitlement;
   title?: string;
   className?: string;
+  onSelect?: (item: BadgeCollectionItem) => void;
 };
 
 export default function BadgeGrid({
@@ -27,10 +28,12 @@ export default function BadgeGrid({
   entitlement = defaultEntitlement,
   title = "IronClad badges",
   className = "",
+  onSelect,
 }: BadgeGridProps) {
   const [selectedItem, setSelectedItem] = useState<BadgeCollectionItem | null>(
     null
   );
+  const handleSelect = onSelect ?? setSelectedItem;
   const orderedItems = useMemo(
     () =>
       [...collection.items].sort(
@@ -62,20 +65,20 @@ export default function BadgeGrid({
       <div
         role="list"
         aria-label="IronClad badge collection slots"
-        className="mt-5 grid grid-cols-2 gap-3 min-[440px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-10"
+        className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
       >
         {orderedItems.map((item) => (
           <div key={item.definition.slug} role="listitem">
             <BadgeSlot
               item={item}
               entitlement={entitlement}
-              onSelect={setSelectedItem}
+              onSelect={handleSelect}
             />
           </div>
         ))}
       </div>
 
-      {selectedItem ? (
+      {!onSelect && selectedItem ? (
         <BadgeDetailModal
           item={selectedItem}
           entitlement={entitlement}

@@ -1,15 +1,14 @@
 "use client";
 
 import { CalendarDays, LockKeyhole, ShieldCheck, X } from "lucide-react";
-import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
+import BadgeArtwork from "@/components/badges/BadgeArtwork";
 import PremiumBadgeEffects from "@/components/badges/PremiumBadgeEffects";
 import {
   BADGE_RARITY_TOKENS,
   getAwardDisplayDate,
-  getBadgeAssetPath,
   getBadgeFallbackLabel,
   getBadgeRarityLabel,
   getBadgeSlotPresentation,
@@ -34,7 +33,6 @@ export default function BadgeDetailModal({
   entitlement = defaultEntitlement,
   onClose,
 }: BadgeDetailModalProps) {
-  const [imageFailed, setImageFailed] = useState(false);
   const tokens = BADGE_RARITY_TOKENS[item.definition.rarity];
   const rarityLabel = getBadgeRarityLabel(item.definition.rarity);
   const presentation = getBadgeSlotPresentation(item, entitlement);
@@ -70,13 +68,13 @@ export default function BadgeDetailModal({
         type="button"
         aria-label="Dismiss badge details"
         onClick={onClose}
-        className="absolute inset-0 h-full w-full cursor-default bg-black/82 backdrop-blur-md"
+        className="absolute inset-0 h-full w-full cursor-default bg-black/78 backdrop-blur-md"
       />
       <article
         role="dialog"
         aria-modal="true"
         aria-labelledby={`badge-detail-${item.definition.slug}`}
-        className={`relative max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-lg border bg-zinc-950 shadow-2xl shadow-black/60 ${tokens.borderClassName}`}
+        className={`relative max-h-[calc(100dvh-2rem)] w-full max-w-4xl overflow-y-auto rounded-lg border bg-[linear-gradient(180deg,rgba(24,24,27,0.98),rgba(8,8,9,0.98))] shadow-2xl shadow-black/55 ${tokens.borderClassName}`}
       >
         <PremiumBadgeEffects
           active={presentation.premiumEffectsEnabled}
@@ -113,36 +111,15 @@ export default function BadgeDetailModal({
           </button>
         </header>
 
-        <div className="relative z-10 grid gap-5 p-5 sm:grid-cols-[180px_1fr] sm:p-6">
-          <div className="relative grid aspect-square place-items-center overflow-hidden rounded-lg border border-white/10 bg-black/45">
-            {!imageFailed ? (
-              <Image
-                src={getBadgeAssetPath(item, "static")}
-                alt={`${item.definition.name} badge artwork`}
-                width={180}
-                height={180}
-                unoptimized
-                className={`h-full w-full object-contain p-5 ${
-                  item.state === "earned" ? "opacity-100" : "opacity-45"
-                }`}
-                onError={() => setImageFailed(true)}
-              />
-            ) : (
-              <span
-                data-testid="badge-detail-asset-fallback"
-                className={`grid h-24 w-24 place-items-center rounded-lg border text-3xl font-black ${
-                  item.state === "earned"
-                    ? tokens.badgeClassName
-                    : "border-white/10 bg-zinc-900 text-zinc-500"
-                }`}
-              >
-                {getBadgeFallbackLabel(item.definition)}
-              </span>
-            )}
-          </div>
+        <div className="relative z-10 grid gap-5 p-5 sm:grid-cols-[minmax(260px,340px)_1fr] sm:p-6">
+          <BadgeArtwork
+            item={item}
+            variant="detail"
+            className="mx-auto max-w-[340px]"
+          />
 
           <div className="grid gap-4">
-            <div className="rounded-lg border border-white/10 bg-black/35 p-4">
+            <div className="rounded-lg border border-orange-300/10 bg-black/35 p-4">
               <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
                 Unlock meaning
               </p>
@@ -151,7 +128,7 @@ export default function BadgeDetailModal({
               </p>
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-black/35 p-4">
+            <div className="rounded-lg border border-orange-300/10 bg-black/35 p-4">
               <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
                 {item.state === "earned" ? (
                   <ShieldCheck size={14} aria-hidden="true" />
@@ -166,7 +143,7 @@ export default function BadgeDetailModal({
             </div>
 
             {awardDate ? (
-              <div className="rounded-lg border border-white/10 bg-black/35 p-4">
+              <div className="rounded-lg border border-orange-300/10 bg-black/35 p-4">
                 <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
                   <CalendarDays size={14} aria-hidden="true" />
                   Original awarded

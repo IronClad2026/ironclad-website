@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 
 import Phase10PreviewPanel from "@/components/badges/Phase10PreviewPanel";
 
@@ -8,9 +9,16 @@ export const metadata: Metadata = {
   description: "Development-only IronClad badge system mock data preview.",
 };
 
-export default function BadgeSystemPreviewPage() {
+export default async function BadgeSystemPreviewPage() {
   if (process.env.NODE_ENV === "production") {
     notFound();
+  }
+
+  const host = (await headers()).get("host");
+  const localhostUrl = getLoopbackLocalhostUrl(host);
+
+  if (localhostUrl) {
+    redirect(localhostUrl);
   }
 
   return (
@@ -34,4 +42,31 @@ export default function BadgeSystemPreviewPage() {
       </div>
     </main>
   );
+}
+
+function getLoopbackLocalhostUrl(host: string | null) {
+  if (!host) {
+    return null;
+  }
+
+  const normalizedHost = host.toLowerCase();
+  const loopbackPrefix = "127.0.0.1";
+  const ipv6LoopbackPrefix = "[::1]";
+
+  if (
+    normalizedHost !== loopbackPrefix &&
+    !normalizedHost.startsWith(`${loopbackPrefix}:`) &&
+    normalizedHost !== ipv6LoopbackPrefix &&
+    !normalizedHost.startsWith(`${ipv6LoopbackPrefix}:`)
+  ) {
+    return null;
+  }
+
+  const port = normalizedHost.startsWith(`${loopbackPrefix}:`)
+    ? normalizedHost.slice(loopbackPrefix.length)
+    : normalizedHost.startsWith(`${ipv6LoopbackPrefix}:`)
+      ? normalizedHost.slice(ipv6LoopbackPrefix.length)
+      : "";
+
+  return `http://localhost${port}/dev/badges`;
 }

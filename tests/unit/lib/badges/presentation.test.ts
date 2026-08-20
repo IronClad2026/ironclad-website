@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { BADGE_DEFINITIONS, BADGE_TOTAL } from "@/lib/badges/catalog";
 import {
+  BADGE_DEFINITIONS,
+  BADGE_TOTAL,
+  getBadgeDefinitionByNumber,
+} from "@/lib/badges/catalog";
+import {
+  BADGE_REAL_ARTWORK_NUMBERS,
+  getBadgeArtworkAsset,
+  getBadgeAssetPath,
   getBadgeProgressSummary,
   getBadgeSlotPresentation,
+  hasBadgeArtwork,
   mapBadgeCollection,
 } from "@/lib/badges/presentation";
 import type {
@@ -25,6 +33,52 @@ const premiumEntitlement: BadgePresentationEntitlement = {
 };
 
 describe("badge presentation mapping", () => {
+  it("resolves real artwork for canonical badges with available files", () => {
+    const recruit = getBadgeDefinitionByNumber(1);
+    const eliteChampion = getBadgeDefinitionByNumber(26);
+
+    expect(BADGE_REAL_ARTWORK_NUMBERS).toEqual([
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      26,
+    ]);
+    expect(recruit).toBeDefined();
+    expect(eliteChampion).toBeDefined();
+    expect(hasBadgeArtwork(recruit!)).toBe(true);
+    expect(getBadgeArtworkAsset(recruit!)).toEqual({
+      src: "/assets/badges/1.png",
+      alt: "IronClad Recruit badge artwork",
+    });
+    expect(getBadgeArtworkAsset(eliteChampion!)).toEqual({
+      src: "/assets/badges/26.png",
+      alt: "Elite Champion badge artwork",
+    });
+  });
+
+  it("returns no artwork asset for badges that should use the fallback", () => {
+    const fiveVictories = getBadgeDefinitionByNumber(11);
+    const seasonChampion = getBadgeDefinitionByNumber(30);
+    const collection = mapBadgeCollection({ awards: [] });
+    const missingArtworkItem = collection.items.find(
+      (item) => item.definition.number === 11
+    );
+
+    expect(fiveVictories).toBeDefined();
+    expect(seasonChampion).toBeDefined();
+    expect(hasBadgeArtwork(fiveVictories!)).toBe(false);
+    expect(hasBadgeArtwork(seasonChampion!)).toBe(false);
+    expect(getBadgeArtworkAsset(fiveVictories!)).toBeNull();
+    expect(getBadgeAssetPath(missingArtworkItem!)).toBeNull();
+  });
+
   it("derives earned state only from PlayerBadgeAward input", () => {
     const emptyCollection = mapBadgeCollection({ awards: [] });
     const awardedCollection = mapBadgeCollection({

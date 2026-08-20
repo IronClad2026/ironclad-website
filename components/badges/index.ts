@@ -1,3 +1,5 @@
+export { default as BadgeArtwork } from "@/components/badges/BadgeArtwork";
+export type { BadgeArtworkProps } from "@/components/badges/BadgeArtwork";
 export { default as BadgeDetailModal } from "@/components/badges/BadgeDetailModal";
 export type { BadgeDetailModalProps } from "@/components/badges/BadgeDetailModal";
 export { default as BadgeGrid } from "@/components/badges/BadgeGrid";
