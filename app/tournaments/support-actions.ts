@@ -87,25 +87,40 @@ export async function requestMatchAdminAssistance(input: {
       );
     }
 
-    const eventKey = `match.admin_assistance:${input.matchId}:${userId}`;
-    const { data: existingRequest, error: existingRequestError } =
+    const { data: previousRequests, error: previousRequestError } =
       await supabase
         .from("notifications")
-        .select("id")
+        .select("id, in_app_hidden_at")
         .eq("recipient_role", "admin")
         .eq("type", "match.admin_assistance_requested")
         .eq("actor_clerk_user_id", userId)
         .eq("match_id", input.matchId)
-        .is("in_app_hidden_at", null)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(1);
 
-    if (existingRequestError) {
+    if (previousRequestError) {
       return failure(REQUEST_FAILED_MESSAGE, "request_failed");
     }
 
-    if (Array.isArray(existingRequest) && existingRequest.length > 0) {
+    const previousRequest = Array.isArray(previousRequests)
+      ? previousRequests[0]
+      : null;
+
+    if (previousRequest && !isAssistanceRequestRow(previousRequest)) {
+      return failure(REQUEST_FAILED_MESSAGE, "request_failed");
+    }
+
+    if (previousRequest?.in_app_hidden_at === null) {
       return success();
     }
+
+    const requestCycle = previousRequest
+      ? `after:${previousRequest.id}`
+      : "initial";
+    const eventKey =
+      `match:${input.matchId}:registration:${registrationData.id}:` +
+      `admin-assistance-request:${requestCycle}`;
 
     const created = await createInAppNotification({
       recipientRole: "admin",
@@ -175,6 +190,18 @@ function isRegistrationRow(value: unknown): value is {
     isUuid(value.tournament_id) &&
     isBoundedText(value.tournament_title) &&
     isBoundedText(value.player_name)
+  );
+}
+
+function isAssistanceRequestRow(value: unknown): value is {
+  id: string;
+  in_app_hidden_at: string | null;
+} {
+  return (
+    isRecord(value) &&
+    isUuid(value.id) &&
+    (value.in_app_hidden_at === null ||
+      typeof value.in_app_hidden_at === "string")
   );
 }
 

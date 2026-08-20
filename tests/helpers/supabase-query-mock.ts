@@ -22,12 +22,14 @@ type SupportedQueryMethod = (typeof supportedQueryMethods)[number];
 export function createSupabaseQueryMock({
   data = null,
   error = null,
+  count = null,
 }: {
   data?: unknown;
   error?: { message: string } | null;
+  count?: number | null;
 } = {}) {
   const calls: SupabaseQueryCall[] = [];
-  const result = { data, error };
+  const result = { data, error, count };
   type QueryMethod = (...args: unknown[]) => QueryMock;
   type QueryMock = PromiseLike<typeof result> &
     Record<SupportedQueryMethod, QueryMethod>;

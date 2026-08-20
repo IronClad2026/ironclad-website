@@ -37,6 +37,10 @@ class QueryMock implements PromiseLike<QueryResult> {
     return this;
   }
 
+  order() {
+    return this;
+  }
+
   limit() {
     return this;
   }
@@ -150,14 +154,23 @@ describe("match admin-assistance fallback", () => {
       tournamentTitle: "Phase 15A Fixture Tournament",
       registrationId: REGISTRATION_ID,
       matchId: MATCH_ID,
-      eventKey: `match.admin_assistance:${MATCH_ID}:${USER_ID}`,
+      eventKey:
+        `match:${MATCH_ID}:registration:${REGISTRATION_ID}:` +
+        "admin-assistance-request:initial",
       metadata: { source: "tournament_match_workspace" },
     });
   });
 
   it("treats an existing open request as success without duplicating it", async () => {
     createSupabaseAdminClientMock.mockReturnValue(
-      createClient({ existingRequests: [{ id: "existing" }] })
+      createClient({
+        existingRequests: [
+          {
+            id: "55555555-5555-4555-8555-555555555555",
+            in_app_hidden_at: null,
+          },
+        ],
+      })
     );
 
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
@@ -165,5 +178,30 @@ describe("match admin-assistance fallback", () => {
     expect(result.success).toBe(true);
     expect(result.code).toBe("requested");
     expect(createInAppNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("derives a new deterministic cycle after a prior request is hidden", async () => {
+    const priorId = "55555555-5555-4555-8555-555555555555";
+    createSupabaseAdminClientMock.mockReturnValue(
+      createClient({
+        existingRequests: [
+          {
+            id: priorId,
+            in_app_hidden_at: "2026-08-20T01:00:00.000Z",
+          },
+        ],
+      })
+    );
+
+    const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
+
+    expect(result.success).toBe(true);
+    expect(createInAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventKey:
+          `match:${MATCH_ID}:registration:${REGISTRATION_ID}:` +
+          `admin-assistance-request:after:${priorId}`,
+      })
+    );
   });
 });

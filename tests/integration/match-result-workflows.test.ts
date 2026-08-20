@@ -285,6 +285,8 @@ describe("match-result workflow contracts", () => {
         recipientClerkUserId: "user_test_opponent",
         reportGroupId: "report-group-1",
         type: "match.no_show_reported",
+        eventKey:
+          "match:match-1:report-group:report-group-1:no-show-reported",
       })
     );
     expect(createInAppNotificationMock.mock.calls[0][0]).not.toHaveProperty(

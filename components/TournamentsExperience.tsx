@@ -1320,7 +1320,6 @@ function Brackets({
       );
 
       if (
-        focusedBracket?.format === "single_elimination" &&
         focusedMatch &&
         focusedMatch.activationVersion > 0 &&
         viewerOwnsMatch
@@ -4735,7 +4734,6 @@ function MobileBrackets({
       );
 
       if (
-        focusedBracket?.format === "single_elimination" &&
         focusedMatch &&
         focusedMatch.activationVersion > 0 &&
         viewerOwnsMatch

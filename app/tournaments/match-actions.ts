@@ -354,6 +354,7 @@ export async function submitNoShowReport(
     report_group_id?: string;
     confirmation_deadline_at?: string;
   } | null;
+  const reportGroupId = reportDetails?.report_group_id ?? null;
   const submitterName =
     ownedRegistration.player_name ??
     ownedRegistrationName(match, ownedRegistration.id);
@@ -362,7 +363,7 @@ export async function submitNoShowReport(
     missingRegistration?.player_name ??
     ownedRegistrationName(match, noShowRegistrationId);
 
-  if (missingRegistration?.clerk_user_id) {
+  if (missingRegistration?.clerk_user_id && reportGroupId) {
     await createInAppNotification({
       recipientClerkUserId: missingRegistration.clerk_user_id,
       recipientRole: "player",
@@ -373,7 +374,8 @@ export async function submitNoShowReport(
       tournamentId: match.tournament_id,
       tournamentTitle: match.tournament_title,
       matchId,
-      reportGroupId: reportDetails?.report_group_id ?? null,
+      reportGroupId,
+      eventKey: `match:${matchId}:report-group:${reportGroupId}:no-show-reported`,
       metadata: {
         roundName: match.round_name,
         matchNumber: match.match_number,
@@ -779,6 +781,7 @@ type MatchMutationRow = {
   match_number: number;
   round_name: string;
   series_best_of: number;
+  activation_version: number;
 };
 
 async function loadMatchForMutation(
@@ -790,7 +793,7 @@ async function loadMatchForMutation(
   const { data, error } = await supabase
     .from("tournament_matches")
     .select(
-      "id, generated_bracket_id, match_number, series_best_of, player_one_registration_id, player_two_registration_id, player_one:registrations!tournament_matches_player_one_registration_id_fkey(player_name), player_two:registrations!tournament_matches_player_two_registration_id_fkey(player_name), bracket_rounds!inner(name), generated_brackets!inner(tournament_brackets!inner(tournament_id, launched_at, tournaments!inner(id, title)))"
+      "id, generated_bracket_id, match_number, series_best_of, activation_version, player_one_registration_id, player_two_registration_id, player_one:registrations!tournament_matches_player_one_registration_id_fkey(player_name), player_two:registrations!tournament_matches_player_two_registration_id_fkey(player_name), bracket_rounds!inner(name), generated_brackets!inner(tournament_brackets!inner(tournament_id, launched_at, tournaments!inner(id, title)))"
     )
     .eq("id", matchId)
     .maybeSingle();
@@ -805,6 +808,7 @@ async function loadMatchForMutation(
     generated_bracket_id: string;
     match_number: number;
     series_best_of: number;
+    activation_version: number;
     player_one_registration_id: string | null;
     player_two_registration_id: string | null;
     player_one?: { player_name: string | null } | { player_name: string | null }[];
@@ -855,6 +859,7 @@ async function loadMatchForMutation(
     match_number: row.match_number,
     round_name: round?.name ?? "",
     series_best_of: row.series_best_of,
+    activation_version: row.activation_version,
   };
 }
 
@@ -904,6 +909,7 @@ async function notifyPlayersOfAdminOfficialMatchResult(
       tournamentId: match.tournament_id,
       tournamentTitle: match.tournament_title,
       matchId: match.id,
+      eventKey: `match:${match.id}:activation:${match.activation_version}:admin-official-result-approved`,
       metadata: {
         roundName: match.round_name,
         matchNumber: match.match_number,

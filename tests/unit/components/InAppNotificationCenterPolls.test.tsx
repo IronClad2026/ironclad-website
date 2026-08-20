@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InAppNotification } from "@/lib/notifications";
 
 const pushMock = vi.hoisted(() => vi.fn());
-const markReadMock = vi.hoisted(() => vi.fn(async () => undefined));
+const markReadMock = vi.hoisted(() =>
+  vi.fn(async () => ({ ok: true, unreadCount: 0 }))
+);
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, refresh: vi.fn() }),

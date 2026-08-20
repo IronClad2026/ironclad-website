@@ -164,6 +164,7 @@ export async function notifyAdminsOfMatchDispute(
     tournamentTitle: context.tournamentTitle,
     matchId: context.matchId,
     reportGroupId: context.id,
+    eventKey: `match:${context.matchId}:report-group:${context.id}:dispute-opened`,
     metadata: {
       roundName: context.roundName,
       matchNumber: context.matchNumber,
@@ -217,6 +218,7 @@ export async function notifyNoShowReporterOfResponse(
     tournamentTitle: context.tournamentTitle,
     matchId: context.matchId,
     reportGroupId: context.id,
+    eventKey: `match:${context.matchId}:report-group:${context.id}:response:${decision}`,
     metadata: {
       roundName: context.roundName,
       matchNumber: context.matchNumber,
@@ -260,6 +262,7 @@ export async function notifyPlayersOfReportGroupReview(
       matchId: context.matchId,
       reportGroupId: context.id,
       resultType: context.resultType,
+      eventKey: `match:${context.matchId}:report-group:${context.id}:review:${decision}`,
       metadata: {
         roundName: context.roundName,
         matchNumber: context.matchNumber,
@@ -300,6 +303,7 @@ export async function notifyPlayersOfLegacyMatchResultReview(
       tournamentTitle: context.tournamentTitle,
       matchId: context.matchId,
       reportGroupId: null,
+      eventKey: `match:${context.matchId}:submission:${context.id}:review:${decision}`,
       metadata: {
         roundName: context.roundName,
         matchNumber: context.matchNumber,
@@ -502,6 +506,7 @@ function buildMatchReviewNotification({
   matchId,
   reportGroupId,
   resultType = "normal",
+  eventKey,
   metadata,
 }: {
   recipientClerkUserId: string;
@@ -511,6 +516,7 @@ function buildMatchReviewNotification({
   matchId: string;
   reportGroupId: string | null;
   resultType?: "normal" | "no_show";
+  eventKey: string;
   metadata: Record<string, unknown>;
 }): NotificationCreateInput {
   const approved = decision === "approved";
@@ -552,6 +558,7 @@ function buildMatchReviewNotification({
     tournamentTitle,
     matchId,
     reportGroupId,
+    eventKey,
     metadata: {
       ...metadata,
       decision,

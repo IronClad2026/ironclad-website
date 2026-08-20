@@ -86,6 +86,7 @@ export default function InAppNotificationCenter({
   const [dismissedMatchActionIds, setDismissedMatchActionIds] = useState<
     Set<string>
   >(new Set());
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const t = useOptionalTranslations(
@@ -125,6 +126,7 @@ export default function InAppNotificationCenter({
   const displayTotalCount =
     notificationTotalCount + matchActionNotifications.length;
   const displayUnreadCount = unreadCount + matchActionNotifications.length;
+  const visibleError = mutationError ?? error;
 
   useEffect(() => {
     if (!adminModalOpen) return;
@@ -147,19 +149,31 @@ export default function InAppNotificationCenter({
     if (!notification || notification.readAt !== null || pending) return;
 
     startTransition(async () => {
-      const formData = new FormData();
-      formData.set("scope", scope);
-      formData.set("notificationId", notificationId);
-      await markInAppNotificationRead(formData);
+      setMutationError(null);
+      try {
+        const formData = new FormData();
+        formData.set("scope", scope);
+        formData.set("notificationId", notificationId);
+        const result = await markInAppNotificationRead(formData);
 
-      const readAt = new Date().toISOString();
-      setNotifications((current) =>
-        current.map((item) =>
-          item.id === notificationId ? { ...item, readAt } : item
-        )
-      );
-      setUnreadCount((current) => Math.max(current - 1, 0));
-      router.refresh();
+        if (!result.ok) {
+          setMutationError(t("dashboard.actions.updateFailed"));
+          router.refresh();
+          return;
+        }
+
+        const readAt = new Date().toISOString();
+        setNotifications((current) =>
+          current.map((item) =>
+            item.id === notificationId ? { ...item, readAt } : item
+          )
+        );
+        setUnreadCount(result.unreadCount);
+        router.refresh();
+      } catch {
+        setMutationError(t("dashboard.actions.updateFailed"));
+        router.refresh();
+      }
     });
   };
 
@@ -167,16 +181,28 @@ export default function InAppNotificationCenter({
     if (unreadCount === 0 || pending) return;
 
     startTransition(async () => {
-      const formData = new FormData();
-      formData.set("scope", scope);
-      await markAllInAppNotificationsRead(formData);
+      setMutationError(null);
+      try {
+        const formData = new FormData();
+        formData.set("scope", scope);
+        const result = await markAllInAppNotificationsRead(formData);
 
-      const readAt = new Date().toISOString();
-      setNotifications((current) =>
-        current.map((notification) => ({ ...notification, readAt }))
-      );
-      setUnreadCount(0);
-      router.refresh();
+        if (!result.ok) {
+          setMutationError(t("dashboard.actions.updateFailed"));
+          router.refresh();
+          return;
+        }
+
+        const readAt = new Date().toISOString();
+        setNotifications((current) =>
+          current.map((notification) => ({ ...notification, readAt }))
+        );
+        setUnreadCount(result.unreadCount);
+        router.refresh();
+      } catch {
+        setMutationError(t("dashboard.actions.updateFailed"));
+        router.refresh();
+      }
     });
   };
 
@@ -218,31 +244,37 @@ export default function InAppNotificationCenter({
     if (selectedIds.length === 0 || pending) return;
 
     startTransition(async () => {
-      const formData = new FormData();
-      formData.set("scope", scope);
-      for (const notificationId of selectedIds) {
-        formData.append("notificationId", notificationId);
+      setMutationError(null);
+      try {
+        const formData = new FormData();
+        formData.set("scope", scope);
+        for (const notificationId of selectedIds) {
+          formData.append("notificationId", notificationId);
+        }
+
+        const result = await markVisibleInAppNotificationsRead(formData);
+
+        if (!result.ok) {
+          setMutationError(t("dashboard.actions.updateFailed"));
+          router.refresh();
+          return;
+        }
+
+        const readAt = new Date().toISOString();
+        setNotifications((current) =>
+          current.map((notification) =>
+            selectedIds.includes(notification.id)
+              ? { ...notification, readAt }
+              : notification
+          )
+        );
+        setUnreadCount(result.unreadCount);
+        setSelectedNotificationIds(new Set());
+        router.refresh();
+      } catch {
+        setMutationError(t("dashboard.actions.updateFailed"));
+        router.refresh();
       }
-
-      await markVisibleInAppNotificationsRead(formData);
-
-      const readAt = new Date().toISOString();
-      const newlyReadCount = notifications.filter(
-        (notification) =>
-          selectedNotificationIds.has(notification.id) &&
-          notification.readAt === null
-      ).length;
-
-      setNotifications((current) =>
-        current.map((notification) =>
-          selectedIds.includes(notification.id)
-            ? { ...notification, readAt }
-            : notification
-        )
-      );
-      setUnreadCount((current) => Math.max(current - newlyReadCount, 0));
-      setSelectedNotificationIds(new Set());
-      router.refresh();
     });
   };
 
@@ -259,52 +291,69 @@ export default function InAppNotificationCenter({
     }
 
     startTransition(async () => {
-      if (selectedIds.length > 0) {
-        const formData = new FormData();
-        formData.set("scope", scope);
-        for (const notificationId of selectedIds) {
-          formData.append("notificationId", notificationId);
-        }
+      setMutationError(null);
+      try {
+        let authoritativeUnreadCount: number | null = null;
 
-        await deleteSelectedInAppNotifications(formData);
-      }
-
-      if (scope === "player" && selectedMatchActionIds.length > 0) {
-        const formData = new FormData();
-        for (const notificationId of selectedMatchActionIds) {
-          formData.append("notificationId", notificationId);
-        }
-        await dismissDashboardNotifications(formData);
-      }
-
-      const deleted = new Set(selectedIds);
-      const deletedUnreadCount = notifications.filter(
-        (notification) =>
-          deleted.has(notification.id) && notification.readAt === null
-      ).length;
-      const remaining = notifications.filter(
-        (notification) => !deleted.has(notification.id)
-      );
-
-      setNotifications(remaining);
-      setNotificationTotalCount((current) =>
-        Math.max(current - selectedIds.length, 0)
-      );
-      setUnreadCount((current) => Math.max(current - deletedUnreadCount, 0));
-      if (selectedMatchActionIds.length > 0) {
-        setDismissedMatchActionIds((current) => {
-          const next = new Set(current);
-          for (const notificationId of selectedMatchActionIds) {
-            next.add(notificationId);
+        if (selectedIds.length > 0) {
+          const formData = new FormData();
+          formData.set("scope", scope);
+          for (const notificationId of selectedIds) {
+            formData.append("notificationId", notificationId);
           }
-          return next;
-        });
+
+          const result = await deleteSelectedInAppNotifications(formData);
+          if (!result.ok) {
+            setMutationError(t("dashboard.actions.updateFailed"));
+            router.refresh();
+            return;
+          }
+          authoritativeUnreadCount = result.unreadCount;
+        }
+
+        if (scope === "player" && selectedMatchActionIds.length > 0) {
+          const formData = new FormData();
+          for (const notificationId of selectedMatchActionIds) {
+            formData.append("notificationId", notificationId);
+          }
+          const result = await dismissDashboardNotifications(formData);
+          if (result.status !== "success") {
+            setMutationError(t("dashboard.actions.updateFailed"));
+            router.refresh();
+            return;
+          }
+        }
+
+        const deleted = new Set(selectedIds);
+        const remaining = notifications.filter(
+          (notification) => !deleted.has(notification.id)
+        );
+
+        setNotifications(remaining);
+        setNotificationTotalCount((current) =>
+          Math.max(current - selectedIds.length, 0)
+        );
+        if (authoritativeUnreadCount !== null) {
+          setUnreadCount(authoritativeUnreadCount);
+        }
+        if (selectedMatchActionIds.length > 0) {
+          setDismissedMatchActionIds((current) => {
+            const next = new Set(current);
+            for (const notificationId of selectedMatchActionIds) {
+              next.add(notificationId);
+            }
+            return next;
+          });
+        }
+        setSelectedNotificationIds(new Set());
+        setSelectedId((current) =>
+          current && deleted.has(current) ? (remaining[0]?.id ?? null) : current
+        );
+        router.refresh();
+      } catch {
+        setMutationError(t("dashboard.actions.updateFailed"));
+        router.refresh();
       }
-      setSelectedNotificationIds(new Set());
-      setSelectedId((current) =>
-        current && deleted.has(current) ? (remaining[0]?.id ?? null) : current
-      );
-      router.refresh();
     });
   };
 
@@ -319,11 +368,27 @@ export default function InAppNotificationCenter({
       notification.type === "poll.decision_published"
     ) {
       startTransition(async () => {
-        if (notification.readAt === null) {
-          const formData = new FormData();
-          formData.set("scope", "player");
-          formData.set("notificationId", notification.id);
-          await markInAppNotificationRead(formData);
+        setMutationError(null);
+        try {
+          if (notification.readAt === null) {
+            const formData = new FormData();
+            formData.set("scope", "player");
+            formData.set("notificationId", notification.id);
+            const result = await markInAppNotificationRead(formData);
+            if (result.ok) {
+              const readAt = new Date().toISOString();
+              setNotifications((current) =>
+                current.map((item) =>
+                  item.id === notification.id ? { ...item, readAt } : item
+                )
+              );
+              setUnreadCount(result.unreadCount);
+            } else {
+              setMutationError(t("dashboard.actions.updateFailed"));
+            }
+          }
+        } catch {
+          setMutationError(t("dashboard.actions.updateFailed"));
         }
 
         router.push(notification.href ?? "/tournaments");
@@ -378,7 +443,7 @@ export default function InAppNotificationCenter({
                     selectedNotification={selectedNotification}
                     unreadCount={unreadCount}
                     pending={pending}
-                    error={error}
+                    error={visibleError}
                     emptyMessage={emptyMessage}
                     selectedIds={selectedNotificationIds}
                     allVisibleSelected={allVisibleSelected}
@@ -445,9 +510,12 @@ export default function InAppNotificationCenter({
             className="border-t border-white/10"
           >
             <div className="space-y-3 p-4 sm:p-5">
-              {error && (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-                  {error}
+              {visibleError && (
+                <div
+                  role="alert"
+                  className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300"
+                >
+                  {visibleError}
                 </div>
               )}
 
@@ -692,7 +760,10 @@ function AdminNotificationModal({
         </header>
 
         {error && (
-          <div className="border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-300">
+          <div
+            role="alert"
+            className="border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-300"
+          >
             {error}
           </div>
         )}
