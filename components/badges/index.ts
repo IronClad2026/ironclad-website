@@ -10,6 +10,10 @@ export { default as BadgeRevealOverlay } from "@/components/badges/BadgeRevealOv
 export type { BadgeRevealOverlayProps } from "@/components/badges/BadgeRevealOverlay";
 export { default as BadgeSlot } from "@/components/badges/BadgeSlot";
 export type { BadgeSlotProps } from "@/components/badges/BadgeSlot";
+export { default as DashboardBadgeCollection } from "@/components/badges/DashboardBadgeCollection";
+export type { DashboardBadgeCollectionProps } from "@/components/badges/DashboardBadgeCollection";
+export { default as DashboardBadgesSection } from "@/components/badges/DashboardBadgesSection";
+export type { DashboardBadgesSectionProps } from "@/components/badges/DashboardBadgesSection";
 export { default as Phase10PreviewPanel } from "@/components/badges/Phase10PreviewPanel";
 export { default as PremiumBadgeEffects } from "@/components/badges/PremiumBadgeEffects";
 export type { PremiumBadgeEffectsProps } from "@/components/badges/PremiumBadgeEffects";

@@ -265,25 +265,25 @@ describe("badge foundation components", () => {
     const image = within(button).getByRole("img", {
       name: "IronClad Recruit badge artwork",
     });
+    const artworkFrame = image.closest("[data-badge-artwork]");
 
     expect(image).toHaveAttribute("src", "/assets/badges/1.png");
     expect(image).toHaveClass("object-contain");
     expect(image).not.toHaveClass("mix-blend-multiply");
     expect(image.className).not.toContain("bg-white");
-    expect(image.closest("[data-badge-artwork]")).toHaveAttribute(
+    expect(artworkFrame).toHaveAttribute(
       "data-badge-artwork",
       "real"
     );
-    expect(image.closest("[data-badge-artwork]")).toHaveAttribute(
+    expect(artworkFrame).toHaveAttribute(
       "data-badge-artwork-surface",
       "card"
     );
-    expect(image.closest("[data-badge-artwork]")).toHaveClass(
-      "pointer-events-none"
-    );
-    expect(image.closest("[data-badge-artwork]")?.className).not.toContain(
-      "bg-white"
-    );
+    expect(artworkFrame).toHaveClass("pointer-events-none");
+    expect(artworkFrame).toHaveClass("overflow-visible");
+    expect(artworkFrame).not.toHaveClass("rounded-lg");
+    expect(artworkFrame).not.toHaveClass("overflow-hidden");
+    expect(artworkFrame?.className).not.toContain("bg-");
   });
 
   it("renders locked BadgeSlot artwork when available", () => {
@@ -295,18 +295,22 @@ describe("badge foundation components", () => {
     const image = within(button).getByRole("img", {
       name: "First Deployment badge artwork",
     });
+    const artworkFrame = image.closest("[data-badge-artwork]");
 
     expect(image).toHaveAttribute("src", "/assets/badges/2.png");
     expect(image).toHaveClass("grayscale");
     expect(image).toHaveClass("object-contain");
-    expect(image).toHaveClass("opacity-[0.72]");
-    expect(image).toHaveClass("brightness-[0.88]");
+    expect(image).toHaveClass("opacity-[0.8]");
+    expect(image).toHaveClass("brightness-[0.94]");
     expect(image).not.toHaveClass("brightness-[0.52]");
     expect(image).not.toHaveClass("mix-blend-multiply");
-    expect(image.closest("[data-badge-artwork]")).toHaveAttribute(
-      "data-badge-artwork",
-      "real"
-    );
+    expect(artworkFrame).toHaveAttribute("data-badge-artwork", "real");
+    expect(artworkFrame?.className).not.toContain("bg-");
+    expect(
+      Array.from(artworkFrame?.querySelectorAll("span") ?? []).some((span) =>
+        span.className.includes("bg-black/6")
+      )
+    ).toBe(false);
   });
 
   it("closes BadgeDetailModal with Escape", () => {
@@ -451,17 +455,22 @@ describe("badge foundation components", () => {
       name: "Five Victories, Uncommon, locked",
     });
     const fallback = within(button).getByTestId("badge-artwork-fallback");
+    const artworkFrame = fallback.closest("[data-badge-artwork]");
 
     expect(within(button).queryByRole("img")).not.toBeInTheDocument();
     expect(fallback).toHaveTextContent("11");
     expect(fallback).toHaveTextContent("Five Victories");
     expect(fallback).toHaveTextContent("Uncommon");
     expect(fallback).toHaveTextContent("Locked");
-    expect(fallback.closest("[data-badge-artwork]")).toHaveAttribute(
+    expect(artworkFrame).toHaveAttribute(
       "data-badge-artwork-surface",
       "fallback"
     );
-    expect(fallback.closest("[data-badge-artwork]")).not.toHaveClass("border");
+    expect(artworkFrame).not.toHaveClass("border");
+    expect(artworkFrame).toHaveClass("overflow-visible");
+    expect(artworkFrame).not.toHaveClass("overflow-hidden");
+    expect(artworkFrame).not.toHaveClass("rounded-lg");
+    expect(artworkFrame?.className).not.toContain("bg-");
     expect(within(fallback).getByText("11")).not.toHaveClass("rounded-lg");
     expect(within(fallback).getByText("11")).not.toHaveClass("border");
   });

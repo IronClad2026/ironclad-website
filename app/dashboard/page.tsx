@@ -16,12 +16,14 @@ import type { ReactNode } from "react";
 import DashboardChampionHistory from "@/components/DashboardChampionHistory";
 import DashboardMatchHistory from "@/components/DashboardMatchHistory";
 import DashboardNotifications from "@/components/DashboardNotifications";
+import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
 import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
 import PlayerRegistrationActions from "@/components/PlayerRegistrationActions";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
+import { buildDashboardBadgeData } from "@/lib/badges/dashboard";
 import {
   getLocalizedCountryName,
   getLocalizedPlayerRegion,
@@ -165,6 +167,9 @@ export default async function PlayerDashboardPage() {
       first(registration.tournaments)?.status ?? "upcoming",
   }));
   const profileComplete = profile?.profile_completed === true;
+  const dashboardBadgeData = buildDashboardBadgeData({
+    playerId: profile?.id ?? null,
+  });
 
   return (
     <main
@@ -366,6 +371,9 @@ export default async function PlayerDashboardPage() {
           statistics={career.statistics}
           locale={locale}
           t={t}
+        />
+        <DashboardBadgesSection
+          badgeData={dashboardBadgeData}
         />
         <DashboardChampionHistory champions={career.champions} />
         <DashboardMatchHistory matches={career.matchHistory} />

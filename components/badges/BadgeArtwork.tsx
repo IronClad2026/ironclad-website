@@ -57,16 +57,13 @@ export default function BadgeArtwork({
   const fallbackLabel = getBadgeFallbackLabel(item.definition);
   const showArtwork = Boolean(artwork && failedArtworkSrc !== artwork.src);
   const StatusIcon = isEarned ? Award : LockKeyhole;
-  const surfaceClassName = showArtwork
-    ? "overflow-visible rounded-lg bg-transparent"
-    : "overflow-hidden rounded-lg bg-[radial-gradient(circle_at_50%_34%,rgba(249,115,22,0.14),rgba(39,39,42,0.32)_42%,transparent_72%)]";
 
   return (
     <span
       data-badge-artwork={showArtwork ? "real" : "fallback"}
       data-badge-number={fallbackLabel}
       data-badge-artwork-surface={showArtwork ? "card" : "fallback"}
-      className={`pointer-events-none relative isolate grid place-items-center ${surfaceClassName} ${frameClassNames[variant]} ${className}`}
+      className={`pointer-events-none relative isolate grid place-items-center overflow-visible ${frameClassNames[variant]} ${className}`}
     >
       {showArtwork && artwork ? (
         <>
@@ -80,20 +77,14 @@ export default function BadgeArtwork({
             className={`relative z-10 h-full w-full object-contain drop-shadow-[0_14px_18px_rgba(0,0,0,0.38)] ${
               isEarned
                 ? "opacity-100"
-                : "opacity-[0.72] grayscale brightness-[0.88] saturate-[0.72]"
+                : "opacity-[0.8] grayscale brightness-[0.94] saturate-[0.78]"
             }`}
             onError={() => setFailedArtworkSrc(artwork.src)}
           />
           {!isEarned ? (
-            <>
-              <span
-                aria-hidden="true"
-                className="absolute inset-0 z-20 rounded-lg bg-black/12"
-              />
-              <span className="absolute right-1 top-1 z-30 grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-zinc-950/82 text-zinc-300 shadow-lg shadow-black/35">
-                <LockKeyhole size={16} aria-hidden="true" />
-              </span>
-            </>
+            <span className="absolute right-1 top-1 z-30 grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-zinc-950/78 text-zinc-300 shadow-lg shadow-black/35">
+              <LockKeyhole size={16} aria-hidden="true" />
+            </span>
           ) : null}
         </>
       ) : (
