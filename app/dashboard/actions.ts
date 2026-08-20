@@ -9,6 +9,7 @@ import {
 import {
   BadgeAuthorityError,
   evaluateMatchBadgeAwardsForReportGroup,
+  evaluateTournamentBadgeAwardsForReportGroup,
 } from "@/lib/badges/authority";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
@@ -279,7 +280,7 @@ export async function confirmDashboardMatchResult(
     );
   }
 
-  await evaluateMatchBadgesAfterReportGroup(supabase, reportGroupId);
+  await evaluateBadgesAfterReportGroup(supabase, reportGroupId);
 
   await notifyNoShowReporterOfResponse(supabase, {
     reportGroupId,
@@ -696,7 +697,7 @@ function revalidateDashboardPaths() {
   revalidatePath("/admin/tournaments");
 }
 
-async function evaluateMatchBadgesAfterReportGroup(
+async function evaluateBadgesAfterReportGroup(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   reportGroupId: string
 ) {
@@ -712,6 +713,21 @@ async function evaluateMatchBadgesAfterReportGroup(
         error instanceof BadgeAuthorityError
           ? error.code
           : "BADGE_MATCH_EVALUATION_FAILED",
+    });
+  }
+
+  try {
+    await evaluateTournamentBadgeAwardsForReportGroup({
+      supabase,
+      reportGroupId,
+    });
+  } catch (error) {
+    console.error("Badge tournament evaluation failed.", {
+      operation: "badge-tournament-evaluation",
+      code:
+        error instanceof BadgeAuthorityError
+          ? error.code
+          : "BADGE_TOURNAMENT_EVALUATION_FAILED",
     });
   }
 }

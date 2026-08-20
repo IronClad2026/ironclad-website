@@ -9,7 +9,12 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "first-deployment",
   "first-victory",
   "battle-tested",
+  "first-campaign",
+  "iron-regular",
+  "tournament-veteran",
   "five-victories",
+  "ten-victories",
+  "twenty-five-victories",
 ] as const satisfies readonly BadgeSlug[];
 
 type ProductionBadgeAuthoritySlug =
@@ -17,7 +22,7 @@ type ProductionBadgeAuthoritySlug =
 
 type BadgeAuthorityClient = Pick<SupabaseClient, "from" | "rpc">;
 
-type BadgeSourceType = "profile" | "match";
+type BadgeSourceType = "profile" | "match" | "tournament";
 
 type BadgeSourceMetadata = Record<string, string | number | boolean | null>;
 
@@ -75,6 +80,28 @@ type MatchBadgeSummaryRow = {
   first_win_at: unknown;
   fifth_win_match_id: unknown;
   fifth_win_at: unknown;
+  tenth_win_match_id: unknown;
+  tenth_win_at: unknown;
+  twenty_fifth_win_match_id: unknown;
+  twenty_fifth_win_at: unknown;
+};
+
+type TournamentBadgeParticipantRow = {
+  player_id: unknown;
+};
+
+type TournamentBadgeForMatchRow = {
+  tournament_id: unknown;
+};
+
+type TournamentBadgeSummaryRow = {
+  completed_tournament_count: unknown;
+  first_completed_tournament_id: unknown;
+  first_completed_at: unknown;
+  third_completed_tournament_id: unknown;
+  third_completed_at: unknown;
+  tenth_completed_tournament_id: unknown;
+  tenth_completed_at: unknown;
 };
 
 type MatchThreshold = {
@@ -85,13 +112,30 @@ type MatchThreshold = {
     | "firstPlayedMatchId"
     | "tenthPlayedMatchId"
     | "firstWinMatchId"
-    | "fifthWinMatchId";
+    | "fifthWinMatchId"
+    | "tenthWinMatchId"
+    | "twentyFifthWinMatchId";
   originalUnlockedAtKey:
     | "firstPlayedAt"
     | "tenthPlayedAt"
     | "firstWinAt"
-    | "fifthWinAt";
+    | "fifthWinAt"
+    | "tenthWinAt"
+    | "twentyFifthWinAt";
   evaluator: "match-count" | "win-count";
+};
+
+type TournamentThreshold = {
+  badgeSlug: ProductionBadgeAuthoritySlug;
+  threshold: number;
+  sourceIdKey:
+    | "firstCompletedTournamentId"
+    | "thirdCompletedTournamentId"
+    | "tenthCompletedTournamentId";
+  originalUnlockedAtKey:
+    | "firstCompletedAt"
+    | "thirdCompletedAt"
+    | "tenthCompletedAt";
 };
 
 const PROFILE_SELECT = [
@@ -139,6 +183,43 @@ const MATCH_THRESHOLDS: readonly MatchThreshold[] = [
     sourceIdKey: "fifthWinMatchId",
     originalUnlockedAtKey: "fifthWinAt",
     evaluator: "win-count",
+  },
+  {
+    badgeSlug: "ten-victories",
+    countKey: "winCount",
+    threshold: 10,
+    sourceIdKey: "tenthWinMatchId",
+    originalUnlockedAtKey: "tenthWinAt",
+    evaluator: "win-count",
+  },
+  {
+    badgeSlug: "twenty-five-victories",
+    countKey: "winCount",
+    threshold: 25,
+    sourceIdKey: "twentyFifthWinMatchId",
+    originalUnlockedAtKey: "twentyFifthWinAt",
+    evaluator: "win-count",
+  },
+];
+
+const TOURNAMENT_THRESHOLDS: readonly TournamentThreshold[] = [
+  {
+    badgeSlug: "first-campaign",
+    threshold: 1,
+    sourceIdKey: "firstCompletedTournamentId",
+    originalUnlockedAtKey: "firstCompletedAt",
+  },
+  {
+    badgeSlug: "iron-regular",
+    threshold: 3,
+    sourceIdKey: "thirdCompletedTournamentId",
+    originalUnlockedAtKey: "thirdCompletedAt",
+  },
+  {
+    badgeSlug: "tournament-veteran",
+    threshold: 10,
+    sourceIdKey: "tenthCompletedTournamentId",
+    originalUnlockedAtKey: "tenthCompletedAt",
   },
 ];
 
@@ -268,25 +349,9 @@ export async function evaluateMatchBadgeAwardsForReportGroup({
   reportGroupId: string;
   supabase?: BadgeAuthorityClient;
 }): Promise<BadgeAwardEvaluationResult> {
-  const { data, error } = await supabase
-    .from("match_result_report_groups")
-    .select("match_id, status, finalized_at")
-    .eq("id", reportGroupId)
-    .maybeSingle();
+  const matchId = await loadFinalizedReportGroupMatchId(supabase, reportGroupId);
 
-  if (error) {
-    throw new BadgeAuthorityError(
-      "REPORT_GROUP_LOAD_FAILED",
-      "Badge match evaluation could not load the report group."
-    );
-  }
-
-  const reportGroup = firstRecord(data);
-  const matchId = stringOrNull(reportGroup?.match_id);
-  const status = stringOrNull(reportGroup?.status);
-  const finalizedAt = isoOrNull(reportGroup?.finalized_at);
-
-  if (!matchId || !finalizedAt || !isFinalizedReportGroupStatus(status)) {
+  if (!matchId) {
     return {
       ...EMPTY_EVALUATION_RESULT,
       skippedReasons: ["report_group_not_finalized"],
@@ -303,24 +368,12 @@ export async function evaluateMatchBadgeAwardsForLegacySubmission({
   submissionId: string;
   supabase?: BadgeAuthorityClient;
 }): Promise<BadgeAwardEvaluationResult> {
-  const { data, error } = await supabase
-    .from("match_result_submissions")
-    .select("match_id, status")
-    .eq("id", submissionId)
-    .maybeSingle();
+  const matchId = await loadApprovedLegacySubmissionMatchId(
+    supabase,
+    submissionId
+  );
 
-  if (error) {
-    throw new BadgeAuthorityError(
-      "SUBMISSION_LOAD_FAILED",
-      "Badge match evaluation could not load the legacy submission."
-    );
-  }
-
-  const submission = firstRecord(data);
-  const matchId = stringOrNull(submission?.match_id);
-  const status = stringOrNull(submission?.status);
-
-  if (!matchId || status !== "approved") {
+  if (!matchId) {
     return {
       ...EMPTY_EVALUATION_RESULT,
       skippedReasons: ["submission_not_approved"],
@@ -328,6 +381,195 @@ export async function evaluateMatchBadgeAwardsForLegacySubmission({
   }
 
   return evaluateMatchBadgeAwardsForMatch({ matchId, supabase });
+}
+
+export async function evaluateTournamentBadgeAwardsForMatch({
+  matchId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  matchId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const tournamentId = await loadCompletedTournamentIdForMatch(
+    supabase,
+    matchId
+  );
+
+  if (!tournamentId) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      skippedReasons: ["tournament_not_completed"],
+    };
+  }
+
+  return evaluateTournamentBadgeAwardsForTournament({
+    tournamentId,
+    supabase,
+    evaluationMode,
+  });
+}
+
+export async function evaluateTournamentBadgeAwardsForReportGroup({
+  reportGroupId,
+  supabase = createSupabaseAdminClient(),
+}: {
+  reportGroupId: string;
+  supabase?: BadgeAuthorityClient;
+}): Promise<BadgeAwardEvaluationResult> {
+  const matchId = await loadFinalizedReportGroupMatchId(supabase, reportGroupId);
+
+  if (!matchId) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      skippedReasons: ["report_group_not_finalized"],
+    };
+  }
+
+  return evaluateTournamentBadgeAwardsForMatch({ matchId, supabase });
+}
+
+export async function evaluateTournamentBadgeAwardsForLegacySubmission({
+  submissionId,
+  supabase = createSupabaseAdminClient(),
+}: {
+  submissionId: string;
+  supabase?: BadgeAuthorityClient;
+}): Promise<BadgeAwardEvaluationResult> {
+  const matchId = await loadApprovedLegacySubmissionMatchId(
+    supabase,
+    submissionId
+  );
+
+  if (!matchId) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      skippedReasons: ["submission_not_approved"],
+    };
+  }
+
+  return evaluateTournamentBadgeAwardsForMatch({ matchId, supabase });
+}
+
+export async function evaluateTournamentBadgeAwardsForTournament({
+  tournamentId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  tournamentId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_tournament_participants",
+    {
+      p_tournament_id: tournamentId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "TOURNAMENT_PARTICIPANTS_LOAD_FAILED",
+      "Badge tournament evaluation could not load participants."
+    );
+  }
+
+  const playerIds = [
+    ...new Set(
+      rowsOf<TournamentBadgeParticipantRow>(data)
+        .map((row) => stringOrNull(row.player_id))
+        .filter((value): value is string => value !== null)
+    ),
+  ];
+
+  if (playerIds.length === 0) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      skippedReasons: ["tournament_not_completed"],
+    };
+  }
+
+  return mergeEvaluationResults(
+    await Promise.all(
+      playerIds.map((playerId) =>
+        evaluateTournamentBadgeAwardsForPlayer({
+          playerId,
+          supabase,
+          evaluationMode,
+        })
+      )
+    )
+  );
+}
+
+export async function evaluateTournamentBadgeAwardsForPlayer({
+  playerId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  playerId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const summary = await loadTournamentBadgeSummary(supabase, playerId);
+  if (!summary) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: TOURNAMENT_THRESHOLDS.map(
+        (threshold) => threshold.badgeSlug
+      ),
+      skippedReasons: ["tournament_summary_unavailable"],
+    };
+  }
+
+  const createdSlugs: ProductionBadgeAuthoritySlug[] = [];
+  const skippedReasons: string[] = [];
+
+  for (const threshold of TOURNAMENT_THRESHOLDS) {
+    const sourceId = summary[threshold.sourceIdKey];
+    const originalUnlockedAt = summary[threshold.originalUnlockedAtKey];
+
+    if (summary.completedTournamentCount < threshold.threshold) {
+      skippedReasons.push(`${threshold.badgeSlug}_threshold_not_met`);
+      continue;
+    }
+
+    if (!sourceId) {
+      skippedReasons.push(`${threshold.badgeSlug}_source_missing`);
+      continue;
+    }
+
+    const created = await persistBadgeAward(supabase, {
+      playerId,
+      badgeSlug: threshold.badgeSlug,
+      sourceType: "tournament",
+      sourceId,
+      originalUnlockedAt,
+      sourceMetadata: {
+        evaluator: "tournament-count",
+        evaluationMode,
+        threshold: threshold.threshold,
+        qualifyingCount: summary.completedTournamentCount,
+        originalUnlockedAtBasis: originalUnlockedAt
+          ? "tournament_first_completed_at"
+          : "unavailable",
+      },
+    });
+
+    if (created) {
+      createdSlugs.push(threshold.badgeSlug);
+    }
+  }
+
+  return {
+    createdCount: createdSlugs.length,
+    createdSlugs,
+    evaluatedSlugs: TOURNAMENT_THRESHOLDS.map(
+      (threshold) => threshold.badgeSlug
+    ),
+    skippedReasons,
+  };
 }
 
 export async function evaluateMatchBadgeAwardsForPlayer({
@@ -422,6 +664,11 @@ export async function backfillInitialBadgeAwards({
           supabase,
           evaluationMode: "backfill",
         }),
+        await evaluateTournamentBadgeAwardsForPlayer({
+          playerId,
+          supabase,
+          evaluationMode: "backfill",
+        }),
       ]);
 
       for (const slug of result.createdSlugs) {
@@ -472,7 +719,7 @@ async function loadMatchBadgeSummary(
   playerId: string
 ) {
   const { data, error } = await supabase.rpc(
-    "get_player_badge_match_summary",
+    "get_player_badge_match_threshold_summary",
     {
       p_player_id: playerId,
     }
@@ -501,7 +748,125 @@ async function loadMatchBadgeSummary(
     firstWinAt: isoOrNull(row.first_win_at),
     fifthWinMatchId: stringOrNull(row.fifth_win_match_id),
     fifthWinAt: isoOrNull(row.fifth_win_at),
+    tenthWinMatchId: stringOrNull(row.tenth_win_match_id),
+    tenthWinAt: isoOrNull(row.tenth_win_at),
+    twentyFifthWinMatchId: stringOrNull(row.twenty_fifth_win_match_id),
+    twentyFifthWinAt: isoOrNull(row.twenty_fifth_win_at),
   };
+}
+
+async function loadCompletedTournamentIdForMatch(
+  supabase: BadgeAuthorityClient,
+  matchId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_tournament_for_match",
+    {
+      p_match_id: matchId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "MATCH_TOURNAMENT_LOAD_FAILED",
+      "Badge tournament evaluation could not load the match tournament."
+    );
+  }
+
+  return stringOrNull(
+    rowsOf<TournamentBadgeForMatchRow>(data)[0]?.tournament_id
+  );
+}
+
+async function loadTournamentBadgeSummary(
+  supabase: BadgeAuthorityClient,
+  playerId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_tournament_summary",
+    {
+      p_player_id: playerId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "TOURNAMENT_SUMMARY_LOAD_FAILED",
+      "Badge tournament evaluation could not load the tournament summary."
+    );
+  }
+
+  const row = rowsOf<TournamentBadgeSummaryRow>(data)[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    completedTournamentCount: integerOrZero(row.completed_tournament_count),
+    firstCompletedTournamentId: stringOrNull(
+      row.first_completed_tournament_id
+    ),
+    firstCompletedAt: isoOrNull(row.first_completed_at),
+    thirdCompletedTournamentId: stringOrNull(
+      row.third_completed_tournament_id
+    ),
+    thirdCompletedAt: isoOrNull(row.third_completed_at),
+    tenthCompletedTournamentId: stringOrNull(
+      row.tenth_completed_tournament_id
+    ),
+    tenthCompletedAt: isoOrNull(row.tenth_completed_at),
+  };
+}
+
+async function loadFinalizedReportGroupMatchId(
+  supabase: BadgeAuthorityClient,
+  reportGroupId: string
+) {
+  const { data, error } = await supabase
+    .from("match_result_report_groups")
+    .select("match_id, status, finalized_at")
+    .eq("id", reportGroupId)
+    .maybeSingle();
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "REPORT_GROUP_LOAD_FAILED",
+      "Badge match evaluation could not load the report group."
+    );
+  }
+
+  const reportGroup = firstRecord(data);
+  const matchId = stringOrNull(reportGroup?.match_id);
+  const status = stringOrNull(reportGroup?.status);
+  const finalizedAt = isoOrNull(reportGroup?.finalized_at);
+
+  return matchId && finalizedAt && isFinalizedReportGroupStatus(status)
+    ? matchId
+    : null;
+}
+
+async function loadApprovedLegacySubmissionMatchId(
+  supabase: BadgeAuthorityClient,
+  submissionId: string
+) {
+  const { data, error } = await supabase
+    .from("match_result_submissions")
+    .select("match_id, status")
+    .eq("id", submissionId)
+    .maybeSingle();
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "SUBMISSION_LOAD_FAILED",
+      "Badge match evaluation could not load the legacy submission."
+    );
+  }
+
+  const submission = firstRecord(data);
+  const matchId = stringOrNull(submission?.match_id);
+  const status = stringOrNull(submission?.status);
+
+  return matchId && status === "approved" ? matchId : null;
 }
 
 async function persistBadgeAward(

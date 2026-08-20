@@ -28,6 +28,9 @@ import {
   evaluateMatchBadgeAwardsForLegacySubmission,
   evaluateMatchBadgeAwardsForMatch,
   evaluateMatchBadgeAwardsForReportGroup,
+  evaluateTournamentBadgeAwardsForLegacySubmission,
+  evaluateTournamentBadgeAwardsForMatch,
+  evaluateTournamentBadgeAwardsForReportGroup,
 } from "@/lib/badges/authority";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -1009,6 +1012,15 @@ async function evaluateMatchBadgesAfterReportGroup(
   } catch (error) {
     logBadgeEvaluationFailure(error);
   }
+
+  try {
+    await evaluateTournamentBadgeAwardsForReportGroup({
+      supabase,
+      reportGroupId,
+    });
+  } catch (error) {
+    logBadgeEvaluationFailure(error, "tournament");
+  }
 }
 
 async function evaluateMatchBadgesAfterMatch(
@@ -1022,6 +1034,15 @@ async function evaluateMatchBadgesAfterMatch(
     });
   } catch (error) {
     logBadgeEvaluationFailure(error);
+  }
+
+  try {
+    await evaluateTournamentBadgeAwardsForMatch({
+      supabase,
+      matchId,
+    });
+  } catch (error) {
+    logBadgeEvaluationFailure(error, "tournament");
   }
 }
 
@@ -1037,15 +1058,32 @@ async function evaluateMatchBadgesAfterLegacySubmission(
   } catch (error) {
     logBadgeEvaluationFailure(error);
   }
+
+  try {
+    await evaluateTournamentBadgeAwardsForLegacySubmission({
+      supabase,
+      submissionId,
+    });
+  } catch (error) {
+    logBadgeEvaluationFailure(error, "tournament");
+  }
 }
 
-function logBadgeEvaluationFailure(error: unknown) {
-  console.error("Badge match evaluation failed.", {
-    operation: "badge-match-evaluation",
+function logBadgeEvaluationFailure(
+  error: unknown,
+  evaluator: "match" | "tournament" = "match"
+) {
+  const fallbackCode =
+    evaluator === "match"
+      ? "BADGE_MATCH_EVALUATION_FAILED"
+      : "BADGE_TOURNAMENT_EVALUATION_FAILED";
+
+  console.error(`Badge ${evaluator} evaluation failed.`, {
+    operation: `badge-${evaluator}-evaluation`,
     code:
       error instanceof BadgeAuthorityError
         ? error.code
-        : "BADGE_MATCH_EVALUATION_FAILED",
+        : fallbackCode,
   });
 }
 
