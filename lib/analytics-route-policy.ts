@@ -1,6 +1,8 @@
 const MAX_ANALYTICS_URL_LENGTH = 2_048;
 
-const EXACT_PUBLIC_PATHS = new Set([
+const NORMALIZED_PLAYER_PROFILE_PATH = "/players/[playerId]";
+
+export const ANALYTICS_APPROVED_REPORTING_PATHS = [
   "/",
   "/about",
   "/rankings",
@@ -9,12 +11,17 @@ const EXACT_PUBLIC_PATHS = new Set([
   "/privacy",
   "/players",
   "/tournaments",
-]);
+  NORMALIZED_PLAYER_PROFILE_PATH,
+] as const;
+
+const EXACT_PUBLIC_PATHS = new Set<string>(
+  ANALYTICS_APPROVED_REPORTING_PATHS.filter(
+    (pathname) => pathname !== NORMALIZED_PLAYER_PROFILE_PATH
+  )
+);
 
 const PLAYER_PROFILE_PATH_PATTERN =
   /^\/players\/([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-5][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12})$/;
-const NORMALIZED_PLAYER_PROFILE_PATH = "/players/[playerId]";
-
 /**
  * Returns the only URL that may be sent to Web Analytics, or null when the
  * candidate does not match IronClad's deliberately narrow public-route policy.

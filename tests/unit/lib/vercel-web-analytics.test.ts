@@ -11,12 +11,18 @@ const authMock = vi.hoisted(() => vi.fn());
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
 
 import { loadAdminWebsiteTraffic } from "@/lib/vercel-web-analytics";
+import { ANALYTICS_APPROVED_REPORTING_PATHS } from "@/lib/analytics-route-policy";
 
 const NOW = "2026-08-20T12:34:56.789Z";
 const ACCESS_TOKEN = "test_vercel_token_private_marker";
 const TEAM_ID = "team_test123";
 const PROJECT_ID = "prj_test456";
 const PROVIDER_ORIGIN = "https://api.vercel.com";
+const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+const PRODUCTION_APPROVED_ROUTE_FILTER = `environment eq 'production' and requestPath in (${ANALYTICS_APPROVED_REPORTING_PATHS.map(
+  (pathname) => `'${pathname}'`
+).join(",")})`;
 const ENVIRONMENT_KEYS = [
   "VERCEL_ENV",
   "VERCEL_ANALYTICS_ACCESS_TOKEN",
@@ -45,10 +51,17 @@ function jsonResponse(payload: unknown, status = 200) {
 }
 
 function providerQuery(url: URL, by?: string) {
+  const since = new Date(String(url.searchParams.get("since")));
+  const requestedUntil = new Date(String(url.searchParams.get("until")));
+  const boundaryMs = by === "day" ? DAY_MS : HOUR_MS;
+  const until = new Date(
+    (Math.floor(requestedUntil.getTime() / boundaryMs) + 1) * boundaryMs
+  );
+
   return {
-    since: url.searchParams.get("since"),
-    until: url.searchParams.get("until"),
-    ...(by ? { groupBy: [by] } : {}),
+    since: since.toISOString().replace(".000Z", "Z"),
+    until: until.toISOString().replace(".000Z", "Z"),
+    ...(by && by !== "day" ? { groupBy: [by] } : {}),
     filter: url.searchParams.get("filter"),
     ...(by ? { limit: Number(url.searchParams.get("limit")) } : {}),
   };
@@ -170,6 +183,134 @@ function stubSuccessfulProvider(
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
+
+function stubProviderQueryMutation(
+  targetDimension: string,
+  mutate: (query: Record<string, unknown>) => void
+) {
+  const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
+    const url = new URL(String(input));
+    const by = url.searchParams.get("by");
+    const query = providerQuery(url, by ?? undefined) as Record<
+      string,
+      unknown
+    >;
+
+    if (by === targetDimension) mutate(query);
+
+    return Promise.resolve(
+      jsonResponse({
+        version: 1,
+        query,
+        data: by === "day" ? DEFAULT_DAILY_ROWS : aggregateRows(by),
+      })
+    );
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+const QUERY_MISMATCH_CASES: Array<
+  [string, string, (query: Record<string, unknown>) => void]
+> = [
+  [
+    "a wrong since instant",
+    "country",
+    (query) => {
+      query.since = "2026-07-22T00:00:00.001Z";
+    },
+  ],
+  [
+    "a wrong normalized until instant",
+    "country",
+    (query) => {
+      query.until = "2026-08-20T13:00:00.001Z";
+    },
+  ],
+  [
+    "a wrong normalized daily until instant",
+    "day",
+    (query) => {
+      query.until = "2026-08-20T13:00:00Z";
+    },
+  ],
+  [
+    "a wrong filter",
+    "country",
+    (query) => {
+      query.filter = PRODUCTION_APPROVED_ROUTE_FILTER.replace(
+        "environment eq 'production'",
+        "environment eq 'preview'"
+      );
+    },
+  ],
+  [
+    "a filter missing the Production restriction",
+    "country",
+    (query) => {
+      query.filter = PRODUCTION_APPROVED_ROUTE_FILTER.replace(
+        "environment eq 'production' and ",
+        ""
+      );
+    },
+  ],
+  [
+    "missing filter metadata",
+    "country",
+    (query) => {
+      delete query.filter;
+    },
+  ],
+  [
+    "the wrong breakdown group",
+    "country",
+    (query) => {
+      query.groupBy = ["browserName"];
+    },
+  ],
+  [
+    "missing breakdown group metadata",
+    "country",
+    (query) => {
+      delete query.groupBy;
+    },
+  ],
+  [
+    "malformed group metadata",
+    "country",
+    (query) => {
+      query.groupBy = "country";
+    },
+  ],
+  [
+    "the wrong limit",
+    "country",
+    (query) => {
+      query.limit = 7;
+    },
+  ],
+  [
+    "malformed limit metadata",
+    "country",
+    (query) => {
+      query.limit = "8";
+    },
+  ],
+  [
+    "a present wrong daily group",
+    "day",
+    (query) => {
+      query.groupBy = ["country"];
+    },
+  ],
+  [
+    "malformed since metadata",
+    "country",
+    (query) => {
+      query.since = "not-a-date";
+    },
+  ],
+];
 
 describe("server-only Vercel Web Analytics loader", () => {
   beforeEach(() => {
@@ -386,6 +527,57 @@ describe("server-only Vercel Web Analytics loader", () => {
     expect(JSON.stringify(result)).not.toContain("https://private.example");
   });
 
+  it("accepts current provider normalization with omitted daily group metadata", async () => {
+    stubSuccessfulProvider();
+
+    await expect(loadAdminWebsiteTraffic()).resolves.toMatchObject({
+      status: "available",
+      summary: { today: { visitors: 2, pageViews: 4 } },
+    });
+  });
+
+  it("accepts an exact daily group when the provider includes it", async () => {
+    stubProviderQueryMutation("day", (query) => {
+      query.groupBy = ["day"];
+    });
+
+    await expect(loadAdminWebsiteTraffic()).resolves.toMatchObject({
+      status: "available",
+    });
+  });
+
+  it.each(QUERY_MISMATCH_CASES)(
+    "fails closed when the provider echoes %s",
+    async (_, dimension, mutate) => {
+      stubProviderQueryMutation(dimension, mutate);
+
+      await expect(loadAdminWebsiteTraffic()).resolves.toEqual({
+        status: "unavailable",
+        reason: "provider-unavailable",
+      });
+    }
+  );
+
+  it("rejects an unsupported provider envelope version", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
+      const url = new URL(String(input));
+      const by = url.searchParams.get("by");
+      return Promise.resolve(
+        jsonResponse({
+          version: by === "country" ? 2 : 1,
+          query: providerQuery(url, by ?? undefined),
+          data: by === "day" ? DEFAULT_DAILY_ROWS : aggregateRows(by),
+        })
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadAdminWebsiteTraffic()).resolves.toEqual({
+      status: "unavailable",
+      reason: "provider-unavailable",
+    });
+  });
+
   it("ignores the live adjusted-zero count defect and uses today's partial daily row", async () => {
     const fetchMock = stubSuccessfulProvider([utcDayRow(0, 2, 7)]);
 
@@ -460,7 +652,7 @@ describe("server-only Vercel Web Analytics loader", () => {
     });
   });
 
-  it("uses one UTC daily aggregate plus six bounded Production breakdowns", async () => {
+  it("uses one route-limited UTC daily aggregate plus six bounded breakdowns", async () => {
     const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -481,7 +673,8 @@ describe("server-only Vercel Web Analytics loader", () => {
           url.pathname.endsWith("/aggregate") &&
           url.searchParams.get("since") === "2026-07-22T00:00:00.000Z" &&
           url.searchParams.get("until") === "2026-08-20T12:34:56.788Z" &&
-          url.searchParams.get("filter") === "environment eq 'production'" &&
+          url.searchParams.get("filter") ===
+            PRODUCTION_APPROVED_ROUTE_FILTER &&
           url.searchParams.get("teamId") === TEAM_ID &&
           url.searchParams.get("projectId") === PROJECT_ID
       )
@@ -505,6 +698,12 @@ describe("server-only Vercel Web Analytics loader", () => {
     expect(
       urls.filter((url) => url.searchParams.get("by") === "day")
     ).toHaveLength(1);
+    for (const pathname of ANALYTICS_APPROVED_REPORTING_PATHS) {
+      expect(PRODUCTION_APPROVED_ROUTE_FILTER).toContain(`'${pathname}'`);
+    }
+    expect(PRODUCTION_APPROVED_ROUTE_FILTER).not.toMatch(
+      /\/admin|\/dashboard|\?|#|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
+    );
     expect(timeoutSpy).toHaveBeenCalledTimes(7);
     expect(timeoutSpy).toHaveBeenCalledWith(8_000);
 

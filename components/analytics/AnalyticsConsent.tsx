@@ -27,6 +27,16 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
+const subscribeToHydration = () => () => undefined;
+
+function getHydratedSnapshot() {
+  return true;
+}
+
+function getHydrationServerSnapshot() {
+  return false;
+}
+
 export default function AnalyticsConsent({
   copy,
 }: {
@@ -36,6 +46,11 @@ export default function AnalyticsConsent({
     subscribeToAnalyticsConsent,
     readAnalyticsConsent,
     () => null
+  );
+  const mounted = useSyncExternalStore(
+    subscribeToHydration,
+    getHydratedSnapshot,
+    getHydrationServerSnapshot
   );
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -51,7 +66,7 @@ export default function AnalyticsConsent({
   const dialogDescriptionId = useId();
 
   useEffect(() => {
-    if (!preferencesOpen) return;
+    if (!mounted || !preferencesOpen) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -108,7 +123,7 @@ export default function AnalyticsConsent({
         window.setTimeout(() => returnTarget.focus({ preventScroll: true }), 0);
       }
     };
-  }, [decision, preferencesOpen]);
+  }, [decision, mounted, preferencesOpen]);
 
   const openPreferences = () => {
     returnFocusRef.current = choicesTriggerRef.current;
@@ -147,7 +162,6 @@ export default function AnalyticsConsent({
         ? copy.statusDeclined
         : copy.statusUndecided;
   const showBanner = decision === null && !preferencesOpen;
-  const canUsePortal = typeof document !== "undefined";
 
   return (
     <>
@@ -164,7 +178,7 @@ export default function AnalyticsConsent({
         {announcement}
       </p>
 
-      {canUsePortal && showBanner
+      {mounted && showBanner
         ? createPortal(
             <section
               role="region"
@@ -238,7 +252,7 @@ export default function AnalyticsConsent({
           )
         : null}
 
-      {canUsePortal && preferencesOpen
+      {mounted && preferencesOpen
         ? createPortal(
             <div
               data-testid="analytics-consent-backdrop"

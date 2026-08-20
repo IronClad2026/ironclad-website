@@ -2,7 +2,10 @@ import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
 
-import { sanitizeAnalyticsBreakdownPath } from "@/lib/analytics-route-policy";
+import {
+  ANALYTICS_APPROVED_REPORTING_PATHS,
+  sanitizeAnalyticsBreakdownPath,
+} from "@/lib/analytics-route-policy";
 import type {
   WebsiteTrafficAnalytics,
   WebsiteTrafficBreakdownPoint,
@@ -34,6 +37,19 @@ type AggregateDimension =
   | "browserName"
   | "osName";
 
+type AggregateQueryContract = {
+  dimension: AggregateDimension;
+  filter: string;
+  limit: number;
+  since: Date;
+  until: Date;
+};
+
+type AggregateRequest = {
+  query: AggregateQueryContract;
+  url: URL;
+};
+
 type ProviderFailureKind = "plan-restriction" | "rate-limited" | "provider";
 
 class ProviderFailure extends Error {
@@ -52,12 +68,15 @@ const VERCEL_ANALYTICS_TIMEOUT_MS = 8_000;
 const VERCEL_ANALYTICS_RESPONSE_LIMIT = 256_000;
 const BREAKDOWN_LIMIT = 8;
 const TREND_LIMIT = 31;
-const PRODUCTION_FILTER = "environment eq 'production'";
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 const MAX_LABEL_LENGTH = 128;
 const CONFIGURATION_ID_PATTERN = /^(?:prj|team)_[A-Za-z0-9]+$/;
 const UUID_PATTERN =
   /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+const PRODUCTION_FILTER = `environment eq 'production' and requestPath in (${ANALYTICS_APPROVED_REPORTING_PATHS.map(
+  (pathname) => `'${pathname}'`
+).join(",")})`;
 
 /**
  * Loads read-only Production Web Analytics for an authenticated Admin.
@@ -211,11 +230,14 @@ async function requestTrend(
   configuration: VercelAnalyticsConfiguration,
   window: UtcWindow
 ): Promise<WebsiteTrafficDailyPoint[]> {
-  const payload = await requestJson(
+  const request = createAggregateRequest(
     configuration,
-    createAggregateApiUrl(configuration, window, "day", TREND_LIMIT)
+    window,
+    "day",
+    TREND_LIMIT
   );
-  const rows = parseAggregateEnvelope(payload, "day", TREND_LIMIT);
+  const payload = await requestJson(configuration, request.url);
+  const rows = parseAggregateEnvelope(payload, request.query);
   const seenDates = new Set<string>();
 
   const points = rows.map((row) => {
@@ -301,16 +323,14 @@ async function requestBreakdown(
   window: UtcWindow,
   dimension: Exclude<AggregateDimension, "day">
 ): Promise<WebsiteTrafficBreakdownPoint[]> {
-  const payload = await requestJson(
+  const request = createAggregateRequest(
     configuration,
-    createAggregateApiUrl(
-      configuration,
-      window,
-      dimension,
-      BREAKDOWN_LIMIT
-    )
+    window,
+    dimension,
+    BREAKDOWN_LIMIT
   );
-  const rows = parseAggregateEnvelope(payload, dimension, BREAKDOWN_LIMIT);
+  const payload = await requestJson(configuration, request.url);
+  const rows = parseAggregateEnvelope(payload, request.query);
   const points: WebsiteTrafficBreakdownPoint[] = [];
 
   for (const row of rows) {
@@ -335,12 +355,12 @@ async function requestBreakdown(
   return points;
 }
 
-function createAggregateApiUrl(
+function createAggregateRequest(
   configuration: VercelAnalyticsConfiguration,
   window: UtcWindow,
   by: AggregateDimension,
   limit: number
-) {
+): AggregateRequest {
   const url = new URL(
     `${VERCEL_ANALYTICS_API_PATH}/aggregate`,
     VERCEL_ANALYTICS_API_ORIGIN
@@ -352,7 +372,21 @@ function createAggregateApiUrl(
   url.searchParams.set("filter", PRODUCTION_FILTER);
   url.searchParams.set("by", by);
   url.searchParams.set("limit", String(limit));
-  return url;
+  return {
+    query: {
+      dimension: by,
+      filter: PRODUCTION_FILTER,
+      limit,
+      since: window.startInclusive,
+      until: nextProviderBoundary(window.providerUntilInclusive, by),
+    },
+    url,
+  };
+}
+
+function nextProviderBoundary(value: Date, dimension: AggregateDimension) {
+  const boundaryMs = dimension === "day" ? DAY_MS : HOUR_MS;
+  return new Date((Math.floor(value.getTime() / boundaryMs) + 1) * boundaryMs);
 }
 
 async function requestJson(
@@ -412,37 +446,29 @@ async function requestJson(
   }
 }
 
-function isProviderEnvelope(
-  payload: unknown
-): payload is { version: number; query: Record<string, unknown>; data: unknown } {
-  if (!isRecord(payload) || !isRecord(payload.query)) return false;
-
-  return (
-    typeof payload.version === "number" &&
-    Number.isFinite(payload.version) &&
-    typeof payload.query.since === "string" &&
-    typeof payload.query.until === "string" &&
-    (payload.query.filter === undefined ||
-      typeof payload.query.filter === "string")
-  );
-}
-
 function parseAggregateEnvelope(
   payload: unknown,
-  dimension: AggregateDimension,
-  limit: number
+  expected: AggregateQueryContract
 ): Record<string, unknown>[] {
+  if (!isRecord(payload) || !isRecord(payload.query)) {
+    throw new ProviderFailure("provider");
+  }
+
+  const groupBy = payload.query.groupBy;
+  const groupMatches =
+    expected.dimension === "day"
+      ? groupBy === undefined || isExactGroup(groupBy, expected.dimension)
+      : isExactGroup(groupBy, expected.dimension);
+
   if (
-    !isProviderEnvelope(payload) ||
+    payload.version !== 1 ||
     !Array.isArray(payload.data) ||
-    payload.data.length > limit + 1 ||
-    typeof payload.query.limit !== "number" ||
-    !Number.isSafeInteger(payload.query.limit) ||
-    payload.query.limit < 1 ||
-    (payload.query.groupBy !== undefined &&
-      (!Array.isArray(payload.query.groupBy) ||
-        payload.query.groupBy.length !== 1 ||
-        payload.query.groupBy[0] !== dimension))
+    payload.data.length > expected.limit + 1 ||
+    !matchesProviderInstant(payload.query.since, expected.since) ||
+    !matchesProviderInstant(payload.query.until, expected.until) ||
+    payload.query.filter !== expected.filter ||
+    payload.query.limit !== expected.limit ||
+    !groupMatches
   ) {
     throw new ProviderFailure("provider");
   }
@@ -453,6 +479,20 @@ function parseAggregateEnvelope(
     rows.push(row);
   }
   return rows;
+}
+
+function matchesProviderInstant(candidate: unknown, expected: Date) {
+  if (typeof candidate !== "string") return false;
+  const parsed = new Date(candidate);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() === expected.getTime();
+}
+
+function isExactGroup(candidate: unknown, dimension: AggregateDimension) {
+  return (
+    Array.isArray(candidate) &&
+    candidate.length === 1 &&
+    candidate[0] === dimension
+  );
 }
 
 function parseCount(value: unknown): number | null {
