@@ -4,8 +4,10 @@ import {
   evaluateMatchBadgeAwardsForMatch,
   evaluateMatchBadgeAwardsForPlayer,
   evaluateProfileBadgeAwards,
+  evaluateTournamentBadgeAwardsForMatch,
   evaluateTournamentBadgeAwardsForPlayer,
   evaluateTournamentBadgeAwardsForTournament,
+  evaluateTournamentPrestigeBadgeAwardsForPlayer,
 } from "@/lib/badges/authority";
 
 type BadgeAuthorityClient = NonNullable<
@@ -23,6 +25,14 @@ const TWENTY_FIFTH_WIN_ID = "88888888-8888-4888-8888-888888888888";
 const FIRST_TOURNAMENT_ID = "99999999-9999-4999-8999-999999999999";
 const THIRD_TOURNAMENT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENTH_TOURNAMENT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const FIRST_ADVANCE_MATCH_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const FIRST_SEMIFINAL_TOURNAMENT_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const FIRST_FINALIST_TOURNAMENT_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const FIRST_ACADEMY_TOURNAMENT_ID = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const FIRST_CHALLENGE_TOURNAMENT_ID = "12121212-1212-4212-8212-121212121212";
+const FIRST_MAIN_TOURNAMENT_ID = "34343434-3434-4434-8434-343434343434";
+const SECOND_CHAMPIONSHIP_TOURNAMENT_ID =
+  "56565656-5656-4565-8565-565656565656";
 
 type BadgeAwardPayload = {
   player_id: string;
@@ -37,8 +47,10 @@ type FakeAuthorityClientOptions = {
   profile?: Record<string, unknown> | null;
   summaries?: Record<string, Record<string, unknown>>;
   tournamentSummaries?: Record<string, Record<string, unknown>>;
+  tournamentPrestigeSummaries?: Record<string, Record<string, unknown>>;
   participants?: Array<Record<string, unknown>>;
   tournamentParticipants?: Array<Record<string, unknown>>;
+  matchTournamentRows?: Array<Record<string, unknown>>;
   backfillPlayers?: string[];
   existingAwards?: string[];
 };
@@ -92,6 +104,36 @@ function tournamentSummary(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function tournamentPrestigeSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    played_advance_win_count: 0,
+    first_advance_match_id: null,
+    first_advance_at: null,
+    semifinalist_count: 0,
+    first_semifinal_tournament_id: null,
+    first_semifinal_at: null,
+    finalist_count: 0,
+    first_finalist_tournament_id: null,
+    first_finalist_at: null,
+    academy_championship_count: 0,
+    first_academy_championship_tournament_id: null,
+    first_academy_championship_at: null,
+    challenge_championship_count: 0,
+    first_challenge_championship_tournament_id: null,
+    first_challenge_championship_at: null,
+    main_championship_count: 0,
+    first_main_championship_tournament_id: null,
+    first_main_championship_at: null,
+    championship_count: 0,
+    second_championship_tournament_id: null,
+    second_championship_at: null,
+    triple_crown_bracket_count: 0,
+    triple_crown_tournament_id: null,
+    triple_crown_at: null,
+    ...overrides,
+  };
+}
+
 function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
   const awards = new Set(options.existingAwards ?? []);
   const upsertPayloads: BadgeAwardPayload[] = [];
@@ -104,6 +146,10 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
   const tournamentSummaries: Record<string, Record<string, unknown>> =
     options.tournamentSummaries ?? {
       [PLAYER_ID]: tournamentSummary(),
+    };
+  const tournamentPrestigeSummaries: Record<string, Record<string, unknown>> =
+    options.tournamentPrestigeSummaries ?? {
+      [PLAYER_ID]: tournamentPrestigeSummary(),
     };
   const backfillPlayers = options.backfillPlayers ?? [PLAYER_ID];
 
@@ -211,12 +257,13 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
 
     if (name === "get_player_badge_tournament_for_match") {
       return {
-        data: [{ tournament_id: FIRST_TOURNAMENT_ID }],
+        data:
+          options.matchTournamentRows ?? [{ tournament_id: FIRST_TOURNAMENT_ID }],
         error: null,
       };
     }
 
-    if (name === "get_player_badge_tournament_participants") {
+    if (name === "get_player_badge_tournament_authority_participants") {
       return {
         data:
           options.tournamentParticipants ??
@@ -233,6 +280,16 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
       return {
         data: [
           tournamentSummaries[String(args.p_player_id)] ?? tournamentSummary(),
+        ],
+        error: null,
+      };
+    }
+
+    if (name === "get_player_badge_tournament_prestige_summary") {
+      return {
+        data: [
+          tournamentPrestigeSummaries[String(args.p_player_id)] ??
+            tournamentPrestigeSummary(),
         ],
         error: null,
       };
@@ -760,6 +817,247 @@ describe("badge authority evaluators", () => {
       .toEqual(["first-campaign", "iron-regular", "tournament-veteran"]);
   });
 
+  it("requires a played official win that advances for First Advance", async () => {
+    const noAdvance = createAuthorityClient();
+    const oneAdvance = createAuthorityClient({
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary({
+          played_advance_win_count: 1,
+          first_advance_match_id: FIRST_ADVANCE_MATCH_ID,
+          first_advance_at: "2026-08-17T12:00:00.000Z",
+        }),
+      },
+    });
+
+    await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: noAdvance.client,
+    });
+    await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: oneAdvance.client,
+    });
+    const repeated = await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: oneAdvance.client,
+    });
+
+    expect(noAdvance.upsertPayloads.map((payload) => payload.badge_slug))
+      .not.toContain("first-advance");
+    expect(oneAdvance.upsertPayloads[0]).toEqual(
+      expect.objectContaining({
+        badge_slug: "first-advance",
+        source_type: "match",
+        source_id: FIRST_ADVANCE_MATCH_ID,
+        original_unlocked_at: "2026-08-17T12:00:00.000Z",
+        source_metadata: expect.objectContaining({
+          evaluator: "tournament-progression",
+          eventType: "played_match_win",
+          originalUnlockedAtBasis: "match_official_result_decided_at",
+        }),
+      })
+    );
+    expect(repeated.createdCount).toBe(0);
+    expect(oneAdvance.awards.size).toBe(1);
+  });
+
+  it("evaluates First Advance immediately after an in-progress played match advances the winner", async () => {
+    const fixture = createAuthorityClient({
+      matchTournamentRows: [],
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary({
+          played_advance_win_count: 1,
+          first_advance_match_id: FIRST_ADVANCE_MATCH_ID,
+          first_advance_at: "2026-08-17T12:00:00.000Z",
+        }),
+      },
+    });
+
+    const result = await evaluateTournamentBadgeAwardsForMatch({
+      matchId: FIRST_ADVANCE_MATCH_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).toEqual(["first-advance"]);
+    expect(fixture.rpc).toHaveBeenCalledWith(
+      "get_player_badge_match_participants",
+      { p_match_id: FIRST_ADVANCE_MATCH_ID }
+    );
+    expect(fixture.upsertPayloads[0]).toMatchObject({
+      badge_slug: "first-advance",
+      source_type: "match",
+      source_id: FIRST_ADVANCE_MATCH_ID,
+    });
+  });
+
+  it("does not award First Advance when loss, bye, default, admin-only, cancelled, voided, or non-advancing history is omitted by the database summary", async () => {
+    const fixture = createAuthorityClient({
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary(),
+      },
+    });
+
+    const result = await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).not.toContain("first-advance");
+    expect(result.skippedReasons).toContain(
+      "first-advance_threshold_not_met"
+    );
+    expect(fixture.upsert).not.toHaveBeenCalled();
+  });
+
+  it("awards semifinal and final reach badges only from round-reach facts", async () => {
+    const semifinalOnly = createAuthorityClient({
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary({
+          semifinalist_count: 1,
+          first_semifinal_tournament_id: FIRST_SEMIFINAL_TOURNAMENT_ID,
+          first_semifinal_at: "2026-08-18T12:00:00.000Z",
+        }),
+      },
+    });
+    const finalist = createAuthorityClient({
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary({
+          semifinalist_count: 1,
+          first_semifinal_tournament_id: FIRST_SEMIFINAL_TOURNAMENT_ID,
+          first_semifinal_at: "2026-08-18T12:00:00.000Z",
+          finalist_count: 1,
+          first_finalist_tournament_id: FIRST_FINALIST_TOURNAMENT_ID,
+          first_finalist_at: "2026-08-19T12:00:00.000Z",
+        }),
+      },
+    });
+
+    await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: semifinalOnly.client,
+    });
+    await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: finalist.client,
+    });
+
+    expect(semifinalOnly.upsertPayloads.map((payload) => payload.badge_slug))
+      .toEqual(["semifinalist"]);
+    expect(finalist.upsertPayloads.map((payload) => payload.badge_slug))
+      .toEqual(["semifinalist", "finalist"]);
+    expect(finalist.upsertPayloads.map((payload) => payload.badge_slug))
+      .not.toContain("academy-champion");
+  });
+
+  it("awards division champions from authoritative tournament-win facts", async () => {
+    const fixture = createAuthorityClient({
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary({
+          academy_championship_count: 1,
+          first_academy_championship_tournament_id: FIRST_ACADEMY_TOURNAMENT_ID,
+          first_academy_championship_at: "2026-08-20T12:00:00.000Z",
+          challenge_championship_count: 1,
+          first_challenge_championship_tournament_id:
+            FIRST_CHALLENGE_TOURNAMENT_ID,
+          first_challenge_championship_at: "2026-08-21T12:00:00.000Z",
+          main_championship_count: 1,
+          first_main_championship_tournament_id: FIRST_MAIN_TOURNAMENT_ID,
+          first_main_championship_at: "2026-08-22T12:00:00.000Z",
+        }),
+      },
+    });
+
+    const result = await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).toEqual([
+      "academy-champion",
+      "challenge-champion",
+      "elite-champion",
+    ]);
+    expect(
+      fixture.upsertPayloads.map((payload) => payload.source_metadata)
+    ).toEqual([
+      expect.objectContaining({
+        evaluator: "division-championship",
+        bracketType: "academy",
+        eventType: "tournament_win",
+      }),
+      expect.objectContaining({
+        evaluator: "division-championship",
+        bracketType: "challenge",
+        eventType: "tournament_win",
+      }),
+      expect.objectContaining({
+        evaluator: "division-championship",
+        bracketType: "main",
+        eventType: "tournament_win",
+      }),
+    ]);
+  });
+
+  it("cascades championship prestige thresholds without duplicate awards", async () => {
+    const oneChampion = createAuthorityClient({
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary({
+          academy_championship_count: 1,
+          first_academy_championship_tournament_id: FIRST_ACADEMY_TOURNAMENT_ID,
+          first_academy_championship_at: "2026-08-20T12:00:00.000Z",
+          championship_count: 1,
+        }),
+      },
+    });
+    const tripleCrown = createAuthorityClient({
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary({
+          academy_championship_count: 1,
+          first_academy_championship_tournament_id: FIRST_ACADEMY_TOURNAMENT_ID,
+          first_academy_championship_at: "2026-08-20T12:00:00.000Z",
+          challenge_championship_count: 1,
+          first_challenge_championship_tournament_id:
+            FIRST_CHALLENGE_TOURNAMENT_ID,
+          first_challenge_championship_at: "2026-08-21T12:00:00.000Z",
+          main_championship_count: 1,
+          first_main_championship_tournament_id: FIRST_MAIN_TOURNAMENT_ID,
+          first_main_championship_at: "2026-08-22T12:00:00.000Z",
+          championship_count: 3,
+          second_championship_tournament_id: SECOND_CHAMPIONSHIP_TOURNAMENT_ID,
+          second_championship_at: "2026-08-21T12:00:00.000Z",
+          triple_crown_bracket_count: 3,
+          triple_crown_tournament_id: FIRST_MAIN_TOURNAMENT_ID,
+          triple_crown_at: "2026-08-22T12:00:00.000Z",
+        }),
+      },
+    });
+
+    await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: oneChampion.client,
+    });
+    const first = await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: tripleCrown.client,
+    });
+    const second = await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: tripleCrown.client,
+    });
+
+    expect(oneChampion.upsertPayloads.map((payload) => payload.badge_slug))
+      .toEqual(["academy-champion"]);
+    expect(first.createdSlugs).toEqual([
+      "academy-champion",
+      "challenge-champion",
+      "elite-champion",
+      "double-champion",
+      "triple-crown",
+    ]);
+    expect(second.createdCount).toBe(0);
+    expect(tripleCrown.awards.size).toBe(5);
+  });
+
   it("evaluates tournament badges only from completed tournament participants", async () => {
     const invalidTournament = createAuthorityClient({
       tournamentParticipants: [],
@@ -798,6 +1096,10 @@ describe("badge authority evaluators", () => {
       "first-campaign",
       "iron-regular",
     ]);
+    expect(completedTournament.rpc).toHaveBeenCalledWith(
+      "get_player_badge_tournament_authority_participants",
+      { p_tournament_id: FIRST_TOURNAMENT_ID }
+    );
   });
 
   it("does not award tournament badges from registration-only, cancelled, voided, in-progress, withdrawal, or no-show history omitted by the database summary", async () => {
@@ -817,11 +1119,27 @@ describe("badge authority evaluators", () => {
       "first-campaign",
       "iron-regular",
       "tournament-veteran",
+      "first-advance",
+      "semifinalist",
+      "finalist",
+      "academy-champion",
+      "challenge-champion",
+      "elite-champion",
+      "double-champion",
+      "triple-crown",
     ]);
     expect(result.skippedReasons).toEqual([
       "first-campaign_threshold_not_met",
       "iron-regular_threshold_not_met",
       "tournament-veteran_threshold_not_met",
+      "first-advance_threshold_not_met",
+      "semifinalist_threshold_not_met",
+      "finalist_threshold_not_met",
+      "academy-champion_threshold_not_met",
+      "challenge-champion_threshold_not_met",
+      "elite-champion_threshold_not_met",
+      "double-champion_threshold_not_met",
+      "triple-crown_threshold_not_met",
     ]);
     expect(fixture.upsert).not.toHaveBeenCalled();
   });
@@ -901,6 +1219,48 @@ describe("badge authority evaluators", () => {
     ]);
   });
 
+  it("backfills First Advance only from genuine played advancement history", async () => {
+    const byeOnly = createAuthorityClient({
+      backfillPlayers: [PLAYER_ID],
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary(),
+      },
+    });
+    const playedAdvance = createAuthorityClient({
+      backfillPlayers: [PLAYER_ID],
+      tournamentPrestigeSummaries: {
+        [PLAYER_ID]: tournamentPrestigeSummary({
+          played_advance_win_count: 1,
+          first_advance_match_id: FIRST_ADVANCE_MATCH_ID,
+          first_advance_at: "2026-08-17T12:00:00.000Z",
+        }),
+      },
+    });
+
+    const byeOnlyResult = await backfillInitialBadgeAwards({
+      supabase: byeOnly.client,
+    });
+    const playedAdvanceResult = await backfillInitialBadgeAwards({
+      supabase: playedAdvance.client,
+    });
+    const repeatedPlayedAdvance = await backfillInitialBadgeAwards({
+      supabase: playedAdvance.client,
+    });
+
+    expect(byeOnlyResult.badgeCounts["first-advance"]).toBe(0);
+    expect(byeOnly.upsertPayloads.map((payload) => payload.badge_slug))
+      .not.toContain("first-advance");
+    expect(playedAdvanceResult.badgeCounts["first-advance"]).toBe(1);
+    expect(playedAdvance.upsertPayloads).toContainEqual(
+      expect.objectContaining({
+        badge_slug: "first-advance",
+        source_type: "match",
+        source_id: FIRST_ADVANCE_MATCH_ID,
+      })
+    );
+    expect(repeatedPlayedAdvance.badgeCounts["first-advance"]).toBe(0);
+  });
+
   it("runs an idempotent controlled backfill for only implemented authority badges", async () => {
     const fixture = createAuthorityClient({
       backfillPlayers: [PLAYER_ID, OTHER_PLAYER_ID],
@@ -944,6 +1304,14 @@ describe("badge authority evaluators", () => {
       "five-victories": 1,
       "ten-victories": 0,
       "twenty-five-victories": 0,
+      "first-advance": 0,
+      "semifinalist": 0,
+      "finalist": 0,
+      "academy-champion": 0,
+      "challenge-champion": 0,
+      "elite-champion": 0,
+      "double-champion": 0,
+      "triple-crown": 0,
     });
     expect(second.awardsCreated).toBe(0);
     expect(
@@ -959,6 +1327,14 @@ describe("badge authority evaluators", () => {
           "five-victories",
           "ten-victories",
           "twenty-five-victories",
+          "first-advance",
+          "semifinalist",
+          "finalist",
+          "academy-champion",
+          "challenge-champion",
+          "elite-champion",
+          "double-champion",
+          "triple-crown",
         ].includes(payload.badge_slug)
       )
     ).toBe(true);
@@ -1021,6 +1397,14 @@ describe("badge authority evaluators", () => {
       "five-victories": 1,
       "ten-victories": 1,
       "twenty-five-victories": 1,
+      "first-advance": 0,
+      "semifinalist": 0,
+      "finalist": 0,
+      "academy-champion": 0,
+      "challenge-champion": 0,
+      "elite-champion": 0,
+      "double-champion": 0,
+      "triple-crown": 0,
     });
     expect(second.awardsCreated).toBe(0);
     expect(fixture.awards.size).toBe(10);
@@ -1054,6 +1438,14 @@ describe("badge authority evaluators", () => {
       "five-victories": 0,
       "ten-victories": 0,
       "twenty-five-victories": 0,
+      "first-advance": 0,
+      "semifinalist": 0,
+      "finalist": 0,
+      "academy-champion": 0,
+      "challenge-champion": 0,
+      "elite-champion": 0,
+      "double-champion": 0,
+      "triple-crown": 0,
     });
     expect(fixture.upsertPayloads.map((payload) => payload.badge_slug)).toEqual([
       "ironclad-recruit",

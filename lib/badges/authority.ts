@@ -15,6 +15,14 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "five-victories",
   "ten-victories",
   "twenty-five-victories",
+  "first-advance",
+  "semifinalist",
+  "finalist",
+  "academy-champion",
+  "challenge-champion",
+  "elite-champion",
+  "double-champion",
+  "triple-crown",
 ] as const satisfies readonly BadgeSlug[];
 
 type ProductionBadgeAuthoritySlug =
@@ -104,6 +112,33 @@ type TournamentBadgeSummaryRow = {
   tenth_completed_at: unknown;
 };
 
+type TournamentPrestigeSummaryRow = {
+  played_advance_win_count: unknown;
+  first_advance_match_id: unknown;
+  first_advance_at: unknown;
+  semifinalist_count: unknown;
+  first_semifinal_tournament_id: unknown;
+  first_semifinal_at: unknown;
+  finalist_count: unknown;
+  first_finalist_tournament_id: unknown;
+  first_finalist_at: unknown;
+  academy_championship_count: unknown;
+  first_academy_championship_tournament_id: unknown;
+  first_academy_championship_at: unknown;
+  challenge_championship_count: unknown;
+  first_challenge_championship_tournament_id: unknown;
+  first_challenge_championship_at: unknown;
+  main_championship_count: unknown;
+  first_main_championship_tournament_id: unknown;
+  first_main_championship_at: unknown;
+  championship_count: unknown;
+  second_championship_tournament_id: unknown;
+  second_championship_at: unknown;
+  triple_crown_bracket_count: unknown;
+  triple_crown_tournament_id: unknown;
+  triple_crown_at: unknown;
+};
+
 type MatchThreshold = {
   badgeSlug: ProductionBadgeAuthoritySlug;
   countKey: "playedMatchCount" | "winCount";
@@ -136,6 +171,47 @@ type TournamentThreshold = {
     | "firstCompletedAt"
     | "thirdCompletedAt"
     | "tenthCompletedAt";
+};
+
+type TournamentPrestigeThreshold = {
+  badgeSlug: ProductionBadgeAuthoritySlug;
+  countKey:
+    | "playedAdvanceWinCount"
+    | "semifinalistCount"
+    | "finalistCount"
+    | "academyChampionshipCount"
+    | "challengeChampionshipCount"
+    | "mainChampionshipCount"
+    | "championshipCount"
+    | "tripleCrownBracketCount";
+  threshold: number;
+  sourceIdKey:
+    | "firstAdvanceMatchId"
+    | "firstSemifinalTournamentId"
+    | "firstFinalistTournamentId"
+    | "firstAcademyChampionshipTournamentId"
+    | "firstChallengeChampionshipTournamentId"
+    | "firstMainChampionshipTournamentId"
+    | "secondChampionshipTournamentId"
+    | "tripleCrownTournamentId";
+  originalUnlockedAtKey:
+    | "firstAdvanceAt"
+    | "firstSemifinalAt"
+    | "firstFinalistAt"
+    | "firstAcademyChampionshipAt"
+    | "firstChallengeChampionshipAt"
+    | "firstMainChampionshipAt"
+    | "secondChampionshipAt"
+    | "tripleCrownAt";
+  evaluator:
+    | "tournament-progression"
+    | "round-reach"
+    | "division-championship"
+    | "championship-count"
+    | "triple-crown";
+  bracketType?: "academy" | "challenge" | "main";
+  eventType?: "played_match_win" | "tournament_win";
+  sourceType?: BadgeSourceType;
 };
 
 const PROFILE_SELECT = [
@@ -223,6 +299,83 @@ const TOURNAMENT_THRESHOLDS: readonly TournamentThreshold[] = [
   },
 ];
 
+const TOURNAMENT_PRESTIGE_THRESHOLDS: readonly TournamentPrestigeThreshold[] = [
+  {
+    badgeSlug: "first-advance",
+    countKey: "playedAdvanceWinCount",
+    threshold: 1,
+    sourceIdKey: "firstAdvanceMatchId",
+    originalUnlockedAtKey: "firstAdvanceAt",
+    evaluator: "tournament-progression",
+    eventType: "played_match_win",
+    sourceType: "match",
+  },
+  {
+    badgeSlug: "semifinalist",
+    countKey: "semifinalistCount",
+    threshold: 1,
+    sourceIdKey: "firstSemifinalTournamentId",
+    originalUnlockedAtKey: "firstSemifinalAt",
+    evaluator: "round-reach",
+  },
+  {
+    badgeSlug: "finalist",
+    countKey: "finalistCount",
+    threshold: 1,
+    sourceIdKey: "firstFinalistTournamentId",
+    originalUnlockedAtKey: "firstFinalistAt",
+    evaluator: "round-reach",
+  },
+  {
+    badgeSlug: "academy-champion",
+    countKey: "academyChampionshipCount",
+    threshold: 1,
+    sourceIdKey: "firstAcademyChampionshipTournamentId",
+    originalUnlockedAtKey: "firstAcademyChampionshipAt",
+    evaluator: "division-championship",
+    bracketType: "academy",
+    eventType: "tournament_win",
+  },
+  {
+    badgeSlug: "challenge-champion",
+    countKey: "challengeChampionshipCount",
+    threshold: 1,
+    sourceIdKey: "firstChallengeChampionshipTournamentId",
+    originalUnlockedAtKey: "firstChallengeChampionshipAt",
+    evaluator: "division-championship",
+    bracketType: "challenge",
+    eventType: "tournament_win",
+  },
+  {
+    badgeSlug: "elite-champion",
+    countKey: "mainChampionshipCount",
+    threshold: 1,
+    sourceIdKey: "firstMainChampionshipTournamentId",
+    originalUnlockedAtKey: "firstMainChampionshipAt",
+    evaluator: "division-championship",
+    bracketType: "main",
+    eventType: "tournament_win",
+  },
+  {
+    badgeSlug: "double-champion",
+    countKey: "championshipCount",
+    threshold: 2,
+    sourceIdKey: "secondChampionshipTournamentId",
+    originalUnlockedAtKey: "secondChampionshipAt",
+    evaluator: "championship-count",
+    eventType: "tournament_win",
+  },
+  {
+    badgeSlug: "triple-crown",
+    countKey: "tripleCrownBracketCount",
+    threshold: 3,
+    sourceIdKey: "tripleCrownTournamentId",
+    originalUnlockedAtKey: "tripleCrownAt",
+    evaluator: "triple-crown",
+    eventType: "tournament_win",
+  },
+];
+
 const EMPTY_EVALUATION_RESULT: BadgeAwardEvaluationResult = {
   createdCount: 0,
   createdSlugs: [],
@@ -300,27 +453,10 @@ export async function evaluateMatchBadgeAwardsForMatch({
   supabase?: BadgeAuthorityClient;
   evaluationMode?: "live" | "backfill";
 }): Promise<BadgeAwardEvaluationResult> {
-  const { data, error } = await supabase.rpc(
-    "get_player_badge_match_participants",
-    {
-      p_match_id: matchId,
-    }
+  const playerIds = await loadPlayedMatchParticipantPlayerIds(
+    supabase,
+    matchId
   );
-
-  if (error) {
-    throw new BadgeAuthorityError(
-      "MATCH_PARTICIPANTS_LOAD_FAILED",
-      "Badge match evaluation could not load participants."
-    );
-  }
-
-  const playerIds = [
-    ...new Set(
-      rowsOf<MatchBadgeParticipantRow>(data)
-        .map((row) => stringOrNull(row.player_id))
-        .filter((value): value is string => value !== null)
-    ),
-  ];
 
   if (playerIds.length === 0) {
     return {
@@ -392,23 +528,42 @@ export async function evaluateTournamentBadgeAwardsForMatch({
   supabase?: BadgeAuthorityClient;
   evaluationMode?: "live" | "backfill";
 }): Promise<BadgeAwardEvaluationResult> {
-  const tournamentId = await loadCompletedTournamentIdForMatch(
+  const playerIds = await loadPlayedMatchParticipantPlayerIds(
     supabase,
     matchId
   );
+  const livePrestigeResult =
+    playerIds.length > 0
+      ? mergeEvaluationResults(
+          await Promise.all(
+            playerIds.map((playerId) =>
+              evaluateTournamentPrestigeBadgeAwardsForPlayer({
+                playerId,
+                supabase,
+                evaluationMode,
+              })
+            )
+          )
+        )
+      : {
+          ...EMPTY_EVALUATION_RESULT,
+          skippedReasons: ["match_not_played"],
+        };
+
+  const tournamentId = await loadCompletedTournamentIdForMatch(supabase, matchId);
 
   if (!tournamentId) {
-    return {
-      ...EMPTY_EVALUATION_RESULT,
-      skippedReasons: ["tournament_not_completed"],
-    };
+    return livePrestigeResult;
   }
 
-  return evaluateTournamentBadgeAwardsForTournament({
-    tournamentId,
-    supabase,
-    evaluationMode,
-  });
+  return mergeEvaluationResults([
+    livePrestigeResult,
+    await evaluateTournamentBadgeAwardsForTournament({
+      tournamentId,
+      supabase,
+      evaluationMode,
+    }),
+  ]);
 }
 
 export async function evaluateTournamentBadgeAwardsForReportGroup({
@@ -462,7 +617,7 @@ export async function evaluateTournamentBadgeAwardsForTournament({
   evaluationMode?: "live" | "backfill";
 }): Promise<BadgeAwardEvaluationResult> {
   const { data, error } = await supabase.rpc(
-    "get_player_badge_tournament_participants",
+    "get_player_badge_tournament_authority_participants",
     {
       p_tournament_id: tournamentId,
     }
@@ -511,6 +666,29 @@ export async function evaluateTournamentBadgeAwardsForPlayer({
   playerId: string;
   supabase?: BadgeAuthorityClient;
   evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  return mergeEvaluationResults([
+    await evaluateTournamentCountBadgeAwardsForPlayer({
+      playerId,
+      supabase,
+      evaluationMode,
+    }),
+    await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+      playerId,
+      supabase,
+      evaluationMode,
+    }),
+  ]);
+}
+
+async function evaluateTournamentCountBadgeAwardsForPlayer({
+  playerId,
+  supabase,
+  evaluationMode,
+}: {
+  playerId: string;
+  supabase: BadgeAuthorityClient;
+  evaluationMode: "live" | "backfill";
 }): Promise<BadgeAwardEvaluationResult> {
   const summary = await loadTournamentBadgeSummary(supabase, playerId);
   if (!summary) {
@@ -566,6 +744,80 @@ export async function evaluateTournamentBadgeAwardsForPlayer({
     createdCount: createdSlugs.length,
     createdSlugs,
     evaluatedSlugs: TOURNAMENT_THRESHOLDS.map(
+      (threshold) => threshold.badgeSlug
+    ),
+    skippedReasons,
+  };
+}
+
+export async function evaluateTournamentPrestigeBadgeAwardsForPlayer({
+  playerId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  playerId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const summary = await loadTournamentPrestigeBadgeSummary(supabase, playerId);
+  if (!summary) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: TOURNAMENT_PRESTIGE_THRESHOLDS.map(
+        (threshold) => threshold.badgeSlug
+      ),
+      skippedReasons: ["tournament_prestige_summary_unavailable"],
+    };
+  }
+
+  const createdSlugs: ProductionBadgeAuthoritySlug[] = [];
+  const skippedReasons: string[] = [];
+
+  for (const threshold of TOURNAMENT_PRESTIGE_THRESHOLDS) {
+    const qualifyingCount = summary[threshold.countKey];
+    const sourceId = summary[threshold.sourceIdKey];
+    const originalUnlockedAt = summary[threshold.originalUnlockedAtKey];
+
+    if (qualifyingCount < threshold.threshold) {
+      skippedReasons.push(`${threshold.badgeSlug}_threshold_not_met`);
+      continue;
+    }
+
+    if (!sourceId) {
+      skippedReasons.push(`${threshold.badgeSlug}_source_missing`);
+      continue;
+    }
+
+    const created = await persistBadgeAward(supabase, {
+      playerId,
+      badgeSlug: threshold.badgeSlug,
+      sourceType: threshold.sourceType ?? "tournament",
+      sourceId,
+      originalUnlockedAt,
+      sourceMetadata: {
+        evaluator: threshold.evaluator,
+        evaluationMode,
+        threshold: threshold.threshold,
+        qualifyingCount,
+        bracketType: threshold.bracketType ?? null,
+        eventType: threshold.eventType ?? null,
+        originalUnlockedAtBasis: originalUnlockedAt
+          ? threshold.sourceType === "match"
+            ? "match_official_result_decided_at"
+            : "tournament_first_completed_at"
+          : "unavailable",
+      },
+    });
+
+    if (created) {
+      createdSlugs.push(threshold.badgeSlug);
+    }
+  }
+
+  return {
+    createdCount: createdSlugs.length,
+    createdSlugs,
+    evaluatedSlugs: TOURNAMENT_PRESTIGE_THRESHOLDS.map(
       (threshold) => threshold.badgeSlug
     ),
     skippedReasons,
@@ -755,6 +1007,33 @@ async function loadMatchBadgeSummary(
   };
 }
 
+async function loadPlayedMatchParticipantPlayerIds(
+  supabase: BadgeAuthorityClient,
+  matchId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_match_participants",
+    {
+      p_match_id: matchId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "MATCH_PARTICIPANTS_LOAD_FAILED",
+      "Badge match evaluation could not load participants."
+    );
+  }
+
+  return [
+    ...new Set(
+      rowsOf<MatchBadgeParticipantRow>(data)
+        .map((row) => stringOrNull(row.player_id))
+        .filter((value): value is string => value !== null)
+    ),
+  ];
+}
+
 async function loadCompletedTournamentIdForMatch(
   supabase: BadgeAuthorityClient,
   matchId: string
@@ -815,6 +1094,75 @@ async function loadTournamentBadgeSummary(
       row.tenth_completed_tournament_id
     ),
     tenthCompletedAt: isoOrNull(row.tenth_completed_at),
+  };
+}
+
+async function loadTournamentPrestigeBadgeSummary(
+  supabase: BadgeAuthorityClient,
+  playerId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_tournament_prestige_summary",
+    {
+      p_player_id: playerId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "TOURNAMENT_PRESTIGE_SUMMARY_LOAD_FAILED",
+      "Badge tournament evaluation could not load the tournament prestige summary."
+    );
+  }
+
+  const row = rowsOf<TournamentPrestigeSummaryRow>(data)[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    playedAdvanceWinCount: integerOrZero(row.played_advance_win_count),
+    firstAdvanceMatchId: stringOrNull(row.first_advance_match_id),
+    firstAdvanceAt: isoOrNull(row.first_advance_at),
+    semifinalistCount: integerOrZero(row.semifinalist_count),
+    firstSemifinalTournamentId: stringOrNull(
+      row.first_semifinal_tournament_id
+    ),
+    firstSemifinalAt: isoOrNull(row.first_semifinal_at),
+    finalistCount: integerOrZero(row.finalist_count),
+    firstFinalistTournamentId: stringOrNull(row.first_finalist_tournament_id),
+    firstFinalistAt: isoOrNull(row.first_finalist_at),
+    academyChampionshipCount: integerOrZero(
+      row.academy_championship_count
+    ),
+    firstAcademyChampionshipTournamentId: stringOrNull(
+      row.first_academy_championship_tournament_id
+    ),
+    firstAcademyChampionshipAt: isoOrNull(
+      row.first_academy_championship_at
+    ),
+    challengeChampionshipCount: integerOrZero(
+      row.challenge_championship_count
+    ),
+    firstChallengeChampionshipTournamentId: stringOrNull(
+      row.first_challenge_championship_tournament_id
+    ),
+    firstChallengeChampionshipAt: isoOrNull(
+      row.first_challenge_championship_at
+    ),
+    mainChampionshipCount: integerOrZero(row.main_championship_count),
+    firstMainChampionshipTournamentId: stringOrNull(
+      row.first_main_championship_tournament_id
+    ),
+    firstMainChampionshipAt: isoOrNull(row.first_main_championship_at),
+    championshipCount: integerOrZero(row.championship_count),
+    secondChampionshipTournamentId: stringOrNull(
+      row.second_championship_tournament_id
+    ),
+    secondChampionshipAt: isoOrNull(row.second_championship_at),
+    tripleCrownBracketCount: integerOrZero(row.triple_crown_bracket_count),
+    tripleCrownTournamentId: stringOrNull(row.triple_crown_tournament_id),
+    tripleCrownAt: isoOrNull(row.triple_crown_at),
   };
 }
 
