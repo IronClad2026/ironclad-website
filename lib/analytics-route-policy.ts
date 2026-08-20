@@ -12,7 +12,7 @@ const EXACT_PUBLIC_PATHS = new Set([
 ]);
 
 const PLAYER_PROFILE_PATH_PATTERN =
-  /^\/players\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+  /^\/players\/([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-5][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12})$/;
 const NORMALIZED_PLAYER_PROFILE_PATH = "/players/[playerId]";
 
 /**

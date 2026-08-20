@@ -34,6 +34,26 @@ describe("analytics route policy", () => {
     expect(sanitized).not.toContain(playerId);
   });
 
+  it("normalizes uppercase UUID hex while keeping the Player prefix case-sensitive", () => {
+    const playerId = "123E4567-E89B-12D3-A456-426614174000";
+    const sanitized = sanitizeAnalyticsEventUrl(
+      `${ORIGIN}/players/${playerId}`,
+      ORIGIN
+    );
+
+    expect(sanitized).toBe(`${ORIGIN}/players/[playerId]`);
+    expect(sanitized).not.toContain(playerId);
+  });
+
+  it.each([
+    "/Players/123e4567-e89b-12d3-a456-426614174000",
+    "/PLAYERS/123e4567-e89b-12d3-a456-426614174000",
+    "/playersX/123e4567-e89b-12d3-a456-426614174000",
+    "/players/123e4567-e89b-12d3-a456-426614174000/extra",
+  ])("rejects a non-canonical dynamic Player path: %s", (pathname) => {
+    expect(sanitizeAnalyticsEventUrl(`${ORIGIN}${pathname}`, ORIGIN)).toBeNull();
+  });
+
   it.each([
     `${ORIGIN}/tournaments?tournament=123e4567-e89b-12d3-a456-426614174000`,
     `${ORIGIN}/tournaments?`,
