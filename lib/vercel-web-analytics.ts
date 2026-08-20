@@ -104,9 +104,6 @@ async function loadAuthorizedAdminWebsiteTraffic(): Promise<WebsiteTrafficAnalyt
 
   const windows = resolveUtcWindows(now);
   const [
-    today,
-    sevenDays,
-    thirtyDays,
     trend,
     routes,
     countries,
@@ -115,9 +112,6 @@ async function loadAuthorizedAdminWebsiteTraffic(): Promise<WebsiteTrafficAnalyt
     browsers,
     operatingSystems,
   ] = await Promise.all([
-    requestCount(configuration, windows.today),
-    requestCount(configuration, windows.sevenDays),
-    requestCount(configuration, windows.thirtyDays),
     requestTrend(configuration, windows.thirtyDays),
     requestBreakdown(configuration, windows.thirtyDays, "requestPath"),
     requestBreakdown(configuration, windows.thirtyDays, "country"),
@@ -130,12 +124,13 @@ async function loadAuthorizedAdminWebsiteTraffic(): Promise<WebsiteTrafficAnalyt
     requestBreakdown(configuration, windows.thirtyDays, "browserName"),
     requestBreakdown(configuration, windows.thirtyDays, "osName"),
   ]);
+  const summary = deriveSummaryFromDailyPoints(trend, windows);
 
   return {
     status: "available",
     generatedAt: now.toISOString(),
     timezone: "UTC",
-    summary: { today, sevenDays, thirtyDays },
+    summary,
     trend,
     breakdowns: {
       routes,
@@ -212,39 +207,13 @@ function resolveUtcWindows(now: Date) {
   };
 }
 
-async function requestCount(
-  configuration: VercelAnalyticsConfiguration,
-  window: UtcWindow
-): Promise<WebsiteTrafficMetric> {
-  if (window.endExclusive <= window.startInclusive) {
-    return { visitors: 0, pageViews: 0 };
-  }
-
-  const payload = await requestJson(
-    configuration,
-    createApiUrl(configuration, "/count", window)
-  );
-
-  if (!isProviderEnvelope(payload) || !isRecord(payload.data)) {
-    throw new ProviderFailure("provider");
-  }
-
-  const visitors = parseCount(payload.data.visitors);
-  const pageViews = parseCount(payload.data.pageviews);
-  if (visitors === null || pageViews === null) {
-    throw new ProviderFailure("provider");
-  }
-
-  return { visitors, pageViews };
-}
-
 async function requestTrend(
   configuration: VercelAnalyticsConfiguration,
   window: UtcWindow
 ): Promise<WebsiteTrafficDailyPoint[]> {
   const payload = await requestJson(
     configuration,
-    createApiUrl(configuration, "/aggregate", window, "day", TREND_LIMIT)
+    createAggregateApiUrl(configuration, window, "day", TREND_LIMIT)
   );
   const rows = parseAggregateEnvelope(payload, "day", TREND_LIMIT);
   const seenDates = new Set<string>();
@@ -285,6 +254,48 @@ async function requestTrend(
   return points.sort((left, right) => left.date.localeCompare(right.date));
 }
 
+function deriveSummaryFromDailyPoints(
+  points: readonly WebsiteTrafficDailyPoint[],
+  windows: ReturnType<typeof resolveUtcWindows>
+) {
+  const todayDate = windows.today.startInclusive.toISOString().slice(0, 10);
+  const sevenDaysStartDate = windows.sevenDays.startInclusive
+    .toISOString()
+    .slice(0, 10);
+
+  let today: WebsiteTrafficMetric = { visitors: 0, pageViews: 0 };
+  let sevenDays: WebsiteTrafficMetric = { visitors: 0, pageViews: 0 };
+  let thirtyDays: WebsiteTrafficMetric = { visitors: 0, pageViews: 0 };
+
+  for (const point of points) {
+    thirtyDays = addTrafficMetrics(thirtyDays, point);
+
+    if (point.date >= sevenDaysStartDate) {
+      sevenDays = addTrafficMetrics(sevenDays, point);
+    }
+
+    if (point.date === todayDate) {
+      today = addTrafficMetrics(today, point);
+    }
+  }
+
+  return { today, sevenDays, thirtyDays };
+}
+
+function addTrafficMetrics(
+  total: WebsiteTrafficMetric,
+  next: WebsiteTrafficMetric
+): WebsiteTrafficMetric {
+  const visitors = total.visitors + next.visitors;
+  const pageViews = total.pageViews + next.pageViews;
+
+  if (!Number.isSafeInteger(visitors) || !Number.isSafeInteger(pageViews)) {
+    throw new ProviderFailure("provider");
+  }
+
+  return { visitors, pageViews };
+}
+
 async function requestBreakdown(
   configuration: VercelAnalyticsConfiguration,
   window: UtcWindow,
@@ -292,9 +303,8 @@ async function requestBreakdown(
 ): Promise<WebsiteTrafficBreakdownPoint[]> {
   const payload = await requestJson(
     configuration,
-    createApiUrl(
+    createAggregateApiUrl(
       configuration,
-      "/aggregate",
       window,
       dimension,
       BREAKDOWN_LIMIT
@@ -325,15 +335,14 @@ async function requestBreakdown(
   return points;
 }
 
-function createApiUrl(
+function createAggregateApiUrl(
   configuration: VercelAnalyticsConfiguration,
-  suffix: "/count" | "/aggregate",
   window: UtcWindow,
-  by?: AggregateDimension,
-  limit?: number
+  by: AggregateDimension,
+  limit: number
 ) {
   const url = new URL(
-    `${VERCEL_ANALYTICS_API_PATH}${suffix}`,
+    `${VERCEL_ANALYTICS_API_PATH}/aggregate`,
     VERCEL_ANALYTICS_API_ORIGIN
   );
   url.searchParams.set("projectId", configuration.projectId);
@@ -341,8 +350,8 @@ function createApiUrl(
   url.searchParams.set("since", window.startInclusive.toISOString());
   url.searchParams.set("until", window.providerUntilInclusive.toISOString());
   url.searchParams.set("filter", PRODUCTION_FILTER);
-  if (by) url.searchParams.set("by", by);
-  if (limit !== undefined) url.searchParams.set("limit", String(limit));
+  url.searchParams.set("by", by);
+  url.searchParams.set("limit", String(limit));
   return url;
 }
 

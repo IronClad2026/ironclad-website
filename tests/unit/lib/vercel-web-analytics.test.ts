@@ -54,31 +54,43 @@ function providerQuery(url: URL, by?: string) {
   };
 }
 
-function countForStart(start: string | null) {
-  if (start === "2026-08-20T00:00:00.000Z") {
-    return { visitors: 2, pageviews: 4 };
-  }
-  if (start === "2026-08-14T00:00:00.000Z") {
-    return { visitors: 7, pageviews: 14 };
-  }
-  return { visitors: 30, pageviews: 60 };
+type DailyProviderRow = {
+  timestamp: string;
+  visitors: number;
+  pageviews: number;
+};
+
+const DEFAULT_DAILY_ROWS: DailyProviderRow[] = [
+  {
+    timestamp: "2026-08-20T00:00:00.000Z",
+    visitors: 2,
+    pageviews: 4,
+  },
+  {
+    timestamp: "2026-08-19T00:00:00.000Z",
+    visitors: 1,
+    pageviews: 3,
+  },
+];
+
+function utcDayRow(
+  daysBeforeToday: number,
+  visitors: number,
+  pageviews: number
+): DailyProviderRow {
+  return {
+    timestamp: new Date(
+      Date.UTC(2026, 7, 20) - daysBeforeToday * 86_400_000
+    ).toISOString(),
+    visitors,
+    pageviews,
+  };
 }
 
 function aggregateRows(by: string | null): Record<string, unknown>[] {
   switch (by) {
     case "day":
-      return [
-        {
-          timestamp: "2026-08-20T00:00:00.000Z",
-          visitors: 2,
-          pageviews: 4,
-        },
-        {
-          timestamp: "2026-08-19T00:00:00Z",
-          visitors: 1,
-          pageviews: 3,
-        },
-      ];
+      return DEFAULT_DAILY_ROWS;
     case "requestPath":
       return [
         { requestPath: "/", visitors: 12, pageviews: 20 },
@@ -117,14 +129,25 @@ function aggregateRows(by: string | null): Record<string, unknown>[] {
   }
 }
 
-function successfulProviderResponse(input: RequestInfo | URL) {
+function successfulProviderResponse(
+  input: RequestInfo | URL,
+  dailyRows: Record<string, unknown>[] = DEFAULT_DAILY_ROWS
+) {
   const url = new URL(String(input));
 
+  // This reproduces the live defect: the provider adjusted the requested
+  // partial current-day count window to a midnight boundary and returned a
+  // misleading zero while the daily aggregate contained real traffic. The
+  // corrected loader must never make this request.
   if (url.pathname.endsWith("/count")) {
     return jsonResponse({
       version: 1,
-      query: providerQuery(url),
-      data: countForStart(url.searchParams.get("since")),
+      query: {
+        since: "2026-08-20T00:00:00.000Z",
+        until: "2026-08-21T00:00:00.000Z",
+        filter: url.searchParams.get("filter"),
+      },
+      data: { visitors: 0, pageviews: 0 },
     });
   }
 
@@ -132,8 +155,20 @@ function successfulProviderResponse(input: RequestInfo | URL) {
   return jsonResponse({
     version: 1,
     query: providerQuery(url, by ?? undefined),
-    data: aggregateRows(by),
+    data: by === "day" ? dailyRows : aggregateRows(by),
   });
+}
+
+function stubSuccessfulProvider(
+  dailyRows: Record<string, unknown>[] = DEFAULT_DAILY_ROWS
+) {
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockImplementation((input) =>
+      Promise.resolve(successfulProviderResponse(input, dailyRows))
+    );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 describe("server-only Vercel Web Analytics loader", () => {
@@ -299,7 +334,7 @@ describe("server-only Vercel Web Analytics loader", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("loads truthful count, trend, and bounded breakdown metrics for an Admin", async () => {
+  it("loads truthful daily summaries, trend, and bounded breakdown metrics for an Admin", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockImplementation((input) => Promise.resolve(successfulProviderResponse(input)));
@@ -313,8 +348,8 @@ describe("server-only Vercel Web Analytics loader", () => {
       timezone: "UTC",
       summary: {
         today: { visitors: 2, pageViews: 4 },
-        sevenDays: { visitors: 7, pageViews: 14 },
-        thirtyDays: { visitors: 30, pageViews: 60 },
+        sevenDays: { visitors: 3, pageViews: 7 },
+        thirtyDays: { visitors: 3, pageViews: 7 },
       },
       trend: [
         { date: "2026-08-19", visitors: 1, pageViews: 3 },
@@ -336,7 +371,12 @@ describe("server-only Vercel Web Analytics loader", () => {
         ],
       },
     });
-    expect(fetchMock).toHaveBeenCalledTimes(10);
+    expect(fetchMock).toHaveBeenCalledTimes(7);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        new URL(String(input)).pathname.endsWith("/count")
+      )
+    ).toBe(false);
     expect(authMock.mock.invocationCallOrder[0]).toBeLessThan(
       fetchMock.mock.invocationCallOrder[0]
     );
@@ -346,7 +386,81 @@ describe("server-only Vercel Web Analytics loader", () => {
     expect(JSON.stringify(result)).not.toContain("https://private.example");
   });
 
-  it("uses UTC calendar windows and maps their half-open end to Vercel's inclusive until", async () => {
+  it("ignores the live adjusted-zero count defect and uses today's partial daily row", async () => {
+    const fetchMock = stubSuccessfulProvider([utcDayRow(0, 2, 7)]);
+
+    const result = await loadAdminWebsiteTraffic();
+
+    expect(result).toMatchObject({
+      status: "available",
+      summary: {
+        today: { visitors: 2, pageViews: 7 },
+        sevenDays: { visitors: 2, pageViews: 7 },
+        thirtyDays: { visitors: 2, pageViews: 7 },
+      },
+    });
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        new URL(String(input)).pathname.endsWith("/count")
+      )
+    ).toBe(false);
+  });
+
+  it("sums exactly today plus six and twenty-nine prior UTC dates", async () => {
+    const dailyRows = Array.from({ length: 30 }, (_, daysBeforeToday) =>
+      daysBeforeToday === 0
+        ? utcDayRow(daysBeforeToday, 2, 7)
+        : utcDayRow(daysBeforeToday, 1, 2)
+    );
+    stubSuccessfulProvider(dailyRows);
+
+    const result = await loadAdminWebsiteTraffic();
+
+    expect(result).toMatchObject({
+      status: "available",
+      summary: {
+        today: { visitors: 2, pageViews: 7 },
+        sevenDays: { visitors: 8, pageViews: 19 },
+        thirtyDays: { visitors: 31, pageViews: 65 },
+      },
+    });
+  });
+
+  it("treats sparse dates as zero and excludes day seven only from the seven-day total", async () => {
+    stubSuccessfulProvider([
+      utcDayRow(0, 2, 7),
+      utcDayRow(6, 3, 4),
+      utcDayRow(7, 11, 13),
+      utcDayRow(29, 17, 19),
+    ]);
+
+    const result = await loadAdminWebsiteTraffic();
+
+    expect(result).toMatchObject({
+      status: "available",
+      summary: {
+        today: { visitors: 2, pageViews: 7 },
+        sevenDays: { visitors: 5, pageViews: 11 },
+        thirtyDays: { visitors: 33, pageViews: 43 },
+      },
+    });
+  });
+
+  it("sums daily Vercel Visitors without deduplicating across dates", async () => {
+    stubSuccessfulProvider([utcDayRow(0, 2, 4), utcDayRow(1, 3, 6)]);
+
+    const result = await loadAdminWebsiteTraffic();
+
+    expect(result).toMatchObject({
+      status: "available",
+      summary: {
+        sevenDays: { visitors: 5, pageViews: 10 },
+        thirtyDays: { visitors: 5, pageViews: 10 },
+      },
+    });
+  });
+
+  it("uses one UTC daily aggregate plus six bounded Production breakdowns", async () => {
     const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -356,16 +470,16 @@ describe("server-only Vercel Web Analytics loader", () => {
     await loadAdminWebsiteTraffic();
 
     const urls = fetchMock.mock.calls.map(([input]) => new URL(String(input)));
-    const countUrls = urls.filter((url) => url.pathname.endsWith("/count"));
-    expect(countUrls.map((url) => url.searchParams.get("since"))).toEqual([
-      "2026-08-20T00:00:00.000Z",
-      "2026-08-14T00:00:00.000Z",
-      "2026-07-22T00:00:00.000Z",
-    ]);
+    expect(urls).toHaveLength(7);
+    expect(
+      urls.filter((url) => url.pathname.endsWith("/count"))
+    ).toHaveLength(0);
     expect(
       urls.every(
         (url) =>
           url.origin === PROVIDER_ORIGIN &&
+          url.pathname.endsWith("/aggregate") &&
+          url.searchParams.get("since") === "2026-07-22T00:00:00.000Z" &&
           url.searchParams.get("until") === "2026-08-20T12:34:56.788Z" &&
           url.searchParams.get("filter") === "environment eq 'production'" &&
           url.searchParams.get("teamId") === TEAM_ID &&
@@ -388,7 +502,10 @@ describe("server-only Vercel Web Analytics loader", () => {
       ["browserName", "8"],
       ["osName", "8"],
     ]);
-    expect(timeoutSpy).toHaveBeenCalledTimes(10);
+    expect(
+      urls.filter((url) => url.searchParams.get("by") === "day")
+    ).toHaveLength(1);
+    expect(timeoutSpy).toHaveBeenCalledTimes(7);
     expect(timeoutSpy).toHaveBeenCalledWith(8_000);
 
     for (const [, init] of fetchMock.mock.calls) {
@@ -408,29 +525,34 @@ describe("server-only Vercel Web Analytics loader", () => {
       .mockImplementation((input) => Promise.resolve(successfulProviderResponse(input)));
     vi.stubGlobal("fetch", fetchMock);
 
+    let result: Awaited<ReturnType<typeof loadAdminWebsiteTraffic>>;
     try {
-      await loadAdminWebsiteTraffic();
+      result = await loadAdminWebsiteTraffic();
     } finally {
       if (originalTimezone === undefined) delete process.env.TZ;
       else process.env.TZ = originalTimezone;
     }
 
-    const todayUrl = new URL(String(fetchMock.mock.calls[0][0]));
-    expect(todayUrl.searchParams.get("since")).toBe(
-      "2026-08-20T00:00:00.000Z"
+    const dailyUrl = fetchMock.mock.calls
+      .map(([input]) => new URL(String(input)))
+      .find((url) => url.searchParams.get("by") === "day");
+    expect(dailyUrl?.searchParams.get("since")).toBe(
+      "2026-07-22T00:00:00.000Z"
     );
+    expect(result).toMatchObject({
+      status: "available",
+      summary: { today: { visitors: 2, pageViews: 4 } },
+    });
   });
 
-  it("returns a genuine available zero when count data is zero and aggregates are empty", async () => {
+  it("returns a genuine available zero when the complete aggregate is empty", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
       const url = new URL(String(input));
       return Promise.resolve(
         jsonResponse({
           version: 1,
           query: providerQuery(url, url.searchParams.get("by") ?? undefined),
-          data: url.pathname.endsWith("/count")
-            ? { visitors: 0, pageviews: 0 }
-            : [],
+          data: [],
         })
       );
     });
@@ -457,43 +579,37 @@ describe("server-only Vercel Web Analytics loader", () => {
     });
   });
 
-  it("returns Today as a local real zero at the exact UTC boundary", async () => {
+  it("returns Today as a genuine zero at UTC midnight while retaining prior dates", async () => {
     vi.setSystemTime(new Date("2026-08-20T00:00:00.000Z"));
-    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
-      const url = new URL(String(input));
-      if (!url.pathname.endsWith("/aggregate") || url.searchParams.get("by") !== "day") {
-        return Promise.resolve(successfulProviderResponse(input));
-      }
-      return Promise.resolve(
-        jsonResponse({
-          version: 1,
-          query: providerQuery(url, "day"),
-          data: [
-            {
-              timestamp: "2026-08-19T00:00:00Z",
-              visitors: 1,
-              pageviews: 3,
-            },
-          ],
-        })
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation((input) =>
+        Promise.resolve(
+          successfulProviderResponse(input, [utcDayRow(1, 1, 3)])
+        )
       );
-    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await loadAdminWebsiteTraffic();
 
     expect(result).toMatchObject({
       status: "available",
-      summary: { today: { visitors: 0, pageViews: 0 } },
+      summary: {
+        today: { visitors: 0, pageViews: 0 },
+        sevenDays: { visitors: 1, pageViews: 3 },
+        thirtyDays: { visitors: 1, pageViews: 3 },
+      },
     });
-    expect(fetchMock).toHaveBeenCalledTimes(9);
-    expect(
-      fetchMock.mock.calls.every(([input]) => {
-        const url = new URL(String(input));
-        return url.searchParams.get("until") !== "2026-08-19T23:59:59.999Z" ||
-          url.searchParams.get("since") !== "2026-08-20T00:00:00.000Z";
-      })
-    ).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(7);
+    const dailyUrl = fetchMock.mock.calls
+      .map(([input]) => new URL(String(input)))
+      .find((url) => url.searchParams.get("by") === "day");
+    expect(dailyUrl?.searchParams.get("since")).toBe(
+      "2026-07-22T00:00:00.000Z"
+    );
+    expect(dailyUrl?.searchParams.get("until")).toBe(
+      "2026-08-19T23:59:59.999Z"
+    );
   });
 
   it.each([
@@ -570,19 +686,19 @@ describe("server-only Vercel Web Analytics loader", () => {
   });
 
   it.each([
-    { visitors: "1", pageviews: 2 },
-    { visitors: -1, pageviews: 2 },
-    { visitors: 1.5, pageviews: 2 },
-    { visitors: 1, pageviews: Number.MAX_SAFE_INTEGER + 1 },
-    { visitors: 1 },
-  ])("rejects malformed count metrics %#", async (data) => {
-    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
-      const url = new URL(String(input));
-      return Promise.resolve(
-        jsonResponse({ version: 1, query: providerQuery(url), data })
-      );
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    { timestamp: "2026-08-20T00:00:00.000Z", visitors: "1", pageviews: 2 },
+    { timestamp: "2026-08-20T00:00:00.000Z", visitors: -1, pageviews: 2 },
+    { timestamp: "2026-08-20T00:00:00.000Z", visitors: 1.5, pageviews: 2 },
+    {
+      timestamp: "2026-08-20T00:00:00.000Z",
+      visitors: 1,
+      pageviews: Number.MAX_SAFE_INTEGER + 1,
+    },
+    { timestamp: "2026-08-20T00:00:00.000Z", visitors: 1 },
+    { timestamp: "not-a-date", visitors: 1, pageviews: 2 },
+    { timestamp: "2026-08-20T01:00:00.000Z", visitors: 1, pageviews: 2 },
+  ])("rejects malformed daily rows %#", async (row) => {
+    stubSuccessfulProvider([row]);
 
     await expect(loadAdminWebsiteTraffic()).resolves.toEqual({
       status: "unavailable",
@@ -590,12 +706,9 @@ describe("server-only Vercel Web Analytics loader", () => {
     });
   });
 
-  it("rejects malformed aggregate schema and duplicate daily buckets", async () => {
+  it("rejects duplicate daily buckets", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
       const url = new URL(String(input));
-      if (url.pathname.endsWith("/count")) {
-        return Promise.resolve(successfulProviderResponse(input));
-      }
       const by = url.searchParams.get("by");
       const rows =
         by === "day"
@@ -620,12 +733,21 @@ describe("server-only Vercel Web Analytics loader", () => {
     });
   });
 
+  it("fails closed when otherwise valid daily values overflow a summary", async () => {
+    stubSuccessfulProvider([
+      utcDayRow(0, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER),
+      utcDayRow(1, 1, 1),
+    ]);
+
+    await expect(loadAdminWebsiteTraffic()).resolves.toEqual({
+      status: "unavailable",
+      reason: "provider-unavailable",
+    });
+  });
+
   it("rejects aggregate rows outside the requested UTC window", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
       const url = new URL(String(input));
-      if (url.pathname.endsWith("/count")) {
-        return Promise.resolve(successfulProviderResponse(input));
-      }
       const by = url.searchParams.get("by");
       return Promise.resolve(
         jsonResponse({
@@ -655,9 +777,6 @@ describe("server-only Vercel Web Analytics loader", () => {
   it("rejects oversized, non-array, and over-limit aggregate payloads", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
       const url = new URL(String(input));
-      if (url.pathname.endsWith("/count")) {
-        return Promise.resolve(successfulProviderResponse(input));
-      }
       const by = url.searchParams.get("by");
       const data =
         by === "country"
