@@ -6,6 +6,9 @@ import {
   evaluateMatchExcellenceBadgeAwardsForPlayer,
   evaluateMatchBadgeAwardsForPlayer,
   evaluateProfileBadgeAwards,
+  evaluateSeasonBadgeAwardsForPlayer,
+  evaluateSeasonBadgeAwardsForSeason,
+  evaluateSeasonBadgeAwardsForTournament,
   evaluateTournamentBadgeAwardsForMatch,
   evaluateTournamentBadgeAwardsForPlayer,
   evaluateTournamentBadgeAwardsForTournament,
@@ -40,6 +43,9 @@ const FIRST_CHALLENGE_TOURNAMENT_ID = "12121212-1212-4212-8212-121212121212";
 const FIRST_MAIN_TOURNAMENT_ID = "34343434-3434-4434-8434-343434343434";
 const SECOND_CHAMPIONSHIP_TOURNAMENT_ID =
   "56565656-5656-4565-8565-565656565656";
+const SEASON_ID = "abababab-abab-4aba-8aba-abababababab";
+const FOURTH_SEASON_TOURNAMENT_ID =
+  "efefefef-efef-4efe-8efe-efefefefefef";
 
 type BadgeAwardPayload = {
   player_id: string;
@@ -56,9 +62,12 @@ type FakeAuthorityClientOptions = {
   matchExcellenceSummaries?: Record<string, Record<string, unknown>>;
   tournamentSummaries?: Record<string, Record<string, unknown>>;
   tournamentPrestigeSummaries?: Record<string, Record<string, unknown>>;
+  seasonSummaries?: Record<string, Record<string, unknown>>;
   participants?: Array<Record<string, unknown>>;
   tournamentParticipants?: Array<Record<string, unknown>>;
   matchTournamentRows?: Array<Record<string, unknown>>;
+  seasonParticipants?: Array<Record<string, unknown>>;
+  tournamentSeasonRows?: Array<Record<string, unknown>>;
   backfillPlayers?: string[];
   existingAwards?: string[];
 };
@@ -163,6 +172,25 @@ function tournamentPrestigeSummary(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function seasonSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    season_campaigner_count: 0,
+    first_season_campaigner_season_id: null,
+    first_season_campaigner_at: null,
+    first_season_campaigner_threshold_tournament_id: null,
+    first_season_campaigner_tournament_count: null,
+    podium_finish_count: 0,
+    first_podium_season_id: null,
+    first_podium_at: null,
+    first_podium_rank: null,
+    champion_finish_count: 0,
+    first_champion_season_id: null,
+    first_champion_at: null,
+    first_champion_rank: null,
+    ...overrides,
+  };
+}
+
 function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
   const awards = new Set(options.existingAwards ?? []);
   const upsertPayloads: BadgeAwardPayload[] = [];
@@ -183,6 +211,10 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
   const tournamentPrestigeSummaries: Record<string, Record<string, unknown>> =
     options.tournamentPrestigeSummaries ?? {
       [PLAYER_ID]: tournamentPrestigeSummary(),
+    };
+  const seasonSummaries: Record<string, Record<string, unknown>> =
+    options.seasonSummaries ?? {
+      [PLAYER_ID]: seasonSummary(),
     };
   const backfillPlayers = options.backfillPlayers ?? [PLAYER_ID];
 
@@ -338,6 +370,36 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
       };
     }
 
+    if (name === "get_player_badge_finalized_season_for_tournament") {
+      return {
+        data:
+          options.tournamentSeasonRows ?? [{ season_id: SEASON_ID }],
+        error: null,
+      };
+    }
+
+    if (name === "get_player_badge_season_authority_participants") {
+      return {
+        data:
+          options.seasonParticipants ??
+          [
+            {
+              player_id: PLAYER_ID,
+            },
+          ],
+        error: null,
+      };
+    }
+
+    if (name === "get_player_badge_season_summary") {
+      return {
+        data: [
+          seasonSummaries[String(args.p_player_id)] ?? seasonSummary(),
+        ],
+        error: null,
+      };
+    }
+
     throw new Error(`Unexpected RPC: ${name}`);
   });
 
@@ -361,6 +423,7 @@ describe("badge authority evaluators", () => {
       "first-campaign",
       "iron-regular",
       "tournament-veteran",
+      "season-campaigner",
       "five-victories",
       "ten-victories",
       "twenty-five-victories",
@@ -377,7 +440,15 @@ describe("badge authority evaluators", () => {
       "elite-champion",
       "double-champion",
       "triple-crown",
+      "season-podium",
+      "season-champion",
     ]);
+    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
+      "rising-through-the-ranks"
+    );
+    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
+      "reliable-competitor"
+    );
     expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
       "comeback-commander"
     );
@@ -1467,6 +1538,304 @@ describe("badge authority evaluators", () => {
     expect(fixture.awards.size).toBe(3);
   });
 
+  it("awards Season Campaigner only after four qualifying tournaments in one finalized season", async () => {
+    const threeTournaments = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary(),
+      },
+    });
+    const fourTournaments = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          season_campaigner_count: 1,
+          first_season_campaigner_season_id: SEASON_ID,
+          first_season_campaigner_at: "2026-08-24T12:00:00.000Z",
+          first_season_campaigner_threshold_tournament_id:
+            FOURTH_SEASON_TOURNAMENT_ID,
+          first_season_campaigner_tournament_count: 4,
+        }),
+      },
+    });
+
+    const locked = await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: threeTournaments.client,
+    });
+    const awarded = await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fourTournaments.client,
+    });
+
+    expect(locked.createdCount).toBe(0);
+    expect(locked.skippedReasons).toContain(
+      "season-campaigner_threshold_not_met"
+    );
+    expect(awarded.createdSlugs).toEqual(["season-campaigner"]);
+    expect(fourTournaments.upsertPayloads[0]).toMatchObject({
+      player_id: PLAYER_ID,
+      badge_slug: "season-campaigner",
+      source_type: "season",
+      source_id: SEASON_ID,
+      original_unlocked_at: "2026-08-24T12:00:00.000Z",
+      source_metadata: expect.objectContaining({
+        evaluator: "season-campaigner",
+        thresholdTournamentId: FOURTH_SEASON_TOURNAMENT_ID,
+        qualifyingTournamentCount: 4,
+      }),
+    });
+  });
+
+  it("does not award Season Campaigner from split seasons or invalid participation omitted by the database summary", async () => {
+    const fixture = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary(),
+      },
+    });
+
+    const result = await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdCount).toBe(0);
+    expect(result.evaluatedSlugs).toEqual([
+      "season-campaigner",
+      "season-podium",
+      "season-champion",
+    ]);
+    expect(result.skippedReasons).toEqual([
+      "season-campaigner_threshold_not_met",
+      "season-podium_threshold_not_met",
+      "season-champion_threshold_not_met",
+    ]);
+    expect(fixture.upsert).not.toHaveBeenCalled();
+  });
+
+  it("awards Season Podium from finalized official top-three season ranks", async () => {
+    const rankFour = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary(),
+      },
+    });
+    const rankThree = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 3,
+        }),
+      },
+    });
+    const rankTwo = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 2,
+        }),
+      },
+    });
+    const rankOne = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 1,
+        }),
+      },
+    });
+
+    await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: rankFour.client,
+    });
+    const third = await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: rankThree.client,
+    });
+    const second = await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: rankTwo.client,
+    });
+    const first = await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: rankOne.client,
+    });
+
+    expect(rankFour.upsert).not.toHaveBeenCalled();
+    expect(third.createdSlugs).toEqual(["season-podium"]);
+    expect(second.createdSlugs).toEqual(["season-podium"]);
+    expect(first.createdSlugs).toEqual(["season-podium"]);
+    expect(rankThree.upsertPayloads[0]).toMatchObject({
+      badge_slug: "season-podium",
+      source_type: "season",
+      source_id: SEASON_ID,
+      original_unlocked_at: "2026-08-25T12:00:00.000Z",
+      source_metadata: expect.objectContaining({
+        evaluator: "season-podium",
+        officialRank: 3,
+      }),
+    });
+  });
+
+  it("awards Season Champion only from finalized official champion authority", async () => {
+    const rankTwo = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 2,
+        }),
+      },
+    });
+    const champion = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 1,
+          champion_finish_count: 1,
+          first_champion_season_id: SEASON_ID,
+          first_champion_at: "2026-08-25T12:00:00.000Z",
+          first_champion_rank: 1,
+        }),
+      },
+    });
+
+    const locked = await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: rankTwo.client,
+    });
+    const awarded = await evaluateSeasonBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: champion.client,
+    });
+
+    expect(locked.createdSlugs).toEqual(["season-podium"]);
+    expect(locked.createdSlugs).not.toContain("season-champion");
+    expect(awarded.createdSlugs).toEqual([
+      "season-podium",
+      "season-champion",
+    ]);
+    expect(champion.upsertPayloads[1]).toMatchObject({
+      badge_slug: "season-champion",
+      source_type: "season",
+      source_id: SEASON_ID,
+      source_metadata: expect.objectContaining({
+        evaluator: "season-champion",
+        officialRank: 1,
+      }),
+    });
+  });
+
+  it("evaluates finalized season badges through the completed tournament live path", async () => {
+    const fixture = createAuthorityClient({
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          season_campaigner_count: 1,
+          first_season_campaigner_season_id: SEASON_ID,
+          first_season_campaigner_at: "2026-08-24T12:00:00.000Z",
+          first_season_campaigner_threshold_tournament_id:
+            FOURTH_SEASON_TOURNAMENT_ID,
+          first_season_campaigner_tournament_count: 4,
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 1,
+          champion_finish_count: 1,
+          first_champion_season_id: SEASON_ID,
+          first_champion_at: "2026-08-25T12:00:00.000Z",
+          first_champion_rank: 1,
+        }),
+      },
+    });
+
+    const result = await evaluateTournamentBadgeAwardsForTournament({
+      tournamentId: FIRST_TOURNAMENT_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).toEqual([
+      "season-campaigner",
+      "season-podium",
+      "season-champion",
+    ]);
+    expect(fixture.rpc).toHaveBeenCalledWith(
+      "get_player_badge_finalized_season_for_tournament",
+      { p_tournament_id: FIRST_TOURNAMENT_ID }
+    );
+    expect(fixture.rpc).toHaveBeenCalledWith(
+      "get_player_badge_season_authority_participants",
+      { p_season_id: SEASON_ID }
+    );
+  });
+
+  it("does not live-award season badges when the tournament season is not finalized", async () => {
+    const fixture = createAuthorityClient({
+      tournamentSeasonRows: [],
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          season_campaigner_count: 1,
+          first_season_campaigner_season_id: SEASON_ID,
+          first_season_campaigner_at: "2026-08-24T12:00:00.000Z",
+          first_season_campaigner_threshold_tournament_id:
+            FOURTH_SEASON_TOURNAMENT_ID,
+          first_season_campaigner_tournament_count: 4,
+        }),
+      },
+    });
+
+    const result = await evaluateSeasonBadgeAwardsForTournament({
+      tournamentId: FIRST_TOURNAMENT_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdCount).toBe(0);
+    expect(result.skippedReasons).toContain("season_not_finalized");
+    expect(fixture.upsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps repeated season evaluation idempotent and preserves official ties from the summary", async () => {
+    const fixture = createAuthorityClient({
+      seasonParticipants: [
+        { player_id: PLAYER_ID },
+        { player_id: OTHER_PLAYER_ID },
+      ],
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 1,
+        }),
+        [OTHER_PLAYER_ID]: seasonSummary({
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 1,
+        }),
+      },
+    });
+
+    const first = await evaluateSeasonBadgeAwardsForSeason({
+      seasonId: SEASON_ID,
+      supabase: fixture.client,
+    });
+    const second = await evaluateSeasonBadgeAwardsForSeason({
+      seasonId: SEASON_ID,
+      supabase: fixture.client,
+    });
+
+    expect(first.createdSlugs).toEqual(["season-podium", "season-podium"]);
+    expect(second.createdCount).toBe(0);
+    expect(fixture.awards.size).toBe(2);
+  });
+
   it("keeps repeated and concurrent profile evaluation idempotent", async () => {
     const fixture = createAuthorityClient();
 
@@ -1611,6 +1980,64 @@ describe("badge authority evaluators", () => {
       ]);
   });
 
+  it("backfills finalized season badges idempotently from season summaries", async () => {
+    const fixture = createAuthorityClient({
+      backfillPlayers: [PLAYER_ID],
+      seasonSummaries: {
+        [PLAYER_ID]: seasonSummary({
+          season_campaigner_count: 1,
+          first_season_campaigner_season_id: SEASON_ID,
+          first_season_campaigner_at: "2026-08-24T12:00:00.000Z",
+          first_season_campaigner_threshold_tournament_id:
+            FOURTH_SEASON_TOURNAMENT_ID,
+          first_season_campaigner_tournament_count: 4,
+          podium_finish_count: 1,
+          first_podium_season_id: SEASON_ID,
+          first_podium_at: "2026-08-25T12:00:00.000Z",
+          first_podium_rank: 1,
+          champion_finish_count: 1,
+          first_champion_season_id: SEASON_ID,
+          first_champion_at: "2026-08-25T12:00:00.000Z",
+          first_champion_rank: 1,
+        }),
+      },
+    });
+
+    const first = await backfillInitialBadgeAwards({
+      supabase: fixture.client,
+    });
+    const second = await backfillInitialBadgeAwards({
+      supabase: fixture.client,
+    });
+
+    expect(first.badgeCounts).toMatchObject({
+      "season-campaigner": 1,
+      "season-podium": 1,
+      "season-champion": 1,
+    });
+    expect(first.awardsCreated).toBe(4);
+    expect(second.awardsCreated).toBe(0);
+    expect(fixture.upsertPayloads).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          badge_slug: "season-campaigner",
+          source_type: "season",
+          source_id: SEASON_ID,
+        }),
+        expect.objectContaining({
+          badge_slug: "season-podium",
+          source_type: "season",
+          source_id: SEASON_ID,
+        }),
+        expect.objectContaining({
+          badge_slug: "season-champion",
+          source_type: "season",
+          source_id: SEASON_ID,
+        }),
+      ])
+    );
+  });
+
   it("runs an idempotent controlled backfill for only implemented authority badges", async () => {
     const fixture = createAuthorityClient({
       backfillPlayers: [PLAYER_ID, OTHER_PLAYER_ID],
@@ -1651,6 +2078,7 @@ describe("badge authority evaluators", () => {
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,
+      "season-campaigner": 0,
       "five-victories": 1,
       "ten-victories": 0,
       "twenty-five-victories": 0,
@@ -1667,6 +2095,8 @@ describe("badge authority evaluators", () => {
       "elite-champion": 0,
       "double-champion": 0,
       "triple-crown": 0,
+      "season-podium": 0,
+      "season-champion": 0,
     });
     expect(second.awardsCreated).toBe(0);
     expect(
@@ -1679,6 +2109,7 @@ describe("badge authority evaluators", () => {
           "first-campaign",
           "iron-regular",
           "tournament-veteran",
+          "season-campaigner",
           "five-victories",
           "ten-victories",
           "twenty-five-victories",
@@ -1695,6 +2126,8 @@ describe("badge authority evaluators", () => {
           "elite-champion",
           "double-champion",
           "triple-crown",
+          "season-podium",
+          "season-champion",
         ].includes(payload.badge_slug)
       )
     ).toBe(true);
@@ -1754,6 +2187,7 @@ describe("badge authority evaluators", () => {
       "first-campaign": 1,
       "iron-regular": 1,
       "tournament-veteran": 1,
+      "season-campaigner": 0,
       "five-victories": 1,
       "ten-victories": 1,
       "twenty-five-victories": 1,
@@ -1770,6 +2204,8 @@ describe("badge authority evaluators", () => {
       "elite-champion": 0,
       "double-champion": 0,
       "triple-crown": 0,
+      "season-podium": 0,
+      "season-champion": 0,
     });
     expect(second.awardsCreated).toBe(0);
     expect(fixture.awards.size).toBe(10);
@@ -1800,6 +2236,7 @@ describe("badge authority evaluators", () => {
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,
+      "season-campaigner": 0,
       "five-victories": 0,
       "ten-victories": 0,
       "twenty-five-victories": 0,
@@ -1816,6 +2253,8 @@ describe("badge authority evaluators", () => {
       "elite-champion": 0,
       "double-champion": 0,
       "triple-crown": 0,
+      "season-podium": 0,
+      "season-champion": 0,
     });
     expect(fixture.upsertPayloads.map((payload) => payload.badge_slug)).toEqual([
       "ironclad-recruit",

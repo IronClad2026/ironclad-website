@@ -12,6 +12,7 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "first-campaign",
   "iron-regular",
   "tournament-veteran",
+  "season-campaigner",
   "five-victories",
   "ten-victories",
   "twenty-five-victories",
@@ -28,6 +29,8 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "elite-champion",
   "double-champion",
   "triple-crown",
+  "season-podium",
+  "season-champion",
 ] as const satisfies readonly BadgeSlug[];
 
 type ProductionBadgeAuthoritySlug =
@@ -35,7 +38,7 @@ type ProductionBadgeAuthoritySlug =
 
 type BadgeAuthorityClient = Pick<SupabaseClient, "from" | "rpc">;
 
-type BadgeSourceType = "profile" | "match" | "tournament";
+type BadgeSourceType = "profile" | "match" | "tournament" | "season";
 
 type BadgeSourceMetadata = Record<string, string | number | boolean | null>;
 
@@ -162,6 +165,30 @@ type TournamentPrestigeSummaryRow = {
   triple_crown_at: unknown;
 };
 
+type SeasonBadgeForTournamentRow = {
+  season_id: unknown;
+};
+
+type SeasonBadgeParticipantRow = {
+  player_id: unknown;
+};
+
+type SeasonBadgeSummaryRow = {
+  season_campaigner_count: unknown;
+  first_season_campaigner_season_id: unknown;
+  first_season_campaigner_at: unknown;
+  first_season_campaigner_threshold_tournament_id: unknown;
+  first_season_campaigner_tournament_count: unknown;
+  podium_finish_count: unknown;
+  first_podium_season_id: unknown;
+  first_podium_at: unknown;
+  first_podium_rank: unknown;
+  champion_finish_count: unknown;
+  first_champion_season_id: unknown;
+  first_champion_at: unknown;
+  first_champion_rank: unknown;
+};
+
 type MatchThreshold = {
   badgeSlug: ProductionBadgeAuthoritySlug;
   countKey: "playedMatchCount" | "winCount";
@@ -255,6 +282,25 @@ type TournamentPrestigeThreshold = {
   bracketType?: "academy" | "challenge" | "main";
   eventType?: "played_match_win" | "tournament_win";
   sourceType?: BadgeSourceType;
+};
+
+type SeasonThreshold = {
+  badgeSlug: ProductionBadgeAuthoritySlug;
+  countKey:
+    | "seasonCampaignerCount"
+    | "podiumFinishCount"
+    | "championFinishCount";
+  threshold: number;
+  sourceIdKey:
+    | "firstSeasonCampaignerSeasonId"
+    | "firstPodiumSeasonId"
+    | "firstChampionSeasonId";
+  originalUnlockedAtKey:
+    | "firstSeasonCampaignerAt"
+    | "firstPodiumAt"
+    | "firstChampionAt";
+  evaluator: "season-campaigner" | "season-podium" | "season-champion";
+  rankKey?: "firstPodiumRank" | "firstChampionRank";
 };
 
 const PROFILE_SELECT = [
@@ -461,6 +507,35 @@ const TOURNAMENT_PRESTIGE_THRESHOLDS: readonly TournamentPrestigeThreshold[] = [
     originalUnlockedAtKey: "tripleCrownAt",
     evaluator: "triple-crown",
     eventType: "tournament_win",
+  },
+];
+
+const SEASON_THRESHOLDS: readonly SeasonThreshold[] = [
+  {
+    badgeSlug: "season-campaigner",
+    countKey: "seasonCampaignerCount",
+    threshold: 1,
+    sourceIdKey: "firstSeasonCampaignerSeasonId",
+    originalUnlockedAtKey: "firstSeasonCampaignerAt",
+    evaluator: "season-campaigner",
+  },
+  {
+    badgeSlug: "season-podium",
+    countKey: "podiumFinishCount",
+    threshold: 1,
+    sourceIdKey: "firstPodiumSeasonId",
+    originalUnlockedAtKey: "firstPodiumAt",
+    evaluator: "season-podium",
+    rankKey: "firstPodiumRank",
+  },
+  {
+    badgeSlug: "season-champion",
+    countKey: "championFinishCount",
+    threshold: 1,
+    sourceIdKey: "firstChampionSeasonId",
+    originalUnlockedAtKey: "firstChampionAt",
+    evaluator: "season-champion",
+    rankKey: "firstChampionRank",
   },
 ];
 
@@ -733,7 +808,7 @@ export async function evaluateTournamentBadgeAwardsForTournament({
     };
   }
 
-  return mergeEvaluationResults(
+  const tournamentResult = mergeEvaluationResults(
     await Promise.all(
       playerIds.map((playerId) =>
         evaluateTournamentBadgeAwardsForPlayer({
@@ -744,6 +819,15 @@ export async function evaluateTournamentBadgeAwardsForTournament({
       )
     )
   );
+
+  return mergeEvaluationResults([
+    tournamentResult,
+    await evaluateSeasonBadgeAwardsForTournament({
+      tournamentId,
+      supabase,
+      evaluationMode,
+    }),
+  ]);
 }
 
 export async function evaluateTournamentBadgeAwardsForPlayer({
@@ -908,6 +992,144 @@ export async function evaluateTournamentPrestigeBadgeAwardsForPlayer({
     evaluatedSlugs: TOURNAMENT_PRESTIGE_THRESHOLDS.map(
       (threshold) => threshold.badgeSlug
     ),
+    skippedReasons,
+  };
+}
+
+export async function evaluateSeasonBadgeAwardsForTournament({
+  tournamentId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  tournamentId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const seasonId = await loadFinalizedSeasonIdForTournament(
+    supabase,
+    tournamentId
+  );
+
+  if (!seasonId) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      skippedReasons: ["season_not_finalized"],
+    };
+  }
+
+  return evaluateSeasonBadgeAwardsForSeason({
+    seasonId,
+    supabase,
+    evaluationMode,
+  });
+}
+
+export async function evaluateSeasonBadgeAwardsForSeason({
+  seasonId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  seasonId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const playerIds = await loadSeasonBadgeParticipantPlayerIds(
+    supabase,
+    seasonId
+  );
+
+  if (playerIds.length === 0) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      skippedReasons: ["season_not_finalized_or_no_participants"],
+    };
+  }
+
+  return mergeEvaluationResults(
+    await Promise.all(
+      playerIds.map((playerId) =>
+        evaluateSeasonBadgeAwardsForPlayer({
+          playerId,
+          supabase,
+          evaluationMode,
+        })
+      )
+    )
+  );
+}
+
+export async function evaluateSeasonBadgeAwardsForPlayer({
+  playerId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  playerId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const summary = await loadSeasonBadgeSummary(supabase, playerId);
+  if (!summary) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: SEASON_THRESHOLDS.map((threshold) => threshold.badgeSlug),
+      skippedReasons: ["season_summary_unavailable"],
+    };
+  }
+
+  const createdSlugs: ProductionBadgeAuthoritySlug[] = [];
+  const skippedReasons: string[] = [];
+
+  for (const threshold of SEASON_THRESHOLDS) {
+    const qualifyingCount = summary[threshold.countKey];
+    const sourceId = summary[threshold.sourceIdKey];
+    const originalUnlockedAt = summary[threshold.originalUnlockedAtKey];
+
+    if (qualifyingCount < threshold.threshold) {
+      skippedReasons.push(`${threshold.badgeSlug}_threshold_not_met`);
+      continue;
+    }
+
+    if (!sourceId) {
+      skippedReasons.push(`${threshold.badgeSlug}_source_missing`);
+      continue;
+    }
+
+    const created = await persistBadgeAward(supabase, {
+      playerId,
+      badgeSlug: threshold.badgeSlug,
+      sourceType: "season",
+      sourceId,
+      originalUnlockedAt,
+      sourceMetadata: {
+        evaluator: threshold.evaluator,
+        evaluationMode,
+        threshold: threshold.threshold,
+        qualifyingCount,
+        officialRank: threshold.rankKey ? summary[threshold.rankKey] : null,
+        thresholdTournamentId:
+          threshold.badgeSlug === "season-campaigner"
+            ? summary.firstSeasonCampaignerThresholdTournamentId
+            : null,
+        qualifyingTournamentCount:
+          threshold.badgeSlug === "season-campaigner"
+            ? summary.firstSeasonCampaignerTournamentCount
+            : null,
+        originalUnlockedAtBasis:
+          threshold.badgeSlug === "season-campaigner"
+            ? "fourth_qualifying_tournament_first_completed_at"
+            : "season_finalized_at",
+      },
+    });
+
+    if (created) {
+      createdSlugs.push(threshold.badgeSlug);
+    }
+  }
+
+  return {
+    createdCount: createdSlugs.length,
+    createdSlugs,
+    evaluatedSlugs: SEASON_THRESHOLDS.map((threshold) => threshold.badgeSlug),
     skippedReasons,
   };
 }
@@ -1106,6 +1328,11 @@ export async function backfillInitialBadgeAwards({
           evaluationMode: "backfill",
         }),
         await evaluateTournamentBadgeAwardsForPlayer({
+          playerId,
+          supabase,
+          evaluationMode: "backfill",
+        }),
+        await evaluateSeasonBadgeAwardsForPlayer({
           playerId,
           supabase,
           evaluationMode: "backfill",
@@ -1394,6 +1621,102 @@ async function loadTournamentPrestigeBadgeSummary(
     tripleCrownBracketCount: integerOrZero(row.triple_crown_bracket_count),
     tripleCrownTournamentId: stringOrNull(row.triple_crown_tournament_id),
     tripleCrownAt: isoOrNull(row.triple_crown_at),
+  };
+}
+
+async function loadFinalizedSeasonIdForTournament(
+  supabase: BadgeAuthorityClient,
+  tournamentId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_finalized_season_for_tournament",
+    {
+      p_tournament_id: tournamentId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "TOURNAMENT_SEASON_LOAD_FAILED",
+      "Badge season evaluation could not load the tournament season."
+    );
+  }
+
+  return stringOrNull(
+    rowsOf<SeasonBadgeForTournamentRow>(data)[0]?.season_id
+  );
+}
+
+async function loadSeasonBadgeParticipantPlayerIds(
+  supabase: BadgeAuthorityClient,
+  seasonId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_season_authority_participants",
+    {
+      p_season_id: seasonId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "SEASON_PARTICIPANTS_LOAD_FAILED",
+      "Badge season evaluation could not load participants."
+    );
+  }
+
+  return [
+    ...new Set(
+      rowsOf<SeasonBadgeParticipantRow>(data)
+        .map((row) => stringOrNull(row.player_id))
+        .filter((value): value is string => value !== null)
+    ),
+  ];
+}
+
+async function loadSeasonBadgeSummary(
+  supabase: BadgeAuthorityClient,
+  playerId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_season_summary",
+    {
+      p_player_id: playerId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "SEASON_SUMMARY_LOAD_FAILED",
+      "Badge season evaluation could not load the season summary."
+    );
+  }
+
+  const row = rowsOf<SeasonBadgeSummaryRow>(data)[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    seasonCampaignerCount: integerOrZero(row.season_campaigner_count),
+    firstSeasonCampaignerSeasonId: stringOrNull(
+      row.first_season_campaigner_season_id
+    ),
+    firstSeasonCampaignerAt: isoOrNull(row.first_season_campaigner_at),
+    firstSeasonCampaignerThresholdTournamentId: stringOrNull(
+      row.first_season_campaigner_threshold_tournament_id
+    ),
+    firstSeasonCampaignerTournamentCount: integerOrZero(
+      row.first_season_campaigner_tournament_count
+    ),
+    podiumFinishCount: integerOrZero(row.podium_finish_count),
+    firstPodiumSeasonId: stringOrNull(row.first_podium_season_id),
+    firstPodiumAt: isoOrNull(row.first_podium_at),
+    firstPodiumRank: integerOrNull(row.first_podium_rank),
+    championFinishCount: integerOrZero(row.champion_finish_count),
+    firstChampionSeasonId: stringOrNull(row.first_champion_season_id),
+    firstChampionAt: isoOrNull(row.first_champion_at),
+    firstChampionRank: integerOrNull(row.first_champion_rank),
   };
 }
 
