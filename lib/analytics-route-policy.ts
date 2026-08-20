@@ -28,9 +28,7 @@ export function sanitizeAnalyticsEventUrl(
     candidate.length === 0 ||
     candidate.length > MAX_ANALYTICS_URL_LENGTH ||
     typeof expectedOrigin !== "string" ||
-    expectedOrigin.length === 0 ||
-    candidate.includes("?") ||
-    candidate.includes("#")
+    expectedOrigin.length === 0
   ) {
     return null;
   }
@@ -92,7 +90,17 @@ export function sanitizeAnalyticsBreakdownPath(
 function hasCanonicalRawPath(candidate: string, parsedPathname: string) {
   const authorityStart = "https://".length;
   const pathStart = candidate.indexOf("/", authorityStart);
-  const rawPath = pathStart === -1 ? "/" : candidate.slice(pathStart);
+  const queryStart = candidate.indexOf("?", authorityStart);
+  const fragmentStart = candidate.indexOf("#", authorityStart);
+  const pathEnd = Math.min(
+    ...[queryStart, fragmentStart, candidate.length].filter(
+      (index) => index !== -1
+    )
+  );
+  const rawPath =
+    pathStart === -1 || pathStart >= pathEnd
+      ? "/"
+      : candidate.slice(pathStart, pathEnd);
 
   return rawPath === parsedPathname;
 }

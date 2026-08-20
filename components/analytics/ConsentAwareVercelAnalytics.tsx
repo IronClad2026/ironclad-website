@@ -4,7 +4,7 @@ import {
   Analytics,
   type BeforeSendEvent,
 } from "@vercel/analytics/next";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Suspense,
   useCallback,
@@ -39,7 +39,6 @@ function ConsentAwareVercelAnalyticsRuntime({
   reloadCurrentPage = reloadBrowserDocument,
 }: ConsentAwareVercelAnalyticsProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const hash = useSyncExternalStore(
     subscribeToHashChanges,
     readBrowserHash,
@@ -50,11 +49,7 @@ function ConsentAwareVercelAnalyticsRuntime({
     readAnalyticsConsent,
     () => null
   );
-  const currentRouteAllowed = isCurrentRouteAllowed(
-    pathname,
-    searchParams.toString(),
-    hash
-  );
+  const currentRouteAllowed = isCurrentRouteAllowed(pathname, hash);
   const active = enabled && decision === "granted" && currentRouteAllowed;
   const runtimeMountedInDocument = useRef(active);
 
@@ -109,13 +104,11 @@ function readServerHash() {
 
 function isCurrentRouteAllowed(
   pathname: string | null,
-  serializedSearchParams: string,
   hash: string
 ) {
   if (
     typeof window === "undefined" ||
     window.location.pathname !== pathname ||
-    window.location.search.slice(1) !== serializedSearchParams ||
     window.location.hash !== hash
   ) {
     return false;

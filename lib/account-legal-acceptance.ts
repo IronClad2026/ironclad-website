@@ -1,6 +1,7 @@
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
+import rawLegalSuccessorRelease from "@/content/legal-successor-release.json";
 import { legalCorpus } from "@/lib/legal-corpus-publication";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -13,16 +14,24 @@ const PREVIOUS_ACCOUNT_LEGAL_VERSIONS = Object.freeze({
   terms: "1.0",
   privacy: "1.0",
 });
-const ACCOUNT_LEGAL_DOCUMENT_PATHS = Object.freeze({
+const CANONICAL_LEGAL_ORIGIN = "https://www.ironcladtournaments.com";
+const ACCOUNT_LEGAL_LOOKUP_TIMEOUT_MS = 4_000;
+const PREVIOUS_ACCOUNT_LEGAL_RELEASES = Object.freeze({
   terms: {
-    "1.0": "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
-    "1.1": "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+    kind: "terms",
+    version: "1.0",
+    path: "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
+    sha256:
+      "99442282625dc7b2600475df7edc5649520d5cef64f2fcfe99f6e8e6d4d08ba1",
   },
   privacy: {
-    "1.0": "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
-    "1.1": "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
+    kind: "privacy",
+    version: "1.0",
+    path: "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
+    sha256:
+      "cedb9cb46d2ae7bbd7328c500ca466c237afef8f11626d3095329087ec6453f0",
   },
-});
+} as const);
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -58,6 +67,8 @@ type DeployedLegalDocument = {
   kind: "terms" | "privacy";
   version: string;
   path: string;
+  sha256: string;
+  url: string;
 };
 
 export async function loadAccountLegalGateState(): Promise<AccountLegalGateState> {
@@ -111,13 +122,16 @@ async function loadLegalRuntimeState(
   let documentResult: { data: unknown; error: unknown };
 
   try {
-    documentResult = await supabase
-      .from("legal_documents")
-      .select(
-        "id, document_kind, version, immutable_url, status, effective_at, sha256"
-      )
-      .eq("status", "effective")
-      .in("document_kind", ["terms", "privacy"]);
+    documentResult = await withLegalLookupDeadline((signal) =>
+      supabase
+        .from("legal_documents")
+        .select(
+          "id, document_kind, version, immutable_url, status, effective_at, sha256"
+        )
+        .eq("status", "effective")
+        .in("document_kind", ["terms", "privacy"])
+        .abortSignal(signal)
+    );
   } catch {
     console.error("Account legal gate document lookup failed unexpectedly.");
     return unavailableRuntime(userId);
@@ -170,15 +184,18 @@ async function loadLegalRuntimeState(
   let acceptanceResult: { data: unknown; error: unknown };
 
   try {
-    acceptanceResult = await supabase
-      .from("account_legal_acceptances")
-      .select(
-        "id, terms_document_id, privacy_document_id, terms_accepted, privacy_acknowledged"
-      )
-      .eq("clerk_user_id", userId)
-      .eq("terms_document_id", documents.terms.id)
-      .eq("privacy_document_id", documents.privacy.id)
-      .maybeSingle();
+    acceptanceResult = await withLegalLookupDeadline((signal) =>
+      supabase
+        .from("account_legal_acceptances")
+        .select(
+          "id, terms_document_id, privacy_document_id, terms_accepted, privacy_acknowledged"
+        )
+        .eq("clerk_user_id", userId)
+        .eq("terms_document_id", documents.terms.id)
+        .eq("privacy_document_id", documents.privacy.id)
+        .abortSignal(signal)
+        .maybeSingle()
+    );
   } catch {
     console.error("Account legal acceptance lookup failed unexpectedly.");
     return unavailableRuntime(userId);
@@ -285,11 +302,13 @@ function parseDeployedDocument(
   }
 
   const path = parseDeployedDocumentPath(value.publicPath);
+  const release = readReleaseDocument(expectedKind, value.version);
 
   if (
     !path ||
     !isSupportedDocumentVersion(value.version) ||
-    path !== ACCOUNT_LEGAL_DOCUMENT_PATHS[expectedKind][value.version]
+    !release ||
+    path !== release.path
   ) {
     return null;
   }
@@ -298,6 +317,83 @@ function parseDeployedDocument(
     kind: expectedKind,
     version: value.version,
     path,
+    sha256: release.sha256,
+    url: `${CANONICAL_LEGAL_ORIGIN}${path}`,
+  };
+}
+
+function readReleaseDocument(
+  expectedKind: "terms" | "privacy",
+  version: string
+): Pick<DeployedLegalDocument, "kind" | "version" | "path" | "sha256"> | null {
+  if (version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS[expectedKind]) {
+    return PREVIOUS_ACCOUNT_LEGAL_RELEASES[expectedKind];
+  }
+
+  if (version !== ACCOUNT_LEGAL_SUCCESSOR_VERSIONS[expectedKind]) {
+    return null;
+  }
+
+  const manifest: unknown = rawLegalSuccessorRelease;
+
+  if (
+    !isRecord(manifest) ||
+    manifest.schemaVersion !== 1 ||
+    manifest.status !== "Final" ||
+    !Array.isArray(manifest.documents) ||
+    manifest.documents.length !== 2
+  ) {
+    return null;
+  }
+
+  const parsed = manifest.documents.map(parseSuccessorReleaseDocument);
+
+  if (parsed.some((document) => document === null)) {
+    return null;
+  }
+
+  const documents = parsed as Pick<
+    DeployedLegalDocument,
+    "kind" | "version" | "path" | "sha256"
+  >[];
+  const terms = documents.filter((document) => document.kind === "terms");
+  const privacy = documents.filter((document) => document.kind === "privacy");
+
+  if (terms.length !== 1 || privacy.length !== 1) {
+    return null;
+  }
+
+  return expectedKind === "terms" ? terms[0] : privacy[0];
+}
+
+function parseSuccessorReleaseDocument(
+  value: unknown
+): Pick<
+  DeployedLegalDocument,
+  "kind" | "version" | "path" | "sha256"
+> | null {
+  if (
+    !isRecord(value) ||
+    (value.kind !== "terms" && value.kind !== "privacy") ||
+    value.version !== ACCOUNT_LEGAL_SUCCESSOR_VERSIONS[value.kind] ||
+    typeof value.sha256 !== "string" ||
+    !SHA256_PATTERN.test(value.sha256) ||
+    !isBoundedText(value.publicPath, 2_048)
+  ) {
+    return null;
+  }
+
+  const path = parseDeployedDocumentPath(value.publicPath);
+
+  if (!path) {
+    return null;
+  }
+
+  return {
+    kind: value.kind,
+    version: value.version,
+    path,
+    sha256: value.sha256,
   };
 }
 
@@ -324,8 +420,10 @@ function documentPairsMatch(
   return (
     deployed.terms.version === effective.terms.version &&
     deployed.privacy.version === effective.privacy.version &&
-    deployed.terms.path === parseEffectiveDocumentPath(effective.terms.url) &&
-    deployed.privacy.path === parseEffectiveDocumentPath(effective.privacy.url)
+    deployed.terms.url === effective.terms.url &&
+    deployed.privacy.url === effective.privacy.url &&
+    deployed.terms.sha256 === effective.terms.sha256 &&
+    deployed.privacy.sha256 === effective.privacy.sha256
   );
 }
 
@@ -353,7 +451,7 @@ function parseDeployedDocumentPath(value: string) {
   }
 }
 
-function parseEffectiveDocumentPath(value: string) {
+function parseCanonicalEffectiveDocumentUrl(value: string) {
   try {
     const url = new URL(value);
 
@@ -361,14 +459,16 @@ function parseEffectiveDocumentPath(value: string) {
       url.protocol !== "https:" ||
       url.username ||
       url.password ||
+      url.port ||
       url.search ||
       url.hash ||
-      !url.hostname
+      url.origin !== CANONICAL_LEGAL_ORIGIN ||
+      value !== `${CANONICAL_LEGAL_ORIGIN}${url.pathname}`
     ) {
       return null;
     }
 
-    return url.pathname;
+    return value;
   } catch {
     return null;
   }
@@ -415,14 +515,36 @@ function parseEffectiveDocument(value: unknown): EffectiveLegalDocument | null {
     return null;
   }
 
+  const url = parseCanonicalEffectiveDocumentUrl(value.immutable_url);
+
+  if (!url) {
+    return null;
+  }
+
   return {
     id: value.id,
     kind: value.document_kind,
     version: value.version,
-    url: value.immutable_url,
+    url,
     effectiveAt: value.effective_at,
     sha256: value.sha256,
   };
+}
+
+async function withLegalLookupDeadline<T>(
+  lookup: (signal: AbortSignal) => PromiseLike<T>
+): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    ACCOUNT_LEGAL_LOOKUP_TIMEOUT_MS
+  );
+
+  try {
+    return await lookup(controller.signal);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function isSatisfiedAcceptance(
