@@ -13,6 +13,7 @@ import {
 } from "../../scripts/legal-successor/finalize-v1.1.mjs";
 import {
   buildSuccessorTransactionSql,
+  legalAuditResultsMatch,
   validateSuccessorRelease,
 } from "../../scripts/legal-successor/legal-document-successor.mjs";
 
@@ -190,6 +191,25 @@ describe("Terms and Privacy v1.1 successor contract", () => {
     expect(rollbackSql).toContain("version = '1.1'");
     expect(applySql).toContain("commit;");
     expect(applySql).not.toContain("rollback;");
+  });
+
+  it("compares only the audited database snapshot after rollback", () => {
+    const snapshot = {
+      legal_documents: 4,
+      legal_rows: [{ document_kind: "terms", version: "1.0" }],
+      registration_acceptances: 0,
+    };
+
+    const before = { durationMs: 12, rows: [snapshot] };
+    const after = { durationMs: 27, rows: [structuredClone(snapshot)] };
+
+    expect(legalAuditResultsMatch(before, after)).toBe(true);
+    expect(
+      legalAuditResultsMatch(before, {
+        durationMs: 27,
+        rows: [{ ...snapshot, legal_documents: 5 }],
+      })
+    ).toBe(false);
   });
 
   it("keeps PDF token substitution and rendering document-specific", () => {

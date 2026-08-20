@@ -418,7 +418,13 @@ function main() {
 
   const result = queryProject(target, sql);
   const after = queryProject(target, auditSql());
-  if (options.rollbackValidate && stableJson(before) !== stableJson(after)) {
+  if (!Array.isArray(after.rows) || after.rows.length !== 1) {
+    throw new Error("Legal-register postflight did not return one audit row.");
+  }
+  if (
+    options.rollbackValidate &&
+    !legalAuditResultsMatch(before, after)
+  ) {
     throw new Error("Rollback validation left database residue.");
   }
   if (options.apply) {
@@ -613,6 +619,16 @@ function stableJson(value) {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+export function legalAuditResultsMatch(before, after) {
+  return (
+    Array.isArray(before?.rows) &&
+    before.rows.length === 1 &&
+    Array.isArray(after?.rows) &&
+    after.rows.length === 1 &&
+    stableJson(before.rows[0]) === stableJson(after.rows[0])
+  );
 }
 
 function runSupabase(arguments_) {
