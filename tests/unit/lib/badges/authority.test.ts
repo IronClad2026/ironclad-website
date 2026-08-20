@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  PRODUCTION_BADGE_AUTHORITY_SLUGS,
   backfillInitialBadgeAwards,
   evaluateMatchBadgeAwardsForMatch,
+  evaluateMatchExcellenceBadgeAwardsForPlayer,
   evaluateMatchBadgeAwardsForPlayer,
   evaluateProfileBadgeAwards,
   evaluateTournamentBadgeAwardsForMatch,
@@ -22,6 +24,11 @@ const FIRST_WIN_ID = "55555555-5555-4555-8555-555555555555";
 const FIFTH_WIN_ID = "66666666-6666-4666-8666-666666666666";
 const TENTH_WIN_ID = "77777777-7777-4777-8777-777777777777";
 const TWENTY_FIFTH_WIN_ID = "88888888-8888-4888-8888-888888888888";
+const THIRD_STREAK_MATCH_ID = "24242424-2424-4242-8242-242424242424";
+const FIFTH_STREAK_MATCH_ID = "25252525-2525-4252-8252-252525252525";
+const CLEAN_SWEEP_MATCH_ID = "16161616-1616-4161-8161-161616161616";
+const FIRST_UPSET_MATCH_ID = "18181818-1818-4181-8181-181818181818";
+const THIRD_UPSET_MATCH_ID = "19191919-1919-4191-8191-191919191919";
 const FIRST_TOURNAMENT_ID = "99999999-9999-4999-8999-999999999999";
 const THIRD_TOURNAMENT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENTH_TOURNAMENT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -46,6 +53,7 @@ type BadgeAwardPayload = {
 type FakeAuthorityClientOptions = {
   profile?: Record<string, unknown> | null;
   summaries?: Record<string, Record<string, unknown>>;
+  matchExcellenceSummaries?: Record<string, Record<string, unknown>>;
   tournamentSummaries?: Record<string, Record<string, unknown>>;
   tournamentPrestigeSummaries?: Record<string, Record<string, unknown>>;
   participants?: Array<Record<string, unknown>>;
@@ -87,6 +95,27 @@ function matchSummary(overrides: Record<string, unknown> = {}) {
     tenth_win_at: null,
     twenty_fifth_win_match_id: null,
     twenty_fifth_win_at: null,
+    ...overrides,
+  };
+}
+
+function matchExcellenceSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    best_win_streak: 0,
+    third_streak_match_id: null,
+    third_streak_at: null,
+    fifth_streak_match_id: null,
+    fifth_streak_at: null,
+    clean_sweep_count: 0,
+    first_clean_sweep_match_id: null,
+    first_clean_sweep_at: null,
+    upset_win_count: 0,
+    first_upset_match_id: null,
+    first_upset_at: null,
+    first_upset_elo_delta: null,
+    third_upset_match_id: null,
+    third_upset_at: null,
+    third_upset_elo_delta: null,
     ...overrides,
   };
 }
@@ -142,6 +171,10 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
   const summaries: Record<string, Record<string, unknown>> =
     options.summaries ?? {
       [PLAYER_ID]: matchSummary(),
+    };
+  const matchExcellenceSummaries: Record<string, Record<string, unknown>> =
+    options.matchExcellenceSummaries ?? {
+      [PLAYER_ID]: matchExcellenceSummary(),
     };
   const tournamentSummaries: Record<string, Record<string, unknown>> =
     options.tournamentSummaries ?? {
@@ -255,6 +288,16 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
       };
     }
 
+    if (name === "get_player_badge_match_excellence_summary") {
+      return {
+        data: [
+          matchExcellenceSummaries[String(args.p_player_id)] ??
+            matchExcellenceSummary(),
+        ],
+        error: null,
+      };
+    }
+
     if (name === "get_player_badge_tournament_for_match") {
       return {
         data:
@@ -309,6 +352,40 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
 }
 
 describe("badge authority evaluators", () => {
+  it("keeps production authority limited to implemented exact badges", () => {
+    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).toEqual([
+      "ironclad-recruit",
+      "first-deployment",
+      "first-victory",
+      "battle-tested",
+      "first-campaign",
+      "iron-regular",
+      "tournament-veteran",
+      "five-victories",
+      "ten-victories",
+      "twenty-five-victories",
+      "iron-streak",
+      "unbroken",
+      "clean-sweep",
+      "giant-slayer",
+      "giant-hunter",
+      "first-advance",
+      "semifinalist",
+      "finalist",
+      "academy-champion",
+      "challenge-champion",
+      "elite-champion",
+      "double-champion",
+      "triple-crown",
+    ]);
+    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
+      "comeback-commander"
+    );
+    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
+      "flawless-campaign"
+    );
+  });
+
   it("awards IronClad Recruit for a verified eligible player", async () => {
     const fixture = createAuthorityClient();
 
@@ -429,6 +506,11 @@ describe("badge authority evaluators", () => {
       "five-victories",
       "ten-victories",
       "twenty-five-victories",
+      "iron-streak",
+      "unbroken",
+      "clean-sweep",
+      "giant-slayer",
+      "giant-hunter",
     ]);
     expect(result.skippedReasons).toEqual([
       "first-deployment_threshold_not_met",
@@ -437,6 +519,11 @@ describe("badge authority evaluators", () => {
       "five-victories_threshold_not_met",
       "ten-victories_threshold_not_met",
       "twenty-five-victories_threshold_not_met",
+      "iron-streak_threshold_not_met",
+      "unbroken_threshold_not_met",
+      "clean-sweep_threshold_not_met",
+      "giant-slayer_threshold_not_met",
+      "giant-hunter_threshold_not_met",
     ]);
     expect(fixture.upsert).not.toHaveBeenCalled();
   });
@@ -706,6 +793,212 @@ describe("badge authority evaluators", () => {
         "twenty-five-victories",
       ]);
     expect(twentyFiveWins.awards.size).toBe(6);
+  });
+
+  it("awards win streak thresholds from historical best streaks", async () => {
+    const twoWinStreak = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          best_win_streak: 2,
+        }),
+      },
+    });
+    const threeWinStreak = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          best_win_streak: 3,
+          third_streak_match_id: THIRD_STREAK_MATCH_ID,
+          third_streak_at: "2026-08-14T12:00:00.000Z",
+        }),
+      },
+    });
+    const fiveWinStreak = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          best_win_streak: 5,
+          third_streak_match_id: THIRD_STREAK_MATCH_ID,
+          third_streak_at: "2026-08-14T12:00:00.000Z",
+          fifth_streak_match_id: FIFTH_STREAK_MATCH_ID,
+          fifth_streak_at: "2026-08-16T12:00:00.000Z",
+        }),
+      },
+    });
+
+    await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: twoWinStreak.client,
+    });
+    await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: threeWinStreak.client,
+    });
+    const first = await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fiveWinStreak.client,
+    });
+    const second = await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fiveWinStreak.client,
+    });
+
+    expect(twoWinStreak.upsert).not.toHaveBeenCalled();
+    expect(threeWinStreak.upsertPayloads.map((payload) => payload.badge_slug))
+      .toEqual(["iron-streak"]);
+    expect(first.createdSlugs).toEqual(["iron-streak", "unbroken"]);
+    expect(second.createdCount).toBe(0);
+    expect(fiveWinStreak.awards.size).toBe(2);
+    expect(fiveWinStreak.upsertPayloads[1]).toMatchObject({
+      badge_slug: "unbroken",
+      source_type: "match",
+      source_id: FIFTH_STREAK_MATCH_ID,
+      original_unlocked_at: "2026-08-16T12:00:00.000Z",
+      source_metadata: expect.objectContaining({
+        evaluator: "win-streak",
+        threshold: 5,
+      }),
+    });
+  });
+
+  it("does not award win streak thresholds without authoritative result timestamps", async () => {
+    const missingThirdTimestamp = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          best_win_streak: 3,
+          third_streak_match_id: THIRD_STREAK_MATCH_ID,
+        }),
+      },
+    });
+    const missingFifthTimestamp = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          best_win_streak: 5,
+          third_streak_match_id: THIRD_STREAK_MATCH_ID,
+          third_streak_at: "2026-08-14T12:00:00.000Z",
+          fifth_streak_match_id: FIFTH_STREAK_MATCH_ID,
+        }),
+      },
+    });
+
+    const thirdResult = await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: missingThirdTimestamp.client,
+    });
+    const fifthResult = await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: missingFifthTimestamp.client,
+    });
+
+    expect(thirdResult.createdSlugs).toEqual([]);
+    expect(thirdResult.skippedReasons).toContain(
+      "iron-streak_timestamp_missing"
+    );
+    expect(missingThirdTimestamp.upsert).not.toHaveBeenCalled();
+    expect(fifthResult.createdSlugs).toEqual(["iron-streak"]);
+    expect(fifthResult.skippedReasons).toContain("unbroken_timestamp_missing");
+    expect(
+      missingFifthTimestamp.upsertPayloads.map((payload) => payload.badge_slug)
+    )
+      .toEqual(["iron-streak"]);
+  });
+
+  it("awards Clean Sweep only when the database summary finds a flawless BO3 or BO5 played win", async () => {
+    const noCleanSweep = createAuthorityClient();
+    const cleanSweep = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          clean_sweep_count: 1,
+          first_clean_sweep_match_id: CLEAN_SWEEP_MATCH_ID,
+          first_clean_sweep_at: "2026-08-17T12:00:00.000Z",
+        }),
+      },
+    });
+
+    await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: noCleanSweep.client,
+    });
+    const result = await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: cleanSweep.client,
+    });
+
+    expect(noCleanSweep.upsertPayloads.map((payload) => payload.badge_slug))
+      .not.toContain("clean-sweep");
+    expect(result.createdSlugs).toEqual(["clean-sweep"]);
+    expect(cleanSweep.upsertPayloads[0]).toMatchObject({
+      badge_slug: "clean-sweep",
+      source_type: "match",
+      source_id: CLEAN_SWEEP_MATCH_ID,
+      source_metadata: expect.objectContaining({
+        evaluator: "clean-sweep",
+      }),
+    });
+  });
+
+  it("cascades Giant Slayer and Giant Hunter upset thresholds", async () => {
+    const belowThreshold = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          upset_win_count: 0,
+        }),
+      },
+    });
+    const oneUpset = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          upset_win_count: 1,
+          first_upset_match_id: FIRST_UPSET_MATCH_ID,
+          first_upset_at: "2026-08-18T12:00:00.000Z",
+          first_upset_elo_delta: 200,
+        }),
+      },
+    });
+    const threeUpsets = createAuthorityClient({
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          upset_win_count: 3,
+          first_upset_match_id: FIRST_UPSET_MATCH_ID,
+          first_upset_at: "2026-08-18T12:00:00.000Z",
+          first_upset_elo_delta: 200,
+          third_upset_match_id: THIRD_UPSET_MATCH_ID,
+          third_upset_at: "2026-08-20T12:00:00.000Z",
+          third_upset_elo_delta: 250,
+        }),
+      },
+    });
+
+    await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: belowThreshold.client,
+    });
+    await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: oneUpset.client,
+    });
+    const first = await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: threeUpsets.client,
+    });
+    const second = await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: threeUpsets.client,
+    });
+
+    expect(belowThreshold.upsert).not.toHaveBeenCalled();
+    expect(oneUpset.upsertPayloads.map((payload) => payload.badge_slug))
+      .toEqual(["giant-slayer"]);
+    expect(first.createdSlugs).toEqual(["giant-slayer", "giant-hunter"]);
+    expect(second.createdCount).toBe(0);
+    expect(threeUpsets.awards.size).toBe(2);
+    expect(threeUpsets.upsertPayloads[1]).toMatchObject({
+      badge_slug: "giant-hunter",
+      source_type: "match",
+      source_id: THIRD_UPSET_MATCH_ID,
+      source_metadata: expect.objectContaining({
+        evaluator: "elo-upset",
+        upsetEloDelta: 250,
+      }),
+    });
   });
 
   it("requires one completed tournament for First Campaign", async () => {
@@ -1261,6 +1554,63 @@ describe("badge authority evaluators", () => {
     expect(repeatedPlayedAdvance.badgeCounts["first-advance"]).toBe(0);
   });
 
+  it("backfills match excellence badges idempotently from played-match summaries", async () => {
+    const fixture = createAuthorityClient({
+      backfillPlayers: [PLAYER_ID],
+      matchExcellenceSummaries: {
+        [PLAYER_ID]: matchExcellenceSummary({
+          best_win_streak: 5,
+          third_streak_match_id: THIRD_STREAK_MATCH_ID,
+          third_streak_at: "2026-08-14T12:00:00.000Z",
+          fifth_streak_match_id: FIFTH_STREAK_MATCH_ID,
+          fifth_streak_at: "2026-08-16T12:00:00.000Z",
+          clean_sweep_count: 1,
+          first_clean_sweep_match_id: CLEAN_SWEEP_MATCH_ID,
+          first_clean_sweep_at: "2026-08-17T12:00:00.000Z",
+          upset_win_count: 3,
+          first_upset_match_id: FIRST_UPSET_MATCH_ID,
+          first_upset_at: "2026-08-18T12:00:00.000Z",
+          first_upset_elo_delta: 200,
+          third_upset_match_id: THIRD_UPSET_MATCH_ID,
+          third_upset_at: "2026-08-20T12:00:00.000Z",
+          third_upset_elo_delta: 250,
+        }),
+      },
+    });
+
+    const first = await backfillInitialBadgeAwards({
+      supabase: fixture.client,
+    });
+    const second = await backfillInitialBadgeAwards({
+      supabase: fixture.client,
+    });
+
+    expect(first.badgeCounts).toMatchObject({
+      "iron-streak": 1,
+      "unbroken": 1,
+      "clean-sweep": 1,
+      "giant-slayer": 1,
+      "giant-hunter": 1,
+    });
+    expect(first.awardsCreated).toBe(6);
+    expect(second.awardsCreated).toBe(0);
+    expect(fixture.upsertPayloads.map((payload) => payload.badge_slug))
+      .toEqual([
+        "ironclad-recruit",
+        "iron-streak",
+        "unbroken",
+        "clean-sweep",
+        "giant-slayer",
+        "giant-hunter",
+        "ironclad-recruit",
+        "iron-streak",
+        "unbroken",
+        "clean-sweep",
+        "giant-slayer",
+        "giant-hunter",
+      ]);
+  });
+
   it("runs an idempotent controlled backfill for only implemented authority badges", async () => {
     const fixture = createAuthorityClient({
       backfillPlayers: [PLAYER_ID, OTHER_PLAYER_ID],
@@ -1304,6 +1654,11 @@ describe("badge authority evaluators", () => {
       "five-victories": 1,
       "ten-victories": 0,
       "twenty-five-victories": 0,
+      "iron-streak": 0,
+      "unbroken": 0,
+      "clean-sweep": 0,
+      "giant-slayer": 0,
+      "giant-hunter": 0,
       "first-advance": 0,
       "semifinalist": 0,
       "finalist": 0,
@@ -1327,6 +1682,11 @@ describe("badge authority evaluators", () => {
           "five-victories",
           "ten-victories",
           "twenty-five-victories",
+          "iron-streak",
+          "unbroken",
+          "clean-sweep",
+          "giant-slayer",
+          "giant-hunter",
           "first-advance",
           "semifinalist",
           "finalist",
@@ -1397,6 +1757,11 @@ describe("badge authority evaluators", () => {
       "five-victories": 1,
       "ten-victories": 1,
       "twenty-five-victories": 1,
+      "iron-streak": 0,
+      "unbroken": 0,
+      "clean-sweep": 0,
+      "giant-slayer": 0,
+      "giant-hunter": 0,
       "first-advance": 0,
       "semifinalist": 0,
       "finalist": 0,
@@ -1438,6 +1803,11 @@ describe("badge authority evaluators", () => {
       "five-victories": 0,
       "ten-victories": 0,
       "twenty-five-victories": 0,
+      "iron-streak": 0,
+      "unbroken": 0,
+      "clean-sweep": 0,
+      "giant-slayer": 0,
+      "giant-hunter": 0,
       "first-advance": 0,
       "semifinalist": 0,
       "finalist": 0,

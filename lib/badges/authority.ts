@@ -15,6 +15,11 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "five-victories",
   "ten-victories",
   "twenty-five-victories",
+  "iron-streak",
+  "unbroken",
+  "clean-sweep",
+  "giant-slayer",
+  "giant-hunter",
   "first-advance",
   "semifinalist",
   "finalist",
@@ -94,6 +99,24 @@ type MatchBadgeSummaryRow = {
   twenty_fifth_win_at: unknown;
 };
 
+type MatchExcellenceSummaryRow = {
+  best_win_streak: unknown;
+  third_streak_match_id: unknown;
+  third_streak_at: unknown;
+  fifth_streak_match_id: unknown;
+  fifth_streak_at: unknown;
+  clean_sweep_count: unknown;
+  first_clean_sweep_match_id: unknown;
+  first_clean_sweep_at: unknown;
+  upset_win_count: unknown;
+  first_upset_match_id: unknown;
+  first_upset_at: unknown;
+  first_upset_elo_delta: unknown;
+  third_upset_match_id: unknown;
+  third_upset_at: unknown;
+  third_upset_elo_delta: unknown;
+};
+
 type TournamentBadgeParticipantRow = {
   player_id: unknown;
 };
@@ -158,6 +181,26 @@ type MatchThreshold = {
     | "tenthWinAt"
     | "twentyFifthWinAt";
   evaluator: "match-count" | "win-count";
+};
+
+type MatchExcellenceThreshold = {
+  badgeSlug: ProductionBadgeAuthoritySlug;
+  countKey: "bestWinStreak" | "cleanSweepCount" | "upsetWinCount";
+  threshold: number;
+  sourceIdKey:
+    | "thirdStreakMatchId"
+    | "fifthStreakMatchId"
+    | "firstCleanSweepMatchId"
+    | "firstUpsetMatchId"
+    | "thirdUpsetMatchId";
+  originalUnlockedAtKey:
+    | "thirdStreakAt"
+    | "fifthStreakAt"
+    | "firstCleanSweepAt"
+    | "firstUpsetAt"
+    | "thirdUpsetAt";
+  evaluator: "win-streak" | "clean-sweep" | "elo-upset";
+  upsetEloDeltaKey?: "firstUpsetEloDelta" | "thirdUpsetEloDelta";
 };
 
 type TournamentThreshold = {
@@ -275,6 +318,51 @@ const MATCH_THRESHOLDS: readonly MatchThreshold[] = [
     sourceIdKey: "twentyFifthWinMatchId",
     originalUnlockedAtKey: "twentyFifthWinAt",
     evaluator: "win-count",
+  },
+];
+
+const MATCH_EXCELLENCE_THRESHOLDS: readonly MatchExcellenceThreshold[] = [
+  {
+    badgeSlug: "iron-streak",
+    countKey: "bestWinStreak",
+    threshold: 3,
+    sourceIdKey: "thirdStreakMatchId",
+    originalUnlockedAtKey: "thirdStreakAt",
+    evaluator: "win-streak",
+  },
+  {
+    badgeSlug: "unbroken",
+    countKey: "bestWinStreak",
+    threshold: 5,
+    sourceIdKey: "fifthStreakMatchId",
+    originalUnlockedAtKey: "fifthStreakAt",
+    evaluator: "win-streak",
+  },
+  {
+    badgeSlug: "clean-sweep",
+    countKey: "cleanSweepCount",
+    threshold: 1,
+    sourceIdKey: "firstCleanSweepMatchId",
+    originalUnlockedAtKey: "firstCleanSweepAt",
+    evaluator: "clean-sweep",
+  },
+  {
+    badgeSlug: "giant-slayer",
+    countKey: "upsetWinCount",
+    threshold: 1,
+    sourceIdKey: "firstUpsetMatchId",
+    originalUnlockedAtKey: "firstUpsetAt",
+    evaluator: "elo-upset",
+    upsetEloDeltaKey: "firstUpsetEloDelta",
+  },
+  {
+    badgeSlug: "giant-hunter",
+    countKey: "upsetWinCount",
+    threshold: 3,
+    sourceIdKey: "thirdUpsetMatchId",
+    originalUnlockedAtKey: "thirdUpsetAt",
+    evaluator: "elo-upset",
+    upsetEloDeltaKey: "thirdUpsetEloDelta",
   },
 ];
 
@@ -833,6 +921,29 @@ export async function evaluateMatchBadgeAwardsForPlayer({
   supabase?: BadgeAuthorityClient;
   evaluationMode?: "live" | "backfill";
 }): Promise<BadgeAwardEvaluationResult> {
+  return mergeEvaluationResults([
+    await evaluateMatchCountBadgeAwardsForPlayer({
+      playerId,
+      supabase,
+      evaluationMode,
+    }),
+    await evaluateMatchExcellenceBadgeAwardsForPlayer({
+      playerId,
+      supabase,
+      evaluationMode,
+    }),
+  ]);
+}
+
+async function evaluateMatchCountBadgeAwardsForPlayer({
+  playerId,
+  supabase,
+  evaluationMode,
+}: {
+  playerId: string;
+  supabase: BadgeAuthorityClient;
+  evaluationMode: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
   const summary = await loadMatchBadgeSummary(supabase, playerId);
   if (!summary) {
     return {
@@ -886,6 +997,84 @@ export async function evaluateMatchBadgeAwardsForPlayer({
     createdCount: createdSlugs.length,
     createdSlugs,
     evaluatedSlugs: MATCH_THRESHOLDS.map((threshold) => threshold.badgeSlug),
+    skippedReasons,
+  };
+}
+
+export async function evaluateMatchExcellenceBadgeAwardsForPlayer({
+  playerId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  playerId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const summary = await loadMatchExcellenceBadgeSummary(supabase, playerId);
+  if (!summary) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: MATCH_EXCELLENCE_THRESHOLDS.map(
+        (threshold) => threshold.badgeSlug
+      ),
+      skippedReasons: ["match_excellence_summary_unavailable"],
+    };
+  }
+
+  const createdSlugs: ProductionBadgeAuthoritySlug[] = [];
+  const skippedReasons: string[] = [];
+
+  for (const threshold of MATCH_EXCELLENCE_THRESHOLDS) {
+    const qualifyingCount = summary[threshold.countKey];
+    const sourceId = summary[threshold.sourceIdKey];
+    const originalUnlockedAt = summary[threshold.originalUnlockedAtKey];
+
+    if (qualifyingCount < threshold.threshold) {
+      skippedReasons.push(`${threshold.badgeSlug}_threshold_not_met`);
+      continue;
+    }
+
+    if (!sourceId) {
+      skippedReasons.push(`${threshold.badgeSlug}_source_missing`);
+      continue;
+    }
+
+    if (threshold.evaluator === "win-streak" && !originalUnlockedAt) {
+      skippedReasons.push(`${threshold.badgeSlug}_timestamp_missing`);
+      continue;
+    }
+
+    const created = await persistBadgeAward(supabase, {
+      playerId,
+      badgeSlug: threshold.badgeSlug,
+      sourceType: "match",
+      sourceId,
+      originalUnlockedAt,
+      sourceMetadata: {
+        evaluator: threshold.evaluator,
+        evaluationMode,
+        threshold: threshold.threshold,
+        qualifyingCount,
+        upsetEloDelta: threshold.upsetEloDeltaKey
+          ? summary[threshold.upsetEloDeltaKey]
+          : null,
+        originalUnlockedAtBasis: originalUnlockedAt
+          ? "official_match_result_timestamp"
+          : "unavailable",
+      },
+    });
+
+    if (created) {
+      createdSlugs.push(threshold.badgeSlug);
+    }
+  }
+
+  return {
+    createdCount: createdSlugs.length,
+    createdSlugs,
+    evaluatedSlugs: MATCH_EXCELLENCE_THRESHOLDS.map(
+      (threshold) => threshold.badgeSlug
+    ),
     skippedReasons,
   };
 }
@@ -1004,6 +1193,48 @@ async function loadMatchBadgeSummary(
     tenthWinAt: isoOrNull(row.tenth_win_at),
     twentyFifthWinMatchId: stringOrNull(row.twenty_fifth_win_match_id),
     twentyFifthWinAt: isoOrNull(row.twenty_fifth_win_at),
+  };
+}
+
+async function loadMatchExcellenceBadgeSummary(
+  supabase: BadgeAuthorityClient,
+  playerId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_match_excellence_summary",
+    {
+      p_player_id: playerId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "MATCH_EXCELLENCE_SUMMARY_LOAD_FAILED",
+      "Badge match evaluation could not load the match excellence summary."
+    );
+  }
+
+  const row = rowsOf<MatchExcellenceSummaryRow>(data)[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    bestWinStreak: integerOrZero(row.best_win_streak),
+    thirdStreakMatchId: stringOrNull(row.third_streak_match_id),
+    thirdStreakAt: isoOrNull(row.third_streak_at),
+    fifthStreakMatchId: stringOrNull(row.fifth_streak_match_id),
+    fifthStreakAt: isoOrNull(row.fifth_streak_at),
+    cleanSweepCount: integerOrZero(row.clean_sweep_count),
+    firstCleanSweepMatchId: stringOrNull(row.first_clean_sweep_match_id),
+    firstCleanSweepAt: isoOrNull(row.first_clean_sweep_at),
+    upsetWinCount: integerOrZero(row.upset_win_count),
+    firstUpsetMatchId: stringOrNull(row.first_upset_match_id),
+    firstUpsetAt: isoOrNull(row.first_upset_at),
+    firstUpsetEloDelta: integerOrNull(row.first_upset_elo_delta),
+    thirdUpsetMatchId: stringOrNull(row.third_upset_match_id),
+    thirdUpsetAt: isoOrNull(row.third_upset_at),
+    thirdUpsetEloDelta: integerOrNull(row.third_upset_elo_delta),
   };
 }
 
