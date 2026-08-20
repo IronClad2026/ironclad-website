@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const pathnameMock = vi.hoisted(() => vi.fn(() => "/"));
@@ -33,6 +42,83 @@ describe("AnalyticsConsent", () => {
     document.body.style.overflow = "";
     vi.restoreAllMocks();
   });
+
+  it("keeps portals out of SSR and the first hydration render before showing the undecided banner", async () => {
+    const recoverableErrors: unknown[] = [];
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const container = document.createElement("div");
+    let root: ReturnType<typeof hydrateRoot> | null = null;
+
+    const serverMarkup = renderToString(<AnalyticsConsent copy={copy} />);
+    expect(serverMarkup).toContain(copy.choices);
+    expect(serverMarkup).not.toContain('role="region"');
+    expect(serverMarkup).not.toContain('role="dialog"');
+    container.innerHTML = serverMarkup;
+    document.body.append(container);
+
+    try {
+      const firstRenderMarkup = container.innerHTML;
+
+      await act(async () => {
+        root = hydrateRoot(container, <AnalyticsConsent copy={copy} />, {
+          onRecoverableError: (error) => recoverableErrors.push(error),
+        });
+        expect(container.innerHTML).toBe(firstRenderMarkup);
+        expect(
+          document.querySelector('[role="region"]')
+        ).not.toBeInTheDocument();
+      });
+
+      expect(recoverableErrors).toEqual([]);
+      expect(consoleError).not.toHaveBeenCalled();
+      expect(
+        await screen.findByRole("region", { name: copy.title })
+      ).toBeInTheDocument();
+    } finally {
+      if (root) {
+        await act(async () => root?.unmount());
+      }
+      container.remove();
+    }
+  });
+
+  it.each(["granted", "declined"] as const)(
+    "hydrates a stored %s choice without showing the undecided banner",
+    async (decision) => {
+      localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, decision);
+      const recoverableErrors: unknown[] = [];
+      const container = document.createElement("div");
+      let root: ReturnType<typeof hydrateRoot> | null = null;
+
+      const serverMarkup = renderToString(<AnalyticsConsent copy={copy} />);
+      expect(serverMarkup).not.toContain('role="region"');
+      container.innerHTML = serverMarkup;
+      document.body.append(container);
+
+      try {
+        await act(async () => {
+          root = hydrateRoot(container, <AnalyticsConsent copy={copy} />, {
+            onRecoverableError: (error) => recoverableErrors.push(error),
+          });
+        });
+        await act(async () => {
+          await new Promise((resolve) => window.setTimeout(resolve, 0));
+        });
+
+        expect(recoverableErrors).toEqual([]);
+        expect(
+          screen.queryByRole("region", { name: copy.title })
+        ).not.toBeInTheDocument();
+      } finally {
+        if (root) {
+          await act(async () => root?.unmount());
+        }
+        container.remove();
+      }
+    }
+  );
 
   it("offers equally prominent allow and decline controls without loading analytics", async () => {
     render(<AnalyticsConsent copy={copy} />);

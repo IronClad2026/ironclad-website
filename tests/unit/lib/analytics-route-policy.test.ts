@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ANALYTICS_APPROVED_REPORTING_PATHS,
   sanitizeAnalyticsBreakdownPath,
   sanitizeAnalyticsEventUrl,
 } from "@/lib/analytics-route-policy";
@@ -13,6 +14,20 @@ const MATCH_ID = "323e4567-e89b-12d3-a456-426614174000";
 const POLL_ID = "423e4567-e89b-12d3-a456-426614174000";
 
 describe("analytics route policy", () => {
+  it("exports only the approved provider-safe reporting paths", () => {
+    expect(ANALYTICS_APPROVED_REPORTING_PATHS).toEqual([
+      "/",
+      "/about",
+      "/rankings",
+      "/rules",
+      "/terms",
+      "/privacy",
+      "/players",
+      "/tournaments",
+      "/players/[playerId]",
+    ]);
+  });
+
   it.each([
     "/",
     "/about",
