@@ -17,6 +17,12 @@ import {
   type AdminOperationsMetrics,
   type AdminOperationsRow,
 } from "@/lib/admin-operations-metrics";
+import type { WebsiteTrafficAnalytics } from "@/lib/vercel-web-analytics-types";
+
+const previewTraffic: WebsiteTrafficAnalytics = {
+  status: "unavailable",
+  reason: "non-production",
+};
 
 function emptyMetrics(): AdminOperationsMetrics {
   const zeroGrowth = {
@@ -188,13 +194,17 @@ describe("Admin Operations dashboard contracts", () => {
     const metrics = emptyMetrics();
     metrics.matches.resultResolution.playerConfirmed = 1;
     const { container } = render(
-      <AdminOperationsDashboard metrics={metrics} />
+      <AdminOperationsDashboard
+        metrics={metrics}
+        websiteTraffic={previewTraffic}
+      />
     );
 
     for (const heading of [
       "Operations & Analytics",
       "The operational picture",
       "Actionable Admin queues",
+      "Public-site reach",
       "Player readiness and participation",
       "Registration flow and current decisions",
       "Event lifecycle and Division delivery",
@@ -250,8 +260,11 @@ describe("Admin Operations dashboard contracts", () => {
     expect(
       screen.getAllByText("No records are available for this view.").length
     ).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Website traffic analytics unavailable")
+    ).toBeInTheDocument();
     expect(container.textContent).not.toMatch(
-      /Website Traffic|Subscriptions|Revenue|page views|visitors|subscriber|tracker/i
+      /Subscriptions|Revenue|subscriber|tracker/i
     );
     for (const misleadingLabel of [
       "Approved Players",
@@ -285,7 +298,12 @@ describe("Admin Operations dashboard contracts", () => {
     });
     metrics.overview.openIssues.value = 1;
 
-    render(<AdminOperationsDashboard metrics={metrics} />);
+    render(
+      <AdminOperationsDashboard
+        metrics={metrics}
+        websiteTraffic={previewTraffic}
+      />
+    );
 
     const withdrawn = screen.getByRole("link", { name: /Withdrawn Player/ });
     const dispute = screen.getByRole("link", {
@@ -327,6 +345,9 @@ describe("Admin Operations dashboard contracts", () => {
     );
     expect(source).toContain("sm:flex-row sm:items-center sm:justify-between");
     expect(source.indexOf('id="attention-required"')).toBeLessThan(
+      source.indexOf("<WebsiteTrafficSection")
+    );
+    expect(source.indexOf("<WebsiteTrafficSection")).toBeLessThan(
       source.indexOf('id="players"')
     );
     expect(source).toContain("<svg");
@@ -342,8 +363,6 @@ describe("Admin Operations dashboard contracts", () => {
     ]) {
       expect(source).not.toContain(misleadingLabel);
     }
-    expect(source).not.toMatch(
-      /Website Traffic|Subscriptions|Revenue|subscriber|tracker/i
-    );
+    expect(source).not.toMatch(/Subscriptions|Revenue|subscriber|tracker/i);
   });
 });

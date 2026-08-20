@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { extname, join, relative, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -15,30 +15,53 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
-describe("PR B1 analytics-disabled contract", () => {
-  it("contains no analytics package, tracker, beacon, endpoint, or runtime secret", () => {
-    const packageJson = readFileSync(resolve(root, "package.json"), "utf8");
-    const packageLock = readFileSync(resolve(root, "package-lock.json"), "utf8");
-    expect(packageJson).not.toContain("@vercel/analytics");
-    expect(packageLock).not.toContain('"node_modules/@vercel/analytics"');
-
-    const files = [
-      ...sourceRoots.flatMap((directory) =>
-        sourceFiles(resolve(root, directory))
-      ),
-      resolve(root, "next.config.ts"),
-    ];
+describe("PR B2 analytics privacy and activation contract", () => {
+  it("uses only the approved Vercel package and has no custom tracker", () => {
+    const packageJson = JSON.parse(
+      readFileSync(resolve(root, "package.json"), "utf8")
+    ) as { dependencies?: Record<string, string> };
+    const files = sourceRoots.flatMap((directory) =>
+      sourceFiles(resolve(root, directory))
+    );
     const runtimeSource = files
       .map((path) => readFileSync(path, "utf8"))
       .join("\n");
 
-    expect(runtimeSource).not.toMatch(
-      /(?:from|require\()\s*["']@vercel\/analytics/
-    );
-    expect(runtimeSource).not.toMatch(/<Analytics\b|\/_vercel\/insights/);
-    expect(runtimeSource).not.toContain("VERCEL_ANALYTICS_ACCESS_TOKEN");
-    expect(runtimeSource).not.toMatch(
-      /<script[^>]+(?:analytics|insights)|sendBeacon\s*\(/i
-    );
+    expect(packageJson.dependencies?.["@vercel/analytics"]).toBe("2.0.1");
+    expect(runtimeSource).not.toMatch(/\btrack\s*\(/);
+    expect(runtimeSource).not.toMatch(/sendBeacon\s*\(/);
+    expect(runtimeSource).not.toMatch(/\/_vercel\/insights/);
+    expect(runtimeSource).not.toMatch(/<script[^>]+(?:analytics|insights)/i);
+  });
+
+  it("keeps every Analytics credential out of Client Components", () => {
+    const clientSources = sourceRoots
+      .flatMap((directory) => sourceFiles(resolve(root, directory)))
+      .filter((path) => {
+        const source = readFileSync(path, "utf8");
+        return /^\s*["']use client["'];/m.test(source);
+      })
+      .map((path) => ({
+        path: relative(root, path),
+        source: readFileSync(path, "utf8"),
+      }));
+
+    for (const file of clientSources) {
+      expect(file.source, file.path).not.toMatch(
+        /VERCEL_ANALYTICS_(?:ACCESS_TOKEN|TEAM_ID|PROJECT_ID)/
+      );
+      expect(file.source, file.path).not.toMatch(
+        /NEXT_PUBLIC_[A-Z0-9_]*ANALYTICS/
+      );
+    }
+  });
+
+  it("declares only server-side Production reporting configuration", () => {
+    const example = readFileSync(resolve(root, ".env.example"), "utf8");
+
+    expect(example).toContain("VERCEL_ANALYTICS_ACCESS_TOKEN=");
+    expect(example).toContain("VERCEL_ANALYTICS_TEAM_ID=");
+    expect(example).toContain("VERCEL_ANALYTICS_PROJECT_ID=");
+    expect(example).not.toMatch(/NEXT_PUBLIC_[A-Z0-9_]*ANALYTICS/);
   });
 });

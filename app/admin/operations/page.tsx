@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import AdminOperationsDashboard from "@/components/admin/operations/AdminOperationsDashboard";
 import { loadAdminOperationsMetrics } from "@/lib/admin-operations";
 import { parseAdminOperationsPeriod } from "@/lib/admin-operations-metrics";
+import { loadAdminWebsiteTraffic } from "@/lib/vercel-web-analytics";
 
 type CustomClaims = { metadata?: { role?: string } };
 type AdminOperationsPageProps = {
@@ -20,9 +21,17 @@ export default async function AdminOperationsPage({
 
   const params = await searchParams;
   const period = parseAdminOperationsPeriod(params.period);
-  const metrics = await loadAdminOperationsMetrics(period);
+  const [metrics, websiteTraffic] = await Promise.all([
+    loadAdminOperationsMetrics(period),
+    loadAdminWebsiteTraffic(),
+  ]);
 
-  if (!metrics) redirect("/");
+  if (!metrics || !websiteTraffic) redirect("/");
 
-  return <AdminOperationsDashboard metrics={metrics} />;
+  return (
+    <AdminOperationsDashboard
+      metrics={metrics}
+      websiteTraffic={websiteTraffic}
+    />
+  );
 }
