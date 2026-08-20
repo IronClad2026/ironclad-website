@@ -4,14 +4,17 @@ import { SignOutButton } from "@clerk/nextjs";
 import { ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef } from "react";
-import {
-  acceptAccountLegalUpdate,
-  initialAccountLegalAcceptanceActionState,
-} from "@/app/legal-update-actions";
+import { acceptAccountLegalUpdate } from "@/app/legal-update-actions";
+import type { AccountLegalAcceptanceActionState } from "@/app/legal-update-actions";
 import type {
   AccountLegalGateDocument,
   AccountLegalGateState,
 } from "@/lib/account-legal-acceptance";
+
+const initialState: AccountLegalAcceptanceActionState = {
+  status: "idle",
+  code: "idle",
+};
 
 export type AccountLegalUpdateCopy = {
   eyebrow: string;
@@ -92,7 +95,7 @@ function RequiredAcceptance({
   const router = useRouter();
   const [actionState, formAction, pending] = useActionState(
     acceptAccountLegalUpdate,
-    initialAccountLegalAcceptanceActionState
+    initialState
   );
 
   useEffect(() => {

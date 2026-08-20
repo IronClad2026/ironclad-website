@@ -11,14 +11,16 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
-import {
-  acceptAccountLegalUpdate,
-  initialAccountLegalAcceptanceActionState,
-} from "@/app/legal-update-actions";
+import { acceptAccountLegalUpdate } from "@/app/legal-update-actions";
+import type { AccountLegalAcceptanceActionState } from "@/app/legal-update-actions";
 
 const TERMS_ID = "11111111-1111-4111-8111-111111111111";
 const PRIVACY_ID = "22222222-2222-4222-8222-222222222222";
 const ACCEPTANCE_ID = "33333333-3333-4333-8333-333333333333";
+const initialState: AccountLegalAcceptanceActionState = {
+  status: "idle",
+  code: "idle",
+};
 
 function form({ terms = true, privacy = true } = {}) {
   const data = new FormData();
@@ -42,7 +44,7 @@ describe("account legal acceptance action", () => {
 
     await expect(
       acceptAccountLegalUpdate(
-        initialAccountLegalAcceptanceActionState,
+        initialState,
         form()
       )
     ).resolves.toEqual({ status: "error", code: "auth-required" });
@@ -57,7 +59,7 @@ describe("account legal acceptance action", () => {
 
     await expect(
       acceptAccountLegalUpdate(
-        initialAccountLegalAcceptanceActionState,
+        initialState,
         form(values)
       )
     ).resolves.toEqual({ status: "error", code: "acceptance-required" });
@@ -81,7 +83,7 @@ describe("account legal acceptance action", () => {
 
     await expect(
       acceptAccountLegalUpdate(
-        initialAccountLegalAcceptanceActionState,
+        initialState,
         form()
       )
     ).resolves.toEqual({ status: "success", code: "accepted" });
@@ -114,7 +116,7 @@ describe("account legal acceptance action", () => {
 
     await expect(
       acceptAccountLegalUpdate(
-        initialAccountLegalAcceptanceActionState,
+        initialState,
         form()
       )
     ).resolves.toEqual({ status: "error", code: "unavailable" });
@@ -145,7 +147,7 @@ describe("account legal acceptance action", () => {
 
     await expect(
       acceptAccountLegalUpdate(
-        initialAccountLegalAcceptanceActionState,
+        initialState,
         form()
       )
     ).resolves.toEqual({ status: "success", code: "accepted" });

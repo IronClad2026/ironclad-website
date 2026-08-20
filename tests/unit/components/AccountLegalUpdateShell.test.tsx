@@ -21,10 +21,6 @@ vi.mock("@clerk/nextjs", () => ({
 }));
 vi.mock("@/app/legal-update-actions", () => ({
   acceptAccountLegalUpdate: acceptAccountLegalUpdateMock,
-  initialAccountLegalAcceptanceActionState: {
-    status: "idle",
-    code: "idle",
-  },
 }));
 
 import AccountLegalUpdateShell, {
@@ -93,6 +89,11 @@ describe("AccountLegalUpdateShell", () => {
     expect(privacy).not.toBeChecked();
     expect(terms).toBeRequired();
     expect(privacy).toBeRequired();
+    expect(terms).toBeInvalid();
+    expect(privacy).toBeInvalid();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(acceptAccountLegalUpdateMock).not.toHaveBeenCalled();
 
     expect(
       screen.getByRole("link", { name: /Terms of Service v1\.1/ })
@@ -103,6 +104,23 @@ describe("AccountLegalUpdateShell", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
     expect(screen.queryByText(/allow analytics/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps an unchecked submission browser-invalid without invoking the action", () => {
+    render(<AccountLegalUpdateShell state={requiredState} copy={copy} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(
+      screen.getByRole("checkbox", { name: copy.termsAgreement })
+    ).toBeInvalid();
+    expect(
+      screen.getByRole("checkbox", { name: copy.privacyAcknowledgement })
+    ).toBeInvalid();
+    expect(acceptAccountLegalUpdateMock).not.toHaveBeenCalled();
+    expect(refreshMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("provides safe retry and sign-out escapes when lookup fails closed", () => {
@@ -130,7 +148,11 @@ describe("AccountLegalUpdateShell", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      copy.acceptedMessage
+    );
     await waitFor(() => expect(refreshMock).toHaveBeenCalledOnce());
+    expect(acceptAccountLegalUpdateMock).toHaveBeenCalledOnce();
   });
 
   it("does not refresh normal content after a rejected server acceptance", async () => {
