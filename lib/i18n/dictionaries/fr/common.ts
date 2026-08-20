@@ -37,6 +37,57 @@ const dictionary = {
     success: "Succès",
     error: "Erreur",
   },
+  analyticsConsent: {
+    label: "Préférences d’analyse",
+    title: "Aidez-nous à améliorer IronClad",
+    description:
+      "L’analyse facultative nous aide à comprendre les visites et l’utilisation des pages. Elle ne se charge que si vous l’autorisez.",
+    details:
+      "Lorsqu’elle est activée, Vercel peut recevoir le chemin de la page publique, la source de la visite, le pays approximatif, le type d’appareil, le navigateur et le système d’exploitation. IronClad n’utilise ni cookies d’analyse, ni publicité, ni relecture de session.",
+    required:
+      "Les fonctions nécessaires d’authentification et de sécurité ne sont pas affectées par ce choix.",
+    allow: "Autoriser l’analyse",
+    decline: "Refuser",
+    privacyLink: "Lire la Politique de confidentialité",
+    choices: "Choix relatifs à l’analyse",
+    dialogTitle: "Préférences d’analyse",
+    dialogDescription:
+      "Vous pouvez modifier le choix de ce navigateur à tout moment. Le retrait de votre autorisation met fin à la collecte future de données d’analyse.",
+    close: "Fermer les préférences d’analyse",
+    currentChoice: "Choix actuel",
+    statusGranted: "Analyse autorisée",
+    statusDeclined: "Analyse désactivée",
+    statusUndecided: "Aucun choix enregistré",
+    withdraw: "Retirer l’autorisation d’analyse",
+    saveError:
+      "Nous n’avons pas pu enregistrer votre choix. L’analyse est désactivée dans cet onglet, mais ce changement peut ne pas persister. Vérifiez le stockage du navigateur et réessayez.",
+    savedGranted: "Analyse autorisée.",
+    savedDeclined: "L’analyse reste désactivée.",
+  },
+  legalUpdate: {
+    eyebrow: "Mise à jour juridique importante",
+    title: "Consultez et acceptez les conditions mises à jour",
+    description:
+      "Pour continuer à utiliser les fonctionnalités d’IronClad après connexion, consultez et acceptez Terms of Service v1.1, puis confirmez avoir pris connaissance de Privacy Policy v1.1. L’analyse reste facultative et fait l’objet d’un choix distinct.",
+    termsLinkLabel: "Lire Terms of Service",
+    privacyLinkLabel: "Lire Privacy Policy",
+    termsAgreement: "J’accepte Terms of Service v1.1.",
+    privacyAcknowledgement:
+      "Je confirme avoir pris connaissance de Privacy Policy v1.1.",
+    continueAction: "Accepter et continuer",
+    savingAction: "Enregistrement de l’acceptation…",
+    signOutAction: "Se déconnecter",
+    retryAction: "Réessayer",
+    unavailableTitle: "Mise à jour juridique temporairement indisponible",
+    unavailableDescription:
+      "IronClad ne peut pas vérifier les documents juridiques en vigueur pour le moment. Aucune acceptation n’a été enregistrée. Réessayez ou déconnectez-vous.",
+    authRequiredError: "Reconnectez-vous pour continuer.",
+    acceptanceRequiredError:
+      "Les deux confirmations juridiques sont obligatoires.",
+    unavailableError:
+      "IronClad n’a pas pu enregistrer votre acceptation. Aucune information n’a été sauvegardée. Réessayez.",
+    acceptedMessage: "Acceptation enregistrée. Chargement d’IronClad…",
+  },
   selector: {
     language: "Langue",
     triggerAriaLabel: "Choisir la langue. Langue actuelle : {language}",

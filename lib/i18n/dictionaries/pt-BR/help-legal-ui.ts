@@ -21,9 +21,9 @@ const dictionary = {
     hero: {
       eyebrow: "Central oficial de regras", title: "Regras de competição do IronClad",
       description: "Comece pelo resumo em linguagem clara e depois consulte o Regulamento e o Acordo de Participação do Jogador versionados para acessar o texto normativo aplicável.",
-      effective: "Vigente · {date}", summaryAria: "Resumo operacional das regras",
+      effective: "Conjunto atualizado · {date}", summaryAria: "Resumo operacional das regras",
       operations: "Operações do torneio", corpus: "Corpus normativo",
-      corpusText: "Quatro documentos aprovados e versionados estão vigentes desde {date}.",
+      corpusText: "Quatro documentos aprovados e versionados estão vigentes. Cada documento mostra sua própria data de vigência.",
     },
     category: {
       eyebrow: "Escolha o conjunto de regras", title: "Comece pelas regras aplicáveis ao seu evento.",
@@ -52,7 +52,7 @@ const dictionary = {
       eyebrow: "Resumo rápido", title: "Leia o resumo selecionado antes das regras detalhadas.",
       description: "O resumo da categoria apresenta os fatos do lançamento sem duplicar os documentos normativos completos.",
       selected: "Resumo selecionado", documentStatusLabel: "Status dos documentos", documentStatusTitle: "Corpus normativo aprovado",
-      documentStatusText: "Regulamento, PPA, Termos e Política de Privacidade estão vigentes desde {date}. A inscrição usa seus registros versionados exatos.",
+      documentStatusText: "O Regulamento, o PPA, os Termos e a Política de Privacidade vigentes mostram suas próprias datas. A inscrição usa seus registros versionados exatos.",
       navigationLabel: "Navegação", navigationTitle: "Comece pelo seu conjunto de regras",
       navigationText: "Escolha a categoria ativa antes dos detalhes para manter a página focada no seu evento.",
       integrityLabel: "Integridade", integrityTitle: "Linguagem clara, limites exatos",
@@ -108,7 +108,7 @@ const dictionary = {
     },
     documents: {
       eyebrow: "Documentos oficiais", title: "Status dos documentos normativos.",
-      description: "As versões finais aprovadas são a fonte normativa que prevalece desde {date}.",
+      description: "As versões vigentes aprovadas são a fonte normativa. Cada cartão mostra a data de vigência do documento.",
       immutable: "Baixe os PDFs imutáveis e versionados usados na inscrição.",
       version: "Versão {version}", effective: "Vigente desde {date}", readOnline: "Ler online", read: "Ler",
       opensNewTab: "(abre em nova aba)", download: "Baixar PDF",
@@ -132,7 +132,7 @@ const dictionary = {
     disclaimer: {
       eyebrow: "Status normativo", title: "Guia em linguagem clara",
       text: "Esta página é um guia em linguagem clara. A hierarquia documental e as versões exatas aceitas prevalecem. Páginas de Torneio, Decisões Publicadas e Termos de Prêmio só complementam dentro do escopo declarado.",
-      effective: "Regulamento, PPA, Termos e Política de Privacidade estão vigentes desde {date}. A inscrição registra a versão exata apresentada de cada documento.",
+      effective: "Cada Regulamento, PPA, Termos e Política de Privacidade vigente mostra sua própria data. A inscrição registra a versão exata apresentada de cada documento.",
       english: "O texto normativo em vigor e que prevalece está em inglês. No momento, não há tradução oficial.",
     },
   },

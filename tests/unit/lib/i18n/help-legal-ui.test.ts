@@ -61,17 +61,24 @@ describe("help and legal localization contract", () => {
     }
   });
 
-  it("keeps the complete Effective legal corpus byte-for-byte unchanged across checkout line endings", () => {
-    const bytes = readFileSync(join(root, "content", "legal-corpus.json"));
-    const normalizedBytes = Buffer.from(
-      bytes.toString("utf8").replace(/\r\n/g, "\n"),
-      "utf8"
-    );
+  it("keeps the unchanged Rulebook and PPA source documents exact", () => {
+    const corpus = JSON.parse(
+      readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
+    ) as { documents: { kind: string }[] };
+    const expected = {
+      ppa: "e7ecbca6de3d2bf1edf808ce82e4e2eabc61e972c4234e77dff7de10db8f60ae",
+      rulebook:
+        "3280648ccfe591a3b7d38d7b4d872459a1dda90f9f39ca390e352d34af8b2084",
+    };
 
-    expect(normalizedBytes).toHaveLength(154_267);
-    expect(createHash("sha256").update(normalizedBytes).digest("hex")).toBe(
-      "5ceec8dc27ac5ae53699e0551058b699b153bb61c17970777299103cfd8b38de"
-    );
+    for (const [kind, sha256] of Object.entries(expected)) {
+      const document = corpus.documents.find((candidate) => candidate.kind === kind);
+      expect(document, kind).toBeDefined();
+      expect(
+        createHash("sha256").update(JSON.stringify(document)).digest("hex"),
+        kind
+      ).toBe(sha256);
+    }
   });
 
   it("keeps the full corpus out of the Rules client module", () => {

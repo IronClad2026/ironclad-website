@@ -37,6 +37,55 @@ const dictionary = {
     success: "Success",
     error: "Error",
   },
+  analyticsConsent: {
+    label: "Optional analytics",
+    title: "Help improve IronClad",
+    description:
+      "Optional website analytics helps us understand visits and page use. It only loads after you allow it.",
+    details:
+      "When enabled, Vercel may receive the public page route, referrer, approximate country, device type, browser and operating system. IronClad does not use analytics cookies, advertising or session replay.",
+    required:
+      "Necessary authentication and security features are not affected by this choice.",
+    allow: "Allow analytics",
+    decline: "Decline",
+    privacyLink: "Read the Privacy Policy",
+    choices: "Analytics choices",
+    dialogTitle: "Analytics choices",
+    dialogDescription:
+      "Change this browser's analytics choice at any time. Withdrawal stops future analytics collection.",
+    close: "Close analytics choices",
+    currentChoice: "Current choice",
+    statusGranted: "Analytics allowed",
+    statusDeclined: "Analytics off",
+    statusUndecided: "No choice saved",
+    withdraw: "Withdraw analytics consent",
+    saveError:
+      "Your choice could not be saved. Analytics is off in this tab, but the change may not persist. Check your browser storage settings and try again.",
+    savedGranted: "Analytics allowed for this browser.",
+    savedDeclined: "Analytics remains off for this browser.",
+  },
+  legalUpdate: {
+    eyebrow: "Important legal update",
+    title: "Review and accept the updated terms",
+    description:
+      "To continue using signed-in IronClad features, review and accept Terms of Service v1.1 and acknowledge Privacy Policy v1.1. Analytics remains optional and is a separate choice.",
+    termsLinkLabel: "Read Terms of Service",
+    privacyLinkLabel: "Read Privacy Policy",
+    termsAgreement: "I accept Terms of Service v1.1.",
+    privacyAcknowledgement: "I acknowledge Privacy Policy v1.1.",
+    continueAction: "Accept and continue",
+    savingAction: "Saving acceptance…",
+    signOutAction: "Sign out",
+    retryAction: "Try again",
+    unavailableTitle: "Legal update temporarily unavailable",
+    unavailableDescription:
+      "IronClad cannot verify the current legal documents right now. No acceptance has been recorded. Try again or sign out.",
+    authRequiredError: "Sign in again to continue.",
+    acceptanceRequiredError: "Both legal controls are required.",
+    unavailableError:
+      "IronClad could not record your acceptance. Nothing was saved. Try again.",
+    acceptedMessage: "Acceptance recorded. Loading IronClad…",
+  },
   selector: {
     language: "Language",
     triggerAriaLabel: "Choose language. Current language: {language}",

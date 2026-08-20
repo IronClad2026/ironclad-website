@@ -7,21 +7,25 @@ import englishCommon, {
   type CommonDictionary,
 } from "@/lib/i18n/dictionaries/en/common";
 import { interpolateMessage } from "@/lib/i18n/translate";
+import AnalyticsConsent from "@/components/analytics/AnalyticsConsent";
 
 type FooterProps = {
+  analyticsConsentAvailable: boolean;
   dictionary?: CommonDictionary;
   rulebookPath: string;
   ppaPath: string;
 };
 
 export default function Footer({
+  analyticsConsentAvailable,
   dictionary = englishCommon,
   rulebookPath,
   ppaPath,
 }: FooterProps) {
   const pathname = usePathname();
   const adminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
-  const copy = (adminRoute ? englishCommon : dictionary).footer;
+  const resolvedDictionary = adminRoute ? englishCommon : dictionary;
+  const copy = resolvedDictionary.footer;
 
   return (
     <footer
@@ -79,6 +83,9 @@ export default function Footer({
           >
             {copy.privacy}
           </Link>
+          {analyticsConsentAvailable && !adminRoute ? (
+            <AnalyticsConsent copy={resolvedDictionary.analyticsConsent} />
+          ) : null}
         </nav>
       </div>
     </footer>

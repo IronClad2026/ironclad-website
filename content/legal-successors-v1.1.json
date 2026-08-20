@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "status": "Review Draft",
+  "effectiveDateToken": "{{PRODUCTION_EFFECTIVE_DATE}}",
+  "publicationRule": "Terms v1.1 and Privacy v1.1 become Effective only through the controlled same-day Production publication process. The finalizer must use the actual Australia/Sydney publication date. Review-Draft text and unactivated release candidates are not Effective documents.",
+  "documents": [
+    {
+      "kind": "terms",
+      "fromVersion": "1.0",
+      "version": "1.1",
+      "filename": "ironclad-terms-of-service-v1.1.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+      "operations": [
+        {
+          "op": "replace-list-item",
+          "sectionNumber": "15",
+          "expected": "Vercel for hosting and delivery;",
+          "replacement": "Vercel for hosting, delivery and, when enabled after a separate opt-in, optional public-site Web Analytics;"
+        },
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "21",
+          "expected": "IronClad uses necessary authentication and Steam-link technologies and limited Admin session storage as described in the Privacy Policy. It does not currently deploy IronClad analytics, advertising pixels or a consent-management platform.",
+          "replacement": "IronClad uses necessary authentication and Steam-link technologies, limited Admin session storage, and a first-party browser preference used only to remember a visitor's optional analytics choice. IronClad does not load optional website analytics unless the visitor has deliberately selected \u201cAllow analytics\u201d. After that choice and once the feature is enabled, Vercel Web Analytics may measure approved public routes as described in the Privacy Policy. A visitor may decline or later withdraw analytics without losing normal IronClad functionality. IronClad does not deploy advertising pixels or a general consent-management platform."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "22",
+          "expected": "Continued browsing alone does not replace a required active acceptance.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Where a new Effective Terms or Privacy version requires renewed acceptance, an authenticated user must actively accept the Terms and acknowledge the Privacy Policy before continuing normal authenticated use. Public browsing remains available. Optional analytics consent is separate from legal acceptance and is not required to create an Account, register for or participate in an Event, or use normal IronClad functionality."
+            },
+            {
+              "type": "paragraph",
+              "text": "The trusted acceptance process creates private, immutable evidence of the authenticated identity, database-owned time, exact Effective Terms and Privacy document facts, Terms acceptance and Privacy acknowledgement."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "privacy",
+      "fromVersion": "1.0",
+      "version": "1.1",
+      "filename": "ironclad-privacy-policy-v1.1.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
+      "operations": [
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "2",
+          "expected": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, rankings, Polls, notifications, support, account closure and prize administration where applicable.",
+          "replacement": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, rankings, Polls, notifications, support, account closure, optional analytics preference, optional consent-gated public-site analytics and prize administration where applicable."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "3",
+          "expected": "Privacy acknowledgement records that the Policy was presented. It is not blanket consent.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Account-wide successor acceptance information:"
+            },
+            {
+              "type": "bullets",
+              "items": [
+                "authenticated Clerk user ID;",
+                "database-owned acceptance time;",
+                "exact Terms and Privacy document identifiers, versions, stable URLs and SHA-256 hashes;",
+                "Terms acceptance; and",
+                "Privacy Policy acknowledgement."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "The account-wide successor acceptance record is private, identity-linked and immutable. It is separate from Tournament registration acceptance and does not record analytics consent."
+            }
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "3",
+          "expected": "Necessary hosting, security and provider logs may contain IP address, device and browser information, timestamps, requested route, response or error metadata, authentication events and security diagnostics.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Analytics preference and optional public-site analytics:"
+            },
+            {
+              "type": "bullets",
+              "items": [
+                "the first-party browser preference ironclad_analytics_consent, containing only granted or declined; and",
+                "when Vercel Web Analytics is enabled and the visitor has selected Allow analytics: a sanitized and normalized approved public route, request timestamp, referrer information limited by IronClad's referrer policy and route redaction, coarse geography, device type, browser, operating system and Vercel's request-derived anonymous daily visitor measure."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Before an analytics pageview may be sent, IronClad removes query strings and URL fragments, normalizes an approved public player-profile route to /players/[playerId], and excludes private, authenticated, operational and unknown routes."
+            },
+            {
+              "type": "paragraph",
+              "text": "IronClad does not send an IronClad user ID, Clerk ID, SteamID64, email address, Discord username, Match ID, replay or evidence path, custom user property or custom behavioral event to Vercel Web Analytics in this implementation."
+            },
+            {
+              "type": "paragraph",
+              "text": "Vercel's anonymous visitor mechanism is request-derived and resets daily. It does not identify a globally unique person across days, devices or sites, and IronClad does not describe it that way."
+            }
+          ]
+        },
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "4",
+          "expected": "Information may come directly from the user; from a delegated Admin acting within authority; from Clerk; from Steam OpenID and Valve's supported public profile service; from Relic's Company of Heroes 3 personal-stat service; from another Player involved in the same Match; from hosting, database, Storage, security and email providers; from support or privacy correspondence; and from a payout provider for a specifically approved prize-bearing Event.",
+          "replacement": "Information may come directly from the user; from a delegated Admin acting within authority; from Clerk; from Steam OpenID and Valve's supported public profile service; from Relic's Company of Heroes 3 personal-stat service; from another Player involved in the same Match; from hosting, database, Storage, security and email providers; from a consenting visitor's browser and Vercel for optional public-site analytics when enabled; from support or privacy correspondence; and from a payout provider for a specifically approved prize-bearing Event."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "5",
+          "expected": "We process information to authenticate users and secure Accounts; create and maintain profiles; verify control of a Steam identity; obtain supported Relic 1v1 information; determine Division eligibility; register and waitlist Players; preserve exact versioned acceptance evidence; operate brackets and Matches; process Dice and Polls; receive and confirm results; investigate disputes, no-shows, cheating and security incidents; calculate rankings and standings; publish factual Competition History; deliver notifications and transactional email; provide support and Admin Assistance; administer a lawful prize where applicable; prevent fraud and platform abuse; enforce the Governing Documents; maintain required audit and legal evidence; handle account closure and privacy requests; and comply with applicable law.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "IronClad preserves private account-wide evidence that an authenticated user accepted the current Terms and acknowledged the current Privacy Policy so it can enforce the required legal-update gate and demonstrate the exact documents presented."
+            },
+            {
+              "type": "paragraph",
+              "text": "If a visitor opts in and optional analytics has been enabled, IronClad uses the limited analytics information only to measure aggregate public-site traffic, understand which approved public pages are used, and improve the operation and presentation of the website. It is not used for advertising, behavioral profiling, individual eligibility, rankings, Tournament decisions or surveillance."
+            }
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "6",
+          "expected": "Where legitimate interests are used, IronClad must consider necessity, proportionality, reasonable expectations and the user's rights.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Optional Vercel Web Analytics relies on the visitor's explicit consent. Analytics is off by default. Declining or withdrawing consent does not block public browsing, Account creation, Tournament registration or participation, or normal IronClad functionality. Withdrawal does not invalidate processing already completed while consent was valid."
+            }
+          ]
+        },
+        {
+          "op": "replace-list-item",
+          "sectionNumber": "15",
+          "expected": "Vercel: current hosting, application delivery and request processing.",
+          "replacement": "Vercel: current hosting, application delivery and request processing and, only when enabled after the visitor's separate opt-in, optional public-site Web Analytics."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "10",
+          "expected": "Acceptance evidence is private and is not a public profile or Competition History field.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A separate account-wide successor acceptance record may be required when Effective Terms or Privacy versions change materially. It records the authenticated Clerk identity, database-owned time, exact Terms and Privacy document identifiers, versions, stable URLs and SHA-256 hashes, Terms acceptance and Privacy acknowledgement. It is private and immutable, does not create or amend a Tournament registration, and does not record optional analytics consent."
+            }
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "16",
+          "expected": "Provider regions, subprocessors, data-processing terms and transfer mechanisms must be reviewed periodically and when a provider changes.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "When optional Web Analytics is enabled after consent, Vercel and its relevant infrastructure or subprocessors may process the limited analytics information in countries outside the visitor's country. This disclosure does not claim a legal certification or by itself establish a transfer mechanism."
+            }
+          ]
+        },
+        {
+          "op": "insert-list-item-after",
+          "sectionNumber": "17",
+          "expected": "__Host-ironclad-steam-link, a necessary first-party cookie that binds a Steam OpenID callback to the authenticated session and linking intent. It lasts up to 10 minutes, contains random flow state, intent, session hash and expiry, is HttpOnly, Secure, SameSite=Lax and Path=/, and is cleared by the callback.",
+          "item": "ironclad_locale, a first-party functionality-preference cookie that remembers only the selected interface locale. It lasts up to one year, is HttpOnly, SameSite=Lax and Path=/, and is Secure in Production. For a signed-in user, the selected transactional-language preference may also be mirrored in Clerk private metadata. This preference is separate from analytics consent and is not used to measure behavior."
+        },
+        {
+          "op": "insert-list-item-after",
+          "sectionNumber": "17",
+          "expected": "ironclad:new-tournament-draft in browser sessionStorage to recover non-file fields in the delegated Admin create-Tournament form. It is scoped to the browser tab/session and excludes the file input and stored banner image URL.",
+          "item": "ironclad_analytics_consent in browser localStorage, containing only granted or declined, solely to remember the visitor's optional analytics preference. It contains no user ID, account ID, email, Steam identity, IP address, fingerprint or preference-history timestamp."
+        },
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "17",
+          "expected": "No IronClad application localStorage, marketing cookie, advertising pixel, first-party analytics integration or consent-management platform is currently used.",
+          "replacement": "Apart from the analytics preference described above, IronClad does not use application localStorage for analytics, a marketing cookie, an advertising pixel or a general consent-management platform. The preference remembers the visitor's choice and is not itself used to measure behavior."
+        },
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "17",
+          "expected": "Because the current implementation uses necessary technology and does not load IronClad non-essential analytics or advertising technology, no generic marketing-cookie banner is used.",
+          "replacement": "Optional analytics is off by default. The focused analytics choice presents Allow analytics and Decline without a preselected choice. Declining does not reduce normal IronClad functionality. A visitor may later change or withdraw the preference through the Analytics choices control."
+        },
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "17",
+          "expected": "If non-essential analytics, advertising, cross-site measurement or embedded tracking is introduced later, IronClad must update this Policy and obtain any legally required opt-in before loading that technology. Reject and withdrawal controls must be as accessible as acceptance where consent is required.",
+          "replacement": "When Vercel Web Analytics is enabled in a later controlled release, it may load only after the stored preference is granted. Vercel Web Analytics does not set an analytics cookie. IronClad limits collection to an explicit public-route allowlist, removes query strings and URL fragments, normalizes approved public player-profile routes, applies a protective referrer policy, and fails closed for private, authenticated, operational and unknown routes. No custom analytics user properties or custom behavioral events are used in V1."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "17",
+          "expected": "When Vercel Web Analytics is enabled in a later controlled release, it may load only after the stored preference is granted. Vercel Web Analytics does not set an analytics cookie. IronClad limits collection to an explicit public-route allowlist, removes query strings and URL fragments, normalizes approved public player-profile routes, applies a protective referrer policy, and fails closed for private, authenticated, operational and unknown routes. No custom analytics user properties or custom behavioral events are used in V1.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Any later analytics expansion, advertising, cross-site measurement or embedded tracking requires a fresh data-minimisation and Policy review and any legally required choice before it loads. Reject and withdrawal controls must remain as accessible as acceptance where consent is required."
+            },
+            {
+              "type": "paragraph",
+              "text": "Traffic reports may undercount because visitors can decline or withdraw analytics and because JavaScript blocking or ad blockers may prevent collection."
+            }
+          ]
+        },
+        {
+          "op": "insert-table-row-after",
+          "sectionNumber": "18",
+          "expectedFirstCell": "Immutable registration acceptance",
+          "row": [
+            "Immutable account-wide successor acceptance",
+            "7 years from the database acceptance timestamp. Account closure does not shorten this period. Delete through controlled legal-evidence maintenance unless an active claim or legal hold requires longer retention."
+          ]
+        },
+        {
+          "op": "insert-table-row-after",
+          "sectionNumber": "18",
+          "expectedFirstCell": "Security and runtime logs under IronClad control",
+          "row": [
+            "Optional analytics preference and Vercel Web Analytics",
+            "The granted or declined preference remains in that browser until the visitor changes it or clears browser storage. When analytics is enabled after consent, Vercel Hobby reporting available to IronClad covers a rolling one-month window. Vercel may retain provider copies under its own lawful schedules, so IronClad does not promise automatic deletion at exactly 30 days."
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "20",
+          "expected": "Withdrawing public-profile, Discord or media permission does not automatically erase lawful historic publication or affect processing already completed on another valid basis.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A visitor may change or withdraw the optional analytics preference through the Analytics choices control. Declining or withdrawing analytics does not affect normal access to IronClad. Clearing browser storage may remove the saved choice, in which case analytics remains off until another deliberate choice is made."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

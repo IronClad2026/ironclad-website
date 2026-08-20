@@ -37,6 +37,56 @@ const dictionary = {
     success: "Sucesso",
     error: "Erro",
   },
+  analyticsConsent: {
+    label: "Preferências de análise",
+    title: "Ajude a melhorar o IronClad",
+    description:
+      "A análise opcional nos ajuda a entender as visitas e o uso das páginas. Ela só é carregada se você permitir.",
+    details:
+      "Quando ativada, a Vercel pode receber a rota da página pública, a origem da visita, o país aproximado, o tipo de dispositivo, o navegador e o sistema operacional. O IronClad não usa cookies de análise, publicidade nem reprodução de sessões.",
+    required:
+      "Os recursos necessários de autenticação e segurança não são afetados por essa escolha.",
+    allow: "Permitir análise",
+    decline: "Recusar",
+    privacyLink: "Ler a Política de Privacidade",
+    choices: "Opções de análise",
+    dialogTitle: "Preferências de análise",
+    dialogDescription:
+      "Você pode alterar a escolha deste navegador a qualquer momento. Revogar a permissão interrompe a coleta futura de dados de análise.",
+    close: "Fechar preferências de análise",
+    currentChoice: "Escolha atual",
+    statusGranted: "Análise permitida",
+    statusDeclined: "Análise desativada",
+    statusUndecided: "Nenhuma escolha salva",
+    withdraw: "Revogar permissão para análise",
+    saveError:
+      "Não foi possível salvar sua escolha. A análise está desativada nesta aba, mas a alteração pode não persistir. Verifique o armazenamento do navegador e tente novamente.",
+    savedGranted: "Análise permitida.",
+    savedDeclined: "A análise continua desativada.",
+  },
+  legalUpdate: {
+    eyebrow: "Atualização jurídica importante",
+    title: "Leia e aceite os termos atualizados",
+    description:
+      "Para continuar usando os recursos do IronClad que exigem login, leia e aceite Terms of Service v1.1 e declare ciência de Privacy Policy v1.1. A análise continua opcional e é uma escolha separada.",
+    termsLinkLabel: "Ler Terms of Service",
+    privacyLinkLabel: "Ler Privacy Policy",
+    termsAgreement: "Aceito Terms of Service v1.1.",
+    privacyAcknowledgement: "Declaro ciência de Privacy Policy v1.1.",
+    continueAction: "Aceitar e continuar",
+    savingAction: "Salvando a aceitação…",
+    signOutAction: "Sair",
+    retryAction: "Tentar novamente",
+    unavailableTitle: "Atualização jurídica temporariamente indisponível",
+    unavailableDescription:
+      "O IronClad não consegue verificar os documentos jurídicos vigentes no momento. Nenhuma aceitação foi registrada. Tente novamente ou saia.",
+    authRequiredError: "Entre novamente para continuar.",
+    acceptanceRequiredError:
+      "É necessário marcar as duas opções jurídicas.",
+    unavailableError:
+      "O IronClad não conseguiu registrar sua aceitação. Nada foi salvo. Tente novamente.",
+    acceptedMessage: "Aceitação registrada. Carregando o IronClad…",
+  },
   selector: {
     language: "Idioma",
     triggerAriaLabel: "Escolher idioma. Idioma atual: {language}",

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate the complete IronClad legal PDF corpus from canonical JSON.
+"""Generate selected IronClad legal PDFs from the canonical current corpus.
 
-This command always generates all four versioned PDFs as one corpus. If the
-Production activation date changes, update the canonical corpus date first and
-regenerate all four PDFs before computing hashes or publishing any artifact.
+The initial four-document release remains supported. A successor release may
+select only Terms and Privacy so the immutable Rulebook, PPA and historical
+Terms/Privacy artifacts are preserved. Dates are read per document and an
+explicit release-date assertion never rewrites the source corpus.
 """
 
 from __future__ import annotations
@@ -48,11 +49,22 @@ DEFAULT_CORPUS = ROOT / "content" / "legal-corpus.json"
 DEFAULT_OUTPUT = ROOT / "public" / "documents-rules-ppa"
 LOGO_PATH = ROOT / "public" / "images" / "ironclad-logo.png"
 
-EXPECTED_FILENAMES = {
-    "rulebook": "ironclad-official-tournament-rulebook-v3.0.pdf",
-    "ppa": "ironclad-player-participation-agreement-v3.0.pdf",
-    "terms": "ironclad-terms-of-service-v1.0.pdf",
-    "privacy": "ironclad-privacy-policy-v1.0.pdf",
+DOCUMENT_KINDS = ("rulebook", "ppa", "terms", "privacy")
+APPROVED_FILENAMES = {
+    "rulebook": {
+        "3.0": "ironclad-official-tournament-rulebook-v3.0.pdf",
+    },
+    "ppa": {
+        "3.0": "ironclad-player-participation-agreement-v3.0.pdf",
+    },
+    "terms": {
+        "1.0": "ironclad-terms-of-service-v1.0.pdf",
+        "1.1": "ironclad-terms-of-service-v1.1.pdf",
+    },
+    "privacy": {
+        "1.0": "ironclad-privacy-policy-v1.0.pdf",
+        "1.1": "ironclad-privacy-policy-v1.1.pdf",
+    },
 }
 
 DISALLOWED_DASHES = {
@@ -81,7 +93,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument(
         "--effective-date",
-        help="YYYY-MM-DD assertion. It must match the canonical corpus date.",
+        help="YYYY-MM-DD assertion. It must match every selected document.",
+    )
+    parser.add_argument(
+        "--kinds",
+        default=",".join(DOCUMENT_KINDS),
+        help="Comma-separated document kinds to generate.",
     )
     return parser.parse_args()
 
@@ -91,23 +108,53 @@ def format_date(value: str) -> str:
     return f"{parsed.day} {parsed.strftime('%B %Y')}"
 
 
-def load_corpus(path: Path, effective_date_override: str | None) -> dict[str, Any]:
+def parse_selected_kinds(value: str) -> tuple[str, ...]:
+    selected = tuple(part.strip() for part in value.split(",") if part.strip())
+    if not selected or len(set(selected)) != len(selected):
+        raise ValueError("--kinds must contain unique document kinds")
+    invalid = set(selected) - set(DOCUMENT_KINDS)
+    if invalid:
+        raise ValueError(f"Unsupported --kinds values: {sorted(invalid)}")
+    return selected
+
+
+def load_corpus(
+    path: Path,
+    effective_date_override: str | None,
+    selected_kinds: tuple[str, ...],
+) -> dict[str, Any]:
     corpus = json.loads(path.read_text(encoding="utf-8"))
     canonical_date = corpus.get("effectiveDate")
-    if effective_date_override and effective_date_override != canonical_date:
-        raise ValueError(
-            "--effective-date must match the canonical corpus date; update the corpus "
-            "before regenerating all four artifacts"
-        )
-    selected_date = canonical_date
-    if not isinstance(selected_date, str):
+    if not isinstance(canonical_date, str):
         raise ValueError("The corpus must define effectiveDate in YYYY-MM-DD form")
-    display_date = format_date(selected_date)
-    corpus["effectiveDate"] = selected_date
-    corpus["effectiveDateDisplay"] = display_date
-    for document in corpus.get("documents", []):
-        document["effectiveDate"] = selected_date
-    return replace_tokens(corpus, {"{{EFFECTIVE_DATE}}": display_date})
+    expected_display = format_date(canonical_date)
+    if corpus.get("effectiveDateDisplay") != expected_display:
+        raise ValueError("The corpus effectiveDateDisplay does not match effectiveDate")
+
+    documents = corpus.get("documents", [])
+    if not isinstance(documents, list):
+        raise ValueError("The legal corpus documents must be a list")
+    corpus["documents"] = [resolve_document_tokens(document) for document in documents]
+
+    selected_documents = [
+        document
+        for document in corpus["documents"]
+        if document.get("kind") in selected_kinds
+    ]
+    if len(selected_documents) != len(selected_kinds):
+        raise ValueError("The corpus does not contain every selected document kind")
+    if effective_date_override:
+        mismatched = [
+            document.get("kind")
+            for document in selected_documents
+            if document.get("effectiveDate") != effective_date_override
+        ]
+        if mismatched:
+            raise ValueError(
+                "--effective-date does not match selected document dates: "
+                + ", ".join(str(kind) for kind in mismatched)
+            )
+    return corpus
 
 
 def replace_tokens(value: Any, replacements: dict[str, str]) -> Any:
@@ -122,6 +169,22 @@ def replace_tokens(value: Any, replacements: dict[str, str]) -> Any:
     return value
 
 
+def resolve_document_tokens(document: dict[str, Any]) -> dict[str, Any]:
+    """Resolve display tokens using this document's own immutable date."""
+    effective_date = document.get("effectiveDate")
+    if not isinstance(effective_date, str):
+        raise ValueError(f"{document.get('kind', 'document')} has no effectiveDate")
+    resolved = replace_tokens(
+        document,
+        {"{{EFFECTIVE_DATE}}": format_date(effective_date)},
+    )
+    if "{{EFFECTIVE_DATE}}" in json.dumps(resolved, ensure_ascii=False):
+        raise ValueError(
+            f"{document.get('kind', 'document')} has an unresolved Effective-date token"
+        )
+    return resolved
+
+
 def validate_corpus(corpus: dict[str, Any]) -> None:
     if corpus.get("schemaVersion") != 1:
         raise ValueError("Unsupported legal corpus schemaVersion")
@@ -130,7 +193,7 @@ def validate_corpus(corpus: dict[str, Any]) -> None:
         raise ValueError("The legal corpus must contain exactly four documents")
 
     kinds = {document.get("kind") for document in documents}
-    if kinds != set(EXPECTED_FILENAMES):
+    if kinds != set(DOCUMENT_KINDS):
         raise ValueError(f"Unexpected document kinds: {sorted(str(kind) for kind in kinds)}")
 
     serialized = json.dumps(corpus, ensure_ascii=False)
@@ -140,11 +203,17 @@ def validate_corpus(corpus: dict[str, Any]) -> None:
 
     for document in documents:
         kind = document["kind"]
-        if document.get("filename") != EXPECTED_FILENAMES[kind]:
+        version = document.get("version")
+        expected_filename = APPROVED_FILENAMES[kind].get(version)
+        if not expected_filename or document.get("filename") != expected_filename:
             raise ValueError(f"Incorrect filename for {kind}")
         if document.get("status") != "Effective":
             raise ValueError(f"{kind} is not marked Effective")
-        expected_path = f"/documents-rules-ppa/{EXPECTED_FILENAMES[kind]}"
+        effective_date = document.get("effectiveDate")
+        if not isinstance(effective_date, str):
+            raise ValueError(f"{kind} has no effectiveDate")
+        format_date(effective_date)
+        expected_path = f"/documents-rules-ppa/{expected_filename}"
         if document.get("publicPath") != expected_path:
             raise ValueError(f"Incorrect publicPath for {kind}")
         sections = document.get("sections")
@@ -659,23 +728,27 @@ def sha256(path: Path) -> str:
 
 def main() -> int:
     args = parse_args()
+    selected_kinds = parse_selected_kinds(args.kinds)
     corpus_path = args.corpus.resolve()
     output_dir = args.output_dir.resolve()
-    corpus = load_corpus(corpus_path, args.effective_date)
+    corpus = load_corpus(corpus_path, args.effective_date, selected_kinds)
     validate_corpus(corpus)
 
     print("=" * 78)
-    print("IRONCLAD LEGAL CORPUS GENERATION - ALL FOUR DOCUMENTS")
-    print(f"Effective date: {corpus['effectiveDateDisplay']} ({corpus['effectiveDate']})")
-    print(
-        "IMPORTANT: If Production activation occurs on a later date, update the date "
-        "and regenerate ALL FOUR PDFs together before hashing or publication."
-    )
+    print("IRONCLAD LEGAL DOCUMENT GENERATION")
+    print(f"Selected kinds: {', '.join(selected_kinds)}")
+    if args.effective_date:
+        print(f"Asserted Effective date: {format_date(args.effective_date)} ({args.effective_date})")
     print("=" * 78)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     existing_pdfs = {path.name for path in output_dir.glob("*.pdf")}
-    unexpected = existing_pdfs - set(EXPECTED_FILENAMES.values())
+    approved_names = {
+        filename
+        for versions in APPROVED_FILENAMES.values()
+        for filename in versions.values()
+    }
+    unexpected = existing_pdfs - approved_names
     if unexpected:
         raise RuntimeError(
             "Unexpected PDFs in final output directory; remove or relocate them first: "
@@ -690,7 +763,7 @@ def main() -> int:
     # atomic on Windows and makes files inherit the public directory's ACL.
     staged: list[tuple[Path, Path]] = []
     try:
-        for kind in ("rulebook", "ppa", "terms", "privacy"):
+        for kind in selected_kinds:
             document = documents[kind]
             staged_path = output_dir / f".{document['filename']}.staging"
             if staged_path.exists():
@@ -698,7 +771,7 @@ def main() -> int:
             build_pdf(
                 staged_path,
                 document,
-                corpus["effectiveDateDisplay"],
+                format_date(document["effectiveDate"]),
                 fonts,
                 styles,
             )
@@ -710,10 +783,12 @@ def main() -> int:
         for staged_path, _ in staged:
             staged_path.unlink(missing_ok=True)
 
-    final_files = sorted(output_dir.glob("*.pdf"))
-    final_names = {path.name for path in final_files}
-    if final_names != set(EXPECTED_FILENAMES.values()):
-        raise RuntimeError("Final directory does not contain exactly the four approved PDFs")
+    selected_names = {documents[kind]["filename"] for kind in selected_kinds}
+    final_files = sorted(
+        path for path in output_dir.glob("*.pdf") if path.name in selected_names
+    )
+    if {path.name for path in final_files} != selected_names:
+        raise RuntimeError("Final directory does not contain every selected PDF")
 
     for path in final_files:
         print(f"{path.name}\t{path.stat().st_size} bytes\tSHA-256 {sha256(path)}")

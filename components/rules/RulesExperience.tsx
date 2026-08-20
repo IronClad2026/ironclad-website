@@ -35,6 +35,7 @@ export type RuleDocumentSummary = {
   title: string;
   version: string;
   status: string;
+  effectiveDate: string;
   description: string;
   href: string;
   filename: string;
@@ -64,12 +65,12 @@ const documentIcons: Record<LegalDocumentKind, LucideIcon> = {
 export default function RulesExperience({
   copy,
   documents,
-  effectiveDate,
+  latestDocumentDate,
   locale,
 }: {
   copy: HelpLegalUiDictionary;
   documents: RuleDocumentSummary[];
-  effectiveDate: string;
+  latestDocumentDate: string;
   locale: Locale;
 }) {
   const reduceMotion = useReducedMotion() ?? false;
@@ -107,7 +108,7 @@ export default function RulesExperience({
 
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white" lang={locale}>
-      <HeroSection copy={copy} effectiveDate={effectiveDate} reduceMotion={reduceMotion} />
+      <HeroSection copy={copy} effectiveDate={latestDocumentDate} reduceMotion={reduceMotion} />
       <RuleCategorySelector
         activeTab={activeTab}
         copy={copy}
@@ -116,7 +117,7 @@ export default function RulesExperience({
         reduceMotion={reduceMotion}
         tabRefs={tabRefs}
       />
-      <QuickBriefingSection activeTab={activeTab} copy={copy} effectiveDate={effectiveDate} reduceMotion={reduceMotion} />
+      <QuickBriefingSection activeTab={activeTab} copy={copy} reduceMotion={reduceMotion} />
       <RuleExplorerSection
         activeTab={activeTab}
         copy={copy}
@@ -124,14 +125,14 @@ export default function RulesExperience({
         reduceMotion={reduceMotion}
         setOpenIndex={setOpenIndex}
       />
-      <OfficialDocumentsSection copy={copy} documents={documents} effectiveDate={effectiveDate} reduceMotion={reduceMotion} />
+      <OfficialDocumentsSection copy={copy} documents={documents} reduceMotion={reduceMotion} />
       <FaqSection copy={copy} reduceMotion={reduceMotion} />
-      <DisclaimerSection copy={copy} effectiveDate={effectiveDate} reduceMotion={reduceMotion} />
+      <DisclaimerSection copy={copy} reduceMotion={reduceMotion} />
     </main>
   );
 }
 
-function HeroSection({ copy, effectiveDate, reduceMotion }: RulesSectionProps) {
+function HeroSection({ copy, effectiveDate, reduceMotion }: RulesSectionProps & { effectiveDate: string }) {
   const hero = copy.rules.hero;
   return (
     <section className="relative isolate flex min-h-[72svh] items-end overflow-hidden border-b border-orange-500/20 px-5 pt-28 pb-10 sm:min-h-[78vh] sm:px-8 sm:pt-32 sm:pb-14 lg:min-h-[88vh] lg:px-12">
@@ -215,12 +216,12 @@ function RuleCategorySelector({ activeTab, copy, onKeyDown, onSelect, reduceMoti
   );
 }
 
-function QuickBriefingSection({ activeTab, copy, effectiveDate, reduceMotion }: RulesSectionProps & { activeTab: TabName }) {
+function QuickBriefingSection({ activeTab, copy, reduceMotion }: RulesSectionProps & { activeTab: TabName }) {
   const details = copy.rules.tabs[activeTab];
   const ActiveIcon = tabIcons[activeTab];
   const quick = copy.rules.quick;
   const cards = [
-    { icon: ShieldCheck, label: quick.documentStatusLabel, title: quick.documentStatusTitle, text: interpolateMessage(quick.documentStatusText, { date: effectiveDate }) },
+    { icon: ShieldCheck, label: quick.documentStatusLabel, title: quick.documentStatusTitle, text: quick.documentStatusText },
     { icon: Radio, label: quick.navigationLabel, title: quick.navigationTitle, text: quick.navigationText },
     { icon: FileCheck2, label: quick.integrityLabel, title: quick.integrityTitle, text: quick.integrityText },
   ];
@@ -261,13 +262,13 @@ function RuleExplorerSection({ activeTab, copy, openIndex, reduceMotion, setOpen
   );
 }
 
-function OfficialDocumentsSection({ copy, documents, effectiveDate, reduceMotion }: RulesSectionProps & { documents: RuleDocumentSummary[] }) {
+function OfficialDocumentsSection({ copy, documents, reduceMotion }: RulesSectionProps & { documents: RuleDocumentSummary[] }) {
   const labels = copy.rules.documents;
   return (
     <section className="relative isolate overflow-hidden border-b border-white/10 px-5 py-20 sm:px-8 lg:px-12">
       <TacticalBackdrop muted />
       <div className="relative z-10 mx-auto max-w-7xl">
-        <div className="mb-12 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><SectionHeading eyebrow={labels.eyebrow} title={labels.title} text={interpolateMessage(labels.description, { date: effectiveDate })} /><p className="max-w-sm border-l border-orange-400/40 pl-4 text-sm leading-6 text-zinc-400">{labels.immutable}</p></div>
+        <div className="mb-12 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><SectionHeading eyebrow={labels.eyebrow} title={labels.title} text={labels.description} /><p className="max-w-sm border-l border-orange-400/40 pl-4 text-sm leading-6 text-zinc-400">{labels.immutable}</p></div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {documents.map((document, index) => {
             const Icon = documentIcons[document.kind];
@@ -279,7 +280,7 @@ function OfficialDocumentsSection({ copy, documents, effectiveDate, reduceMotion
                 <h3 className="mt-7 text-2xl font-black text-white" lang="en">{document.title}</h3>
                 <p className="mt-2 text-xs font-black uppercase tracking-wide text-orange-300">{interpolateMessage(labels.version, { version: document.version })}</p>
                 <p className="mt-4 flex-1 text-sm leading-7 text-zinc-400" lang="en">{document.description}</p>
-                <p className="mt-4 text-xs font-black uppercase tracking-wide text-zinc-500">{interpolateMessage(labels.effective, { date: effectiveDate })}</p>
+                <p className="mt-4 text-xs font-black uppercase tracking-wide text-zinc-500">{interpolateMessage(labels.effective, { date: document.effectiveDate })}</p>
                 <div className="mt-5 grid gap-2">
                   {online ? <Link className="inline-flex min-h-11 items-center justify-center border border-white/20 bg-white/[0.04] px-4 py-2 text-sm font-black text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-300" href={document.readHref}>{labels.readOnline}</Link> : <a className="inline-flex min-h-11 items-center justify-center border border-white/20 bg-white/[0.04] px-4 py-2 text-sm font-black text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-300" href={document.readHref} rel="noopener noreferrer" target="_blank">{labels.read}<span className="sr-only"> {labels.opensNewTab}</span></a>}
                   <a className="inline-flex min-h-11 items-center justify-center gap-2 border border-orange-400/70 bg-orange-500/10 px-4 py-2 text-sm font-black text-orange-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-300" download={document.filename} href={document.href}>{labels.download}<Download aria-hidden="true" size={17} /></a>
@@ -305,10 +306,10 @@ function FaqSection({ copy, reduceMotion }: { copy: HelpLegalUiDictionary; reduc
   );
 }
 
-function DisclaimerSection({ copy, effectiveDate, reduceMotion }: RulesSectionProps) {
+function DisclaimerSection({ copy, reduceMotion }: RulesSectionProps) {
   const disclaimer = copy.rules.disclaimer;
   return (
-    <section className="relative isolate overflow-hidden px-5 py-20 sm:px-8 lg:px-12"><TacticalBackdrop muted /><div className="relative z-10 mx-auto max-w-5xl"><motion.div className="border border-amber-300/25 bg-amber-400/[0.055] p-6 sm:p-8" initial={reduceMotion ? false : "hidden"} variants={fadeUp} viewport={{ once: true }} whileInView="visible"><div className="flex flex-col gap-5 sm:flex-row sm:items-start"><span className="grid h-12 w-12 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200"><AlertTriangle size={24} aria-hidden="true" /></span><div><p className="text-xs font-black uppercase text-amber-200">{disclaimer.eyebrow}</p><h2 className="locale-display mt-2 text-3xl font-black text-white">{disclaimer.title}</h2><p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-300 sm:text-base">{disclaimer.text}</p><p className="mt-4 max-w-3xl text-sm font-bold leading-7 text-amber-100 sm:text-base">{interpolateMessage(disclaimer.effective, { date: effectiveDate })}</p><p className="mt-4 max-w-3xl border-l-2 border-orange-400 pl-4 text-sm font-bold leading-7 text-orange-100">{disclaimer.english}</p></div></div></motion.div></div></section>
+    <section className="relative isolate overflow-hidden px-5 py-20 sm:px-8 lg:px-12"><TacticalBackdrop muted /><div className="relative z-10 mx-auto max-w-5xl"><motion.div className="border border-amber-300/25 bg-amber-400/[0.055] p-6 sm:p-8" initial={reduceMotion ? false : "hidden"} variants={fadeUp} viewport={{ once: true }} whileInView="visible"><div className="flex flex-col gap-5 sm:flex-row sm:items-start"><span className="grid h-12 w-12 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200"><AlertTriangle size={24} aria-hidden="true" /></span><div><p className="text-xs font-black uppercase text-amber-200">{disclaimer.eyebrow}</p><h2 className="locale-display mt-2 text-3xl font-black text-white">{disclaimer.title}</h2><p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-300 sm:text-base">{disclaimer.text}</p><p className="mt-4 max-w-3xl text-sm font-bold leading-7 text-amber-100 sm:text-base">{disclaimer.effective}</p><p className="mt-4 max-w-3xl border-l-2 border-orange-400 pl-4 text-sm font-bold leading-7 text-orange-100">{disclaimer.english}</p></div></div></motion.div></div></section>
   );
 }
 
@@ -338,7 +339,7 @@ function getFaqs(copy: HelpLegalUiDictionary): [string, string][] {
   return [[f.registerQuestion, f.registerAnswer], [f.divisionQuestion, f.divisionAnswer], [f.discordQuestion, f.discordAnswer], [f.fullQuestion, f.fullAnswer], [f.mapQuestion, f.mapAnswer], [f.diceQuestion, f.diceAnswer], [f.scheduleQuestion, f.scheduleAnswer], [f.replayQuestion, f.replayAnswer], [f.resultQuestion, f.resultAnswer], [f.standingsQuestion, f.standingsAnswer], [f.pollQuestion, f.pollAnswer], [f.prizesQuestion, f.prizesAnswer]];
 }
 
-type RulesSectionProps = { copy: HelpLegalUiDictionary; effectiveDate: string; reduceMotion: boolean };
+type RulesSectionProps = { copy: HelpLegalUiDictionary; reduceMotion: boolean };
 
 function SectionHeading({ eyebrow, text, title }: { eyebrow: string; text: string; title: string }) {
   return <div className="max-w-4xl"><p className="text-sm font-black uppercase text-orange-300">{eyebrow}</p><h2 className="locale-display mt-4 text-4xl font-black leading-tight text-white sm:text-5xl lg:text-6xl">{title}</h2><p className="mt-6 max-w-3xl text-base leading-8 text-zinc-300">{text}</p></div>;

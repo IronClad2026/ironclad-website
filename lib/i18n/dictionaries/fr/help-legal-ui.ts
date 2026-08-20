@@ -21,9 +21,9 @@ const dictionary = {
     hero: {
       eyebrow: "Centre officiel des règles", title: "Règles de compétition IronClad",
       description: "Commencez par le résumé en langage clair, puis consultez le Règlement et l’Accord de participation du joueur versionnés pour accéder au texte applicable faisant foi.",
-      effective: "En vigueur · {date}", summaryAria: "Résumé opérationnel des règles",
+      effective: "Corpus mis à jour · {date}", summaryAria: "Résumé opérationnel des règles",
       operations: "Opérations du tournoi", corpus: "Corpus juridique applicable",
-      corpusText: "Quatre documents approuvés et versionnés sont en vigueur depuis le {date}.",
+      corpusText: "Quatre documents approuvés et versionnés sont en vigueur. Chacun affiche sa propre date d’entrée en vigueur.",
     },
     category: {
       eyebrow: "Choisir le règlement", title: "Commencez par les règles applicables à votre événement.",
@@ -52,7 +52,7 @@ const dictionary = {
       eyebrow: "Résumé rapide", title: "Lisez le résumé sélectionné avant les règles détaillées.",
       description: "Le résumé de catégorie présente les informations de lancement sans reproduire intégralement les documents applicables.",
       selected: "Résumé sélectionné", documentStatusLabel: "Statut des documents", documentStatusTitle: "Corpus juridique applicable approuvé",
-      documentStatusText: "Le Règlement, le PPA, les Conditions et la Politique de confidentialité sont en vigueur depuis le {date}. L’inscription utilise leurs enregistrements versionnés exacts.",
+      documentStatusText: "Le Règlement, le PPA, les Conditions et la Politique de confidentialité en vigueur affichent chacun leur propre date. L’inscription utilise leurs enregistrements versionnés exacts.",
       navigationLabel: "Navigation", navigationTitle: "Commencez par votre règlement",
       navigationText: "Choisissez la catégorie active avant de lire les détails afin que la page reste centrée sur votre événement.",
       integrityLabel: "Intégrité", integrityTitle: "Langage clair, limites précises",
@@ -108,7 +108,7 @@ const dictionary = {
     },
     documents: {
       eyebrow: "Documents officiels", title: "Statut des documents applicables.",
-      description: "Les versions finales approuvées constituent la référence faisant foi depuis le {date}.",
+      description: "Les versions en vigueur approuvées constituent la référence faisant foi. Chaque carte affiche la date du document.",
       immutable: "Téléchargez les PDF immuables et versionnés utilisés pour l’inscription.",
       version: "Version {version}", effective: "En vigueur depuis le {date}", readOnline: "Lire en ligne", read: "Lire",
       opensNewTab: "(s’ouvre dans un nouvel onglet)", download: "Télécharger le PDF",
@@ -132,7 +132,7 @@ const dictionary = {
     disclaimer: {
       eyebrow: "Statut juridique", title: "Guide en langage clair",
       text: "Cette page est un guide en langage clair. La hiérarchie des documents et les versions exactes acceptées prévalent. Pages de Tournoi, Décisions Publiées et Conditions de prix ne les complètent que dans leur portée annoncée.",
-      effective: "Le Règlement, le PPA, les Conditions et la Politique de confidentialité sont en vigueur depuis le {date}. L’inscription enregistre la version exacte présentée de chaque document.",
+      effective: "Chaque Règlement, PPA, Conditions et Politique de confidentialité en vigueur affiche sa propre date. L’inscription enregistre la version exacte présentée de chaque document.",
       english: "Le texte applicable faisant foi est en anglais. Aucune traduction officielle n’est actuellement fournie.",
     },
   },

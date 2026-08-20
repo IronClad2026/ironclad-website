@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import GlobalSmoke from "@/components/GlobalSmoke";
 import Navbar from "@/components/Navbar";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
+import AccountLegalUpdateGate from "@/components/legal/AccountLegalUpdateGate";
 import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 import { loadClerkLocalization } from "@/lib/i18n/clerk";
@@ -81,25 +82,31 @@ export default async function RootLayout({
   ]);
   const rulebook = getLegalDocument("rulebook");
   const ppa = getLegalDocument("ppa");
+  // PR B1 keeps the preference surface dormant. PR B2 may enable it only
+  // after the deployed corpus and authoritative legal register are aligned.
+  const analyticsConsentAvailable = false;
 
   return (
     <ClerkProvider localization={clerkLocalization}>
       <html lang={locale}>
         <body>
           <LocaleProvider locale={locale} dictionaries={{ common }}>
-            <SmoothScrollProvider>
-              <GlobalSmoke />
-              <Navbar />
+            <AccountLegalUpdateGate copy={common.legalUpdate}>
+              <SmoothScrollProvider>
+                <GlobalSmoke />
+                <Navbar />
 
-              <div>{children}</div>
+                <div>{children}</div>
 
-              <Footer
-                dictionary={common}
-                rulebookPath={rulebook.publicPath}
-                ppaPath={ppa.publicPath}
-              />
-              <SiteMusicPlayer />
-            </SmoothScrollProvider>
+                <Footer
+                  analyticsConsentAvailable={analyticsConsentAvailable}
+                  dictionary={common}
+                  rulebookPath={rulebook.publicPath}
+                  ppaPath={ppa.publicPath}
+                />
+                <SiteMusicPlayer />
+              </SmoothScrollProvider>
+            </AccountLegalUpdateGate>
           </LocaleProvider>
         </body>
       </html>

@@ -22,9 +22,9 @@ const dictionary = {
     hero: {
       eyebrow: "Centro oficial de reglas", title: "Reglas competitivas de IronClad",
       description: "Empieza por el resumen en lenguaje claro y usa después el Reglamento y el Acuerdo de participación del jugador versionados como texto rector.",
-      effective: "Vigente · {date}", summaryAria: "Resumen operativo de las reglas",
+      effective: "Conjunto actualizado · {date}", summaryAria: "Resumen operativo de las reglas",
       operations: "Operaciones del Torneo", corpus: "Corpus rector",
-      corpusText: "Cuatro documentos aprobados y versionados están vigentes desde el {date}.",
+      corpusText: "Hay cuatro documentos aprobados y versionados vigentes. Cada documento muestra su propia fecha de vigencia.",
     },
     category: {
       eyebrow: "Elige el conjunto de reglas", title: "Empieza por las reglas aplicables a tu Evento.",
@@ -54,7 +54,7 @@ const dictionary = {
       description: "El resumen de categoría ofrece los datos de lanzamiento sin duplicar los documentos rectores completos.",
       selected: "Resumen seleccionado", documentStatusLabel: "Estado documental",
       documentStatusTitle: "Corpus rector aprobado",
-      documentStatusText: "El Reglamento, el PPA, los Términos y la Política de privacidad están vigentes desde el {date}. La inscripción usa sus registros versionados exactos.",
+      documentStatusText: "El Reglamento, el PPA, los Términos y la Política de privacidad vigentes muestran cada uno su propia fecha de vigencia. La inscripción usa sus registros versionados exactos.",
       navigationLabel: "Navegación", navigationTitle: "Empieza por tu conjunto de reglas",
       navigationText: "Elige la categoría activa antes de leer los detalles para centrar la página en tu Evento.",
       integrityLabel: "Integridad", integrityTitle: "Lenguaje claro y límites exactos",
@@ -113,7 +113,7 @@ const dictionary = {
     },
     documents: {
       eyebrow: "Documentos oficiales", title: "Estado de los documentos rectores.",
-      description: "Las versiones finales aprobadas son la fuente rectora desde el {date}.",
+      description: "Las versiones vigentes aprobadas son la fuente rectora. Cada tarjeta muestra la fecha de vigencia del documento.",
       immutable: "Descarga los PDF inmutables y versionados usados en la inscripción.",
       version: "Versión {version}", effective: "Vigente desde {date}", readOnline: "Leer en línea", read: "Leer",
       opensNewTab: "(se abre en una pestaña nueva)", download: "Descargar PDF",
@@ -137,7 +137,7 @@ const dictionary = {
     disclaimer: {
       eyebrow: "Estado rector", title: "Guía en lenguaje claro",
       text: "Esta página es una guía en lenguaje claro. Prevalecen la jerarquía de los documentos rectores y las versiones exactas aceptadas. Las páginas de torneos, las decisiones publicadas y las Condiciones de Premios solo los complementan dentro del alcance que indiquen.",
-      effective: "El Reglamento, PPA, Términos y Política de privacidad están vigentes desde el {date}. La inscripción registra la versión exacta mostrada de cada documento.",
+      effective: "Cada Reglamento, PPA, Términos y Política de privacidad vigente muestra su propia fecha de vigencia. La inscripción registra la versión exacta mostrada de cada documento.",
       english: "El texto rector vigente está en inglés. Actualmente no se ofrece una traducción oficial.",
     },
   },
