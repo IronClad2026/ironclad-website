@@ -9,6 +9,7 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "first-deployment",
   "first-victory",
   "battle-tested",
+  "reliable-competitor",
   "first-campaign",
   "iron-regular",
   "tournament-veteran",
@@ -119,6 +120,12 @@ type MatchExcellenceSummaryRow = {
   third_upset_match_id: unknown;
   third_upset_at: unknown;
   third_upset_elo_delta: unknown;
+};
+
+type ReliableCompetitorSummaryRow = {
+  best_run: unknown;
+  tenth_match_id: unknown;
+  tenth_at: unknown;
 };
 
 type TournamentBadgeParticipantRow = {
@@ -1226,12 +1233,74 @@ export async function evaluateMatchBadgeAwardsForPlayer({
       supabase,
       evaluationMode,
     }),
+    await evaluateReliableCompetitorBadgeAwardsForPlayer({
+      playerId,
+      supabase,
+      evaluationMode,
+    }),
     await evaluateMatchExcellenceBadgeAwardsForPlayer({
       playerId,
       supabase,
       evaluationMode,
     }),
   ]);
+}
+
+export async function evaluateReliableCompetitorBadgeAwardsForPlayer({
+  playerId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  playerId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const summary = await loadReliableCompetitorBadgeSummary(supabase, playerId);
+  if (!summary) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: ["reliable-competitor"],
+      skippedReasons: ["reliable_competitor_summary_unavailable"],
+    };
+  }
+
+  if (summary.bestRun < 10) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: ["reliable-competitor"],
+      skippedReasons: ["reliable-competitor_threshold_not_met"],
+    };
+  }
+
+  if (!summary.tenthMatchId || !summary.tenthAt) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: ["reliable-competitor"],
+      skippedReasons: ["reliable_competitor_source_missing"],
+    };
+  }
+
+  const created = await persistBadgeAward(supabase, {
+    playerId,
+    badgeSlug: "reliable-competitor",
+    sourceType: "match",
+    sourceId: summary.tenthMatchId,
+    originalUnlockedAt: summary.tenthAt,
+    sourceMetadata: {
+      evaluator: "reliable-competitor",
+      evaluationMode,
+      threshold: 10,
+      runLength: summary.bestRun,
+      originalUnlockedAtBasis: "participant_outcome_finalized_at",
+    },
+  });
+
+  return {
+    createdCount: created ? 1 : 0,
+    createdSlugs: created ? ["reliable-competitor"] : [],
+    evaluatedSlugs: ["reliable-competitor"],
+    skippedReasons: created ? [] : ["award_already_exists"],
+  };
 }
 
 async function evaluateMatchCountBadgeAwardsForPlayer({
@@ -1497,6 +1566,36 @@ async function loadMatchBadgeSummary(
     tenthWinAt: isoOrNull(row.tenth_win_at),
     twentyFifthWinMatchId: stringOrNull(row.twenty_fifth_win_match_id),
     twentyFifthWinAt: isoOrNull(row.twenty_fifth_win_at),
+  };
+}
+
+async function loadReliableCompetitorBadgeSummary(
+  supabase: BadgeAuthorityClient,
+  playerId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_reliable_competitor_summary",
+    {
+      p_player_id: playerId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "RELIABLE_COMPETITOR_SUMMARY_LOAD_FAILED",
+      "Badge reliability evaluation could not load participant authority."
+    );
+  }
+
+  const row = rowsOf<ReliableCompetitorSummaryRow>(data)[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    bestRun: integerOrZero(row.best_run),
+    tenthMatchId: stringOrNull(row.tenth_match_id),
+    tenthAt: isoOrNull(row.tenth_at),
   };
 }
 

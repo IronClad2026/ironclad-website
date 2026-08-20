@@ -62,6 +62,7 @@ type FakeAuthorityClientOptions = {
   profile?: Record<string, unknown> | null;
   summaries?: Record<string, Record<string, unknown>>;
   matchExcellenceSummaries?: Record<string, Record<string, unknown>>;
+  reliableCompetitorSummaries?: Record<string, Record<string, unknown>>;
   tournamentSummaries?: Record<string, Record<string, unknown>>;
   bracketProgressionSummaries?: Record<string, Record<string, unknown>>;
   tournamentPrestigeSummaries?: Record<string, Record<string, unknown>>;
@@ -128,6 +129,15 @@ function matchExcellenceSummary(overrides: Record<string, unknown> = {}) {
     third_upset_match_id: null,
     third_upset_at: null,
     third_upset_elo_delta: null,
+    ...overrides,
+  };
+}
+
+function reliableCompetitorSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    best_run: 0,
+    tenth_match_id: null,
+    tenth_at: null,
     ...overrides,
   };
 }
@@ -218,6 +228,10 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
   const matchExcellenceSummaries: Record<string, Record<string, unknown>> =
     options.matchExcellenceSummaries ?? {
       [PLAYER_ID]: matchExcellenceSummary(),
+    };
+  const reliableCompetitorSummaries: Record<string, Record<string, unknown>> =
+    options.reliableCompetitorSummaries ?? {
+      [PLAYER_ID]: reliableCompetitorSummary(),
     };
   const tournamentSummaries: Record<string, Record<string, unknown>> =
     options.tournamentSummaries ?? {
@@ -349,6 +363,16 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
       };
     }
 
+    if (name === "get_player_badge_reliable_competitor_summary") {
+      return {
+        data: [
+          reliableCompetitorSummaries[String(args.p_player_id)] ??
+            reliableCompetitorSummary(),
+        ],
+        error: null,
+      };
+    }
+
     if (name === "get_player_badge_tournament_for_match") {
       return {
         data:
@@ -449,6 +473,7 @@ describe("badge authority evaluators", () => {
       "first-deployment",
       "first-victory",
       "battle-tested",
+      "reliable-competitor",
       "first-campaign",
       "iron-regular",
       "tournament-veteran",
@@ -473,9 +498,6 @@ describe("badge authority evaluators", () => {
       "season-podium",
       "season-champion",
     ]);
-    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
-      "reliable-competitor"
-    );
     expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
       "comeback-commander"
     );
@@ -604,6 +626,7 @@ describe("badge authority evaluators", () => {
       "five-victories",
       "ten-victories",
       "twenty-five-victories",
+      "reliable-competitor",
       "iron-streak",
       "unbroken",
       "clean-sweep",
@@ -617,6 +640,7 @@ describe("badge authority evaluators", () => {
       "five-victories_threshold_not_met",
       "ten-victories_threshold_not_met",
       "twenty-five-victories_threshold_not_met",
+      "reliable-competitor_threshold_not_met",
       "iron-streak_threshold_not_met",
       "unbroken_threshold_not_met",
       "clean-sweep_threshold_not_met",
@@ -698,6 +722,76 @@ describe("badge authority evaluators", () => {
       .not.toContain("battle-tested");
     expect(tenMatches.upsertPayloads.map((payload) => payload.badge_slug))
       .toContain("battle-tested");
+  });
+
+  it("awards Reliable Competitor from a ten-obligation participant-authority run", async () => {
+    const nine = createAuthorityClient({
+      reliableCompetitorSummaries: {
+        [PLAYER_ID]: reliableCompetitorSummary({ best_run: 9 }),
+      },
+    });
+    const ten = createAuthorityClient({
+      reliableCompetitorSummaries: {
+        [PLAYER_ID]: reliableCompetitorSummary({
+          best_run: 10,
+          tenth_match_id: TENTH_MATCH_ID,
+          tenth_at: "2026-08-10T12:00:00.000Z",
+        }),
+      },
+    });
+
+    await evaluateMatchBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: nine.client,
+    });
+    await evaluateMatchBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: ten.client,
+    });
+
+    expect(nine.upsertPayloads.map((payload) => payload.badge_slug)).not.toContain(
+      "reliable-competitor"
+    );
+    expect(ten.upsertPayloads).toContainEqual(
+      expect.objectContaining({
+        badge_slug: "reliable-competitor",
+        source_type: "match",
+        source_id: TENTH_MATCH_ID,
+        original_unlocked_at: "2026-08-10T12:00:00.000Z",
+      })
+    );
+  });
+
+  it("keeps Reliable Competitor idempotent and trusts the durable summary rather than legacy match counts", async () => {
+    const fixture = createAuthorityClient({
+      reliableCompetitorSummaries: {
+        [PLAYER_ID]: reliableCompetitorSummary({
+          best_run: 10,
+          tenth_match_id: TENTH_MATCH_ID,
+          tenth_at: "2026-08-10T12:00:00.000Z",
+        }),
+      },
+      summaries: {
+        [PLAYER_ID]: matchSummary({ played_match_count: 0 }),
+      },
+    });
+
+    const first = await evaluateMatchBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+    const second = await evaluateMatchBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(first.createdSlugs).toContain("reliable-competitor");
+    expect(second.createdSlugs).not.toContain("reliable-competitor");
+    expect(
+      fixture.upsertPayloads.filter(
+        (payload) => payload.badge_slug === "reliable-competitor"
+      )
+    ).toHaveLength(2);
   });
 
   it("requires five qualifying wins for Five Victories", async () => {
@@ -2276,6 +2370,7 @@ describe("badge authority evaluators", () => {
       "first-deployment": 1,
       "first-victory": 1,
       "battle-tested": 1,
+      "reliable-competitor": 0,
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,
@@ -2308,6 +2403,7 @@ describe("badge authority evaluators", () => {
           "first-deployment",
           "first-victory",
           "battle-tested",
+          "reliable-competitor",
           "first-campaign",
           "iron-regular",
           "tournament-veteran",
@@ -2386,6 +2482,7 @@ describe("badge authority evaluators", () => {
       "first-deployment": 1,
       "first-victory": 1,
       "battle-tested": 1,
+      "reliable-competitor": 0,
       "first-campaign": 1,
       "iron-regular": 1,
       "tournament-veteran": 1,
@@ -2436,6 +2533,7 @@ describe("badge authority evaluators", () => {
       "first-deployment": 0,
       "first-victory": 0,
       "battle-tested": 0,
+      "reliable-competitor": 0,
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,
