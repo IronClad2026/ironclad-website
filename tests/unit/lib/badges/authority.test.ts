@@ -67,6 +67,7 @@ type FakeAuthorityClientOptions = {
   tournamentSummaries?: Record<string, Record<string, unknown>>;
   bracketProgressionSummaries?: Record<string, Record<string, unknown>>;
   tournamentPrestigeSummaries?: Record<string, Record<string, unknown>>;
+  flawlessCampaignSummaries?: Record<string, Array<Record<string, unknown>>>;
   seasonSummaries?: Record<string, Record<string, unknown>>;
   participants?: Array<Record<string, unknown>>;
   tournamentParticipants?: Array<Record<string, unknown>>;
@@ -266,6 +267,12 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
     options.tournamentPrestigeSummaries ?? {
       [PLAYER_ID]: tournamentPrestigeSummary(),
     };
+  const flawlessCampaignSummaries: Record<
+    string,
+    Array<Record<string, unknown>>
+  > = options.flawlessCampaignSummaries ?? {
+    [PLAYER_ID]: [],
+  };
   const seasonSummaries: Record<string, Record<string, unknown>> =
     options.seasonSummaries ?? {
       [PLAYER_ID]: seasonSummary(),
@@ -452,6 +459,14 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
       };
     }
 
+    if (name === "get_player_badge_flawless_campaign_summary") {
+      return {
+        data:
+          flawlessCampaignSummaries[String(args.p_player_id)] ?? [],
+        error: null,
+      };
+    }
+
     if (name === "get_player_badge_finalized_season_for_tournament") {
       return {
         data:
@@ -504,6 +519,7 @@ describe("badge authority evaluators", () => {
       "battle-tested",
       "reliable-competitor",
       "comeback-commander",
+      "flawless-campaign",
       "first-campaign",
       "iron-regular",
       "tournament-veteran",
@@ -528,9 +544,6 @@ describe("badge authority evaluators", () => {
       "season-podium",
       "season-champion",
     ]);
-    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
-      "flawless-campaign"
-    );
   });
 
   it("awards IronClad Recruit for a verified eligible player", async () => {
@@ -1860,6 +1873,7 @@ describe("badge authority evaluators", () => {
       "elite-champion",
       "double-champion",
       "triple-crown",
+      "flawless-campaign",
     ]);
     expect(result.skippedReasons).toEqual([
       "higher_bracket_threshold_not_met",
@@ -1874,6 +1888,7 @@ describe("badge authority evaluators", () => {
       "elite-champion_threshold_not_met",
       "double-champion_threshold_not_met",
       "triple-crown_threshold_not_met",
+      "flawless_campaign_evidence_unavailable",
     ]);
     expect(fixture.upsert).not.toHaveBeenCalled();
   });
@@ -2447,6 +2462,7 @@ describe("badge authority evaluators", () => {
       "battle-tested": 1,
       "reliable-competitor": 0,
       "comeback-commander": 0,
+      "flawless-campaign": 0,
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,
@@ -2560,6 +2576,7 @@ describe("badge authority evaluators", () => {
       "battle-tested": 1,
       "reliable-competitor": 0,
       "comeback-commander": 0,
+      "flawless-campaign": 0,
       "first-campaign": 1,
       "iron-regular": 1,
       "tournament-veteran": 1,
@@ -2612,6 +2629,7 @@ describe("badge authority evaluators", () => {
       "battle-tested": 0,
       "reliable-competitor": 0,
       "comeback-commander": 0,
+      "flawless-campaign": 0,
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,

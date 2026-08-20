@@ -11,6 +11,7 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "battle-tested",
   "reliable-competitor",
   "comeback-commander",
+  "flawless-campaign",
   "first-campaign",
   "iron-regular",
   "tournament-veteran",
@@ -136,6 +137,17 @@ type ComebackCommanderSummaryRow = {
   series_best_of: unknown;
   finalized_game_count: unknown;
   finalized_at: unknown;
+};
+
+type FlawlessCampaignSummaryRow = {
+  tournament_id: unknown;
+  registration_id: unknown;
+  first_completed_at: unknown;
+  expected_path_segment_count: unknown;
+  played_segment_count: unknown;
+  automatic_bye_count: unknown;
+  opponent_no_show_count: unknown;
+  verified_game_count: unknown;
 };
 
 type TournamentBadgeParticipantRow = {
@@ -882,7 +894,60 @@ export async function evaluateTournamentBadgeAwardsForPlayer({
       supabase,
       evaluationMode,
     }),
+    await evaluateFlawlessCampaignBadgeAwardsForPlayer({
+      playerId,
+      supabase,
+      evaluationMode,
+    }),
   ]);
+}
+
+export async function evaluateFlawlessCampaignBadgeAwardsForPlayer({
+  playerId,
+  supabase = createSupabaseAdminClient(),
+  evaluationMode = "live",
+}: {
+  playerId: string;
+  supabase?: BadgeAuthorityClient;
+  evaluationMode?: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const summary = await loadFlawlessCampaignBadgeSummary(supabase, playerId);
+  const evidence = summary?.[0];
+
+  if (!evidence) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: ["flawless-campaign"],
+      skippedReasons: ["flawless_campaign_evidence_unavailable"],
+    };
+  }
+
+  const created = await persistBadgeAward(supabase, {
+    playerId,
+    badgeSlug: "flawless-campaign",
+    sourceType: "tournament",
+    sourceId: evidence.tournamentId,
+    originalUnlockedAt: evidence.firstCompletedAt,
+    sourceMetadata: {
+      evaluator: "flawless-campaign",
+      evaluationMode,
+      tournamentId: evidence.tournamentId,
+      registrationId: evidence.registrationId,
+      expectedPathLength: evidence.expectedPathSegmentCount,
+      playedSegmentCount: evidence.playedSegmentCount,
+      automaticByeCount: evidence.automaticByeCount,
+      opponentNoShowCount: evidence.opponentNoShowCount,
+      verifiedGameCount: evidence.verifiedGameCount,
+      originalUnlockedAtBasis: "tournament_first_completed_at",
+    },
+  });
+
+  return {
+    createdCount: created ? 1 : 0,
+    createdSlugs: created ? ["flawless-campaign"] : [],
+    evaluatedSlugs: ["flawless-campaign"],
+    skippedReasons: created ? [] : ["award_already_exists"],
+  };
 }
 
 async function evaluateBracketProgressionBadgeAwardsForPlayer({
@@ -1940,6 +2005,44 @@ async function loadTournamentPrestigeBadgeSummary(
     tripleCrownTournamentId: stringOrNull(row.triple_crown_tournament_id),
     tripleCrownAt: isoOrNull(row.triple_crown_at),
   };
+}
+
+async function loadFlawlessCampaignBadgeSummary(
+  supabase: BadgeAuthorityClient,
+  playerId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_flawless_campaign_summary",
+    {
+      p_player_id: playerId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "FLAWLESS_CAMPAIGN_SUMMARY_LOAD_FAILED",
+      "Badge tournament evaluation could not load flawless campaign authority."
+    );
+  }
+
+  return rowsOf<FlawlessCampaignSummaryRow>(data)
+    .map((row) => ({
+      tournamentId: stringOrNull(row.tournament_id),
+      registrationId: stringOrNull(row.registration_id),
+      firstCompletedAt: isoOrNull(row.first_completed_at),
+      expectedPathSegmentCount: integerOrZero(
+        row.expected_path_segment_count
+      ),
+      playedSegmentCount: integerOrZero(row.played_segment_count),
+      automaticByeCount: integerOrZero(row.automatic_bye_count),
+      opponentNoShowCount: integerOrZero(row.opponent_no_show_count),
+      verifiedGameCount: integerOrZero(row.verified_game_count),
+    }))
+    .filter(
+      (row): row is typeof row & {
+        tournamentId: string;
+      } => row.tournamentId !== null
+    );
 }
 
 async function loadFinalizedSeasonIdForTournament(
