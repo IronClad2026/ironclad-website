@@ -1,0 +1,1623 @@
+%PDF-1.4
+%IronClad
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R 25 0 R 27 0 R 29 0 R 31 0 R 33 0 R 35 0 R 37 0 R 39 0 R 41 0 R] /Count 18 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+6 0 obj
+<< /Length 1049 >>
+stream
+0.055 0.065 0.08 rg 0 0 595 842 re f
+0.91 0.34 0.08 rg 0 834 595 8 re f
+1 1 1 rg BT /F2 38 Tf 1 0 0 1 48.00 737.00 Tm (IRONCLAD) Tj ET
+0.96 0.55 0.25 rg BT /F2 22 Tf 1 0 0 1 48.00 697.00 Tm (TOURNAMENTS) Tj ET
+1 1 1 rg BT /F2 26 Tf 1 0 0 1 48.00 612.00 Tm (Complete Badge System) Tj ET
+0.88 0.89 0.92 rg BT /F1 18 Tf 1 0 0 1 48.00 577.00 Tm (Technical & Operational Guide) Tj ET
+0.55 0.28 0.12 RG 1 w 48 547 m 547 547 l S
+0.8 0.82 0.86 rg BT /F1 11 Tf 1 0 0 1 48.00 497.00 Tm (Canonical registry, server authority, durable) Tj ET
+0.8 0.82 0.86 rg BT /F1 11 Tf 1 0 0 1 48.00 479.00 Tm (match/game/path evidence, security, and deployment status) Tj ET
+0.72 0.74 0.78 rg BT /F1 10 Tf 1 0 0 1 48.00 145.00 Tm (Generation date: 2026-08-21) Tj ET
+0.72 0.74 0.78 rg BT /F1 10 Tf 1 0 0 1 48.00 128.00 Tm (Branch: feature/badge-system-foundation) Tj ET
+0.72 0.74 0.78 rg BT /F1 10 Tf 1 0 0 1 48.00 111.00 Tm (Commit: daf1455) Tj ET
+0.62 0.64 0.68 rg BT /F1 8 Tf 1 0 0 1 48.00 58.00 Tm (Repository source of truth. Database runtime validation pending.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 4325 >>
+stream
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 2 of 18) Tj ET
+0.1 0.12 0.15 rg BT /F2 20 Tf 1 0 0 1 48.00 760.00 Tm (Table of Contents) Tj ET
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 724.00 Tm (1. Scope and Status) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 724.00 Tm (3) Tj ET
+0.84 0.82 0.78 RG 0.25 w 133.5 721 m 515 721 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 706.00 Tm (2. System Architecture) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 706.00 Tm (3) Tj ET
+0.84 0.82 0.78 RG 0.25 w 147 703 m 515 703 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 688.00 Tm (3. Canonical Registry, Artwork, and UI) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 688.00 Tm (4) Tj ET
+0.84 0.82 0.78 RG 0.25 w 219 685 m 515 685 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 670.00 Tm (4. Award Persistence and Security Boundary) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 670.00 Tm (4) Tj ET
+0.84 0.82 0.78 RG 0.25 w 237 667 m 515 667 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 652.00 Tm (5. Complete Badge Reference) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 652.00 Tm (5) Tj ET
+0.84 0.82 0.78 RG 0.25 w 169.5 649 m 515 649 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 634.00 Tm (6. Authority Families) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 634.00 Tm (8) Tj ET
+0.84 0.82 0.78 RG 0.25 w 142.5 631 m 515 631 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 616.00 Tm (7. Durable Match Authority) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 616.00 Tm (9) Tj ET
+0.84 0.82 0.78 RG 0.25 w 165 613 m 515 613 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 598.00 Tm (8. Championship Path Authority) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 598.00 Tm (11) Tj ET
+0.84 0.82 0.78 RG 0.25 w 183 595 m 515 595 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 580.00 Tm (9. Flawless Campaign) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 580.00 Tm (11) Tj ET
+0.84 0.82 0.78 RG 0.25 w 138 577 m 515 577 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 562.00 Tm (10. Reliable Competitor) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 562.00 Tm (12) Tj ET
+0.84 0.82 0.78 RG 0.25 w 151.5 559 m 515 559 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 544.00 Tm (11. Comeback Commander) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 544.00 Tm (13) Tj ET
+0.84 0.82 0.78 RG 0.25 w 147 541 m 515 541 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 526.00 Tm (12. Season Authority) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 526.00 Tm (14) Tj ET
+0.84 0.82 0.78 RG 0.25 w 138 523 m 515 523 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 508.00 Tm (13. Live Badge Lifecycle) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 508.00 Tm (14) Tj ET
+0.84 0.82 0.78 RG 0.25 w 156 505 m 515 505 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 490.00 Tm (14. Backfill) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 490.00 Tm (15) Tj ET
+0.84 0.82 0.78 RG 0.25 w 102 487 m 515 487 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 472.00 Tm (15. Corrections and Invalidation) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 472.00 Tm (15) Tj ET
+0.84 0.82 0.78 RG 0.25 w 192 469 m 515 469 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 454.00 Tm (16. Migration Chain) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 454.00 Tm (16) Tj ET
+0.84 0.82 0.78 RG 0.25 w 133.5 451 m 515 451 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 436.00 Tm (17. Testing and Validation) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 436.00 Tm (17) Tj ET
+0.84 0.82 0.78 RG 0.25 w 165 433 m 515 433 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 418.00 Tm (18. Preview and Production Safety) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 418.00 Tm (17) Tj ET
+0.84 0.82 0.78 RG 0.25 w 196.5 415 m 515 415 l S
+0.1 0.12 0.15 rg BT /F1 9 Tf 1 0 0 1 48.00 400.00 Tm (19. Limitations and Future Work) Tj ET
+0.91 0.34 0.08 rg BT /F2 9 Tf 1 0 0 1 525.00 400.00 Tm (18) Tj ET
+0.84 0.82 0.78 RG 0.25 w 187.5 397 m 515 397 l S
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 5602 >>
+stream
+0.91 0.34 0.08 rg 48 765 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 769.00 Tm (1. Scope and Status) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 743.00 Tm (This document describes the complete badge authority implementation present in) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 727.00 Tm (the repository at commit daf1455. The source of truth is the combination of:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 707.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 707.00 Tm (lib/badges/catalog.ts for canonical badge definitions;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 692.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 692.00 Tm (lib/badges/authority.ts for server evaluator composition and award writes;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 677.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 677.00 Tm (lib/badges/read.ts and lib/badges/dashboard.ts for authenticated reads;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 662.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 662.00 Tm (the ordered Supabase migrations under supabase/migrations/;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 647.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 647.00 Tm (the tournament, result, leaderboard, profile, Steam, and Relic ELO workflows;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 632.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 632.00 Tm (unit and migration-contract tests under tests/.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 613.00 Tm (All 30 canonical badges are represented in the production authority registry.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 597.00 Tm (The migration files are committed to the branch but have not been applied to a) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 581.00 Tm (database as part of this local work. No production backfill has been run.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 561.00 Tm (The repository currently provides static, mocked, and contract-level validation.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 545.00 Tm (It does not provide proof of live PostgreSQL trigger, RLS, grant, or RPC) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 529.00 Tm (execution. A disposable local or preview database must be used before deployment.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 509 m 547 509 l S
+0.91 0.34 0.08 rg 48 482 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 486.00 Tm (2. System Architecture) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 460.00 Tm (The badge system has six layers:) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 440.00 Tm (1. Canonical catalog. lib/badges/catalog.ts defines exactly 30 numbered) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 424.00 Tm (badges, names, slugs, rarities, unlock meanings, and artwork paths. The) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 408.00 Tm (database does not duplicate this catalog.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 392.00 Tm (2. Authoritative source data. Profiles, Steam/Relic verification,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 376.00 Tm (registrations, tournament brackets, matches, result reports, game evidence,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 360.00 Tm (leaderboard events, seasons, and durable authority ledgers remain the source) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 344.00 Tm (of truth for qualification.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 328.00 Tm (3. Server authority. lib/badges/authority.ts loads authoritative summaries,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 312.00 Tm (applies threshold and evidence rules, and writes awards through the trusted) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 296.00 Tm (Supabase admin client. React and browser code never evaluates or grants badges.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 280.00 Tm (4. Supabase RPCs and durable ledgers. Service-role-only RPCs aggregate) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 264.00 Tm (historical facts. Durable participant, game, and championship-path tables) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 248.00 Tm (preserve facts across correction and bracket regeneration.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 232.00 Tm (5. Persistent awards. player_badge_awards stores one append-only award) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 216.00 Tm (fact per player and canonical slug.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 200.00 Tm (6. Authenticated presentation. Dashboard Server Components read the player's) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 184.00 Tm (awards with a Clerk-authenticated Supabase client and map rows back to the) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 168.00 Tm (canonical catalog. Locked badges remain locked because the frontend does not) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 152.00 Tm (calculate achievements.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 132.00 Tm (The common flow is:) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 3 of 18) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 6162 >>
+stream
+0.95 0.95 0.95 rg 48 694 499 82 re f
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 762.00 Tm (Authoritative profile/match/tournament/season operation) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 752.00 Tm (  -> database state and durable authority are finalized) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 742.00 Tm (  -> server-side evaluator loads service-role RPC summaries) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 732.00 Tm (  -> canonical predicate and evidence checks pass) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 722.00 Tm (  -> conflict-safe player_badge_awards upsert) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 712.00 Tm (  -> authenticated dashboard read) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 702.00 Tm (  -> catalog definition + persisted award map to earned/locked UI) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 682.00 Tm (Badge evaluation is deliberately downstream and best-effort. A badge failure) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 666.00 Tm (is logged and does not invalidate a successful profile or competition operation.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 646 m 547 646 l S
+0.91 0.34 0.08 rg 48 619 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 623.00 Tm (3. Canonical Registry, Artwork, and UI) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 597.00 Tm (lib/badges/catalog.ts exports BADGE_DEFINITIONS, BADGE_TOTAL = 30, and) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 581.00 Tm (canonical lookup helpers. It also asserts canonical numbering and duplicate-free) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 565.00 Tm (slugs. The production registry in lib/badges/authority.ts contains the same 30) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 549.00 Tm (slugs exactly once:) Tj ET
+0.95 0.95 0.95 rg 48 447 499 82 re f
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 515.00 Tm (ironclad-recruit, first-deployment, first-victory, battle-tested,) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 505.00 Tm (rising-through-the-ranks, first-campaign, iron-regular, tournament-veteran,) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 495.00 Tm (season-campaigner, reliable-competitor, five-victories, ten-victories,) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 485.00 Tm (twenty-five-victories, iron-streak, unbroken, clean-sweep,) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 475.00 Tm (comeback-commander, giant-slayer, giant-hunter, flawless-campaign,) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 465.00 Tm (first-advance, semifinalist, finalist, academy-champion, challenge-champion,) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 455.00 Tm (elite-champion, double-champion, triple-crown, season-podium, season-champion) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 435.00 Tm (Each canonical definition resolves artwork through the existing badge asset) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 419.00 Tm (paths. lib/badges/presentation.ts applies rarity labels and presentation) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 403.00 Tm (tokens; the dashboard uses the existing showcase and /dashboard/badges) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 387.00 Tm (collection structure. /dev/badges remains the visual laboratory and is not an) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 371.00 Tm (authority source.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 351.00 Tm (The production dashboard does not use fixture achievements. loadPlayerBadgeAwards) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 335.00 Tm (reads only rows for the authenticated player's player_id, validates each slug) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 319.00 Tm (against the canonical catalog, and maps the result into buildDashboardBadgeData.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 299 m 547 299 l S
+0.91 0.34 0.08 rg 48 272 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 276.00 Tm (4. Award Persistence and Security Boundary) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 245.00 Tm (player_badge_awards) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 225.00 Tm (The foundation migration creates:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 205.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 205.00 Tm (id - stable UUID primary key;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 190.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 190.00 Tm (player_id - foreign key to players;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 175.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 175.00 Tm (badge_slug - canonical application slug format;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 160.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 160.00 Tm (source_type - profile, match, tournament, season, backfill, or) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 145.00 Tm (admin_correction;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 129.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 129.00 Tm (source_id - stable source identifier where available;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 114.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 114.00 Tm (source_metadata - JSON object with minimal descriptive evidence;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 99.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 99.00 Tm (unlocked_at - database time of award-row creation;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 84.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 84.00 Tm (original_unlocked_at - source-event time when reliably available;) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 4 of 18) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 8029 >>
+stream
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 776.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 776.00 Tm (reveal timestamps reserved for later reveal flows;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 761.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 761.00 Tm (created_at.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 742.00 Tm (The database enforces UNIQUE\(player_id, badge_slug\). The authority layer uses) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 726.00 Tm (Supabase upsert with onConflict: "player_id,badge_slug" and) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 710.00 Tm (ignoreDuplicates: true. Retries and concurrent evaluators therefore cannot) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 694.00 Tm (create duplicate awards.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 674.00 Tm (RLS is enabled and forced. Authenticated users receive only SELECT access, with) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 658.00 Tm (a policy requiring the player's Clerk JWT subject to match the owning player's) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 642.00 Tm (clerk_user_id. Insert, update, and delete are unavailable to authenticated) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 626.00 Tm (users. The service role receives trusted table access and is the only role used) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 610.00 Tm (by the server authority layer for writes.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 590.00 Tm (Authority RPCs use:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 570.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 570.00 Tm (SECURITY DEFINER where required;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 555.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 555.00 Tm (SET search_path = pg_catalog;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 540.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 540.00 Tm (fully qualified public. references;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 525.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 525.00 Tm (no dynamic SQL;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 510.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 510.00 Tm (execution revoked from public, anon, and authenticated;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 495.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 495.00 Tm (execution granted only to service_role.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 476.00 Tm (Authenticated Supabase clients are intentionally used for dashboard reads. They) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 460.00 Tm (do not evaluate or grant badges. Service-role credentials remain server-only.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 440 m 547 440 l S
+0.91 0.34 0.08 rg 48 413 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 417.00 Tm (5. Complete Badge Reference) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 391.00 Tm (The following entries combine the canonical meaning from catalog.ts with the) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 375.00 Tm (implemented production predicate, evidence contract, trigger family, backfill) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 359.00 Tm (behavior, and exclusions.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 334.00 Tm (5.1 Profile and match entry badges) Tj ET
+0.98 0.96 0.93 rg 48 296.5 499 17.5 re f
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 52.00 302.00 Tm (#) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 314 m 78 296.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 82.00 302.00 Tm (Badge / slug) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 314 m 196 296.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 200.00 302.00 Tm (Canonical requirement) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 314 m 368 296.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 372.00 302.00 Tm (Production predicate and evidence) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 296.5 m 547 296.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 284.50 Tm (01) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 296.5 m 78 222 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 284.50 Tm (IronClad Recruit /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 275.00 Tm (ironclad-recruit) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 296.5 m 196 222 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 284.50 Tm (Complete identity and ELO verification) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 275.00 Tm (and become an eligible IronClad player.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 296.5 m 368 222 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 284.50 Tm (profile_completed, Steam identity, current) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 275.00 Tm (ELO equal to verified Relic ELO, verified) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 265.50 Tm (faction/division, calculation version, and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 256.00 Tm (verification timestamp are all present.) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 246.50 Tm (source_type=profile; source_id=player_id;) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 237.00 Tm (original time is the best available Relic) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 227.50 Tm (verification/profile timestamp.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 222 m 547 222 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 210.00 Tm (02) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 222 m 78 147.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 210.00 Tm (First Deployment /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 200.50 Tm (first-deployment) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 222 m 196 147.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 210.00 Tm (Complete the first official IronClad) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 200.50 Tm (match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 222 m 368 147.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 210.00 Tm (First qualifying official played match) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 200.50 Tm (under the existing leaderboard played) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 191.00 Tm (predicate and valid tournament hierarchy.) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 181.50 Tm (source_type=match; source is the first) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 172.00 Tm (match ID; time is the RPC's) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 162.50 Tm (official-result timestamp or documented) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 153.00 Tm (fallback.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 147.5 m 547 147.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 135.50 Tm (03) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 147.5 m 78 92 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 135.50 Tm (First Victory /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 126.00 Tm (first-victory) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 147.5 m 196 92 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 135.50 Tm (Win the first official IronClad match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 147.5 m 368 92 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 135.50 Tm (First distinct qualifying official played) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 126.00 Tm (victory using finalized winner data and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 116.50 Tm (the same tournament exclusions as Badge) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 107.00 Tm (02. Match source and first-win time are) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 97.50 Tm (persisted.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 92 m 547 92 l S
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 5 of 18) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 12719 >>
+stream
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 764.00 Tm (04) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 776 m 78 720.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 764.00 Tm (Battle Tested /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 754.50 Tm (battle-tested) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 776 m 196 720.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 764.00 Tm (Complete 10 official IronClad matches.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 776 m 368 720.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 764.00 Tm (At least 10 distinct qualifying played) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 754.50 Tm (matches. Cancelled/voided tournaments and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 745.00 Tm (outcomes excluded by) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 735.50 Tm (is_tournament_match_played_for_leaderboard) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 726.00 Tm (do not count. Source is the tenth match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 720.5 m 547 720.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 708.50 Tm (05) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 720.5 m 78 646 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 708.50 Tm (Rising Through the Ranks /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 699.00 Tm (rising-through-the-ranks) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 720.5 m 196 646 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 708.50 Tm (Compete successfully in a higher bracket) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 699.00 Tm (than the player originally entered.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 720.5 m 368 646 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 708.50 Tm (First qualifying completed participation) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 699.00 Tm (establishes the original bracket; a later) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 689.50 Tm (qualifying completed participation in a) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 680.00 Tm (strictly higher academy < challenge < main) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 670.50 Tm (family awards the badge. Source is the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 661.00 Tm (later tournament; time is its) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 651.50 Tm (authoritative completion time.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 646 m 547 646 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 634.00 Tm (06) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 646 m 78 581 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 634.00 Tm (First Campaign /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 624.50 Tm (first-campaign) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 646 m 196 581 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 634.00 Tm (Complete the first full IronClad) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 624.50 Tm (tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 646 m 368 581 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 634.00 Tm (First distinct qualifying completed) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 624.50 Tm (tournament participation, not) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 615.00 Tm (registration-only, withdrawal, no-show,) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 605.50 Tm (withheld, cancelled, voided, or) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 596.00 Tm (in-progress history. Source is the first) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 586.50 Tm (tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 581 m 547 581 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 569.00 Tm (07) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 581 m 78 544.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 569.00 Tm (Iron Regular / iron-regular) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 581 m 196 544.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 569.00 Tm (Complete 3 IronClad tournaments.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 581 m 368 544.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 569.00 Tm (Three distinct qualifying completed) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 559.50 Tm (tournament participations. Source is the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 550.00 Tm (third tournament and its completion time.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 544.5 m 547 544.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 532.50 Tm (08) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 544.5 m 78 508 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 532.50 Tm (Tournament Veteran /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 523.00 Tm (tournament-veteran) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 544.5 m 196 508 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 532.50 Tm (Complete 10 IronClad tournaments.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 544.5 m 368 508 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 532.50 Tm (Ten distinct qualifying completed) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 523.00 Tm (tournament participations. Source is the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 513.50 Tm (tenth tournament and its completion time.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 508 m 547 508 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 496.00 Tm (09) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 508 m 78 452.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 496.00 Tm (Season Campaigner /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 486.50 Tm (season-campaigner) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 508 m 196 452.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 496.00 Tm (Complete at least 4 tournaments in one) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 486.50 Tm (IronClad season.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 508 m 368 452.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 496.00 Tm (Four distinct qualifying completed) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 486.50 Tm (tournament IDs in one authoritative) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 477.00 Tm (finalized season. source_type=season;) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 467.50 Tm (source_id=season_id; original time is the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 458.00 Tm (fourth tournament completion.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 452.5 m 547 452.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 440.50 Tm (10) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 452.5 m 78 387.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 440.50 Tm (Reliable Competitor /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 431.00 Tm (reliable-competitor) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 452.5 m 196 387.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 440.50 Tm (Complete 10 scheduled matches without a) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 431.00 Tm (confirmed player-caused no-show.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 452.5 m 368 387.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 440.50 Tm (Best historical run from durable) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 431.00 Tm (participant outcomes. played and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 421.50 Tm (opponent_no_show advance; player_no_show) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 412.00 Tm (resets; neutral outcomes do neither.) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 402.50 Tm (Source is the tenth qualifying match and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 393.00 Tm (finalized_at.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 387.5 m 547 387.5 l S
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 370.50 Tm (5.2 Victory milestones) Tj ET
+0.98 0.96 0.93 rg 48 333 499 17.5 re f
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 52.00 338.50 Tm (#) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 350.5 m 78 333 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 82.00 338.50 Tm (Badge / slug) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 350.5 m 196 333 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 200.00 338.50 Tm (Canonical requirement) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 350.5 m 368 333 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 372.00 338.50 Tm (Production predicate and evidence) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 333 m 547 333 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 321.00 Tm (11) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 333 m 78 306 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 321.00 Tm (Five Victories /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 311.50 Tm (five-victories) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 333 m 196 306 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 321.00 Tm (Win 5 official IronClad matches.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 333 m 368 306 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 321.00 Tm (Five distinct qualifying official played) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 311.50 Tm (victories. Source is the fifth win match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 306 m 547 306 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 294.00 Tm (12) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 306 m 78 250.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 294.00 Tm (Ten Victories /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 284.50 Tm (ten-victories) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 306 m 196 250.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 294.00 Tm (Win 10 official IronClad matches.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 306 m 368 250.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 294.00 Tm (Ten distinct qualifying official played) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 284.50 Tm (victories. The shared win evaluator) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 275.00 Tm (cascades Badge 11 and 12 when the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 265.50 Tm (threshold is already passed. Source is the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 256.00 Tm (tenth win match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 250.5 m 547 250.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 238.50 Tm (13) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 250.5 m 78 204.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 238.50 Tm (Twenty-Five Victories /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 229.00 Tm (twenty-five-victories) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 250.5 m 196 204.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 238.50 Tm (Win 25 official IronClad matches.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 250.5 m 368 204.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 238.50 Tm (Twenty-five distinct qualifying official) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 229.00 Tm (played victories. A 25-win evaluation) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 219.50 Tm (ensures Badges 11, 12, and 13. Source is) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 210.00 Tm (the twenty-fifth win match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 204.5 m 547 204.5 l S
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 187.50 Tm (5.3 Match excellence) Tj ET
+0.98 0.96 0.93 rg 48 150 499 17.5 re f
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 52.00 155.50 Tm (#) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 167.5 m 78 150 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 82.00 155.50 Tm (Badge / slug) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 167.5 m 196 150 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 200.00 155.50 Tm (Canonical requirement) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 167.5 m 368 150 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 372.00 155.50 Tm (Production predicate and evidence) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 150 m 547 150 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 138.00 Tm (14) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 150 m 78 85 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 138.00 Tm (Iron Streak / iron-streak) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 150 m 196 85 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 138.00 Tm (Win 3 consecutive played official) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 128.50 Tm (matches.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 150 m 368 85 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 138.00 Tm (Historical best streak of three) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 128.50 Tm (timestamped played wins. Played losses) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 119.00 Tm (reset; non-played events are excluded from) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 109.50 Tm (the played sequence. Source is the third) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 100.00 Tm (streak match; missing authoritative) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 90.50 Tm (chronology is excluded.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 85 m 547 85 l S
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 6 of 18) Tj ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 12922 >>
+stream
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 764.00 Tm (15) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 776 m 78 730 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 764.00 Tm (Unbroken / unbroken) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 776 m 196 730 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 764.00 Tm (Win 5 consecutive played official) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 754.50 Tm (matches.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 776 m 368 730 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 764.00 Tm (Same chronology and sequence rules as) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 754.50 Tm (Badge 14, threshold five. A later loss) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 745.00 Tm (does not revoke an earlier achieved) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 735.50 Tm (streak. Source is the fifth streak match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 730 m 547 730 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 718.00 Tm (16) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 730 m 78 674.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 718.00 Tm (Clean Sweep / clean-sweep) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 730 m 196 674.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 718.00 Tm (Win a BO3 2-0 or a BO5 3-0.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 730 m 368 674.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 718.00 Tm (Official played result plus durable) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 708.50 Tm (authoritative final score/game evidence) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 699.00 Tm (identifying the clean series. 2-1, 3-1,) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 689.50 Tm (and 3-2 do not qualify. Source is the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 680.00 Tm (clean-sweep match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 674.5 m 547 674.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 662.50 Tm (17) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 674.5 m 78 600 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 662.50 Tm (Comeback Commander /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 653.00 Tm (comeback-commander) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 674.5 m 196 600 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 662.50 Tm (Lose Game 1 and then win the series.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 674.5 m 368 600 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 662.50 Tm (Latest participant outcome must be played;) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 653.00 Tm (complete durable contiguous game authority) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 643.50 Tm (must exist; authoritative Game 1 winner) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 634.00 Tm (must be the opponent; the player must be) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 624.50 Tm (the official series winner. Source is the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 615.00 Tm (match; original time is series) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 605.50 Tm (finalization.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 600 m 547 600 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 588.00 Tm (18) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 600 m 78 544.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 588.00 Tm (Giant Slayer / giant-slayer) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 600 m 196 544.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 588.00 Tm (Defeat an opponent whose verified) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 578.50 Tm (tournament ELO is at least 200 points) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 569.00 Tm (higher.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 600 m 368 544.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 588.00 Tm (Played official win with same-context) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 578.50 Tm (immutable verified Relic 1v1 registration) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 569.00 Tm (snapshots and opponent_elo - player_elo >=) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 559.50 Tm (200, matching calculation version. Source) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 550.00 Tm (is the upset match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 544.5 m 547 544.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 532.50 Tm (19) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 544.5 m 78 508 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 532.50 Tm (Giant Hunter / giant-hunter) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 544.5 m 196 508 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 532.50 Tm (Earn the Giant Slayer achievement three) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 523.00 Tm (separate times.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 544.5 m 368 508 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 532.50 Tm (Three distinct matches satisfying the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 523.00 Tm (exact Badge 18 predicate. Source is the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 513.50 Tm (third qualifying upset match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 508 m 547 508 l S
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 491.00 Tm (5.4 Tournament progression and championships) Tj ET
+0.98 0.96 0.93 rg 48 453.5 499 17.5 re f
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 52.00 459.00 Tm (#) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 471 m 78 453.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 82.00 459.00 Tm (Badge / slug) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 471 m 196 453.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 200.00 459.00 Tm (Canonical requirement) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 471 m 368 453.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 372.00 459.00 Tm (Production predicate and evidence) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 453.5 m 547 453.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 441.50 Tm (20) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 453.5 m 78 379 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 441.50 Tm (Flawless Campaign /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 432.00 Tm (flawless-campaign) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 453.5 m 196 379 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 441.50 Tm (Win an IronClad tournament without losing) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 432.00 Tm (a single individual game.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 453.5 m 368 379 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 441.50 Tm (Requires champion authority, latest) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 432.00 Tm (complete path summary, valid latest path) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 422.50 Tm (segments, and complete active game) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 413.00 Tm (authority for every played segment with) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 403.50 Tm (every game won by the champion. Source is) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 394.00 Tm (the tournament; original time is) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 384.50 Tm (first_completed_at. See Chapter 9.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 379 m 547 379 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 367.00 Tm (21) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 379 m 78 323.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 367.00 Tm (First Advance /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 357.50 Tm (first-advance) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 379 m 196 323.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 367.00 Tm (Win the first tournament bracket round.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 379 m 368 323.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 367.00 Tm (A genuinely played official match win with) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 357.50 Tm (authoritative advancement from one bracket) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 348.00 Tm (round to the next. Bye/default/slot) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 338.50 Tm (placement alone cannot qualify. Source is) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 329.00 Tm (the advancing match.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 323.5 m 547 323.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 311.50 Tm (22) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 323.5 m 78 268 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 311.50 Tm (Semifinalist / semifinalist) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 323.5 m 196 268 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 311.50 Tm (Reach an official IronClad tournament) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 302.00 Tm (semifinal.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 323.5 m 368 268 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 311.50 Tm (Official bracket progression/round) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 302.00 Tm (placement in a valid tournament, including) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 292.50 Tm (legitimate bye semantics where the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 283.00 Tm (platform treats the player as reaching the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 273.50 Tm (round. Source is the semifinal tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 268 m 547 268 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 256.00 Tm (23) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 268 m 78 222 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 256.00 Tm (Finalist / finalist) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 268 m 196 222 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 256.00 Tm (Reach an official IronClad tournament) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 246.50 Tm (final.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 268 m 368 222 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 256.00 Tm (Official bracket progression to the final) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 246.50 Tm (using authoritative round topology, not) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 237.00 Tm (display labels. Source is the finalist) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 227.50 Tm (tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 222 m 547 222 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 210.00 Tm (24) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 222 m 78 176 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 210.00 Tm (Academy Champion /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 200.50 Tm (academy-champion) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 222 m 196 176 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 210.00 Tm (Win an official Academy bracket) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 200.50 Tm (tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 222 m 368 176 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 210.00 Tm (Valid completed tournament and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 200.50 Tm (authoritative system/recalculation) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 191.00 Tm (tournament_win for bracket type academy.) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 181.50 Tm (Source is tournament ID.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 176 m 547 176 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 164.00 Tm (25) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 176 m 78 149 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 164.00 Tm (Challenge Champion /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 154.50 Tm (challenge-champion) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 176 m 196 149 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 164.00 Tm (Win an official Challenge bracket) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 154.50 Tm (tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 176 m 368 149 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 164.00 Tm (Same championship authority with bracket) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 154.50 Tm (type challenge.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 149 m 547 149 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 137.00 Tm (26) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 149 m 78 103 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 137.00 Tm (Elite Champion /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 127.50 Tm (elite-champion) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 149 m 196 103 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 137.00 Tm (Win an official Main/Elite bracket) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 127.50 Tm (tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 149 m 368 103 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 137.00 Tm (Repository stores the current family as) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 127.50 Tm (main; the evaluator maps canonical) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 118.00 Tm (Elite/Main to stored main. Source is) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 108.50 Tm (tournament ID.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 103 m 547 103 l S
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 7 of 18) Tj ET
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 18 0 R >>
+endobj
+20 0 obj
+<< /Length 7856 >>
+stream
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 764.00 Tm (27) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 776 m 78 720.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 764.00 Tm (Double Champion /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 754.50 Tm (double-champion) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 776 m 196 720.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 764.00 Tm (Win 2 distinct IronClad tournaments.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 776 m 368 720.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 764.00 Tm (Two distinct valid completed championship) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 754.50 Tm (tournament IDs. Recalculation duplicates) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 745.00 Tm (and multiple brackets do not inflate the) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 735.50 Tm (count. Source is the second championship) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 726.00 Tm (tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 720.5 m 547 720.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 708.50 Tm (28) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 720.5 m 78 665 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 708.50 Tm (Triple Crown / triple-crown) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 720.5 m 196 665 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 708.50 Tm (Win Academy, Challenge, and Elite/Main) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 699.00 Tm (tournaments at least once each.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 720.5 m 368 665 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 708.50 Tm (At least one valid championship in each) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 699.00 Tm (stored category family: academy,) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 689.50 Tm (challenge, and main. Three Main wins alone) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 680.00 Tm (do not qualify. Source is the threshold) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 670.50 Tm (championship tournament.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 665 m 547 665 l S
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 648.00 Tm (5.5 Season achievements) Tj ET
+0.98 0.96 0.93 rg 48 610.5 499 17.5 re f
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 52.00 616.00 Tm (#) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 628 m 78 610.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 82.00 616.00 Tm (Badge / slug) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 628 m 196 610.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 200.00 616.00 Tm (Canonical requirement) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 628 m 368 610.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 372.00 616.00 Tm (Production predicate and evidence) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 610.5 m 547 610.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 598.50 Tm (29) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 610.5 m 78 555 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 598.50 Tm (Season Podium /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 589.00 Tm (season-podium) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 610.5 m 196 555 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 598.50 Tm (Finish an official season in the top 3.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 610.5 m 368 555 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 598.50 Tm (Finalized season authority, not under) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 589.00 Tm (review, and official final rank <= 3. Tied) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 579.50 Tm (official ranks follow stored platform) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 570.00 Tm (semantics. source_type=season; source is) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 560.50 Tm (season ID; time is finalized_at.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 555 m 547 555 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 543.00 Tm (30) Tj ET
+0.84 0.82 0.78 RG 0.35 w 78 555 m 78 490 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 543.00 Tm (Season Champion /) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 82.00 533.50 Tm (season-champion) Tj ET
+0.84 0.82 0.78 RG 0.35 w 196 555 m 196 490 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 543.00 Tm (Finish 1st on the official seasonal) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 200.00 533.50 Tm (leaderboard.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 368 555 m 368 490 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 543.00 Tm (Finalized season, not under review,) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 533.50 Tm (official rank 1/champion authority from) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 524.00 Tm (leaderboard_season_champions or) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 514.50 Tm (equivalent. Ties follow platform) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 505.00 Tm (authority. Source is season ID and time is) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 372.00 495.50 Tm (finalization.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 490 m 547 490 l S
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 478.00 Tm (All 30 slugs are present exactly once in PRODUCTION_BADGE_AUTHORITY_SLUGS.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 462.00 Tm (No catalog slug is missing and no unknown slug is registered.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 442 m 547 442 l S
+0.91 0.34 0.08 rg 48 415 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 419.00 Tm (6. Authority Families) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 388.00 Tm (Profile / entry authority: Badge 01) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 368.00 Tm (Profile qualification is evaluated from the players row after profile writes,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 352.00 Tm (Steam identity synchronization, or Relic ELO verification. The current ELO must) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 336.00 Tm (equal the verified Relic ELO and all identity, faction, division, calculation) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 320.00 Tm (version, and verification timestamp fields must be present.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 295.00 Tm (Match participation: Badges 02, 04, and 10) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 275.00 Tm (Badges 02 and 04 use official played-match summaries. The underlying SQL joins) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 259.00 Tm (through tournament_matches -> generated_brackets -> tournament_brackets ->) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 243.00 Tm (tournaments, rejects cancelled and voided tournaments, and retains the existing) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 227.00 Tm (is_tournament_match_played_for_leaderboard predicate.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 207.00 Tm (Badge 10 uses the newer durable participant authority rather than inferring) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 191.00 Tm (attendance from missing no-show rows.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 166.00 Tm (Match victories: Badges 03, 11, 12, and 13) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 146.00 Tm (The shared win-count evaluator uses distinct qualifying official victories and) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 130.00 Tm (threshold data. Threshold jumps cascade lower milestones safely.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 105.00 Tm (Tournament participation: Badges 06, 07, and 08) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 85.00 Tm (The tournament summary counts distinct completed tournaments with authoritative) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 8 of 18) Tj ET
+endstream
+endobj
+21 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 20 0 R >>
+endobj
+22 0 obj
+<< /Length 5162 >>
+stream
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 776.00 Tm (participation facts, valid registration/bracket evidence, and no withheld) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 760.00 Tm (participation. Registration-only, withdrawn, no-show, cancelled, voided, and) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 744.00 Tm (in-progress tournaments are excluded.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 719.00 Tm (Bracket progression: Badges 05, 21, 22, and 23) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 699.00 Tm (Badge 05 uses first qualifying completed participation as the original bracket) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 683.00 Tm (and compares later completed participation through academy < challenge < main.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 667.00 Tm (Badge 21 requires a played win that proves advancement. Badges 22 and 23 use) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 651.00 Tm (authoritative round-relative bracket topology and allow legitimate bye semantics) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 635.00 Tm (where the platform records actual placement in the round.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 610.00 Tm (Match excellence: Badges 14, 15, 16, 17, 18, and 19) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 590.00 Tm (The match-excellence RPC provides historical streak, clean-series, and upset) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 574.00 Tm (evidence. Comeback Commander uses the separate complete-game RPC. Giant Slayer) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 558.00 Tm (and Giant Hunter share one historical upset predicate and count distinct match) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 542.00 Tm (IDs.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 517.00 Tm (Championships: Badges 24-28) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 497.00 Tm (These use finalized tournament-win leaderboard events, valid tournament state,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 481.00 Tm (stored bracket category, and distinct tournament identity. Main is the stored) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 465.00 Tm (category corresponding to the canonical Main/Elite family.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 440.00 Tm (Flawless Campaign: Badge 20) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 420.00 Tm (Badge 20 combines championship authority, durable path summary, participant) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 404.00 Tm (outcomes, and finalized game authority. It is intentionally evaluated only when) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 388.00 Tm (the tournament is completed and the necessary path/game facts are already) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 372.00 Tm (durable.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 347.00 Tm (Seasons: Badges 09, 29, and 30) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 327.00 Tm (Season RPCs use repository season identity and finalization facts. Calendar) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 311.00 Tm (inference is not used. Active or under-review seasons do not award final season) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 295.00 Tm (badges.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 275 m 547 275 l S
+0.91 0.34 0.08 rg 48 248 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 252.00 Tm (7. Durable Match Authority) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 226.00 Tm (Migration 20260820160000_match_authority_foundation.sql adds two append-only,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 210.00 Tm (revisioned ledgers.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 185.00 Tm (match_participant_outcome_authority) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 165.00 Tm (Each row records a participant-specific terminal fact for a logical) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 149.00 Tm (match_id + registration_id identity. Important columns include:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 129.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 129.00 Tm (tournament_id and registration_id durable foreign keys;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 114.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 114.00 Tm (match_id as provenance identity without a foreign key;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 99.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 99.00 Tm (outcome_kind;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 84.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 84.00 Tm (revision and supersedes_id;) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 9 of 18) Tj ET
+endstream
+endobj
+23 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 22 0 R >>
+endobj
+24 0 obj
+<< /Length 6649 >>
+stream
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 776.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 776.00 Tm (authoritative finalized_at;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 761.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 761.00 Tm (source_type, source_id, and JSON provenance;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 746.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 746.00 Tm (created_at.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 727.00 Tm (Supported outcomes:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 707.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 707.00 Tm (played - positive authoritative evidence of a genuinely played official) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 692.00 Tm (result;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 676.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 676.00 Tm (opponent_no_show - opponent-caused confirmed no-show/walkover outcome;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 661.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 661.00 Tm (player_no_show - confirmed player-caused no-show;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 646.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 646.00 Tm (double_no_show - both participants failed to attend;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 631.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 631.00 Tm (automatic_bye - bracket-generated bye advancement;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 616.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 616.00 Tm (admin_default - administrative/default advancement without played evidence;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 601.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 601.00 Tm (cancelled - match cancelled;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 586.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 586.00 Tm (voided - match/tournament authority voided;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 571.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 571.00 Tm (unknown - source evidence cannot safely distinguish the result state.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 552.00 Tm (The absence of a no-show row never creates played. Ambiguous direct admin) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 536.00 Tm (results remain unknown unless the source contains positive played evidence.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 511.00 Tm (match_game_result_authority) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 491.00 Tm (Each row records one finalized game for match_id + game_number. It preserves:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 471.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 471.00 Tm (winner and optional loser registration IDs;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 456.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 456.00 Tm (series format and finalized game count;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 441.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 441.00 Tm (game_authority_complete;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 426.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 426.00 Tm (authority state, revision, and supersession;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 411.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 411.00 Tm (finalization timestamp and provenance.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 392.00 Tm (Game 1 is authoritative only when its game-numbered evidence is from a trusted) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 376.00 Tm (modern finalized path. Legacy synthetic game_number = 1 rows are not treated) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 360.00 Tm (as Game 1 proof. A final BO3/BO5 score alone cannot reconstruct game ordering.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 335.00 Tm (Revision and invalidation) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 315.00 Tm (Corrections append a higher revision whose supersedes_id points to the prior) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 299.00 Tm (fact. Reset and void operations append invalidating/neutral facts. Latest) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 283.00 Tm (revision selection is deterministic by revision and stable UUID tie-breaker;) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 267.00 Tm (older authority does not resurface when the latest row is invalidated.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 247.00 Tm (Append functions serialize logical keys with PostgreSQL transaction advisory) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 231.00 Tm (locks. Durable ledgers do not cascade from tournament_matches or) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 215.00 Tm (generated_brackets, because those rows can be deleted during bracket recovery) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 199.00 Tm (or regeneration. This retains tournament and registration identity while) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 183.00 Tm (keeping replacement match UUIDs distinct.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 163.00 Tm (RLS is enabled and forced on both ledgers. Authenticated reads are limited to a) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 147.00 Tm (player's own registration identity. Authority mutation is trusted/server-only.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 131.00 Tm (Tournament and registration foreign keys use restrictive behavior to preserve) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 115.00 Tm (history and prevent accidental deletion of factual authority; account privacy) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 99.00 Tm (flows use the repository's supported anonymization/closure model rather than) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 83.00 Tm (hard-deleting durable competition evidence.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 63 m 547 63 l S
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 10 of 18) Tj ET
+endstream
+endobj
+25 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 24 0 R >>
+endobj
+26 0 obj
+<< /Length 5724 >>
+stream
+0.91 0.34 0.08 rg 48 765 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 769.00 Tm (8. Championship Path Authority) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 743.00 Tm (Migration 20260820190000_tournament_championship_path_authority.sql adds:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 723.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 723.00 Tm (tournament_championship_path_authority;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 708.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 708.00 Tm (tournament_championship_path_summary_authority.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 684.00 Tm (Path segments) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 664.00 Tm (A logical segment is identified by:) Tj ET
+0.95 0.95 0.95 rg 48 622 499 22 re f
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 630.00 Tm (tournament_id + registration_id + path_index) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 610.00 Tm (path_index is the stable ordered campaign position. round_number and source) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 594.00 Tm (bracket/round IDs provide topology context; source_match_id is provenance,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 578.00 Tm (not a durable foreign key. Supported single-elimination topology is validated) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 562.00 Tm (conservatively. Malformed or unsupported topology remains incomplete.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 542.00 Tm (Path outcomes mirror durable participant outcomes. played, opponent_no_show,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 526.00 Tm (and automatic_bye can remain eligible for a flawless campaign. player_no_show,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 510.00 Tm (double_no_show, admin_default, cancelled, voided, and unknown prevent) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 494.00 Tm (completeness. Empty feeders do not create fake participant segments.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 469.00 Tm (Summary completeness) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 449.00 Tm (The summary is a standalone latest-revision contract. It may be complete only) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 433.00 Tm (when:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 413.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 413.00 Tm (the tournament is completed;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 398.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 398.00 Tm (current authoritative champion identity matches the registration;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 383.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 383.00 Tm (expected path length is known and positive;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 368.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 368.00 Tm (observed latest segment count matches expected length;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 353.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 353.00 Tm (path indexes are contiguous;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 338.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 338.00 Tm (all latest segment revisions are active and allowed;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 323.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 323.00 Tm (all required participant authority aligns with each segment;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 308.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 308.00 Tm (no segment is missing, unknown, reset, invalidated, or disqualifying.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 289.00 Tm (Segment writes trigger summary recomputation, including late segment arrival) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 273.00 Tm (after champion finalization. Corrections, resets, regeneration, cancellation,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 257.00 Tm (and voiding immediately recompute the latest summary. A previously complete) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 241.00 Tm (summary cannot remain trusted after the latest path truth becomes incomplete.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 221.00 Tm (Summary and segment revision keys use advisory locking to prevent concurrent) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 205.00 Tm (revision collisions and stale complete state. A regenerated path must fully) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 189.00 Tm (rebuild valid replacement segments before completeness can return.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 169.00 Tm (This authority is required for Badge 20 because surviving clean matches alone do) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 153.00 Tm (not prove that the entire championship path was captured.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 133 m 547 133 l S
+0.91 0.34 0.08 rg 48 106 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 110.00 Tm (9. Flawless Campaign) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 84.00 Tm (Canonical meaning: Win an IronClad tournament without losing a single) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 11 of 18) Tj ET
+endstream
+endobj
+27 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 26 0 R >>
+endobj
+28 0 obj
+<< /Length 6262 >>
+stream
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 776.00 Tm (individual game.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 756.00 Tm (The service-role RPC) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 740.00 Tm (get_player_badge_flawless_campaign_summary\(player_id\) combines:) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 720.00 Tm (1. completed tournament and system/recalculation tournament_win authority;) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 704.00 Tm (2. the latest championship path summary;) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 688.00 Tm (3. latest path segment revisions;) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 672.00 Tm (4. latest participant outcome revisions;) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 656.00 Tm (5. latest game revisions for every played path segment.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 636.00 Tm (For every played path segment, all of the following are required:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 616.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 616.00 Tm (participant authority is latest played;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 601.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 601.00 Tm (a source match exists;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 586.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 586.00 Tm (game authority is complete and active;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 571.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 571.00 Tm (game numbers are contiguous from Game 1;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 556.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 556.00 Tm (finalized game count matches the observed game set;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 541.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 541.00 Tm (all game rows agree on series format and finalized count;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 526.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 526.00 Tm (every game winner is the champion registration.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 507.00 Tm (The allowed non-played path outcomes are automatic_bye and) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 491.00 Tm (opponent_no_show, because neither contains an individual game loss. The) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 475.00 Tm (following keep the badge locked: player no-show, double no-show, admin default,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 459.00 Tm (cancelled, voided, unknown, missing path segments, incomplete path summary, or) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 443.00 Tm (incomplete game authority.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 423.00 Tm (Examples:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 403.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 403.00 Tm (Champion with a complete path and BO3 2-0 / BO5 3-0 played matches: qualifies.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 388.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 388.00 Tm (Champion with an automatic bye plus clean played matches: qualifies.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 373.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 373.00 Tm (Champion with an opponent no-show plus clean played matches: qualifies.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 358.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 358.00 Tm (Any opponent game win in a played series: does not qualify.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 343.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 343.00 Tm (BO3 2-1, BO5 3-1, or BO5 3-2: does not qualify.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 328.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 328.00 Tm (Final score without durable per-game evidence: does not qualify.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 313.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 313.00 Tm (Admin default, double no-show, unknown, or incomplete regenerated path: does) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 298.00 Tm (not qualify.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 278.00 Tm (If a game is corrected before evaluation, latest authority controls. A corrected) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 262.00 Tm (opponent win can make the campaign eligible only if the resulting latest complete) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 246.00 Tm (set is clean; a corrected champion win to opponent win blocks it. Existing badge) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 230.00 Tm (awards are append-only and are not automatically revoked if facts later change.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 210.00 Tm (Legacy campaigns without durable path and game authority remain locked. No) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 194.00 Tm (legacy path or final-score reconstruction is performed.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 174 m 547 174 l S
+0.91 0.34 0.08 rg 48 147 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 151.00 Tm (10. Reliable Competitor) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 125.00 Tm (Canonical meaning: Complete 10 scheduled matches without a confirmed) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 109.00 Tm (player-caused no-show.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 89.00 Tm (The reliable competitor RPC reads the latest participant authority per logical) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 73.00 Tm (match_id + registration_id, orders by immutable finalized_at, and uses a) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 12 of 18) Tj ET
+endstream
+endobj
+29 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 28 0 R >>
+endobj
+30 0 obj
+<< /Length 6663 >>
+stream
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 776.00 Tm (stable identifier only as a tie-breaker. Mutable updated_at is not used.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 756.00 Tm (Sequence behavior:) Tj ET
+0.98 0.96 0.93 rg 48 718.5 499 17.5 re f
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 52.00 724.00 Tm (Outcome) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 736 m 193 718.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 197.00 724.00 Tm (Effect) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 718.5 m 547 718.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 706.50 Tm (played) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 718.5 m 193 701 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 706.50 Tm (Advances the run) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 701 m 547 701 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 689.00 Tm (opponent_no_show) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 701 m 193 683.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 689.00 Tm (Advances the run) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 683.5 m 547 683.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 671.50 Tm (player_no_show) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 683.5 m 193 666 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 671.50 Tm (Resets the run) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 666 m 547 666 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 654.00 Tm (double_no_show) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 666 m 193 648.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 654.00 Tm (Neutral; neither advances nor resets) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 648.5 m 547 648.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 636.50 Tm (automatic_bye) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 648.5 m 193 631 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 636.50 Tm (Neutral) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 631 m 547 631 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 619.00 Tm (admin_default) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 631 m 193 613.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 619.00 Tm (Neutral) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 613.5 m 547 613.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 601.50 Tm (cancelled) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 613.5 m 193 596 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 601.50 Tm (Neutral) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 596 m 547 596 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 584.00 Tm (voided) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 596 m 193 578.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 584.00 Tm (Neutral) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 578.5 m 547 578.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 566.50 Tm (unknown) Tj ET
+0.84 0.82 0.78 RG 0.35 w 193 578.5 m 193 561 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 197.00 566.50 Tm (Neutral) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 561 m 547 561 l S
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 549.00 Tm (The evaluator searches for the best historical run, not only the current run.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 533.00 Tm (Ten qualifying outcomes award the badge; a later player no-show does not revoke) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 517.00 Tm (it. Missing legacy participant authority is ignored rather than interpreted as) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 501.00 Tm (attendance.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 481.00 Tm (Source evidence is source_type=match, the tenth qualifying match ID, and the) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 465.00 Tm (participant authority finalized_at.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 445 m 547 445 l S
+0.91 0.34 0.08 rg 48 418 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 422.00 Tm (11. Comeback Commander) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 396.00 Tm (Canonical meaning: Lose Game 1 and then win the series.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 376.00 Tm (The evaluator requires:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 356.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 356.00 Tm (latest participant outcome is played;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 341.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 341.00 Tm (official series authority identifies the player as winner;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 326.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 326.00 Tm (complete durable game authority exists;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 311.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 311.00 Tm (latest game revisions are active and contiguous;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 296.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 296.00 Tm (Game 1 exists authoritatively;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 281.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 281.00 Tm (Game 1 winner is the opponent;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 266.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 266.00 Tm (the finalized series is complete.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 247.00 Tm (A final 2-1, 3-1, or 3-2 score does not prove Game 1 was lost. Legacy or) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 231.00 Tm (synthetic Game 1 rows, pending claims, rejected submissions, admin-default,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 215.00 Tm (no-show, bye, cancelled, voided, and unknown results do not qualify.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 195.00 Tm (Corrections use latest revisions. A Game 1 loss corrected to a win removes the) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 179.00 Tm (comeback evidence before award evaluation; a Game 1 win corrected to a loss can) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 163.00 Tm (qualify if the rest of the complete series proves victory. Invalidated latest) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 147.00 Tm (authority cannot expose an older active row.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 127.00 Tm (Source is the stable match ID and original time is the official series) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 111.00 Tm (finalization timestamp, not Game 1 submission time.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 91 m 547 91 l S
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 13 of 18) Tj ET
+endstream
+endobj
+31 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 30 0 R >>
+endobj
+32 0 obj
+<< /Length 5302 >>
+stream
+0.91 0.34 0.08 rg 48 765 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 769.00 Tm (12. Season Authority) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 743.00 Tm (The season family uses the existing:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 723.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 723.00 Tm (leaderboard_seasons;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 708.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 708.00 Tm (leaderboard_tournament_season_memberships;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 693.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 693.00 Tm (leaderboard_player_season_stats;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 678.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 678.00 Tm (leaderboard_season_champions;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 663.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 663.00 Tm (leaderboard_point_events.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 644.00 Tm (No calendar-based season is invented.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 619.00 Tm (Season Campaigner - Badge 09) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 599.00 Tm (The season must be finalized and valid. Four distinct qualifying completed) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 583.00 Tm (tournament IDs must belong to the same authoritative season_id. Registration) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 567.00 Tm (only, withheld participation, cancelled, voided, and incomplete tournaments do) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 551.00 Tm (not count. Source is the season ID; original time is the fourth tournament's) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 535.00 Tm (authoritative completion timestamp.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 510.00 Tm (Season Podium - Badge 29) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 490.00 Tm (Requires finalized season authority, no active review state, and official final) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 474.00 Tm (rank <= 3. The evaluator preserves platform tie semantics rather than inventing) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 458.00 Tm (a tiebreaker. Source time is finalized_at.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 433.00 Tm (Season Champion - Badge 30) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 413.00 Tm (Requires finalized, non-review season authority and official champion/rank-1) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 397.00 Tm (evidence from the season champion source. Live rank 1 before finalization cannot) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 381.00 Tm (award. Tied rank-1 behavior follows the stored platform authority.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 361.00 Tm (If a finalized season later enters review, new evaluation skips it. Existing) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 345.00 Tm (awards are not automatically revoked.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 325 m 547 325 l S
+0.91 0.34 0.08 rg 48 298 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 302.00 Tm (13. Live Badge Lifecycle) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 271.00 Tm (Profile and identity hooks) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 251.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 251.00 Tm (app/profile/actions.ts evaluates Badge 01 after a successful profile write.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 236.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 236.00 Tm (app/profile/relic-elo-action.ts evaluates Badge 01 after successful Relic ELO) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 221.00 Tm (verification.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 205.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 205.00 Tm (app/api/steam/callback/route.ts evaluates Badge 01 after successful Steam) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 190.00 Tm (identity synchronization, including race-recovery paths.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 170.00 Tm (These calls are wrapped in best-effort error handling after the authoritative) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 154.00 Tm (operation succeeds.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 129.00 Tm (Match hooks) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 109.00 Tm (app/tournaments/match-actions.ts and related dashboard/admin actions evaluate) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 93.00 Tm (match and tournament families after:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 73.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 73.00 Tm (confirmed or approved report groups;) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 14 of 18) Tj ET
+endstream
+endobj
+33 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 32 0 R >>
+endobj
+34 0 obj
+<< /Length 5543 >>
+stream
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 776.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 776.00 Tm (admin official result operations;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 761.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 761.00 Tm (approved legacy submission review;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 746.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 746.00 Tm (finalized match operations.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 727.00 Tm (The evaluator first validates finalized report status or approved submission,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 711.00 Tm (then loads authoritative summaries. Durable database triggers write match and) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 695.00 Tm (game authority in the result transaction where applicable. Badge 20 is only) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 679.00 Tm (eligible when the downstream tournament evaluation sees completed championship) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 663.00 Tm (and path authority.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 638.00 Tm (Tournament and season hooks) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 618.00 Tm (evaluateTournamentBadgeAwardsForMatch loads the completed tournament context.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 602.00 Tm (When the tournament is completed, it evaluates tournament participation,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 586.00 Tm (progression, championships, Flawless Campaign, and then season evaluation. The) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 570.00 Tm (season evaluator separately requires finalized season authority. There is no) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 554.00 Tm (client-side achievement calculation.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 529.00 Tm (Dashboard reads) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 509.00 Tm (app/dashboard/page.tsx and app/dashboard/badges/page.tsx call) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 493.00 Tm (buildDashboardBadgeDataFromAwards. lib/badges/read.ts uses the authenticated) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 477.00 Tm (Supabase client to select the current player's rows. The dashboard never calls) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 461.00 Tm (the service-role authority client.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 441 m 547 441 l S
+0.91 0.34 0.08 rg 48 414 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 418.00 Tm (14. Backfill) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 392.00 Tm (backfillInitialBadgeAwards in lib/badges/authority.ts is a controlled,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 376.00 Tm (server-only function. It loads player IDs, runs the same profile, match,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 360.00 Tm (tournament, season, and durable authority evaluators with evaluationMode:) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 344.00 Tm ("backfill", and returns counts and per-player errors.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 324.00 Tm (The backfill covers all 30 production registry slugs. It is not automatically) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 308.00 Tm (run on requests and is not exposed as a public route. Database uniqueness makes) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 292.00 Tm (repeated runs idempotent.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 272.00 Tm (Historical policy is conservative:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 252.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 252.00 Tm (missing participant authority does not imply attendance;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 237.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 237.00 Tm (missing game authority does not imply Game 1 or clean performance;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 222.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 222.00 Tm (missing path summary does not imply a complete campaign;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 207.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 207.00 Tm (incomplete or ambiguous season/tournament evidence remains locked;) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 192.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 192.00 Tm (old mutable or synthetic evidence is not promoted into durable authority.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 173.00 Tm (No production backfill has been executed as part of this branch work.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 153 m 547 153 l S
+0.91 0.34 0.08 rg 48 126 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 130.00 Tm (15. Corrections and Invalidation) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 104.00 Tm (Authority ledgers preserve historical revisions and resolve the latest valid) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 88.00 Tm (fact for evaluation.) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 15 of 18) Tj ET
+endstream
+endobj
+35 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 34 0 R >>
+endobj
+36 0 obj
+<< /Length 10319 >>
+stream
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 776.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 776.00 Tm (Result correction appends a superseding participant/game/path revision.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 761.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 761.00 Tm (Match reset appends invalidating or neutral authority.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 746.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 746.00 Tm (Tournament cancellation/void invalidates related durable authority without) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 731.00 Tm (depending on surviving generated match rows.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 715.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 715.00 Tm (Bracket regeneration invalidates old path evidence; replacement segments are) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 700.00 Tm (distinct provenance and must rebuild completeness.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 684.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 684.00 Tm (Game invalidation hides the old latest game from consumers.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 669.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 669.00 Tm (Championship path summaries refresh whenever latest segment truth changes.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 654.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 654.00 Tm (A season entering review prevents new season awards.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 639.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 639.00 Tm (Already-issued rows in player_badge_awards are not automatically revoked.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 620.00 Tm (This separates audit history from the current qualification projection. It also) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 604.00 Tm (means operational correction may prevent future awards without silently deleting) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 588.00 Tm (historical award rows.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 568 m 547 568 l S
+0.91 0.34 0.08 rg 48 541 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 545.00 Tm (16. Migration Chain) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 519.00 Tm (All migrations below are additive and must be replayed after the earlier base) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 503.00 Tm (schema migrations. Do not apply only the badge subset to a clean database.) Tj ET
+0.98 0.96 0.93 rg 48 465.5 499 17.5 re f
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 52.00 471.00 Tm (Migration) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 483 m 148 465.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 152.00 471.00 Tm (Purpose and authority introduced) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 483 m 328 465.5 l S
+0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 332.00 471.00 Tm (Badges enabled) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 465.5 m 547 465.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 453.50 Tm (20260820100000_badge_aw) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 444.00 Tm (ard_foundation.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 465.5 m 148 429 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 453.50 Tm (player_badge_awards, unique award key, RLS,) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 444.00 Tm (own-player read policy, match) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 434.50 Tm (participant/summary RPCs.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 465.5 m 328 429 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 453.50 Tm (01-04 foundation) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 429 m 547 429 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 417.00 Tm (20260820110000_badge_ba) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 407.50 Tm (tch_2_authority.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 429 m 148 402 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 417.00 Tm (Win threshold, tournament lookup,) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 407.50 Tm (participant, and tournament summary RPCs.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 429 m 328 402 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 417.00 Tm (11-13, 06-08) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 402 m 547 402 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 390.00 Tm (20260820120000_badge_pr) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 380.50 Tm (ogression_championship_) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 371.00 Tm (authority.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 402 m 148 365.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 390.00 Tm (Tournament authority participant and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 380.50 Tm (prestige summary RPCs.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 402 m 328 365.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 390.00 Tm (21-28) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 365.5 m 547 365.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 353.50 Tm (20260820130000_badge_st) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 344.00 Tm (reak_clean_upset_author) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 334.50 Tm (ity.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 365.5 m 148 329 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 353.50 Tm (Match excellence summary RPC.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 365.5 m 328 329 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 353.50 Tm (14-16, 18-19) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 329 m 547 329 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 317.00 Tm (20260820140000_badge_se) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 307.50 Tm (ason_authority.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 329 m 148 302 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 317.00 Tm (Finalized season, season participant, and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 307.50 Tm (season summary RPCs.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 329 m 328 302 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 317.00 Tm (09, 29-30) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 302 m 547 302 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 290.00 Tm (20260820150000_badge_br) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 280.50 Tm (acket_progression_autho) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 271.00 Tm (rity.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 302 m 148 265.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 290.00 Tm (Bracket progression summary RPC.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 302 m 328 265.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 290.00 Tm (05, 21-23) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 265.5 m 547 265.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 253.50 Tm (20260820160000_match_au) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 244.00 Tm (thority_foundation.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 265.5 m 148 229 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 253.50 Tm (Durable participant/game ledgers,) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 244.00 Tm (append/read RPCs, match and tournament void) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 234.50 Tm (triggers, RLS.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 265.5 m 328 229 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 253.50 Tm (Durable foundation for 10, 17, 20) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 229 m 547 229 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 217.00 Tm (20260820170000_badge_re) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 207.50 Tm (liable_competitor_autho) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 198.00 Tm (rity.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 229 m 148 192.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 217.00 Tm (Reliable Competitor sequence summary RPC.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 229 m 328 192.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 217.00 Tm (10) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 192.5 m 547 192.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 180.50 Tm (20260820180000_badge_co) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 171.00 Tm (meback_commander_author) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 161.50 Tm (ity.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 192.5 m 148 156 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 180.50 Tm (Complete-game comeback summary RPC.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 192.5 m 328 156 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 180.50 Tm (17) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 156 m 547 156 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 144.00 Tm (20260820190000_tourname) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 134.50 Tm (nt_championship_path_au) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 125.00 Tm (thority.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 156 m 148 119.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 144.00 Tm (Durable path and summary ledgers, refresh,) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 134.50 Tm (completion, regeneration, void, and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 125.00 Tm (completion triggers.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 156 m 328 119.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 144.00 Tm (Durable foundation for 20) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 119.5 m 547 119.5 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 107.50 Tm (20260820200000_badge_fl) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 98.00 Tm (awless_campaign_authori) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 88.50 Tm (ty.sql) Tj ET
+0.84 0.82 0.78 RG 0.35 w 148 119.5 m 148 83 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 107.50 Tm (Service-role Flawless Campaign summary RPC) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 98.00 Tm (combining champion, path, participant, and) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 88.50 Tm (game evidence.) Tj ET
+0.84 0.82 0.78 RG 0.35 w 328 119.5 m 328 83 l S
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 107.50 Tm (20) Tj ET
+0.84 0.82 0.78 RG 0.35 w 48 83 m 547 83 l S
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 16 of 18) Tj ET
+endstream
+endobj
+37 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 36 0 R >>
+endobj
+38 0 obj
+<< /Length 5390 >>
+stream
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 776.00 Tm (All earlier migrations under supabase/migrations/ are prerequisites for a) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 760.00 Tm (clean replay because these functions reference the existing tournament,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 744.00 Tm (registration, leaderboard, result, ELO, and authentication schema.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 724.00 Tm (No migration has been applied as part of this branch work.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 704 m 547 704 l S
+0.91 0.34 0.08 rg 48 677 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 681.00 Tm (17. Testing and Validation) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 655.00 Tm (The repository test strategy has two layers:) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 630.00 Tm (Static and mocked validation) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 610.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 610.00 Tm (Unit tests exercise evaluator composition, threshold cascades, idempotent) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 595.00 Tm (mocked upserts, dashboard mapping, and source contracts.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 579.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 579.00 Tm (Integration tests are migration-contract tests that inspect SQL text, object) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 564.00 Tm (names, ordering, grants, and security clauses.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 548.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 548.00 Tm (Supabase access is mocked; these tests do not execute PostgreSQL triggers,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 533.00 Tm (RLS, grants, advisory locks, or SECURITY DEFINER functions.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 517.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 517.00 Tm (Regression tests verify that existing badge families remain in the registry) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 502.00 Tm (and that unsupported badges are not accidentally added.) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 477.00 Tm (Application validation recorded for this branch) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 457.00 Tm (The repository validation state recorded during implementation was:) Tj ET
+0.95 0.95 0.95 rg 48 365 499 72 re f
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 423.00 Tm (npm.cmd run lint          PASS) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 413.00 Tm (npx.cmd tsc --noEmit     PASS) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 403.00 Tm (npm.cmd run test         PASS) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 393.00 Tm (npm.cmd run test:integration PASS) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 383.00 Tm (npm.cmd run build        PASS) Tj ET
+0.1 0.12 0.15 rg BT /F3 7.3 Tf 1 0 0 1 56.00 373.00 Tm (git diff --check         PASS) Tj ET
+0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 348.00 Tm (Runtime status) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 328.00 Tm (The Badge System migrations have not been runtime-validated against a real local) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 312.00 Tm (or preview PostgreSQL/Supabase instance as part of this branch workflow. The) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 296.00 Tm (remaining required validation includes clean migration replay, trigger tests,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 280.00 Tm (RLS role tests, SECURITY DEFINER execution, revision concurrency, regeneration) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 264.00 Tm (durability, controlled fixtures, and a non-production backfill rehearsal.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 244 m 547 244 l S
+0.91 0.34 0.08 rg 48 217 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 221.00 Tm (18. Preview and Production Safety) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 195.00 Tm (Frontend Preview alone is insufficient. The target Supabase database must have) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 179.00 Tm (the complete ordered migration chain before the matching application can safely) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 163.00 Tm (call the authority RPCs.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 143.00 Tm (Before any Preview runtime test:) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 123.00 Tm (1. Prove that Vercel Preview environment variables target an isolated,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 107.00 Tm (non-production Supabase project.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 91.00 Tm (2. Confirm the target database has no production users or tournament history.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 75.00 Tm (3. Apply and verify every migration in order in a disposable or approved) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 17 of 18) Tj ET
+endstream
+endobj
+39 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 38 0 R >>
+endobj
+40 0 obj
+<< /Length 4760 >>
+stream
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 776.00 Tm (staging database.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 760.00 Tm (4. Use controlled fixture identities and tournaments only.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 744.00 Tm (5. Disable or isolate Clerk, Steam, email, webhooks, and other external effects.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 728.00 Tm (6. Deploy the application commit that matches the database schema.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 48.00 712.00 Tm (7. Run RLS, RPC, authority, correction, void, regeneration, season, and badge) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 696.00 Tm (smoke tests.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 676.00 Tm (Never use production users, production tournaments, or production backfill for) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 660.00 Tm (authority validation. Never assume that a Vercel Preview database is isolated) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 644.00 Tm (without manually checking its environment-variable mapping and Supabase project) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 628.00 Tm (identity.) Tj ET
+0.84 0.82 0.78 RG 0.5 w 48 608 m 547 608 l S
+0.91 0.34 0.08 rg 48 581 4 17 re f
+0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 585.00 Tm (19. Limitations and Future Work) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 559.00 Tm (Known limitations proven by the repository:) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 539.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 539.00 Tm (PostgreSQL runtime validation is pending.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 524.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 524.00 Tm (Static migration tests do not prove live trigger or RLS behavior.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 509.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 509.00 Tm (Legacy game and attendance evidence can be incomplete; conservative no-award) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 494.00 Tm (behavior is intentional.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 478.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 478.00 Tm (Badge awards are append-only and have no automatic revocation workflow.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 463.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 463.00 Tm (Durable authority preserves tournament/registration history and relies on the) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 448.00 Tm (repository's supported account closure/anonymization model.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 432.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 432.00 Tm (Older match-count summary functions retain their documented) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 417.00 Tm (official_result_decided_at/updated_at fallback for legacy match-count) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 401.00 Tm (ordering; newer streak and durable-authority paths require authoritative) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 385.00 Tm (timestamps and do not use mutable time as a substitute.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 369.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 369.00 Tm (Preview Supabase isolation requires external Vercel and Supabase configuration) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 354.00 Tm (confirmation; it cannot be established from committed repository files alone.) Tj ET
+0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 338.00 Tm (?) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 338.00 Tm (No Premium entitlement, public-profile badge integration, billing, or reveal) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 323.00 Tm (mutation flow is implemented in this authority work.) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 303.00 Tm (The next operational step is a disposable local or preview PostgreSQL validation) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 287.00 Tm (of the complete migration chain. That validation must occur before any staging or) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 271.00 Tm (production migration application or controlled historical backfill.) Tj ET
+q
+0.91 0.34 0.08 rg 48 800 499 1 re f
+Q
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 48.00 808.00 Tm (IRONCLAD TOURNAMENTS) Tj ET
+0.34 0.37 0.41 rg BT /F2 7 Tf 1 0 0 1 377.00 808.00 Tm (COMPLETE BADGE SYSTEM GUIDE) Tj ET
+0.84 0.82 0.78 RG 0.4 w 48 38 m 547 38 l S
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 48.00 25.00 Tm (Internal technical documentation) Tj ET
+0.34 0.37 0.41 rg BT /F1 7 Tf 1 0 0 1 492.00 25.00 Tm (Page 18 of 18) Tj ET
+endstream
+endobj
+41 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 40 0 R >>
+endobj
+xref
+0 42
+0000000000 65535 f 
+0000000019 00000 n 
+0000000068 00000 n 
+0000000244 00000 n 
+0000000314 00000 n 
+0000000389 00000 n 
+0000000457 00000 n 
+0000001557 00000 n 
+0000001703 00000 n 
+0000006079 00000 n 
+0000006225 00000 n 
+0000011879 00000 n 
+0000012027 00000 n 
+0000018241 00000 n 
+0000018389 00000 n 
+0000026470 00000 n 
+0000026618 00000 n 
+0000039390 00000 n 
+0000039538 00000 n 
+0000052513 00000 n 
+0000052661 00000 n 
+0000060569 00000 n 
+0000060717 00000 n 
+0000065931 00000 n 
+0000066079 00000 n 
+0000072780 00000 n 
+0000072928 00000 n 
+0000078704 00000 n 
+0000078852 00000 n 
+0000085166 00000 n 
+0000085314 00000 n 
+0000092029 00000 n 
+0000092177 00000 n 
+0000097531 00000 n 
+0000097679 00000 n 
+0000103274 00000 n 
+0000103422 00000 n 
+0000113794 00000 n 
+0000113942 00000 n 
+0000119384 00000 n 
+0000119532 00000 n 
+0000124344 00000 n 
+trailer
+<< /Size 42 /Root 1 0 R >>
+startxref
+124492
+%%EOF
