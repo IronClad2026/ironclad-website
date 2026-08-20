@@ -7,10 +7,12 @@ import "./globals.css";
 import Footer from "@/components/Footer";
 import GlobalSmoke from "@/components/GlobalSmoke";
 import Navbar from "@/components/Navbar";
+import ConsentAwareVercelAnalytics from "@/components/analytics/ConsentAwareVercelAnalytics";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
 import AccountLegalUpdateGate from "@/components/legal/AccountLegalUpdateGate";
 import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
+import { loadAccountLegalRuntimeState } from "@/lib/account-legal-acceptance";
 import { loadClerkLocalization } from "@/lib/i18n/clerk";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
@@ -76,22 +78,28 @@ export default async function RootLayout({
   children: ReactNode;
 }>) {
   const locale = await getRequestLocale();
-  const [common, clerkLocalization] = await Promise.all([
+  const isVercelProduction = process.env.VERCEL_ENV === "production";
+  const [common, clerkLocalization, legalRuntime] = await Promise.all([
     loadDictionary(locale, "common"),
     loadClerkLocalization(locale),
+    loadAccountLegalRuntimeState({
+      includeAnalytics: isVercelProduction,
+    }),
   ]);
   const rulebook = getLegalDocument("rulebook");
   const ppa = getLegalDocument("ppa");
-  // PR B1 keeps the preference surface dormant. PR B2 may enable it only
-  // after the deployed corpus and authoritative legal register are aligned.
-  const analyticsConsentAvailable = false;
+  const analyticsConsentAvailable =
+    isVercelProduction && legalRuntime.analyticsAvailable;
 
   return (
     <ClerkProvider localization={clerkLocalization}>
       <html lang={locale}>
         <body>
           <LocaleProvider locale={locale} dictionaries={{ common }}>
-            <AccountLegalUpdateGate copy={common.legalUpdate}>
+            <AccountLegalUpdateGate
+              copy={common.legalUpdate}
+              state={legalRuntime.accountGate}
+            >
               <SmoothScrollProvider>
                 <GlobalSmoke />
                 <Navbar />
@@ -103,6 +111,9 @@ export default async function RootLayout({
                   dictionary={common}
                   rulebookPath={rulebook.publicPath}
                   ppaPath={ppa.publicPath}
+                />
+                <ConsentAwareVercelAnalytics
+                  enabled={analyticsConsentAvailable}
                 />
                 <SiteMusicPlayer />
               </SmoothScrollProvider>

@@ -17,6 +17,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import OperationsRefreshButton from "@/components/admin/operations/OperationsRefreshButton";
+import WebsiteTrafficSection from "@/components/admin/operations/WebsiteTrafficSection";
 import type {
   AdminOperationsAttentionItem,
   AdminOperationsDailyPoint,
@@ -27,6 +28,7 @@ import type {
   AdminOperationsPeriod,
   AdminOperationsRow,
 } from "@/lib/admin-operations-metrics";
+import type { WebsiteTrafficAnalytics } from "@/lib/vercel-web-analytics-types";
 
 const numberFormatter = new Intl.NumberFormat("en-AU");
 const percentFormatter = new Intl.NumberFormat("en-AU", {
@@ -57,8 +59,10 @@ const barColors = [
 
 export default function AdminOperationsDashboard({
   metrics,
+  websiteTraffic,
 }: {
   metrics: AdminOperationsMetrics;
+  websiteTraffic: WebsiteTrafficAnalytics;
 }) {
   const hasActiveAttention = metrics.attention.some((item) => item.count > 0);
   const periodLabel = metrics.period.label;
@@ -226,6 +230,8 @@ export default function AdminOperationsDashboard({
             ))}
           </div>
         </section>
+
+        <WebsiteTrafficSection analytics={websiteTraffic} />
 
         <SectionShell
           id="players"

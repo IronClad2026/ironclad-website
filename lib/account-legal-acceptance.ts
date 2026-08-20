@@ -13,6 +13,16 @@ const PREVIOUS_ACCOUNT_LEGAL_VERSIONS = Object.freeze({
   terms: "1.0",
   privacy: "1.0",
 });
+const ACCOUNT_LEGAL_DOCUMENT_PATHS = Object.freeze({
+  terms: {
+    "1.0": "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
+    "1.1": "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+  },
+  privacy: {
+    "1.0": "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
+    "1.1": "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
+  },
+});
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -33,6 +43,11 @@ export type AccountLegalGateState =
       privacy: AccountLegalGateDocument;
     };
 
+export type AccountLegalRuntimeState = {
+  accountGate: AccountLegalGateState;
+  analyticsAvailable: boolean;
+};
+
 type EffectiveLegalDocument = AccountLegalGateDocument & {
   kind: "terms" | "privacy";
   effectiveAt: string;
@@ -46,24 +61,42 @@ type DeployedLegalDocument = {
 };
 
 export async function loadAccountLegalGateState(): Promise<AccountLegalGateState> {
+  const runtime = await loadLegalRuntimeState(false);
+  return runtime.accountGate;
+}
+
+export async function loadAccountLegalRuntimeState({
+  includeAnalytics,
+}: {
+  includeAnalytics: boolean;
+}): Promise<AccountLegalRuntimeState> {
+  return loadLegalRuntimeState(includeAnalytics);
+}
+
+async function loadLegalRuntimeState(
+  includeAnalytics: boolean
+): Promise<AccountLegalRuntimeState> {
   let userId: string | null;
 
   try {
     ({ userId } = await auth());
   } catch {
     console.error("Account legal gate authentication failed.");
-    return { status: "unavailable" };
+    return {
+      accountGate: { status: "unavailable" },
+      analyticsAvailable: false,
+    };
   }
 
-  if (!userId) {
-    return { status: "inactive", reason: "anonymous" };
+  if (!userId && !includeAnalytics) {
+    return anonymousRuntime();
   }
 
   const deployedDocuments = readDeployedDocumentPair();
 
   if (!deployedDocuments) {
     console.error("Account legal gate deployed document set was invalid.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   let supabase: ReturnType<typeof createSupabaseAdminClient>;
@@ -72,7 +105,7 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
     supabase = createSupabaseAdminClient();
   } catch {
     console.error("Account legal gate service configuration failed.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   let documentResult: { data: unknown; error: unknown };
@@ -87,31 +120,36 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
       .in("document_kind", ["terms", "privacy"]);
   } catch {
     console.error("Account legal gate document lookup failed unexpectedly.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   if (documentResult.error) {
     console.error("Account legal gate document lookup failed.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   const documents = parseEffectiveDocumentPair(documentResult.data);
 
   if (!documents) {
     console.error("Account legal gate document set was invalid.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   if (!documentPairsMatch(deployedDocuments, documents)) {
     console.error("Account legal gate document sources were not aligned.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   if (
     documents.terms.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.terms &&
     documents.privacy.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.privacy
   ) {
-    return { status: "inactive", reason: "predecessor" };
+    return {
+      accountGate: userId
+        ? { status: "inactive", reason: "predecessor" }
+        : { status: "inactive", reason: "anonymous" },
+      analyticsAvailable: false,
+    };
   }
 
   if (
@@ -119,7 +157,14 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
     documents.privacy.version !== ACCOUNT_LEGAL_SUCCESSOR_VERSIONS.privacy
   ) {
     console.error("Account legal gate encountered an unsupported document pair.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
+  }
+
+  if (!userId) {
+    return {
+      accountGate: { status: "inactive", reason: "anonymous" },
+      analyticsAvailable: true,
+    };
   }
 
   let acceptanceResult: { data: unknown; error: unknown };
@@ -136,12 +181,12 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
       .maybeSingle();
   } catch {
     console.error("Account legal acceptance lookup failed unexpectedly.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   if (acceptanceResult.error) {
     console.error("Account legal acceptance lookup failed.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   if (
@@ -151,19 +196,43 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
       documents.privacy.id
     )
   ) {
-    return { status: "satisfied" };
+    return {
+      accountGate: { status: "satisfied" },
+      analyticsAvailable: true,
+    };
   }
 
   if (acceptanceResult.data !== null) {
     console.error("Account legal acceptance evidence was invalid.");
-    return { status: "unavailable" };
+    return unavailableRuntime(userId);
   }
 
   return {
-    status: "required",
-    terms: presentDocument(documents.terms, deployedDocuments.terms.path),
-    privacy: presentDocument(documents.privacy, deployedDocuments.privacy.path),
+    accountGate: {
+      status: "required",
+      terms: presentDocument(documents.terms, deployedDocuments.terms.path),
+      privacy: presentDocument(documents.privacy, deployedDocuments.privacy.path),
+    },
+    analyticsAvailable: true,
   };
+}
+
+function anonymousRuntime(): AccountLegalRuntimeState {
+  return {
+    accountGate: { status: "inactive", reason: "anonymous" },
+    analyticsAvailable: false,
+  };
+}
+
+function unavailableRuntime(
+  userId?: string | null
+): AccountLegalRuntimeState {
+  return userId
+    ? {
+        accountGate: { status: "unavailable" },
+        analyticsAvailable: false,
+      }
+    : anonymousRuntime();
 }
 
 function readDeployedDocumentPair(): {
@@ -217,13 +286,23 @@ function parseDeployedDocument(
 
   const path = parseDeployedDocumentPath(value.publicPath);
 
-  return path
-    ? {
-        kind: expectedKind,
-        version: value.version,
-        path,
-      }
-    : null;
+  if (
+    !path ||
+    !isSupportedDocumentVersion(value.version) ||
+    path !== ACCOUNT_LEGAL_DOCUMENT_PATHS[expectedKind][value.version]
+  ) {
+    return null;
+  }
+
+  return {
+    kind: expectedKind,
+    version: value.version,
+    path,
+  };
+}
+
+function isSupportedDocumentVersion(value: string): value is "1.0" | "1.1" {
+  return value === "1.0" || value === "1.1";
 }
 
 function isSupportedVersionPair(

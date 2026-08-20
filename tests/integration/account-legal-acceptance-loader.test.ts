@@ -13,7 +13,10 @@ vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
 }));
 
-import { loadAccountLegalGateState } from "@/lib/account-legal-acceptance";
+import {
+  loadAccountLegalGateState,
+  loadAccountLegalRuntimeState,
+} from "@/lib/account-legal-acceptance";
 
 const TERMS_ID = "11111111-1111-4111-8111-111111111111";
 const PRIVACY_ID = "22222222-2222-4222-8222-222222222222";
@@ -122,6 +125,58 @@ describe("account legal acceptance gate loader", () => {
       reason: "anonymous",
     });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("makes analytics available to anonymous browsing only for an aligned v1.1 pair", async () => {
+    authMock.mockResolvedValue(anonymousIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    const fixture = clientFixture({ documents: documentRows("1.1", "1.1") });
+
+    await expect(
+      loadAccountLegalRuntimeState({ includeAnalytics: true })
+    ).resolves.toEqual({
+      accountGate: { status: "inactive", reason: "anonymous" },
+      analyticsAvailable: true,
+    });
+    expect(fixture.from).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["predecessor database", "1.1", "1.1", "1.0", "1.0"],
+    ["successor database with predecessor web", "1.0", "1.0", "1.1", "1.1"],
+    ["mixed deployed pair", "1.1", "1.0", "1.1", "1.0"],
+  ])(
+    "keeps anonymous browsing available but analytics off for %s",
+    async (_, webTerms, webPrivacy, databaseTerms, databasePrivacy) => {
+      authMock.mockResolvedValue(anonymousIdentity);
+      setDeployedDocumentPair(webTerms, webPrivacy);
+      clientFixture({
+        documents: documentRows(databaseTerms, databasePrivacy),
+      });
+
+      await expect(
+        loadAccountLegalRuntimeState({ includeAnalytics: true })
+      ).resolves.toEqual({
+        accountGate: { status: "inactive", reason: "anonymous" },
+        analyticsAvailable: false,
+      });
+    }
+  );
+
+  it("keeps anonymous browsing available when the optional alignment lookup fails", async () => {
+    authMock.mockResolvedValue(anonymousIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({
+      documents: null,
+      documentError: new Error("provider detail"),
+    });
+
+    await expect(
+      loadAccountLegalRuntimeState({ includeAnalytics: true })
+    ).resolves.toEqual({
+      accountGate: { status: "inactive", reason: "anonymous" },
+      analyticsAvailable: false,
+    });
   });
 
   it("keeps the Effective v1.0 pair inactive", async () => {
@@ -283,6 +338,38 @@ describe("account legal acceptance gate loader", () => {
       status: "satisfied",
     });
   });
+
+  it.each([
+    ["required", null],
+    [
+      "satisfied",
+      {
+        id: ACCEPTANCE_ID,
+        terms_document_id: TERMS_ID,
+        privacy_document_id: PRIVACY_ID,
+        terms_accepted: true,
+        privacy_acknowledged: true,
+      },
+    ],
+  ])(
+    "shares one aligned legal read with the signed-in %s gate state",
+    async (expectedStatus, acceptance) => {
+      authMock.mockResolvedValue(playerIdentity);
+      setDeployedDocumentPair("1.1", "1.1");
+      const fixture = clientFixture({
+        documents: documentRows("1.1", "1.1"),
+        acceptance,
+      });
+
+      const runtime = await loadAccountLegalRuntimeState({
+        includeAnalytics: true,
+      });
+
+      expect(runtime.accountGate.status).toBe(expectedStatus);
+      expect(runtime.analyticsAvailable).toBe(true);
+      expect(fixture.from).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it("fails closed and does not expose provider failures", async () => {
     authMock.mockResolvedValue(playerIdentity);

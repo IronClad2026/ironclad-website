@@ -4,27 +4,35 @@ import AccountLegalUpdateShell, {
   type AccountLegalUpdateCopy,
 } from "@/components/legal/AccountLegalUpdateShell";
 import { loadAccountLegalGateState } from "@/lib/account-legal-acceptance";
+import type { AccountLegalGateState } from "@/lib/account-legal-acceptance";
 
 export type AccountLegalUpdateGateProps = {
   children: ReactNode;
   copy: AccountLegalUpdateCopy;
+  state?: AccountLegalGateState;
 };
 
 export default async function AccountLegalUpdateGate({
   children,
   copy,
+  state,
 }: AccountLegalUpdateGateProps) {
-  const state = await loadAccountLegalGateState();
+  const resolvedState = state ?? (await loadAccountLegalGateState());
 
-  if (state.status === "inactive" || state.status === "satisfied") {
+  if (
+    resolvedState.status === "inactive" ||
+    resolvedState.status === "satisfied"
+  ) {
     return (
       <>
         <AccountLegalGateRevalidation
           initiallySignedIn={
-            state.status === "satisfied" || state.reason === "predecessor"
+            resolvedState.status === "satisfied" ||
+            resolvedState.reason === "predecessor"
           }
           watchForSuccessor={
-            state.status === "inactive" && state.reason === "predecessor"
+            resolvedState.status === "inactive" &&
+            resolvedState.reason === "predecessor"
           }
         />
         {children}
@@ -32,5 +40,5 @@ export default async function AccountLegalUpdateGate({
     );
   }
 
-  return <AccountLegalUpdateShell state={state} copy={copy} />;
+  return <AccountLegalUpdateShell state={resolvedState} copy={copy} />;
 }

@@ -51,6 +51,20 @@ const copy = {
 describe("AccountLegalUpdateGate", () => {
   afterEach(() => cleanup());
 
+  it("uses the root-layout state without repeating the legal loader", async () => {
+    const result = await AccountLegalUpdateGate({
+      copy,
+      state: { status: "satisfied" },
+      children: <div>Normal authenticated application</div>,
+    });
+    render(result);
+
+    expect(loadGateStateMock).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Normal authenticated application")
+    ).toBeInTheDocument();
+  });
+
   it.each([
     { status: "inactive" as const, reason: "anonymous" as const },
     { status: "inactive" as const, reason: "predecessor" as const },
