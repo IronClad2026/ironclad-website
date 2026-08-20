@@ -34,6 +34,11 @@ type CapturedAnalyticsProps = {
   mode: string;
 };
 
+const PLAYER_ID = "123e4567-e89b-12d3-a456-426614174000";
+const TOURNAMENT_ID = "223e4567-e89b-12d3-a456-426614174000";
+const MATCH_ID = "323e4567-e89b-12d3-a456-426614174000";
+const POLL_ID = "423e4567-e89b-12d3-a456-426614174000";
+
 describe("ConsentAwareVercelAnalytics", () => {
   beforeEach(() => {
     writeAnalyticsConsent("declined");
@@ -97,12 +102,11 @@ describe("ConsentAwareVercelAnalytics", () => {
   );
 
   it.each([
-    "/admin",
-    "/dashboard",
-    "/tournaments?tournament=private-id",
-    "/players#directory",
-    "/unknown",
-  ])("does not mount on an excluded or unsanitized current URL: %s", (url) => {
+    "/admin?x=1",
+    "/dashboard?x=1",
+    "/api/test?x=1",
+    "/unknown#private",
+  ])("does not mount on an excluded current URL: %s", (url) => {
     localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     setCurrentRoute(url);
 
@@ -112,30 +116,86 @@ describe("ConsentAwareVercelAnalytics", () => {
     expect(analyticsPropsSpy).not.toHaveBeenCalled();
   });
 
-  it("sanitizes pageviews and rejects custom events and unsafe event URLs", () => {
+  it.each([
+    "/about?test=1",
+    "/about?source=hello%20world",
+    "/about#test",
+    `/tournaments?tournament=${TOURNAMENT_ID}`,
+    `/players/${PLAYER_ID}?tab=history#section`,
+  ])("mounts on an approved query- or hash-bearing route: %s", (url) => {
+    localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setCurrentRoute(url);
+
+    const view = render(<ConsentAwareVercelAnalytics enabled />);
+
+    expect(view.getByTestId("vercel-analytics")).toBeInTheDocument();
+    expect(getLatestAnalyticsProps().mode).toBe("production");
+  });
+
+  it("strips query, fragment, and identifiers from outgoing pageviews", () => {
     localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     render(<ConsentAwareVercelAnalytics enabled />);
     const { beforeSend } = getLatestAnalyticsProps();
-    const playerId = "123e4567-e89b-12d3-a456-426614174000";
+
+    const sanitizedPlayer = beforeSend({
+      type: "pageview",
+      url: `https://ironclad.example/players/${PLAYER_ID}?tab=history#section`,
+    });
+    const sanitizedTournament = beforeSend({
+      type: "pageview",
+      url: `https://ironclad.example/tournaments?tournament=${TOURNAMENT_ID}&match=${MATCH_ID}&poll=${POLL_ID}#private-state`,
+    });
+
+    expect(sanitizedPlayer).toEqual({
+      type: "pageview",
+      url: "https://ironclad.example/players/[playerId]",
+    });
+    expect(sanitizedTournament).toEqual({
+      type: "pageview",
+      url: "https://ironclad.example/tournaments",
+    });
+
+    const serializedPayload = JSON.stringify([
+      sanitizedPlayer,
+      sanitizedTournament,
+    ]);
+    for (const discardedValue of [
+      PLAYER_ID,
+      TOURNAMENT_ID,
+      MATCH_ID,
+      POLL_ID,
+      "history",
+      "section",
+      "private-state",
+    ]) {
+      expect(serializedPayload).not.toContain(discardedValue);
+    }
+    expect(serializedPayload).not.toMatch(/[?#]/);
+  });
+
+  it("rejects custom events and unsafe event URLs", () => {
+    localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    render(<ConsentAwareVercelAnalytics enabled />);
+    const { beforeSend } = getLatestAnalyticsProps();
 
     expect(
       beforeSend({
         type: "pageview",
-        url: `https://ironclad.example/players/${playerId}`,
+        url: "https://ironclad.example/about?source=public#section",
       })
     ).toEqual({
       type: "pageview",
-      url: "https://ironclad.example/players/[playerId]",
+      url: "https://ironclad.example/about",
     });
     expect(
       beforeSend({ type: "event", url: "https://ironclad.example/" })
     ).toBeNull();
 
     for (const url of [
-      "https://ironclad.example/tournaments?match=private",
-      "https://ironclad.example/players#private",
-      "https://ironclad.example/admin/operations",
-      "https://foreign.example/about",
+      "https://ironclad.example/admin/operations?x=1",
+      "https://ironclad.example/dashboard#private",
+      "https://ironclad.example/api/test?x=1",
+      "https://foreign.example/about?x=1",
     ]) {
       expect(beforeSend({ type: "pageview", url })).toBeNull();
     }
