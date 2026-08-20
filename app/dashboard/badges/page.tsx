@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import DashboardBadgeCollection from "@/components/badges/DashboardBadgeCollection";
-import { buildDashboardBadgeData } from "@/lib/badges/dashboard";
+import { buildDashboardBadgeDataFromAwards } from "@/lib/badges/read";
+import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,27 @@ export default async function DashboardBadgeCollectionPage() {
     redirect("/sign-in");
   }
 
-  const dashboardBadgeData = buildDashboardBadgeData();
+  const supabase = await createAuthenticatedSupabaseClient();
+  const { data: profile, error: profileError } = await supabase
+    .from("players")
+    .select("id")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error("Dashboard badge collection profile load failed.", {
+      operation: "dashboard-badge-profile-load",
+      code:
+        typeof profileError.code === "string"
+          ? profileError.code
+          : "PROFILE_LOAD_FAILED",
+    });
+  }
+
+  const dashboardBadgeData = await buildDashboardBadgeDataFromAwards(
+    supabase,
+    typeof profile?.id === "string" ? profile.id : null
+  );
 
   return (
     <main

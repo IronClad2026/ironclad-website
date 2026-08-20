@@ -23,7 +23,7 @@ import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCar
 import PlayerRegistrationActions from "@/components/PlayerRegistrationActions";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
-import { buildDashboardBadgeData } from "@/lib/badges/dashboard";
+import { buildDashboardBadgeDataFromAwards } from "@/lib/badges/read";
 import {
   getLocalizedCountryName,
   getLocalizedPlayerRegion,
@@ -167,9 +167,10 @@ export default async function PlayerDashboardPage() {
       first(registration.tournaments)?.status ?? "upcoming",
   }));
   const profileComplete = profile?.profile_completed === true;
-  const dashboardBadgeData = buildDashboardBadgeData({
-    playerId: profile?.id ?? null,
-  });
+  const dashboardBadgeData = await buildDashboardBadgeDataFromAwards(
+    supabase,
+    profile?.id ?? null
+  );
 
   return (
     <main

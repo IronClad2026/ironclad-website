@@ -12,6 +12,10 @@ import {
   MAX_AVATAR_UPLOAD_SIZE_BYTES,
   MAX_AVATAR_UPLOAD_SIZE_LABEL,
 } from "@/lib/avatar";
+import {
+  BadgeAuthorityError,
+  evaluateProfileBadgeAwards,
+} from "@/lib/badges/authority";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 type ValidatedProfile = {
@@ -171,8 +175,11 @@ export async function savePlayerProfile(
     };
   }
 
+  await evaluateProfileBadgesAfterWrite(playerId);
+
   revalidatePath("/profile");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/badges");
   revalidatePath("/players");
   revalidatePath(`/players/${playerId}`);
   revalidatePath("/");
@@ -183,6 +190,20 @@ export async function savePlayerProfile(
     message: "Player profile saved successfully.",
     errors: {},
   };
+}
+
+async function evaluateProfileBadgesAfterWrite(playerId: string) {
+  try {
+    await evaluateProfileBadgeAwards({ playerId });
+  } catch (error) {
+    console.error("Badge profile evaluation failed.", {
+      operation: "badge-profile-evaluation",
+      code:
+        error instanceof BadgeAuthorityError
+          ? error.code
+          : "BADGE_PROFILE_EVALUATION_FAILED",
+    });
+  }
 }
 
 type StorageErrorCode =

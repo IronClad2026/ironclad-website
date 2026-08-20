@@ -2,6 +2,10 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import {
+  BadgeAuthorityError,
+  evaluateProfileBadgeAwards,
+} from "@/lib/badges/authority";
 import type { IronCladDivision } from "@/lib/elo-verification/divisions";
 import {
   getRelic1v1Elo,
@@ -261,7 +265,21 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
   }
 
   try {
+    await evaluateProfileBadgeAwards({ playerId: player.id });
+  } catch (error) {
+    console.error("Badge profile evaluation failed.", {
+      operation: "badge-profile-evaluation",
+      code:
+        error instanceof BadgeAuthorityError
+          ? error.code
+          : "BADGE_PROFILE_EVALUATION_FAILED",
+    });
+  }
+
+  try {
     revalidatePath(PROFILE_PATH);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/badges");
   } catch {
     console.error("Relic ELO profile revalidation failed.");
   }

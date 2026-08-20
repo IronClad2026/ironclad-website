@@ -4,6 +4,7 @@ import { playerIdentity } from "@/tests/fixtures/auth";
 
 const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
+const evaluateProfileBadgeAwardsMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -16,6 +17,18 @@ vi.mock("next/cache", () => ({
 
 vi.mock("@/lib/supabase-server", () => ({
   createAuthenticatedSupabaseClient: createAuthenticatedSupabaseClientMock,
+}));
+
+vi.mock("@/lib/badges/authority", () => ({
+  BadgeAuthorityError: class BadgeAuthorityError extends Error {
+    readonly code: string;
+
+    constructor(code: string, message: string) {
+      super(message);
+      this.code = code;
+    }
+  },
+  evaluateProfileBadgeAwards: evaluateProfileBadgeAwardsMock,
 }));
 
 import { savePlayerProfile } from "@/app/profile/actions";
@@ -103,6 +116,7 @@ function createPngAvatar(size: number, fileName = "avatar.png") {
 describe("profile save validation and Steam identity regression", () => {
   beforeEach(() => {
     authMock.mockResolvedValue(playerIdentity);
+    evaluateProfileBadgeAwardsMock.mockReset();
   });
 
   it("ignores a forged Steam display name and leaves completion to the protected database rule", async () => {
@@ -151,7 +165,11 @@ describe("profile save validation and Steam identity regression", () => {
     }
     expect(fixture.select).toHaveBeenCalledWith("id");
     expect(options).toEqual({ onConflict: "clerk_user_id" });
+    expect(evaluateProfileBadgeAwardsMock).toHaveBeenCalledWith({
+      playerId: "player-existing",
+    });
     expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard/badges");
   });
 
   it("allows Discord to be cleared and neutralizes public visibility", async () => {

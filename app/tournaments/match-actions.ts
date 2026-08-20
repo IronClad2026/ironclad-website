@@ -23,6 +23,12 @@ import {
   type PrepareMatchReplayUploadsInput,
   type PreparedMatchReplayUpload,
 } from "@/lib/match-replay-direct-upload";
+import {
+  BadgeAuthorityError,
+  evaluateMatchBadgeAwardsForLegacySubmission,
+  evaluateMatchBadgeAwardsForMatch,
+  evaluateMatchBadgeAwardsForReportGroup,
+} from "@/lib/badges/authority";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type CustomClaims = {
@@ -432,6 +438,8 @@ export async function confirmMatchResultReportGroup(
     );
   }
 
+  await evaluateMatchBadgesAfterReportGroup(supabase, reportGroupId);
+
   await notifyNoShowReporterOfResponse(supabase, {
     reportGroupId,
     decision: "confirmed",
@@ -534,6 +542,10 @@ export async function reviewMatchResultReportGroup(
     );
   }
 
+  if (decision === "approved") {
+    await evaluateMatchBadgesAfterReportGroup(supabase, reportGroupId);
+  }
+
   await notifyPlayersOfReportGroupReview(supabase, {
     reportGroupId,
     decision,
@@ -626,6 +638,8 @@ export async function saveAdminMatchResult(
       );
     }
 
+    await evaluateMatchBadgesAfterReportGroup(supabase, activeReportGroup.id);
+
     await notifyPlayersOfReportGroupReview(supabase, {
       reportGroupId: activeReportGroup.id,
       decision: "approved",
@@ -652,6 +666,8 @@ export async function saveAdminMatchResult(
       )
     );
   }
+
+  await evaluateMatchBadgesAfterMatch(supabase, matchId);
 
   await notifyPlayersOfAdminOfficialMatchResult(supabase, match);
 
@@ -750,6 +766,10 @@ export async function reviewMatchResult(
         "The match result review could not be saved. Please try again."
       )
     );
+  }
+
+  if (decision === "approved") {
+    await evaluateMatchBadgesAfterLegacySubmission(supabase, submissionId);
   }
 
   await notifyPlayersOfLegacyMatchResultReview(supabase, {
@@ -974,6 +994,59 @@ function revalidateTournamentPaths() {
   revalidatePath("/admin");
   revalidatePath("/admin/tournaments");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/badges");
+}
+
+async function evaluateMatchBadgesAfterReportGroup(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  reportGroupId: string
+) {
+  try {
+    await evaluateMatchBadgeAwardsForReportGroup({
+      supabase,
+      reportGroupId,
+    });
+  } catch (error) {
+    logBadgeEvaluationFailure(error);
+  }
+}
+
+async function evaluateMatchBadgesAfterMatch(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  matchId: string
+) {
+  try {
+    await evaluateMatchBadgeAwardsForMatch({
+      supabase,
+      matchId,
+    });
+  } catch (error) {
+    logBadgeEvaluationFailure(error);
+  }
+}
+
+async function evaluateMatchBadgesAfterLegacySubmission(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  submissionId: string
+) {
+  try {
+    await evaluateMatchBadgeAwardsForLegacySubmission({
+      supabase,
+      submissionId,
+    });
+  } catch (error) {
+    logBadgeEvaluationFailure(error);
+  }
+}
+
+function logBadgeEvaluationFailure(error: unknown) {
+  console.error("Badge match evaluation failed.", {
+    operation: "badge-match-evaluation",
+    code:
+      error instanceof BadgeAuthorityError
+        ? error.code
+        : "BADGE_MATCH_EVALUATION_FAILED",
+  });
 }
 
 function getText(formData: FormData, field: string) {

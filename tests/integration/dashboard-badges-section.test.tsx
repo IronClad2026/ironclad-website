@@ -115,7 +115,7 @@ describe("dashboard badge section integration", () => {
     vi.unstubAllEnvs();
   });
 
-  it("passes compact production-safe badge data and preserves existing dashboard sections", async () => {
+  it("passes compact real award data and preserves existing dashboard sections", async () => {
     vi.stubEnv("NODE_ENV", "production");
     const page = await PlayerDashboardPage();
     const badgeSections = findElements(page, DashboardBadgesSection);
@@ -128,16 +128,28 @@ describe("dashboard badge section integration", () => {
     expect(badgeSectionProps).not.toHaveProperty("fixtureData");
     expect(badgeSectionProps.badgeData.collection.items).toHaveLength(30);
     expect(
-      badgeSectionProps.badgeData.collection.items.every(
-        (item) => item.state === "locked"
+      badgeSectionProps.badgeData.collection.items.find(
+        (item) => item.definition.slug === "first-victory"
       )
-    ).toBe(true);
+    ).toMatchObject({
+      state: "earned",
+      award: expect.objectContaining({
+        badgeSlug: "first-victory",
+        awardedAt: "2026-08-03T18:30:00.000Z",
+      }),
+    });
+    expect(
+      badgeSectionProps.badgeData.collection.items.find(
+        (item) => item.definition.slug === "ironclad-recruit"
+      )?.state
+    ).toBe("locked");
     expect(badgeSectionProps.badgeData).not.toHaveProperty(
       "pendingRevealQueue"
     );
     expect(client.from.mock.calls.map(([table]: [string]) => table)).toEqual([
       "players",
       "registrations",
+      "player_badge_awards",
     ]);
     expect(findElements(page, dashboardNotificationsMock)).toHaveLength(1);
     expect(findElements(page, inAppNotificationCenterMock)).toHaveLength(1);
@@ -148,6 +160,9 @@ describe("dashboard badge section integration", () => {
 
   it("does not pass dashboard fixture data in development", async () => {
     vi.stubEnv("NODE_ENV", "development");
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(
+      createDashboardClient({ awards: [] })
+    );
     const page = await PlayerDashboardPage();
     const [badgeSection] = findElements(page, DashboardBadgesSection);
     const props = badgeSection.props as DashboardBadgesSectionProps;
@@ -160,7 +175,19 @@ describe("dashboard badge section integration", () => {
   });
 });
 
-function createDashboardClient() {
+function createDashboardClient({
+  awards = [
+    {
+      id: "award-first-victory",
+      badge_slug: "first-victory",
+      unlocked_at: "2026-08-03T18:30:00.000Z",
+      original_unlocked_at: "2026-08-03T18:30:00.000Z",
+      source_metadata: {},
+    },
+  ],
+}: {
+  awards?: Array<Record<string, unknown>>;
+} = {}) {
   const profileQuery = {
     select: vi.fn(),
     eq: vi.fn(),
@@ -199,10 +226,19 @@ function createDashboardClient() {
   registrationsQuery.select.mockReturnValue(registrationsQuery);
   registrationsQuery.eq.mockReturnValue(registrationsQuery);
 
+  const badgeAwardsQuery = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    order: vi.fn(async () => ({ data: awards, error: null })),
+  };
+  badgeAwardsQuery.select.mockReturnValue(badgeAwardsQuery);
+  badgeAwardsQuery.eq.mockReturnValue(badgeAwardsQuery);
+
   return {
     from: vi.fn((table: string) => {
       if (table === "players") return profileQuery;
       if (table === "registrations") return registrationsQuery;
+      if (table === "player_badge_awards") return badgeAwardsQuery;
       throw new Error(`Unexpected dashboard table: ${table}`);
     }),
   };

@@ -6,6 +6,10 @@ import {
   notifyAdminsOfMatchDispute,
   notifyNoShowReporterOfResponse,
 } from "@/lib/notification-events";
+import {
+  BadgeAuthorityError,
+  evaluateMatchBadgeAwardsForReportGroup,
+} from "@/lib/badges/authority";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -274,6 +278,8 @@ export async function confirmDashboardMatchResult(
       "The match result could not be confirmed. Please try again."
     );
   }
+
+  await evaluateMatchBadgesAfterReportGroup(supabase, reportGroupId);
 
   await notifyNoShowReporterOfResponse(supabase, {
     reportGroupId,
@@ -684,9 +690,30 @@ function getUuid(formData: FormData, field: string) {
 
 function revalidateDashboardPaths() {
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/badges");
   revalidatePath("/tournaments");
   revalidatePath("/admin");
   revalidatePath("/admin/tournaments");
+}
+
+async function evaluateMatchBadgesAfterReportGroup(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  reportGroupId: string
+) {
+  try {
+    await evaluateMatchBadgeAwardsForReportGroup({
+      supabase,
+      reportGroupId,
+    });
+  } catch (error) {
+    console.error("Badge match evaluation failed.", {
+      operation: "badge-match-evaluation",
+      code:
+        error instanceof BadgeAuthorityError
+          ? error.code
+          : "BADGE_MATCH_EVALUATION_FAILED",
+    });
+  }
 }
 
 function errorResult(

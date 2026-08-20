@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
+const evaluateProfileBadgeAwardsMock = vi.hoisted(() => vi.fn());
 const buildSteamOpenIdAuthenticationUrlMock = vi.hoisted(() => vi.fn());
 const buildSteamOpenIdCallbackUrlMock = vi.hoisted(() => vi.fn());
 const createSteamOpenIdFlowMock = vi.hoisted(() => vi.fn());
@@ -32,6 +33,18 @@ vi.mock("@/lib/steam-openid", () => ({
   validateSteamOpenIdCallback: validateSteamOpenIdCallbackMock,
   validateSteamOpenIdFlowCookie: validateSteamOpenIdFlowCookieMock,
   verifySteamOpenIdAssertion: verifySteamOpenIdAssertionMock,
+}));
+
+vi.mock("@/lib/badges/authority", () => ({
+  BadgeAuthorityError: class BadgeAuthorityError extends Error {
+    readonly code: string;
+
+    constructor(code: string, message: string) {
+      super(message);
+      this.code = code;
+    }
+  },
+  evaluateProfileBadgeAwards: evaluateProfileBadgeAwardsMock,
 }));
 
 import { GET as callbackGET } from "@/app/api/steam/callback/route";
@@ -416,6 +429,7 @@ describe("Steam connection callback route", () => {
     });
     verifySteamOpenIdAssertionMock.mockResolvedValue(STEAM_ID);
     fetchSteamDisplayNameMock.mockResolvedValue(STEAM_DISPLAY_NAME);
+    evaluateProfileBadgeAwardsMock.mockReset();
   });
 
   it("rejects an unauthenticated callback and consumes the cookie", async () => {
@@ -558,6 +572,10 @@ describe("Steam connection callback route", () => {
     expect(fixture.linkEq).toHaveBeenCalledWith("id", "player-1");
     expect(fixture.linkEq).toHaveBeenCalledWith("clerk_user_id", USER_ID);
     expect(fixture.linkIs).toHaveBeenCalledWith("steam_id64", null);
+    expect(evaluateProfileBadgeAwardsMock).toHaveBeenCalledWith({
+      playerId: "player-1",
+      supabase: fixture.client,
+    });
     expect(fixture.syncFilters).toHaveLength(3);
     expect(fixture.syncFilters).toEqual(
       expect.arrayContaining([
@@ -589,6 +607,10 @@ describe("Steam connection callback route", () => {
     expectFlowCookieConsumed(response);
     expect(fixture.update).toHaveBeenCalledOnce();
     expect(fixture.update).toHaveBeenCalledWith({ steam_id64: STEAM_ID });
+    expect(evaluateProfileBadgeAwardsMock).toHaveBeenCalledWith({
+      playerId: "player-1",
+      supabase: fixture.client,
+    });
     expect(fixture.syncFilters).toEqual([]);
     const [identityUpdate] = fixture.update.mock.calls[0] as [
       Record<string, unknown>,
@@ -634,6 +656,10 @@ describe("Steam connection callback route", () => {
     expectProfileRedirect(response, "display-name-failed");
     expect(fetchSteamDisplayNameMock).toHaveBeenCalledWith(STEAM_ID);
     expect(fixture.update).not.toHaveBeenCalled();
+    expect(evaluateProfileBadgeAwardsMock).toHaveBeenCalledWith({
+      playerId: "player-1",
+      supabase: fixture.client,
+    });
   });
 
   it("replaces a legacy display name only through trusted same-ID refresh", async () => {

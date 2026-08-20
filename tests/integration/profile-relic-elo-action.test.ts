@@ -6,6 +6,7 @@ import {
 
 const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
+const evaluateProfileBadgeAwardsMock = vi.hoisted(() => vi.fn());
 const getRelic1v1EloMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 
@@ -19,6 +20,18 @@ vi.mock("@/lib/supabase-admin", () => ({
 
 vi.mock("@/lib/elo-verification/relic", () => ({
   getRelic1v1Elo: getRelic1v1EloMock,
+}));
+
+vi.mock("@/lib/badges/authority", () => ({
+  BadgeAuthorityError: class BadgeAuthorityError extends Error {
+    readonly code: string;
+
+    constructor(code: string, message: string) {
+      super(message);
+      this.code = code;
+    }
+  },
+  evaluateProfileBadgeAwards: evaluateProfileBadgeAwardsMock,
 }));
 
 vi.mock("next/cache", () => ({
@@ -270,6 +283,7 @@ describe("profile Relic ELO verification action", () => {
     vi.setSystemTime(new Date(VERIFIED_AT));
     authMock.mockResolvedValue(playerIdentity);
     createSupabaseAdminClientMock.mockReset();
+    evaluateProfileBadgeAwardsMock.mockReset();
     getRelic1v1EloMock.mockReset();
     revalidatePathMock.mockReset();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -369,7 +383,12 @@ describe("profile Relic ELO verification action", () => {
       },
       refreshAvailableAt: REFRESH_AVAILABLE_AT,
     });
-    expect(revalidatePathMock).toHaveBeenCalledExactlyOnceWith("/profile");
+    expect(evaluateProfileBadgeAwardsMock).toHaveBeenCalledWith({
+      playerId: PLAYER_ID,
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard/badges");
 
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain(PLAYER_ID);

@@ -14,6 +14,11 @@ const notifyAdminsOfMatchDisputeMock = vi.hoisted(() => vi.fn());
 const notifyNoShowReporterOfResponseMock = vi.hoisted(() => vi.fn());
 const notifyPlayersOfLegacyMatchResultReviewMock = vi.hoisted(() => vi.fn());
 const notifyPlayersOfReportGroupReviewMock = vi.hoisted(() => vi.fn());
+const evaluateMatchBadgeAwardsForLegacySubmissionMock = vi.hoisted(() =>
+  vi.fn()
+);
+const evaluateMatchBadgeAwardsForMatchMock = vi.hoisted(() => vi.fn());
+const evaluateMatchBadgeAwardsForReportGroupMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -35,6 +40,22 @@ vi.mock("@/lib/notification-events", () => ({
   notifyPlayersOfLegacyMatchResultReview:
     notifyPlayersOfLegacyMatchResultReviewMock,
   notifyPlayersOfReportGroupReview: notifyPlayersOfReportGroupReviewMock,
+}));
+
+vi.mock("@/lib/badges/authority", () => ({
+  BadgeAuthorityError: class BadgeAuthorityError extends Error {
+    readonly code: string;
+
+    constructor(code: string, message: string) {
+      super(message);
+      this.code = code;
+    }
+  },
+  evaluateMatchBadgeAwardsForLegacySubmission:
+    evaluateMatchBadgeAwardsForLegacySubmissionMock,
+  evaluateMatchBadgeAwardsForMatch: evaluateMatchBadgeAwardsForMatchMock,
+  evaluateMatchBadgeAwardsForReportGroup:
+    evaluateMatchBadgeAwardsForReportGroupMock,
 }));
 
 vi.mock("next/cache", () => ({
@@ -127,6 +148,9 @@ describe("match-result workflow contracts", () => {
     notifyNoShowReporterOfResponseMock.mockReset();
     notifyPlayersOfLegacyMatchResultReviewMock.mockReset();
     notifyPlayersOfReportGroupReviewMock.mockReset();
+    evaluateMatchBadgeAwardsForLegacySubmissionMock.mockReset();
+    evaluateMatchBadgeAwardsForMatchMock.mockReset();
+    evaluateMatchBadgeAwardsForReportGroupMock.mockReset();
     revalidatePathMock.mockReset();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
@@ -162,8 +186,13 @@ describe("match-result workflow contracts", () => {
         decision: "confirmed",
       }
     );
+    expect(evaluateMatchBadgeAwardsForReportGroupMock).toHaveBeenCalledWith({
+      supabase: service.client,
+      reportGroupId: "report-group-1",
+    });
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard/badges");
   });
 
   it("preserves dispute RPC parameters and both notification flows", async () => {
@@ -379,6 +408,10 @@ describe("match-result workflow contracts", () => {
         decision: "approved",
       }
     );
+    expect(evaluateMatchBadgeAwardsForReportGroupMock).toHaveBeenCalledWith({
+      supabase: service.client,
+      reportGroupId: "report-group-1",
+    });
   });
 
   it("preserves legacy administrator review without notification audit IDs", async () => {
@@ -413,6 +446,65 @@ describe("match-result workflow contracts", () => {
         decision: "resubmission_requested",
       }
     );
+    expect(evaluateMatchBadgeAwardsForLegacySubmissionMock)
+      .not.toHaveBeenCalled();
+  });
+
+  it("runs legacy badge evaluation only after an approved official result", async () => {
+    const service = createRpcClient();
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+
+    await expect(
+      reviewMatchResult(
+        idleState,
+        createFormData({
+          submissionId: "submission-1",
+          decision: "approved",
+          reviewNotes: "Approved.",
+        })
+      )
+    ).resolves.toMatchObject({
+      status: "success",
+      message: "Series approved and winner advanced.",
+    });
+
+    expect(evaluateMatchBadgeAwardsForLegacySubmissionMock).toHaveBeenCalledWith(
+      {
+        supabase: service.client,
+        submissionId: "submission-1",
+      }
+    );
+  });
+
+  it("keeps successful match confirmation intact when badge evaluation fails", async () => {
+    const service = createRpcClient();
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+    evaluateMatchBadgeAwardsForReportGroupMock.mockRejectedValueOnce(
+      new Error("badge storage unavailable")
+    );
+
+    await expect(
+      confirmMatchResultReportGroup(
+        idleState,
+        createFormData({ reportGroupId: "report-group-1" })
+      )
+    ).resolves.toEqual({
+      status: "success",
+      code: "confirmed",
+      message: "Result confirmed. The winner has been advanced.",
+      values: undefined,
+    });
+
+    expect(vi.mocked(console.error)).toHaveBeenCalledWith(
+      "Badge match evaluation failed.",
+      {
+        operation: "badge-match-evaluation",
+        code: "BADGE_MATCH_EVALUATION_FAILED",
+      }
+    );
+    expect(notifyNoShowReporterOfResponseMock).toHaveBeenCalled();
   });
 
   it("returns and logs a generic error for an internal path-bearing failure", async () => {
@@ -618,6 +710,28 @@ describe("match-result workflow contracts", () => {
       code: "confirm-failed",
       message: "The match result could not be confirmed. Please try again.",
     });
+  });
+
+  it("runs badge evaluation after dashboard-side result confirmation", async () => {
+    const service = createRpcClient();
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+
+    await expect(
+      confirmDashboardMatchResult(
+        createFormData({ reportGroupId: REPORT_GROUP_UUID })
+      )
+    ).resolves.toEqual({
+      status: "success",
+      code: "confirmed",
+      message: "Result confirmed. The bracket has been updated.",
+    });
+
+    expect(evaluateMatchBadgeAwardsForReportGroupMock).toHaveBeenCalledWith({
+      supabase: service.client,
+      reportGroupId: REPORT_GROUP_UUID,
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard/badges");
   });
 
   it.each([

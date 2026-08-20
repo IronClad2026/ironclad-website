@@ -13,6 +13,10 @@ import {
 } from "@/lib/steam-openid";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { LOCALE_COOKIE_NAME, resolveLocale } from "@/lib/i18n/config";
+import {
+  BadgeAuthorityError,
+  evaluateProfileBadgeAwards,
+} from "@/lib/badges/authority";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type ProfileResult =
@@ -116,6 +120,7 @@ export async function GET(request: NextRequest) {
       userId,
       steamId64
     );
+    await evaluateProfileBadgesAfterSteamUpdate(supabase, currentPlayer.id);
     return terminalResponse(
       redirectToProfile(
         origin,
@@ -164,6 +169,7 @@ export async function GET(request: NextRequest) {
       userId,
       steamId64
     );
+    await evaluateProfileBadgesAfterSteamUpdate(supabase, currentPlayer.id);
     return terminalResponse(
       redirectToProfile(
         origin,
@@ -181,6 +187,7 @@ export async function GET(request: NextRequest) {
       userId,
       steamId64
     );
+    await evaluateProfileBadgesAfterSteamUpdate(supabase, racedPlayer.id);
     return terminalResponse(
       redirectToProfile(
         origin,
@@ -194,6 +201,23 @@ export async function GET(request: NextRequest) {
   }
 
   return terminalResponse(redirectToProfile(origin, "failed"));
+}
+
+async function evaluateProfileBadgesAfterSteamUpdate(
+  supabase: SteamIdentityClient,
+  playerId: string
+) {
+  try {
+    await evaluateProfileBadgeAwards({ playerId, supabase });
+  } catch (error) {
+    console.error("Badge profile evaluation failed.", {
+      operation: "badge-profile-evaluation",
+      code:
+        error instanceof BadgeAuthorityError
+          ? error.code
+          : "BADGE_PROFILE_EVALUATION_FAILED",
+    });
+  }
 }
 
 type SteamIdentityLookup =
