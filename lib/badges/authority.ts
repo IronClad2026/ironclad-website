@@ -12,6 +12,7 @@ export const PRODUCTION_BADGE_AUTHORITY_SLUGS = [
   "first-campaign",
   "iron-regular",
   "tournament-veteran",
+  "rising-through-the-ranks",
   "season-campaigner",
   "five-victories",
   "ten-victories",
@@ -136,6 +137,15 @@ type TournamentBadgeSummaryRow = {
   third_completed_at: unknown;
   tenth_completed_tournament_id: unknown;
   tenth_completed_at: unknown;
+};
+
+type TournamentBracketProgressionSummaryRow = {
+  original_bracket: unknown;
+  original_tournament_id: unknown;
+  original_completed_at: unknown;
+  higher_bracket: unknown;
+  higher_tournament_id: unknown;
+  higher_completed_at: unknown;
 };
 
 type TournamentPrestigeSummaryRow = {
@@ -840,6 +850,11 @@ export async function evaluateTournamentBadgeAwardsForPlayer({
   evaluationMode?: "live" | "backfill";
 }): Promise<BadgeAwardEvaluationResult> {
   return mergeEvaluationResults([
+    await evaluateBracketProgressionBadgeAwardsForPlayer({
+      playerId,
+      supabase,
+      evaluationMode,
+    }),
     await evaluateTournamentCountBadgeAwardsForPlayer({
       playerId,
       supabase,
@@ -851,6 +866,68 @@ export async function evaluateTournamentBadgeAwardsForPlayer({
       evaluationMode,
     }),
   ]);
+}
+
+async function evaluateBracketProgressionBadgeAwardsForPlayer({
+  playerId,
+  supabase,
+  evaluationMode,
+}: {
+  playerId: string;
+  supabase: BadgeAuthorityClient;
+  evaluationMode: "live" | "backfill";
+}): Promise<BadgeAwardEvaluationResult> {
+  const summary = await loadTournamentBracketProgressionSummary(
+    supabase,
+    playerId
+  );
+
+  if (!summary) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: ["rising-through-the-ranks"],
+      skippedReasons: ["bracket_progression_summary_unavailable"],
+    };
+  }
+
+  if (
+    !summary.originalBracket ||
+    !summary.originalTournamentId ||
+    !summary.higherBracket ||
+    !summary.higherTournamentId
+  ) {
+    return {
+      ...EMPTY_EVALUATION_RESULT,
+      evaluatedSlugs: ["rising-through-the-ranks"],
+      skippedReasons: ["higher_bracket_threshold_not_met"],
+    };
+  }
+
+  const created = await persistBadgeAward(supabase, {
+    playerId,
+    badgeSlug: "rising-through-the-ranks",
+    sourceType: "tournament",
+    sourceId: summary.higherTournamentId,
+    originalUnlockedAt: summary.higherCompletedAt,
+    sourceMetadata: {
+      evaluator: "bracket-progression",
+      evaluationMode,
+      originalBracket: summary.originalBracket,
+      higherBracket: summary.higherBracket,
+      originalTournamentId: summary.originalTournamentId,
+      thresholdTournamentId: summary.higherTournamentId,
+      originalUnlockedAtBasis: summary.higherCompletedAt
+        ? "higher_tournament_first_completed_at"
+        : "unavailable",
+    },
+  });
+
+  return {
+    createdCount: created ? 1 : 0,
+    createdSlugs: created ? ["rising-through-the-ranks"] : [],
+    evaluatedSlugs: ["rising-through-the-ranks"],
+    skippedReasons: created ? [] : ["award_already_exists"],
+  };
 }
 
 async function evaluateTournamentCountBadgeAwardsForPlayer({
@@ -1552,6 +1629,39 @@ async function loadTournamentBadgeSummary(
       row.tenth_completed_tournament_id
     ),
     tenthCompletedAt: isoOrNull(row.tenth_completed_at),
+  };
+}
+
+async function loadTournamentBracketProgressionSummary(
+  supabase: BadgeAuthorityClient,
+  playerId: string
+) {
+  const { data, error } = await supabase.rpc(
+    "get_player_badge_bracket_progression_summary",
+    {
+      p_player_id: playerId,
+    }
+  );
+
+  if (error) {
+    throw new BadgeAuthorityError(
+      "BRACKET_PROGRESSION_SUMMARY_LOAD_FAILED",
+      "Badge bracket progression evaluation could not load the participation summary."
+    );
+  }
+
+  const row = rowsOf<TournamentBracketProgressionSummaryRow>(data)[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    originalBracket: stringOrNull(row.original_bracket),
+    originalTournamentId: stringOrNull(row.original_tournament_id),
+    originalCompletedAt: isoOrNull(row.original_completed_at),
+    higherBracket: stringOrNull(row.higher_bracket),
+    higherTournamentId: stringOrNull(row.higher_tournament_id),
+    higherCompletedAt: isoOrNull(row.higher_completed_at),
   };
 }
 

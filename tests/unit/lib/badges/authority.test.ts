@@ -33,6 +33,8 @@ const CLEAN_SWEEP_MATCH_ID = "16161616-1616-4161-8161-161616161616";
 const FIRST_UPSET_MATCH_ID = "18181818-1818-4181-8181-181818181818";
 const THIRD_UPSET_MATCH_ID = "19191919-1919-4191-8191-191919191919";
 const FIRST_TOURNAMENT_ID = "99999999-9999-4999-8999-999999999999";
+const HIGHER_BRACKET_TOURNAMENT_ID =
+  "abababab-abab-4aba-8aba-abababababab";
 const THIRD_TOURNAMENT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENTH_TOURNAMENT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const FIRST_ADVANCE_MATCH_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -61,6 +63,7 @@ type FakeAuthorityClientOptions = {
   summaries?: Record<string, Record<string, unknown>>;
   matchExcellenceSummaries?: Record<string, Record<string, unknown>>;
   tournamentSummaries?: Record<string, Record<string, unknown>>;
+  bracketProgressionSummaries?: Record<string, Record<string, unknown>>;
   tournamentPrestigeSummaries?: Record<string, Record<string, unknown>>;
   seasonSummaries?: Record<string, Record<string, unknown>>;
   participants?: Array<Record<string, unknown>>;
@@ -142,6 +145,18 @@ function tournamentSummary(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function bracketProgressionSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    original_bracket: null,
+    original_tournament_id: null,
+    original_completed_at: null,
+    higher_bracket: null,
+    higher_tournament_id: null,
+    higher_completed_at: null,
+    ...overrides,
+  };
+}
+
 function tournamentPrestigeSummary(overrides: Record<string, unknown> = {}) {
   return {
     played_advance_win_count: 0,
@@ -207,6 +222,10 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
   const tournamentSummaries: Record<string, Record<string, unknown>> =
     options.tournamentSummaries ?? {
       [PLAYER_ID]: tournamentSummary(),
+    };
+  const bracketProgressionSummaries: Record<string, Record<string, unknown>> =
+    options.bracketProgressionSummaries ?? {
+      [PLAYER_ID]: bracketProgressionSummary(),
     };
   const tournamentPrestigeSummaries: Record<string, Record<string, unknown>> =
     options.tournamentPrestigeSummaries ?? {
@@ -360,6 +379,16 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
       };
     }
 
+    if (name === "get_player_badge_bracket_progression_summary") {
+      return {
+        data: [
+          bracketProgressionSummaries[String(args.p_player_id)] ??
+            bracketProgressionSummary(),
+        ],
+        error: null,
+      };
+    }
+
     if (name === "get_player_badge_tournament_prestige_summary") {
       return {
         data: [
@@ -423,6 +452,7 @@ describe("badge authority evaluators", () => {
       "first-campaign",
       "iron-regular",
       "tournament-veteran",
+      "rising-through-the-ranks",
       "season-campaigner",
       "five-victories",
       "ten-victories",
@@ -443,9 +473,6 @@ describe("badge authority evaluators", () => {
       "season-podium",
       "season-champion",
     ]);
-    expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
-      "rising-through-the-ranks"
-    );
     expect(PRODUCTION_BADGE_AUTHORITY_SLUGS).not.toContain(
       "reliable-competitor"
     );
@@ -1181,6 +1208,178 @@ describe("badge authority evaluators", () => {
       .toEqual(["first-campaign", "iron-regular", "tournament-veteran"]);
   });
 
+  it.each([
+    ["academy", "challenge"],
+    ["academy", "main"],
+    ["challenge", "main"],
+  ])(
+    "awards Rising Through the Ranks for %s first and %s later",
+    async (originalBracket, higherBracket) => {
+      const fixture = createAuthorityClient({
+        bracketProgressionSummaries: {
+          [PLAYER_ID]: bracketProgressionSummary({
+            original_bracket: originalBracket,
+            original_tournament_id: FIRST_TOURNAMENT_ID,
+            original_completed_at: "2026-08-14T12:00:00.000Z",
+            higher_bracket: higherBracket,
+            higher_tournament_id: HIGHER_BRACKET_TOURNAMENT_ID,
+            higher_completed_at: "2026-08-15T12:00:00.000Z",
+          }),
+        },
+      });
+
+      const result = await evaluateTournamentBadgeAwardsForPlayer({
+        playerId: PLAYER_ID,
+        supabase: fixture.client,
+      });
+
+      expect(result.createdSlugs).toContain("rising-through-the-ranks");
+      expect(fixture.upsertPayloads).toContainEqual(
+        expect.objectContaining({
+          badge_slug: "rising-through-the-ranks",
+          source_type: "tournament",
+          source_id: HIGHER_BRACKET_TOURNAMENT_ID,
+          original_unlocked_at: "2026-08-15T12:00:00.000Z",
+          source_metadata: expect.objectContaining({
+            originalBracket,
+            higherBracket,
+            originalTournamentId: FIRST_TOURNAMENT_ID,
+            thresholdTournamentId: HIGHER_BRACKET_TOURNAMENT_ID,
+          }),
+        })
+      );
+    }
+  );
+
+  it("does not award Rising Through the Ranks for non-increasing bracket history", async () => {
+    const fixture = createAuthorityClient({
+      bracketProgressionSummaries: {
+        [PLAYER_ID]: bracketProgressionSummary({
+          original_bracket: "main",
+          original_tournament_id: FIRST_TOURNAMENT_ID,
+          original_completed_at: "2026-08-14T12:00:00.000Z",
+          higher_bracket: null,
+          higher_tournament_id: null,
+        }),
+      },
+    });
+
+    const result = await evaluateTournamentBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).not.toContain("rising-through-the-ranks");
+    expect(fixture.upsertPayloads).not.toContainEqual(
+      expect.objectContaining({ badge_slug: "rising-through-the-ranks" })
+    );
+  });
+
+  it("uses the authoritative progression summary for duplicate, invalid, and ambiguous history", async () => {
+    const fixture = createAuthorityClient({
+      bracketProgressionSummaries: {
+        [PLAYER_ID]: bracketProgressionSummary(),
+      },
+    });
+
+    const result = await evaluateTournamentBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).not.toContain("rising-through-the-ranks");
+    expect(result.skippedReasons).toContain(
+      "higher_bracket_threshold_not_met"
+    );
+    expect(fixture.rpc).toHaveBeenCalledWith(
+      "get_player_badge_bracket_progression_summary",
+      { p_player_id: PLAYER_ID }
+    );
+  });
+
+  it("keeps Rising Through the Ranks live evaluation idempotent", async () => {
+    const fixture = createAuthorityClient({
+      bracketProgressionSummaries: {
+        [PLAYER_ID]: bracketProgressionSummary({
+          original_bracket: "academy",
+          original_tournament_id: FIRST_TOURNAMENT_ID,
+          original_completed_at: "2026-08-14T12:00:00.000Z",
+          higher_bracket: "challenge",
+          higher_tournament_id: HIGHER_BRACKET_TOURNAMENT_ID,
+          higher_completed_at: "2026-08-15T12:00:00.000Z",
+        }),
+      },
+    });
+
+    const first = await evaluateTournamentBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+    const second = await evaluateTournamentBadgeAwardsForPlayer({
+      playerId: PLAYER_ID,
+      supabase: fixture.client,
+    });
+
+    expect(first.createdSlugs).toContain("rising-through-the-ranks");
+    expect(second.createdCount).toBe(0);
+    expect(
+      fixture.upsertPayloads.filter(
+        (payload) => payload.badge_slug === "rising-through-the-ranks"
+      )
+    ).toHaveLength(2);
+    expect(fixture.awards).toContain(`${PLAYER_ID}:rising-through-the-ranks`);
+  });
+
+  it("evaluates Rising Through the Ranks from the completed-tournament hook", async () => {
+    const fixture = createAuthorityClient({
+      tournamentParticipants: [{ player_id: PLAYER_ID }],
+      bracketProgressionSummaries: {
+        [PLAYER_ID]: bracketProgressionSummary({
+          original_bracket: "academy",
+          original_tournament_id: FIRST_TOURNAMENT_ID,
+          original_completed_at: "2026-08-14T12:00:00.000Z",
+          higher_bracket: "challenge",
+          higher_tournament_id: HIGHER_BRACKET_TOURNAMENT_ID,
+          higher_completed_at: "2026-08-15T12:00:00.000Z",
+        }),
+      },
+    });
+
+    const result = await evaluateTournamentBadgeAwardsForTournament({
+      tournamentId: HIGHER_BRACKET_TOURNAMENT_ID,
+      supabase: fixture.client,
+    });
+
+    expect(result.createdSlugs).toContain("rising-through-the-ranks");
+  });
+
+  it("backfills Rising Through the Ranks idempotently from the same summary", async () => {
+    const fixture = createAuthorityClient({
+      bracketProgressionSummaries: {
+        [PLAYER_ID]: bracketProgressionSummary({
+          original_bracket: "challenge",
+          original_tournament_id: FIRST_TOURNAMENT_ID,
+          original_completed_at: "2026-08-14T12:00:00.000Z",
+          higher_bracket: "main",
+          higher_tournament_id: HIGHER_BRACKET_TOURNAMENT_ID,
+          higher_completed_at: "2026-08-15T12:00:00.000Z",
+        }),
+      },
+    });
+
+    const first = await backfillInitialBadgeAwards({
+      supabase: fixture.client,
+      playerIds: [PLAYER_ID],
+    });
+    const second = await backfillInitialBadgeAwards({
+      supabase: fixture.client,
+      playerIds: [PLAYER_ID],
+    });
+
+    expect(first.badgeCounts["rising-through-the-ranks"]).toBe(1);
+    expect(second.badgeCounts["rising-through-the-ranks"]).toBe(0);
+  });
+
   it("requires a played official win that advances for First Advance", async () => {
     const noAdvance = createAuthorityClient();
     const oneAdvance = createAuthorityClient({
@@ -1480,6 +1679,7 @@ describe("badge authority evaluators", () => {
 
     expect(result.createdCount).toBe(0);
     expect(result.evaluatedSlugs).toEqual([
+      "rising-through-the-ranks",
       "first-campaign",
       "iron-regular",
       "tournament-veteran",
@@ -1493,6 +1693,7 @@ describe("badge authority evaluators", () => {
       "triple-crown",
     ]);
     expect(result.skippedReasons).toEqual([
+      "higher_bracket_threshold_not_met",
       "first-campaign_threshold_not_met",
       "iron-regular_threshold_not_met",
       "tournament-veteran_threshold_not_met",
@@ -2078,6 +2279,7 @@ describe("badge authority evaluators", () => {
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,
+      "rising-through-the-ranks": 0,
       "season-campaigner": 0,
       "five-victories": 1,
       "ten-victories": 0,
@@ -2187,6 +2389,7 @@ describe("badge authority evaluators", () => {
       "first-campaign": 1,
       "iron-regular": 1,
       "tournament-veteran": 1,
+      "rising-through-the-ranks": 0,
       "season-campaigner": 0,
       "five-victories": 1,
       "ten-victories": 1,
@@ -2236,6 +2439,7 @@ describe("badge authority evaluators", () => {
       "first-campaign": 0,
       "iron-regular": 0,
       "tournament-veteran": 0,
+      "rising-through-the-ranks": 0,
       "season-campaigner": 0,
       "five-victories": 0,
       "ten-victories": 0,
