@@ -17,12 +17,6 @@ export type AccountLegalAcceptanceActionState = {
     | "accepted";
 };
 
-export const initialAccountLegalAcceptanceActionState: AccountLegalAcceptanceActionState =
-  {
-    status: "idle",
-    code: "idle",
-  };
-
 export async function acceptAccountLegalUpdate(
   _previousState: AccountLegalAcceptanceActionState,
   formData: FormData

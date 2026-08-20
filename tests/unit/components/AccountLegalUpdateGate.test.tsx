@@ -19,10 +19,6 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/app/legal-update-actions", () => ({
   acceptAccountLegalUpdate: vi.fn(),
-  initialAccountLegalAcceptanceActionState: {
-    status: "idle",
-    code: "idle",
-  },
 }));
 
 import AccountLegalUpdateGate from "@/components/legal/AccountLegalUpdateGate";
