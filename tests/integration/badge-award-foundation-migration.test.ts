@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const migrationName = "20260820100000_badge_award_foundation.sql";
+const migrationName = "20260821000000_badge_award_foundation.sql";
 const previousMigrationName = "20260818100000_phase15a_versioned_consent_discord.sql";
 const migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations", migrationName),

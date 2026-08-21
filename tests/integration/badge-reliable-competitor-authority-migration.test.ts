@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { resolve } from "node:path";
 
-const migrationName = "20260820170000_badge_reliable_competitor_authority.sql";
+const migrationName = "20260821007000_badge_reliable_competitor_authority.sql";
 const migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations", migrationName),
   "utf8"
@@ -13,7 +13,7 @@ describe("Reliable Competitor authority migration", () => {
   it("is additive and ordered after the match authority foundation", () => {
     const names = readdirSync(resolve(process.cwd(), "supabase/migrations")).sort();
     expect(names.indexOf(migrationName)).toBeGreaterThan(
-      names.indexOf("20260820160000_match_authority_foundation.sql")
+      names.indexOf("20260821006000_match_authority_foundation.sql")
     );
     expect(compactMigration.startsWith("begin;")).toBe(true);
     expect(compactMigration.endsWith("commit;")).toBe(true);

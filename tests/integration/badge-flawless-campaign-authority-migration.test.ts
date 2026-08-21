@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const migrationName = "20260820200000_badge_flawless_campaign_authority.sql";
+const migrationName = "20260821010000_badge_flawless_campaign_authority.sql";
 const migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations", migrationName),
   "utf8"
@@ -13,7 +13,7 @@ describe("flawless campaign authority migration", () => {
   it("is additive and ordered after championship path authority", () => {
     const names = readdirSync(resolve(process.cwd(), "supabase/migrations")).sort();
     expect(names.indexOf(migrationName)).toBeGreaterThan(
-      names.indexOf("20260820190000_tournament_championship_path_authority.sql")
+      names.indexOf("20260821009000_tournament_championship_path_authority.sql")
     );
     expect(sql.startsWith("begin;")).toBe(true);
     expect(sql.endsWith("commit;")).toBe(true);

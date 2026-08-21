@@ -843,7 +843,7 @@ stream
 0.84 0.82 0.78 RG 0.5 w 48 275 m 547 275 l S
 0.91 0.34 0.08 rg 48 248 4 17 re f
 0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 252.00 Tm (7. Durable Match Authority) Tj ET
-0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 226.00 Tm (Migration 20260820160000_match_authority_foundation.sql adds two append-only,) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 226.00 Tm (Migration 20260821006000_match_authority_foundation.sql adds two append-only,) Tj ET
 0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 210.00 Tm (revisioned ledgers.) Tj ET
 0.91 0.34 0.08 rg BT /F2 11.5 Tf 1 0 0 1 48.00 185.00 Tm (match_participant_outcome_authority) Tj ET
 0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 165.00 Tm (Each row records a participant-specific terminal fact for a logical) Tj ET
@@ -950,7 +950,7 @@ endobj
 stream
 0.91 0.34 0.08 rg 48 765 4 17 re f
 0.1 0.12 0.15 rg BT /F2 15 Tf 1 0 0 1 60.00 769.00 Tm (8. Championship Path Authority) Tj ET
-0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 743.00 Tm (Migration 20260820190000_tournament_championship_path_authority.sql adds:) Tj ET
+0.1 0.12 0.15 rg BT /F1 9.3 Tf 1 0 0 1 48.00 743.00 Tm (Migration 20260821009000_tournament_championship_path_authority.sql adds:) Tj ET
 0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 723.00 Tm (?) Tj ET
 0.1 0.12 0.15 rg BT /F1 9.1 Tf 1 0 0 1 62.00 723.00 Tm (tournament_championship_path_authority;) Tj ET
 0.91 0.34 0.08 rg BT /F2 9.1 Tf 1 0 0 1 48.00 708.00 Tm (?) Tj ET
@@ -1345,7 +1345,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 483 m 328 465.5 l S
 0.1 0.12 0.15 rg BT /F2 8 Tf 1 0 0 1 332.00 471.00 Tm (Badges enabled) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 465.5 m 547 465.5 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 453.50 Tm (20260820100000_badge_aw) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 453.50 Tm (20260821000000_badge_aw) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 444.00 Tm (ard_foundation.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 465.5 m 148 429 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 453.50 Tm (player_badge_awards, unique award key, RLS,) Tj ET
@@ -1354,7 +1354,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 465.5 m 328 429 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 453.50 Tm (01-04 foundation) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 429 m 547 429 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 417.00 Tm (20260820110000_badge_ba) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 417.00 Tm (20260821001000_badge_ba) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 407.50 Tm (tch_2_authority.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 429 m 148 402 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 417.00 Tm (Win threshold, tournament lookup,) Tj ET
@@ -1362,7 +1362,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 429 m 328 402 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 417.00 Tm (11-13, 06-08) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 402 m 547 402 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 390.00 Tm (20260820120000_badge_pr) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 390.00 Tm (20260821002000_badge_pr) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 380.50 Tm (ogression_championship_) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 371.00 Tm (authority.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 402 m 148 365.5 l S
@@ -1371,7 +1371,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 402 m 328 365.5 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 390.00 Tm (21-28) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 365.5 m 547 365.5 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 353.50 Tm (20260820130000_badge_st) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 353.50 Tm (20260821003000_badge_st) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 344.00 Tm (reak_clean_upset_author) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 334.50 Tm (ity.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 365.5 m 148 329 l S
@@ -1379,7 +1379,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 365.5 m 328 329 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 353.50 Tm (14-16, 18-19) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 329 m 547 329 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 317.00 Tm (20260820140000_badge_se) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 317.00 Tm (20260821004000_badge_se) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 307.50 Tm (ason_authority.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 329 m 148 302 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 317.00 Tm (Finalized season, season participant, and) Tj ET
@@ -1387,7 +1387,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 329 m 328 302 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 317.00 Tm (09, 29-30) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 302 m 547 302 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 290.00 Tm (20260820150000_badge_br) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 290.00 Tm (20260821005000_badge_br) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 280.50 Tm (acket_progression_autho) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 271.00 Tm (rity.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 302 m 148 265.5 l S
@@ -1395,7 +1395,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 302 m 328 265.5 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 290.00 Tm (05, 21-23) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 265.5 m 547 265.5 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 253.50 Tm (20260820160000_match_au) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 253.50 Tm (20260821006000_match_au) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 244.00 Tm (thority_foundation.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 265.5 m 148 229 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 152.00 253.50 Tm (Durable participant/game ledgers,) Tj ET
@@ -1404,7 +1404,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 265.5 m 328 229 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 253.50 Tm (Durable foundation for 10, 17, 20) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 229 m 547 229 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 217.00 Tm (20260820170000_badge_re) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 217.00 Tm (20260821007000_badge_re) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 207.50 Tm (liable_competitor_autho) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 198.00 Tm (rity.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 229 m 148 192.5 l S
@@ -1412,7 +1412,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 229 m 328 192.5 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 217.00 Tm (10) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 192.5 m 547 192.5 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 180.50 Tm (20260820180000_badge_co) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 180.50 Tm (20260821008000_badge_co) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 171.00 Tm (meback_commander_author) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 161.50 Tm (ity.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 192.5 m 148 156 l S
@@ -1420,7 +1420,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 192.5 m 328 156 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 180.50 Tm (17) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 156 m 547 156 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 144.00 Tm (20260820190000_tourname) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 144.00 Tm (20260821009000_tourname) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 134.50 Tm (nt_championship_path_au) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 125.00 Tm (thority.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 156 m 148 119.5 l S
@@ -1430,7 +1430,7 @@ stream
 0.84 0.82 0.78 RG 0.35 w 328 156 m 328 119.5 l S
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 332.00 144.00 Tm (Durable foundation for 20) Tj ET
 0.84 0.82 0.78 RG 0.35 w 48 119.5 m 547 119.5 l S
-0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 107.50 Tm (20260820200000_badge_fl) Tj ET
+0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 107.50 Tm (20260821010000_badge_fl) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 98.00 Tm (awless_campaign_authori) Tj ET
 0.1 0.12 0.15 rg BT /F1 8 Tf 1 0 0 1 52.00 88.50 Tm (ty.sql) Tj ET
 0.84 0.82 0.78 RG 0.35 w 148 119.5 m 148 83 l S

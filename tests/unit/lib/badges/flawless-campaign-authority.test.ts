@@ -9,7 +9,7 @@ const authority = readFileSync(
 const migration = readFileSync(
   resolve(
     process.cwd(),
-    "supabase/migrations/20260820200000_badge_flawless_campaign_authority.sql"
+    "supabase/migrations/20260821010000_badge_flawless_campaign_authority.sql"
   ),
   "utf8"
 );

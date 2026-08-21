@@ -2,9 +2,9 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const migrationName = "20260820140000_badge_season_authority.sql";
+const migrationName = "20260821004000_badge_season_authority.sql";
 const previousMigrationName =
-  "20260820130000_badge_streak_clean_upset_authority.sql";
+  "20260821003000_badge_streak_clean_upset_authority.sql";
 const migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations", migrationName),
   "utf8"

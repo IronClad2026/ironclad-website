@@ -303,7 +303,7 @@ badges.
 
 ## 7. Durable Match Authority
 
-Migration `20260820160000_match_authority_foundation.sql` adds two append-only,
+Migration `20260821006000_match_authority_foundation.sql` adds two append-only,
 revisioned ledgers.
 
 ### `match_participant_outcome_authority`
@@ -373,7 +373,7 @@ hard-deleting durable competition evidence.
 
 ## 8. Championship Path Authority
 
-Migration `20260820190000_tournament_championship_path_authority.sql` adds:
+Migration `20260821009000_tournament_championship_path_authority.sql` adds:
 
 - `tournament_championship_path_authority`;
 - `tournament_championship_path_summary_authority`.
@@ -671,17 +671,17 @@ schema migrations. Do not apply only the badge subset to a clean database.
 
 | Migration | Purpose and authority introduced | Badges enabled |
 |---|---|---|
-| `20260820100000_badge_award_foundation.sql` | `player_badge_awards`, unique award key, RLS, own-player read policy, match participant/summary RPCs. | 01-04 foundation |
-| `20260820110000_badge_batch_2_authority.sql` | Win threshold, tournament lookup, participant, and tournament summary RPCs. | 11-13, 06-08 |
-| `20260820120000_badge_progression_championship_authority.sql` | Tournament authority participant and prestige summary RPCs. | 21-28 |
-| `20260820130000_badge_streak_clean_upset_authority.sql` | Match excellence summary RPC. | 14-16, 18-19 |
-| `20260820140000_badge_season_authority.sql` | Finalized season, season participant, and season summary RPCs. | 09, 29-30 |
-| `20260820150000_badge_bracket_progression_authority.sql` | Bracket progression summary RPC. | 05, 21-23 |
-| `20260820160000_match_authority_foundation.sql` | Durable participant/game ledgers, append/read RPCs, match and tournament void triggers, RLS. | Durable foundation for 10, 17, 20 |
-| `20260820170000_badge_reliable_competitor_authority.sql` | Reliable Competitor sequence summary RPC. | 10 |
-| `20260820180000_badge_comeback_commander_authority.sql` | Complete-game comeback summary RPC. | 17 |
-| `20260820190000_tournament_championship_path_authority.sql` | Durable path and summary ledgers, refresh, completion, regeneration, void, and completion triggers. | Durable foundation for 20 |
-| `20260820200000_badge_flawless_campaign_authority.sql` | Service-role Flawless Campaign summary RPC combining champion, path, participant, and game evidence. | 20 |
+| `20260821000000_badge_award_foundation.sql` | `player_badge_awards`, unique award key, RLS, own-player read policy, match participant/summary RPCs. | 01-04 foundation |
+| `20260821001000_badge_batch_2_authority.sql` | Win threshold, tournament lookup, participant, and tournament summary RPCs. | 11-13, 06-08 |
+| `20260821002000_badge_progression_championship_authority.sql` | Tournament authority participant and prestige summary RPCs. | 21-28 |
+| `20260821003000_badge_streak_clean_upset_authority.sql` | Match excellence summary RPC. | 14-16, 18-19 |
+| `20260821004000_badge_season_authority.sql` | Finalized season, season participant, and season summary RPCs. | 09, 29-30 |
+| `20260821005000_badge_bracket_progression_authority.sql` | Bracket progression summary RPC. | 05, 21-23 |
+| `20260821006000_match_authority_foundation.sql` | Durable participant/game ledgers, append/read RPCs, match and tournament void triggers, RLS. | Durable foundation for 10, 17, 20 |
+| `20260821007000_badge_reliable_competitor_authority.sql` | Reliable Competitor sequence summary RPC. | 10 |
+| `20260821008000_badge_comeback_commander_authority.sql` | Complete-game comeback summary RPC. | 17 |
+| `20260821009000_tournament_championship_path_authority.sql` | Durable path and summary ledgers, refresh, completion, regeneration, void, and completion triggers. | Durable foundation for 20 |
+| `20260821010000_badge_flawless_campaign_authority.sql` | Service-role Flawless Campaign summary RPC combining champion, path, participant, and game evidence. | 20 |
 
 All earlier migrations under `supabase/migrations/` are prerequisites for a
 clean replay because these functions reference the existing tournament,
@@ -778,4 +778,3 @@ Known limitations proven by the repository:
 The next operational step is a disposable local or preview PostgreSQL validation
 of the complete migration chain. That validation must occur before any staging or
 production migration application or controlled historical backfill.
-
