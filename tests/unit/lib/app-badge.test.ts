@@ -77,13 +77,61 @@ describe("installed-app badge helper", () => {
       "player"
     );
     const unrelated = displayedNotification("another-app-notification", "player");
-    installDisplayedNotifications([target, other, unrelated]);
+    const browser = installDisplayedNotifications([target, other, unrelated]);
+
+    await closeDisplayedIronCladNotifications({ notificationIds: [targetId] });
+
+    expect(browser.getNotifications).toHaveBeenCalledWith();
+    expect(target.close).toHaveBeenCalledOnce();
+    expect(other.close).not.toHaveBeenCalled();
+    expect(unrelated.close).not.toHaveBeenCalled();
+  });
+
+  it("recovers the durable id from notification data", async () => {
+    const targetId = "11111111-1111-4111-8111-111111111111";
+    const target = {
+      tag: "",
+      data: { notificationId: targetId, scope: "player" },
+      close: vi.fn(),
+    } as unknown as Notification;
+    installDisplayedNotifications([target]);
 
     await closeDisplayedIronCladNotifications({ notificationIds: [targetId] });
 
     expect(target.close).toHaveBeenCalledOnce();
-    expect(other.close).not.toHaveBeenCalled();
-    expect(unrelated.close).not.toHaveBeenCalled();
+  });
+
+  it("uses the active registration associated with the current page", async () => {
+    const targetId = "11111111-1111-4111-8111-111111111111";
+    const target = displayedNotification(
+      `ironclad-notification:${targetId}`,
+      "player"
+    );
+    const matchedGetNotifications = vi.fn().mockResolvedValue([]);
+    const matchedRegistration = {
+      active: {},
+      getNotifications: matchedGetNotifications,
+      scope: "https://example.test/",
+    } as unknown as ServiceWorkerRegistration;
+    const readyGetNotifications = vi.fn().mockResolvedValue([target]);
+    const readyRegistration = {
+      active: {},
+      getNotifications: readyGetNotifications,
+      scope: "https://example.test/",
+    } as unknown as ServiceWorkerRegistration;
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        getRegistration: vi.fn().mockResolvedValue(matchedRegistration),
+        ready: Promise.resolve(readyRegistration),
+      },
+    });
+
+    await closeDisplayedIronCladNotifications({ notificationIds: [targetId] });
+
+    expect(matchedGetNotifications).not.toHaveBeenCalled();
+    expect(readyGetNotifications).toHaveBeenCalledWith();
+    expect(target.close).toHaveBeenCalledOnce();
   });
 
   it("closes only current-scope IronClad notifications for mark-all", async () => {
@@ -119,6 +167,64 @@ describe("installed-app badge helper", () => {
 
     await expect(closeDisplayedIronCladNotifications()).resolves.toBeUndefined();
   });
+
+  it("contains getNotifications rejection", async () => {
+    const registration = {
+      active: {},
+      getNotifications: vi
+        .fn()
+        .mockRejectedValue(new Error("GET_NOTIFICATIONS_FAILED")),
+      scope: "https://example.test/",
+    } as unknown as ServiceWorkerRegistration;
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        getRegistration: vi.fn().mockResolvedValue(registration),
+        ready: Promise.resolve(registration),
+      },
+    });
+
+    await expect(closeDisplayedIronCladNotifications()).resolves.toBeUndefined();
+  });
+
+  it("returns without awaiting readiness when no registration exists", async () => {
+    const serviceWorkers = {
+      getRegistration: vi.fn().mockResolvedValue(undefined),
+      get ready() {
+        throw new Error("READY_MUST_NOT_BE_READ");
+      },
+    };
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: serviceWorkers,
+    });
+
+    await expect(closeDisplayedIronCladNotifications()).resolves.toBeUndefined();
+  });
+
+  it("contains a notification close failure", async () => {
+    const failingId = "11111111-1111-4111-8111-111111111111";
+    const succeedingId = "22222222-2222-4222-8222-222222222222";
+    const failing = displayedNotification(
+      `ironclad-notification:${failingId}`,
+      "player"
+    );
+    const succeeding = displayedNotification(
+      `ironclad-notification:${succeedingId}`,
+      "player"
+    );
+    vi.mocked(failing.close).mockImplementation(() => {
+      throw new Error("CLOSE_FAILED");
+    });
+    installDisplayedNotifications([failing, succeeding]);
+
+    await expect(
+      closeDisplayedIronCladNotifications({
+        notificationIds: [failingId, succeedingId],
+      })
+    ).resolves.toBeUndefined();
+    expect(succeeding.close).toHaveBeenCalledOnce();
+  });
 });
 
 function displayedNotification(tag: string, scope: "player" | "admin") {
@@ -131,10 +237,15 @@ function displayedNotification(tag: string, scope: "player" | "admin") {
 
 function installDisplayedNotifications(notifications: Notification[]) {
   const getNotifications = vi.fn().mockResolvedValue(notifications);
-  const getRegistration = vi.fn().mockResolvedValue({ getNotifications });
+  const registration = {
+    active: {},
+    getNotifications,
+    scope: "https://example.test/",
+  } as unknown as ServiceWorkerRegistration;
+  const getRegistration = vi.fn().mockResolvedValue(registration);
   Object.defineProperty(navigator, "serviceWorker", {
     configurable: true,
-    value: { getRegistration },
+    value: { getRegistration, ready: Promise.resolve(registration) },
   });
   return { getNotifications, getRegistration };
 }

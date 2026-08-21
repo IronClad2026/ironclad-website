@@ -125,12 +125,13 @@ describe("notification service worker", () => {
     focusedClient.navigate.mockResolvedValue(focusedClient);
     worker.matchAll.mockResolvedValue([focusedClient]);
 
-    await worker.dispatchClick({
+    const close = await worker.dispatchClick({
       notificationId: NOTIFICATION_ID,
       scope: "player",
       destination: "https://evil.example/ignored",
     });
 
+    expect(close).toHaveBeenCalledOnce();
     expect(focusedClient.navigate).toHaveBeenCalledWith(
       `${ORIGIN}/api/notifications/click?notificationId=${NOTIFICATION_ID}&scope=player`
     );
@@ -204,13 +205,15 @@ function createWorkerHarness() {
     },
     async dispatchClick(data: Record<string, unknown>) {
       let work: Promise<unknown> | null = null;
+      const close = vi.fn();
       listeners.get("notificationclick")?.({
-        notification: { close: vi.fn(), data },
+        notification: { close, data },
         waitUntil: (promise: Promise<unknown>) => {
           work = promise;
         },
       });
       await work;
+      return close;
     },
   };
 }

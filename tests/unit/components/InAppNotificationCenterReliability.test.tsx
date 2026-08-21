@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InAppNotification } from "@/lib/notifications";
 import type { DashboardNotification } from "@/lib/player-dashboard";
 
+const NOTIFICATION_ID = "55555555-5555-4555-8555-555555555555";
 const pushMock = vi.hoisted(() => vi.fn());
 const refreshMock = vi.hoisted(() => vi.fn());
 const deleteSelectedMock = vi.hoisted(() => vi.fn());
@@ -41,7 +42,7 @@ function notification(
   overrides: Partial<InAppNotification> = {}
 ): InAppNotification {
   return {
-    id: "notification-reliability",
+    id: NOTIFICATION_ID,
     recipientRole: "player",
     type: "registration.rejected",
     title: "Registration Rejected",
@@ -134,7 +135,7 @@ describe("notification-center mutation reliability", () => {
     });
     expect(screen.queryByText("New")).not.toBeInTheDocument();
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
-      notificationIds: ["notification-reliability"],
+      notificationIds: [NOTIFICATION_ID],
     });
     expect(refreshMock).toHaveBeenCalled();
   });
@@ -159,6 +160,27 @@ describe("notification-center mutation reliability", () => {
     expect(refreshMock).toHaveBeenCalled();
   });
 
+  it("waits for displayed-notification cleanup after a durable hide before refreshing", async () => {
+    let finishCleanup!: () => void;
+    closeDisplayedNotificationsMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishCleanup = resolve;
+      })
+    );
+    renderPlayerCenter(notification());
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Select Registration Rejected/i })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+
+    await waitFor(() => expect(deleteSelectedMock).toHaveBeenCalledOnce());
+    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+    expect(refreshMock).not.toHaveBeenCalled();
+
+    finishCleanup();
+    await waitFor(() => expect(refreshMock).toHaveBeenCalledOnce());
+  });
+
   it("reconciles badge truth after marking selected durable notifications read", async () => {
     renderPlayerCenter(notification());
     fireEvent.click(
@@ -174,7 +196,7 @@ describe("notification-center mutation reliability", () => {
     await waitFor(() => expect(markSelectedMock).toHaveBeenCalledOnce());
     expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
-      notificationIds: ["notification-reliability"],
+      notificationIds: [NOTIFICATION_ID],
     });
   });
 
@@ -205,8 +227,25 @@ describe("notification-center mutation reliability", () => {
     await waitFor(() => expect(deleteSelectedMock).toHaveBeenCalledOnce());
     expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
-      notificationIds: ["notification-reliability"],
+      notificationIds: [NOTIFICATION_ID],
     });
+  });
+
+  it("does not close a displayed notification when durable hide fails", async () => {
+    deleteSelectedMock.mockResolvedValue({ ok: false, code: "unavailable" });
+    renderPlayerCenter(notification());
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Select Registration Rejected/i })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Your notifications could not be updated."
+      );
+    });
+    expect(closeDisplayedNotificationsMock).not.toHaveBeenCalled();
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
   });
 
   it("reconciles committed durable truth if a projected dismissal later fails", async () => {
@@ -243,7 +282,7 @@ describe("notification-center mutation reliability", () => {
     });
     expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
-      notificationIds: ["notification-reliability"],
+      notificationIds: [NOTIFICATION_ID],
     });
   });
 

@@ -235,9 +235,9 @@ export default function NotificationPermissionControl({
         return;
       }
 
+      await closeDisplayedIronCladNotifications();
       setExistingSubscription(null);
       setPhase(Notification.permission === "denied" ? "blocked" : "ready");
-      void closeDisplayedIronCladNotifications();
       requestNotificationBadgeReconciliation();
     } catch {
       setPhase("error");

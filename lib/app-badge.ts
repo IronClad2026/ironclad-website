@@ -73,36 +73,42 @@ export async function closeDisplayedIronCladNotifications(
     return;
   }
 
-  const targetTags = options.notificationIds
+  const targetIds = options.notificationIds
     ? new Set(
-        options.notificationIds
-          .filter((notificationId) =>
-            NOTIFICATION_ID_PATTERN.test(notificationId)
-          )
-          .map(
-            (notificationId) =>
-              `${IRONCLAD_NOTIFICATION_TAG_PREFIX}${notificationId}`
-          )
+        options.notificationIds.filter((notificationId) =>
+          NOTIFICATION_ID_PATTERN.test(notificationId)
+        )
       )
     : null;
 
-  if (targetTags?.size === 0) {
+  if (targetIds?.size === 0) {
     return;
   }
 
   try {
-    const registration = await navigator.serviceWorker.getRegistration("/");
-    if (!registration || typeof registration.getNotifications !== "function") {
+    const serviceWorkers = navigator.serviceWorker;
+    const matchingRegistration = await serviceWorkers.getRegistration();
+    if (!matchingRegistration?.active) {
+      return;
+    }
+
+    const registration = await serviceWorkers.ready;
+    if (
+      registration.scope !== matchingRegistration.scope ||
+      typeof registration.getNotifications !== "function"
+    ) {
       return;
     }
 
     const displayedNotifications = await registration.getNotifications();
+
     for (const displayedNotification of displayedNotifications) {
-      if (!isIronCladNotificationTag(displayedNotification.tag)) {
+      const notificationId = readDisplayedNotificationId(displayedNotification);
+      if (!notificationId) {
         continue;
       }
 
-      if (targetTags && !targetTags.has(displayedNotification.tag)) {
+      if (targetIds && !targetIds.has(notificationId)) {
         continue;
       }
 
@@ -127,14 +133,28 @@ export async function closeDisplayedIronCladNotifications(
   }
 }
 
-function isIronCladNotificationTag(tag: string) {
+function readDisplayedNotificationId(notification: Notification) {
+  const tag = notification.tag;
   if (!tag.startsWith(IRONCLAD_NOTIFICATION_TAG_PREFIX)) {
-    return false;
+    return readNotificationIdFromData(notification.data);
   }
 
-  return NOTIFICATION_ID_PATTERN.test(
-    tag.slice(IRONCLAD_NOTIFICATION_TAG_PREFIX.length)
-  );
+  const notificationId = tag.slice(IRONCLAD_NOTIFICATION_TAG_PREFIX.length);
+  return NOTIFICATION_ID_PATTERN.test(notificationId)
+    ? notificationId
+    : readNotificationIdFromData(notification.data);
+}
+
+function readNotificationIdFromData(data: unknown) {
+  if (!data || typeof data !== "object" || !("notificationId" in data)) {
+    return null;
+  }
+
+  const notificationId = data.notificationId;
+  return typeof notificationId === "string" &&
+    NOTIFICATION_ID_PATTERN.test(notificationId)
+    ? notificationId
+    : null;
 }
 
 function readDisplayedNotificationScope(

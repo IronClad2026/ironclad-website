@@ -179,7 +179,7 @@ export default function InAppNotificationCenter({
           )
         );
         commitAuthoritativeUnreadCount(result.unreadCount);
-        void closeDisplayedIronCladNotifications({
+        await closeDisplayedIronCladNotifications({
           notificationIds: [notificationId],
         });
         router.refresh();
@@ -211,7 +211,7 @@ export default function InAppNotificationCenter({
           current.map((notification) => ({ ...notification, readAt }))
         );
         commitAuthoritativeUnreadCount(result.unreadCount);
-        void closeDisplayedIronCladNotifications({ scope });
+        await closeDisplayedIronCladNotifications({ scope });
         router.refresh();
       } catch {
         setMutationError(t("dashboard.actions.updateFailed"));
@@ -283,7 +283,7 @@ export default function InAppNotificationCenter({
           )
         );
         commitAuthoritativeUnreadCount(result.unreadCount);
-        void closeDisplayedIronCladNotifications({
+        await closeDisplayedIronCladNotifications({
           notificationIds: selectedIds,
         });
         setSelectedNotificationIds(new Set());
@@ -324,7 +324,7 @@ export default function InAppNotificationCenter({
             return;
           }
           commitAuthoritativeUnreadCount(result.unreadCount);
-          void closeDisplayedIronCladNotifications({
+          await closeDisplayedIronCladNotifications({
             notificationIds: selectedIds,
           });
         }
@@ -398,7 +398,7 @@ export default function InAppNotificationCenter({
                 )
               );
               commitAuthoritativeUnreadCount(result.unreadCount);
-              void closeDisplayedIronCladNotifications({
+              await closeDisplayedIronCladNotifications({
                 notificationIds: [notification.id],
               });
             } else {
