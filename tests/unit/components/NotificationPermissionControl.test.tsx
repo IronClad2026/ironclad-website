@@ -8,6 +8,7 @@ const checkOwnershipMock = vi.hoisted(() => vi.fn());
 const saveSubscriptionMock = vi.hoisted(() => vi.fn());
 const deleteSubscriptionMock = vi.hoisted(() => vi.fn());
 const reconcileBadgeMock = vi.hoisted(() => vi.fn());
+const closeDisplayedNotificationsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/app/notifications/actions", () => ({
   checkWebPushSubscriptionOwnership: checkOwnershipMock,
@@ -16,6 +17,7 @@ vi.mock("@/app/notifications/actions", () => ({
   saveWebPushSubscription: saveSubscriptionMock,
 }));
 vi.mock("@/lib/app-badge", () => ({
+  closeDisplayedIronCladNotifications: closeDisplayedNotificationsMock,
   requestNotificationBadgeReconciliation: reconcileBadgeMock,
 }));
 
@@ -36,6 +38,7 @@ describe("notification permission control", () => {
     checkOwnershipMock.mockResolvedValue({ ok: true, owned: true });
     saveSubscriptionMock.mockResolvedValue({ ok: true });
     deleteSubscriptionMock.mockResolvedValue({ ok: true });
+    closeDisplayedNotificationsMock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -234,6 +237,22 @@ describe("notification permission control", () => {
     expect(deleteSubscriptionMock).not.toHaveBeenCalled();
     expect(saveSubscriptionMock).not.toHaveBeenCalled();
     expect(browser.register).not.toHaveBeenCalled();
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledOnce();
+    expect(reconcileBadgeMock).toHaveBeenCalledOnce();
+  });
+
+  it("closes stale displayed notifications for a registered worker without a subscription", async () => {
+    installBrowserMocks({
+      permission: "granted",
+      existingRegistration: true,
+    });
+
+    render(<NotificationPermissionControl />);
+
+    await screen.findByText("Notifications are off on this device.");
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledOnce();
+    expect(deleteSubscriptionMock).not.toHaveBeenCalled();
+    expect(saveSubscriptionMock).not.toHaveBeenCalled();
   });
 
   it("repairs an unowned browser subscription without taking another account's endpoint", async () => {
@@ -251,6 +270,9 @@ describe("notification permission control", () => {
       existingRegistration: true,
     });
     checkOwnershipMock.mockResolvedValue({ ok: true, owned: false });
+    closeDisplayedNotificationsMock.mockImplementation(async () => {
+      order.push("close");
+    });
 
     render(<NotificationPermissionControl />);
     fireEvent.click(
@@ -258,7 +280,8 @@ describe("notification permission control", () => {
     );
 
     await screen.findByText("Notifications are enabled on this device.");
-    expect(order).toEqual(["unsubscribe", "subscribe"]);
+    expect(order).toEqual(["unsubscribe", "close", "subscribe"]);
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledOnce();
     expect(saveSubscriptionMock).toHaveBeenCalledWith(
       expect.objectContaining({
         endpoint:
@@ -293,6 +316,8 @@ describe("notification permission control", () => {
     expect(deleteSubscriptionMock).toHaveBeenCalledWith(
       "https://fcm.googleapis.com/push/subscription-one"
     );
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledOnce();
+    expect(reconcileBadgeMock).toHaveBeenCalledOnce();
   });
 
   it("reports a denied browser permission without retrying it automatically", async () => {

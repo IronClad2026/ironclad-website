@@ -10,7 +10,10 @@ import {
 } from "@/app/notifications/actions";
 import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
 import notificationsEnglish from "@/lib/i18n/dictionaries/en/notifications";
-import { requestNotificationBadgeReconciliation } from "@/lib/app-badge";
+import {
+  closeDisplayedIronCladNotifications,
+  requestNotificationBadgeReconciliation,
+} from "@/lib/app-badge";
 
 type PermissionPhase =
   | "checking"
@@ -71,6 +74,8 @@ export default function NotificationPermissionControl({
             return;
           }
           setExistingSubscription(null);
+          void closeDisplayedIronCladNotifications();
+          requestNotificationBadgeReconciliation();
         } else {
           setExistingSubscription({
             endpoint: subscription.endpoint,
@@ -79,6 +84,9 @@ export default function NotificationPermissionControl({
         }
       } else {
         setExistingSubscription(null);
+        if (registration) {
+          void closeDisplayedIronCladNotifications();
+        }
       }
 
       setPhase(Notification.permission === "denied" ? "blocked" : "ready");
@@ -145,6 +153,8 @@ export default function NotificationPermissionControl({
             return;
           }
           priorSubscription = null;
+          await closeDisplayedIronCladNotifications();
+          requestNotificationBadgeReconciliation();
         }
       }
 
@@ -227,6 +237,8 @@ export default function NotificationPermissionControl({
 
       setExistingSubscription(null);
       setPhase(Notification.permission === "denied" ? "blocked" : "ready");
+      void closeDisplayedIronCladNotifications();
+      requestNotificationBadgeReconciliation();
     } catch {
       setPhase("error");
     }

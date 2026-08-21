@@ -39,7 +39,10 @@ import type {
   InAppNotification,
   NotificationScope,
 } from "@/lib/notifications";
-import { requestNotificationBadgeReconciliation } from "@/lib/app-badge";
+import {
+  closeDisplayedIronCladNotifications,
+  requestNotificationBadgeReconciliation,
+} from "@/lib/app-badge";
 
 type InAppNotificationCenterProps = {
   scope: NotificationScope;
@@ -176,6 +179,9 @@ export default function InAppNotificationCenter({
           )
         );
         commitAuthoritativeUnreadCount(result.unreadCount);
+        void closeDisplayedIronCladNotifications({
+          notificationIds: [notificationId],
+        });
         router.refresh();
       } catch {
         setMutationError(t("dashboard.actions.updateFailed"));
@@ -205,6 +211,7 @@ export default function InAppNotificationCenter({
           current.map((notification) => ({ ...notification, readAt }))
         );
         commitAuthoritativeUnreadCount(result.unreadCount);
+        void closeDisplayedIronCladNotifications({ scope });
         router.refresh();
       } catch {
         setMutationError(t("dashboard.actions.updateFailed"));
@@ -276,6 +283,9 @@ export default function InAppNotificationCenter({
           )
         );
         commitAuthoritativeUnreadCount(result.unreadCount);
+        void closeDisplayedIronCladNotifications({
+          notificationIds: selectedIds,
+        });
         setSelectedNotificationIds(new Set());
         router.refresh();
       } catch {
@@ -300,8 +310,6 @@ export default function InAppNotificationCenter({
     startTransition(async () => {
       setMutationError(null);
       try {
-        let authoritativeUnreadCount: number | null = null;
-
         if (selectedIds.length > 0) {
           const formData = new FormData();
           formData.set("scope", scope);
@@ -315,7 +323,10 @@ export default function InAppNotificationCenter({
             router.refresh();
             return;
           }
-          authoritativeUnreadCount = result.unreadCount;
+          commitAuthoritativeUnreadCount(result.unreadCount);
+          void closeDisplayedIronCladNotifications({
+            notificationIds: selectedIds,
+          });
         }
 
         if (scope === "player" && selectedMatchActionIds.length > 0) {
@@ -340,9 +351,6 @@ export default function InAppNotificationCenter({
         setNotificationTotalCount((current) =>
           Math.max(current - selectedIds.length, 0)
         );
-        if (authoritativeUnreadCount !== null) {
-          commitAuthoritativeUnreadCount(authoritativeUnreadCount);
-        }
         if (selectedMatchActionIds.length > 0) {
           setDismissedMatchActionIds((current) => {
             const next = new Set(current);
@@ -390,6 +398,9 @@ export default function InAppNotificationCenter({
                 )
               );
               commitAuthoritativeUnreadCount(result.unreadCount);
+              void closeDisplayedIronCladNotifications({
+                notificationIds: [notification.id],
+              });
             } else {
               setMutationError(t("dashboard.actions.updateFailed"));
             }
