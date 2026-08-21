@@ -4,7 +4,10 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
 const NOTIFICATION_ID = "11111111-1111-4111-8111-111111111111";
+const SECOND_NOTIFICATION_ID = "22222222-2222-4222-8222-222222222222";
 const ORIGIN = "https://www.ironcladtournaments.com";
+const CLOSE_MESSAGE_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS";
+const CLOSE_RESULT_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
 
 describe("notification service worker", () => {
   it("shows a conservative notification and applies a trusted badge snapshot", async () => {
@@ -150,6 +153,127 @@ describe("notification service worker", () => {
 
     expect(worker.openWindow).toHaveBeenCalledWith(`${ORIGIN}/`);
   });
+
+  it("closes exact same-scope notifications inside the owning service worker", async () => {
+    const worker = createWorkerHarness();
+    const tagged = displayedNotification({
+      notificationId: NOTIFICATION_ID,
+      scope: "player",
+    });
+    const dataFallback = displayedNotification({
+      notificationId: SECOND_NOTIFICATION_ID,
+      scope: "player",
+      tag: "",
+    });
+    const wrongScope = displayedNotification({
+      notificationId: NOTIFICATION_ID,
+      scope: "admin",
+    });
+    const unrelated = displayedNotification({
+      notificationId: "33333333-3333-4333-8333-333333333333",
+      scope: "player",
+    });
+    worker.getNotifications.mockResolvedValue([
+      tagged,
+      dataFallback,
+      wrongScope,
+      unrelated,
+    ]);
+
+    const reply = await worker.dispatchMessage({
+      type: CLOSE_MESSAGE_TYPE,
+      notificationIds: [NOTIFICATION_ID, SECOND_NOTIFICATION_ID],
+      scope: "player",
+    });
+
+    expect(worker.getNotifications).toHaveBeenCalledOnce();
+    expect(tagged.close).toHaveBeenCalledOnce();
+    expect(dataFallback.close).toHaveBeenCalledOnce();
+    expect(wrongScope.close).not.toHaveBeenCalled();
+    expect(unrelated.close).not.toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith({
+      type: CLOSE_RESULT_TYPE,
+      ok: true,
+      matchedCount: 2,
+      closedCount: 2,
+    });
+  });
+
+  it("closes only valid current-scope notifications for mark-all", async () => {
+    const worker = createWorkerHarness();
+    const player = displayedNotification({
+      notificationId: NOTIFICATION_ID,
+      scope: "player",
+    });
+    const playerCloseFailure = displayedNotification({
+      notificationId: SECOND_NOTIFICATION_ID,
+      scope: "player",
+    });
+    playerCloseFailure.close.mockImplementation(() => {
+      throw new Error("CLOSE_FAILED");
+    });
+    const admin = displayedNotification({
+      notificationId: "33333333-3333-4333-8333-333333333333",
+      scope: "admin",
+    });
+    const conflictingIdentity = displayedNotification({
+      notificationId: "44444444-4444-4444-8444-444444444444",
+      scope: "player",
+      dataNotificationId: "55555555-5555-4555-8555-555555555555",
+    });
+    const unrelated = {
+      tag: "another-app-notification",
+      data: { scope: "player" },
+      close: vi.fn(),
+    };
+    worker.getNotifications.mockResolvedValue([
+      player,
+      playerCloseFailure,
+      admin,
+      conflictingIdentity,
+      unrelated,
+    ]);
+
+    const reply = await worker.dispatchMessage({
+      type: CLOSE_MESSAGE_TYPE,
+      scope: "player",
+    });
+
+    expect(player.close).toHaveBeenCalledOnce();
+    expect(playerCloseFailure.close).toHaveBeenCalledOnce();
+    expect(admin.close).not.toHaveBeenCalled();
+    expect(conflictingIdentity.close).not.toHaveBeenCalled();
+    expect(unrelated.close).not.toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith({
+      type: CLOSE_RESULT_TYPE,
+      ok: false,
+      matchedCount: 2,
+      closedCount: 1,
+    });
+  });
+
+  it("ignores malformed, cross-origin, and over-broad cleanup messages", async () => {
+    const worker = createWorkerHarness();
+    const malformedMessages = [
+      { type: "UNTRUSTED_MESSAGE", scope: "player" },
+      { type: CLOSE_MESSAGE_TYPE, notificationIds: [] },
+      { type: CLOSE_MESSAGE_TYPE, notificationIds: ["not-a-uuid"] },
+      { type: CLOSE_MESSAGE_TYPE, scope: "owner-supplied-admin" },
+      { type: CLOSE_MESSAGE_TYPE, scope: "player", destination: "/admin" },
+    ];
+
+    for (const message of malformedMessages) {
+      const reply = await worker.dispatchMessage(message);
+      expect(reply).not.toHaveBeenCalled();
+    }
+    const crossOriginReply = await worker.dispatchMessage(
+      { type: CLOSE_MESSAGE_TYPE, scope: "player" },
+      "https://evil.example"
+    );
+
+    expect(crossOriginReply).not.toHaveBeenCalled();
+    expect(worker.getNotifications).not.toHaveBeenCalled();
+  });
 });
 
 function createWorkerHarness() {
@@ -159,11 +283,12 @@ function createWorkerHarness() {
   const clearAppBadge = vi.fn().mockResolvedValue(undefined);
   const matchAll = vi.fn().mockResolvedValue([]);
   const openWindow = vi.fn().mockResolvedValue(undefined);
+  const getNotifications = vi.fn().mockResolvedValue([]);
   const workerSource = readFileSync(resolve(process.cwd(), "public/sw.js"), "utf8");
   const serviceWorker = {
     location: { origin: ORIGIN },
     navigator: { setAppBadge, clearAppBadge },
-    registration: { showNotification },
+    registration: { getNotifications, showNotification },
     clients: {
       claim: vi.fn().mockResolvedValue(undefined),
       matchAll,
@@ -189,6 +314,7 @@ function createWorkerHarness() {
 
   return {
     clearAppBadge,
+    getNotifications,
     matchAll,
     openWindow,
     setAppBadge,
@@ -215,5 +341,37 @@ function createWorkerHarness() {
       await work;
       return close;
     },
+    async dispatchMessage(data: unknown, origin = ORIGIN) {
+      let work: Promise<unknown> | null = null;
+      const postMessage = vi.fn();
+      listeners.get("message")?.({
+        data,
+        origin,
+        ports: [{ postMessage }],
+        waitUntil: (promise: Promise<unknown>) => {
+          work = promise;
+        },
+      });
+      await work;
+      return postMessage;
+    },
+  };
+}
+
+function displayedNotification({
+  notificationId,
+  scope,
+  tag = `ironclad-notification:${notificationId}`,
+  dataNotificationId = notificationId,
+}: {
+  notificationId: string;
+  scope: "player" | "admin";
+  tag?: string;
+  dataNotificationId?: string;
+}) {
+  return {
+    tag,
+    data: { notificationId: dataNotificationId, scope },
+    close: vi.fn(),
   };
 }

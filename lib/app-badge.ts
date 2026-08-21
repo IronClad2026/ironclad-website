@@ -1,9 +1,14 @@
 export const NOTIFICATION_BADGE_RECONCILE_EVENT =
   "ironclad:notification-badge-reconcile";
 
-const IRONCLAD_NOTIFICATION_TAG_PREFIX = "ironclad-notification:";
 const NOTIFICATION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE =
+  "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS";
+const CLOSE_DISPLAYED_NOTIFICATIONS_RESULT =
+  "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
+const CLOSE_DISPLAYED_NOTIFICATIONS_TIMEOUT_MS = 1_500;
+const MAX_CLOSE_NOTIFICATION_IDS = 100;
 
 type BadgeNavigator = Navigator & {
   clearAppBadge?: () => Promise<void>;
@@ -69,101 +74,106 @@ export function requestNotificationBadgeReconciliation() {
 export async function closeDisplayedIronCladNotifications(
   options: CloseDisplayedNotificationsOptions = {}
 ): Promise<void> {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+  if (
+    typeof navigator === "undefined" ||
+    !("serviceWorker" in navigator) ||
+    typeof MessageChannel === "undefined"
+  ) {
     return;
   }
 
-  const targetIds = options.notificationIds
-    ? new Set(
-        options.notificationIds.filter((notificationId) =>
-          NOTIFICATION_ID_PATTERN.test(notificationId)
-        )
-      )
-    : null;
-
-  if (targetIds?.size === 0) {
+  const notificationIds = options.notificationIds
+    ? [...new Set(options.notificationIds)]
+    : undefined;
+  if (
+    notificationIds?.length === 0 ||
+    (notificationIds?.length ?? 0) > MAX_CLOSE_NOTIFICATION_IDS ||
+    notificationIds?.some(
+      (notificationId) => !NOTIFICATION_ID_PATTERN.test(notificationId)
+    ) ||
+    (options.scope !== undefined &&
+      options.scope !== "player" &&
+      options.scope !== "admin")
+  ) {
     return;
   }
 
   try {
     const serviceWorkers = navigator.serviceWorker;
-    const matchingRegistration = await serviceWorkers.getRegistration();
+    const matchingRegistration = await serviceWorkers.getRegistration("/");
     if (!matchingRegistration?.active) {
       return;
     }
 
-    const registration = await serviceWorkers.ready;
-    if (
-      registration.scope !== matchingRegistration.scope ||
-      typeof registration.getNotifications !== "function"
-    ) {
-      return;
-    }
-
-    const displayedNotifications = await registration.getNotifications();
-
-    for (const displayedNotification of displayedNotifications) {
-      const notificationId = readDisplayedNotificationId(displayedNotification);
-      if (!notificationId) {
-        continue;
-      }
-
-      if (targetIds && !targetIds.has(notificationId)) {
-        continue;
-      }
-
-      if (
-        options.scope &&
-        readDisplayedNotificationScope(displayedNotification.data) !==
-          options.scope
-      ) {
-        continue;
-      }
-
-      try {
-        displayedNotification.close();
-      } catch {
-        // Displayed-notification cleanup is best effort and must never undo a
-        // successful authoritative notification mutation.
-      }
-    }
+    await requestServiceWorkerNotificationCleanup(matchingRegistration.active, {
+      type: CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE,
+      ...(notificationIds ? { notificationIds } : {}),
+      ...(options.scope ? { scope: options.scope } : {}),
+    });
   } catch {
-    // Some browsers do not expose persistent-notification inspection. The
-    // durable database mutation and badge reconciliation remain authoritative.
+    // Persistent-notification cleanup is best effort. The durable database
+    // mutation and authoritative badge reconciliation must remain successful.
   }
 }
 
-function readDisplayedNotificationId(notification: Notification) {
-  const tag = notification.tag;
-  if (!tag.startsWith(IRONCLAD_NOTIFICATION_TAG_PREFIX)) {
-    return readNotificationIdFromData(notification.data);
+async function requestServiceWorkerNotificationCleanup(
+  activeWorker: ServiceWorker,
+  request: {
+    type: typeof CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE;
+    notificationIds?: string[];
+    scope?: DisplayedNotificationScope;
   }
+) {
+  const channel = new MessageChannel();
 
-  const notificationId = tag.slice(IRONCLAD_NOTIFICATION_TAG_PREFIX.length);
-  return NOTIFICATION_ID_PATTERN.test(notificationId)
-    ? notificationId
-    : readNotificationIdFromData(notification.data);
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeoutId);
+      channel.port1.onmessage = null;
+      channel.port1.onmessageerror = null;
+      channel.port1.close();
+      resolve();
+    };
+    const timeoutId = setTimeout(
+      finish,
+      CLOSE_DISPLAYED_NOTIFICATIONS_TIMEOUT_MS
+    );
+
+    channel.port1.onmessage = (event: MessageEvent<unknown>) => {
+      if (isCloseDisplayedNotificationsResult(event.data)) {
+        finish();
+      }
+    };
+    channel.port1.onmessageerror = finish;
+    channel.port1.start();
+
+    try {
+      activeWorker.postMessage(request, [channel.port2]);
+    } catch {
+      channel.port2.close();
+      finish();
+    }
+  });
 }
 
-function readNotificationIdFromData(data: unknown) {
-  if (!data || typeof data !== "object" || !("notificationId" in data)) {
-    return null;
+function isCloseDisplayedNotificationsResult(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return false;
   }
 
-  const notificationId = data.notificationId;
-  return typeof notificationId === "string" &&
-    NOTIFICATION_ID_PATTERN.test(notificationId)
-    ? notificationId
-    : null;
-}
-
-function readDisplayedNotificationScope(
-  data: unknown
-): DisplayedNotificationScope | null {
-  if (!data || typeof data !== "object" || !("scope" in data)) {
-    return null;
-  }
-
-  const scope = data.scope;
-  return scope === "player" || scope === "admin" ? scope : null;
+  const result = value as Record<string, unknown>;
+  return (
+    result.type === CLOSE_DISPLAYED_NOTIFICATIONS_RESULT &&
+    typeof result.ok === "boolean" &&
+    Number.isSafeInteger(result.matchedCount) &&
+    Number(result.matchedCount) >= 0 &&
+    Number.isSafeInteger(result.closedCount) &&
+    Number(result.closedCount) >= 0 &&
+    Number(result.closedCount) <= Number(result.matchedCount)
+  );
 }

@@ -3,9 +3,15 @@
 const DEFAULT_DESTINATION = "/";
 const NOTIFICATION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const IRONCLAD_NOTIFICATION_TAG_PREFIX = "ironclad-notification:";
+const CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE =
+  "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS";
+const CLOSE_DISPLAYED_NOTIFICATIONS_RESULT =
+  "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
 const MAX_TITLE_LENGTH = 80;
 const MAX_BODY_LENGTH = 180;
 const MAX_UNREAD_COUNT = 999_999;
+const MAX_CLOSE_NOTIFICATION_IDS = 100;
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -43,6 +49,36 @@ self.addEventListener("notificationclick", (event) => {
   );
 
   event.waitUntil(focusOrOpenDestination(destination));
+});
+
+self.addEventListener("message", (event) => {
+  const request = readCloseDisplayedNotificationsRequest(event.data);
+  const responsePort = event.ports?.[0];
+  if (
+    event.origin !== self.location.origin ||
+    !request ||
+    !responsePort
+  ) {
+    return;
+  }
+
+  event.waitUntil(
+    closeDisplayedNotifications(request)
+      .then(({ matchedCount, closedCount }) => {
+        postCloseDisplayedNotificationsResult(responsePort, {
+          ok: closedCount === matchedCount,
+          matchedCount,
+          closedCount,
+        });
+      })
+      .catch(() => {
+        postCloseDisplayedNotificationsResult(responsePort, {
+          ok: false,
+          matchedCount: 0,
+          closedCount: 0,
+        });
+      })
+  );
 });
 
 function readPushPayload(data) {
@@ -97,6 +133,115 @@ function readNotificationId(value) {
 
 function readScope(value) {
   return value === "player" || value === "admin" ? value : null;
+}
+
+function readCloseDisplayedNotificationsRequest(value) {
+  if (!isRecord(value) || value.type !== CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE) {
+    return null;
+  }
+
+  const allowedKeys = new Set(["type", "notificationIds", "scope"]);
+  if (Object.keys(value).some((key) => !allowedKeys.has(key))) {
+    return null;
+  }
+
+  let notificationIds = null;
+  if (Object.prototype.hasOwnProperty.call(value, "notificationIds")) {
+    if (
+      !Array.isArray(value.notificationIds) ||
+      value.notificationIds.length === 0 ||
+      value.notificationIds.length > MAX_CLOSE_NOTIFICATION_IDS
+    ) {
+      return null;
+    }
+
+    notificationIds = new Set();
+    for (const valueNotificationId of value.notificationIds) {
+      const notificationId = readNotificationId(valueNotificationId);
+      if (!notificationId) {
+        return null;
+      }
+      notificationIds.add(notificationId);
+    }
+  }
+
+  let scope = null;
+  if (Object.prototype.hasOwnProperty.call(value, "scope")) {
+    scope = readScope(value.scope);
+    if (!scope) {
+      return null;
+    }
+  }
+
+  return { notificationIds, scope };
+}
+
+async function closeDisplayedNotifications({ notificationIds, scope }) {
+  const displayedNotifications = await self.registration.getNotifications();
+  let matchedCount = 0;
+  let closedCount = 0;
+
+  for (const displayedNotification of displayedNotifications) {
+    const notificationId = readDisplayedNotificationId(displayedNotification);
+    const notificationScope = readScope(displayedNotification.data?.scope);
+    if (!notificationId || !notificationScope) {
+      continue;
+    }
+
+    if (notificationIds && !notificationIds.has(notificationId)) {
+      continue;
+    }
+
+    if (scope && notificationScope !== scope) {
+      continue;
+    }
+
+    matchedCount += 1;
+    try {
+      displayedNotification.close();
+      closedCount += 1;
+    } catch {
+      // Continue closing other matching IronClad notifications.
+    }
+  }
+
+  return { matchedCount, closedCount };
+}
+
+function readDisplayedNotificationId(notification) {
+  const tag = typeof notification.tag === "string" ? notification.tag : "";
+  const dataNotificationId = readNotificationId(
+    notification.data?.notificationId
+  );
+  if (tag.startsWith(IRONCLAD_NOTIFICATION_TAG_PREFIX)) {
+    const taggedNotificationId = readNotificationId(
+      tag.slice(IRONCLAD_NOTIFICATION_TAG_PREFIX.length)
+    );
+    if (taggedNotificationId) {
+      if (dataNotificationId && dataNotificationId !== taggedNotificationId) {
+        return "";
+      }
+      return taggedNotificationId;
+    }
+  }
+
+  return dataNotificationId;
+}
+
+function postCloseDisplayedNotificationsResult(
+  responsePort,
+  { ok, matchedCount, closedCount }
+) {
+  try {
+    responsePort.postMessage({
+      type: CLOSE_DISPLAYED_NOTIFICATIONS_RESULT,
+      ok,
+      matchedCount,
+      closedCount,
+    });
+  } catch {
+    // The page may have navigated after its bounded acknowledgement window.
+  }
 }
 
 function buildNotificationClickDestination(notificationId, scope) {

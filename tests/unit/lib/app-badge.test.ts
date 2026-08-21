@@ -8,11 +8,20 @@ import {
   requestNotificationBadgeReconciliation,
 } from "@/lib/app-badge";
 
+const originalMessageChannel = globalThis.MessageChannel;
+const CLOSE_RESULT_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
+
 describe("installed-app badge helper", () => {
   afterEach(() => {
     Reflect.deleteProperty(navigator, "setAppBadge");
     Reflect.deleteProperty(navigator, "clearAppBadge");
     Reflect.deleteProperty(navigator, "serviceWorker");
+    Object.defineProperty(globalThis, "MessageChannel", {
+      configurable: true,
+      writable: true,
+      value: originalMessageChannel,
+    });
+    vi.useRealTimers();
   });
 
   it("sets a positive authoritative unread count", async () => {
@@ -65,98 +74,68 @@ describe("installed-app badge helper", () => {
     window.removeEventListener(NOTIFICATION_BADGE_RECONCILE_EVENT, listener);
   });
 
-  it("closes only the displayed notification for a trusted durable id", async () => {
+  it("sends exact durable identity and scope to the active worker and awaits acknowledgement", async () => {
     const targetId = "11111111-1111-4111-8111-111111111111";
-    const otherId = "22222222-2222-4222-8222-222222222222";
-    const target = displayedNotification(
-      `ironclad-notification:${targetId}`,
-      "player"
-    );
-    const other = displayedNotification(
-      `ironclad-notification:${otherId}`,
-      "player"
-    );
-    const unrelated = displayedNotification("another-app-notification", "player");
-    const browser = installDisplayedNotifications([target, other, unrelated]);
+    const worker = installActiveWorker({ acknowledge: false });
 
-    await closeDisplayedIronCladNotifications({ notificationIds: [targetId] });
+    let settled = false;
+    const cleanup = closeDisplayedIronCladNotifications({
+      notificationIds: [targetId, targetId],
+      scope: "player",
+    }).then(() => {
+      settled = true;
+    });
+    await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledOnce());
 
-    expect(browser.getNotifications).toHaveBeenCalledWith();
-    expect(target.close).toHaveBeenCalledOnce();
-    expect(other.close).not.toHaveBeenCalled();
-    expect(unrelated.close).not.toHaveBeenCalled();
-  });
-
-  it("recovers the durable id from notification data", async () => {
-    const targetId = "11111111-1111-4111-8111-111111111111";
-    const target = {
-      tag: "",
-      data: { notificationId: targetId, scope: "player" },
-      close: vi.fn(),
-    } as unknown as Notification;
-    installDisplayedNotifications([target]);
-
-    await closeDisplayedIronCladNotifications({ notificationIds: [targetId] });
-
-    expect(target.close).toHaveBeenCalledOnce();
-  });
-
-  it("uses the active registration associated with the current page", async () => {
-    const targetId = "11111111-1111-4111-8111-111111111111";
-    const target = displayedNotification(
-      `ironclad-notification:${targetId}`,
-      "player"
-    );
-    const matchedGetNotifications = vi.fn().mockResolvedValue([]);
-    const matchedRegistration = {
-      active: {},
-      getNotifications: matchedGetNotifications,
-      scope: "https://example.test/",
-    } as unknown as ServiceWorkerRegistration;
-    const readyGetNotifications = vi.fn().mockResolvedValue([target]);
-    const readyRegistration = {
-      active: {},
-      getNotifications: readyGetNotifications,
-      scope: "https://example.test/",
-    } as unknown as ServiceWorkerRegistration;
-    Object.defineProperty(navigator, "serviceWorker", {
-      configurable: true,
-      value: {
-        getRegistration: vi.fn().mockResolvedValue(matchedRegistration),
-        ready: Promise.resolve(readyRegistration),
+    expect(worker.getRegistration).toHaveBeenCalledWith("/");
+    expect(worker.postMessage).toHaveBeenCalledWith(
+      {
+        type: "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS",
+        notificationIds: [targetId],
+        scope: "player",
       },
+      [expect.any(TestMessagePort)]
+    );
+    expect(settled).toBe(false);
+
+    worker.reply({
+      type: CLOSE_RESULT_TYPE,
+      ok: true,
+      matchedCount: 1,
+      closedCount: 1,
+    });
+    await cleanup;
+    expect(settled).toBe(true);
+  });
+
+  it("sends scope-only cleanup for mark-all", async () => {
+    const worker = installActiveWorker();
+
+    await closeDisplayedIronCladNotifications({ scope: "admin" });
+
+    expect(worker.postMessage).toHaveBeenCalledWith(
+      {
+        type: "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS",
+        scope: "admin",
+      },
+      [expect.any(TestMessagePort)]
+    );
+  });
+
+  it("rejects malformed durable ids before messaging the worker", async () => {
+    const worker = installActiveWorker();
+
+    await closeDisplayedIronCladNotifications({
+      notificationIds: [
+        "11111111-1111-4111-8111-111111111111",
+        "not-a-notification-id",
+      ],
     });
 
-    await closeDisplayedIronCladNotifications({ notificationIds: [targetId] });
-
-    expect(matchedGetNotifications).not.toHaveBeenCalled();
-    expect(readyGetNotifications).toHaveBeenCalledWith();
-    expect(target.close).toHaveBeenCalledOnce();
+    expect(worker.postMessage).not.toHaveBeenCalled();
   });
 
-  it("closes only current-scope IronClad notifications for mark-all", async () => {
-    const player = displayedNotification(
-      "ironclad-notification:11111111-1111-4111-8111-111111111111",
-      "player"
-    );
-    const admin = displayedNotification(
-      "ironclad-notification:22222222-2222-4222-8222-222222222222",
-      "admin"
-    );
-    const malformed = displayedNotification(
-      "ironclad-notification:not-a-notification-id",
-      "player"
-    );
-    installDisplayedNotifications([player, admin, malformed]);
-
-    await closeDisplayedIronCladNotifications({ scope: "player" });
-
-    expect(player.close).toHaveBeenCalledOnce();
-    expect(admin.close).not.toHaveBeenCalled();
-    expect(malformed.close).not.toHaveBeenCalled();
-  });
-
-  it("contains unavailable or rejected notification inspection", async () => {
+  it("contains unavailable registration and worker messaging failures", async () => {
     const getRegistration = vi
       .fn()
       .mockRejectedValue(new Error("NOTIFICATION_INSPECTION_FAILED"));
@@ -166,86 +145,102 @@ describe("installed-app badge helper", () => {
     });
 
     await expect(closeDisplayedIronCladNotifications()).resolves.toBeUndefined();
-  });
-
-  it("contains getNotifications rejection", async () => {
-    const registration = {
-      active: {},
-      getNotifications: vi
-        .fn()
-        .mockRejectedValue(new Error("GET_NOTIFICATIONS_FAILED")),
-      scope: "https://example.test/",
-    } as unknown as ServiceWorkerRegistration;
-    Object.defineProperty(navigator, "serviceWorker", {
-      configurable: true,
-      value: {
-        getRegistration: vi.fn().mockResolvedValue(registration),
-        ready: Promise.resolve(registration),
-      },
-    });
-
+    const worker = installActiveWorker({ postMessageError: true });
     await expect(closeDisplayedIronCladNotifications()).resolves.toBeUndefined();
+    expect(worker.postMessage).toHaveBeenCalledOnce();
   });
 
-  it("returns without awaiting readiness when no registration exists", async () => {
-    const serviceWorkers = {
-      getRegistration: vi.fn().mockResolvedValue(undefined),
-      get ready() {
-        throw new Error("READY_MUST_NOT_BE_READ");
-      },
-    };
-    Object.defineProperty(navigator, "serviceWorker", {
-      configurable: true,
-      value: serviceWorkers,
+  it("bounds a missing or malformed worker acknowledgement", async () => {
+    vi.useFakeTimers();
+    const worker = installActiveWorker({ acknowledge: false });
+    const cleanup = closeDisplayedIronCladNotifications();
+    await vi.advanceTimersByTimeAsync(0);
+    worker.reply({ type: "UNTRUSTED_RESULT" });
+
+    let settled = false;
+    void cleanup.then(() => {
+      settled = true;
     });
-
-    await expect(closeDisplayedIronCladNotifications()).resolves.toBeUndefined();
-  });
-
-  it("contains a notification close failure", async () => {
-    const failingId = "11111111-1111-4111-8111-111111111111";
-    const succeedingId = "22222222-2222-4222-8222-222222222222";
-    const failing = displayedNotification(
-      `ironclad-notification:${failingId}`,
-      "player"
-    );
-    const succeeding = displayedNotification(
-      `ironclad-notification:${succeedingId}`,
-      "player"
-    );
-    vi.mocked(failing.close).mockImplementation(() => {
-      throw new Error("CLOSE_FAILED");
-    });
-    installDisplayedNotifications([failing, succeeding]);
-
-    await expect(
-      closeDisplayedIronCladNotifications({
-        notificationIds: [failingId, succeedingId],
-      })
-    ).resolves.toBeUndefined();
-    expect(succeeding.close).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1_499);
+    expect(settled).toBe(false);
+    await vi.runAllTimersAsync();
+    await expect(cleanup).resolves.toBeUndefined();
   });
 });
 
-function displayedNotification(tag: string, scope: "player" | "admin") {
-  return {
-    tag,
-    data: { scope },
-    close: vi.fn(),
-  } as unknown as Notification;
+class TestMessagePort {
+  onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+  onmessageerror: (() => void) | null = null;
+  peer: TestMessagePort | null = null;
+  close = vi.fn();
+  start = vi.fn();
+
+  postMessage(data: unknown) {
+    this.peer?.onmessage?.({ data } as MessageEvent<unknown>);
+  }
 }
 
-function installDisplayedNotifications(notifications: Notification[]) {
-  const getNotifications = vi.fn().mockResolvedValue(notifications);
-  const registration = {
-    active: {},
-    getNotifications,
+class TestMessageChannel {
+  port1 = new TestMessagePort();
+  port2 = new TestMessagePort();
+
+  constructor() {
+    this.port1.peer = this.port2;
+    this.port2.peer = this.port1;
+  }
+}
+
+function installActiveWorker({
+  acknowledge = true,
+  postMessageError = false,
+}: {
+  acknowledge?: boolean;
+  postMessageError?: boolean;
+} = {}) {
+  Object.defineProperty(globalThis, "MessageChannel", {
+    configurable: true,
+    writable: true,
+    value: TestMessageChannel,
+  });
+
+  let responsePort: TestMessagePort | null = null;
+  const postMessage = vi.fn(
+    (_request: unknown, ports: readonly TestMessagePort[]) => {
+      if (postMessageError) {
+        throw new Error("POST_MESSAGE_FAILED");
+      }
+      responsePort = ports[0] ?? null;
+      if (acknowledge) {
+        responsePort?.postMessage({
+          type: CLOSE_RESULT_TYPE,
+          ok: true,
+          matchedCount: 1,
+          closedCount: 1,
+        });
+      }
+    }
+  );
+  const active = { postMessage } as unknown as ServiceWorker;
+  const matchingRegistration = {
+    active,
     scope: "https://example.test/",
   } as unknown as ServiceWorkerRegistration;
-  const getRegistration = vi.fn().mockResolvedValue(registration);
+  const getRegistration = vi.fn().mockResolvedValue(matchingRegistration);
   Object.defineProperty(navigator, "serviceWorker", {
     configurable: true,
-    value: { getRegistration, ready: Promise.resolve(registration) },
+    value: {
+      getRegistration,
+      get ready() {
+        throw new Error("READY_MUST_NOT_BE_READ");
+      },
+    },
   });
-  return { getNotifications, getRegistration };
+
+  return {
+    getRegistration,
+    postMessage,
+    reply(data: unknown) {
+      responsePort?.postMessage(data);
+    },
+  };
 }

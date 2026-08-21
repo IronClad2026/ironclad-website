@@ -133,8 +133,15 @@ export default function InAppNotificationCenter({
   const displayUnreadCount = unreadCount + matchActionNotifications.length;
   const visibleError = mutationError ?? error;
 
-  const commitAuthoritativeUnreadCount = (nextUnreadCount: number) => {
+  const reconcileAuthoritativeUnreadCount = async (
+    nextUnreadCount: number,
+    cleanup: {
+      notificationIds?: readonly string[];
+      scope?: NotificationScope;
+    }
+  ) => {
     setUnreadCount(nextUnreadCount);
+    await closeDisplayedIronCladNotifications(cleanup).catch(() => undefined);
     requestNotificationBadgeReconciliation();
   };
 
@@ -178,9 +185,9 @@ export default function InAppNotificationCenter({
             item.id === notificationId ? { ...item, readAt } : item
           )
         );
-        commitAuthoritativeUnreadCount(result.unreadCount);
-        await closeDisplayedIronCladNotifications({
+        await reconcileAuthoritativeUnreadCount(result.unreadCount, {
           notificationIds: [notificationId],
+          scope,
         });
         router.refresh();
       } catch {
@@ -210,8 +217,7 @@ export default function InAppNotificationCenter({
         setNotifications((current) =>
           current.map((notification) => ({ ...notification, readAt }))
         );
-        commitAuthoritativeUnreadCount(result.unreadCount);
-        await closeDisplayedIronCladNotifications({ scope });
+        await reconcileAuthoritativeUnreadCount(result.unreadCount, { scope });
         router.refresh();
       } catch {
         setMutationError(t("dashboard.actions.updateFailed"));
@@ -282,9 +288,9 @@ export default function InAppNotificationCenter({
               : notification
           )
         );
-        commitAuthoritativeUnreadCount(result.unreadCount);
-        await closeDisplayedIronCladNotifications({
+        await reconcileAuthoritativeUnreadCount(result.unreadCount, {
           notificationIds: selectedIds,
+          scope,
         });
         setSelectedNotificationIds(new Set());
         router.refresh();
@@ -323,9 +329,9 @@ export default function InAppNotificationCenter({
             router.refresh();
             return;
           }
-          commitAuthoritativeUnreadCount(result.unreadCount);
-          await closeDisplayedIronCladNotifications({
+          await reconcileAuthoritativeUnreadCount(result.unreadCount, {
             notificationIds: selectedIds,
+            scope,
           });
         }
 
@@ -397,9 +403,9 @@ export default function InAppNotificationCenter({
                   item.id === notification.id ? { ...item, readAt } : item
                 )
               );
-              commitAuthoritativeUnreadCount(result.unreadCount);
-              await closeDisplayedIronCladNotifications({
+              await reconcileAuthoritativeUnreadCount(result.unreadCount, {
                 notificationIds: [notification.id],
+                scope: "player",
               });
             } else {
               setMutationError(t("dashboard.actions.updateFailed"));

@@ -6,6 +6,7 @@ import type { InAppNotification } from "@/lib/notifications";
 import type { DashboardNotification } from "@/lib/player-dashboard";
 
 const NOTIFICATION_ID = "55555555-5555-4555-8555-555555555555";
+const OTHER_NOTIFICATION_ID = "66666666-6666-4666-8666-666666666666";
 const pushMock = vi.hoisted(() => vi.fn());
 const refreshMock = vi.hoisted(() => vi.fn());
 const deleteSelectedMock = vi.hoisted(() => vi.fn());
@@ -61,14 +62,15 @@ function notification(
   };
 }
 
-function renderPlayerCenter(item: InAppNotification) {
+function renderPlayerCenter(item: InAppNotification | InAppNotification[]) {
+  const notifications = Array.isArray(item) ? item : [item];
   const rendered = render(
     <InAppNotificationCenter
       scope="player"
       title="Notifications"
       description="Recent updates."
       emptyMessage="No updates."
-      notifications={[item]}
+      notifications={notifications}
       totalCount={4}
       unreadCount={3}
     />
@@ -136,6 +138,7 @@ describe("notification-center mutation reliability", () => {
     expect(screen.queryByText("New")).not.toBeInTheDocument();
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
       notificationIds: [NOTIFICATION_ID],
+      scope: "player",
     });
     expect(refreshMock).toHaveBeenCalled();
   });
@@ -173,16 +176,29 @@ describe("notification-center mutation reliability", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
 
-    await waitFor(() => expect(deleteSelectedMock).toHaveBeenCalledOnce());
-    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+    await waitFor(() => {
+      expect(deleteSelectedMock).toHaveBeenCalledOnce();
+      expect(screen.getByText("4 total · 0 unread")).toBeInTheDocument();
+    });
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
     expect(refreshMock).not.toHaveBeenCalled();
 
     finishCleanup();
-    await waitFor(() => expect(refreshMock).toHaveBeenCalledOnce());
+    await waitFor(() => {
+      expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+      expect(refreshMock).toHaveBeenCalledOnce();
+    });
   });
 
   it("reconciles badge truth after marking selected durable notifications read", async () => {
-    renderPlayerCenter(notification());
+    renderPlayerCenter([
+      notification(),
+      notification({
+        id: OTHER_NOTIFICATION_ID,
+        title: "Registration Approved",
+        type: "registration.approved",
+      }),
+    ]);
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: /Select Registration Rejected/i,
@@ -197,6 +213,7 @@ describe("notification-center mutation reliability", () => {
     expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
       notificationIds: [NOTIFICATION_ID],
+      scope: "player",
     });
   });
 
@@ -213,7 +230,14 @@ describe("notification-center mutation reliability", () => {
   });
 
   it("reconciles badge truth after hiding a selected durable notification", async () => {
-    renderPlayerCenter(notification());
+    renderPlayerCenter([
+      notification(),
+      notification({
+        id: OTHER_NOTIFICATION_ID,
+        title: "Registration Approved",
+        type: "registration.approved",
+      }),
+    ]);
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: /Select Registration Rejected/i,
@@ -228,6 +252,7 @@ describe("notification-center mutation reliability", () => {
     expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
       notificationIds: [NOTIFICATION_ID],
+      scope: "player",
     });
   });
 
@@ -246,6 +271,25 @@ describe("notification-center mutation reliability", () => {
     });
     expect(closeDisplayedNotificationsMock).not.toHaveBeenCalled();
     expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a successful durable mutation successful when cleanup rejects", async () => {
+    closeDisplayedNotificationsMock.mockRejectedValueOnce(
+      new Error("SERVICE_WORKER_CLEANUP_FAILED")
+    );
+    renderPlayerCenter(notification());
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Select Registration Rejected/i })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+
+    await waitFor(() => {
+      expect(deleteSelectedMock).toHaveBeenCalledOnce();
+      expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+      expect(refreshMock).toHaveBeenCalledOnce();
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("reconciles committed durable truth if a projected dismissal later fails", async () => {
@@ -283,6 +327,7 @@ describe("notification-center mutation reliability", () => {
     expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
       notificationIds: [NOTIFICATION_ID],
+      scope: "player",
     });
   });
 
@@ -354,5 +399,49 @@ describe("notification-center mutation reliability", () => {
       expect(pushMock).toHaveBeenCalledWith(href);
     });
     expect(markReadMock).toHaveBeenCalledOnce();
+    expect(closeDisplayedNotificationsMock).not.toHaveBeenCalled();
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+  });
+
+  it("waits for cleanup before navigating from a successful notification read", async () => {
+    let finishCleanup!: () => void;
+    closeDisplayedNotificationsMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finishCleanup = resolve;
+      })
+    );
+    const href =
+      "/tournaments?tournament=11111111-1111-4111-8111-111111111111&tab=brackets&match=33333333-3333-4333-8333-333333333333";
+    renderPlayerCenter(
+      notification({
+        type: "match.confirmation_required",
+        title: "Match result needs confirmation",
+        message: "Confirm or dispute the submitted result.",
+        matchId: "33333333-3333-4333-8333-333333333333",
+        reportGroupId: "44444444-4444-4444-8444-444444444444",
+        registrationId: null,
+        href,
+      })
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Match result needs confirmation/i,
+      })
+    );
+
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledOnce());
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
+      notificationIds: [NOTIFICATION_ID],
+      scope: "player",
+    });
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+
+    finishCleanup();
+    await waitFor(() => {
+      expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+      expect(pushMock).toHaveBeenCalledWith(href);
+    });
   });
 });
