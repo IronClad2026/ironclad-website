@@ -8,6 +8,7 @@ const SECOND_NOTIFICATION_ID = "22222222-2222-4222-8222-222222222222";
 const ORIGIN = "https://www.ironcladtournaments.com";
 const CLOSE_MESSAGE_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS";
 const CLOSE_RESULT_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
+const WORKER_VERSION = "android-cleanup-diagnostic-v1";
 
 describe("notification service worker", () => {
   it("shows a conservative notification and applies a trusted badge snapshot", async () => {
@@ -173,12 +174,9 @@ describe("notification service worker", () => {
       notificationId: "33333333-3333-4333-8333-333333333333",
       scope: "player",
     });
-    worker.getNotifications.mockResolvedValue([
-      tagged,
-      dataFallback,
-      wrongScope,
-      unrelated,
-    ]);
+    worker.getNotifications
+      .mockResolvedValueOnce([tagged, dataFallback, wrongScope, unrelated])
+      .mockResolvedValueOnce([wrongScope, unrelated]);
 
     const reply = await worker.dispatchMessage({
       type: CLOSE_MESSAGE_TYPE,
@@ -186,16 +184,23 @@ describe("notification service worker", () => {
       scope: "player",
     });
 
-    expect(worker.getNotifications).toHaveBeenCalledOnce();
+    expect(worker.getNotifications).toHaveBeenCalledTimes(2);
     expect(tagged.close).toHaveBeenCalledOnce();
     expect(dataFallback.close).toHaveBeenCalledOnce();
     expect(wrongScope.close).not.toHaveBeenCalled();
     expect(unrelated.close).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       type: CLOSE_RESULT_TYPE,
+      workerVersion: WORKER_VERSION,
       ok: true,
+      status: "closed",
+      receivedCount: 1,
+      enumeratedCount: 4,
       matchedCount: 2,
       closedCount: 2,
+      remainingCount: 0,
+      originStatus: "same",
+      sourceStatus: "same_origin_window",
     });
   });
 
@@ -226,13 +231,20 @@ describe("notification service worker", () => {
       data: { scope: "player" },
       close: vi.fn(),
     };
-    worker.getNotifications.mockResolvedValue([
-      player,
-      playerCloseFailure,
-      admin,
-      conflictingIdentity,
-      unrelated,
-    ]);
+    worker.getNotifications
+      .mockResolvedValueOnce([
+        player,
+        playerCloseFailure,
+        admin,
+        conflictingIdentity,
+        unrelated,
+      ])
+      .mockResolvedValueOnce([
+        playerCloseFailure,
+        admin,
+        conflictingIdentity,
+        unrelated,
+      ]);
 
     const reply = await worker.dispatchMessage({
       type: CLOSE_MESSAGE_TYPE,
@@ -246,13 +258,20 @@ describe("notification service worker", () => {
     expect(unrelated.close).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       type: CLOSE_RESULT_TYPE,
+      workerVersion: WORKER_VERSION,
       ok: false,
+      status: "remaining",
+      receivedCount: 1,
+      enumeratedCount: 5,
       matchedCount: 2,
       closedCount: 1,
+      remainingCount: 1,
+      originStatus: "same",
+      sourceStatus: "same_origin_window",
     });
   });
 
-  it("ignores malformed, cross-origin, and over-broad cleanup messages", async () => {
+  it("rejects malformed and over-broad cleanup messages", async () => {
     const worker = createWorkerHarness();
     const malformedMessages = [
       { type: "UNTRUSTED_MESSAGE", scope: "player" },
@@ -266,13 +285,113 @@ describe("notification service worker", () => {
       const reply = await worker.dispatchMessage(message);
       expect(reply).not.toHaveBeenCalled();
     }
-    const crossOriginReply = await worker.dispatchMessage(
-      { type: CLOSE_MESSAGE_TYPE, scope: "player" },
-      "https://evil.example"
+    expect(worker.getNotifications).not.toHaveBeenCalled();
+  });
+
+  it("uses a same-origin WindowClient when Chromium supplies an empty origin", async () => {
+    const worker = createWorkerHarness();
+    worker.getNotifications
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const reply = await worker.dispatchMessage(
+      {
+        type: CLOSE_MESSAGE_TYPE,
+        notificationIds: [NOTIFICATION_ID],
+        scope: "player",
+      },
+      ""
     );
 
-    expect(crossOriginReply).not.toHaveBeenCalled();
+    expect(worker.getNotifications).toHaveBeenCalledTimes(2);
+    expect(reply).toHaveBeenCalledWith({
+      type: CLOSE_RESULT_TYPE,
+      workerVersion: WORKER_VERSION,
+      ok: false,
+      status: "not_found",
+      receivedCount: 1,
+      enumeratedCount: 0,
+      matchedCount: 0,
+      closedCount: 0,
+      remainingCount: 0,
+      originStatus: "empty",
+      sourceStatus: "same_origin_window",
+    });
+  });
+
+  it("trusts the same-origin WindowClient when the origin field disagrees", async () => {
+    const worker = createWorkerHarness();
+
+    const reply = await worker.dispatchMessage(
+      { type: CLOSE_MESSAGE_TYPE, scope: "player" },
+      "https://inconsistent.example"
+    );
+
+    expect(worker.getNotifications).toHaveBeenCalledTimes(2);
+    expect(reply).toHaveBeenCalledWith({
+      type: CLOSE_RESULT_TYPE,
+      workerVersion: WORKER_VERSION,
+      ok: true,
+      status: "nothing_to_close",
+      receivedCount: 1,
+      enumeratedCount: 0,
+      matchedCount: 0,
+      closedCount: 0,
+      remainingCount: 0,
+      originStatus: "mismatch",
+      sourceStatus: "same_origin_window",
+    });
+  });
+
+  it("rejects an empty-origin message without a same-origin WindowClient", async () => {
+    const worker = createWorkerHarness();
+
+    const reply = await worker.dispatchMessage(
+      { type: CLOSE_MESSAGE_TYPE, scope: "player" },
+      "",
+      { id: "foreign-client", type: "window", url: "https://evil.example/" }
+    );
+
+    expect(reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "source_rejected",
+        originStatus: "empty",
+        sourceStatus: "cross_origin_window",
+      })
+    );
     expect(worker.getNotifications).not.toHaveBeenCalled();
+  });
+
+  it("preserves first-pass counts when post-close verification fails", async () => {
+    const worker = createWorkerHarness();
+    const target = displayedNotification({
+      notificationId: NOTIFICATION_ID,
+      scope: "player",
+    });
+    worker.getNotifications
+      .mockResolvedValueOnce([target])
+      .mockRejectedValueOnce(new Error("VERIFICATION_FAILED"));
+
+    const reply = await worker.dispatchMessage({
+      type: CLOSE_MESSAGE_TYPE,
+      notificationIds: [NOTIFICATION_ID],
+      scope: "player",
+    });
+
+    expect(target.close).toHaveBeenCalledOnce();
+    expect(reply).toHaveBeenCalledWith({
+      type: CLOSE_RESULT_TYPE,
+      workerVersion: WORKER_VERSION,
+      ok: false,
+      status: "verification_failed",
+      receivedCount: 1,
+      enumeratedCount: 1,
+      matchedCount: 1,
+      closedCount: 1,
+      remainingCount: null,
+      originStatus: "same",
+      sourceStatus: "same_origin_window",
+    });
   });
 });
 
@@ -341,12 +460,21 @@ function createWorkerHarness() {
       await work;
       return close;
     },
-    async dispatchMessage(data: unknown, origin = ORIGIN) {
+    async dispatchMessage(
+      data: unknown,
+      origin = ORIGIN,
+      source = {
+        id: "ironclad-window-client",
+        type: "window",
+        url: `${ORIGIN}/dashboard`,
+      }
+    ) {
       let work: Promise<unknown> | null = null;
       const postMessage = vi.fn();
       listeners.get("message")?.({
         data,
         origin,
+        source,
         ports: [{ postMessage }],
         waitUntil: (promise: Promise<unknown>) => {
           work = promise;

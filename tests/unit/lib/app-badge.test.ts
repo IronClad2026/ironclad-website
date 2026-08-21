@@ -10,6 +10,7 @@ import {
 
 const originalMessageChannel = globalThis.MessageChannel;
 const CLOSE_RESULT_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
+const WORKER_VERSION = "android-cleanup-diagnostic-v1";
 
 describe("installed-app badge helper", () => {
   afterEach(() => {
@@ -82,7 +83,8 @@ describe("installed-app badge helper", () => {
     const cleanup = closeDisplayedIronCladNotifications({
       notificationIds: [targetId, targetId],
       scope: "player",
-    }).then(() => {
+    });
+    void cleanup.then(() => {
       settled = true;
     });
     await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledOnce());
@@ -98,13 +100,20 @@ describe("installed-app badge helper", () => {
     );
     expect(settled).toBe(false);
 
-    worker.reply({
-      type: CLOSE_RESULT_TYPE,
-      ok: true,
-      matchedCount: 1,
-      closedCount: 1,
+    worker.reply(workerReply());
+    await expect(cleanup).resolves.toEqual({
+      status: "closed",
+      sent: 1,
+      received: 1,
+      enumerated: 1,
+      matched: 1,
+      closed: 1,
+      remaining: 0,
+      origin: "same",
+      source: "same_origin_window",
+      workerVersion: WORKER_VERSION,
+      controller: "current",
     });
-    await cleanup;
     expect(settled).toBe(true);
   });
 
@@ -125,12 +134,16 @@ describe("installed-app badge helper", () => {
   it("rejects malformed durable ids before messaging the worker", async () => {
     const worker = installActiveWorker();
 
-    await closeDisplayedIronCladNotifications({
-      notificationIds: [
-        "11111111-1111-4111-8111-111111111111",
-        "not-a-notification-id",
-      ],
-    });
+    await expect(
+      closeDisplayedIronCladNotifications({
+        notificationIds: [
+          "11111111-1111-4111-8111-111111111111",
+          "not-a-notification-id",
+        ],
+      })
+    ).resolves.toEqual(
+      expect.objectContaining({ status: "invalid_request", sent: 0 })
+    );
 
     expect(worker.postMessage).not.toHaveBeenCalled();
   });
@@ -144,9 +157,16 @@ describe("installed-app badge helper", () => {
       value: { getRegistration },
     });
 
-    await expect(closeDisplayedIronCladNotifications()).resolves.toBeUndefined();
+    await expect(closeDisplayedIronCladNotifications()).resolves.toEqual(
+      expect.objectContaining({
+        status: "registration_unavailable",
+        sent: 0,
+      })
+    );
     const worker = installActiveWorker({ postMessageError: true });
-    await expect(closeDisplayedIronCladNotifications()).resolves.toBeUndefined();
+    await expect(closeDisplayedIronCladNotifications()).resolves.toEqual(
+      expect.objectContaining({ status: "message_failed", sent: 0 })
+    );
     expect(worker.postMessage).toHaveBeenCalledOnce();
   });
 
@@ -164,7 +184,36 @@ describe("installed-app badge helper", () => {
     await vi.advanceTimersByTimeAsync(1_499);
     expect(settled).toBe(false);
     await vi.runAllTimersAsync();
-    await expect(cleanup).resolves.toBeUndefined();
+    await expect(cleanup).resolves.toEqual(
+      expect.objectContaining({
+        status: "message_timeout",
+        sent: 1,
+        received: 0,
+      })
+    );
+  });
+
+  it("distinguishes an acknowledgement from a stale worker version", async () => {
+    const worker = installActiveWorker({ acknowledge: false });
+    const cleanup = closeDisplayedIronCladNotifications({ scope: "player" });
+    await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledOnce());
+
+    worker.reply({
+      type: CLOSE_RESULT_TYPE,
+      ok: true,
+      matchedCount: 1,
+      closedCount: 1,
+    });
+
+    await expect(cleanup).resolves.toEqual(
+      expect.objectContaining({
+        status: "worker_version_mismatch",
+        sent: 1,
+        received: 1,
+        workerVersion: null,
+        controller: "current",
+      })
+    );
   });
 });
 
@@ -211,12 +260,7 @@ function installActiveWorker({
       }
       responsePort = ports[0] ?? null;
       if (acknowledge) {
-        responsePort?.postMessage({
-          type: CLOSE_RESULT_TYPE,
-          ok: true,
-          matchedCount: 1,
-          closedCount: 1,
-        });
+        responsePort?.postMessage(workerReply());
       }
     }
   );
@@ -230,6 +274,7 @@ function installActiveWorker({
     configurable: true,
     value: {
       getRegistration,
+      controller: active,
       get ready() {
         throw new Error("READY_MUST_NOT_BE_READ");
       },
@@ -242,5 +287,22 @@ function installActiveWorker({
     reply(data: unknown) {
       responsePort?.postMessage(data);
     },
+  };
+}
+
+function workerReply(overrides: Record<string, unknown> = {}) {
+  return {
+    type: CLOSE_RESULT_TYPE,
+    workerVersion: WORKER_VERSION,
+    ok: true,
+    status: "closed",
+    receivedCount: 1,
+    enumeratedCount: 1,
+    matchedCount: 1,
+    closedCount: 1,
+    remainingCount: 0,
+    originStatus: "same",
+    sourceStatus: "same_origin_window",
+    ...overrides,
   };
 }

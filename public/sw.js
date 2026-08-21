@@ -8,6 +8,7 @@ const CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE =
   "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS";
 const CLOSE_DISPLAYED_NOTIFICATIONS_RESULT =
   "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
+const CLEANUP_DIAGNOSTIC_WORKER_VERSION = "android-cleanup-diagnostic-v1";
 const MAX_TITLE_LENGTH = 80;
 const MAX_BODY_LENGTH = 180;
 const MAX_UNREAD_COUNT = 999_999;
@@ -54,32 +55,97 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("message", (event) => {
   const request = readCloseDisplayedNotificationsRequest(event.data);
   const responsePort = event.ports?.[0];
-  if (
-    event.origin !== self.location.origin ||
-    !request ||
-    !responsePort
-  ) {
+  if (!request || !responsePort) {
+    return;
+  }
+
+  const sourceValidation = validateCloseMessageSource(event);
+  if (!sourceValidation.ok) {
+    postCloseDisplayedNotificationsResult(responsePort, {
+      ok: false,
+      status: sourceValidation.status,
+      receivedCount: 1,
+      enumeratedCount: null,
+      matchedCount: null,
+      closedCount: null,
+      remainingCount: null,
+      originStatus: sourceValidation.originStatus,
+      sourceStatus: sourceValidation.sourceStatus,
+    });
     return;
   }
 
   event.waitUntil(
     closeDisplayedNotifications(request)
-      .then(({ matchedCount, closedCount }) => {
+      .then((result) => {
         postCloseDisplayedNotificationsResult(responsePort, {
-          ok: closedCount === matchedCount,
-          matchedCount,
-          closedCount,
+          ...result,
+          receivedCount: 1,
+          originStatus: sourceValidation.originStatus,
+          sourceStatus: sourceValidation.sourceStatus,
         });
       })
       .catch(() => {
         postCloseDisplayedNotificationsResult(responsePort, {
           ok: false,
-          matchedCount: 0,
-          closedCount: 0,
+          status: "enumeration_failed",
+          receivedCount: 1,
+          enumeratedCount: null,
+          matchedCount: null,
+          closedCount: null,
+          remainingCount: null,
+          originStatus: sourceValidation.originStatus,
+          sourceStatus: sourceValidation.sourceStatus,
         });
       })
   );
 });
+
+function validateCloseMessageSource(event) {
+  const originStatus =
+    event.origin === self.location.origin
+      ? "same"
+      : event.origin === ""
+        ? "empty"
+        : "mismatch";
+  const source = event.source;
+  if (
+    !source ||
+    source.type !== "window" ||
+    typeof source.url !== "string"
+  ) {
+    return {
+      ok: false,
+      status: "source_rejected",
+      originStatus,
+      sourceStatus: "invalid",
+    };
+  }
+
+  try {
+    if (new URL(source.url).origin !== self.location.origin) {
+      return {
+        ok: false,
+        status: "source_rejected",
+        originStatus,
+        sourceStatus: "cross_origin_window",
+      };
+    }
+  } catch {
+    return {
+      ok: false,
+      status: "source_rejected",
+      originStatus,
+      sourceStatus: "invalid",
+    };
+  }
+
+  return {
+    ok: true,
+    originStatus,
+    sourceStatus: "same_origin_window",
+  };
+}
 
 function readPushPayload(data) {
   let value = {};
@@ -182,17 +248,13 @@ async function closeDisplayedNotifications({ notificationIds, scope }) {
   let closedCount = 0;
 
   for (const displayedNotification of displayedNotifications) {
-    const notificationId = readDisplayedNotificationId(displayedNotification);
-    const notificationScope = readScope(displayedNotification.data?.scope);
-    if (!notificationId || !notificationScope) {
-      continue;
-    }
-
-    if (notificationIds && !notificationIds.has(notificationId)) {
-      continue;
-    }
-
-    if (scope && notificationScope !== scope) {
+    if (
+      !matchesDisplayedNotification(
+        displayedNotification,
+        notificationIds,
+        scope
+      )
+    ) {
       continue;
     }
 
@@ -205,7 +267,59 @@ async function closeDisplayedNotifications({ notificationIds, scope }) {
     }
   }
 
-  return { matchedCount, closedCount };
+  let remainingNotifications;
+  try {
+    remainingNotifications = await self.registration.getNotifications();
+  } catch {
+    return {
+      ok: false,
+      status: "verification_failed",
+      enumeratedCount: displayedNotifications.length,
+      matchedCount,
+      closedCount,
+      remainingCount: null,
+    };
+  }
+  const remainingCount = remainingNotifications.filter((notification) =>
+    matchesDisplayedNotification(notification, notificationIds, scope)
+  ).length;
+  const targetedRequest = notificationIds !== null;
+  const ok =
+    closedCount === matchedCount &&
+    remainingCount === 0 &&
+    (!targetedRequest || matchedCount > 0);
+  const status = ok
+    ? matchedCount > 0
+      ? "closed"
+      : "nothing_to_close"
+    : matchedCount === 0
+      ? "not_found"
+      : remainingCount > 0
+        ? "remaining"
+        : "close_failed";
+
+  return {
+    ok,
+    status,
+    enumeratedCount: displayedNotifications.length,
+    matchedCount,
+    closedCount,
+    remainingCount,
+  };
+}
+
+function matchesDisplayedNotification(notification, notificationIds, scope) {
+  const notificationId = readDisplayedNotificationId(notification);
+  const notificationScope = readScope(notification.data?.scope);
+  if (!notificationId || !notificationScope) {
+    return false;
+  }
+
+  if (notificationIds && !notificationIds.has(notificationId)) {
+    return false;
+  }
+
+  return !scope || notificationScope === scope;
 }
 
 function readDisplayedNotificationId(notification) {
@@ -230,14 +344,31 @@ function readDisplayedNotificationId(notification) {
 
 function postCloseDisplayedNotificationsResult(
   responsePort,
-  { ok, matchedCount, closedCount }
+  {
+    ok,
+    status,
+    receivedCount,
+    enumeratedCount,
+    matchedCount,
+    closedCount,
+    remainingCount,
+    originStatus,
+    sourceStatus,
+  }
 ) {
   try {
     responsePort.postMessage({
       type: CLOSE_DISPLAYED_NOTIFICATIONS_RESULT,
+      workerVersion: CLEANUP_DIAGNOSTIC_WORKER_VERSION,
       ok,
+      status,
+      receivedCount,
+      enumeratedCount,
       matchedCount,
       closedCount,
+      remainingCount,
+      originStatus,
+      sourceStatus,
     });
   } catch {
     // The page may have navigated after its bounded acknowledgement window.
