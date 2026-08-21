@@ -3,6 +3,7 @@ import type {
   BadgeCollection,
   BadgeCollectionItem,
   BadgeDefinition,
+  BadgeNumber,
   BadgePresentationEntitlement,
   BadgeRarity,
   BadgeSlug,
@@ -16,6 +17,39 @@ export const BADGE_RARITY_LABELS: Record<BadgeRarity, string> = {
   rare: "Rare",
   epic: "Epic",
   legendary: "Legendary",
+};
+
+export const BADGE_VISUAL_SCALE: Record<BadgeNumber, number> = {
+  1: 1,
+  2: 1.03,
+  3: 1,
+  4: 1,
+  5: 1,
+  6: 1.03,
+  7: 1.02,
+  8: 1,
+  9: 1,
+  10: 1,
+  11: 1.06,
+  12: 0.98,
+  13: 1.08,
+  14: 0.99,
+  15: 1.09,
+  16: 0.97,
+  17: 1,
+  18: 0.99,
+  19: 1,
+  20: 1,
+  21: 0.98,
+  22: 1,
+  23: 0.98,
+  24: 1.21,
+  25: 1.04,
+  26: 1,
+  27: 1.01,
+  28: 0.97,
+  29: 0.97,
+  30: 0.98,
 };
 
 export const BADGE_RARITY_TOKENS: Record<
@@ -151,7 +185,12 @@ export function getBadgeArtworkAsset(definition: BadgeDefinition) {
   return {
     src: artworkPath,
     alt: `${definition.name} badge artwork`,
+    scale: getBadgeArtworkVisualScale(definition),
   };
+}
+
+export function getBadgeArtworkVisualScale(definition: BadgeDefinition) {
+  return BADGE_VISUAL_SCALE[definition.number];
 }
 
 export function getBadgeRarityLabel(rarity: BadgeRarity) {

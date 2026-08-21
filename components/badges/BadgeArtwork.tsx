@@ -17,7 +17,7 @@ type BadgeArtworkVariant = "slot" | "detail" | "reveal";
 const frameClassNames: Record<BadgeArtworkVariant, string> = {
   slot: "aspect-square w-full",
   detail: "aspect-square w-full",
-  reveal: "h-48 w-48 sm:h-56 sm:w-56",
+  reveal: "aspect-square w-48 sm:w-56",
 };
 
 const imageSizes: Record<BadgeArtworkVariant, number> = {
@@ -57,6 +57,7 @@ export default function BadgeArtwork({
   const fallbackLabel = getBadgeFallbackLabel(item.definition);
   const showArtwork = Boolean(artwork && failedArtworkSrc !== artwork.src);
   const StatusIcon = isEarned ? Award : LockKeyhole;
+  const artworkScale = artwork?.scale ?? 1;
 
   return (
     <span
@@ -79,6 +80,10 @@ export default function BadgeArtwork({
                 ? "opacity-100"
                 : "opacity-[0.8] grayscale brightness-[0.94] saturate-[0.78]"
             }`}
+            style={{
+              transform: `scale(${artworkScale})`,
+              transformOrigin: "center",
+            }}
             onError={() => setFailedArtworkSrc(artwork.src)}
           />
           {!isEarned ? (

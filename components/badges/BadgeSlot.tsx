@@ -59,7 +59,7 @@ export default function BadgeSlot({
           openBadge();
         }
       }}
-      className={`group relative isolate flex h-full min-h-[15.75rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border p-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_14px_30px_rgba(0,0,0,0.28)] transition hover:-translate-y-0.5 hover:border-orange-300/45 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_34px_rgba(249,115,22,0.08),0_18px_34px_rgba(0,0,0,0.32)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 sm:p-3 ${
+      className={`group relative isolate flex h-full min-h-[22rem] w-full cursor-pointer flex-col overflow-hidden rounded-lg border p-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_14px_30px_rgba(0,0,0,0.28)] transition hover:-translate-y-0.5 hover:border-orange-300/45 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_34px_rgba(249,115,22,0.08),0_18px_34px_rgba(0,0,0,0.32)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 sm:p-3 ${
         isEarned
           ? `${tokens.borderClassName} bg-[linear-gradient(180deg,rgba(35,29,23,0.98),rgba(12,12,13,0.98))] ring-1 ring-orange-300/16 hover:ring-orange-300/28`
           : "border-zinc-800/80 bg-[linear-gradient(180deg,rgba(28,28,31,0.96),rgba(11,11,12,0.98))] text-zinc-500"
@@ -79,10 +79,12 @@ export default function BadgeSlot({
         compact
       />
 
-      <BadgeArtwork item={item} variant="slot" className="relative z-10" />
+      <span className="relative z-10 flex h-60 shrink-0 items-center justify-center">
+        <BadgeArtwork item={item} variant="slot" className="h-full w-full" />
+      </span>
 
       <span className="relative z-10 mt-2.5 flex min-w-0 flex-1 flex-col">
-        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider">
+        <span className="flex h-5 shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider">
           <Icon size={14} aria-hidden="true" />
           <span className={isEarned ? tokens.textClassName : "text-zinc-500"}>
             {isEarned ? "Earned" : "Locked"}
@@ -92,11 +94,11 @@ export default function BadgeSlot({
             <Sparkles size={13} className="text-orange-200" aria-hidden="true" />
           ) : null}
         </span>
-        <span className="mt-2 line-clamp-2 text-sm font-black text-white">
+        <span className="mt-2 flex h-10 shrink-0 items-start line-clamp-2 text-sm font-black text-white">
           {item.definition.name}
         </span>
         <span
-          className={`mt-auto w-fit rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
+          className={`mt-auto flex min-h-7 w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
             isEarned
               ? tokens.badgeClassName
               : "border-white/10 bg-white/[0.03] text-zinc-500"

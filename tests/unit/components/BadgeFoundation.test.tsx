@@ -268,6 +268,10 @@ describe("badge foundation components", () => {
     const artworkFrame = image.closest("[data-badge-artwork]");
 
     expect(image).toHaveAttribute("src", "/assets/badges/1.png");
+    expect(image).toHaveStyle({
+      transform: "scale(1)",
+      transformOrigin: "center",
+    });
     expect(image).toHaveClass("object-contain");
     expect(image).not.toHaveClass("mix-blend-multiply");
     expect(image.className).not.toContain("bg-white");
@@ -298,6 +302,10 @@ describe("badge foundation components", () => {
     const artworkFrame = image.closest("[data-badge-artwork]");
 
     expect(image).toHaveAttribute("src", "/assets/badges/2.png");
+    expect(image).toHaveStyle({
+      transform: "scale(1.03)",
+      transformOrigin: "center",
+    });
     expect(image).toHaveClass("grayscale");
     expect(image).toHaveClass("object-contain");
     expect(image).toHaveClass("opacity-[0.8]");
@@ -460,6 +468,10 @@ describe("badge foundation components", () => {
     const artworkFrame = image.closest("[data-badge-artwork]");
 
     expect(image).toHaveAttribute("src", "/assets/badges/11.png");
+    expect(image).toHaveStyle({
+      transform: "scale(1.06)",
+      transformOrigin: "center",
+    });
     expect(image).toHaveClass("grayscale");
     expect(artworkFrame).toHaveAttribute(
       "data-badge-artwork-surface",
@@ -467,6 +479,27 @@ describe("badge foundation components", () => {
     );
     expect(artworkFrame).toHaveClass("overflow-visible");
     expect(artworkFrame).toHaveAttribute("data-badge-artwork", "real");
+  });
+
+  it("reserves layout space for the shared tall-artwork compensation", () => {
+    const tallItem = requireItemByNumber(mapBadgeCollection({ awards: [] }), 14);
+
+    render(<BadgeSlot item={tallItem} />);
+
+    const button = screen.getByRole("button", {
+      name: "Iron Streak, Rare, locked",
+    });
+    const image = within(button).getByRole("img", {
+      name: "Iron Streak badge artwork",
+    });
+    const artworkFrame = image.closest("[data-badge-artwork]");
+
+    expect(image).toHaveStyle({
+      transform: "scale(0.99)",
+      transformOrigin: "center",
+    });
+    expect(artworkFrame).toHaveClass("aspect-square");
+    expect(artworkFrame?.parentElement).toHaveClass("h-60");
   });
 
   it("keeps artwork and lock overlays from blocking card clicks", () => {

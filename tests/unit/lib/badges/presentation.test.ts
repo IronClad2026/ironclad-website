@@ -7,6 +7,8 @@ import {
 } from "@/lib/badges/catalog";
 import {
   getBadgeArtworkAsset,
+  BADGE_VISUAL_SCALE,
+  getBadgeArtworkVisualScale,
   getBadgeAssetPath,
   getBadgeProgressSummary,
   getBadgeSlotPresentation,
@@ -51,11 +53,31 @@ describe("badge presentation mapping", () => {
     expect(getBadgeArtworkAsset(recruit!)).toEqual({
       src: "/assets/badges/1.png",
       alt: "IronClad Recruit badge artwork",
+      scale: 1,
     });
     expect(getBadgeArtworkAsset(eliteChampion!)).toEqual({
       src: "/assets/badges/26.png",
       alt: "Elite Champion badge artwork",
+      scale: 1,
     });
+  });
+
+  it("uses the centralized per-badge visual scale map", () => {
+    const standard = getBadgeDefinitionByNumber(10);
+
+    expect(getBadgeArtworkVisualScale(standard!)).toBe(1);
+    expect(BADGE_VISUAL_SCALE[8]).toBe(1);
+    expect(BADGE_VISUAL_SCALE[9]).toBe(1);
+    expect(BADGE_VISUAL_SCALE[10]).toBe(1);
+    expect(BADGE_VISUAL_SCALE[7]).toBe(1.02);
+    expect(BADGE_VISUAL_SCALE[13]).toBe(1.08);
+    expect(BADGE_VISUAL_SCALE[14]).toBe(0.99);
+    expect(BADGE_VISUAL_SCALE[24]).toBe(1.21);
+    expect(BADGE_VISUAL_SCALE[27]).toBe(1.01);
+    expect(BADGE_VISUAL_SCALE[28]).toBe(0.97);
+    expect(BADGE_VISUAL_SCALE[29]).toBe(0.97);
+    expect(BADGE_VISUAL_SCALE[30]).toBe(0.98);
+    expect(Object.keys(BADGE_VISUAL_SCALE)).toHaveLength(30);
   });
 
   it("does not generate fallback artwork for canonical badges", () => {
@@ -73,6 +95,7 @@ describe("badge presentation mapping", () => {
     expect(getBadgeArtworkAsset(fiveVictories!)).toEqual({
       src: "/assets/badges/11.png",
       alt: "Five Victories badge artwork",
+      scale: 1.06,
     });
     expect(getBadgeAssetPath(fiveVictoriesItem!)).toBe("/assets/badges/11.png");
   });

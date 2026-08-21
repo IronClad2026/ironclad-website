@@ -181,7 +181,7 @@ describe("DashboardBadgesSection", () => {
     expect(list.className).not.toContain("grid-cols-10");
     expect(
       within(list).getAllByRole("button").every(
-        (button) => button.className.includes("min-h-[13.5rem]")
+        (button) => button.className.includes("min-h-[17rem]")
       )
     ).toBe(true);
   });

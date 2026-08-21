@@ -158,15 +158,17 @@ function DashboardBadgeShowcaseCard({
           onSelect();
         }
       }}
-      className={`group flex h-full min-h-[13.5rem] w-full cursor-pointer flex-col border p-3 text-left transition hover:-translate-y-0.5 hover:border-orange-300/45 hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 ${
+      className={`group flex h-full min-h-[17rem] w-full cursor-pointer flex-col border p-3 text-left transition hover:-translate-y-0.5 hover:border-orange-300/45 hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 ${
         isEarned
           ? `${tokens.borderClassName} bg-[linear-gradient(180deg,rgba(31,26,21,0.88),rgba(7,7,8,0.94))] shadow-[0_18px_34px_rgba(0,0,0,0.25)]`
           : "border-zinc-800/80 bg-[linear-gradient(180deg,rgba(24,24,27,0.72),rgba(8,8,9,0.9))]"
       }`}
     >
-      <BadgeArtwork item={item} variant="slot" className="mx-auto max-w-32" />
+      <span className="flex h-40 shrink-0 items-center justify-center">
+        <BadgeArtwork item={item} variant="slot" className="h-full w-full max-w-32" />
+      </span>
       <span className="mt-3 flex min-w-0 flex-1 flex-col">
-        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider">
+        <span className="flex h-5 shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider">
           <StatusIcon size={13} aria-hidden="true" />
           <span className={isEarned ? tokens.textClassName : "text-zinc-500"}>
             {isEarned ? "Earned" : "Locked"}
@@ -175,11 +177,11 @@ function DashboardBadgeShowcaseCard({
             {String(item.definition.number).padStart(2, "0")}
           </span>
         </span>
-        <span className="mt-2 line-clamp-2 text-sm font-black leading-5 text-white">
+        <span className="mt-2 flex h-10 shrink-0 items-start line-clamp-2 text-sm font-black leading-5 text-white">
           {item.definition.name}
         </span>
         <span
-          className={`mt-auto w-fit rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
+          className={`mt-auto flex min-h-7 w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
             isEarned
               ? tokens.badgeClassName
               : "border-white/10 bg-white/[0.03] text-zinc-500"
