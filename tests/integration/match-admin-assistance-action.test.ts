@@ -37,6 +37,10 @@ class QueryMock implements PromiseLike<QueryResult> {
     return this;
   }
 
+  order() {
+    return this;
+  }
+
   limit() {
     return this;
   }
@@ -56,6 +60,7 @@ class QueryMock implements PromiseLike<QueryResult> {
 }
 
 function createClient({
+  matchStatus = "in_progress",
   registration = {
     id: REGISTRATION_ID,
     tournament_id: TOURNAMENT_ID,
@@ -63,9 +68,12 @@ function createClient({
     player_name: "Fixture Player",
   } as unknown,
   existingRequests = [] as unknown[],
+  existingRequestsError = null as unknown,
 }: {
+  matchStatus?: string;
   registration?: unknown;
   existingRequests?: unknown[];
+  existingRequestsError?: unknown;
 } = {}) {
   const from = vi.fn((table: string) => ({
     select: () => {
@@ -74,7 +82,7 @@ function createClient({
           data: {
             id: MATCH_ID,
             match_number: 3,
-            status: "in_progress",
+            status: matchStatus,
             player_one_registration_id: REGISTRATION_ID,
             player_two_registration_id: OPPONENT_REGISTRATION_ID,
           },
@@ -87,7 +95,10 @@ function createClient({
       }
 
       if (table === "notifications") {
-        return new QueryMock({ data: existingRequests, error: null });
+        return new QueryMock({
+          data: existingRequests,
+          error: existingRequestsError,
+        });
       }
 
       throw new Error(`Unexpected table: ${table}`);
@@ -150,20 +161,103 @@ describe("match admin-assistance fallback", () => {
       tournamentTitle: "Phase 15A Fixture Tournament",
       registrationId: REGISTRATION_ID,
       matchId: MATCH_ID,
-      eventKey: `match.admin_assistance:${MATCH_ID}:${USER_ID}`,
+      eventKey:
+        `match:${MATCH_ID}:registration:${REGISTRATION_ID}:` +
+        "admin-assistance-request:initial",
       metadata: { source: "tournament_match_workspace" },
     });
   });
 
   it("treats an existing open request as success without duplicating it", async () => {
     createSupabaseAdminClientMock.mockReturnValue(
-      createClient({ existingRequests: [{ id: "existing" }] })
+      createClient({
+        existingRequests: [
+          {
+            id: "55555555-5555-4555-8555-555555555555",
+            in_app_hidden_at: null,
+          },
+        ],
+      })
     );
 
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
 
     expect(result.success).toBe(true);
     expect(result.code).toBe("requested");
+    expect(createInAppNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a completed Match as unavailable", async () => {
+    createSupabaseAdminClientMock.mockReturnValue(
+      createClient({ matchStatus: "completed" })
+    );
+
+    const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
+
+    expect(result).toEqual({
+      success: false,
+      code: "unavailable",
+      message: "Admin assistance is not available for this match.",
+    });
+    expect(createInAppNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("derives a new deterministic cycle after a prior request is hidden", async () => {
+    const priorId = "55555555-5555-4555-8555-555555555555";
+    createSupabaseAdminClientMock.mockReturnValue(
+      createClient({
+        existingRequests: [
+          {
+            id: priorId,
+            in_app_hidden_at: "2026-08-20T01:00:00.000Z",
+          },
+        ],
+      })
+    );
+
+    const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
+
+    expect(result.success).toBe(true);
+    expect(createInAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventKey:
+          `match:${MATCH_ID}:registration:${REGISTRATION_ID}:` +
+          `admin-assistance-request:after:${priorId}`,
+      })
+    );
+  });
+
+  it("fails safely when the previous-request lookup fails", async () => {
+    createSupabaseAdminClientMock.mockReturnValue(
+      createClient({ existingRequestsError: { code: "READ_FAILED" } })
+    );
+
+    const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
+
+    expect(result).toEqual({
+      success: false,
+      code: "request_failed",
+      message: "Admin assistance could not be requested. Please try again.",
+    });
+    expect(createInAppNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("fails safely when the latest previous-request row is malformed", async () => {
+    createSupabaseAdminClientMock.mockReturnValue(
+      createClient({
+        existingRequests: [
+          { id: "not-a-uuid", in_app_hidden_at: "2026-08-20T01:00:00.000Z" },
+        ],
+      })
+    );
+
+    const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
+
+    expect(result).toEqual({
+      success: false,
+      code: "request_failed",
+      message: "Admin assistance could not be requested. Please try again.",
+    });
     expect(createInAppNotificationMock).not.toHaveBeenCalled();
   });
 });
