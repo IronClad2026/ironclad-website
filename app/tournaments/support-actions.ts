@@ -19,6 +19,11 @@ export type MatchAdminAssistanceResult = {
     | "requested";
 };
 
+type AssistanceRequestRow = {
+  id: string;
+  in_app_hidden_at: string | null;
+};
+
 export async function requestMatchAdminAssistance(input: {
   matchId: string;
 }): Promise<MatchAdminAssistanceResult> {
@@ -103,12 +108,23 @@ export async function requestMatchAdminAssistance(input: {
       return failure(REQUEST_FAILED_MESSAGE, "request_failed");
     }
 
-    const previousRequest = Array.isArray(previousRequests)
-      ? previousRequests[0]
-      : null;
-
-    if (previousRequest && !isAssistanceRequestRow(previousRequest)) {
+    if (
+      !Array.isArray(previousRequests) ||
+      previousRequests.length > 1
+    ) {
       return failure(REQUEST_FAILED_MESSAGE, "request_failed");
+    }
+
+    let previousRequest: AssistanceRequestRow | null = null;
+
+    if (previousRequests.length === 1) {
+      const candidate = previousRequests[0];
+
+      if (!isAssistanceRequestRow(candidate)) {
+        return failure(REQUEST_FAILED_MESSAGE, "request_failed");
+      }
+
+      previousRequest = candidate;
     }
 
     if (previousRequest?.in_app_hidden_at === null) {
@@ -193,10 +209,7 @@ function isRegistrationRow(value: unknown): value is {
   );
 }
 
-function isAssistanceRequestRow(value: unknown): value is {
-  id: string;
-  in_app_hidden_at: string | null;
-} {
+function isAssistanceRequestRow(value: unknown): value is AssistanceRequestRow {
   return (
     isRecord(value) &&
     isUuid(value.id) &&
