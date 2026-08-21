@@ -15,6 +15,10 @@ const PREVIOUS_ACCOUNT_LEGAL_VERSIONS = Object.freeze({
   privacy: "1.0",
 });
 const CANONICAL_LEGAL_ORIGIN = "https://www.ironcladtournaments.com";
+const PREVIEW_LEGAL_DOCUMENT_ORIGIN_ENV =
+  "PREVIEW_LEGAL_DOCUMENT_ORIGIN";
+const VERCEL_PREVIEW_HOST_PATTERN =
+  /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app$/;
 const ACCOUNT_LEGAL_LOOKUP_TIMEOUT_MS = 4_000;
 const PREVIOUS_ACCOUNT_LEGAL_RELEASES = Object.freeze({
   terms: {
@@ -103,7 +107,14 @@ async function loadLegalRuntimeState(
     return anonymousRuntime();
   }
 
-  const deployedDocuments = readDeployedDocumentPair();
+  const trustedLegalOrigin = readTrustedLegalOrigin();
+
+  if (!trustedLegalOrigin) {
+    console.error("Account legal gate document origin was invalid.");
+    return unavailableRuntime(userId);
+  }
+
+  const deployedDocuments = readDeployedDocumentPair(trustedLegalOrigin);
 
   if (!deployedDocuments) {
     console.error("Account legal gate deployed document set was invalid.");
@@ -142,7 +153,10 @@ async function loadLegalRuntimeState(
     return unavailableRuntime(userId);
   }
 
-  const documents = parseEffectiveDocumentPair(documentResult.data);
+  const documents = parseEffectiveDocumentPair(
+    documentResult.data,
+    trustedLegalOrigin
+  );
 
   if (!documents) {
     console.error("Account legal gate document set was invalid.");
@@ -252,7 +266,7 @@ function unavailableRuntime(
     : anonymousRuntime();
 }
 
-function readDeployedDocumentPair(): {
+function readDeployedDocumentPair(trustedLegalOrigin: string): {
   terms: DeployedLegalDocument;
   privacy: DeployedLegalDocument;
 } | null {
@@ -274,8 +288,16 @@ function readDeployedDocumentPair(): {
       return null;
     }
 
-    const terms = parseDeployedDocument(termsCandidates[0], "terms");
-    const privacy = parseDeployedDocument(privacyCandidates[0], "privacy");
+    const terms = parseDeployedDocument(
+      termsCandidates[0],
+      "terms",
+      trustedLegalOrigin
+    );
+    const privacy = parseDeployedDocument(
+      privacyCandidates[0],
+      "privacy",
+      trustedLegalOrigin
+    );
 
     if (!terms || !privacy || !isSupportedVersionPair(terms, privacy)) {
       return null;
@@ -289,7 +311,8 @@ function readDeployedDocumentPair(): {
 
 function parseDeployedDocument(
   value: unknown,
-  expectedKind: "terms" | "privacy"
+  expectedKind: "terms" | "privacy",
+  trustedLegalOrigin: string
 ): DeployedLegalDocument | null {
   if (
     !isRecord(value) ||
@@ -318,8 +341,46 @@ function parseDeployedDocument(
     version: value.version,
     path,
     sha256: release.sha256,
-    url: `${CANONICAL_LEGAL_ORIGIN}${path}`,
+    url: `${trustedLegalOrigin}${path}`,
   };
+}
+
+function readTrustedLegalOrigin(): string | null {
+  if (process.env.VERCEL_ENV === "production") {
+    return CANONICAL_LEGAL_ORIGIN;
+  }
+
+  const configuredOrigin = process.env[PREVIEW_LEGAL_DOCUMENT_ORIGIN_ENV];
+
+  if (!configuredOrigin) {
+    return CANONICAL_LEGAL_ORIGIN;
+  }
+
+  if (process.env.VERCEL_ENV !== "preview") {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(configuredOrigin);
+
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.port ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash ||
+      configuredOrigin !== parsed.origin ||
+      !VERCEL_PREVIEW_HOST_PATTERN.test(parsed.hostname)
+    ) {
+      return null;
+    }
+
+    return parsed.origin;
+  } catch {
+    return null;
+  }
 }
 
 function readReleaseDocument(
@@ -451,7 +512,10 @@ function parseDeployedDocumentPath(value: string) {
   }
 }
 
-function parseCanonicalEffectiveDocumentUrl(value: string) {
+function parseTrustedEffectiveDocumentUrl(
+  value: string,
+  trustedLegalOrigin: string
+) {
   try {
     const url = new URL(value);
 
@@ -462,8 +526,8 @@ function parseCanonicalEffectiveDocumentUrl(value: string) {
       url.port ||
       url.search ||
       url.hash ||
-      url.origin !== CANONICAL_LEGAL_ORIGIN ||
-      value !== `${CANONICAL_LEGAL_ORIGIN}${url.pathname}`
+      url.origin !== trustedLegalOrigin ||
+      value !== `${trustedLegalOrigin}${url.pathname}`
     ) {
       return null;
     }
@@ -474,7 +538,10 @@ function parseCanonicalEffectiveDocumentUrl(value: string) {
   }
 }
 
-function parseEffectiveDocumentPair(value: unknown): {
+function parseEffectiveDocumentPair(
+  value: unknown,
+  trustedLegalOrigin: string
+): {
   terms: EffectiveLegalDocument;
   privacy: EffectiveLegalDocument;
 } | null {
@@ -482,7 +549,9 @@ function parseEffectiveDocumentPair(value: unknown): {
     return null;
   }
 
-  const parsed = value.map(parseEffectiveDocument);
+  const parsed = value.map((document) =>
+    parseEffectiveDocument(document, trustedLegalOrigin)
+  );
 
   if (parsed.some((document) => document === null)) {
     return null;
@@ -499,7 +568,10 @@ function parseEffectiveDocumentPair(value: unknown): {
   return { terms, privacy };
 }
 
-function parseEffectiveDocument(value: unknown): EffectiveLegalDocument | null {
+function parseEffectiveDocument(
+  value: unknown,
+  trustedLegalOrigin: string
+): EffectiveLegalDocument | null {
   if (
     !isRecord(value) ||
     !isUuid(value.id) ||
@@ -515,7 +587,10 @@ function parseEffectiveDocument(value: unknown): EffectiveLegalDocument | null {
     return null;
   }
 
-  const url = parseCanonicalEffectiveDocumentUrl(value.immutable_url);
+  const url = parseTrustedEffectiveDocumentUrl(
+    value.immutable_url,
+    trustedLegalOrigin
+  );
 
   if (!url) {
     return null;

@@ -22,6 +22,11 @@ const TERMS_ID = "11111111-1111-4111-8111-111111111111";
 const PRIVACY_ID = "22222222-2222-4222-8222-222222222222";
 const ACCEPTANCE_ID = "33333333-3333-4333-8333-333333333333";
 const LEGAL_LOOKUP_TIMEOUT_MS = 4_000;
+const PREVIEW_LEGAL_ORIGIN =
+  "https://ironclad-website-legal-release.vercel.app";
+const originalVercelEnvironment = process.env.VERCEL_ENV;
+const originalPreviewLegalOrigin =
+  process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN;
 const RELEASE_HASHES = {
   terms: {
     "1.0":
@@ -59,13 +64,17 @@ function setDeployedDocumentPair(termsVersion: string, privacyVersion: string) {
   ];
 }
 
-function documentRows(termsVersion: string, privacyVersion: string) {
+function documentRows(
+  termsVersion: string,
+  privacyVersion: string,
+  origin = "https://www.ironcladtournaments.com"
+) {
   return [
     {
       id: TERMS_ID,
       document_kind: "terms",
       version: termsVersion,
-      immutable_url: `https://www.ironcladtournaments.com${documentPath(
+      immutable_url: `${origin}${documentPath(
         "terms",
         termsVersion
       )}`,
@@ -77,7 +86,7 @@ function documentRows(termsVersion: string, privacyVersion: string) {
       id: PRIVACY_ID,
       document_kind: "privacy",
       version: privacyVersion,
-      immutable_url: `https://www.ironcladtournaments.com${documentPath(
+      immutable_url: `${origin}${documentPath(
         "privacy",
         privacyVersion
       )}`,
@@ -94,6 +103,18 @@ function documentHash(kind: "terms" | "privacy", version: string) {
   }
 
   return "a".repeat(64);
+}
+
+function restoreEnvironmentVariable(
+  name: string,
+  value: string | undefined
+) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
 }
 
 function clientFixture({
@@ -142,6 +163,11 @@ describe("account legal acceptance gate loader", () => {
   });
 
   afterEach(() => {
+    restoreEnvironmentVariable("VERCEL_ENV", originalVercelEnvironment);
+    restoreEnvironmentVariable(
+      "PREVIEW_LEGAL_DOCUMENT_ORIGIN",
+      originalPreviewLegalOrigin
+    );
     vi.useRealTimers();
   });
 
@@ -167,6 +193,93 @@ describe("account legal acceptance gate loader", () => {
       analyticsAvailable: true,
     });
     expect(fixture.from).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts one exact configured immutable Preview origin for Staging", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = PREVIEW_LEGAL_ORIGIN;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({
+      documents: documentRows("1.1", "1.1", PREVIEW_LEGAL_ORIGIN),
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "required",
+      terms: {
+        id: TERMS_ID,
+        version: "1.1",
+        url: documentPath("terms", "1.1"),
+      },
+      privacy: {
+        id: PRIVACY_ID,
+        version: "1.1",
+        url: documentPath("privacy", "1.1"),
+      },
+    });
+  });
+
+  it("does not let a configured Preview origin weaken Production", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = PREVIEW_LEGAL_ORIGIN;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({ documents: documentRows("1.1", "1.1") });
+
+    await expect(loadAccountLegalGateState()).resolves.toMatchObject({
+      status: "required",
+    });
+  });
+
+  it("rejects Preview-origin legal rows in Production even when Preview is configured", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = PREVIEW_LEGAL_ORIGIN;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({
+      documents: documentRows("1.1", "1.1", PREVIEW_LEGAL_ORIGIN),
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
+  });
+
+  it.each([
+    "http://ironclad-website-legal-release.vercel.app",
+    "https://ironclad-website-legal-release.vercel.app/",
+    "https://nested.ironclad-website-legal-release.vercel.app",
+    "https://www.ironcladtournaments.com",
+    "https://ironclad-website-legal-release.vercel.app:8443",
+    "https://ironclad-website-legal-release.vercel.app/path",
+  ])("fails closed for an invalid configured Preview legal origin: %s", async (origin) => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = origin;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a different Preview origin than the configured immutable release", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = PREVIEW_LEGAL_ORIGIN;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({
+      documents: documentRows(
+        "1.1",
+        "1.1",
+        "https://ironclad-website-other-release.vercel.app"
+      ),
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
   });
 
   it.each([
