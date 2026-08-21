@@ -67,12 +67,12 @@ function createClient({
     tournament_title: "Phase 15A Fixture Tournament",
     player_name: "Fixture Player",
   } as unknown,
-  existingRequests = [] as unknown[],
+  existingRequests,
   existingRequestsError = null as unknown,
 }: {
   matchStatus?: string;
   registration?: unknown;
-  existingRequests?: unknown[];
+  existingRequests?: unknown;
   existingRequestsError?: unknown;
 } = {}) {
   const from = vi.fn((table: string) => ({
@@ -144,12 +144,15 @@ describe("match admin-assistance fallback", () => {
   });
 
   it("routes a participant request into the existing admin notification feed", async () => {
-    createSupabaseAdminClientMock.mockReturnValue(createClient());
+    createSupabaseAdminClientMock.mockReturnValue(
+      createClient({ existingRequests: [] })
+    );
 
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
 
     expect(result.success).toBe(true);
     expect(result.code).toBe("requested");
+    expect(createInAppNotificationMock).toHaveBeenCalledTimes(1);
     expect(createInAppNotificationMock).toHaveBeenCalledWith({
       recipientRole: "admin",
       type: "match.admin_assistance_requested",
@@ -218,6 +221,7 @@ describe("match admin-assistance fallback", () => {
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
 
     expect(result.success).toBe(true);
+    expect(createInAppNotificationMock).toHaveBeenCalledTimes(1);
     expect(createInAppNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         eventKey:
@@ -229,7 +233,10 @@ describe("match admin-assistance fallback", () => {
 
   it("fails safely when the previous-request lookup fails", async () => {
     createSupabaseAdminClientMock.mockReturnValue(
-      createClient({ existingRequestsError: { code: "READ_FAILED" } })
+      createClient({
+        existingRequests: [],
+        existingRequestsError: { code: "READ_FAILED" },
+      })
     );
 
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
@@ -242,13 +249,39 @@ describe("match admin-assistance fallback", () => {
     expect(createInAppNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("fails safely when the latest previous-request row is malformed", async () => {
+  it.each([
+    { label: "null", value: null },
+    { label: "undefined", value: undefined },
+    { label: "a non-array object", value: {} },
+    { label: "a string", value: "invalid" },
+    { label: "a number", value: 123 },
+    { label: "an array containing null", value: [null] },
+    { label: "an array containing undefined", value: [undefined] },
+    {
+      label: "an array containing a malformed row",
+      value: [
+        {
+          id: "not-a-uuid",
+          in_app_hidden_at: "2026-08-20T01:00:00.000Z",
+        },
+      ],
+    },
+    {
+      label: "an array containing more than one row",
+      value: [
+        {
+          id: "55555555-5555-4555-8555-555555555555",
+          in_app_hidden_at: null,
+        },
+        {
+          id: "66666666-6666-4666-8666-666666666666",
+          in_app_hidden_at: "2026-08-20T01:00:00.000Z",
+        },
+      ],
+    },
+  ])("fails safely when previous-request data is $label", async ({ value }) => {
     createSupabaseAdminClientMock.mockReturnValue(
-      createClient({
-        existingRequests: [
-          { id: "not-a-uuid", in_app_hidden_at: "2026-08-20T01:00:00.000Z" },
-        ],
-      })
+      createClient({ existingRequests: value })
     );
 
     const result = await requestMatchAdminAssistance({ matchId: MATCH_ID });
