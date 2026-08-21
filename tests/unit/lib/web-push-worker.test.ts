@@ -412,8 +412,12 @@ describe("Web Push worker", () => {
       publicMetadata: { role: "admin" },
       privateMetadata: {},
     });
+    mocks.loadUnreadCount.mockResolvedValue(0);
 
-    await runWebPushWorker();
+    await expect(runWebPushWorker()).resolves.toMatchObject({
+      sent: 1,
+      skipped: 0,
+    });
 
     expect(mocks.loadUnreadCount).toHaveBeenCalledWith({
       scope: "admin",
@@ -421,6 +425,25 @@ describe("Web Push worker", () => {
     });
     const payload = JSON.parse(mocks.sendNotification.mock.calls[0][1]);
     expect(payload.scope).toBe("player");
+    expect(payload.unreadCount).toBe(0);
+    expect(completionCalls().at(-1)?.[1]).toMatchObject({
+      p_outcome: "sent",
+      p_error_code: null,
+    });
+  });
+
+  it("still skips a zero unread snapshot when badge and claim scopes match", async () => {
+    mocks.loadUnreadCount.mockResolvedValue(0);
+
+    await expect(runWebPushWorker()).resolves.toMatchObject({
+      sent: 0,
+      skipped: 1,
+    });
+    expect(mocks.sendNotification).not.toHaveBeenCalled();
+    expect(completionCalls().at(-1)?.[1]).toMatchObject({
+      p_outcome: "skipped",
+      p_error_code: "NO_LONGER_UNREAD",
+    });
   });
 
   it("never allows an in-site-only Admin type through defense-in-depth policy", async () => {

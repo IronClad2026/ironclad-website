@@ -314,7 +314,7 @@ async function processClaim(
     );
   }
 
-  if (unreadCount === 0) {
+  if (unreadCount === 0 && badgeScope === claim.recipientRole) {
     await completeNotification(
       supabase,
       claim,
