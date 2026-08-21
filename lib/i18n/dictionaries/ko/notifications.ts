@@ -21,6 +21,23 @@ const dictionary = {
       "상대가 {tournamentName}의 결과를 제출했습니다. 보고된 점수: {score}.",
     openToRespond: "토너먼트를 열어 확인하거나 이의 제기",
     unknownTime: "시간 알 수 없음",
+    pushTitle: "기기 알림",
+    pushDescription:
+      "이 기기에서 중요한 IronClad 알림을 받습니다. 사용을 선택하기 전에는 브라우저가 권한을 요청하지 않습니다.",
+    pushChecking: "이 기기의 알림 상태를 확인하는 중…",
+    pushEnable: "알림 사용",
+    pushDisable: "이 기기에서 사용 중지",
+    pushEnabling: "사용 설정 중…",
+    pushDisabling: "사용 중지 중…",
+    pushEnabled: "이 기기에서 알림이 사용 설정되었습니다.",
+    pushDisabled: "이 기기에서 알림이 꺼져 있습니다.",
+    pushBlocked: "브라우저 또는 기기 설정에서 알림이 차단되었습니다.",
+    pushInstallRequired:
+      "iPhone 또는 iPad에서는 먼저 IronClad를 홈 화면에 설치한 다음 알림을 사용 설정하세요.",
+    pushUnsupported: "이 브라우저는 웹 푸시를 지원하지 않습니다.",
+    pushUnavailable: "알림을 업데이트할 수 없습니다. 다시 시도해 주세요.",
+    pushPrivacy:
+      "알림이 잠금 화면에 표시될 수 있습니다. 기기 설정에서 알림 미리 보기의 개인정보를 보호하세요.",
   },
   dashboard: {
     title: "알림",

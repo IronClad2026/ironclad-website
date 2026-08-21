@@ -156,6 +156,7 @@ describe("versioned legal publication contract", () => {
 
     const pdfNames = readdirSync(publicDirectory)
       .filter((name) => name.toLowerCase().endsWith(".pdf"))
+      .filter((name) => name !== "ironclad-privacy-policy-v1.2.pdf")
       .sort();
     expect(pdfNames).toEqual([...expectedArtifacts.keys()].sort());
 

@@ -24,6 +24,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { dismissDashboardNotifications } from "@/app/dashboard/actions";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import NotificationPermissionControl from "@/components/NotificationPermissionControl";
 import {
   deleteSelectedInAppNotifications,
   markAllInAppNotificationsRead,
@@ -38,6 +39,7 @@ import type {
   InAppNotification,
   NotificationScope,
 } from "@/lib/notifications";
+import { requestNotificationBadgeReconciliation } from "@/lib/app-badge";
 
 type InAppNotificationCenterProps = {
   scope: NotificationScope;
@@ -128,6 +130,11 @@ export default function InAppNotificationCenter({
   const displayUnreadCount = unreadCount + matchActionNotifications.length;
   const visibleError = mutationError ?? error;
 
+  const commitAuthoritativeUnreadCount = (nextUnreadCount: number) => {
+    setUnreadCount(nextUnreadCount);
+    requestNotificationBadgeReconciliation();
+  };
+
   useEffect(() => {
     if (!adminModalOpen) return;
 
@@ -168,7 +175,7 @@ export default function InAppNotificationCenter({
             item.id === notificationId ? { ...item, readAt } : item
           )
         );
-        setUnreadCount(result.unreadCount);
+        commitAuthoritativeUnreadCount(result.unreadCount);
         router.refresh();
       } catch {
         setMutationError(t("dashboard.actions.updateFailed"));
@@ -197,7 +204,7 @@ export default function InAppNotificationCenter({
         setNotifications((current) =>
           current.map((notification) => ({ ...notification, readAt }))
         );
-        setUnreadCount(result.unreadCount);
+        commitAuthoritativeUnreadCount(result.unreadCount);
         router.refresh();
       } catch {
         setMutationError(t("dashboard.actions.updateFailed"));
@@ -268,7 +275,7 @@ export default function InAppNotificationCenter({
               : notification
           )
         );
-        setUnreadCount(result.unreadCount);
+        commitAuthoritativeUnreadCount(result.unreadCount);
         setSelectedNotificationIds(new Set());
         router.refresh();
       } catch {
@@ -334,7 +341,7 @@ export default function InAppNotificationCenter({
           Math.max(current - selectedIds.length, 0)
         );
         if (authoritativeUnreadCount !== null) {
-          setUnreadCount(authoritativeUnreadCount);
+          commitAuthoritativeUnreadCount(authoritativeUnreadCount);
         }
         if (selectedMatchActionIds.length > 0) {
           setDismissedMatchActionIds((current) => {
@@ -382,7 +389,7 @@ export default function InAppNotificationCenter({
                   item.id === notification.id ? { ...item, readAt } : item
                 )
               );
-              setUnreadCount(result.unreadCount);
+              commitAuthoritativeUnreadCount(result.unreadCount);
             } else {
               setMutationError(t("dashboard.actions.updateFailed"));
             }
@@ -510,6 +517,8 @@ export default function InAppNotificationCenter({
             className="border-t border-white/10"
           >
             <div className="space-y-3 p-4 sm:p-5">
+              <NotificationPermissionControl />
+
               {visibleError && (
                 <div
                   role="alert"
@@ -767,6 +776,10 @@ function AdminNotificationModal({
             {error}
           </div>
         )}
+
+        <div className="border-b border-white/10 p-4">
+          <NotificationPermissionControl />
+        </div>
 
         <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(18rem,0.9fr)_1.4fr]">
           <aside className="min-h-0 overflow-y-auto border-b border-white/10 p-3 md:border-r md:border-b-0">

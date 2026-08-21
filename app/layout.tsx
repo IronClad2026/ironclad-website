@@ -7,6 +7,7 @@ import "./globals.css";
 import Footer from "@/components/Footer";
 import GlobalSmoke from "@/components/GlobalSmoke";
 import Navbar from "@/components/Navbar";
+import NotificationBadgeRuntime from "@/components/NotificationBadgeRuntime";
 import ConsentAwareVercelAnalytics from "@/components/analytics/ConsentAwareVercelAnalytics";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
 import AccountLegalUpdateGate from "@/components/legal/AccountLegalUpdateGate";
@@ -95,6 +96,7 @@ export default async function RootLayout({
     <ClerkProvider localization={clerkLocalization}>
       <html lang={locale}>
         <body>
+          <NotificationBadgeRuntime />
           <LocaleProvider locale={locale} dictionaries={{ common }}>
             <AccountLegalUpdateGate
               copy={common.legalUpdate}

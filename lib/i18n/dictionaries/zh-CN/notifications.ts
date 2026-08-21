@@ -20,6 +20,23 @@ const dictionary = {
       "你的对手提交了 {tournamentName} 的赛果。报告比分：{score}。",
     openToRespond: "打开锦标赛以确认或提出异议",
     unknownTime: "时间未知",
+    pushTitle: "设备通知",
+    pushDescription:
+      "允许此设备接收重要的 IronClad 提醒。只有在你选择启用后，浏览器才会请求权限。",
+    pushChecking: "正在检查此设备的通知状态…",
+    pushEnable: "启用通知",
+    pushDisable: "在此设备上停用",
+    pushEnabling: "正在启用…",
+    pushDisabling: "正在停用…",
+    pushEnabled: "此设备已启用通知。",
+    pushDisabled: "此设备的通知已关闭。",
+    pushBlocked: "浏览器或设备设置已阻止通知。",
+    pushInstallRequired:
+      "在 iPhone 或 iPad 上，请先将 IronClad 添加到主屏幕，然后再启用通知。",
+    pushUnsupported: "此浏览器不支持网页推送通知。",
+    pushUnavailable: "无法更新通知设置，请重试。",
+    pushPrivacy:
+      "提醒可能会显示在锁定屏幕上。请在设备设置中保护通知预览的隐私。",
   },
   dashboard: {
     title: "通知",

@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InAppNotification } from "@/lib/notifications";
+import type { DashboardNotification } from "@/lib/player-dashboard";
 
 const pushMock = vi.hoisted(() => vi.fn());
 const refreshMock = vi.hoisted(() => vi.fn());
@@ -10,6 +11,7 @@ const deleteSelectedMock = vi.hoisted(() => vi.fn());
 const markAllMock = vi.hoisted(() => vi.fn());
 const markReadMock = vi.hoisted(() => vi.fn());
 const markSelectedMock = vi.hoisted(() => vi.fn());
+const requestBadgeReconciliationMock = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, refresh: refreshMock }),
@@ -22,6 +24,12 @@ vi.mock("@/app/notifications/actions", () => ({
   markAllInAppNotificationsRead: markAllMock,
   markInAppNotificationRead: markReadMock,
   markVisibleInAppNotificationsRead: markSelectedMock,
+}));
+vi.mock("@/components/NotificationPermissionControl", () => ({
+  default: () => <div data-testid="notification-permission-control" />,
+}));
+vi.mock("@/lib/app-badge", () => ({
+  requestNotificationBadgeReconciliation: requestBadgeReconciliationMock,
 }));
 
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
@@ -75,6 +83,7 @@ describe("notification-center mutation reliability", () => {
 
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
   });
 
   it("uses the authoritative post-mutation unread count on success", async () => {
@@ -86,6 +95,7 @@ describe("notification-center mutation reliability", () => {
 
     await waitFor(() => {
       expect(screen.getByText("4 total · 2 unread")).toBeInTheDocument();
+      expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
     });
     expect(screen.queryByText("New")).not.toBeInTheDocument();
     expect(refreshMock).toHaveBeenCalled();
@@ -106,7 +116,119 @@ describe("notification-center mutation reliability", () => {
     });
     expect(screen.getByText("4 total · 3 unread")).toBeInTheDocument();
     expect(screen.getByText("New")).toBeInTheDocument();
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
     expect(refreshMock).toHaveBeenCalled();
+  });
+
+  it("reconciles badge truth after marking selected durable notifications read", async () => {
+    renderPlayerCenter(notification());
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /Select Registration Rejected/i,
+      })
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Mark selected read" })
+    );
+
+    await waitFor(() => expect(markSelectedMock).toHaveBeenCalledOnce());
+    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+  });
+
+  it("reconciles badge truth after marking all durable notifications read", async () => {
+    renderPlayerCenter(notification());
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+
+    await waitFor(() => expect(markAllMock).toHaveBeenCalledOnce());
+    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+  });
+
+  it("reconciles badge truth after hiding a selected durable notification", async () => {
+    renderPlayerCenter(notification());
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /Select Registration Rejected/i,
+      })
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete selected" })
+    );
+
+    await waitFor(() => expect(deleteSelectedMock).toHaveBeenCalledOnce());
+    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+  });
+
+  it("does not request badge reconciliation from a failed initial load", async () => {
+    render(
+      <InAppNotificationCenter
+        scope="player"
+        title="Notifications"
+        description="Recent updates."
+        emptyMessage="No updates."
+        notifications={[]}
+        totalCount={0}
+        unreadCount={0}
+        error="Notifications could not be loaded."
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Notifications/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Notifications could not be loaded.")
+      ).toBeInTheDocument();
+    });
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+  });
+
+  it("does not use projected Match actions as badge truth", () => {
+    const projectedMatchAction: DashboardNotification = {
+      id: "projected-match-action",
+      source: "report_group",
+      sourceId: "44444444-4444-4444-8444-444444444444",
+      reportGroupId: "44444444-4444-4444-8444-444444444444",
+      resultType: "normal",
+      noShowRegistrationId: null,
+      noShowStatus: null,
+      submissionNumber: 1,
+      gameNumber: 1,
+      tournamentName: "Reliability Cup",
+      roundName: "Round 1",
+      matchNumber: 1,
+      opponentName: "Opponent",
+      reportedWinner: "Player",
+      reportedLoser: "Opponent",
+      reportedScore: "1-0",
+      status: "pending_confirmation",
+      reviewNotes: null,
+      submittedAt: "2026-08-20T00:00:00.000Z",
+      reviewedAt: null,
+      submittedByViewer: false,
+      confirmationDeadlineAt: "2026-08-21T00:00:00.000Z",
+      finalizedAt: null,
+      canConfirm: true,
+      canDispute: true,
+    };
+
+    render(
+      <InAppNotificationCenter
+        scope="player"
+        title="Notifications"
+        description="Recent updates."
+        emptyMessage="No updates."
+        notifications={[notification()]}
+        totalCount={4}
+        unreadCount={3}
+        matchNotifications={[projectedMatchAction]}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Notifications/i }));
+
+    expect(screen.getByText("5 total · 4 unread")).toBeInTheDocument();
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
   });
 
   it("continues to an approved Match destination when mark-read fails", async () => {

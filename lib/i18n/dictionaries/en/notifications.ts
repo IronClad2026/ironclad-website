@@ -21,6 +21,24 @@ const dictionary = {
       "Your opponent submitted a result for {tournamentName}. Reported score: {score}.",
     openToRespond: "Open the tournament to confirm or dispute",
     unknownTime: "Unknown time",
+    pushTitle: "Device notifications",
+    pushDescription:
+      "Allow meaningful IronClad alerts on this device. Nothing is requested until you choose Enable.",
+    pushChecking: "Checking this device's notification status…",
+    pushEnable: "Enable notifications",
+    pushDisable: "Disable on this device",
+    pushEnabling: "Enabling…",
+    pushDisabling: "Disabling…",
+    pushEnabled: "Notifications are enabled on this device.",
+    pushDisabled: "Notifications are off on this device.",
+    pushBlocked:
+      "Notifications are blocked in your browser or device settings.",
+    pushInstallRequired:
+      "On iPhone or iPad, install IronClad on your Home Screen before enabling notifications.",
+    pushUnsupported: "This browser does not support Web Push.",
+    pushUnavailable: "Notifications could not be updated. Please try again.",
+    pushPrivacy:
+      "Alerts may appear on your lock screen. Keep notification previews private in your device settings.",
   },
   dashboard: {
     title: "Notifications",

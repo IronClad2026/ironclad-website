@@ -21,6 +21,25 @@ const dictionary = {
       "Tu rival ha enviado un resultado para {tournamentName}. Marcador indicado: {score}.",
     openToRespond: "Abrir el torneo para confirmar o impugnar",
     unknownTime: "Hora desconocida",
+    pushTitle: "Notificaciones del dispositivo",
+    pushDescription:
+      "Permite alertas importantes de IronClad en este dispositivo. El navegador no solicitará permiso hasta que elijas Activar.",
+    pushChecking: "Comprobando el estado de las notificaciones del dispositivo…",
+    pushEnable: "Activar notificaciones",
+    pushDisable: "Desactivar en este dispositivo",
+    pushEnabling: "Activando…",
+    pushDisabling: "Desactivando…",
+    pushEnabled: "Las notificaciones están activadas en este dispositivo.",
+    pushDisabled: "Las notificaciones están desactivadas en este dispositivo.",
+    pushBlocked:
+      "Las notificaciones están bloqueadas en la configuración del navegador o del dispositivo.",
+    pushInstallRequired:
+      "En iPhone o iPad, instala IronClad en la pantalla de inicio antes de activar las notificaciones.",
+    pushUnsupported: "Este navegador no admite notificaciones push web.",
+    pushUnavailable:
+      "No se pudieron actualizar las notificaciones. Inténtalo de nuevo.",
+    pushPrivacy:
+      "Las alertas pueden aparecer en la pantalla de bloqueo. Protege la vista previa de las notificaciones en la configuración del dispositivo.",
   },
   dashboard: {
     title: "Notificaciones",

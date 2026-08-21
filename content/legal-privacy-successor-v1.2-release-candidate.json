@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "status": "Review Draft - Not Effective",
+  "runtimeActivated": false,
+  "effectiveDate": null,
+  "effectiveDateDisplay": "TBD",
+  "preparedAgainstRuntime": {
+    "termsVersion": "1.1",
+    "privacyVersion": "1.1"
+  },
+  "source": {
+    "path": "content/legal-privacy-successor-v1.2.json",
+    "version": "1.2",
+    "sha256": "8d40ddf5449a21bffc380c7005fd0513eb28683e3c23db6e523a33d20026297b"
+  },
+  "document": {
+    "kind": "privacy",
+    "version": "1.2",
+    "filename": "ironclad-privacy-policy-v1.2.pdf",
+    "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf",
+    "sha256": "7c1490e89721b85298a11f1058ccb6fac0c42585e3c159d7b9ff7db651cb106b",
+    "size": 967412
+  },
+  "activationRequirements": [
+    "owner-authorized final legal review",
+    "actual Australia/Sydney Production effective date",
+    "immutable artifact finalization and deployment",
+    "runtime corpus and release-pair activation",
+    "database legal-document activation",
+    "renewed Terms acceptance and Privacy acknowledgement where required"
+  ]
+}
