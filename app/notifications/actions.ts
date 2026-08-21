@@ -61,8 +61,6 @@ export type WebPushSubscriptionOwnershipResult =
   | { ok: true; owned: boolean }
   | { ok: false; code: NotificationPushFailureCode };
 
-export type { WebPushSubscriptionInput };
-
 const unavailableResult = (): NotificationMutationResult => ({
   ok: false,
   code: "unavailable",

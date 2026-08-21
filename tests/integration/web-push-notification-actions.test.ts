@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
@@ -57,6 +59,17 @@ describe("Web Push notification Server Actions", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it("does not re-export an imported type from the use-server action module", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "app/notifications/actions.ts"),
+      "utf8"
+    );
+
+    expect(source).not.toMatch(
+      /export\s+type\s*\{[^}]*WebPushSubscriptionInput[^}]*\}/
+    );
   });
 
   it("returns only the validated public VAPID key to an authenticated caller", async () => {
