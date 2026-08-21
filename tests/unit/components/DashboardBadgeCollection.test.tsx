@@ -154,21 +154,21 @@ describe("DashboardBadgeCollection", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("Five Victories");
   });
 
-  it("uses the intentional missing-artwork fallback without broken images", () => {
+  it("uses final artwork for a locked badge without changing its locked state", () => {
     render(<DashboardBadgeCollection badgeData={buildDashboardBadgeData()} />);
 
     const fiveVictories = screen.getByRole("button", {
       name: "Five Victories, Uncommon, locked",
     });
-    const fallback = within(fiveVictories).getByTestId(
-      "badge-artwork-fallback"
-    );
+    const image = within(fiveVictories).getByRole("img", {
+      name: "Five Victories badge artwork",
+    });
 
-    expect(fallback).toHaveTextContent("11");
-    expect(within(fiveVictories).queryByRole("img")).not.toBeInTheDocument();
-    expect(fallback.closest("[data-badge-artwork]")).toHaveAttribute(
+    expect(image).toHaveAttribute("src", "/assets/badges/11.png");
+    expect(image).toHaveClass("grayscale");
+    expect(image.closest("[data-badge-artwork]")).toHaveAttribute(
       "data-badge-artwork",
-      "fallback"
+      "real"
     );
   });
 

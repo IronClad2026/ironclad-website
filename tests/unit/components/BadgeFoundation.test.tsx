@@ -443,7 +443,7 @@ describe("badge foundation components", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders intentional fallback content for badges without artwork", () => {
+  it("renders final artwork for a previously fallback-only badge", () => {
     const missingArtworkItem = requireItemByNumber(
       mapBadgeCollection({ awards: [] }),
       11
@@ -454,25 +454,19 @@ describe("badge foundation components", () => {
     const button = screen.getByRole("button", {
       name: "Five Victories, Uncommon, locked",
     });
-    const fallback = within(button).getByTestId("badge-artwork-fallback");
-    const artworkFrame = fallback.closest("[data-badge-artwork]");
+    const image = within(button).getByRole("img", {
+      name: "Five Victories badge artwork",
+    });
+    const artworkFrame = image.closest("[data-badge-artwork]");
 
-    expect(within(button).queryByRole("img")).not.toBeInTheDocument();
-    expect(fallback).toHaveTextContent("11");
-    expect(fallback).toHaveTextContent("Five Victories");
-    expect(fallback).toHaveTextContent("Uncommon");
-    expect(fallback).toHaveTextContent("Locked");
+    expect(image).toHaveAttribute("src", "/assets/badges/11.png");
+    expect(image).toHaveClass("grayscale");
     expect(artworkFrame).toHaveAttribute(
       "data-badge-artwork-surface",
-      "fallback"
+      "card"
     );
-    expect(artworkFrame).not.toHaveClass("border");
     expect(artworkFrame).toHaveClass("overflow-visible");
-    expect(artworkFrame).not.toHaveClass("overflow-hidden");
-    expect(artworkFrame).not.toHaveClass("rounded-lg");
-    expect(artworkFrame?.className).not.toContain("bg-");
-    expect(within(fallback).getByText("11")).not.toHaveClass("rounded-lg");
-    expect(within(fallback).getByText("11")).not.toHaveClass("border");
+    expect(artworkFrame).toHaveAttribute("data-badge-artwork", "real");
   });
 
   it("keeps artwork and lock overlays from blocking card clicks", () => {
@@ -498,7 +492,7 @@ describe("badge foundation components", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("First Deployment");
   });
 
-  it("renders reveal fallback content for earned badges without artwork", () => {
+  it("renders final reveal artwork for earned badges", () => {
     const missingArtworkEarnedItem = requireEarnedItemByNumber(11);
 
     render(
@@ -509,13 +503,10 @@ describe("badge foundation components", () => {
       />
     );
 
-    const fallback = screen.getByTestId("badge-artwork-fallback");
-
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
-    expect(fallback).toHaveTextContent("11");
-    expect(fallback).toHaveTextContent("Five Victories");
-    expect(fallback).toHaveTextContent("Uncommon");
-    expect(fallback).toHaveTextContent("Earned");
+    expect(
+      screen.getByRole("img", { name: "Five Victories badge artwork" })
+    ).toHaveAttribute("src", "/assets/badges/11.png");
+    expect(screen.queryByTestId("badge-artwork-fallback")).not.toBeInTheDocument();
   });
 
   it("renders the Phase 10 preview controls without production data hooks", () => {
