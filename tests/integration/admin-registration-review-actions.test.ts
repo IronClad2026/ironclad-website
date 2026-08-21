@@ -249,7 +249,7 @@ describe("admin registration review action contracts", () => {
     const notificationCall = sliceSource(
       updateRegistrationStatusAction,
       "const notification = buildRegistrationStatusNotification({",
-      "  if (notification)"
+      "  const { error } = await supabase.rpc("
     );
 
     expect(compactNotifications).not.toContain("registration.approved");
@@ -274,6 +274,15 @@ describe("admin registration review action contracts", () => {
     );
     expect(compactNotifications).toContain(
       "You have been added to the waitlist for ${tournamentTitle}."
+    );
+    expect(compactNotifications).toContain(
+      "eventKey: rejectionEventKey"
+    );
+    expect(compact(updateRegistrationStatusAction)).toContain(
+      "`registration:${currentRegistration.id}:rejected:${rejectionCycle}`"
+    );
+    expect(compact(updateRegistrationStatusAction)).not.toContain(
+      "eventKey: `registration:${registration.id}:waitlisted`"
     );
     expect(compactNotifications.toLowerCase()).not.toContain("admin_notes");
     expect(compactNotifications).not.toContain("adminNotes");

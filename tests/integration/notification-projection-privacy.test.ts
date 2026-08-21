@@ -215,6 +215,46 @@ describe("notification browser privacy boundary", () => {
     );
   });
 
+  it("routes confirmation-required truth to the trusted internal Match workflow", async () => {
+    const tournamentId = "22222222-2222-4222-8222-222222222222";
+    const matchId = "33333333-3333-4333-8333-333333333333";
+    const reportGroupId = "44444444-4444-4444-8444-444444444444";
+    const notificationQuery = createNotificationProjectionClient({
+      id: "notification-confirmation-1",
+      recipient_role: "player",
+      type: "match.confirmation_required",
+      title: "Match result needs confirmation",
+      message: "Confirm or dispute the submitted result.",
+      actor_display_name: "Opponent",
+      tournament_id: tournamentId,
+      tournament_title: "Synthetic Tournament",
+      registration_id: "55555555-5555-4555-8555-555555555555",
+      match_id: matchId,
+      report_group_id: reportGroupId,
+      event_key: `match:${matchId}:report-group:${reportGroupId}:confirmation-required`,
+      metadata: {
+        deadlineAt: "2026-08-22T12:00:00.000Z",
+        privateProofPath: "must-not-project/private.rec",
+      },
+      read_at: null,
+      created_at: "2026-08-20T12:00:00.000Z",
+    });
+    createSupabaseAdminClientMock.mockReturnValue(notificationQuery.client);
+
+    const result = await loadPlayerNotifications(recipientClerkUserId);
+
+    expect(result.notifications[0]).toMatchObject({
+      type: "match.confirmation_required",
+      matchId,
+      reportGroupId,
+      href: `/tournaments?tournament=${tournamentId}&tab=brackets&match=${matchId}`,
+    });
+    expect(result.notifications[0]?.href).toMatch(/^\/tournaments\?/);
+    expect(JSON.stringify(result.notifications[0])).not.toContain(
+      "privateProofPath"
+    );
+  });
+
   it("does not persist a reviewer Clerk ID in report-group review notifications", async () => {
     const client = createNotificationContextClient();
     createInAppNotificationsMock.mockResolvedValue(true);

@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
   deleteNotifications,
+  loadUnreadNotificationCount,
   markAllNotificationsRead,
   markNotificationRead,
   markNotificationsRead,
@@ -16,43 +17,56 @@ type CustomClaims = {
   };
 };
 
-export async function markInAppNotificationRead(formData: FormData) {
+export type NotificationMutationResult =
+  | { ok: true; unreadCount: number }
+  | { ok: false; code: "unavailable" };
+
+const unavailableResult = (): NotificationMutationResult => ({
+  ok: false,
+  code: "unavailable",
+});
+
+export async function markInAppNotificationRead(
+  formData: FormData
+): Promise<NotificationMutationResult> {
   const { userId, sessionClaims } = await auth();
   const scope = getScope(formData);
 
   if (!userId || !scope) {
-    return;
+    return unavailableResult();
   }
 
   if (scope === "admin" && !isAdmin(sessionClaims as CustomClaims | null)) {
-    throw new Error("Unauthorized");
+    return unavailableResult();
   }
 
   const notificationId = String(formData.get("notificationId") ?? "");
 
   if (!notificationId) {
-    return;
+    return unavailableResult();
   }
 
-  await markNotificationRead({
+  const updated = await markNotificationRead({
     notificationId,
     scope,
     clerkUserId: scope === "player" ? userId : null,
   });
 
-  revalidateNotificationPaths(scope);
+  return finishMutation(updated, scope, userId);
 }
 
-export async function markVisibleInAppNotificationsRead(formData: FormData) {
+export async function markVisibleInAppNotificationsRead(
+  formData: FormData
+): Promise<NotificationMutationResult> {
   const { userId, sessionClaims } = await auth();
   const scope = getScope(formData);
 
   if (!userId || !scope) {
-    return;
+    return unavailableResult();
   }
 
   if (scope === "admin" && !isAdmin(sessionClaims as CustomClaims | null)) {
-    throw new Error("Unauthorized");
+    return unavailableResult();
   }
 
   const notificationIds = formData
@@ -60,45 +74,49 @@ export async function markVisibleInAppNotificationsRead(formData: FormData) {
     .map((value) => String(value))
     .filter(Boolean);
 
-  await markNotificationsRead({
+  const updated = await markNotificationsRead({
     notificationIds,
     scope,
     clerkUserId: scope === "player" ? userId : null,
   });
 
-  revalidateNotificationPaths(scope);
+  return finishMutation(updated, scope, userId);
 }
 
-export async function markAllInAppNotificationsRead(formData: FormData) {
+export async function markAllInAppNotificationsRead(
+  formData: FormData
+): Promise<NotificationMutationResult> {
   const { userId, sessionClaims } = await auth();
   const scope = getScope(formData);
 
   if (!userId || !scope) {
-    return;
+    return unavailableResult();
   }
 
   if (scope === "admin" && !isAdmin(sessionClaims as CustomClaims | null)) {
-    throw new Error("Unauthorized");
+    return unavailableResult();
   }
 
-  await markAllNotificationsRead({
+  const updated = await markAllNotificationsRead({
     scope,
     clerkUserId: scope === "player" ? userId : null,
   });
 
-  revalidateNotificationPaths(scope);
+  return finishMutation(updated, scope, userId);
 }
 
-export async function deleteSelectedInAppNotifications(formData: FormData) {
+export async function deleteSelectedInAppNotifications(
+  formData: FormData
+): Promise<NotificationMutationResult> {
   const { userId, sessionClaims } = await auth();
   const scope = getScope(formData);
 
   if (!userId || !scope) {
-    return;
+    return unavailableResult();
   }
 
   if (scope === "admin" && !isAdmin(sessionClaims as CustomClaims | null)) {
-    throw new Error("Unauthorized");
+    return unavailableResult();
   }
 
   const notificationIds = formData
@@ -106,13 +124,36 @@ export async function deleteSelectedInAppNotifications(formData: FormData) {
     .map((value) => String(value))
     .filter(Boolean);
 
-  await deleteNotifications({
+  const updated = await deleteNotifications({
     notificationIds,
     scope,
     clerkUserId: scope === "player" ? userId : null,
   });
 
+  return finishMutation(updated, scope, userId);
+}
+
+async function finishMutation(
+  updated: boolean,
+  scope: NotificationScope,
+  clerkUserId: string
+): Promise<NotificationMutationResult> {
+  if (!updated) {
+    return unavailableResult();
+  }
+
   revalidateNotificationPaths(scope);
+
+  const unreadCount = await loadUnreadNotificationCount({
+    scope,
+    clerkUserId: scope === "player" ? clerkUserId : null,
+  });
+
+  if (unreadCount === null) {
+    return unavailableResult();
+  }
+
+  return { ok: true, unreadCount };
 }
 
 function getScope(formData: FormData): NotificationScope | null {

@@ -313,6 +313,7 @@ function buildRegistrationStatusNotification({
   nextStatus,
   registration,
   actorClerkUserId,
+  rejectionEventKey,
 }: {
   previousStatus: RegistrationStatus;
   nextStatus: RegistrationStatus;
@@ -325,6 +326,7 @@ function buildRegistrationStatusNotification({
     bracket_name: string | null;
   };
   actorClerkUserId: string;
+  rejectionEventKey: string | null;
 }): NotificationCreateInput | null {
   if (!registration.clerk_user_id || previousStatus === nextStatus) {
     return null;
@@ -347,11 +349,16 @@ function buildRegistrationStatusNotification({
   };
 
   if (nextStatus === "rejected") {
+    if (!rejectionEventKey) {
+      return null;
+    }
+
     return {
       ...base,
       type: "registration.rejected",
       title: "Registration Rejected",
       message: `Your registration for ${tournamentTitle} has been rejected.`,
+      eventKey: rejectionEventKey,
     };
   }
 
@@ -460,6 +467,51 @@ async function updateRegistrationStatus(formData: FormData) {
     );
   }
 
+  let rejectionEventKey: string | null = null;
+
+  if (
+    nextStatus === "rejected" &&
+    currentRegistration.registration_status !== nextStatus &&
+    currentRegistration.clerk_user_id
+  ) {
+    const { data: previousRejection, error: previousRejectionError } =
+      await supabase
+        .from("notifications")
+        .select("id")
+        .eq("recipient_clerk_user_id", currentRegistration.clerk_user_id)
+        .eq("type", "registration.rejected")
+        .eq("registration_id", currentRegistration.id)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (previousRejectionError) {
+      console.error("Registration rejection notification lookup failed.");
+      redirect(
+        buildHref({
+          filter: activeFilter,
+          selected: selected || registrationId,
+          notice: "save-failed",
+        })
+      );
+    }
+
+    const rejectionCycle = previousRejection
+      ? `after:${previousRejection.id}`
+      : "initial";
+    rejectionEventKey =
+      `registration:${currentRegistration.id}:rejected:${rejectionCycle}`;
+  }
+
+  const notification = buildRegistrationStatusNotification({
+    previousStatus: currentRegistration.registration_status,
+    nextStatus,
+    registration: currentRegistration,
+    actorClerkUserId: userId,
+    rejectionEventKey,
+  });
+
   const { error } = await supabase.rpc("review_tournament_registration", {
     p_registration_id: registrationId,
     p_registration_status: nextStatus,
@@ -487,13 +539,6 @@ async function updateRegistrationStatus(formData: FormData) {
       })
     );
   }
-
-  const notification = buildRegistrationStatusNotification({
-    previousStatus: currentRegistration.registration_status,
-    nextStatus,
-    registration: currentRegistration,
-    actorClerkUserId: userId,
-  });
 
   if (notification) {
     await createInAppNotification(notification);

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   deleteNotifications,
+  loadUnreadNotificationCount,
   markAllNotificationsRead,
   markNotificationRead,
   markNotificationsRead,
@@ -103,6 +104,69 @@ describe("notification read-state filtering", () => {
         clerkUserId: "user_player_a",
       })
     ).resolves.toBe(false);
+  });
+
+  it("loads the authoritative player unread count after visibility filters", async () => {
+    const supabase = createSupabaseQueryMock({ count: 4 });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    await expect(
+      loadUnreadNotificationCount({
+        scope: "player",
+        clerkUserId: "user_player_a",
+      })
+    ).resolves.toBe(4);
+
+    expect(supabase.calls).toEqual(
+      expect.arrayContaining([
+        {
+          method: "select",
+          args: ["id", { count: "exact", head: true }],
+        },
+        { method: "is", args: ["in_app_hidden_at", null] },
+        { method: "is", args: ["read_at", null] },
+        {
+          method: "eq",
+          args: ["recipient_clerk_user_id", "user_player_a"],
+        },
+      ])
+    );
+  });
+
+  it("loads the authoritative global Admin unread count", async () => {
+    const supabase = createSupabaseQueryMock({ count: 7 });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    await expect(
+      loadUnreadNotificationCount({ scope: "admin" })
+    ).resolves.toBe(7);
+
+    expect(supabase.calls).toEqual(
+      expect.arrayContaining([
+        { method: "eq", args: ["recipient_role", "admin"] },
+        { method: "is", args: ["in_app_hidden_at", null] },
+        { method: "is", args: ["read_at", null] },
+      ])
+    );
+    expect(supabase.calls).not.toContainEqual({
+      method: "eq",
+      args: ["recipient_clerk_user_id", expect.anything()],
+    });
+  });
+
+  it("does not substitute zero when the unread count query fails", async () => {
+    const supabase = createSupabaseQueryMock({
+      count: null,
+      error: { message: "mock count failure" },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    await expect(
+      loadUnreadNotificationCount({
+        scope: "player",
+        clerkUserId: "user_player_a",
+      })
+    ).resolves.toBeNull();
   });
 
   it("soft-hides canonical events while physically deleting only legacy rows", async () => {

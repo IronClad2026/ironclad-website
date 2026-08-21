@@ -849,6 +849,10 @@ describe("matchup deadline player and administrator presentation", () => {
     expect(source).toContain('searchParams.get("match")');
     expect(source).toContain("match-desktop-${focusedMatchId}");
     expect(source).toContain("match-mobile-${focusedMatchId}");
+    expect(source).not.toContain(
+      'focusedBracket?.format === "single_elimination"'
+    );
+    expect(source.match(/focusedMatch &&/g)?.length).toBeGreaterThanOrEqual(2);
     expect(source).toContain('t("tournaments.brackets.waitingOpponent")');
     expect(source).toContain('t("tournaments.brackets.deadlinePassed")');
     expect(source).toContain('t("bracketPresentation.noChampion")');

@@ -250,6 +250,40 @@ export async function loadAdminNotifications(
   };
 }
 
+export async function loadUnreadNotificationCount({
+  scope,
+  clerkUserId,
+}: {
+  scope: NotificationScope;
+  clerkUserId?: string | null;
+}): Promise<number | null> {
+  if (scope === "player" && !clerkUserId) {
+    return null;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const query = supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .is("in_app_hidden_at", null)
+    .is("read_at", null);
+
+  if (scope === "admin") {
+    query.eq("recipient_role", "admin");
+  } else {
+    query.eq("recipient_clerk_user_id", clerkUserId);
+  }
+
+  const { count, error } = await query;
+
+  if (error || count === null) {
+    logNotificationFailure("load-unread-count", error);
+    return null;
+  }
+
+  return count;
+}
+
 export async function markNotificationRead({
   notificationId,
   scope,
