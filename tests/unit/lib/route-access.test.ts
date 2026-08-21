@@ -54,8 +54,17 @@ describe("self-authenticated API route access", () => {
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/report-group/11111111-1111-4111-8111-111111111111/replay",
     "/api/internal/transactional-email",
+    "/api/notifications/click",
   ])("matches the intended self-authenticated pathname %s", (pathname) => {
     expect(isSelfAuthenticatedApiPathname(pathname)).toBe(true);
+  });
+
+  it("classifies the notification click route by pathname when a query is present", () => {
+    const url = new URL(
+      "https://example.test/api/notifications/click?notificationId=11111111-1111-4111-8111-111111111111&scope=player"
+    );
+
+    expect(isSelfAuthenticatedApiPathname(url.pathname)).toBe(true);
   });
 
   it.each([
@@ -68,6 +77,10 @@ describe("self-authenticated API route access", () => {
     "/api/internal/transactional-email/run",
     "/api/internal/transactional-email-private",
     "/api/internal/transactional-emails",
+    "/api/notifications/click/",
+    "/api/notifications/click/private",
+    "/api/notifications/click-private",
+    "/api/notifications/clicks",
     "/match-proofs/submission/id/replay",
   ])("does not exempt the lookalike pathname %s", (pathname) => {
     expect(isSelfAuthenticatedApiPathname(pathname)).toBe(false);

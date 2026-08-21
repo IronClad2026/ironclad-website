@@ -51,6 +51,7 @@ describe("Next.js proxy authorization", () => {
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/report-group/11111111-1111-4111-8111-111111111111/replay",
     "/api/internal/transactional-email",
+    "/api/notifications/click",
   ])(
     "lets the self-authenticated route %s reach its own auth boundary",
     async (pathname) => {
@@ -79,6 +80,10 @@ describe("Next.js proxy authorization", () => {
     "/api/internal/transactional-email/run",
     "/api/internal/transactional-email-private",
     "/api/internal/transactional-emails",
+    "/api/notifications/click/",
+    "/api/notifications/click/private",
+    "/api/notifications/click-private",
+    "/api/notifications/clicks",
   ])("calls auth.protect for %s", async (pathname) => {
     const protect = vi.fn(async () => undefined);
 
@@ -114,6 +119,13 @@ describe("Next.js proxy authorization", () => {
         config,
         nextConfig: {},
         url: "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
+      })
+    ).toBe(true);
+    expect(
+      doesProxyMatch({
+        config,
+        nextConfig: {},
+        url: "/api/notifications/click?notificationId=11111111-1111-4111-8111-111111111111&scope=player",
       })
     ).toBe(true);
     expect(

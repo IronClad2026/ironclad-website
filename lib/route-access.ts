@@ -15,6 +15,7 @@ const SELF_AUTHENTICATED_API_ROOTS = ["/api/match-proofs"] as const;
 
 const SELF_AUTHENTICATED_EXACT_API_PATHS = [
   "/api/internal/transactional-email",
+  "/api/notifications/click",
 ] as const;
 
 export function isPublicPathname(pathname: string) {
