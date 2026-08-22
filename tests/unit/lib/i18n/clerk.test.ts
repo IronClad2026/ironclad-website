@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { enUS } from "@clerk/localizations/en-US";
 import { esES } from "@clerk/localizations/es-ES";
 import { frFR } from "@clerk/localizations/fr-FR";
+import { itIT } from "@clerk/localizations/it-IT";
 import { koKR } from "@clerk/localizations/ko-KR";
 import { ptBR } from "@clerk/localizations/pt-BR";
 import { ruRU } from "@clerk/localizations/ru-RU";
@@ -13,6 +14,7 @@ import { loadClerkLocalization } from "@/lib/i18n/clerk";
 describe("Clerk locale mapping", () => {
   it.each([
     ["en", enUS],
+    ["it", itIT],
     ["zh-CN", zhCN],
     ["ru", ruRU],
     ["es", esES],

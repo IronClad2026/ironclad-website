@@ -146,6 +146,10 @@ const dictionary = {
     agreementsDescription: "提交报名之前，请确认所有必需协议。",
     acceptPrefix: "我同意",
     acknowledgePrefix: "我确认已阅读",
+    playerParticipationAgreementLabel: "玩家参与协议",
+    officialTournamentRulebookLabel: "官方锦标赛规则手册",
+    termsOfServiceLabel: "服务条款",
+    privacyPolicyLabel: "隐私政策",
     ageConfirmation: "我确认自己已年满 18 岁。",
     ownershipConfirmation:
       "我确认正在使用自己的 IronClad 账户，并且所连接的 Steam 账户属于我本人。",

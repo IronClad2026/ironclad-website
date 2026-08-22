@@ -1,5 +1,6 @@
 export const SUPPORTED_LOCALES = [
   "en",
+  "it",
   "zh-CN",
   "ru",
   "es",
@@ -24,6 +25,7 @@ export type LocaleOption = {
 
 export const LOCALE_OPTIONS = [
   { id: "en", code: "EN", label: "English", indicator: "🌐" },
+  { id: "it", code: "IT", label: "Italiano", indicator: "🇮🇹" },
   { id: "zh-CN", code: "ZH-CN", label: "简体中文", indicator: "🇨🇳" },
   { id: "ru", code: "RU", label: "Русский", indicator: "🇷🇺" },
   { id: "es", code: "ES", label: "Español", indicator: "🇪🇸" },
@@ -41,6 +43,7 @@ const SUPPORTED_LOCALE_SET = new Set<string>(SUPPORTED_LOCALES);
 
 const INTL_LOCALES: Record<Locale, string> = {
   en: "en-AU",
+  it: "it-IT",
   "zh-CN": "zh-CN",
   ru: "ru-RU",
   es: "es-ES",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import competitionSpanish from "@/lib/i18n/dictionaries/es/competition";
 import competitionFrench from "@/lib/i18n/dictionaries/fr/competition";
+import competitionItalian from "@/lib/i18n/dictionaries/it/competition";
 import competitionKorean from "@/lib/i18n/dictionaries/ko/competition";
 import competitionPortuguese from "@/lib/i18n/dictionaries/pt-BR/competition";
 import competitionRussian from "@/lib/i18n/dictionaries/ru/competition";
@@ -12,6 +13,7 @@ import type { DictionaryTree } from "@/lib/i18n/types";
 
 const localeDictionaries = [
   ["en", competitionEnglish],
+  ["it", competitionItalian],
   ["zh-CN", competitionChinese],
   ["ru", competitionRussian],
   ["es", competitionSpanish],

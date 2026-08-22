@@ -80,6 +80,9 @@ export const LanguageSelectorTrigger = forwardRef<
           <span>{copy.languageRowLabel}</span>
         </span>
         <span className="flex min-w-0 items-center gap-2 text-xs text-zinc-400">
+          <span aria-hidden="true" className="shrink-0 text-base leading-none">
+            {selectedLocale.indicator}
+          </span>
           <span className="font-semibold tracking-[0.08em] text-orange-300">
             {selectedLocale.code}
           </span>
@@ -105,12 +108,14 @@ export const LanguageSelectorTrigger = forwardRef<
       className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-orange-400/45 hover:bg-orange-400/[0.07] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
       onClick={(event) => onOpen(event.currentTarget)}
     >
-      <Globe2 aria-hidden="true" className="size-4 text-orange-300" />
-      <span className="tracking-[0.08em] text-orange-200">
+      <span aria-hidden="true" className="shrink-0 text-base leading-none">
+        {selectedLocale.indicator}
+      </span>
+      <span className="tracking-[0.08em] text-orange-200 min-[1360px]:hidden">
         {selectedLocale.code}
       </span>
       <span
-        className="hidden max-w-28 truncate normal-case tracking-normal 2xl:inline"
+        className="hidden max-w-32 truncate normal-case tracking-normal min-[1360px]:inline"
         lang={selectedLocale.id}
       >
         {selectedLocale.label}

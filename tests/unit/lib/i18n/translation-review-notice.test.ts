@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import en from "@/lib/i18n/dictionaries/en/common";
 import es from "@/lib/i18n/dictionaries/es/common";
 import fr from "@/lib/i18n/dictionaries/fr/common";
+import itCommon from "@/lib/i18n/dictionaries/it/common";
 import ko from "@/lib/i18n/dictionaries/ko/common";
 import ptBR from "@/lib/i18n/dictionaries/pt-BR/common";
 import ru from "@/lib/i18n/dictionaries/ru/common";
@@ -10,6 +11,7 @@ import zhCN from "@/lib/i18n/dictionaries/zh-CN/common";
 
 const notices = {
   en: en.selector.translationReviewNotice,
+  it: itCommon.selector.translationReviewNotice,
   "zh-CN": zhCN.selector.translationReviewNotice,
   ru: ru.selector.translationReviewNotice,
   es: es.selector.translationReviewNotice,
@@ -20,6 +22,7 @@ const notices = {
 
 const reviewedCopy = {
   en: "Translations are provided for convenience and have been carefully reviewed, but may not have been reviewed by a native speaker. English remains the source language.",
+  it: "Le traduzioni sono fornite per comodità e sono state revisionate con cura, ma potrebbero non essere state verificate da un madrelingua. L’inglese rimane la lingua di riferimento.",
   "zh-CN":
     "网站译文旨在方便您使用，且已经过认真审核，但不一定由母语人士审校。英文仍为源语言。",
   ru: "Переводы предоставлены для удобства и были тщательно проверены, однако их мог не проверять носитель языка. Исходным языком остаётся английский.",
@@ -39,6 +42,6 @@ describe("language-selector translation review notice", () => {
     expect(Object.values(notices).every((notice) => notice.trim().length > 0)).toBe(
       true
     );
-    expect(new Set(Object.values(notices))).toHaveLength(7);
+    expect(new Set(Object.values(notices))).toHaveLength(8);
   });
 });

@@ -140,6 +140,10 @@ const dictionary = {
       "Подтвердите все обязательные соглашения перед отправкой регистрации.",
     acceptPrefix: "Я принимаю",
     acknowledgePrefix: "Я подтверждаю ознакомление с",
+    playerParticipationAgreementLabel: "Соглашение об участии игрока",
+    officialTournamentRulebookLabel: "Официальный регламент турнира",
+    termsOfServiceLabel: "Условия использования",
+    privacyPolicyLabel: "Политика конфиденциальности",
     ageConfirmation: "Я подтверждаю, что мне уже исполнилось 18 лет.",
     ownershipConfirmation:
       "Я подтверждаю, что использую собственную учётную запись IronClad и что подключённая учётная запись Steam принадлежит мне.",
