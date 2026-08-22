@@ -72,8 +72,13 @@ Effective Terms/Privacy pair and place only the changed kind or kinds in
 ## Preview origin boundary
 
 Production always trusts only `https://www.ironcladtournaments.com`.
-`PREVIEW_LEGAL_DOCUMENT_ORIGIN` is accepted only when `VERCEL_ENV=preview` and
-must be the exact HTTPS origin for one `*.vercel.app` hostname, with no
-credentials, port, path, trailing slash, query, or fragment. Preview database
-document URLs must equal that configured origin plus the exact manifest path.
-The Preview setting cannot weaken Production origin validation.
+`PREVIEW_LEGAL_DOCUMENT_ORIGIN` and the optional comma-separated
+`PREVIEW_LEGAL_DOCUMENT_ORIGINS` are accepted only when `VERCEL_ENV=preview`.
+Together they form a bounded allowlist of no more than four exact HTTPS
+`*.vercel.app` origins, each with no credentials, port, path, trailing slash,
+query, or fragment. This permits immutable predecessor and successor artifacts
+to remain on different exact deployments without rewriting either artifact or
+database row. Configure only origins needed by the latest predecessor and
+successor pair. Every database document must still match an allowed origin plus
+the exact manifest path, version, kind, and hash. Production ignores both
+Preview settings and remains canonical-only.

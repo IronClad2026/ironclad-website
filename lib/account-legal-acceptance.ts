@@ -7,6 +7,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 const CANONICAL_LEGAL_ORIGIN = "https://www.ironcladtournaments.com";
 const PREVIEW_LEGAL_DOCUMENT_ORIGIN_ENV = "PREVIEW_LEGAL_DOCUMENT_ORIGIN";
+const PREVIEW_LEGAL_DOCUMENT_ORIGINS_ENV = "PREVIEW_LEGAL_DOCUMENT_ORIGINS";
+const MAX_PREVIEW_LEGAL_DOCUMENT_ORIGINS = 4;
 const VERCEL_PREVIEW_HOST_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app$/;
 const ACCOUNT_LEGAL_LOOKUP_TIMEOUT_MS = 4_000;
@@ -52,7 +54,7 @@ type ReleaseDocumentIdentity = {
 };
 
 type DeployedLegalDocument = ReleaseDocumentIdentity & {
-  url: string;
+  urls: readonly string[];
 };
 
 type DeployedLegalDocumentPair = {
@@ -97,14 +99,14 @@ async function loadLegalRuntimeState(
     return anonymousRuntime();
   }
 
-  const trustedLegalOrigin = readTrustedLegalOrigin();
+  const trustedLegalOrigins = readTrustedLegalOrigins();
 
-  if (!trustedLegalOrigin) {
+  if (!trustedLegalOrigins) {
     console.error("Account legal gate document origin was invalid.");
     return unavailableRuntime(userId);
   }
 
-  const releaseTransition = readLegalReleaseTransition(trustedLegalOrigin);
+  const releaseTransition = readLegalReleaseTransition(trustedLegalOrigins);
 
   if (!releaseTransition) {
     console.error("Account legal gate release transition was invalid.");
@@ -112,7 +114,7 @@ async function loadLegalRuntimeState(
   }
 
   const bundledDocuments = readBundledDocumentPair(
-    trustedLegalOrigin,
+    trustedLegalOrigins,
     releaseTransition.successor
   );
 
@@ -155,7 +157,7 @@ async function loadLegalRuntimeState(
 
   const documents = parseEffectiveDocumentPair(
     documentResult.data,
-    trustedLegalOrigin
+    trustedLegalOrigins
   );
 
   if (!documents) {
@@ -252,7 +254,7 @@ function unavailableRuntime(
 }
 
 function readLegalReleaseTransition(
-  trustedLegalOrigin: string
+  trustedLegalOrigins: readonly string[]
 ): LegalReleaseTransition | null {
   const manifest: unknown = rawLegalSuccessorRelease;
 
@@ -307,9 +309,9 @@ function readLegalReleaseTransition(
   return {
     predecessor: deployDocumentPair(
       predecessorIdentities,
-      trustedLegalOrigin
+      trustedLegalOrigins
     ),
-    successor: deployDocumentPair(successorIdentities, trustedLegalOrigin),
+    successor: deployDocumentPair(successorIdentities, trustedLegalOrigins),
   };
 }
 
@@ -373,16 +375,18 @@ function deployDocumentPair(
     terms: ReleaseDocumentIdentity;
     privacy: ReleaseDocumentIdentity;
   },
-  trustedLegalOrigin: string
+  trustedLegalOrigins: readonly string[]
 ): DeployedLegalDocumentPair {
   return {
     terms: {
       ...pair.terms,
-      url: `${trustedLegalOrigin}${pair.terms.path}`,
+      urls: trustedLegalOrigins.map((origin) => `${origin}${pair.terms.path}`),
     },
     privacy: {
       ...pair.privacy,
-      url: `${trustedLegalOrigin}${pair.privacy.path}`,
+      urls: trustedLegalOrigins.map(
+        (origin) => `${origin}${pair.privacy.path}`
+      ),
     },
   };
 }
@@ -401,7 +405,7 @@ function releaseDocumentIdentitiesMatch(
 }
 
 function readBundledDocumentPair(
-  trustedLegalOrigin: string,
+  trustedLegalOrigins: readonly string[],
   expected: DeployedLegalDocumentPair
 ): DeployedLegalDocumentPair | null {
   try {
@@ -425,12 +429,12 @@ function readBundledDocumentPair(
     const terms = parseBundledDocument(
       termsCandidates[0],
       expected.terms,
-      trustedLegalOrigin
+      trustedLegalOrigins
     );
     const privacy = parseBundledDocument(
       privacyCandidates[0],
       expected.privacy,
-      trustedLegalOrigin
+      trustedLegalOrigins
     );
 
     if (!terms || !privacy) {
@@ -446,7 +450,7 @@ function readBundledDocumentPair(
 function parseBundledDocument(
   value: unknown,
   expected: DeployedLegalDocument,
-  trustedLegalOrigin: string
+  trustedLegalOrigins: readonly string[]
 ): DeployedLegalDocument | null {
   if (
     !isRecord(value) ||
@@ -466,7 +470,7 @@ function parseBundledDocument(
 
   return {
     ...expected,
-    url: `${trustedLegalOrigin}${expected.path}`,
+    urls: trustedLegalOrigins.map((origin) => `${origin}${expected.path}`),
   };
 }
 
@@ -492,8 +496,8 @@ function documentPairsMatch(
   return (
     deployed.terms.version === effective.terms.version &&
     deployed.privacy.version === effective.privacy.version &&
-    deployed.terms.url === effective.terms.url &&
-    deployed.privacy.url === effective.privacy.url &&
+    deployed.terms.urls.includes(effective.terms.url) &&
+    deployed.privacy.urls.includes(effective.privacy.url) &&
     deployed.terms.sha256 === effective.terms.sha256 &&
     deployed.privacy.sha256 === effective.privacy.sha256
   );
@@ -523,23 +527,54 @@ function parseDeployedDocumentPath(value: string) {
   }
 }
 
-function readTrustedLegalOrigin(): string | null {
+function readTrustedLegalOrigins(): readonly string[] | null {
   if (process.env.VERCEL_ENV === "production") {
-    return CANONICAL_LEGAL_ORIGIN;
+    return [CANONICAL_LEGAL_ORIGIN];
   }
 
   const configuredOrigin = process.env[PREVIEW_LEGAL_DOCUMENT_ORIGIN_ENV];
+  const configuredOrigins = process.env[PREVIEW_LEGAL_DOCUMENT_ORIGINS_ENV];
 
-  if (!configuredOrigin) {
-    return CANONICAL_LEGAL_ORIGIN;
+  if (!configuredOrigin && !configuredOrigins) {
+    return [CANONICAL_LEGAL_ORIGIN];
   }
 
   if (process.env.VERCEL_ENV !== "preview") {
     return null;
   }
 
+  const additionalOrigins = configuredOrigins?.split(",") ?? [];
+  if (
+    additionalOrigins.some(
+      (origin) => !origin || origin !== origin.trim()
+    )
+  ) {
+    return null;
+  }
+
+  const candidateOrigins = [
+    ...(configuredOrigin ? [configuredOrigin] : []),
+    ...additionalOrigins,
+  ];
+  if (candidateOrigins.length > MAX_PREVIEW_LEGAL_DOCUMENT_ORIGINS) {
+    return null;
+  }
+
+  const trustedOrigins = candidateOrigins.map(parsePreviewLegalOrigin);
+
+  if (trustedOrigins.some((origin) => origin === null)) {
+    return null;
+  }
+
+  const uniqueOrigins = [...new Set(trustedOrigins as string[])];
+  return uniqueOrigins.length <= MAX_PREVIEW_LEGAL_DOCUMENT_ORIGINS
+    ? uniqueOrigins
+    : null;
+}
+
+function parsePreviewLegalOrigin(value: string): string | null {
   try {
-    const parsed = new URL(configuredOrigin);
+    const parsed = new URL(value);
 
     if (
       parsed.protocol !== "https:" ||
@@ -549,7 +584,7 @@ function readTrustedLegalOrigin(): string | null {
       parsed.pathname !== "/" ||
       parsed.search ||
       parsed.hash ||
-      configuredOrigin !== parsed.origin ||
+      value !== parsed.origin ||
       !VERCEL_PREVIEW_HOST_PATTERN.test(parsed.hostname)
     ) {
       return null;
@@ -563,7 +598,7 @@ function readTrustedLegalOrigin(): string | null {
 
 function parseTrustedEffectiveDocumentUrl(
   value: string,
-  trustedLegalOrigin: string
+  trustedLegalOrigins: readonly string[]
 ) {
   try {
     const url = new URL(value);
@@ -575,8 +610,8 @@ function parseTrustedEffectiveDocumentUrl(
       url.port ||
       url.search ||
       url.hash ||
-      url.origin !== trustedLegalOrigin ||
-      value !== `${trustedLegalOrigin}${url.pathname}`
+      !trustedLegalOrigins.includes(url.origin) ||
+      value !== `${url.origin}${url.pathname}`
     ) {
       return null;
     }
@@ -589,7 +624,7 @@ function parseTrustedEffectiveDocumentUrl(
 
 function parseEffectiveDocumentPair(
   value: unknown,
-  trustedLegalOrigin: string
+  trustedLegalOrigins: readonly string[]
 ): {
   terms: EffectiveLegalDocument;
   privacy: EffectiveLegalDocument;
@@ -599,7 +634,7 @@ function parseEffectiveDocumentPair(
   }
 
   const parsed = value.map((document) =>
-    parseEffectiveDocument(document, trustedLegalOrigin)
+    parseEffectiveDocument(document, trustedLegalOrigins)
   );
 
   if (parsed.some((document) => document === null)) {
@@ -619,7 +654,7 @@ function parseEffectiveDocumentPair(
 
 function parseEffectiveDocument(
   value: unknown,
-  trustedLegalOrigin: string
+  trustedLegalOrigins: readonly string[]
 ): EffectiveLegalDocument | null {
   if (
     !isRecord(value) ||
@@ -638,7 +673,7 @@ function parseEffectiveDocument(
 
   const url = parseTrustedEffectiveDocumentUrl(
     value.immutable_url,
-    trustedLegalOrigin
+    trustedLegalOrigins
   );
 
   if (!url) {
