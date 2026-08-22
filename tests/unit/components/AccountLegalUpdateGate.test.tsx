@@ -5,9 +5,16 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const loadGateStateMock = vi.hoisted(() => vi.fn());
+const revalidationPropsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/account-legal-acceptance", () => ({
   loadAccountLegalGateState: loadGateStateMock,
+}));
+vi.mock("@/components/legal/AccountLegalGateRevalidation", () => ({
+  default: (props: unknown) => {
+    revalidationPropsMock(props);
+    return null;
+  },
 }));
 vi.mock("@clerk/nextjs", () => ({
   SignOutButton: ({ children }: { children: ReactNode }) => children,
@@ -45,7 +52,10 @@ const copy = {
 } satisfies AccountLegalUpdateCopy;
 
 describe("AccountLegalUpdateGate", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    revalidationPropsMock.mockReset();
+  });
 
   it("uses the root-layout state without repeating the legal loader", async () => {
     const result = await AccountLegalUpdateGate({
@@ -59,11 +69,14 @@ describe("AccountLegalUpdateGate", () => {
     expect(
       screen.getByText("Normal authenticated application")
     ).toBeInTheDocument();
+    expect(revalidationPropsMock).toHaveBeenCalledWith({
+      initiallySignedIn: true,
+      watchForLegalChange: true,
+    });
   });
 
   it.each([
     { status: "inactive" as const, reason: "anonymous" as const },
-    { status: "inactive" as const, reason: "predecessor" as const },
     { status: "satisfied" as const },
   ])("renders normal children when the gate is $status", async (state) => {
       loadGateStateMock.mockResolvedValue(state);
@@ -76,6 +89,10 @@ describe("AccountLegalUpdateGate", () => {
       expect(
         screen.getByText("Normal authenticated application")
       ).toBeInTheDocument();
+      expect(revalidationPropsMock).toHaveBeenCalledWith({
+        initiallySignedIn: state.status === "satisfied",
+        watchForLegalChange: state.status === "satisfied",
+      });
     });
 
   it.each([

@@ -61,14 +61,14 @@ describe("help and legal localization contract", () => {
     }
   });
 
-  it("keeps the unchanged Rulebook and PPA source documents exact", () => {
+  it("keeps the current Rulebook and PPA source documents exact", () => {
     const corpus = JSON.parse(
       readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
     ) as { documents: { kind: string }[] };
     const expected = {
-      ppa: "e7ecbca6de3d2bf1edf808ce82e4e2eabc61e972c4234e77dff7de10db8f60ae",
+      ppa: "5cbb3fd753660233165d42548177c3634917e02ac2e41a0cf4e687bc057af2b3",
       rulebook:
-        "3280648ccfe591a3b7d38d7b4d872459a1dda90f9f39ca390e352d34af8b2084",
+        "663618938611226fe68af863d2e6545144f58c8e55849667067e26b1cef69728",
     };
 
     for (const [kind, sha256] of Object.entries(expected)) {

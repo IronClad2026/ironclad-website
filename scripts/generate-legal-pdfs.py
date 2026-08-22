@@ -53,9 +53,11 @@ DOCUMENT_KINDS = ("rulebook", "ppa", "terms", "privacy")
 APPROVED_FILENAMES = {
     "rulebook": {
         "3.0": "ironclad-official-tournament-rulebook-v3.0.pdf",
+        "3.1": "ironclad-official-tournament-rulebook-v3.1.pdf",
     },
     "ppa": {
         "3.0": "ironclad-player-participation-agreement-v3.0.pdf",
+        "3.1": "ironclad-player-participation-agreement-v3.1.pdf",
     },
     "terms": {
         "1.0": "ironclad-terms-of-service-v1.0.pdf",

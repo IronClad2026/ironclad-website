@@ -34,7 +34,7 @@ describe("AccountLegalGateRevalidation", () => {
     const view = render(
       <AccountLegalGateRevalidation
         initiallySignedIn={false}
-        watchForSuccessor={false}
+        watchForLegalChange={false}
       />
     );
 
@@ -42,19 +42,19 @@ describe("AccountLegalGateRevalidation", () => {
     view.rerender(
       <AccountLegalGateRevalidation
         initiallySignedIn={false}
-        watchForSuccessor={false}
+        watchForLegalChange={false}
       />
     );
 
     expect(navigation.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("revalidates a predecessor session on route navigation and tab return", () => {
+  it("revalidates a satisfied session on route, focus, and visible boundaries", () => {
     session.userId = "user_player";
     const view = render(
       <AccountLegalGateRevalidation
         initiallySignedIn
-        watchForSuccessor
+        watchForLegalChange
       />
     );
 
@@ -62,7 +62,15 @@ describe("AccountLegalGateRevalidation", () => {
     view.rerender(
       <AccountLegalGateRevalidation
         initiallySignedIn
-        watchForSuccessor
+        watchForLegalChange
+      />
+    );
+    expect(navigation.refresh).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <AccountLegalGateRevalidation
+        initiallySignedIn
+        watchForLegalChange
       />
     );
     expect(navigation.refresh).toHaveBeenCalledTimes(1);
@@ -70,18 +78,44 @@ describe("AccountLegalGateRevalidation", () => {
     act(() => vi.advanceTimersByTime(1_000));
     act(() => window.dispatchEvent(new Event("focus")));
     expect(navigation.refresh).toHaveBeenCalledTimes(2);
+
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(navigation.refresh).toHaveBeenCalledTimes(2);
+
+    act(() => vi.advanceTimersByTime(1_000));
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(navigation.refresh).toHaveBeenCalledTimes(3);
   });
 
-  it("does not add publication refreshes after successor acceptance", () => {
+  it("does not poll or refresh without a user revalidation boundary", () => {
     session.userId = "user_player";
-    render(
+    const view = render(
       <AccountLegalGateRevalidation
         initiallySignedIn
-        watchForSuccessor={false}
+        watchForLegalChange
+      />
+    );
+
+    act(() => vi.advanceTimersByTime(60_000));
+    view.rerender(
+      <AccountLegalGateRevalidation
+        initiallySignedIn
+        watchForLegalChange
+      />
+    );
+    expect(navigation.refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not add legal-change listeners for anonymous browsing", () => {
+    render(
+      <AccountLegalGateRevalidation
+        initiallySignedIn={false}
+        watchForLegalChange={false}
       />
     );
 
     act(() => window.dispatchEvent(new Event("focus")));
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
     expect(navigation.refresh).not.toHaveBeenCalled();
   });
 });

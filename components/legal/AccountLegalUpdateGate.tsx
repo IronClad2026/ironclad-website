@@ -26,14 +26,8 @@ export default async function AccountLegalUpdateGate({
     return (
       <>
         <AccountLegalGateRevalidation
-          initiallySignedIn={
-            resolvedState.status === "satisfied" ||
-            resolvedState.reason === "predecessor"
-          }
-          watchForSuccessor={
-            resolvedState.status === "inactive" &&
-            resolvedState.reason === "predecessor"
-          }
+          initiallySignedIn={resolvedState.status === "satisfied"}
+          watchForLegalChange={resolvedState.status === "satisfied"}
         />
         {children}
       </>

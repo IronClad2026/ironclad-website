@@ -25,6 +25,14 @@ type LegalCorpus = {
 };
 
 type SuccessorManifest = {
+  predecessorDocuments: {
+    effectiveDate: string;
+    filename: string;
+    kind: "privacy" | "terms";
+    publicPath: string;
+    sha256: string;
+    version: string;
+  }[];
   documents: {
     effectiveDate: string;
     filename: string;
@@ -93,6 +101,17 @@ const publishedV11Artifacts = new Map([
   ],
 ]);
 
+const publishedCompetitionV31Artifacts = new Map([
+  [
+    "ironclad-official-tournament-rulebook-v3.1.pdf",
+    "02bef1bfe8f1b2121f62eafd09edc448764adebbfcb54e38934c7433bf6ef0f2",
+  ],
+  [
+    "ironclad-player-participation-agreement-v3.1.pdf",
+    "94dcbf6ecbe0c1de4f908baeff824b8439dd81be8022712cd498e8bb2731869b",
+  ],
+]);
+
 describe("versioned legal publication contract", () => {
   it("publishes the exact finalized mixed-date Privacy v1.2 successor", () => {
     expect(corpus.schemaVersion).toBe(1);
@@ -115,6 +134,20 @@ describe("versioned legal publication contract", () => {
         version: "1.2",
       }),
     ]);
+    expect(manifest?.predecessorDocuments).toEqual([
+      expect.objectContaining({
+        kind: "terms",
+        sha256:
+          "59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1",
+        version: "1.1",
+      }),
+      expect.objectContaining({
+        kind: "privacy",
+        sha256:
+          "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91",
+        version: "1.1",
+      }),
+    ]);
     expect(
       corpus.documents.map((document) => ({
         effectiveDate: document.effectiveDate,
@@ -123,8 +156,8 @@ describe("versioned legal publication contract", () => {
         version: document.version,
       }))
     ).toEqual([
-      { effectiveDate: "2026-08-18", kind: "rulebook", status: "Effective", version: "3.0" },
-      { effectiveDate: "2026-08-18", kind: "ppa", status: "Effective", version: "3.0" },
+      { effectiveDate: "2026-08-22", kind: "rulebook", status: "Effective", version: "3.1" },
+      { effectiveDate: "2026-08-22", kind: "ppa", status: "Effective", version: "3.1" },
       { effectiveDate: "2026-08-20", kind: "terms", status: "Effective", version: "1.1" },
       { effectiveDate: "2026-08-22", kind: "privacy", status: "Effective", version: "1.2" },
     ]);
@@ -143,6 +176,9 @@ describe("versioned legal publication contract", () => {
       ])
     );
     for (const [filename, sha256] of publishedV11Artifacts) {
+      expectedArtifacts.set(filename, sha256);
+    }
+    for (const [filename, sha256] of publishedCompetitionV31Artifacts) {
       expectedArtifacts.set(filename, sha256);
     }
     for (const document of manifest?.documents ?? []) {

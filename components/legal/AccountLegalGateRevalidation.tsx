@@ -6,10 +6,10 @@ import { useCallback, useEffect, useRef } from "react";
 
 export default function AccountLegalGateRevalidation({
   initiallySignedIn,
-  watchForSuccessor,
+  watchForLegalChange,
 }: {
   initiallySignedIn: boolean;
-  watchForSuccessor: boolean;
+  watchForLegalChange: boolean;
 }) {
   const { isLoaded, userId } = useAuth();
   const pathname = usePathname();
@@ -47,11 +47,11 @@ export default function AccountLegalGateRevalidation({
     if (lastPathnameRef.current === pathname) return;
 
     lastPathnameRef.current = pathname;
-    if (watchForSuccessor) requestRevalidation();
-  }, [pathname, requestRevalidation, watchForSuccessor]);
+    if (watchForLegalChange) requestRevalidation();
+  }, [pathname, requestRevalidation, watchForLegalChange]);
 
   useEffect(() => {
-    if (!watchForSuccessor) return;
+    if (!watchForLegalChange) return;
 
     const revalidateWhenActive = () => {
       if (document.visibilityState === "visible") requestRevalidation();
@@ -64,7 +64,7 @@ export default function AccountLegalGateRevalidation({
       window.removeEventListener("focus", revalidateWhenActive);
       document.removeEventListener("visibilitychange", revalidateWhenActive);
     };
-  }, [requestRevalidation, watchForSuccessor]);
+  }, [requestRevalidation, watchForLegalChange]);
 
   return null;
 }
