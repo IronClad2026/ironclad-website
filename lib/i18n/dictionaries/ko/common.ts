@@ -67,11 +67,12 @@ const dictionary = {
     eyebrow: "중요 법률 업데이트",
     title: "업데이트된 약관을 확인하고 동의해 주세요",
     description:
-      "로그인 후 이용할 수 있는 IronClad 기능을 계속 사용하려면 Terms of Service v1.1을 확인하고 동의한 뒤 Privacy Policy v1.1을 확인했음을 표시해 주세요. 분석 기능은 계속 선택 사항이며 별도로 선택할 수 있습니다.",
+      "로그인 후 이용할 수 있는 IronClad 기능을 계속 사용하려면 Terms of Service v{termsVersion}을 확인하고 동의한 뒤 Privacy Policy v{privacyVersion}을 확인했음을 표시해 주세요. 분석 기능은 계속 선택 사항이며 별도로 선택할 수 있습니다.",
     termsLinkLabel: "문서 읽기: Terms of Service",
     privacyLinkLabel: "문서 읽기: Privacy Policy",
-    termsAgreement: "Terms of Service v1.1에 동의합니다.",
-    privacyAcknowledgement: "Privacy Policy v1.1을 확인했습니다.",
+    termsAgreement: "Terms of Service v{termsVersion}에 동의합니다.",
+    privacyAcknowledgement:
+      "Privacy Policy v{privacyVersion}을 확인했습니다.",
     continueAction: "동의하고 계속",
     savingAction: "동의 기록 저장 중…",
     signOutAction: "로그아웃",

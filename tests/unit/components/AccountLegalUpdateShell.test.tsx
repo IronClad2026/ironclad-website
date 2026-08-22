@@ -30,12 +30,13 @@ import AccountLegalUpdateShell, {
 const copy: AccountLegalUpdateCopy = {
   eyebrow: "Legal update",
   title: "Review the updated Terms and Privacy Policy",
-  description: "Review both documents to continue using your signed-in account.",
+  description:
+    "Review Terms v{termsVersion} and Privacy v{privacyVersion} to continue.",
   termsLinkLabel: "Terms of Service",
   privacyLinkLabel: "Privacy Policy",
-  termsAgreement: "I accept the Terms of Service v1.1.",
+  termsAgreement: "I accept the Terms of Service v{termsVersion}.",
   privacyAcknowledgement:
-    "I acknowledge that I reviewed the Privacy Policy v1.1.",
+    "I acknowledge that I reviewed the Privacy Policy v{privacyVersion}.",
   continueAction: "Continue",
   savingAction: "Saving…",
   signOutAction: "Sign out",
@@ -61,6 +62,9 @@ const requiredState = {
     url: "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
   },
 };
+const currentTermsAgreement = "I accept the Terms of Service v1.1.";
+const currentPrivacyAcknowledgement =
+  "I acknowledge that I reviewed the Privacy Policy v1.1.";
 
 describe("AccountLegalUpdateShell", () => {
   beforeEach(() => {
@@ -80,10 +84,10 @@ describe("AccountLegalUpdateShell", () => {
       screen.getByRole("heading", { name: copy.title })
     ).toHaveFocus();
     const terms = screen.getByRole("checkbox", {
-      name: copy.termsAgreement,
+      name: currentTermsAgreement,
     });
     const privacy = screen.getByRole("checkbox", {
-      name: copy.privacyAcknowledgement,
+      name: currentPrivacyAcknowledgement,
     });
     expect(terms).not.toBeChecked();
     expect(privacy).not.toBeChecked();
@@ -106,16 +110,49 @@ describe("AccountLegalUpdateShell", () => {
     expect(screen.queryByText(/allow analytics/i)).not.toBeInTheDocument();
   });
 
+  it("renders the exact Effective versions for the v1.1/v1.2 transition", () => {
+    render(
+      <AccountLegalUpdateShell
+        state={{
+          ...requiredState,
+          privacy: {
+            ...requiredState.privacy,
+            version: "1.2",
+            url: "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf",
+          },
+        }}
+        copy={copy}
+      />
+    );
+
+    expect(screen.getByText("Review Terms v1.1 and Privacy v1.2 to continue."))
+      .toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: currentTermsAgreement })
+    ).toBeRequired();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "I acknowledge that I reviewed the Privacy Policy v1.2.",
+      })
+    ).toBeRequired();
+    expect(
+      screen.getByRole("link", { name: /Privacy Policy v1\.2/ })
+    ).toHaveAttribute(
+      "href",
+      "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf"
+    );
+  });
+
   it("keeps an unchecked submission browser-invalid without invoking the action", () => {
     render(<AccountLegalUpdateShell state={requiredState} copy={copy} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(
-      screen.getByRole("checkbox", { name: copy.termsAgreement })
+      screen.getByRole("checkbox", { name: currentTermsAgreement })
     ).toBeInvalid();
     expect(
-      screen.getByRole("checkbox", { name: copy.privacyAcknowledgement })
+      screen.getByRole("checkbox", { name: currentPrivacyAcknowledgement })
     ).toBeInvalid();
     expect(acceptAccountLegalUpdateMock).not.toHaveBeenCalled();
     expect(refreshMock).not.toHaveBeenCalled();
@@ -141,10 +178,10 @@ describe("AccountLegalUpdateShell", () => {
     render(<AccountLegalUpdateShell state={requiredState} copy={copy} />);
 
     fireEvent.click(
-      screen.getByRole("checkbox", { name: copy.termsAgreement })
+      screen.getByRole("checkbox", { name: currentTermsAgreement })
     );
     fireEvent.click(
-      screen.getByRole("checkbox", { name: copy.privacyAcknowledgement })
+      screen.getByRole("checkbox", { name: currentPrivacyAcknowledgement })
     );
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -163,10 +200,10 @@ describe("AccountLegalUpdateShell", () => {
     render(<AccountLegalUpdateShell state={requiredState} copy={copy} />);
 
     fireEvent.click(
-      screen.getByRole("checkbox", { name: copy.termsAgreement })
+      screen.getByRole("checkbox", { name: currentTermsAgreement })
     );
     fireEvent.click(
-      screen.getByRole("checkbox", { name: copy.privacyAcknowledgement })
+      screen.getByRole("checkbox", { name: currentPrivacyAcknowledgement })
     );
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
