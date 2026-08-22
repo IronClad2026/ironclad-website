@@ -689,7 +689,7 @@ if (invokedPath === import.meta.url) {
     main();
   } catch (error) {
     console.error(
-      `Privacy v1.2 review-draft preparation failed: ${
+      `Privacy v1.2 publication command failed: ${
         error instanceof Error ? error.message : String(error)
       }`
     );

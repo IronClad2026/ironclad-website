@@ -1,109 +1,90 @@
-# Privacy Policy v1.2 review-draft preparation runbook
+# Privacy Policy v1.2 controlled publication runbook
 
-## Status and boundary
+## Finalized source state
 
-This repository contains a prepared Privacy Policy v1.2 artifact labeled:
+Privacy Policy v1.2 was finalized for the actual Australia/Sydney publication
+date `2026-08-22` (`22 August 2026`). The repository now contains:
 
-`REVIEW DRAFT - NOT EFFECTIVE`
+- reviewed operation source: `content/legal-privacy-successor-v1.2.json`;
+- final runtime corpus: `content/legal-corpus.json`;
+- final one-document release: `content/legal-successor-release.json`;
+- final immutable PDF: `public/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf`;
+- final PDF SHA-256:
+  `aa0f7af02b69194172dd6333e1d8b7271152aad0bfdab7a935686071c784bfd6`;
+- bounded finalizer: `scripts/legal-successor/finalize-privacy-v1.2.mjs`; and
+- rollback-default database publication helper:
+  `scripts/legal-successor/privacy-document-successor-v1.2.mjs`.
 
-Its effective date is `TBD`. It is not the runtime Privacy Policy, does not change the legal release pair, does not create or update a `legal_documents` row, and does not change any acceptance requirement.
+The stale review-candidate manifest was removed because it described a `TBD`,
+non-effective artifact with different PDF bytes. Git history preserves that
+review evidence. The reviewed operation source remains unchanged as provenance.
 
-The current effective pair remains:
+## Finalization contract
 
-- Terms of Service v1.1
-- Privacy Policy v1.1
-
-Do not describe Privacy v1.2 as published, final or effective until the owner separately authorizes the controlled Production activation described below.
-
-## Prepared files
-
-- Review source: `content/legal-privacy-successor-v1.2.json`
-- Deterministic draft finalizer: `scripts/legal-successor/finalize-privacy-v1.2.mjs`
-- Non-runtime release candidate: `content/legal-privacy-successor-v1.2-release-candidate.json`
-- Immutable review PDF: `public/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf`
-- Future publication contract: `scripts/legal-successor/privacy-document-successor-v1.2.mjs`
-
-The effective runtime files remain `content/legal-corpus.json` and `content/legal-successor-release.json`. The review-draft finalizer reads and verifies them but never writes them.
-
-## Draft generation
-
-From the repository root, with the existing legal PDF Python toolchain available:
+The one-shot command was:
 
 ```powershell
-node scripts/legal-successor/finalize-privacy-v1.2.mjs
+node scripts/legal-successor/finalize-privacy-v1.2.mjs --activation-date 2026-08-22
 ```
 
-The command accepts no date and no activation option. It:
+It requires a clean worktree, the current Sydney calendar date, the exact
+Terms v1.1 / Privacy v1.1 predecessor corpus and release, all six locked
+historical PDF hashes, and an exact review-source/candidate/PDF match. It applies
+only the approved Privacy operations, preserves Rulebook v3.0, PPA v3.0 and
+Terms v1.1, generates only Privacy v1.2, verifies the final PDF envelope and
+hash, replaces the runtime corpus and release, and removes the stale candidate.
+On failure it restores every changed byte.
 
-1. requires the current Effective Rulebook v3.0, PPA v3.0, Terms v1.1 and Privacy v1.1 corpus;
-2. requires the current Final Terms v1.1 and Privacy v1.1 runtime release;
-3. verifies every already-published legal PDF against its locked SHA-256 hash;
-4. applies the v1.2 operations to a temporary corpus only;
-5. generates only the Privacy v1.2 PDF through `--review-draft` mode;
-6. writes the PDF and non-runtime candidate once, or verifies byte identity on a repeated run; and
-7. verifies that the runtime corpus and runtime release bytes did not change.
+## Required artifact verification
 
-It refuses to overwrite a different PDF or candidate manifest.
-
-## Required draft verification
-
-Run the focused tests:
+Render and inspect every page of the final PDF:
 
 ```powershell
-npx vitest run tests/unit/legal-privacy-successor-v1.2-contract.test.ts tests/integration/legal-privacy-successor-v1.2-publication.test.ts tests/integration/legal-publication-contract.test.ts
-```
-
-Render and inspect every PDF page:
-
-```powershell
-pdftoppm -png public/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf tmp/pdfs/privacy-v1.2-review/page
+pdftoppm -png public/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf tmp/pdfs/privacy-v1.2-final/page
 pdfinfo public/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf
-pdftotext -layout public/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf tmp/pdfs/privacy-v1.2-review/privacy-v1.2.txt
+pdftotext -layout public/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf tmp/pdfs/privacy-v1.2-final/privacy-v1.2.txt
 ```
 
-The final review must confirm:
+Require:
 
-- the cover, metadata and every non-cover footer say `REVIEW DRAFT - NOT EFFECTIVE`;
-- every effective-date presentation says `TBD`;
-- no old v1.1 effective date is presented as the v1.2 effective date;
-- page numbers, contents, headings, bullets and the retention table are readable;
-- there is no clipped, overlapping or missing text;
-- the disclosure covers deliberate opt-in, endpoint and key material, multiple subscriptions, badge semantics, conservative lock-screen payloads, provider routing, international processing, retention, invalid-endpoint cleanup, account closure and user controls;
-- no Push endpoint, key or other real personal information appears in the artifact; and
-- the candidate hash and size match the PDF bytes.
+- every date presentation says `22 August 2026`;
+- no `REVIEW DRAFT - NOT EFFECTIVE`, `TBD` or publication token remains;
+- the cover, metadata, footer, page numbers, contents, headings, bullets and
+  retention table are readable;
+- there is no clipping, overlap, missing text or broken glyph;
+- the approved Push, subscription, badge, payload, retention, cleanup,
+  account-closure and user-control disclosures remain present; and
+- the PDF hash equals the final release manifest.
 
-## Runtime non-activation gate
+## No-lockout Production order
 
-Before merging any preparation-only change, verify all of the following:
+The Production compatibility migration and application layer already support
+both Terms v1.1 / Privacy v1.1 and Terms v1.1 / Privacy v1.2. The remaining
+order is mandatory:
 
-- `content/legal-corpus.json` still contains Effective Terms v1.1 and Privacy v1.1;
-- `content/legal-successor-release.json` still contains only Final Terms v1.1 and Privacy v1.1;
-- the runtime legal gate and locale legal links remain unchanged;
-- no Supabase migration or `legal_documents` mutation was added;
-- no Vercel, Clerk or Supabase setting was changed; and
-- no real PushSubscription data is stored while Privacy v1.2 is only a review draft.
+1. deploy the exact finalized corpus, release manifest and PDF while the
+   Production database remains on Terms v1.1 / Privacy v1.1;
+2. verify that exact Production source, canonical Privacy URL and signed-in
+   1.1/1.1 gate remain healthy;
+3. generate rollback SQL and validate the exact predecessor register:
 
-## Future controlled Production activation
+   ```powershell
+   node scripts/legal-successor/privacy-document-successor-v1.2.mjs --activation-date 2026-08-22
+   ```
 
-Activation is a separate owner-authorized operation. Do not reuse the review PDF as an Effective artifact. The future release must:
+4. only after the deployed-source verification, explicitly generate the apply
+   transaction with `--apply` and execute it against the freshly resolved
+   Production project;
+5. verify exactly one Effective Terms v1.1 row, one Effective Privacy v1.2 row,
+   unchanged historical evidence counts, and the new account acknowledgement
+   flow.
 
-1. complete owner and, where required, legal review of the text;
-2. choose the actual Australia/Sydney Production effective date on the authorized release day;
-3. build a final Privacy v1.2 corpus with status `Effective` and that exact date;
-4. generate and visually verify a fresh immutable PDF with no review-draft markers;
-5. create a final one-document Privacy v1.2 release manifest with the fresh SHA-256 hash;
-6. update the runtime corpus and legal release under one reviewed source change;
-7. deploy and verify the exact Production source and immutable PDF before database activation;
-8. run a rollback-only database validation against the exact predecessor register;
-9. decide and verify the required account-wide Terms acceptance and Privacy acknowledgement behavior for the v1.1/v1.2 pair;
-10. activate exactly one Privacy v1.2 `legal_documents` row in one transaction;
-11. supersede exactly the Effective Privacy v1.1 row while preserving Effective Terms v1.1, Rulebook v3.0 and PPA v3.0; and
-12. verify Production legal links, account gating and acceptance evidence.
+Do not activate the database before the finalized source is deployed. The old
+application intentionally fails closed if it observes the new database pair.
 
-The future SQL contract in `privacy-document-successor-v1.2.mjs` is rollback-only by default. It expects six predecessor rows, four Effective rows and two superseded rows; locks and verifies the four exact current Effective artifacts; preserves registration and account-acceptance counts; and expects seven rows, four Effective rows and three superseded rows after an explicitly authorized apply. The preparation validator does not connect to Supabase or execute that SQL.
+## Recovery
 
-## Rollback and recovery
-
-Before activation, rollback means removing the review candidate from the candidate branch. It has no runtime or database effect. Preserve every v1.0 and v1.1 artifact.
-
-After a future activation, do not delete or rewrite immutable legal artifacts or acceptance evidence. Recovery requires a separately reviewed forward legal release and database transaction appropriate to the actual Production state.
+Before database activation, recovery is a normal source rollback to the last
+Production deployment while the database remains on Privacy v1.1. After
+activation, do not delete, rewrite or backdate legal documents or acceptance
+evidence. Any recovery must be a separately reviewed forward legal release.

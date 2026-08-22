@@ -4,28 +4,22 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  hashReviewSourceBytes,
-} from "../../scripts/legal-successor/finalize-privacy-v1.2.mjs";
-import { validateReviewCandidate } from "../../scripts/legal-successor/privacy-document-successor-v1.2.mjs";
+import { validateFinalPrivacyRelease } from "../../scripts/legal-successor/privacy-document-successor-v1.2.mjs";
 
 const root = process.cwd();
+const activationDate = "2026-08-22";
 const corpus = JSON.parse(
   readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
 );
-const runtimeRelease = JSON.parse(
+const release = JSON.parse(
   readFileSync(join(root, "content", "legal-successor-release.json"), "utf8")
-);
-const sourcePath = join(
-  root,
-  "content",
-  "legal-privacy-successor-v1.2.json"
 );
 const candidatePath = join(
   root,
   "content",
   "legal-privacy-successor-v1.2-release-candidate.json"
 );
+const sourcePath = join(root, "content", "legal-privacy-successor-v1.2.json");
 const pdfPath = join(
   root,
   "public",
@@ -33,7 +27,7 @@ const pdfPath = join(
   "ironclad-privacy-policy-v1.2.pdf"
 );
 
-const publishedHashes = new Map([
+const historicalHashes = new Map([
   [
     "ironclad-official-tournament-rulebook-v3.0.pdf",
     "11a391d5b4602bab6f07381b30c4435fb1b4842be99006bdce2512b583859ab0",
@@ -64,68 +58,80 @@ function sha256(bytes: Buffer) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-describe("Privacy v1.2 review-draft publication boundary", () => {
-  it("keeps current runtime and acceptance-facing legal state at v1.1/v1.1", () => {
+describe("Privacy v1.2 finalized publication boundary", () => {
+  it("contains the exact mixed-date Effective corpus", () => {
     expect(
       corpus.documents.map(
-        (document: { kind: string; status: string; version: string }) => ({
+        (document: {
+          effectiveDate: string;
+          kind: string;
+          status: string;
+          version: string;
+        }) => ({
+          effectiveDate: document.effectiveDate,
           kind: document.kind,
           status: document.status,
           version: document.version,
         })
       )
     ).toEqual([
-      { kind: "rulebook", status: "Effective", version: "3.0" },
-      { kind: "ppa", status: "Effective", version: "3.0" },
-      { kind: "terms", status: "Effective", version: "1.1" },
-      { kind: "privacy", status: "Effective", version: "1.1" },
-    ]);
-    expect(runtimeRelease.status).toBe("Final");
-    expect(
-      runtimeRelease.documents.map(
-        (document: { kind: string; version: string }) =>
-          `${document.kind}:${document.version}`
-      )
-    ).toEqual(["terms:1.1", "privacy:1.1"]);
-    expect(JSON.stringify(corpus)).not.toContain("Privacy v1.2");
-    expect(JSON.stringify(runtimeRelease)).not.toContain("1.2");
-  });
-
-  it("publishes exactly one immutable review-draft artifact and non-runtime manifest", () => {
-    expect(existsSync(candidatePath)).toBe(true);
-    expect(existsSync(pdfPath)).toBe(true);
-
-    const candidate = JSON.parse(readFileSync(candidatePath, "utf8"));
-    const sourceBytes = readFileSync(sourcePath);
-    const pdfBytes = readFileSync(pdfPath);
-    expect(validateReviewCandidate(candidate, corpus, runtimeRelease)).toEqual(
-      candidate.document
-    );
-    expect(candidate).toMatchObject({
-      effectiveDate: null,
-      effectiveDateDisplay: "TBD",
-      runtimeActivated: false,
-      status: "Review Draft - Not Effective",
-      source: { version: "1.2" },
-      document: {
-        filename: "ironclad-privacy-policy-v1.2.pdf",
+      {
+        effectiveDate: "2026-08-18",
+        kind: "rulebook",
+        status: "Effective",
+        version: "3.0",
+      },
+      {
+        effectiveDate: "2026-08-18",
+        kind: "ppa",
+        status: "Effective",
+        version: "3.0",
+      },
+      {
+        effectiveDate: "2026-08-20",
+        kind: "terms",
+        status: "Effective",
+        version: "1.1",
+      },
+      {
+        effectiveDate: activationDate,
         kind: "privacy",
+        status: "Effective",
         version: "1.2",
       },
-    });
-    expect(candidate.source.sha256).toBe(hashReviewSourceBytes(sourceBytes));
-    expect(candidate.document.sha256).toBe(sha256(pdfBytes));
-    expect(candidate.document.size).toBe(pdfBytes.length);
-    expect(pdfBytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
-
-    const pdfSource = pdfBytes.toString("latin1");
-    expect(pdfSource).toContain("REVIEW DRAFT - NOT EFFECTIVE");
-    expect(pdfSource).toContain("Effective date: TBD");
-    expect(pdfSource).not.toContain("Effective 20 August 2026");
+    ]);
   });
 
-  it("preserves every already-published legal artifact byte-for-byte", () => {
-    for (const [filename, expectedHash] of publishedHashes) {
+  it("publishes one final manifest whose hash matches the PDF", () => {
+    const validated = validateFinalPrivacyRelease({
+      activationDate,
+      baseUrl: "https://www.ironcladtournaments.com",
+      corpus,
+      release,
+    });
+    const pdfBytes = readFileSync(pdfPath);
+
+    expect(validated.release).toEqual(release.documents[0]);
+    expect(sha256(pdfBytes)).toBe(release.documents[0].sha256);
+    expect(pdfBytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+    const pdfSource = pdfBytes.toString("latin1");
+    expect(pdfSource).toContain("Effective 22 August 2026");
+    expect(pdfSource).not.toContain("REVIEW DRAFT - NOT EFFECTIVE");
+    expect(pdfSource).not.toContain("Effective date: TBD");
+  });
+
+  it("removes the stale candidate but retains reviewed source provenance", () => {
+    expect(existsSync(candidatePath)).toBe(false);
+    expect(existsSync(sourcePath)).toBe(true);
+    const source = JSON.parse(readFileSync(sourcePath, "utf8"));
+    expect(source).toMatchObject({
+      effectiveDateToken: "{{PRODUCTION_EFFECTIVE_DATE}}",
+      status: "Review Draft",
+    });
+  });
+
+  it("preserves every previously published legal artifact byte-for-byte", () => {
+    for (const [filename, expectedHash] of historicalHashes) {
       const path = join(root, "public", "documents-rules-ppa", filename);
       expect(existsSync(path)).toBe(true);
       expect(sha256(readFileSync(path))).toBe(expectedHash);

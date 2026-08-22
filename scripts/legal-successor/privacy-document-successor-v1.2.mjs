@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const REVIEW_CANDIDATE_PATH = resolve(
-  "content/legal-privacy-successor-v1.2-release-candidate.json"
-);
 const RUNTIME_CORPUS_PATH = resolve("content/legal-corpus.json");
 const RUNTIME_RELEASE_PATH = resolve("content/legal-successor-release.json");
+const PUBLIC_DIRECTORY = resolve("public/documents-rules-ppa");
 
 const PREDECESSORS = Object.freeze([
   Object.freeze({
@@ -386,26 +385,48 @@ function sqlLiteral(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
-function main() {
-  if (process.argv.length !== 2) {
-    throw new Error("This preparation validator accepts no activation arguments.");
+function parseArguments(arguments_) {
+  let activationDate = null;
+  let apply = false;
+  for (let index = 0; index < arguments_.length; index += 1) {
+    const argument = arguments_[index];
+    if (argument === "--activation-date") {
+      activationDate = arguments_[index + 1] ?? null;
+      index += 1;
+    } else if (argument === "--apply") {
+      apply = true;
+    } else {
+      throw new Error(`Unknown argument: ${argument}`);
+    }
   }
-  const candidate = JSON.parse(readFileSync(REVIEW_CANDIDATE_PATH, "utf8"));
+  assertCalendarDate(activationDate);
+  return { activationDate, apply };
+}
+
+function main() {
+  const { activationDate, apply } = parseArguments(process.argv.slice(2));
   const corpus = JSON.parse(readFileSync(RUNTIME_CORPUS_PATH, "utf8"));
   const release = JSON.parse(readFileSync(RUNTIME_RELEASE_PATH, "utf8"));
-  const document = validateReviewCandidate(candidate, corpus, release);
+  const validated = validateFinalPrivacyRelease({
+    activationDate,
+    baseUrl: "https://www.ironcladtournaments.com",
+    corpus,
+    release,
+  });
+  const pdfPath = join(PUBLIC_DIRECTORY, validated.release.filename);
+  const pdfHash = createHash("sha256")
+    .update(readFileSync(pdfPath))
+    .digest("hex");
+  if (pdfHash !== validated.release.sha256) {
+    throw new Error("Final Privacy v1.2 PDF does not match its release manifest.");
+  }
   console.log(
-    JSON.stringify(
-      {
-        validated: true,
-        status: "REVIEW DRAFT - NOT EFFECTIVE",
-        effectiveDate: "TBD",
-        runtimeActivated: false,
-        document,
-      },
-      null,
-      2
-    )
+    buildPrivacyV12TransactionSql({
+      activationDate,
+      apply,
+      immutableUrl: validated.immutableUrl,
+      sha256: validated.release.sha256,
+    })
   );
 }
 
@@ -417,7 +438,7 @@ if (invokedPath === import.meta.url) {
     main();
   } catch (error) {
     console.error(
-      `Privacy v1.2 publication preparation failed: ${
+      `Privacy v1.2 publication SQL generation failed: ${
         error instanceof Error ? error.message : String(error)
       }`
     );
