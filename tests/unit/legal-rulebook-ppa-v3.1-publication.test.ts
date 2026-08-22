@@ -32,6 +32,10 @@ const expectedArtifacts = new Map([
     "aa0f7af02b69194172dd6333e1d8b7271152aad0bfdab7a935686071c784bfd6",
   ],
   [
+    "ironclad-privacy-policy-v1.1.pdf",
+    "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91",
+  ],
+  [
     "ironclad-official-tournament-rulebook-v3.1.pdf",
     "02bef1bfe8f1b2121f62eafd09edc448764adebbfcb54e38934c7433bf6ef0f2",
   ],
@@ -137,13 +141,13 @@ describe("Rulebook v3.1 and PPA v3.1 publication source", () => {
     missing.delete("ironclad-player-participation-agreement-v3.0.pdf");
     expect(() =>
       validateRulebookPpaV31Source({ artifactHashes: missing, corpus })
-    ).toThrow(/exactly six locked legal artifacts/i);
+    ).toThrow(/exactly seven locked legal artifacts/i);
 
     const additional = new Map(expectedArtifacts);
     additional.set("unexpected.pdf", "0".repeat(64));
     expect(() =>
       validateRulebookPpaV31Source({ artifactHashes: additional, corpus })
-    ).toThrow(/exactly six locked legal artifacts/i);
+    ).toThrow(/exactly seven locked legal artifacts/i);
 
     const altered = new Map(expectedArtifacts);
     altered.set(
@@ -228,6 +232,7 @@ describe("Rulebook v3.1 and PPA v3.1 database transaction", () => {
     expect(sql).toContain("count(*) from public.legal_documents) <> 9");
     expect(sql).toContain("where status = 'superseded') <> 5");
     for (const [filename, hash] of expectedArtifacts) {
+      if (filename === "ironclad-privacy-policy-v1.1.pdf") continue;
       expect(sql).toContain(filename);
       expect(sql).toContain(hash);
     }
@@ -262,6 +267,17 @@ describe("Rulebook v3.1 and PPA v3.1 database transaction", () => {
     );
     expect(sql).toContain(
       "count(*) from public.registrations) is distinct from v_registrations"
+    );
+    expect(sql).toContain("count(*) from public.legal_documents) <> 6");
+    expect(sql).toContain("where status = 'superseded') <> 2");
+    expect(sql).toContain("count(*) from public.legal_documents) <> 8");
+    expect(sql).toContain("where status = 'superseded') <> 4");
+    expect(sql).toContain("and document.version = '1.1'");
+    expect(sql).toContain(
+      "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91"
+    );
+    expect(sql).not.toContain(
+      "aa0f7af02b69194172dd6333e1d8b7271152aad0bfdab7a935686071c784bfd6"
     );
     expect(sql).not.toMatch(/\bdelete\b|\btruncate\b/i);
     expect(sql).not.toMatch(

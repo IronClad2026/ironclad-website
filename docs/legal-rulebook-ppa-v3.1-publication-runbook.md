@@ -11,8 +11,8 @@ acceptance evidence.
 | Rulebook | 3.1 | `/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.1.pdf` | `02bef1bfe8f1b2121f62eafd09edc448764adebbfcb54e38934c7433bf6ef0f2` |
 | PPA | 3.1 | `/documents-rules-ppa/ironclad-player-participation-agreement-v3.1.pdf` | `94dcbf6ecbe0c1de4f908baeff824b8439dd81be8022712cd498e8bb2731869b` |
 
-The publication helper also locks and verifies these four Effective
-predecessors before it can produce a commit:
+The publication helper also locks and verifies the exact environment baseline
+before it can produce a commit:
 
 | Document | Version | SHA-256 |
 | --- | --- | --- |
@@ -20,8 +20,9 @@ predecessors before it can produce a commit:
 | PPA | 3.0 | `a836bda5679899cb8b402465fb750b5b0aff4eb7dcf8cdb142a163cb6d8ed600` |
 | Terms | 1.1 | `59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1` |
 | Privacy | 1.2 | `aa0f7af02b69194172dd6333e1d8b7271152aad0bfdab7a935686071c784bfd6` |
+| Privacy (Staging baseline only) | 1.1 | `0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91` |
 
-The local helper reads and hashes all six PDFs. It makes no network or database
+The local helper reads and hashes all seven PDFs. It makes no network or database
 request. SQL output is a rollback transaction unless `--apply` is explicitly
 present.
 
@@ -35,12 +36,14 @@ Before either environment is changed:
    `zzbnneprhjicmajpjkdg`; Production is `nsyjtqpvyxlzyujlbzos`.
 3. Deploy the exact publication commit and verify both new immutable URLs are
    HTTP 200 with the expected hashes.
-4. Confirm the database has exactly seven legal rows: four Effective and three
-   Superseded. The Effective rows must be the exact Rulebook v3.0, PPA v3.0,
-   Terms v1.1, and Privacy v1.2 identities above. Production URLs must use the
-   canonical origin. Staging predecessors may retain their original immutable
-   HTTPS `*.vercel.app` origins, but each origin and exact versioned path must
-   be re-read, fetched and hash-verified before publication.
+4. Confirm the exact environment baseline. Production must have seven legal
+   rows (four Effective, three Superseded) with Rulebook v3.0, PPA v3.0, Terms
+   v1.1, and Privacy v1.2 Effective. The known Staging rehearsal baseline has
+   six legal rows (four Effective, two Superseded) with Rulebook v3.0, PPA v3.0,
+   Terms v1.1, and Privacy v1.1 Effective. Production URLs must use the canonical
+   origin. Staging predecessors may retain their original immutable HTTPS
+   `*.vercel.app` origins, but each origin and exact versioned path must be
+   re-read, fetched and hash-verified before publication.
 5. Record the `registration_acceptances`, `account_legal_acceptances`, and
    `registrations` counts for independent post-run comparison.
 
@@ -69,11 +72,11 @@ After the rollback rehearsal passes, generate a fresh apply transaction:
 node scripts/legal-successor/rulebook-ppa-v3.1-publication.mjs --environment staging --origin https://EXACT-DEPLOYMENT.vercel.app --apply
 ```
 
-Execute it once against the freshly re-verified Staging project. Require nine
-legal rows: four Effective and five Superseded. Only Rulebook v3.0 and PPA v3.0
+Execute it once against the freshly re-verified Staging project. Require eight
+legal rows: four Effective and four Superseded. Only Rulebook v3.0 and PPA v3.0
 become Superseded; Rulebook v3.1 and PPA v3.1 become Effective; the exact Terms
-v1.1 and Privacy v1.2 row IDs stay Effective; all evidence and registration
-counts remain unchanged.
+v1.1 and Privacy v1.1 Staging row IDs stay Effective; all evidence and
+registration counts remain unchanged.
 
 Verify a new controlled registration resolves the v3.1 Rulebook and PPA while
 existing registration evidence continues to reference its originally accepted
@@ -108,10 +111,13 @@ edit the generated SQL to bypass a failed precondition.
 
 Require all of the following:
 
-- nine legal rows, four Effective, and five Superseded;
+- the exact environment shape: Staging eight/four/four or Production
+  nine/four/five for total/Effective/Superseded rows;
 - exact Effective Rulebook v3.1 and PPA v3.1 URLs and hashes;
 - exact Superseded Rulebook v3.0 and PPA v3.0 rows with their original UUIDs;
-- exact Effective Terms v1.1 and Privacy v1.2 rows with their original UUIDs;
+- exact Effective account-wide rows with their original UUIDs: Terms v1.1 and
+  Privacy v1.1 in the Staging rehearsal, Terms v1.1 and Privacy v1.2 in
+  Production;
 - unchanged `registration_acceptances`, `account_legal_acceptances`, and
   `registrations` counts;
 - existing immutable acceptance rows still reference their original document

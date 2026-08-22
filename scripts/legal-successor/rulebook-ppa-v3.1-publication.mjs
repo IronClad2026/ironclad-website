@@ -52,6 +52,20 @@ const CURRENT_EFFECTIVE = Object.freeze([
   }),
 ]);
 
+const STAGING_CURRENT_PRIVACY = Object.freeze({
+  effectiveDate: "2026-08-20",
+  filename: "ironclad-privacy-policy-v1.1.pdf",
+  kind: "privacy",
+  publicPath: "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
+  sha256: "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91",
+  version: "1.1",
+});
+
+const STAGING_CURRENT_EFFECTIVE = Object.freeze([
+  ...CURRENT_EFFECTIVE.slice(0, 3),
+  STAGING_CURRENT_PRIVACY,
+]);
+
 const SUCCESSORS = Object.freeze([
   Object.freeze({
     effectiveDate: ACTIVATION_DATE,
@@ -75,7 +89,11 @@ const SUCCESSORS = Object.freeze([
   }),
 ]);
 
-const ARTIFACTS = Object.freeze([...CURRENT_EFFECTIVE, ...SUCCESSORS]);
+const ARTIFACTS = Object.freeze([
+  ...CURRENT_EFFECTIVE,
+  STAGING_CURRENT_PRIVACY,
+  ...SUCCESSORS,
+]);
 
 export function validateRulebookPpaV31Source({ artifactHashes, corpus }) {
   if (
@@ -116,7 +134,7 @@ export function validateRulebookPpaV31Source({ artifactHashes, corpus }) {
 
   const hashes = normalizeArtifactHashes(artifactHashes);
   if (hashes.size !== ARTIFACTS.length) {
-    throw new Error("Exactly six locked legal artifacts are required.");
+    throw new Error("Exactly seven locked legal artifacts are required.");
   }
   for (const artifact of ARTIFACTS) {
     if (hashes.get(artifact.filename) !== artifact.sha256) {
@@ -178,7 +196,25 @@ export function buildRulebookPpaV31TransactionSql({
   origin,
 }) {
   const publicationOrigin = validatePublicationOrigin({ environment, origin });
-  const expectedEffectiveValues = CURRENT_EFFECTIVE.map(
+  const currentEffective =
+    environment === "staging" ? STAGING_CURRENT_EFFECTIVE : CURRENT_EFFECTIVE;
+  const registerShape =
+    environment === "staging"
+      ? Object.freeze({
+          beforeTotal: 6,
+          beforeSuperseded: 2,
+          afterTotal: 8,
+          afterSuperseded: 4,
+          label: "six-row Staging v1.1 register",
+        })
+      : Object.freeze({
+          beforeTotal: 7,
+          beforeSuperseded: 3,
+          afterTotal: 9,
+          afterSuperseded: 5,
+          label: "seven-row v1.2 register",
+        });
+  const expectedEffectiveValues = currentEffective.map(
     (document) =>
       `(${sqlLiteral(document.kind)}, ${sqlLiteral(
         document.version
@@ -231,10 +267,10 @@ begin
   order by document.document_kind, document.id
   for update;
 
-  if (select count(*) from public.legal_documents) <> 7
+  if (select count(*) from public.legal_documents) <> ${registerShape.beforeTotal}
     or (select count(*) from public.legal_documents where status = 'effective') <> 4
-    or (select count(*) from public.legal_documents where status = 'superseded') <> 3 then
-    raise exception 'Rulebook/PPA v3.1 activation requires the exact seven-row register shape';
+    or (select count(*) from public.legal_documents where status = 'superseded') <> ${registerShape.beforeSuperseded} then
+    raise exception 'Rulebook/PPA v3.1 activation requires the exact ${registerShape.label} shape';
   end if;
 
   if exists (
@@ -250,7 +286,7 @@ begin
      and document.status = 'effective'
     where document.id is null
   ) then
-    raise exception 'Current legal register does not match the exact locked v3.0/v1.1/v1.2 set';
+    raise exception 'Current legal register does not match the exact locked environment baseline';
   end if;
 
   select document.id into strict v_rulebook_id
@@ -259,11 +295,11 @@ begin
     and document.version = '3.0'
     and ${currentImmutableUrlPredicate({
       alias: "document",
-      document: CURRENT_EFFECTIVE[0],
+      document: currentEffective[0],
       environment,
       publicationOrigin,
     })}
-    and document.sha256 = '${CURRENT_EFFECTIVE[0].sha256}'
+    and document.sha256 = '${currentEffective[0].sha256}'
     and document.status = 'effective';
 
   select document.id into strict v_ppa_id
@@ -272,11 +308,11 @@ begin
     and document.version = '3.0'
     and ${currentImmutableUrlPredicate({
       alias: "document",
-      document: CURRENT_EFFECTIVE[1],
+      document: currentEffective[1],
       environment,
       publicationOrigin,
     })}
-    and document.sha256 = '${CURRENT_EFFECTIVE[1].sha256}'
+    and document.sha256 = '${currentEffective[1].sha256}'
     and document.status = 'effective';
 
   select document.id into strict v_terms_id
@@ -285,24 +321,24 @@ begin
     and document.version = '1.1'
     and ${currentImmutableUrlPredicate({
       alias: "document",
-      document: CURRENT_EFFECTIVE[2],
+      document: currentEffective[2],
       environment,
       publicationOrigin,
     })}
-    and document.sha256 = '${CURRENT_EFFECTIVE[2].sha256}'
+    and document.sha256 = '${currentEffective[2].sha256}'
     and document.status = 'effective';
 
   select document.id into strict v_privacy_id
   from public.legal_documents as document
   where document.document_kind = 'privacy'
-    and document.version = '1.2'
+    and document.version = '${currentEffective[3].version}'
     and ${currentImmutableUrlPredicate({
       alias: "document",
-      document: CURRENT_EFFECTIVE[3],
+      document: currentEffective[3],
       environment,
       publicationOrigin,
     })}
-    and document.sha256 = '${CURRENT_EFFECTIVE[3].sha256}'
+    and document.sha256 = '${currentEffective[3].sha256}'
     and document.status = 'effective';
 
   select
@@ -324,11 +360,11 @@ begin
     and document_kind = 'rulebook'
     and version = '3.0'
     and ${currentImmutableUrlPredicate({
-      document: CURRENT_EFFECTIVE[0],
+      document: currentEffective[0],
       environment,
       publicationOrigin,
     })}
-    and sha256 = '${CURRENT_EFFECTIVE[0].sha256}'
+    and sha256 = '${currentEffective[0].sha256}'
     and status = 'effective';
   get diagnostics v_updated = row_count;
   if v_updated <> 1 then
@@ -341,11 +377,11 @@ begin
     and document_kind = 'ppa'
     and version = '3.0'
     and ${currentImmutableUrlPredicate({
-      document: CURRENT_EFFECTIVE[1],
+      document: currentEffective[1],
       environment,
       publicationOrigin,
     })}
-    and sha256 = '${CURRENT_EFFECTIVE[1].sha256}'
+    and sha256 = '${currentEffective[1].sha256}'
     and status = 'effective';
   get diagnostics v_updated = row_count;
   if v_updated <> 1 then
@@ -388,20 +424,20 @@ begin
     '${SUCCESSORS[1].sha256}'
   ) returning id into strict v_new_ppa_id;
 
-  if (select count(*) from public.legal_documents) <> 9
+  if (select count(*) from public.legal_documents) <> ${registerShape.afterTotal}
     or (select count(*) from public.legal_documents where status = 'effective') <> 4
-    or (select count(*) from public.legal_documents where status = 'superseded') <> 5
+    or (select count(*) from public.legal_documents where status = 'superseded') <> ${registerShape.afterSuperseded}
     or not exists (
       select 1 from public.legal_documents
       where id = v_rulebook_id
         and document_kind = 'rulebook'
         and version = '3.0'
         and ${currentImmutableUrlPredicate({
-          document: CURRENT_EFFECTIVE[0],
+          document: currentEffective[0],
           environment,
           publicationOrigin,
         })}
-        and sha256 = '${CURRENT_EFFECTIVE[0].sha256}'
+        and sha256 = '${currentEffective[0].sha256}'
         and status = 'superseded'
     )
     or not exists (
@@ -410,11 +446,11 @@ begin
         and document_kind = 'ppa'
         and version = '3.0'
         and ${currentImmutableUrlPredicate({
-          document: CURRENT_EFFECTIVE[1],
+          document: currentEffective[1],
           environment,
           publicationOrigin,
         })}
-        and sha256 = '${CURRENT_EFFECTIVE[1].sha256}'
+        and sha256 = '${currentEffective[1].sha256}'
         and status = 'superseded'
     )
     or not exists (
@@ -423,24 +459,24 @@ begin
         and document_kind = 'terms'
         and version = '1.1'
         and ${currentImmutableUrlPredicate({
-          document: CURRENT_EFFECTIVE[2],
+          document: currentEffective[2],
           environment,
           publicationOrigin,
         })}
-        and sha256 = '${CURRENT_EFFECTIVE[2].sha256}'
+        and sha256 = '${currentEffective[2].sha256}'
         and status = 'effective'
     )
     or not exists (
       select 1 from public.legal_documents
       where id = v_privacy_id
         and document_kind = 'privacy'
-        and version = '1.2'
+        and version = '${currentEffective[3].version}'
         and ${currentImmutableUrlPredicate({
-          document: CURRENT_EFFECTIVE[3],
+          document: currentEffective[3],
           environment,
           publicationOrigin,
         })}
-        and sha256 = '${CURRENT_EFFECTIVE[3].sha256}'
+        and sha256 = '${currentEffective[3].sha256}'
         and status = 'effective'
     )
     or not exists (
