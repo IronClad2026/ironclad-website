@@ -27,6 +27,34 @@ const pdfPath = join(
   "ironclad-privacy-policy-v1.2.pdf"
 );
 
+function corpusAtPrivacyV12Publication() {
+  const historical = structuredClone(corpus);
+  const rulebook = historical.documents.find(
+    (document: { kind: string }) => document.kind === "rulebook"
+  ) as Record<string, unknown> | undefined;
+  const ppa = historical.documents.find(
+    (document: { kind: string }) => document.kind === "ppa"
+  ) as Record<string, unknown> | undefined;
+  if (!rulebook || !ppa) {
+    throw new Error("Historical Privacy v1.2 corpus is incomplete.");
+  }
+  Object.assign(rulebook, {
+    effectiveDate: "2026-08-18",
+    filename: "ironclad-official-tournament-rulebook-v3.0.pdf",
+    publicPath:
+      "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.0.pdf",
+    version: "3.0",
+  });
+  Object.assign(ppa, {
+    effectiveDate: "2026-08-18",
+    filename: "ironclad-player-participation-agreement-v3.0.pdf",
+    publicPath:
+      "/documents-rules-ppa/ironclad-player-participation-agreement-v3.0.pdf",
+    version: "3.0",
+  });
+  return historical;
+}
+
 const historicalHashes = new Map([
   [
     "ironclad-official-tournament-rulebook-v3.0.pdf",
@@ -76,16 +104,16 @@ describe("Privacy v1.2 finalized publication boundary", () => {
       )
     ).toEqual([
       {
-        effectiveDate: "2026-08-18",
+        effectiveDate: "2026-08-22",
         kind: "rulebook",
         status: "Effective",
-        version: "3.0",
+        version: "3.1",
       },
       {
-        effectiveDate: "2026-08-18",
+        effectiveDate: "2026-08-22",
         kind: "ppa",
         status: "Effective",
-        version: "3.0",
+        version: "3.1",
       },
       {
         effectiveDate: "2026-08-20",
@@ -106,7 +134,7 @@ describe("Privacy v1.2 finalized publication boundary", () => {
     const validated = validateFinalPrivacyRelease({
       activationDate,
       baseUrl: "https://www.ironcladtournaments.com",
-      corpus,
+      corpus: corpusAtPrivacyV12Publication(),
       release,
     });
     const pdfBytes = readFileSync(pdfPath);

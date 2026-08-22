@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "effectiveDate": "2026-08-22",
   "effectiveDateDisplay": "22 August 2026",
-  "activationDatePolicy": "The current document set may contain different Effective dates. Rulebook v3.0 and PPA v3.0 retain 18 August 2026, Terms v1.1 retains 20 August 2026, and Privacy v1.2 uses its actual controlled Production publication date.",
+  "activationDatePolicy": "The current document set may contain different Effective dates. Rulebook v3.1 and PPA v3.1 use 22 August 2026, Terms v1.1 retains 20 August 2026, and Privacy v1.2 uses its actual controlled Production publication date.",
   "documents": [
     {
       "kind": "rulebook",
       "title": "OFFICIAL TOURNAMENT RULEBOOK",
       "shortTitle": "Official Tournament Rulebook",
       "subtitle": "Company of Heroes 3 - 1v1 Launch Events",
-      "version": "3.0",
+      "version": "3.1",
       "status": "Effective",
-      "effectiveDate": "2026-08-18",
-      "filename": "ironclad-official-tournament-rulebook-v3.0.pdf",
-      "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.0.pdf",
+      "effectiveDate": "2026-08-22",
+      "filename": "ironclad-official-tournament-rulebook-v3.1.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.1.pdf",
       "operatorStatement": "Operated by Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy, through the IronClad Tournaments project.",
       "introBlocks": [
         {
@@ -1242,7 +1242,7 @@
             {
               "type": "paragraph",
               "number": "21.4",
-              "text": "An Effective document must not be materially overwritten under the same version. A material revision requires a new version and artifact and may require renewed acceptance."
+              "text": "An Effective document must not be materially overwritten under the same version. A material revision requires a new version and artifact, appropriate notice and renewed acceptance where required. A successor Rulebook normally applies only prospectively to future registrations and Events. The version presented for an existing registration continues to govern that Tournament unless a narrow decision is made under section 21.5."
             },
             {
               "type": "paragraph",
@@ -1492,11 +1492,11 @@
       "title": "PLAYER PARTICIPATION AGREEMENT",
       "shortTitle": "Player Participation Agreement",
       "subtitle": "Company of Heroes 3 - 1v1 Launch Events",
-      "version": "3.0",
+      "version": "3.1",
       "status": "Effective",
-      "effectiveDate": "2026-08-18",
-      "filename": "ironclad-player-participation-agreement-v3.0.pdf",
-      "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.0.pdf",
+      "effectiveDate": "2026-08-22",
+      "filename": "ironclad-player-participation-agreement-v3.1.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.1.pdf",
       "operatorStatement": "Agreement between the Player and Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy.",
       "introBlocks": [
         {
@@ -1537,7 +1537,7 @@
             {
               "type": "paragraph",
               "number": "1.5",
-              "text": "This PPA applies to IronClad-hosted CoH3 1v1 Tournaments unless a later Effective version or clearly identified permitted supplement applies."
+              "text": "This PPA applies to IronClad-hosted CoH3 1v1 Tournaments. A successor PPA normally applies only prospectively to future registrations. The version presented for and accepted with an existing registration continues to govern that Tournament except to the extent of a bounded decision made under the Governing Documents' emergency authority."
             },
             {
               "type": "paragraph",
@@ -2307,7 +2307,7 @@
             {
               "type": "paragraph",
               "number": "19.4",
-              "text": "A material change requires a new version, appropriate notice and renewed acceptance or acknowledgement where required. Continued browsing is not a substitute for Tournament acceptance."
+              "text": "A material change requires a new version, appropriate notice and renewed acceptance or acknowledgement where required. A successor PPA normally applies only prospectively to future registrations. The PPA version presented for and accepted with an existing registration continues to govern that Tournament except to the extent of a bounded decision made under the Governing Documents' emergency authority. Continued browsing is not a substitute for Tournament acceptance."
             },
             {
               "type": "paragraph",

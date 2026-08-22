@@ -32,6 +32,25 @@ const PREDECESSORS = Object.freeze([
   }),
 ]);
 
+const ACCOUNT_GATE_PREDECESSORS = Object.freeze([
+  Object.freeze({
+    effectiveDate: "2026-08-20",
+    filename: "ironclad-terms-of-service-v1.1.pdf",
+    kind: "terms",
+    publicPath: "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+    sha256: "59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1",
+    version: "1.1",
+  }),
+  Object.freeze({
+    effectiveDate: "2026-08-20",
+    filename: "ironclad-privacy-policy-v1.1.pdf",
+    kind: "privacy",
+    publicPath: "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
+    sha256: "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91",
+    version: "1.1",
+  }),
+]);
+
 export function validateReviewCandidate(candidate, corpus, release) {
   if (
     !candidate ||
@@ -193,12 +212,31 @@ export function validateFinalPrivacyRelease({
   }
   if (
     !release ||
+    release.schemaVersion !== 1 ||
     release.status !== "Final" ||
     release.effectiveDate !== activationDate ||
+    release.effectiveDateDisplay !== "22 August 2026" ||
+    !Array.isArray(release.predecessorDocuments) ||
+    release.predecessorDocuments.length !== 2 ||
     !Array.isArray(release.documents) ||
     release.documents.length !== 1
   ) {
     throw new Error("A final one-document Privacy v1.2 release is required.");
+  }
+  for (const expected of ACCOUNT_GATE_PREDECESSORS) {
+    const matches = release.predecessorDocuments.filter(
+      (document) => document?.kind === expected.kind
+    );
+    if (
+      matches.length !== 1 ||
+      Object.entries(expected).some(
+        ([field, value]) => matches[0]?.[field] !== value
+      )
+    ) {
+      throw new Error(
+        `Final Privacy v1.2 ${expected.kind} predecessor identity is invalid.`
+      );
+    }
   }
   const released = release.documents[0];
   if (

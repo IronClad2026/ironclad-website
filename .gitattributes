@@ -1,1 +1,2 @@
 public/documents-rules-ppa/*.pdf binary
+scripts/legal-successor/*.mjs text eol=lf

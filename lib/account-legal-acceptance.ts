@@ -5,59 +5,11 @@ import rawLegalSuccessorRelease from "@/content/legal-successor-release.json";
 import { legalCorpus } from "@/lib/legal-corpus-publication";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
-export const ACCOUNT_LEGAL_CURRENT_VERSIONS = Object.freeze({
-  terms: "1.1",
-  privacy: "1.1",
-});
-
-export const ACCOUNT_LEGAL_NEXT_VERSIONS = Object.freeze({
-  terms: "1.1",
-  privacy: "1.2",
-});
-
-const PREVIOUS_ACCOUNT_LEGAL_VERSIONS = Object.freeze({
-  terms: "1.0",
-  privacy: "1.0",
-});
 const CANONICAL_LEGAL_ORIGIN = "https://www.ironcladtournaments.com";
 const PREVIEW_LEGAL_DOCUMENT_ORIGIN_ENV = "PREVIEW_LEGAL_DOCUMENT_ORIGIN";
 const VERCEL_PREVIEW_HOST_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app$/;
 const ACCOUNT_LEGAL_LOOKUP_TIMEOUT_MS = 4_000;
-const LOCKED_ACCOUNT_LEGAL_RELEASES = Object.freeze({
-  terms: {
-    "1.0": {
-      kind: "terms",
-      version: "1.0",
-      path: "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
-      sha256:
-        "99442282625dc7b2600475df7edc5649520d5cef64f2fcfe99f6e8e6d4d08ba1",
-    },
-    "1.1": {
-      kind: "terms",
-      version: "1.1",
-      path: "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
-      sha256:
-        "59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1",
-    },
-  },
-  privacy: {
-    "1.0": {
-      kind: "privacy",
-      version: "1.0",
-      path: "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
-      sha256:
-        "cedb9cb46d2ae7bbd7328c500ca466c237afef8f11626d3095329087ec6453f0",
-    },
-    "1.1": {
-      kind: "privacy",
-      version: "1.1",
-      path: "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
-      sha256:
-        "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91",
-    },
-  },
-} as const);
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -69,7 +21,7 @@ export type AccountLegalGateDocument = {
 };
 
 export type AccountLegalGateState =
-  | { status: "inactive"; reason: "anonymous" | "predecessor" }
+  | { status: "inactive"; reason: "anonymous" }
   | { status: "satisfied" }
   | { status: "unavailable" }
   | {
@@ -83,18 +35,34 @@ export type AccountLegalRuntimeState = {
   analyticsAvailable: boolean;
 };
 
+type LegalDocumentKind = "terms" | "privacy";
+
 type EffectiveLegalDocument = AccountLegalGateDocument & {
-  kind: "terms" | "privacy";
+  kind: LegalDocumentKind;
   effectiveAt: string;
   sha256: string;
 };
 
-type DeployedLegalDocument = {
-  kind: "terms" | "privacy";
+type ReleaseDocumentIdentity = {
+  kind: LegalDocumentKind;
   version: string;
+  filename: string;
   path: string;
   sha256: string;
+};
+
+type DeployedLegalDocument = ReleaseDocumentIdentity & {
   url: string;
+};
+
+type DeployedLegalDocumentPair = {
+  terms: DeployedLegalDocument;
+  privacy: DeployedLegalDocument;
+};
+
+type LegalReleaseTransition = {
+  predecessor: DeployedLegalDocumentPair;
+  successor: DeployedLegalDocumentPair;
 };
 
 export async function loadAccountLegalGateState(): Promise<AccountLegalGateState> {
@@ -136,7 +104,17 @@ async function loadLegalRuntimeState(
     return unavailableRuntime(userId);
   }
 
-  const bundledDocuments = readBundledDocumentPair(trustedLegalOrigin);
+  const releaseTransition = readLegalReleaseTransition(trustedLegalOrigin);
+
+  if (!releaseTransition) {
+    console.error("Account legal gate release transition was invalid.");
+    return unavailableRuntime(userId);
+  }
+
+  const bundledDocuments = readBundledDocumentPair(
+    trustedLegalOrigin,
+    releaseTransition.successor
+  );
 
   if (!bundledDocuments) {
     console.error("Account legal gate deployed document set was invalid.");
@@ -185,37 +163,13 @@ async function loadLegalRuntimeState(
     return unavailableRuntime(userId);
   }
 
-  const approvedDocuments = readApprovedDocumentPair(
-    documents.terms.version,
-    documents.privacy.version,
-    trustedLegalOrigin
+  const approvedDocuments = selectApprovedEffectivePair(
+    releaseTransition,
+    documents
   );
 
-  if (
-    !approvedDocuments ||
-    !documentPairsMatch(approvedDocuments, documents) ||
-    !bundledPairCanServeEffectivePair(bundledDocuments, documents)
-  ) {
+  if (!approvedDocuments) {
     console.error("Account legal gate document sources were not aligned.");
-    return unavailableRuntime(userId);
-  }
-
-  if (
-    documents.terms.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.terms &&
-    documents.privacy.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.privacy
-  ) {
-    return {
-      accountGate: userId
-        ? { status: "inactive", reason: "predecessor" }
-        : { status: "inactive", reason: "anonymous" },
-      analyticsAvailable: false,
-    };
-  }
-
-  if (
-    !isSupportedSuccessorVersionPair(documents.terms, documents.privacy)
-  ) {
-    console.error("Account legal gate encountered an unsupported document pair.");
     return unavailableRuntime(userId);
   }
 
@@ -297,10 +251,159 @@ function unavailableRuntime(
     : anonymousRuntime();
 }
 
-function readBundledDocumentPair(trustedLegalOrigin: string): {
-  terms: DeployedLegalDocument;
-  privacy: DeployedLegalDocument;
+function readLegalReleaseTransition(
+  trustedLegalOrigin: string
+): LegalReleaseTransition | null {
+  const manifest: unknown = rawLegalSuccessorRelease;
+
+  if (
+    !isRecord(manifest) ||
+    manifest.schemaVersion !== 1 ||
+    manifest.status !== "Final" ||
+    !Array.isArray(manifest.predecessorDocuments) ||
+    !Array.isArray(manifest.documents) ||
+    manifest.documents.length < 1 ||
+    manifest.documents.length > 2
+  ) {
+    return null;
+  }
+
+  const predecessorIdentities = parseReleaseDocumentPair(
+    manifest.predecessorDocuments
+  );
+  const changedDocuments = manifest.documents.map(parseReleaseDocumentIdentity);
+
+  if (
+    !predecessorIdentities ||
+    changedDocuments.some((document) => document === null)
+  ) {
+    return null;
+  }
+
+  const changes = changedDocuments as ReleaseDocumentIdentity[];
+  if (new Set(changes.map((document) => document.kind)).size !== changes.length) {
+    return null;
+  }
+
+  const successorIdentities = {
+    terms: predecessorIdentities.terms,
+    privacy: predecessorIdentities.privacy,
+  };
+
+  for (const document of changes) {
+    const predecessor = predecessorIdentities[document.kind];
+    if (
+      releaseDocumentIdentitiesMatch(predecessor, document) ||
+      predecessor.version === document.version ||
+      predecessor.path === document.path ||
+      predecessor.sha256 === document.sha256
+    ) {
+      return null;
+    }
+
+    successorIdentities[document.kind] = document;
+  }
+
+  return {
+    predecessor: deployDocumentPair(
+      predecessorIdentities,
+      trustedLegalOrigin
+    ),
+    successor: deployDocumentPair(successorIdentities, trustedLegalOrigin),
+  };
+}
+
+function parseReleaseDocumentPair(value: unknown): {
+  terms: ReleaseDocumentIdentity;
+  privacy: ReleaseDocumentIdentity;
 } | null {
+  if (!Array.isArray(value) || value.length !== 2) {
+    return null;
+  }
+
+  const parsed = value.map(parseReleaseDocumentIdentity);
+  if (parsed.some((document) => document === null)) {
+    return null;
+  }
+
+  const documents = parsed as ReleaseDocumentIdentity[];
+  const terms = documents.filter((document) => document.kind === "terms");
+  const privacy = documents.filter((document) => document.kind === "privacy");
+
+  if (terms.length !== 1 || privacy.length !== 1) {
+    return null;
+  }
+
+  return { terms: terms[0], privacy: privacy[0] };
+}
+
+function parseReleaseDocumentIdentity(
+  value: unknown
+): ReleaseDocumentIdentity | null {
+  if (
+    !isRecord(value) ||
+    (value.kind !== "terms" && value.kind !== "privacy") ||
+    !isBoundedText(value.version, 120) ||
+    value.version !== value.version.trim() ||
+    !isBoundedText(value.filename, 255) ||
+    value.filename !== value.filename.trim() ||
+    typeof value.sha256 !== "string" ||
+    !SHA256_PATTERN.test(value.sha256) ||
+    !isBoundedText(value.publicPath, 2_048)
+  ) {
+    return null;
+  }
+
+  const path = parseDeployedDocumentPath(value.publicPath);
+  if (!path || value.filename !== path.slice(path.lastIndexOf("/") + 1)) {
+    return null;
+  }
+
+  return {
+    kind: value.kind,
+    version: value.version,
+    filename: value.filename,
+    path,
+    sha256: value.sha256,
+  };
+}
+
+function deployDocumentPair(
+  pair: {
+    terms: ReleaseDocumentIdentity;
+    privacy: ReleaseDocumentIdentity;
+  },
+  trustedLegalOrigin: string
+): DeployedLegalDocumentPair {
+  return {
+    terms: {
+      ...pair.terms,
+      url: `${trustedLegalOrigin}${pair.terms.path}`,
+    },
+    privacy: {
+      ...pair.privacy,
+      url: `${trustedLegalOrigin}${pair.privacy.path}`,
+    },
+  };
+}
+
+function releaseDocumentIdentitiesMatch(
+  left: ReleaseDocumentIdentity,
+  right: ReleaseDocumentIdentity
+) {
+  return (
+    left.kind === right.kind &&
+    left.version === right.version &&
+    left.filename === right.filename &&
+    left.path === right.path &&
+    left.sha256 === right.sha256
+  );
+}
+
+function readBundledDocumentPair(
+  trustedLegalOrigin: string,
+  expected: DeployedLegalDocumentPair
+): DeployedLegalDocumentPair | null {
   try {
     const corpus: unknown = legalCorpus;
 
@@ -319,23 +422,18 @@ function readBundledDocumentPair(trustedLegalOrigin: string): {
       return null;
     }
 
-    const terms = parseDeployedDocument(
+    const terms = parseBundledDocument(
       termsCandidates[0],
-      "terms",
+      expected.terms,
       trustedLegalOrigin
     );
-    const privacy = parseDeployedDocument(
+    const privacy = parseBundledDocument(
       privacyCandidates[0],
-      "privacy",
+      expected.privacy,
       trustedLegalOrigin
     );
 
-    if (
-      !terms ||
-      !privacy ||
-      !isSupportedVersionPair(terms, privacy) ||
-      !runtimeManifestMatchesBundledPair(terms, privacy)
-    ) {
+    if (!terms || !privacy) {
       return null;
     }
 
@@ -345,255 +443,46 @@ function readBundledDocumentPair(trustedLegalOrigin: string): {
   }
 }
 
-function parseDeployedDocument(
+function parseBundledDocument(
   value: unknown,
-  expectedKind: "terms" | "privacy",
+  expected: DeployedLegalDocument,
   trustedLegalOrigin: string
 ): DeployedLegalDocument | null {
   if (
     !isRecord(value) ||
-    value.kind !== expectedKind ||
+    value.kind !== expected.kind ||
     value.status !== "Effective" ||
-    !isBoundedText(value.version, 120) ||
+    value.version !== expected.version ||
+    value.filename !== expected.filename ||
     !isBoundedText(value.publicPath, 2_048)
   ) {
     return null;
   }
 
   const path = parseDeployedDocumentPath(value.publicPath);
-  const release = readReleaseDocument(expectedKind, value.version);
-
-  if (
-    !path ||
-    !isSupportedDocumentVersion(expectedKind, value.version) ||
-    !release ||
-    path !== release.path
-  ) {
+  if (!path || path !== expected.path) {
     return null;
   }
 
   return {
-    kind: expectedKind,
-    version: value.version,
-    path,
-    sha256: release.sha256,
-    url: `${trustedLegalOrigin}${path}`,
+    ...expected,
+    url: `${trustedLegalOrigin}${expected.path}`,
   };
 }
 
-function readReleaseDocument(
-  expectedKind: "terms" | "privacy",
-  version: string
-): Pick<DeployedLegalDocument, "kind" | "version" | "path" | "sha256"> | null {
-  const locked = readLockedReleaseDocument(expectedKind, version);
-
-  if (locked) {
-    return locked;
+function selectApprovedEffectivePair(
+  transition: LegalReleaseTransition,
+  effective: { terms: EffectiveLegalDocument; privacy: EffectiveLegalDocument }
+): DeployedLegalDocumentPair | null {
+  if (documentPairsMatch(transition.predecessor, effective)) {
+    return transition.predecessor;
   }
 
-  if (
-    expectedKind !== "privacy" ||
-    version !== ACCOUNT_LEGAL_NEXT_VERSIONS.privacy
-  ) {
-    return null;
+  if (documentPairsMatch(transition.successor, effective)) {
+    return transition.successor;
   }
 
-  return readPrivacyV12ReleaseDocument();
-}
-
-function readLockedReleaseDocument(
-  expectedKind: "terms" | "privacy",
-  version: string
-): Pick<DeployedLegalDocument, "kind" | "version" | "path" | "sha256"> | null {
-  if (expectedKind === "terms") {
-    if (version === "1.0") return LOCKED_ACCOUNT_LEGAL_RELEASES.terms["1.0"];
-    if (version === "1.1") return LOCKED_ACCOUNT_LEGAL_RELEASES.terms["1.1"];
-    return null;
-  }
-
-  if (version === "1.0") return LOCKED_ACCOUNT_LEGAL_RELEASES.privacy["1.0"];
-  if (version === "1.1") return LOCKED_ACCOUNT_LEGAL_RELEASES.privacy["1.1"];
   return null;
-}
-
-function readPrivacyV12ReleaseDocument(): Pick<
-  DeployedLegalDocument,
-  "kind" | "version" | "path" | "sha256"
-> | null {
-  const manifest: unknown = rawLegalSuccessorRelease;
-
-  if (
-    !isRecord(manifest) ||
-    manifest.schemaVersion !== 1 ||
-    manifest.status !== "Final" ||
-    !Array.isArray(manifest.documents) ||
-    manifest.documents.length !== 1
-  ) {
-    return null;
-  }
-
-  const document = parsePrivacyV12ReleaseDocument(manifest.documents[0]);
-  if (!document) {
-    return null;
-  }
-
-  return document;
-}
-
-function parsePrivacyV12ReleaseDocument(
-  value: unknown
-): Pick<
-  DeployedLegalDocument,
-  "kind" | "version" | "path" | "sha256"
-> | null {
-  if (
-    !isRecord(value) ||
-    value.kind !== "privacy" ||
-    value.version !== ACCOUNT_LEGAL_NEXT_VERSIONS.privacy ||
-    typeof value.sha256 !== "string" ||
-    !SHA256_PATTERN.test(value.sha256) ||
-    !isBoundedText(value.publicPath, 2_048)
-  ) {
-    return null;
-  }
-
-  const path = parseDeployedDocumentPath(value.publicPath);
-
-  if (
-    path !==
-    "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf"
-  ) {
-    return null;
-  }
-
-  return {
-    kind: value.kind,
-    version: value.version,
-    path,
-    sha256: value.sha256,
-  };
-}
-
-function runtimeManifestMatchesBundledPair(
-  terms: Pick<DeployedLegalDocument, "version">,
-  privacy: Pick<DeployedLegalDocument, "version">
-) {
-  if (
-    terms.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.terms &&
-    privacy.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.privacy
-  ) {
-    return true;
-  }
-
-  if (
-    terms.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.terms &&
-    privacy.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.privacy
-  ) {
-    const manifest: unknown = rawLegalSuccessorRelease;
-    if (
-      !isRecord(manifest) ||
-      manifest.schemaVersion !== 1 ||
-      manifest.status !== "Final" ||
-      !Array.isArray(manifest.documents) ||
-      manifest.documents.length !== 2
-    ) {
-      return false;
-    }
-
-    const parsed = manifest.documents.map(parseCurrentReleaseDocument);
-    return (
-      parsed.every((document) => document !== null) &&
-      parsed.filter((document) => document?.kind === "terms").length === 1 &&
-      parsed.filter((document) => document?.kind === "privacy").length === 1
-    );
-  }
-
-  return (
-    terms.version === ACCOUNT_LEGAL_NEXT_VERSIONS.terms &&
-    privacy.version === ACCOUNT_LEGAL_NEXT_VERSIONS.privacy &&
-    readPrivacyV12ReleaseDocument() !== null
-  );
-}
-
-function parseCurrentReleaseDocument(
-  value: unknown
-): Pick<
-  DeployedLegalDocument,
-  "kind" | "version" | "path" | "sha256"
-> | null {
-  if (
-    !isRecord(value) ||
-    (value.kind !== "terms" && value.kind !== "privacy") ||
-    value.version !== ACCOUNT_LEGAL_CURRENT_VERSIONS[value.kind] ||
-    typeof value.sha256 !== "string" ||
-    !SHA256_PATTERN.test(value.sha256) ||
-    !isBoundedText(value.publicPath, 2_048)
-  ) {
-    return null;
-  }
-
-  const locked = readLockedReleaseDocument(value.kind, value.version);
-  const path = parseDeployedDocumentPath(value.publicPath);
-  if (!locked || path !== locked.path || value.sha256 !== locked.sha256) {
-    return null;
-  }
-
-  return locked;
-}
-
-function readApprovedDocumentPair(
-  termsVersion: string,
-  privacyVersion: string,
-  trustedLegalOrigin: string
-): { terms: DeployedLegalDocument; privacy: DeployedLegalDocument } | null {
-  if (
-    !isSupportedVersionPair(
-      { version: termsVersion },
-      { version: privacyVersion }
-    )
-  ) {
-    return null;
-  }
-
-  const terms = readReleaseDocument("terms", termsVersion);
-  const privacy = readReleaseDocument("privacy", privacyVersion);
-  if (!terms || !privacy) {
-    return null;
-  }
-
-  return {
-    terms: { ...terms, url: `${trustedLegalOrigin}${terms.path}` },
-    privacy: { ...privacy, url: `${trustedLegalOrigin}${privacy.path}` },
-  };
-}
-
-function isSupportedDocumentVersion(kind: "terms" | "privacy", value: string) {
-  return kind === "terms"
-    ? value === "1.0" || value === "1.1"
-    : value === "1.0" || value === "1.1" || value === "1.2";
-}
-
-function isSupportedVersionPair(
-  terms: Pick<DeployedLegalDocument, "version">,
-  privacy: Pick<DeployedLegalDocument, "version">
-) {
-  return (
-    (terms.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.terms &&
-      privacy.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.privacy) ||
-    isSupportedSuccessorVersionPair(terms, privacy)
-  );
-}
-
-function isSupportedSuccessorVersionPair(
-  terms: Pick<DeployedLegalDocument, "version">,
-  privacy: Pick<DeployedLegalDocument, "version">
-) {
-  return (
-    (terms.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.terms &&
-      privacy.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.privacy) ||
-    (terms.version === ACCOUNT_LEGAL_NEXT_VERSIONS.terms &&
-      privacy.version === ACCOUNT_LEGAL_NEXT_VERSIONS.privacy)
-  );
 }
 
 function documentPairsMatch(
@@ -607,25 +496,6 @@ function documentPairsMatch(
     deployed.privacy.url === effective.privacy.url &&
     deployed.terms.sha256 === effective.terms.sha256 &&
     deployed.privacy.sha256 === effective.privacy.sha256
-  );
-}
-
-function bundledPairCanServeEffectivePair(
-  bundled: { terms: DeployedLegalDocument; privacy: DeployedLegalDocument },
-  effective: { terms: EffectiveLegalDocument; privacy: EffectiveLegalDocument }
-) {
-  if (
-    bundled.terms.version === effective.terms.version &&
-    bundled.privacy.version === effective.privacy.version
-  ) {
-    return true;
-  }
-
-  return (
-    bundled.terms.version === ACCOUNT_LEGAL_NEXT_VERSIONS.terms &&
-    bundled.privacy.version === ACCOUNT_LEGAL_NEXT_VERSIONS.privacy &&
-    effective.terms.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.terms &&
-    effective.privacy.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.privacy
   );
 }
 

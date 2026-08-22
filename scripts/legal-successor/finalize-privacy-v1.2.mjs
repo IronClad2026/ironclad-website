@@ -138,6 +138,17 @@ export function buildFinalPrivacyRelease({ activationDate, pdfBytes }) {
     status: "Final",
     effectiveDate: activationDate,
     effectiveDateDisplay: formatDateDisplay(activationDate),
+    predecessorDocuments: ["terms", "privacy"].map((kind) => {
+      const document = CURRENT_RUNTIME_DOCUMENTS[kind];
+      return {
+        effectiveDate: document.effectiveDate,
+        filename: document.filename,
+        kind,
+        publicPath: `/documents-rules-ppa/${document.filename}`,
+        sha256: LOCKED_PUBLISHED_ARTIFACTS[document.filename],
+        version: document.version,
+      };
+    }),
     documents: [
       {
         effectiveDate: activationDate,
