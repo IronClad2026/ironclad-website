@@ -11,6 +11,7 @@ import enEmail, {
 } from "@/lib/i18n/dictionaries/en/email";
 import esEmail from "@/lib/i18n/dictionaries/es/email";
 import frEmail from "@/lib/i18n/dictionaries/fr/email";
+import itEmail from "@/lib/i18n/dictionaries/it/email";
 import koEmail from "@/lib/i18n/dictionaries/ko/email";
 import ptBrEmail from "@/lib/i18n/dictionaries/pt-BR/email";
 import ruEmail from "@/lib/i18n/dictionaries/ru/email";
@@ -34,6 +35,7 @@ const MATCH_DATA = {
 
 const LOCALE_EMAIL_DICTIONARIES = [
   ["en", enEmail],
+  ["it", itEmail],
   ["zh-CN", zhEmail],
   ["ru", ruEmail],
   ["es", esEmail],

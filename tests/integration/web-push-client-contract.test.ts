@@ -85,7 +85,7 @@ describe("Stage B client and PWA contract", () => {
     expect(layout).toContain("<NotificationBadgeRuntime />");
   });
 
-  it("keeps permission and lock-screen copy complete in all seven locales", () => {
+  it("keeps permission and lock-screen copy complete in all eight locales", () => {
     const requiredKeys = [
       "pushTitle",
       "pushDescription",
@@ -103,7 +103,7 @@ describe("Stage B client and PWA contract", () => {
       "pushPrivacy",
     ];
 
-    expect(SUPPORTED_LOCALES).toHaveLength(7);
+    expect(SUPPORTED_LOCALES).toHaveLength(8);
     for (const locale of SUPPORTED_LOCALES) {
       const dictionary = read(
         join("lib", "i18n", "dictionaries", locale, "notifications.ts")

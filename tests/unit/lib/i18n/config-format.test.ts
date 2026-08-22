@@ -7,6 +7,7 @@ import {
   SUPPORTED_LOCALES,
   isLocale,
   resolveLocale,
+  toIntlLocale,
 } from "@/lib/i18n/config";
 import {
   formatDateTime,
@@ -16,9 +17,10 @@ import {
 } from "@/lib/i18n/format";
 
 describe("locale configuration and formatting", () => {
-  it("locks the seven launch locale identifiers and deterministic fallback", () => {
+  it("locks the eight launch locale identifiers and deterministic fallback", () => {
     expect(SUPPORTED_LOCALES).toEqual([
       "en",
+      "it",
       "zh-CN",
       "ru",
       "es",
@@ -29,13 +31,52 @@ describe("locale configuration and formatting", () => {
     expect(LOCALE_OPTIONS.map((option) => option.id)).toEqual(
       SUPPORTED_LOCALES
     );
+    expect(LOCALE_OPTIONS.find((option) => option.id === "it")).toEqual({
+      id: "it",
+      code: "IT",
+      label: "Italiano",
+      indicator: "🇮🇹",
+    });
     expect(DEFAULT_LOCALE).toBe("en");
     expect(LOCALE_COOKIE_NAME).toBe("ironclad_locale");
     expect(LOCALE_COOKIE_MAX_AGE_SECONDS).toBe(31_536_000);
     expect(isLocale("pt-BR")).toBe(true);
+    expect(isLocale("it")).toBe(true);
     expect(isLocale("pt")).toBe(false);
     expect(resolveLocale("de")).toBe("en");
     expect(resolveLocale(undefined)).toBe("en");
+  });
+
+  it("uses the exact Italian Intl locale for dates, numbers, and percentages", () => {
+    expect(toIntlLocale("it")).toBe("it-IT");
+    expect(formatNumber(1234.5, "it")).toBe(
+      new Intl.NumberFormat("it-IT").format(1234.5)
+    );
+    expect(
+      formatNumber(0.125, "it", {
+        style: "percent",
+        maximumFractionDigits: 1,
+      })
+    ).toBe(
+      new Intl.NumberFormat("it-IT", {
+        style: "percent",
+        maximumFractionDigits: 1,
+      }).format(0.125)
+    );
+    expect(
+      formatDateTime(
+        "2026-08-18T14:30:00.000Z",
+        "it",
+        { kind: "utc" },
+        { dateStyle: "medium", timeStyle: "short" }
+      )
+    ).toBe(
+      new Intl.DateTimeFormat("it-IT", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "UTC",
+      }).format(new Date("2026-08-18T14:30:00.000Z"))
+    );
   });
 
   it("requires explicit timezone semantics for dates", () => {

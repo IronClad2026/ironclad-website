@@ -306,7 +306,7 @@ describe("Relic-authoritative tournament registration action", () => {
   });
 
   it.each(
-    (["zh-CN", "ru", "es", "pt-BR", "ko", "fr"] as const).flatMap(
+    (["it", "zh-CN", "ru", "es", "pt-BR", "ko", "fr"] as const).flatMap(
       (locale) => [
         { locale, journey: "Register", waitlistConfirmed: false },
         { locale, journey: "Join Waitlist", waitlistConfirmed: true },

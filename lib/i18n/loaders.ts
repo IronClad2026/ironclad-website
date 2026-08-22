@@ -62,6 +62,18 @@ const DICTIONARY_LOADERS = {
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/en/help-legal-ui"),
   },
+  it: {
+    common: () => import("@/lib/i18n/dictionaries/it/common"),
+    public: () => import("@/lib/i18n/dictionaries/it/public"),
+    "account-dashboard": () =>
+      import("@/lib/i18n/dictionaries/it/account-dashboard"),
+    competition: () => import("@/lib/i18n/dictionaries/it/competition"),
+    notifications: () =>
+      import("@/lib/i18n/dictionaries/it/notifications"),
+    email: () => import("@/lib/i18n/dictionaries/it/email"),
+    "help-legal-ui": () =>
+      import("@/lib/i18n/dictionaries/it/help-legal-ui"),
+  },
   "zh-CN": {
     common: () => import("@/lib/i18n/dictionaries/zh-CN/common"),
     public: () => import("@/lib/i18n/dictionaries/zh-CN/public"),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import notificationsEnglish from "@/lib/i18n/dictionaries/en/notifications";
+import notificationsItalian from "@/lib/i18n/dictionaries/it/notifications";
 import { localizePlayerNotificationCopy } from "@/lib/i18n/notification-copy";
 
 const KNOWN_TYPES = [
@@ -50,5 +51,21 @@ describe("localized notification copy", () => {
         notificationsEnglish
       )
     ).toBeNull();
+  });
+
+  it("renders fixed Player notification templates in Italian", () => {
+    expect(
+      localizePlayerNotificationCopy(
+        {
+          type: "registration.approved",
+          tournamentTitle: "Coppa degli Alleati",
+        },
+        notificationsItalian
+      )
+    ).toEqual({
+      title: "Iscrizione approvata",
+      message:
+        "La tua Iscrizione a Coppa degli Alleati è stata approvata.",
+    });
   });
 });

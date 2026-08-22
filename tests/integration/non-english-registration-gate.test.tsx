@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import competitionSpanish from "@/lib/i18n/dictionaries/es/competition";
+import competitionItalian from "@/lib/i18n/dictionaries/it/competition";
 import type { TournamentCard } from "@/lib/tournaments";
 
 const refreshMock = vi.hoisted(() => vi.fn());
@@ -231,6 +232,29 @@ describe("non-English registration gate", () => {
     window.history.replaceState({}, "", "/");
   });
 
+  it("presents the existing controlling-English registration gate in Italian", () => {
+    renderExperience("it");
+
+    fireEvent.click(
+      screen.getAllByRole("button", {
+        name: new RegExp(
+          `^${competitionItalian.tournaments.actions.register}`
+        ),
+      })[0]
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: competitionItalian.gate.title })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: competitionItalian.gate.continueEnglish,
+      })
+    ).toBeInTheDocument();
+    expect(setLocalePreferenceMock).not.toHaveBeenCalled();
+    expect(profileMaybeSingleMock).not.toHaveBeenCalled();
+  });
+
   it("cancels without changing locale or beginning registration", () => {
     renderExperience("es");
 
@@ -332,17 +356,21 @@ describe("non-English registration gate", () => {
   });
 });
 
-function renderExperience(locale: "en" | "es") {
+function renderExperience(locale: "en" | "es" | "it") {
   return render(experience(locale));
 }
 
-function experience(locale: "en" | "es") {
+function experience(locale: "en" | "es" | "it") {
   return (
     <LocaleProvider
       locale={locale}
       dictionaries={{
         competition:
-          locale === "en" ? competitionEnglish : competitionSpanish,
+          locale === "en"
+            ? competitionEnglish
+            : locale === "it"
+              ? competitionItalian
+              : competitionSpanish,
       }}
     >
       <TournamentsExperience

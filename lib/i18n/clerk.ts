@@ -5,6 +5,8 @@ import type { Locale } from "@/lib/i18n/config";
 const clerkLocaleLoaders = {
   en: () =>
     import("@clerk/localizations/en-US").then(({ enUS }) => enUS),
+  it: () =>
+    import("@clerk/localizations/it-IT").then(({ itIT }) => itIT),
   "zh-CN": () =>
     import("@clerk/localizations/zh-CN").then(({ zhCN }) => zhCN),
   ru: () =>

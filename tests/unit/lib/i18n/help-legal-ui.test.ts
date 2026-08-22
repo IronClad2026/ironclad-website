@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import en from "@/lib/i18n/dictionaries/en/help-legal-ui";
 import es from "@/lib/i18n/dictionaries/es/help-legal-ui";
 import fr from "@/lib/i18n/dictionaries/fr/help-legal-ui";
+import itHelpLegalUi from "@/lib/i18n/dictionaries/it/help-legal-ui";
 import ko from "@/lib/i18n/dictionaries/ko/help-legal-ui";
 import ptBR from "@/lib/i18n/dictionaries/pt-BR/help-legal-ui";
 import ru from "@/lib/i18n/dictionaries/ru/help-legal-ui";
@@ -15,7 +16,16 @@ import { validateDictionary } from "@/lib/i18n/validation";
 import { LOCKED_COMPETITION_NAMES } from "@/lib/i18n/glossary";
 
 const root = process.cwd();
-const translations = { en, es, fr, ko, "pt-BR": ptBR, ru, "zh-CN": zhCN };
+const translations = {
+  en,
+  it: itHelpLegalUi,
+  es,
+  fr,
+  ko,
+  "pt-BR": ptBR,
+  ru,
+  "zh-CN": zhCN,
+};
 
 function flatten(value: unknown, path = "", result = new Map<string, string>()) {
   if (typeof value === "string") {
@@ -43,7 +53,13 @@ describe("help and legal localization contract", () => {
       expect(dictionary.rules.disclaimer.english, locale).not.toBe("");
     }
 
-    expect(new Set(Object.values(translations).map((dictionary) => dictionary.legalPage.effectiveEnglishNotice)).size).toBe(7);
+    expect(
+      new Set(
+        Object.values(translations).map(
+          (dictionary) => dictionary.legalPage.effectiveEnglishNotice
+        )
+      ).size
+    ).toBe(8);
   });
 
   it("preserves locked IronClad and competition names in translated copy", () => {

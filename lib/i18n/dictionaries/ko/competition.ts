@@ -139,6 +139,10 @@ const dictionary = {
     agreementsDescription: "등록을 제출하기 전에 모든 필수 항목에 동의하세요.",
     acceptPrefix: "다음 문서에 동의합니다:",
     acknowledgePrefix: "다음 문서를 확인했습니다:",
+    playerParticipationAgreementLabel: "플레이어 참가 계약",
+    officialTournamentRulebookLabel: "공식 토너먼트 규정집",
+    termsOfServiceLabel: "서비스 이용약관",
+    privacyPolicyLabel: "개인정보 처리방침",
     ageConfirmation: "만 18세 이상임을 확인합니다.",
     ownershipConfirmation:
       "본인의 IronClad 계정을 사용 중이며 연결된 Steam 계정도 본인 소유임을 확인합니다.",

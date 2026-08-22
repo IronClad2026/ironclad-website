@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 
 import { useRef, useState } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import LanguageSelector, {
@@ -39,12 +46,14 @@ const COPY: LanguageSelectorCopy = {
 type HarnessProps = {
   locale?: Locale;
   languageBoundary?: string;
+  variant?: "desktop" | "mobile";
   setLocalePreference?: SetLocalePreferenceAction;
 };
 
 function Harness({
   locale = "en",
   languageBoundary,
+  variant = "desktop",
   setLocalePreference = vi.fn(async (value: string) => ({
     ok: true as const,
     locale: value as Locale,
@@ -60,7 +69,7 @@ function Harness({
         currentLocale={locale}
         copy={COPY}
         open={open}
-        variant="desktop"
+        variant={variant}
         onOpen={(trigger) => {
           returnFocusRef.current = trigger;
           setOpen(true);
@@ -86,7 +95,7 @@ afterEach(() => {
 });
 
 describe("LanguageSelector", () => {
-  it("exposes a labelled dialog with seven native-language radio options", async () => {
+  it("exposes a labelled dialog with eight native-language radio options", async () => {
     render(<Harness locale="zh-CN" />);
 
     const trigger = screen.getByRole("button", {
@@ -100,7 +109,7 @@ describe("LanguageSelector", () => {
       screen.getByRole("dialog", { name: COPY.title })
     ).toBeInTheDocument();
     const options = screen.getAllByRole("radio");
-    expect(options).toHaveLength(7);
+    expect(options).toHaveLength(8);
     expect(screen.getByRole("radio", { name: /简体中文/ })).toHaveAttribute(
       "aria-checked",
       "true"
@@ -109,10 +118,35 @@ describe("LanguageSelector", () => {
       "lang",
       "pt-BR"
     );
+    const italianOption = screen.getByRole("radio", { name: /Italiano/ });
+    expect(within(italianOption).getByText("🇮🇹")).toBeInTheDocument();
+    expect(within(italianOption).getByText("Italiano")).toHaveAttribute(
+      "lang",
+      "it"
+    );
 
     await waitFor(() => {
       expect(screen.getByRole("radio", { name: /简体中文/ })).toHaveFocus();
     });
+  });
+
+  it("uses the shared Italian indicator in desktop and mobile triggers", () => {
+    const { unmount } = render(<Harness locale="it" />);
+    const desktopTrigger = screen.getByRole("button", {
+      name: COPY.triggerAriaLabel,
+    });
+
+    expect(desktopTrigger).toHaveTextContent("🇮🇹");
+    expect(desktopTrigger).toHaveTextContent("Italiano");
+
+    unmount();
+    render(<Harness locale="it" variant="mobile" />);
+    const mobileTrigger = screen.getByRole("button", {
+      name: COPY.triggerAriaLabel,
+    });
+
+    expect(mobileTrigger).toHaveTextContent("🇮🇹");
+    expect(mobileTrigger).toHaveTextContent("Italiano");
   });
 
   it("shows the complete language-preference privacy disclosure", () => {

@@ -22,6 +22,9 @@ import esPublic from "@/lib/i18n/dictionaries/es/public";
 import frAccount from "@/lib/i18n/dictionaries/fr/account-dashboard";
 import frCommon from "@/lib/i18n/dictionaries/fr/common";
 import frPublic from "@/lib/i18n/dictionaries/fr/public";
+import itAccount from "@/lib/i18n/dictionaries/it/account-dashboard";
+import itCommon from "@/lib/i18n/dictionaries/it/common";
+import itPublic from "@/lib/i18n/dictionaries/it/public";
 import { selectPlural } from "@/lib/i18n/format";
 import { translate } from "@/lib/i18n/translate";
 import koAccount from "@/lib/i18n/dictionaries/ko/account-dashboard";
@@ -39,6 +42,7 @@ import zhCnPublic from "@/lib/i18n/dictionaries/zh-CN/public";
 import { validateDictionary } from "@/lib/i18n/validation";
 
 const localized = {
+  it: { account: itAccount, common: itCommon, public: itPublic },
   "zh-CN": { account: zhCnAccount, common: zhCnCommon, public: zhCnPublic },
   ru: { account: ruAccount, common: ruCommon, public: ruPublic },
   es: { account: esAccount, common: esCommon, public: esPublic },

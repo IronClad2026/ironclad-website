@@ -51,6 +51,37 @@ describe("locale preference Server Action", () => {
     expect(authMock).not.toHaveBeenCalled();
   });
 
+  it("persists Italian for an anonymous player through the existing cookie", async () => {
+    authMock.mockResolvedValue({ userId: null });
+
+    await expect(setLocalePreference("it")).resolves.toEqual({
+      ok: true,
+      locale: "it",
+      metadataMirror: "not-signed-in",
+    });
+    expect(cookieSetMock).toHaveBeenCalledWith("ironclad_locale", "it", {
+      httpOnly: true,
+      maxAge: 31_536_000,
+      path: "/",
+      sameSite: "lax",
+      secure: false,
+    });
+    expect(updateUserMetadataMock).not.toHaveBeenCalled();
+  });
+
+  it("mirrors Italian to signed-in Clerk private metadata", async () => {
+    authMock.mockResolvedValue({ userId: "user_test" });
+
+    await expect(setLocalePreference("it")).resolves.toEqual({
+      ok: true,
+      locale: "it",
+      metadataMirror: "updated",
+    });
+    expect(updateUserMetadataMock).toHaveBeenCalledWith("user_test", {
+      privateMetadata: { ironcladLocale: "it" },
+    });
+  });
+
   it("sets the one-year functional cookie without a user identifier", async () => {
     authMock.mockResolvedValue({ userId: null });
 

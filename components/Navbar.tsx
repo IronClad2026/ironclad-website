@@ -168,7 +168,7 @@ export default function Navbar() {
           <button
             type="button"
             aria-label={t("nav.closeMenu")}
-            className="fixed inset-0 z-[80] block h-full w-full cursor-default bg-black/55 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 z-[80] block h-full w-full cursor-default bg-black/55 backdrop-blur-sm xl:hidden"
             onPointerDown={() => setIsOpen(false)}
           />,
           document.body
@@ -202,7 +202,7 @@ export default function Navbar() {
         >
           <Link
             href="/"
-            className="flex items-center"
+            className="flex shrink-0 items-center"
             onClick={() => setIsOpen(false)}
           >
             <Image
@@ -215,51 +215,55 @@ export default function Navbar() {
             />
           </Link>
 
-          <div className="hidden items-center gap-5 text-sm font-medium text-zinc-300 xl:gap-7 md:flex">
-            {playerNavItems.map((item) => {
-              const isActive = isActiveRoute(pathname, item.href);
+          <div className="hidden min-w-0 flex-1 items-center pl-8 text-sm font-medium text-zinc-300 xl:flex">
+            <div className="ml-auto flex items-center gap-5 2xl:gap-7">
+              {playerNavItems.map((item) => {
+                const isActive = isActiveRoute(pathname, item.href);
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={navLinkClass(isActive, item.emphasis)}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-            <LanguageSelectorTrigger
-              currentLocale={selectedLocale}
-              copy={languageCopy}
-              onOpen={(trigger) => {
-                languageReturnFocusRef.current = trigger;
-                setLanguageOpen(true);
-              }}
-              open={languageOpen}
-              variant="desktop"
-            />
-            {accountNavItems.map((item) => {
-              const isActive = isActiveRoute(pathname, item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={navLinkClass(isActive, item.emphasis)}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+              {accountNavItems.map((item) => {
+                const isActive = isActiveRoute(pathname, item.href);
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={navLinkClass(isActive, item.emphasis)}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={navLinkClass(isActive, item.emphasis)}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="ml-5 shrink-0 border-l border-white/10 pl-5 2xl:ml-7 2xl:pl-7">
+              <LanguageSelectorTrigger
+                currentLocale={selectedLocale}
+                copy={languageCopy}
+                onOpen={(trigger) => {
+                  languageReturnFocusRef.current = trigger;
+                  setLanguageOpen(true);
+                }}
+                open={languageOpen}
+                variant="desktop"
+              />
+            </div>
           </div>
 
           <button
             ref={mobileMenuButtonRef}
             type="button"
-            className="border border-white/10 bg-white/[0.04] p-2 text-zinc-200 transition hover:border-orange-400/40 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 md:hidden"
+            className="border border-white/10 bg-white/[0.04] p-2 text-zinc-200 transition hover:border-orange-400/40 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 xl:hidden"
             onClick={() => setIsOpen((current) => !current)}
             aria-label={
               isOpen ? t("nav.closeMenu") : t("nav.openMenu")
@@ -281,7 +285,7 @@ export default function Navbar() {
             role="dialog"
             aria-modal="true"
             aria-label={t("nav.mobileNavigation")}
-            className="relative z-[95] mx-4 mb-4 max-h-[calc(100dvh-120px)] overflow-y-auto border border-white/10 bg-black/95 p-5 text-white shadow-[0_0_60px_rgba(0,0,0,0.8)] md:hidden"
+            className="relative z-[95] mx-4 mb-4 max-h-[calc(100dvh-120px)] overflow-y-auto border border-white/10 bg-black/95 p-5 text-white shadow-[0_0_60px_rgba(0,0,0,0.8)] xl:hidden"
           >
             <div className="flex flex-col gap-4 text-sm font-medium">
               {navItems.map((item) => {

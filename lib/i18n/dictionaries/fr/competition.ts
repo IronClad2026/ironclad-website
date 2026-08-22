@@ -140,6 +140,10 @@ const dictionary = {
       "Confirmez tous les accords requis avant d’envoyer votre inscription.",
     acceptPrefix: "J’accepte :",
     acknowledgePrefix: "Je reconnais avoir pris connaissance de",
+    playerParticipationAgreementLabel: "Accord de participation du joueur",
+    officialTournamentRulebookLabel: "Règlement officiel du tournoi",
+    termsOfServiceLabel: "Conditions d’utilisation",
+    privacyPolicyLabel: "Politique de confidentialité",
     ageConfirmation: "Je confirme avoir au moins 18 ans.",
     ownershipConfirmation:
       "Je confirme utiliser mon propre compte IronClad et être propriétaire du compte Steam associé.",

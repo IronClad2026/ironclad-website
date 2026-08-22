@@ -7,7 +7,7 @@ import {
 } from "@/lib/i18n/glossary";
 
 describe("competition terminology glossary", () => {
-  it("defines a complete fixed-term set for exactly seven locales", () => {
+  it("defines a complete fixed-term set for exactly eight locales", () => {
     expect(Object.keys(COMPETITION_GLOSSARY)).toEqual(SUPPORTED_LOCALES);
 
     const englishKeys = Object.keys(COMPETITION_GLOSSARY.en).sort();

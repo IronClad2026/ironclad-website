@@ -13,10 +13,10 @@ describe("request locale resolution", () => {
 
   it("uses a valid explicit locale cookie for player content", async () => {
     cookiesMock.mockResolvedValue({
-      get: vi.fn(() => ({ value: "ko" })),
+      get: vi.fn(() => ({ value: "it" })),
     });
 
-    await expect(getRequestLocale()).resolves.toBe("ko");
+    await expect(getRequestLocale()).resolves.toBe("it");
   });
 
   it("falls back to English for an invalid or absent cookie", async () => {

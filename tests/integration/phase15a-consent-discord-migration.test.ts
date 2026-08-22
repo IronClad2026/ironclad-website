@@ -310,13 +310,22 @@ describe("Phase 15A versioned consent and Discord database contract", () => {
     ).toBe(false);
     expect(tournamentUi).not.toContain("Admin Final Decision Agreement");
 
-    for (const label of [
-      "Player Participation Agreement",
-      "Official Tournament Rulebook",
-      "Terms of Service",
-      "Privacy Policy",
-    ]) {
-      expect(tournamentUi).toContain(label);
+    const localizedDocumentLabels = {
+      playerParticipationAgreementLabel:
+        "Player Participation Agreement",
+      officialTournamentRulebookLabel: "Official Tournament Rulebook",
+      termsOfServiceLabel: "Terms of Service",
+      privacyPolicyLabel: "Privacy Policy",
+    } as const;
+    for (const [key, label] of Object.entries(localizedDocumentLabels)) {
+      expect(tournamentUi).toMatch(
+        new RegExp(`t\\(\\s*"registrationModal\\.${key}"\\s*\\)`)
+      );
+      expect(
+        competitionEnglish.registrationModal[
+          key as keyof typeof localizedDocumentLabels
+        ]
+      ).toBe(label);
     }
     expect(tournamentUi).toContain('t("registrationModal.ageConfirmation")');
     expect(tournamentUi).toContain(

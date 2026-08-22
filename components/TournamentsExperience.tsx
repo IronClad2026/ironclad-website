@@ -3338,28 +3338,36 @@ export function RegisterModal({
       if (!form.playerParticipationAgreement) {
         nextErrors.playerParticipationAgreement = t(
           "registrationModal.errors.agreementRequired",
-          { document: "Player Participation Agreement" }
+          {
+            document: t(
+              "registrationModal.playerParticipationAgreementLabel"
+            ),
+          }
         );
       }
 
       if (!form.rulebookAgreement) {
         nextErrors.rulebookAgreement = t(
           "registrationModal.errors.agreementRequired",
-          { document: "Official Tournament Rulebook" }
+          {
+            document: t(
+              "registrationModal.officialTournamentRulebookLabel"
+            ),
+          }
         );
       }
 
       if (!form.termsAgreement) {
         nextErrors.termsAgreement = t(
           "registrationModal.errors.agreementRequired",
-          { document: "Terms of Service" }
+          { document: t("registrationModal.termsOfServiceLabel") }
         );
       }
 
       if (!form.privacyAcknowledgement) {
         nextErrors.privacyAcknowledgement = t(
           "registrationModal.errors.acknowledgementRequired",
-          { document: "Privacy Policy" }
+          { document: t("registrationModal.privacyPolicyLabel") }
         );
       }
 
@@ -3756,7 +3764,9 @@ export function RegisterModal({
                     <DocumentAgreementLabel
                       prefix={t("registrationModal.acceptPrefix")}
                       document={registrationDocuments.ppa}
-                      label="Player Participation Agreement"
+                      label={t(
+                        "registrationModal.playerParticipationAgreementLabel"
+                      )}
                     />
                   }
                   checked={form.playerParticipationAgreement}
@@ -3768,7 +3778,9 @@ export function RegisterModal({
                     <DocumentAgreementLabel
                       prefix={t("registrationModal.acceptPrefix")}
                       document={registrationDocuments.rulebook}
-                      label="Official Tournament Rulebook"
+                      label={t(
+                        "registrationModal.officialTournamentRulebookLabel"
+                      )}
                     />
                   }
                   checked={form.rulebookAgreement}
@@ -3780,7 +3792,7 @@ export function RegisterModal({
                     <DocumentAgreementLabel
                       prefix={t("registrationModal.acceptPrefix")}
                       document={registrationDocuments.terms}
-                      label="Terms of Service"
+                      label={t("registrationModal.termsOfServiceLabel")}
                     />
                   }
                   checked={form.termsAgreement}
@@ -3792,7 +3804,7 @@ export function RegisterModal({
                     <DocumentAgreementLabel
                       prefix={t("registrationModal.acknowledgePrefix")}
                       document={registrationDocuments.privacy}
-                      label="Privacy Policy"
+                      label={t("registrationModal.privacyPolicyLabel")}
                     />
                   }
                   checked={form.privacyAcknowledgement}
