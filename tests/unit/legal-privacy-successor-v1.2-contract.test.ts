@@ -7,7 +7,10 @@ import {
   applyPrivacySuccessorDraft,
   assertCurrentRuntimeCorpus,
   assertCurrentRuntimeRelease,
+  buildFinalPrivacyRelease,
   buildReviewCandidateManifest,
+  finalizePrivacySuccessor,
+  formatDateDisplay,
 } from "../../scripts/legal-successor/finalize-privacy-v1.2.mjs";
 import {
   buildPrivacyV12TransactionSql,
@@ -222,6 +225,59 @@ describe("Privacy v1.2 review-draft preparation", () => {
         },
       })
     ).toThrow(/Finalized Privacy v1.2 is invalid/i);
+  });
+
+  it("finalizes only Privacy v1.2 for an explicit publication date", () => {
+    const activationDate = "2026-08-22";
+    const finalized = finalizePrivacySuccessor(
+      currentCorpus,
+      reviewDraft,
+      activationDate
+    );
+    const before = new Map(
+      currentCorpus.documents.map((document: { kind: string }) => [
+        document.kind,
+        document,
+      ])
+    );
+    const after = new Map(
+      finalized.documents.map((document: { kind: string }) => [
+        document.kind,
+        document,
+      ])
+    );
+
+    expect(after.get("rulebook")).toEqual(before.get("rulebook"));
+    expect(after.get("ppa")).toEqual(before.get("ppa"));
+    expect(after.get("terms")).toEqual(before.get("terms"));
+    expect(after.get("privacy")).toMatchObject({
+      effectiveDate: activationDate,
+      filename: "ironclad-privacy-policy-v1.2.pdf",
+      status: "Effective",
+      version: "1.2",
+    });
+    expect(finalized).toMatchObject({
+      effectiveDate: activationDate,
+      effectiveDateDisplay: formatDateDisplay(activationDate),
+    });
+
+    const release = buildFinalPrivacyRelease({
+      activationDate,
+      pdfBytes: Buffer.from("%PDF-1.4\nfinal privacy\n"),
+    });
+    expect(
+      validateFinalPrivacyRelease({
+        activationDate,
+        baseUrl: "https://www.ironcladtournaments.com",
+        corpus: finalized,
+        release,
+      })
+    ).toMatchObject({ activationDate, release: release.documents[0] });
+    expect(release.documents).toHaveLength(1);
+    expect(release.documents[0]).toMatchObject({
+      kind: "privacy",
+      version: "1.2",
+    });
   });
 
   it("keeps the effective v1.1 PDF generator path backward-compatible", () => {
