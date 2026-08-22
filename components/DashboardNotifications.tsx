@@ -165,38 +165,56 @@ export default function DashboardNotifications({
   };
 
   return (
-    <section className="relative mt-8 max-w-xl">
+    <section className="relative w-full" data-testid="match-actions-card">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
-        className="flex w-full items-center justify-between gap-4 rounded-2xl border border-orange-500/25 bg-[linear-gradient(135deg,rgba(249,115,22,0.09),rgba(255,255,255,0.03))] p-5 text-left shadow-xl shadow-black/20 transition hover:border-orange-400/45"
+        className="flex w-full items-center justify-between gap-4 border border-amber-700/35 bg-[linear-gradient(135deg,rgba(127,29,29,0.18),rgba(63,63,70,0.2),rgba(0,0,0,0.45))] p-5 text-left shadow-xl shadow-black/20 transition hover:border-amber-500/55"
       >
         <span className="flex min-w-0 items-center gap-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
-            <Bell size={20} />
+          <span className="grid h-11 w-11 shrink-0 place-items-center border border-red-400/30 bg-red-500/10 text-red-200">
+            <ShieldAlert size={20} />
           </span>
           <span className="min-w-0">
             <span className="block text-sm font-black uppercase tracking-[0.18em] text-white">
               {t("dashboard.title")}
             </span>
-            <span className="mt-1 block truncate text-xs text-zinc-400">
-              {notifications.length === 0
-                ? t("dashboard.noMessages")
-                : pluralMessage(
+            <span className="mt-1 block max-w-2xl text-xs leading-5 text-zinc-400">
+              {t("dashboard.description")}
+            </span>
+            <span className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-wider">
+              <span
+                className={
+                  actionRequired > 0
+                    ? "border border-red-400/35 bg-red-500/10 px-2 py-1 text-red-200"
+                    : "border border-white/10 bg-white/[0.03] px-2 py-1 text-zinc-500"
+                }
+              >
+                {actionRequired > 0
+                  ? t("dashboard.actionRequiredIndicator")
+                  : t("dashboard.noActionsRequired")}
+              </span>
+              {actionRequired > 0 && (
+                <span className="text-red-300/80">
+                  {pluralMessage(
+                    actionRequired,
+                    locale,
+                    t,
+                    "actionRequired"
+                  )}
+                </span>
+              )}
+              {notifications.length > 0 && (
+                <span className="text-zinc-500">
+                  {pluralMessage(
                     notifications.length,
                     locale,
                     t,
                     "message"
                   )}
-              {actionRequired > 0
-                ? ` · ${pluralMessage(
-                    actionRequired,
-                    locale,
-                    t,
-                    "actionRequired"
-                  )}`
-                : ""}
+                </span>
+              )}
             </span>
           </span>
         </span>
@@ -214,7 +232,7 @@ export default function DashboardNotifications({
             initial={{ opacity: 0, height: 0, y: -8 }}
             animate={{ opacity: 1, height: "auto", y: 0 }}
             exit={{ opacity: 0, height: 0, y: -8 }}
-            className="relative z-20 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#0b0d12]/95 shadow-2xl shadow-black/50 backdrop-blur-xl"
+            className="relative z-20 mt-2 overflow-hidden border border-amber-900/30 bg-[#0b0d12]/95 shadow-2xl shadow-black/50 backdrop-blur-xl"
           >
             {notifications.length === 0 ? (
               <p className="p-5 text-sm text-zinc-500">

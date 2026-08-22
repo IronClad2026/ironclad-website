@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "status": "Review Draft",
+  "effectiveDateToken": "{{PRODUCTION_EFFECTIVE_DATE}}",
+  "publicationRule": "Privacy v1.2 remains a REVIEW DRAFT - NOT EFFECTIVE until an owner-authorized controlled Production publication supplies its actual Australia/Sydney effective date, publishes the immutable artifact, updates the runtime legal corpus and release pair, and activates the corresponding database legal-document row. This preparation does none of those things.",
+  "documents": [
+    {
+      "kind": "privacy",
+      "fromVersion": "1.1",
+      "version": "1.2",
+      "filename": "ironclad-privacy-policy-v1.2.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf",
+      "operations": [
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "2",
+          "expected": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, rankings, Polls, notifications, support, account closure, optional analytics preference, optional consent-gated public-site analytics and prize administration where applicable.",
+          "replacement": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, rankings, Polls, in-app notifications, deliberately enabled Web Push, installed-app notification badges, support, account closure, optional analytics preference, optional consent-gated public-site analytics and prize administration where applicable."
+        },
+        {
+          "op": "insert-list-item-after",
+          "sectionNumber": "3",
+          "expected": "email-delivery status and provider message identifier;",
+          "item": "Web Push subscription endpoint associated with the authenticated Account;"
+        },
+        {
+          "op": "insert-list-item-after",
+          "sectionNumber": "3",
+          "expected": "Web Push subscription endpoint associated with the authenticated Account;",
+          "item": "p256dh and auth cryptographic subscription key material;"
+        },
+        {
+          "op": "insert-list-item-after",
+          "sectionNumber": "3",
+          "expected": "p256dh and auth cryptographic subscription key material;",
+          "item": "browser notification permission and subscription creation, update, revocation and delivery-failure state where needed;"
+        },
+        {
+          "op": "insert-list-item-after",
+          "sectionNumber": "3",
+          "expected": "browser notification permission and subscription creation, update, revocation and delivery-failure state where needed;",
+          "item": "the authoritative unread in-app notification count used to reconcile an installed-app badge;"
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "3",
+          "expected": "IronClad does not currently operate a general payout integration or KYC repository.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A Web Push endpoint and its p256dh and auth key material are linked to an Account and are treated as potentially personal information. IronClad does not collect a device fingerprint, IP address, arbitrary user-agent string, browser history or device name merely to operate Push."
+            }
+          ]
+        },
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "4",
+          "expected": "Information may come directly from the user; from a delegated Admin acting within authority; from Clerk; from Steam OpenID and Valve's supported public profile service; from Relic's Company of Heroes 3 personal-stat service; from another Player involved in the same Match; from hosting, database, Storage, security and email providers; from a consenting visitor's browser and Vercel for optional public-site analytics when enabled; from support or privacy correspondence; and from a payout provider for a specifically approved prize-bearing Event.",
+          "replacement": "Information may come directly from the user, including through a deliberate Enable notifications action; from a delegated Admin acting within authority; from Clerk; from Steam OpenID and Valve's supported public profile service; from Relic's Company of Heroes 3 personal-stat service; from another Player involved in the same Match; from hosting, database, Storage, security and email providers; from the user's browser, operating system and browser-selected Push Service when Web Push is enabled; from a consenting visitor's browser and Vercel for optional public-site analytics when enabled; from support or privacy correspondence; and from a payout provider for a specifically approved prize-bearing Event."
+        },
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "5",
+          "expected": "We process information to authenticate users and secure Accounts; create and maintain profiles; verify control of a Steam identity; obtain supported Relic 1v1 information; determine Division eligibility; register and waitlist Players; preserve exact versioned acceptance evidence; operate brackets and Matches; process Dice and Polls; receive and confirm results; investigate disputes, no-shows, cheating and security incidents; calculate rankings and standings; publish factual Competition History; deliver notifications and transactional email; provide support and Admin Assistance; administer a lawful prize where applicable; prevent fraud and platform abuse; enforce the Governing Documents; maintain required audit and legal evidence; handle account closure and privacy requests; and comply with applicable law.",
+          "replacement": "We process information to authenticate users and secure Accounts; create and maintain profiles; verify control of a Steam identity; obtain supported Relic 1v1 information; determine Division eligibility; register and waitlist Players; preserve exact versioned acceptance evidence; operate brackets and Matches; process Dice and Polls; receive and confirm results; investigate disputes, no-shows, cheating and security incidents; calculate rankings and standings; publish factual Competition History; deliver in-app notifications, deliberately enabled Web Push and transactional email; reconcile an installed-app badge with authoritative unread notification state; provide support and Admin Assistance; administer a lawful prize where applicable; prevent fraud and platform abuse; enforce the Governing Documents; maintain required audit and legal evidence; handle account closure and privacy requests; and comply with applicable law."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "13",
+          "expected": "IronClad stores in-app notification content, related identifiers, read or hidden state and action state.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Web Push is optional and may be enabled only through a deliberate signed-in user action followed by the browser's notification-permission process. IronClad does not request notification permission automatically when a page loads. Browser notification permission is a technical permission and is not blanket consent to unrelated processing."
+            },
+            {
+              "type": "paragraph",
+              "text": "Each subscribed browser or installed web application has its own standards-based PushSubscription. One Account may have multiple subscriptions. IronClad stores the minimum endpoint, p256dh and auth values needed for encrypted delivery and does not use Firebase or a paid Push provider for this feature."
+            },
+            {
+              "type": "paragraph",
+              "text": "Web Push is a best-effort delivery channel for selected meaningful notification events. The in-app notification record remains authoritative. The installed-app badge is reconciled from the Account's authoritative unread in-app notification count, even where an unread notification was not Push-important. Platform support may present an exact number, a dot or no badge."
+            },
+            {
+              "type": "paragraph",
+              "text": "Push content may be visible on a lock screen. IronClad therefore limits payloads to a conservative title, concise event summary, notification identifier, approved same-origin destination and an unread-count snapshot. It does not include replay or private Storage URLs, private evidence, email addresses, raw identity data, sensitive Admin notes or full dispute contents."
+            }
+          ]
+        },
+        {
+          "op": "insert-list-item-after",
+          "sectionNumber": "15",
+          "expected": "Vercel: current hosting, application delivery and request processing and, only when enabled after the visitor's separate opt-in, optional public-site Web Analytics.",
+          "item": "Browser and operating-system Push Services: conditional, only after deliberate account-level enablement, to route encrypted standards-based Web Push to each subscribed browser or installed web application. The browser or operating system selects that service and its infrastructure or subprocessors."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "16",
+          "expected": "The responsible operators may access Service data from New South Wales and Italy. Current providers and their subprocessors may process information in other countries according to their infrastructure, account configuration and contractual arrangements.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "When Web Push is deliberately enabled, the browser-selected Push Service and its relevant infrastructure or subprocessors may process the subscription endpoint, encrypted delivery data and routing metadata in countries outside the user's country. IronClad must review applicable provider terms and transfer safeguards before activation."
+            }
+          ]
+        },
+        {
+          "op": "insert-list-item-after",
+          "sectionNumber": "17",
+          "expected": "ironclad_analytics_consent in browser localStorage, containing only granted or declined, solely to remember the visitor's optional analytics preference. It contains no user ID, account ID, email, Steam identity, IP address, fingerprint or preference-history timestamp.",
+          "item": "a standards-based browser PushSubscription, created only after a deliberate enable action and browser permission, containing an endpoint and p256dh and auth key material. IronClad stores the subscription against the authenticated Account; the browser or operating system controls its own permission and local service-worker state."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "17",
+          "expected": "Apart from the analytics preference described above, IronClad does not use application localStorage for analytics, a marketing cookie, an advertising pixel or a general consent-management platform. The preference remembers the visitor's choice and is not itself used to measure behavior.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Web Push permission and subscription state are used only to deliver opted-in notifications and reconcile the installed-app badge. They are not used for advertising, cross-site tracking or device fingerprinting. Browser notification permission is a technical permission and is not blanket consent to unrelated processing."
+            }
+          ]
+        },
+        {
+          "op": "insert-table-row-after",
+          "sectionNumber": "18",
+          "expectedFirstCell": "In-app notifications",
+          "row": [
+            "Web Push subscriptions",
+            "For the life of the deliberate Push opt-in. Delete when the user disables Push in IronClad, on completed Account closure, or when a Push Service reports an expired or invalid endpoint, including HTTP 404 or 410. If permission is revoked only in the browser or operating system, delete when IronClad next detects the revocation or delivery failure. Provider copies follow the provider's lawful schedule."
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "19",
+          "expected": "The systems do not form one transaction. One step may succeed while another fails. IronClad must record and reconcile a known partial failure.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "On completed Account closure, IronClad deletes active Web Push subscription rows associated with that Account. Browser or operating-system permission and provider-side routing state may not disappear immediately; detected expired or invalid endpoints are removed under the retention schedule."
+            }
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "20",
+          "expected": "A visitor may change or withdraw the optional analytics preference through the Analytics choices control. Declining or withdrawing analytics does not affect normal access to IronClad. Clearing browser storage may remove the saved choice, in which case analytics remains off until another deliberate choice is made.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A signed-in user may choose whether to enable Web Push, may disable it in IronClad, and may revoke notification permission in the browser or operating system. Refusing or disabling Push does not remove ordinary in-app notifications or affect Tournament eligibility. Badge appearance and exact numeric presentation depend on platform support."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

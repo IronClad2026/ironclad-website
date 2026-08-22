@@ -141,6 +141,7 @@ describe("Steam identity account-deletion regression", () => {
           p_clerk_user_id: playerIdentity.userId,
         }
       );
+      expect(deletion.rpc).toHaveBeenCalledOnce();
       expect(deleteUser).toHaveBeenCalledWith(playerIdentity.userId);
       expect(deletion.remove.mock.invocationCallOrder[0]).toBeLessThan(
         deletion.rpc.mock.invocationCallOrder[0]

@@ -64,6 +64,7 @@ APPROVED_FILENAMES = {
     "privacy": {
         "1.0": "ironclad-privacy-policy-v1.0.pdf",
         "1.1": "ironclad-privacy-policy-v1.1.pdf",
+        "1.2": "ironclad-privacy-policy-v1.2.pdf",
     },
 }
 
@@ -100,6 +101,14 @@ def parse_args() -> argparse.Namespace:
         default=",".join(DOCUMENT_KINDS),
         help="Comma-separated document kinds to generate.",
     )
+    parser.add_argument(
+        "--review-draft",
+        action="store_true",
+        help=(
+            "Generate only the approved Privacy v1.2 REVIEW DRAFT - NOT "
+            "EFFECTIVE artifact with an Effective date of TBD."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -122,6 +131,7 @@ def load_corpus(
     path: Path,
     effective_date_override: str | None,
     selected_kinds: tuple[str, ...],
+    review_draft: bool = False,
 ) -> dict[str, Any]:
     corpus = json.loads(path.read_text(encoding="utf-8"))
     canonical_date = corpus.get("effectiveDate")
@@ -134,7 +144,20 @@ def load_corpus(
     documents = corpus.get("documents", [])
     if not isinstance(documents, list):
         raise ValueError("The legal corpus documents must be a list")
-    corpus["documents"] = [resolve_document_tokens(document) for document in documents]
+    if review_draft:
+        corpus["documents"] = [
+            resolve_document_tokens(
+                document,
+                review_draft=(
+                    document.get("kind") == "privacy"
+                    and document.get("version") == "1.2"
+                    and document.get("status") == "Review Draft"
+                ),
+            )
+            for document in documents
+        ]
+    else:
+        corpus["documents"] = [resolve_document_tokens(document) for document in documents]
 
     selected_documents = [
         document
@@ -169,15 +192,20 @@ def replace_tokens(value: Any, replacements: dict[str, str]) -> Any:
     return value
 
 
-def resolve_document_tokens(document: dict[str, Any]) -> dict[str, Any]:
+def resolve_document_tokens(
+    document: dict[str, Any], review_draft: bool = False
+) -> dict[str, Any]:
     """Resolve display tokens using this document's own immutable date."""
     effective_date = document.get("effectiveDate")
-    if not isinstance(effective_date, str):
+    if review_draft:
+        resolved = replace_tokens(document, {"{{EFFECTIVE_DATE}}": "TBD"})
+    elif not isinstance(effective_date, str):
         raise ValueError(f"{document.get('kind', 'document')} has no effectiveDate")
-    resolved = replace_tokens(
-        document,
-        {"{{EFFECTIVE_DATE}}": format_date(effective_date)},
-    )
+    else:
+        resolved = replace_tokens(
+            document,
+            {"{{EFFECTIVE_DATE}}": format_date(effective_date)},
+        )
     if "{{EFFECTIVE_DATE}}" in json.dumps(resolved, ensure_ascii=False):
         raise ValueError(
             f"{document.get('kind', 'document')} has an unresolved Effective-date token"
@@ -185,7 +213,11 @@ def resolve_document_tokens(document: dict[str, Any]) -> dict[str, Any]:
     return resolved
 
 
-def validate_corpus(corpus: dict[str, Any]) -> None:
+def validate_corpus(
+    corpus: dict[str, Any],
+    review_draft: bool = False,
+    selected_kinds: tuple[str, ...] = DOCUMENT_KINDS,
+) -> None:
     if corpus.get("schemaVersion") != 1:
         raise ValueError("Unsupported legal corpus schemaVersion")
     documents = corpus.get("documents")
@@ -207,12 +239,22 @@ def validate_corpus(corpus: dict[str, Any]) -> None:
         expected_filename = APPROVED_FILENAMES[kind].get(version)
         if not expected_filename or document.get("filename") != expected_filename:
             raise ValueError(f"Incorrect filename for {kind}")
-        if document.get("status") != "Effective":
+        is_approved_review_draft = (
+            review_draft
+            and selected_kinds == ("privacy",)
+            and kind == "privacy"
+            and version == "1.2"
+            and document.get("status") == "Review Draft"
+        )
+        if document.get("status") != "Effective" and not is_approved_review_draft:
             raise ValueError(f"{kind} is not marked Effective")
         effective_date = document.get("effectiveDate")
-        if not isinstance(effective_date, str):
+        if not is_approved_review_draft and not isinstance(effective_date, str):
             raise ValueError(f"{kind} has no effectiveDate")
-        format_date(effective_date)
+        if isinstance(effective_date, str):
+            format_date(effective_date)
+        elif is_approved_review_draft and effective_date is not None:
+            raise ValueError("The Privacy v1.2 Review Draft effectiveDate must be null")
         expected_path = f"/documents-rules-ppa/{expected_filename}"
         if document.get("publicPath") != expected_path:
             raise ValueError(f"Incorrect publicPath for {kind}")
@@ -482,7 +524,13 @@ class LegalDocTemplate(BaseDocTemplate):
         document: dict[str, Any],
         display_date: str,
         fonts: dict[str, str],
+        review_draft: bool = False,
     ) -> None:
+        subject = (
+            "REVIEW DRAFT - NOT EFFECTIVE | Effective date: TBD"
+            if review_draft
+            else f"Effective {display_date}"
+        )
         super().__init__(
             filename,
             pagesize=A4,
@@ -492,12 +540,13 @@ class LegalDocTemplate(BaseDocTemplate):
             bottomMargin=17 * mm,
             title=f"{document['title']} v{document['version']}",
             author="Marco Stucchi and Simone Vitiello",
-            subject=f"Effective {display_date}",
+            subject=subject,
             creator="IronClad legal corpus PDF generator",
         )
         self.document_meta = document
         self.display_date = display_date
         self.fonts = fonts
+        self.review_draft = review_draft
         frame = Frame(
             self.leftMargin,
             self.bottomMargin,
@@ -511,7 +560,11 @@ class LegalDocTemplate(BaseDocTemplate):
         canvas.saveState()
         canvas.setTitle(f"{self.document_meta['title']} v{self.document_meta['version']}")
         canvas.setAuthor("Marco Stucchi and Simone Vitiello")
-        canvas.setSubject(f"Effective {self.display_date}")
+        canvas.setSubject(
+            "REVIEW DRAFT - NOT EFFECTIVE | Effective date: TBD"
+            if self.review_draft
+            else f"Effective {self.display_date}"
+        )
         canvas.setCreator("IronClad legal corpus PDF generator")
         if doc.page == 1:
             canvas.setFillColor(BLACK)
@@ -547,7 +600,12 @@ class LegalDocTemplate(BaseDocTemplate):
             canvas.line(18 * mm, 13 * mm, PAGE_WIDTH - 18 * mm, 13 * mm)
             canvas.setFillColor(MUTED)
             canvas.setFont(self.fonts["regular"], 7.2)
-            canvas.drawString(18 * mm, 9 * mm, f"Effective {self.display_date}")
+            footer = (
+                "REVIEW DRAFT - NOT EFFECTIVE  |  Effective date: TBD"
+                if self.review_draft
+                else f"Effective {self.display_date}"
+            )
+            canvas.drawString(18 * mm, 9 * mm, footer)
             canvas.drawRightString(
                 PAGE_WIDTH - 18 * mm,
                 9 * mm,
@@ -565,16 +623,24 @@ class LegalDocTemplate(BaseDocTemplate):
 
 
 def make_cover_story(
-    document: dict[str, Any], display_date: str, styles: dict[str, ParagraphStyle]
+    document: dict[str, Any],
+    display_date: str,
+    styles: dict[str, ParagraphStyle],
+    review_draft: bool = False,
 ) -> list[Flowable]:
+    status_label = "REVIEW DRAFT - NOT EFFECTIVE" if review_draft else "EFFECTIVE"
+    effective_date_label = "TBD" if review_draft else display_date
     return [
         Spacer(1, 62 * mm),
         Paragraph("IRONCLAD TOURNAMENTS", styles["coverBrand"]),
         Paragraph(paragraph_text(document["title"]), styles["coverTitle"]),
         Paragraph(paragraph_text(document.get("subtitle", "")), styles["coverSubtitle"]),
         Paragraph(f"<b>VERSION {html.escape(document['version'])}</b>", styles["coverMeta"]),
-        Paragraph("<b>EFFECTIVE</b>", styles["coverMeta"]),
-        Paragraph(f"Effective date: {html.escape(display_date)}", styles["coverMeta"]),
+        Paragraph(f"<b>{status_label}</b>", styles["coverMeta"]),
+        Paragraph(
+            f"Effective date: {html.escape(effective_date_label)}",
+            styles["coverMeta"],
+        ),
         Spacer(1, 5 * mm),
         Paragraph(paragraph_text(document["operatorStatement"]), styles["coverMeta"]),
         Spacer(1, 4 * mm),
@@ -696,10 +762,13 @@ def build_pdf(
     display_date: str,
     fonts: dict[str, str],
     styles: dict[str, ParagraphStyle],
+    review_draft: bool = False,
 ) -> None:
-    template = LegalDocTemplate(str(output_path), document, display_date, fonts)
+    template = LegalDocTemplate(
+        str(output_path), document, display_date, fonts, review_draft
+    )
     story: list[Flowable] = []
-    story.extend(make_cover_story(document, display_date, styles))
+    story.extend(make_cover_story(document, display_date, styles, review_draft))
     story.extend(make_toc(styles, fonts))
     story.extend(render_blocks(document.get("introBlocks", []), styles, template.width))
     if document.get("introBlocks"):
@@ -729,14 +798,22 @@ def sha256(path: Path) -> str:
 def main() -> int:
     args = parse_args()
     selected_kinds = parse_selected_kinds(args.kinds)
+    if args.review_draft and selected_kinds != ("privacy",):
+        raise ValueError("--review-draft requires --kinds privacy")
+    if args.review_draft and args.effective_date:
+        raise ValueError("--review-draft does not accept --effective-date")
     corpus_path = args.corpus.resolve()
     output_dir = args.output_dir.resolve()
-    corpus = load_corpus(corpus_path, args.effective_date, selected_kinds)
-    validate_corpus(corpus)
+    corpus = load_corpus(
+        corpus_path, args.effective_date, selected_kinds, args.review_draft
+    )
+    validate_corpus(corpus, args.review_draft, selected_kinds)
 
     print("=" * 78)
     print("IRONCLAD LEGAL DOCUMENT GENERATION")
     print(f"Selected kinds: {', '.join(selected_kinds)}")
+    if args.review_draft:
+        print("Status: REVIEW DRAFT - NOT EFFECTIVE | Effective date: TBD")
     if args.effective_date:
         print(f"Asserted Effective date: {format_date(args.effective_date)} ({args.effective_date})")
     print("=" * 78)
@@ -768,12 +845,18 @@ def main() -> int:
             staged_path = output_dir / f".{document['filename']}.staging"
             if staged_path.exists():
                 raise RuntimeError(f"Stale PDF staging file exists: {staged_path.name}")
+            display_date = (
+                "TBD"
+                if args.review_draft
+                else format_date(document["effectiveDate"])
+            )
             build_pdf(
                 staged_path,
                 document,
-                format_date(document["effectiveDate"]),
+                display_date,
                 fonts,
                 styles,
+                args.review_draft,
             )
             staged.append((staged_path, output_dir / document["filename"]))
 

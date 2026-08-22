@@ -284,6 +284,39 @@ export async function loadUnreadNotificationCount({
   return count;
 }
 
+export async function resolveNotificationDestination(
+  notificationId: string,
+  scope: NotificationScope,
+  clerkUserId?: string | null
+): Promise<string | null> {
+  if (
+    !isUuid(notificationId) ||
+    (scope === "player" && !clerkUserId?.trim())
+  ) {
+    return null;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const query = supabase
+    .from("notifications")
+    .select(NOTIFICATION_SELECT)
+    .eq("id", notificationId);
+
+  if (scope === "admin") {
+    query.eq("recipient_role", "admin");
+  } else {
+    query.eq("recipient_clerk_user_id", clerkUserId?.trim() ?? "");
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error || !isNotificationDestinationRow(data)) {
+    if (error) logNotificationFailure("resolve-destination", error);
+    return null;
+  }
+
+  return buildNotificationHref(data, scope);
+}
+
 export async function markNotificationRead({
   notificationId,
   scope,
@@ -484,6 +517,40 @@ function isDuplicateNotificationEvent(error: unknown) {
       error !== null &&
       "code" in error &&
       error.code === "23505"
+  );
+}
+
+function isNotificationDestinationRow(
+  value: unknown
+): value is NotificationRow {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row.id === "string" &&
+    typeof row.type === "string" &&
+    isNullableString(row.recipient_role) &&
+    isNullableString(row.tournament_id) &&
+    isNullableString(row.registration_id) &&
+    isNullableString(row.match_id) &&
+    isNullableString(row.report_group_id) &&
+    (row.metadata === null || isRecord(row.metadata))
+  );
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
   );
 }
 

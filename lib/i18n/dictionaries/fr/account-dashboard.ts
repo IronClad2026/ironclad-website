@@ -39,8 +39,8 @@ const dictionary = {
     },
     notificationCenter: {
       eyebrow: "Notifications",
-      title: "Notifications",
-      description: "Dernières informations d’IronClad sur les tournois, les inscriptions, les mouvements de la liste d’attente et les décisions relatives aux résultats des matchs.",
+      title: "Centre de notifications",
+      description: "Toutes les informations du compte et des tournois, notamment les inscriptions, la liste d’attente et les décisions sur les résultats.",
       empty: "Les informations sur les tournois, les inscriptions et les matchs apparaîtront ici.",
     },
     career: {

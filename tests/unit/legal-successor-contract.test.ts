@@ -27,6 +27,9 @@ const reviewDraft = JSON.parse(
 const currentTerms = currentCorpus.documents.find(
   (document: { kind: string }) => document.kind === "terms"
 );
+const currentPrivacy = currentCorpus.documents.find(
+  (document: { kind: string }) => document.kind === "privacy"
+);
 const activationDate =
   currentTerms?.version === "1.1"
     ? currentTerms.effectiveDate
@@ -34,7 +37,20 @@ const activationDate =
 
 function finalizeForTest() {
   if (currentTerms?.version === "1.1") {
-    return structuredClone(currentCorpus);
+    const publishedV11 = structuredClone(currentCorpus);
+    if (currentPrivacy?.version === "1.2") {
+      const privacy = publishedV11.documents.find(
+        (document: { kind: string }) => document.kind === "privacy"
+      );
+      privacy.version = "1.1";
+      privacy.effectiveDate = activationDate;
+      privacy.filename = "ironclad-privacy-policy-v1.1.pdf";
+      privacy.publicPath =
+        "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf";
+      publishedV11.effectiveDate = activationDate;
+      publishedV11.effectiveDateDisplay = formatDateDisplay(activationDate);
+    }
+    return publishedV11;
   }
   return applySuccessorDraft(currentCorpus, reviewDraft, activationDate);
 }

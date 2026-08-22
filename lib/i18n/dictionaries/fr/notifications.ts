@@ -21,9 +21,33 @@ const dictionary = {
       "Votre adversaire a soumis un résultat pour {tournamentName}. Score déclaré : {score}.",
     openToRespond: "Ouvrir le tournoi pour confirmer ou contester",
     unknownTime: "Heure inconnue",
+    pushTitle: "Alertes de l’appareil",
+    pushDescription:
+      "Autorisez les alertes IronClad importantes sur cet appareil. Le navigateur ne demandera rien avant que vous choisissiez Activer.",
+    pushChecking: "Vérification des notifications sur cet appareil…",
+    pushEnable: "Activer les notifications",
+    pushDisable: "Désactiver sur cet appareil",
+    pushEnabling: "Activation…",
+    pushDisabling: "Désactivation…",
+    pushEnabled: "Les notifications sont activées sur cet appareil.",
+    pushEnabledLabel: "Activées",
+    pushDisabled: "Les notifications sont désactivées sur cet appareil.",
+    pushBlocked:
+      "Les notifications sont bloquées dans les réglages du navigateur ou de l’appareil.",
+    pushInstallRequired:
+      "Sur iPhone ou iPad, installez IronClad sur l’écran d’accueil avant d’activer les notifications.",
+    pushUnsupported: "Ce navigateur ne prend pas en charge les notifications push web.",
+    pushUnavailable:
+      "Les notifications n’ont pas pu être mises à jour. Réessayez.",
+    pushPrivacy:
+      "Les alertes peuvent apparaître sur l’écran verrouillé. Protégez leur aperçu dans les réglages de l’appareil.",
   },
   dashboard: {
-    title: "Notifications",
+    title: "Actions de match",
+    description:
+      "Confirmations de résultats, contestations, éléments rejetés ou à soumettre de nouveau et autres actions nécessitant votre réponse.",
+    actionRequiredIndicator: "Action requise",
+    noActionsRequired: "Aucune action requise",
     noMessages: "Aucun message de match",
     messageOne: "1 message de match",
     messageFew: "{count} messages de match",
@@ -33,7 +57,7 @@ const dictionary = {
     actionRequiredFew: "{count} notifications nécessitent une action",
     actionRequiredMany: "{count} notifications nécessitent une action",
     actionRequiredOther: "{count} notifications nécessitent une action",
-    empty: "Les résultats de match soumis et les décisions de l’administration apparaîtront ici.",
+    empty: "Aucune action de match n’attend votre réponse.",
     clearSelection: "Effacer la sélection",
     selectAll: "Tout sélectionner",
     deleteSelected: "Supprimer la sélection",

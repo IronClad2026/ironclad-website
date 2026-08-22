@@ -3,25 +3,45 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InAppNotification } from "@/lib/notifications";
+import type { DashboardNotification } from "@/lib/player-dashboard";
 
+const NOTIFICATION_ID = "55555555-5555-4555-8555-555555555555";
+const OTHER_NOTIFICATION_ID = "66666666-6666-4666-8666-666666666666";
 const pushMock = vi.hoisted(() => vi.fn());
 const refreshMock = vi.hoisted(() => vi.fn());
 const deleteSelectedMock = vi.hoisted(() => vi.fn());
 const markAllMock = vi.hoisted(() => vi.fn());
 const markReadMock = vi.hoisted(() => vi.fn());
 const markSelectedMock = vi.hoisted(() => vi.fn());
+const requestBadgeReconciliationMock = vi.hoisted(() => vi.fn());
+const closeDisplayedNotificationsMock = vi.hoisted(() => vi.fn());
+const dismissDashboardNotificationsMock = vi.hoisted(() => vi.fn());
+const cleanupResult = {
+  status: "closed",
+  enumerated: 1,
+  matched: 1,
+  closed: 1,
+  remaining: 0,
+} as const;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, refresh: refreshMock }),
 }));
 vi.mock("@/app/dashboard/actions", () => ({
-  dismissDashboardNotifications: vi.fn(),
+  dismissDashboardNotifications: dismissDashboardNotificationsMock,
 }));
 vi.mock("@/app/notifications/actions", () => ({
   deleteSelectedInAppNotifications: deleteSelectedMock,
   markAllInAppNotificationsRead: markAllMock,
   markInAppNotificationRead: markReadMock,
   markVisibleInAppNotificationsRead: markSelectedMock,
+}));
+vi.mock("@/components/NotificationPermissionControl", () => ({
+  default: () => <div data-testid="notification-permission-control" />,
+}));
+vi.mock("@/lib/app-badge", () => ({
+  closeDisplayedIronCladNotifications: closeDisplayedNotificationsMock,
+  requestNotificationBadgeReconciliation: requestBadgeReconciliationMock,
 }));
 
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
@@ -30,7 +50,7 @@ function notification(
   overrides: Partial<InAppNotification> = {}
 ): InAppNotification {
   return {
-    id: "notification-reliability",
+    id: NOTIFICATION_ID,
     recipientRole: "player",
     type: "registration.rejected",
     title: "Registration Rejected",
@@ -49,14 +69,15 @@ function notification(
   };
 }
 
-function renderPlayerCenter(item: InAppNotification) {
+function renderPlayerCenter(item: InAppNotification | InAppNotification[]) {
+  const notifications = Array.isArray(item) ? item : [item];
   const rendered = render(
     <InAppNotificationCenter
       scope="player"
       title="Notifications"
       description="Recent updates."
       emptyMessage="No updates."
-      notifications={[item]}
+      notifications={notifications}
       totalCount={4}
       unreadCount={3}
     />
@@ -65,16 +86,49 @@ function renderPlayerCenter(item: InAppNotification) {
   return rendered;
 }
 
+function projectedMatchAction(): DashboardNotification {
+  return {
+    id: "projected-match-action",
+    source: "report_group",
+    sourceId: "44444444-4444-4444-8444-444444444444",
+    reportGroupId: "44444444-4444-4444-8444-444444444444",
+    resultType: "normal",
+    noShowRegistrationId: null,
+    noShowStatus: null,
+    submissionNumber: 1,
+    gameNumber: 1,
+    tournamentName: "Reliability Cup",
+    roundName: "Round 1",
+    matchNumber: 1,
+    opponentName: "Opponent",
+    reportedWinner: "Player",
+    reportedLoser: "Opponent",
+    reportedScore: "1-0",
+    status: "pending_confirmation",
+    reviewNotes: null,
+    submittedAt: "2026-08-20T00:00:00.000Z",
+    reviewedAt: null,
+    submittedByViewer: false,
+    confirmationDeadlineAt: "2026-08-21T00:00:00.000Z",
+    finalizedAt: null,
+    canConfirm: true,
+    canDispute: true,
+  };
+}
+
 describe("notification-center mutation reliability", () => {
   beforeEach(() => {
     deleteSelectedMock.mockResolvedValue({ ok: true, unreadCount: 0 });
     markAllMock.mockResolvedValue({ ok: true, unreadCount: 0 });
     markReadMock.mockResolvedValue({ ok: true, unreadCount: 2 });
     markSelectedMock.mockResolvedValue({ ok: true, unreadCount: 0 });
+    closeDisplayedNotificationsMock.mockResolvedValue(cleanupResult);
+    dismissDashboardNotificationsMock.mockResolvedValue({ status: "success" });
   });
 
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
   });
 
   it("uses the authoritative post-mutation unread count on success", async () => {
@@ -86,8 +140,13 @@ describe("notification-center mutation reliability", () => {
 
     await waitFor(() => {
       expect(screen.getByText("4 total · 2 unread")).toBeInTheDocument();
+      expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
     });
     expect(screen.queryByText("New")).not.toBeInTheDocument();
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
+      notificationIds: [NOTIFICATION_ID],
+      scope: "player",
+    });
     expect(refreshMock).toHaveBeenCalled();
   });
 
@@ -106,7 +165,219 @@ describe("notification-center mutation reliability", () => {
     });
     expect(screen.getByText("4 total · 3 unread")).toBeInTheDocument();
     expect(screen.getByText("New")).toBeInTheDocument();
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+    expect(closeDisplayedNotificationsMock).not.toHaveBeenCalled();
     expect(refreshMock).toHaveBeenCalled();
+  });
+
+  it("waits for displayed-notification cleanup after a durable hide before refreshing", async () => {
+    let finishCleanup!: () => void;
+    closeDisplayedNotificationsMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishCleanup = resolve;
+      })
+    );
+    renderPlayerCenter(notification());
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Select Registration Rejected/i })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+
+    await waitFor(() => {
+      expect(deleteSelectedMock).toHaveBeenCalledOnce();
+      expect(screen.getByText("4 total · 0 unread")).toBeInTheDocument();
+    });
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+    expect(refreshMock).not.toHaveBeenCalled();
+
+    finishCleanup();
+    await waitFor(() => {
+      expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+      expect(refreshMock).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("reconciles badge truth after marking selected durable notifications read", async () => {
+    renderPlayerCenter([
+      notification(),
+      notification({
+        id: OTHER_NOTIFICATION_ID,
+        title: "Registration Approved",
+        type: "registration.approved",
+      }),
+    ]);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /Select Registration Rejected/i,
+      })
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Mark selected read" })
+    );
+
+    await waitFor(() => expect(markSelectedMock).toHaveBeenCalledOnce());
+    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
+      notificationIds: [NOTIFICATION_ID],
+      scope: "player",
+    });
+  });
+
+  it("reconciles badge truth after marking all durable notifications read", async () => {
+    renderPlayerCenter(notification());
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+
+    await waitFor(() => expect(markAllMock).toHaveBeenCalledOnce());
+    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
+      scope: "player",
+    });
+  });
+
+  it("reconciles badge truth after hiding a selected durable notification", async () => {
+    renderPlayerCenter([
+      notification(),
+      notification({
+        id: OTHER_NOTIFICATION_ID,
+        title: "Registration Approved",
+        type: "registration.approved",
+      }),
+    ]);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /Select Registration Rejected/i,
+      })
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete selected" })
+    );
+
+    await waitFor(() => expect(deleteSelectedMock).toHaveBeenCalledOnce());
+    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
+      notificationIds: [NOTIFICATION_ID],
+      scope: "player",
+    });
+  });
+
+  it("does not close a displayed notification when durable hide fails", async () => {
+    deleteSelectedMock.mockResolvedValue({ ok: false, code: "unavailable" });
+    renderPlayerCenter(notification());
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Select Registration Rejected/i })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Your notifications could not be updated."
+      );
+    });
+    expect(closeDisplayedNotificationsMock).not.toHaveBeenCalled();
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a successful durable mutation successful when cleanup rejects", async () => {
+    closeDisplayedNotificationsMock.mockRejectedValueOnce(
+      new Error("SERVICE_WORKER_CLEANUP_FAILED")
+    );
+    renderPlayerCenter(notification());
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Select Registration Rejected/i })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+
+    await waitFor(() => {
+      expect(deleteSelectedMock).toHaveBeenCalledOnce();
+      expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+      expect(refreshMock).toHaveBeenCalledOnce();
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("reconciles committed durable truth if a projected dismissal later fails", async () => {
+    dismissDashboardNotificationsMock.mockResolvedValue({ status: "error" });
+    render(
+      <InAppNotificationCenter
+        scope="player"
+        title="Notifications"
+        description="Recent updates."
+        emptyMessage="No updates."
+        notifications={[notification()]}
+        totalCount={1}
+        unreadCount={1}
+        matchNotifications={[projectedMatchAction()]}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Notifications/i }));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Select Registration Rejected/i })
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /select match result confirmation notification/i,
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+
+    await waitFor(() => {
+      expect(dismissDashboardNotificationsMock).toHaveBeenCalledOnce();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Your notifications could not be updated."
+      );
+    });
+    expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
+      notificationIds: [NOTIFICATION_ID],
+      scope: "player",
+    });
+  });
+
+  it("does not request badge reconciliation from a failed initial load", async () => {
+    render(
+      <InAppNotificationCenter
+        scope="player"
+        title="Notifications"
+        description="Recent updates."
+        emptyMessage="No updates."
+        notifications={[]}
+        totalCount={0}
+        unreadCount={0}
+        error="Notifications could not be loaded."
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Notifications/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Notifications could not be loaded.")
+      ).toBeInTheDocument();
+    });
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+  });
+
+  it("does not use projected Match actions as badge truth", () => {
+    render(
+      <InAppNotificationCenter
+        scope="player"
+        title="Notifications"
+        description="Recent updates."
+        emptyMessage="No updates."
+        notifications={[notification()]}
+        totalCount={4}
+        unreadCount={3}
+        matchNotifications={[projectedMatchAction()]}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Notifications/i }));
+
+    expect(screen.getByText("5 total · 4 unread")).toBeInTheDocument();
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
   });
 
   it("continues to an approved Match destination when mark-read fails", async () => {
@@ -135,5 +406,49 @@ describe("notification-center mutation reliability", () => {
       expect(pushMock).toHaveBeenCalledWith(href);
     });
     expect(markReadMock).toHaveBeenCalledOnce();
+    expect(closeDisplayedNotificationsMock).not.toHaveBeenCalled();
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+  });
+
+  it("waits for cleanup before navigating from a successful notification read", async () => {
+    let finishCleanup!: () => void;
+    closeDisplayedNotificationsMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finishCleanup = resolve;
+      })
+    );
+    const href =
+      "/tournaments?tournament=11111111-1111-4111-8111-111111111111&tab=brackets&match=33333333-3333-4333-8333-333333333333";
+    renderPlayerCenter(
+      notification({
+        type: "match.confirmation_required",
+        title: "Match result needs confirmation",
+        message: "Confirm or dispute the submitted result.",
+        matchId: "33333333-3333-4333-8333-333333333333",
+        reportGroupId: "44444444-4444-4444-8444-444444444444",
+        registrationId: null,
+        href,
+      })
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Match result needs confirmation/i,
+      })
+    );
+
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledOnce());
+    expect(closeDisplayedNotificationsMock).toHaveBeenCalledWith({
+      notificationIds: [NOTIFICATION_ID],
+      scope: "player",
+    });
+    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+
+    finishCleanup();
+    await waitFor(() => {
+      expect(requestBadgeReconciliationMock).toHaveBeenCalledOnce();
+      expect(pushMock).toHaveBeenCalledWith(href);
+    });
   });
 });

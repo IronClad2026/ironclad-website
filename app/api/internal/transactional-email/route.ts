@@ -47,18 +47,41 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { runTransactionalEmailWorker } = await import(
-      "@/lib/transactional-email/worker"
-    );
-    const result = await runTransactionalEmailWorker();
+    const [emailModule, pushModule] = await Promise.allSettled([
+      import("@/lib/transactional-email/worker"),
+      import("@/lib/web-push/worker"),
+    ]);
+    const [emailResult, pushResult] = await Promise.allSettled([
+      emailModule.status === "fulfilled"
+        ? emailModule.value.runTransactionalEmailWorker()
+        : Promise.reject(emailModule.reason),
+      pushModule.status === "fulfilled"
+        ? pushModule.value.runWebPushWorker()
+        : Promise.reject(pushModule.reason),
+    ]);
+
+    if (
+      emailResult.status === "rejected" ||
+      pushResult.status === "rejected"
+    ) {
+      return jsonResponse({ ok: false, code: "WORKER_FAILED" }, 500);
+    }
 
     return jsonResponse({
       ok: true,
-      claimed: result.claimed,
-      sent: result.sent,
-      skipped: result.skipped,
-      retryableFailures: result.retryableFailures,
-      permanentFailures: result.permanentFailures,
+      claimed: emailResult.value.claimed,
+      sent: emailResult.value.sent,
+      skipped: emailResult.value.skipped,
+      retryableFailures: emailResult.value.retryableFailures,
+      permanentFailures: emailResult.value.permanentFailures,
+      push: {
+        enabled: pushResult.value.enabled,
+        claimed: pushResult.value.claimed,
+        sent: pushResult.value.sent,
+        skipped: pushResult.value.skipped,
+        retryableFailures: pushResult.value.retryableFailures,
+        permanentFailures: pushResult.value.permanentFailures,
+      },
     });
   } catch {
     return jsonResponse({ ok: false, code: "WORKER_FAILED" }, 500);

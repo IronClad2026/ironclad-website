@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runTransactionalEmailWorkerMock = vi.hoisted(() => vi.fn());
+const runWebPushWorkerMock = vi.hoisted(() => vi.fn());
 const workerModuleLoadedMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/transactional-email/worker", () => {
@@ -11,6 +12,10 @@ vi.mock("@/lib/transactional-email/worker", () => {
     runTransactionalEmailWorker: runTransactionalEmailWorkerMock,
   };
 });
+
+vi.mock("@/lib/web-push/worker", () => ({
+  runWebPushWorker: runWebPushWorkerMock,
+}));
 
 import {
   maxDuration,
@@ -42,6 +47,15 @@ describe("transactional email worker route", () => {
       retryableFailures: 1,
       permanentFailures: 1,
       privateIdentifier: "must-not-leak",
+    });
+    runWebPushWorkerMock.mockResolvedValue({
+      enabled: true,
+      claimed: 3,
+      sent: 2,
+      skipped: 1,
+      retryableFailures: 0,
+      permanentFailures: 0,
+      privateEndpoint: "must-not-leak",
     });
   });
 
@@ -97,8 +111,33 @@ describe("transactional email worker route", () => {
       skipped: 1,
       retryableFailures: 1,
       permanentFailures: 1,
+      push: {
+        enabled: true,
+        claimed: 3,
+        sent: 2,
+        skipped: 1,
+        retryableFailures: 0,
+        permanentFailures: 0,
+      },
     });
     expect(runTransactionalEmailWorkerMock).toHaveBeenCalledOnce();
+    expect(runWebPushWorkerMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Push failure independent from email state and returns a sanitized retryable route failure", async () => {
+    runWebPushWorkerMock.mockRejectedValueOnce(
+      new Error("https://private.push.endpoint/token")
+    );
+
+    const response = await POST(createRequest(`Bearer ${WORKER_SECRET}`));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      ok: false,
+      code: "WORKER_FAILED",
+    });
+    expect(runTransactionalEmailWorkerMock).toHaveBeenCalledOnce();
+    expectNoStore(response);
   });
 
   it("returns a sanitized no-store failure without worker details", async () => {
