@@ -67,11 +67,12 @@ const dictionary = {
     eyebrow: "重要法律更新",
     title: "请查看并接受更新后的条款",
     description:
-      "要继续使用 IronClad 的登录功能，请查看并接受 Terms of Service v1.1，并确认知悉 Privacy Policy v1.1。分析功能仍为可选项，并需单独选择。",
+      "要继续使用 IronClad 的登录功能，请查看并接受 Terms of Service v{termsVersion}，并确认知悉 Privacy Policy v{privacyVersion}。分析功能仍为可选项，并需单独选择。",
     termsLinkLabel: "阅读 Terms of Service",
     privacyLinkLabel: "阅读 Privacy Policy",
-    termsAgreement: "我接受 Terms of Service v1.1。",
-    privacyAcknowledgement: "我确认已知悉 Privacy Policy v1.1。",
+    termsAgreement: "我接受 Terms of Service v{termsVersion}。",
+    privacyAcknowledgement:
+      "我确认已知悉 Privacy Policy v{privacyVersion}。",
     continueAction: "接受并继续",
     savingAction: "正在保存接受记录…",
     signOutAction: "退出登录",

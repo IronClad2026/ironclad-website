@@ -5,9 +5,14 @@ import rawLegalSuccessorRelease from "@/content/legal-successor-release.json";
 import { legalCorpus } from "@/lib/legal-corpus-publication";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
-export const ACCOUNT_LEGAL_SUCCESSOR_VERSIONS = Object.freeze({
+export const ACCOUNT_LEGAL_CURRENT_VERSIONS = Object.freeze({
   terms: "1.1",
   privacy: "1.1",
+});
+
+export const ACCOUNT_LEGAL_NEXT_VERSIONS = Object.freeze({
+  terms: "1.1",
+  privacy: "1.2",
 });
 
 const PREVIOUS_ACCOUNT_LEGAL_VERSIONS = Object.freeze({
@@ -15,21 +20,42 @@ const PREVIOUS_ACCOUNT_LEGAL_VERSIONS = Object.freeze({
   privacy: "1.0",
 });
 const CANONICAL_LEGAL_ORIGIN = "https://www.ironcladtournaments.com";
+const PREVIEW_LEGAL_DOCUMENT_ORIGIN_ENV = "PREVIEW_LEGAL_DOCUMENT_ORIGIN";
+const VERCEL_PREVIEW_HOST_PATTERN =
+  /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app$/;
 const ACCOUNT_LEGAL_LOOKUP_TIMEOUT_MS = 4_000;
-const PREVIOUS_ACCOUNT_LEGAL_RELEASES = Object.freeze({
+const LOCKED_ACCOUNT_LEGAL_RELEASES = Object.freeze({
   terms: {
-    kind: "terms",
-    version: "1.0",
-    path: "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
-    sha256:
-      "99442282625dc7b2600475df7edc5649520d5cef64f2fcfe99f6e8e6d4d08ba1",
+    "1.0": {
+      kind: "terms",
+      version: "1.0",
+      path: "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
+      sha256:
+        "99442282625dc7b2600475df7edc5649520d5cef64f2fcfe99f6e8e6d4d08ba1",
+    },
+    "1.1": {
+      kind: "terms",
+      version: "1.1",
+      path: "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+      sha256:
+        "59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1",
+    },
   },
   privacy: {
-    kind: "privacy",
-    version: "1.0",
-    path: "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
-    sha256:
-      "cedb9cb46d2ae7bbd7328c500ca466c237afef8f11626d3095329087ec6453f0",
+    "1.0": {
+      kind: "privacy",
+      version: "1.0",
+      path: "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
+      sha256:
+        "cedb9cb46d2ae7bbd7328c500ca466c237afef8f11626d3095329087ec6453f0",
+    },
+    "1.1": {
+      kind: "privacy",
+      version: "1.1",
+      path: "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
+      sha256:
+        "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91",
+    },
   },
 } as const);
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
@@ -103,9 +129,16 @@ async function loadLegalRuntimeState(
     return anonymousRuntime();
   }
 
-  const deployedDocuments = readDeployedDocumentPair();
+  const trustedLegalOrigin = readTrustedLegalOrigin();
 
-  if (!deployedDocuments) {
+  if (!trustedLegalOrigin) {
+    console.error("Account legal gate document origin was invalid.");
+    return unavailableRuntime(userId);
+  }
+
+  const bundledDocuments = readBundledDocumentPair(trustedLegalOrigin);
+
+  if (!bundledDocuments) {
     console.error("Account legal gate deployed document set was invalid.");
     return unavailableRuntime(userId);
   }
@@ -142,14 +175,27 @@ async function loadLegalRuntimeState(
     return unavailableRuntime(userId);
   }
 
-  const documents = parseEffectiveDocumentPair(documentResult.data);
+  const documents = parseEffectiveDocumentPair(
+    documentResult.data,
+    trustedLegalOrigin
+  );
 
   if (!documents) {
     console.error("Account legal gate document set was invalid.");
     return unavailableRuntime(userId);
   }
 
-  if (!documentPairsMatch(deployedDocuments, documents)) {
+  const approvedDocuments = readApprovedDocumentPair(
+    documents.terms.version,
+    documents.privacy.version,
+    trustedLegalOrigin
+  );
+
+  if (
+    !approvedDocuments ||
+    !documentPairsMatch(approvedDocuments, documents) ||
+    !bundledPairCanServeEffectivePair(bundledDocuments, documents)
+  ) {
     console.error("Account legal gate document sources were not aligned.");
     return unavailableRuntime(userId);
   }
@@ -167,8 +213,7 @@ async function loadLegalRuntimeState(
   }
 
   if (
-    documents.terms.version !== ACCOUNT_LEGAL_SUCCESSOR_VERSIONS.terms ||
-    documents.privacy.version !== ACCOUNT_LEGAL_SUCCESSOR_VERSIONS.privacy
+    !isSupportedSuccessorVersionPair(documents.terms, documents.privacy)
   ) {
     console.error("Account legal gate encountered an unsupported document pair.");
     return unavailableRuntime(userId);
@@ -227,8 +272,8 @@ async function loadLegalRuntimeState(
   return {
     accountGate: {
       status: "required",
-      terms: presentDocument(documents.terms, deployedDocuments.terms.path),
-      privacy: presentDocument(documents.privacy, deployedDocuments.privacy.path),
+      terms: presentDocument(documents.terms, approvedDocuments.terms.path),
+      privacy: presentDocument(documents.privacy, approvedDocuments.privacy.path),
     },
     analyticsAvailable: true,
   };
@@ -252,7 +297,7 @@ function unavailableRuntime(
     : anonymousRuntime();
 }
 
-function readDeployedDocumentPair(): {
+function readBundledDocumentPair(trustedLegalOrigin: string): {
   terms: DeployedLegalDocument;
   privacy: DeployedLegalDocument;
 } | null {
@@ -274,10 +319,23 @@ function readDeployedDocumentPair(): {
       return null;
     }
 
-    const terms = parseDeployedDocument(termsCandidates[0], "terms");
-    const privacy = parseDeployedDocument(privacyCandidates[0], "privacy");
+    const terms = parseDeployedDocument(
+      termsCandidates[0],
+      "terms",
+      trustedLegalOrigin
+    );
+    const privacy = parseDeployedDocument(
+      privacyCandidates[0],
+      "privacy",
+      trustedLegalOrigin
+    );
 
-    if (!terms || !privacy || !isSupportedVersionPair(terms, privacy)) {
+    if (
+      !terms ||
+      !privacy ||
+      !isSupportedVersionPair(terms, privacy) ||
+      !runtimeManifestMatchesBundledPair(terms, privacy)
+    ) {
       return null;
     }
 
@@ -289,7 +347,8 @@ function readDeployedDocumentPair(): {
 
 function parseDeployedDocument(
   value: unknown,
-  expectedKind: "terms" | "privacy"
+  expectedKind: "terms" | "privacy",
+  trustedLegalOrigin: string
 ): DeployedLegalDocument | null {
   if (
     !isRecord(value) ||
@@ -306,7 +365,7 @@ function parseDeployedDocument(
 
   if (
     !path ||
-    !isSupportedDocumentVersion(value.version) ||
+    !isSupportedDocumentVersion(expectedKind, value.version) ||
     !release ||
     path !== release.path
   ) {
@@ -318,7 +377,7 @@ function parseDeployedDocument(
     version: value.version,
     path,
     sha256: release.sha256,
-    url: `${CANONICAL_LEGAL_ORIGIN}${path}`,
+    url: `${trustedLegalOrigin}${path}`,
   };
 }
 
@@ -326,14 +385,41 @@ function readReleaseDocument(
   expectedKind: "terms" | "privacy",
   version: string
 ): Pick<DeployedLegalDocument, "kind" | "version" | "path" | "sha256"> | null {
-  if (version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS[expectedKind]) {
-    return PREVIOUS_ACCOUNT_LEGAL_RELEASES[expectedKind];
+  const locked = readLockedReleaseDocument(expectedKind, version);
+
+  if (locked) {
+    return locked;
   }
 
-  if (version !== ACCOUNT_LEGAL_SUCCESSOR_VERSIONS[expectedKind]) {
+  if (
+    expectedKind !== "privacy" ||
+    version !== ACCOUNT_LEGAL_NEXT_VERSIONS.privacy
+  ) {
     return null;
   }
 
+  return readPrivacyV12ReleaseDocument();
+}
+
+function readLockedReleaseDocument(
+  expectedKind: "terms" | "privacy",
+  version: string
+): Pick<DeployedLegalDocument, "kind" | "version" | "path" | "sha256"> | null {
+  if (expectedKind === "terms") {
+    if (version === "1.0") return LOCKED_ACCOUNT_LEGAL_RELEASES.terms["1.0"];
+    if (version === "1.1") return LOCKED_ACCOUNT_LEGAL_RELEASES.terms["1.1"];
+    return null;
+  }
+
+  if (version === "1.0") return LOCKED_ACCOUNT_LEGAL_RELEASES.privacy["1.0"];
+  if (version === "1.1") return LOCKED_ACCOUNT_LEGAL_RELEASES.privacy["1.1"];
+  return null;
+}
+
+function readPrivacyV12ReleaseDocument(): Pick<
+  DeployedLegalDocument,
+  "kind" | "version" | "path" | "sha256"
+> | null {
   const manifest: unknown = rawLegalSuccessorRelease;
 
   if (
@@ -341,32 +427,20 @@ function readReleaseDocument(
     manifest.schemaVersion !== 1 ||
     manifest.status !== "Final" ||
     !Array.isArray(manifest.documents) ||
-    manifest.documents.length !== 2
+    manifest.documents.length !== 1
   ) {
     return null;
   }
 
-  const parsed = manifest.documents.map(parseSuccessorReleaseDocument);
-
-  if (parsed.some((document) => document === null)) {
+  const document = parsePrivacyV12ReleaseDocument(manifest.documents[0]);
+  if (!document) {
     return null;
   }
 
-  const documents = parsed as Pick<
-    DeployedLegalDocument,
-    "kind" | "version" | "path" | "sha256"
-  >[];
-  const terms = documents.filter((document) => document.kind === "terms");
-  const privacy = documents.filter((document) => document.kind === "privacy");
-
-  if (terms.length !== 1 || privacy.length !== 1) {
-    return null;
-  }
-
-  return expectedKind === "terms" ? terms[0] : privacy[0];
+  return document;
 }
 
-function parseSuccessorReleaseDocument(
+function parsePrivacyV12ReleaseDocument(
   value: unknown
 ): Pick<
   DeployedLegalDocument,
@@ -374,8 +448,8 @@ function parseSuccessorReleaseDocument(
 > | null {
   if (
     !isRecord(value) ||
-    (value.kind !== "terms" && value.kind !== "privacy") ||
-    value.version !== ACCOUNT_LEGAL_SUCCESSOR_VERSIONS[value.kind] ||
+    value.kind !== "privacy" ||
+    value.version !== ACCOUNT_LEGAL_NEXT_VERSIONS.privacy ||
     typeof value.sha256 !== "string" ||
     !SHA256_PATTERN.test(value.sha256) ||
     !isBoundedText(value.publicPath, 2_048)
@@ -385,7 +459,10 @@ function parseSuccessorReleaseDocument(
 
   const path = parseDeployedDocumentPath(value.publicPath);
 
-  if (!path) {
+  if (
+    path !==
+    "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf"
+  ) {
     return null;
   }
 
@@ -397,8 +474,103 @@ function parseSuccessorReleaseDocument(
   };
 }
 
-function isSupportedDocumentVersion(value: string): value is "1.0" | "1.1" {
-  return value === "1.0" || value === "1.1";
+function runtimeManifestMatchesBundledPair(
+  terms: Pick<DeployedLegalDocument, "version">,
+  privacy: Pick<DeployedLegalDocument, "version">
+) {
+  if (
+    terms.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.terms &&
+    privacy.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.privacy
+  ) {
+    return true;
+  }
+
+  if (
+    terms.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.terms &&
+    privacy.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.privacy
+  ) {
+    const manifest: unknown = rawLegalSuccessorRelease;
+    if (
+      !isRecord(manifest) ||
+      manifest.schemaVersion !== 1 ||
+      manifest.status !== "Final" ||
+      !Array.isArray(manifest.documents) ||
+      manifest.documents.length !== 2
+    ) {
+      return false;
+    }
+
+    const parsed = manifest.documents.map(parseCurrentReleaseDocument);
+    return (
+      parsed.every((document) => document !== null) &&
+      parsed.filter((document) => document?.kind === "terms").length === 1 &&
+      parsed.filter((document) => document?.kind === "privacy").length === 1
+    );
+  }
+
+  return (
+    terms.version === ACCOUNT_LEGAL_NEXT_VERSIONS.terms &&
+    privacy.version === ACCOUNT_LEGAL_NEXT_VERSIONS.privacy &&
+    readPrivacyV12ReleaseDocument() !== null
+  );
+}
+
+function parseCurrentReleaseDocument(
+  value: unknown
+): Pick<
+  DeployedLegalDocument,
+  "kind" | "version" | "path" | "sha256"
+> | null {
+  if (
+    !isRecord(value) ||
+    (value.kind !== "terms" && value.kind !== "privacy") ||
+    value.version !== ACCOUNT_LEGAL_CURRENT_VERSIONS[value.kind] ||
+    typeof value.sha256 !== "string" ||
+    !SHA256_PATTERN.test(value.sha256) ||
+    !isBoundedText(value.publicPath, 2_048)
+  ) {
+    return null;
+  }
+
+  const locked = readLockedReleaseDocument(value.kind, value.version);
+  const path = parseDeployedDocumentPath(value.publicPath);
+  if (!locked || path !== locked.path || value.sha256 !== locked.sha256) {
+    return null;
+  }
+
+  return locked;
+}
+
+function readApprovedDocumentPair(
+  termsVersion: string,
+  privacyVersion: string,
+  trustedLegalOrigin: string
+): { terms: DeployedLegalDocument; privacy: DeployedLegalDocument } | null {
+  if (
+    !isSupportedVersionPair(
+      { version: termsVersion },
+      { version: privacyVersion }
+    )
+  ) {
+    return null;
+  }
+
+  const terms = readReleaseDocument("terms", termsVersion);
+  const privacy = readReleaseDocument("privacy", privacyVersion);
+  if (!terms || !privacy) {
+    return null;
+  }
+
+  return {
+    terms: { ...terms, url: `${trustedLegalOrigin}${terms.path}` },
+    privacy: { ...privacy, url: `${trustedLegalOrigin}${privacy.path}` },
+  };
+}
+
+function isSupportedDocumentVersion(kind: "terms" | "privacy", value: string) {
+  return kind === "terms"
+    ? value === "1.0" || value === "1.1"
+    : value === "1.0" || value === "1.1" || value === "1.2";
 }
 
 function isSupportedVersionPair(
@@ -408,8 +580,19 @@ function isSupportedVersionPair(
   return (
     (terms.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.terms &&
       privacy.version === PREVIOUS_ACCOUNT_LEGAL_VERSIONS.privacy) ||
-    (terms.version === ACCOUNT_LEGAL_SUCCESSOR_VERSIONS.terms &&
-      privacy.version === ACCOUNT_LEGAL_SUCCESSOR_VERSIONS.privacy)
+    isSupportedSuccessorVersionPair(terms, privacy)
+  );
+}
+
+function isSupportedSuccessorVersionPair(
+  terms: Pick<DeployedLegalDocument, "version">,
+  privacy: Pick<DeployedLegalDocument, "version">
+) {
+  return (
+    (terms.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.terms &&
+      privacy.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.privacy) ||
+    (terms.version === ACCOUNT_LEGAL_NEXT_VERSIONS.terms &&
+      privacy.version === ACCOUNT_LEGAL_NEXT_VERSIONS.privacy)
   );
 }
 
@@ -424,6 +607,25 @@ function documentPairsMatch(
     deployed.privacy.url === effective.privacy.url &&
     deployed.terms.sha256 === effective.terms.sha256 &&
     deployed.privacy.sha256 === effective.privacy.sha256
+  );
+}
+
+function bundledPairCanServeEffectivePair(
+  bundled: { terms: DeployedLegalDocument; privacy: DeployedLegalDocument },
+  effective: { terms: EffectiveLegalDocument; privacy: EffectiveLegalDocument }
+) {
+  if (
+    bundled.terms.version === effective.terms.version &&
+    bundled.privacy.version === effective.privacy.version
+  ) {
+    return true;
+  }
+
+  return (
+    bundled.terms.version === ACCOUNT_LEGAL_NEXT_VERSIONS.terms &&
+    bundled.privacy.version === ACCOUNT_LEGAL_NEXT_VERSIONS.privacy &&
+    effective.terms.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.terms &&
+    effective.privacy.version === ACCOUNT_LEGAL_CURRENT_VERSIONS.privacy
   );
 }
 
@@ -451,7 +653,48 @@ function parseDeployedDocumentPath(value: string) {
   }
 }
 
-function parseCanonicalEffectiveDocumentUrl(value: string) {
+function readTrustedLegalOrigin(): string | null {
+  if (process.env.VERCEL_ENV === "production") {
+    return CANONICAL_LEGAL_ORIGIN;
+  }
+
+  const configuredOrigin = process.env[PREVIEW_LEGAL_DOCUMENT_ORIGIN_ENV];
+
+  if (!configuredOrigin) {
+    return CANONICAL_LEGAL_ORIGIN;
+  }
+
+  if (process.env.VERCEL_ENV !== "preview") {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(configuredOrigin);
+
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.port ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash ||
+      configuredOrigin !== parsed.origin ||
+      !VERCEL_PREVIEW_HOST_PATTERN.test(parsed.hostname)
+    ) {
+      return null;
+    }
+
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function parseTrustedEffectiveDocumentUrl(
+  value: string,
+  trustedLegalOrigin: string
+) {
   try {
     const url = new URL(value);
 
@@ -462,8 +705,8 @@ function parseCanonicalEffectiveDocumentUrl(value: string) {
       url.port ||
       url.search ||
       url.hash ||
-      url.origin !== CANONICAL_LEGAL_ORIGIN ||
-      value !== `${CANONICAL_LEGAL_ORIGIN}${url.pathname}`
+      url.origin !== trustedLegalOrigin ||
+      value !== `${trustedLegalOrigin}${url.pathname}`
     ) {
       return null;
     }
@@ -474,7 +717,10 @@ function parseCanonicalEffectiveDocumentUrl(value: string) {
   }
 }
 
-function parseEffectiveDocumentPair(value: unknown): {
+function parseEffectiveDocumentPair(
+  value: unknown,
+  trustedLegalOrigin: string
+): {
   terms: EffectiveLegalDocument;
   privacy: EffectiveLegalDocument;
 } | null {
@@ -482,7 +728,9 @@ function parseEffectiveDocumentPair(value: unknown): {
     return null;
   }
 
-  const parsed = value.map(parseEffectiveDocument);
+  const parsed = value.map((document) =>
+    parseEffectiveDocument(document, trustedLegalOrigin)
+  );
 
   if (parsed.some((document) => document === null)) {
     return null;
@@ -499,7 +747,10 @@ function parseEffectiveDocumentPair(value: unknown): {
   return { terms, privacy };
 }
 
-function parseEffectiveDocument(value: unknown): EffectiveLegalDocument | null {
+function parseEffectiveDocument(
+  value: unknown,
+  trustedLegalOrigin: string
+): EffectiveLegalDocument | null {
   if (
     !isRecord(value) ||
     !isUuid(value.id) ||
@@ -515,7 +766,10 @@ function parseEffectiveDocument(value: unknown): EffectiveLegalDocument | null {
     return null;
   }
 
-  const url = parseCanonicalEffectiveDocumentUrl(value.immutable_url);
+  const url = parseTrustedEffectiveDocumentUrl(
+    value.immutable_url,
+    trustedLegalOrigin
+  );
 
   if (!url) {
     return null;

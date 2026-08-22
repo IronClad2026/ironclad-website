@@ -107,7 +107,7 @@ function RequiredAcceptance({
   return (
     <>
       <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">
-        {copy.description}
+        {formatVersionedCopy(copy.description, state)}
       </p>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -142,7 +142,7 @@ function RequiredAcceptance({
               value="accepted"
               className="mt-1 h-5 w-5 shrink-0 accent-orange-500"
             />
-            <span>{copy.termsAgreement}</span>
+            <span>{formatVersionedCopy(copy.termsAgreement, state)}</span>
           </label>
           <label className="flex cursor-pointer items-start gap-3 border border-white/12 bg-white/[0.035] p-4 text-sm leading-6 text-zinc-200 transition hover:border-orange-400/40">
             <input
@@ -152,7 +152,9 @@ function RequiredAcceptance({
               value="acknowledged"
               className="mt-1 h-5 w-5 shrink-0 accent-orange-500"
             />
-            <span>{copy.privacyAcknowledgement}</span>
+            <span>
+              {formatVersionedCopy(copy.privacyAcknowledgement, state)}
+            </span>
           </label>
         </fieldset>
 
@@ -256,4 +258,10 @@ function getActionMessage(
   if (code === "acceptance-required") return copy.acceptanceRequiredError;
   if (code === "accepted") return copy.acceptedMessage;
   return copy.unavailableError;
+}
+
+function formatVersionedCopy(template: string, state: RequiredGateState) {
+  return template
+    .replaceAll("{termsVersion}", state.terms.version)
+    .replaceAll("{privacyVersion}", state.privacy.version);
 }

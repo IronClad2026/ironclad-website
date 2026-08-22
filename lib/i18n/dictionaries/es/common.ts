@@ -68,12 +68,12 @@ const dictionary = {
     eyebrow: "Actualización legal importante",
     title: "Revisa y acepta los términos actualizados",
     description:
-      "Para seguir usando las funciones de IronClad con la sesión iniciada, revisa y acepta Terms of Service v1.1 y confirma que has leído Privacy Policy v1.1. La analítica sigue siendo opcional y se elige por separado.",
+      "Para seguir usando las funciones de IronClad con la sesión iniciada, revisa y acepta Terms of Service v{termsVersion} y confirma que has leído Privacy Policy v{privacyVersion}. La analítica sigue siendo opcional y se elige por separado.",
     termsLinkLabel: "Leer Terms of Service",
     privacyLinkLabel: "Leer Privacy Policy",
-    termsAgreement: "Acepto Terms of Service v1.1.",
+    termsAgreement: "Acepto Terms of Service v{termsVersion}.",
     privacyAcknowledgement:
-      "Confirmo que he leído Privacy Policy v1.1.",
+      "Confirmo que he leído Privacy Policy v{privacyVersion}.",
     continueAction: "Aceptar y continuar",
     savingAction: "Guardando la aceptación…",
     signOutAction: "Cerrar sesión",
