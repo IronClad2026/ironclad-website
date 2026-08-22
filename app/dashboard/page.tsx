@@ -298,26 +298,38 @@ export default async function PlayerDashboardPage() {
         </section>
 
         <div className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] lg:items-start">
-          <InAppNotificationCenter
-            key={[
-              locale,
-              playerNotifications.unreadCount,
-              ...playerNotifications.notifications.map(
-                (notification) =>
-                  `${notification.id}:${notification.readAt ?? ""}`
-              ),
-            ].join("|")}
-            scope="player"
-            title={t("dashboard.notificationCenter.title")}
-            eyebrow={t("dashboard.notificationCenter.eyebrow")}
-            description={t("dashboard.notificationCenter.description")}
-            emptyMessage={t("dashboard.notificationCenter.empty")}
-            notifications={playerNotifications.notifications}
-            totalCount={playerNotifications.totalCount}
-            unreadCount={playerNotifications.unreadCount}
-            error={playerNotifications.error}
-            className="max-w-2xl !rounded-none !border-orange-500/20 !bg-black/65 !shadow-2xl !shadow-black/30 [&_button]:rounded-none [&_div]:rounded-none lg:max-w-none"
-          />
+          <div className="grid min-w-0 gap-3">
+            <InAppNotificationCenter
+              key={[
+                locale,
+                playerNotifications.unreadCount,
+                ...playerNotifications.notifications.map(
+                  (notification) =>
+                    `${notification.id}:${notification.readAt ?? ""}`
+                ),
+              ].join("|")}
+              scope="player"
+              title={t("dashboard.notificationCenter.title")}
+              eyebrow={t("dashboard.notificationCenter.eyebrow")}
+              description={t("dashboard.notificationCenter.description")}
+              emptyMessage={t("dashboard.notificationCenter.empty")}
+              notifications={playerNotifications.notifications}
+              totalCount={playerNotifications.totalCount}
+              unreadCount={playerNotifications.unreadCount}
+              error={playerNotifications.error}
+              className="max-w-2xl !rounded-none !border-orange-500/20 !bg-black/65 !shadow-2xl !shadow-black/30 [&_button]:rounded-none [&_div]:rounded-none lg:max-w-none"
+            />
+
+            <DashboardNotifications
+              key={[
+                locale,
+                ...career.notifications.map(
+                  (notification) => `${notification.id}:${notification.status}`
+                ),
+              ].join("|")}
+              notifications={career.notifications}
+            />
+          </div>
 
           {profile && (
             <div className="grid gap-5">
@@ -331,16 +343,6 @@ export default async function PlayerDashboardPage() {
             </div>
           )}
         </div>
-
-        <DashboardNotifications
-          key={[
-            locale,
-            ...career.notifications.map(
-              (notification) => `${notification.id}:${notification.status}`
-            ),
-          ].join("|")}
-          notifications={career.notifications}
-        />
 
         <div id="community-polls" className="mt-8 scroll-mt-28">
           <PollsAndDecisions

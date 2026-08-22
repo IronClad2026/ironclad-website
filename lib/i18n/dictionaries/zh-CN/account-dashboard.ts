@@ -247,8 +247,8 @@ const dictionary = {
     },
     notificationCenter: {
       eyebrow: "通知",
-      title: "通知",
-      description: "查看 IronClad 锦标赛、报名、候补名单变动和比赛结果裁定的最新动态。",
+      title: "通知中心",
+      description: "查看所有账户和锦标赛动态，包括报名、候补名单变动和比赛结果裁定。",
       empty: "锦标赛、报名和比赛动态将显示在这里。",
     },
     career: {

@@ -10,7 +10,6 @@ import {
 
 const originalMessageChannel = globalThis.MessageChannel;
 const CLOSE_RESULT_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
-const WORKER_VERSION = "android-cleanup-diagnostic-v1";
 
 describe("installed-app badge helper", () => {
   afterEach(() => {
@@ -103,16 +102,10 @@ describe("installed-app badge helper", () => {
     worker.reply(workerReply());
     await expect(cleanup).resolves.toEqual({
       status: "closed",
-      sent: 1,
-      received: 1,
       enumerated: 1,
       matched: 1,
       closed: 1,
       remaining: 0,
-      origin: "same",
-      source: "same_origin_window",
-      workerVersion: WORKER_VERSION,
-      controller: "current",
     });
     expect(settled).toBe(true);
   });
@@ -142,7 +135,7 @@ describe("installed-app badge helper", () => {
         ],
       })
     ).resolves.toEqual(
-      expect.objectContaining({ status: "invalid_request", sent: 0 })
+      expect.objectContaining({ status: "invalid_request" })
     );
 
     expect(worker.postMessage).not.toHaveBeenCalled();
@@ -160,12 +153,11 @@ describe("installed-app badge helper", () => {
     await expect(closeDisplayedIronCladNotifications()).resolves.toEqual(
       expect.objectContaining({
         status: "registration_unavailable",
-        sent: 0,
       })
     );
     const worker = installActiveWorker({ postMessageError: true });
     await expect(closeDisplayedIronCladNotifications()).resolves.toEqual(
-      expect.objectContaining({ status: "message_failed", sent: 0 })
+      expect.objectContaining({ status: "message_failed" })
     );
     expect(worker.postMessage).toHaveBeenCalledOnce();
   });
@@ -187,34 +179,10 @@ describe("installed-app badge helper", () => {
     await expect(cleanup).resolves.toEqual(
       expect.objectContaining({
         status: "message_timeout",
-        sent: 1,
-        received: 0,
       })
     );
   });
 
-  it("distinguishes an acknowledgement from a stale worker version", async () => {
-    const worker = installActiveWorker({ acknowledge: false });
-    const cleanup = closeDisplayedIronCladNotifications({ scope: "player" });
-    await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledOnce());
-
-    worker.reply({
-      type: CLOSE_RESULT_TYPE,
-      ok: true,
-      matchedCount: 1,
-      closedCount: 1,
-    });
-
-    await expect(cleanup).resolves.toEqual(
-      expect.objectContaining({
-        status: "worker_version_mismatch",
-        sent: 1,
-        received: 1,
-        workerVersion: null,
-        controller: "current",
-      })
-    );
-  });
 });
 
 class TestMessagePort {
@@ -293,16 +261,12 @@ function installActiveWorker({
 function workerReply(overrides: Record<string, unknown> = {}) {
   return {
     type: CLOSE_RESULT_TYPE,
-    workerVersion: WORKER_VERSION,
     ok: true,
     status: "closed",
-    receivedCount: 1,
     enumeratedCount: 1,
     matchedCount: 1,
     closedCount: 1,
     remainingCount: 0,
-    originStatus: "same",
-    sourceStatus: "same_origin_window",
     ...overrides,
   };
 }

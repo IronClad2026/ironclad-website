@@ -8,7 +8,6 @@ const SECOND_NOTIFICATION_ID = "22222222-2222-4222-8222-222222222222";
 const ORIGIN = "https://www.ironcladtournaments.com";
 const CLOSE_MESSAGE_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS";
 const CLOSE_RESULT_TYPE = "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
-const WORKER_VERSION = "android-cleanup-diagnostic-v1";
 
 describe("notification service worker", () => {
   it("shows a conservative notification and applies a trusted badge snapshot", async () => {
@@ -191,16 +190,12 @@ describe("notification service worker", () => {
     expect(unrelated.close).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       type: CLOSE_RESULT_TYPE,
-      workerVersion: WORKER_VERSION,
       ok: true,
       status: "closed",
-      receivedCount: 1,
       enumeratedCount: 4,
       matchedCount: 2,
       closedCount: 2,
       remainingCount: 0,
-      originStatus: "same",
-      sourceStatus: "same_origin_window",
     });
   });
 
@@ -258,16 +253,12 @@ describe("notification service worker", () => {
     expect(unrelated.close).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith({
       type: CLOSE_RESULT_TYPE,
-      workerVersion: WORKER_VERSION,
       ok: false,
       status: "remaining",
-      receivedCount: 1,
       enumeratedCount: 5,
       matchedCount: 2,
       closedCount: 1,
       remainingCount: 1,
-      originStatus: "same",
-      sourceStatus: "same_origin_window",
     });
   });
 
@@ -306,16 +297,12 @@ describe("notification service worker", () => {
     expect(worker.getNotifications).toHaveBeenCalledTimes(2);
     expect(reply).toHaveBeenCalledWith({
       type: CLOSE_RESULT_TYPE,
-      workerVersion: WORKER_VERSION,
       ok: false,
       status: "not_found",
-      receivedCount: 1,
       enumeratedCount: 0,
       matchedCount: 0,
       closedCount: 0,
       remainingCount: 0,
-      originStatus: "empty",
-      sourceStatus: "same_origin_window",
     });
   });
 
@@ -330,16 +317,12 @@ describe("notification service worker", () => {
     expect(worker.getNotifications).toHaveBeenCalledTimes(2);
     expect(reply).toHaveBeenCalledWith({
       type: CLOSE_RESULT_TYPE,
-      workerVersion: WORKER_VERSION,
       ok: true,
       status: "nothing_to_close",
-      receivedCount: 1,
       enumeratedCount: 0,
       matchedCount: 0,
       closedCount: 0,
       remainingCount: 0,
-      originStatus: "mismatch",
-      sourceStatus: "same_origin_window",
     });
   });
 
@@ -355,8 +338,6 @@ describe("notification service worker", () => {
     expect(reply).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "source_rejected",
-        originStatus: "empty",
-        sourceStatus: "cross_origin_window",
       })
     );
     expect(worker.getNotifications).not.toHaveBeenCalled();
@@ -381,16 +362,12 @@ describe("notification service worker", () => {
     expect(target.close).toHaveBeenCalledOnce();
     expect(reply).toHaveBeenCalledWith({
       type: CLOSE_RESULT_TYPE,
-      workerVersion: WORKER_VERSION,
       ok: false,
       status: "verification_failed",
-      receivedCount: 1,
       enumeratedCount: 1,
       matchedCount: 1,
       closedCount: 1,
       remainingCount: null,
-      originStatus: "same",
-      sourceStatus: "same_origin_window",
     });
   });
 });

@@ -21,7 +21,7 @@ const dictionary = {
       "Your opponent submitted a result for {tournamentName}. Reported score: {score}.",
     openToRespond: "Open the tournament to confirm or dispute",
     unknownTime: "Unknown time",
-    pushTitle: "Device notifications",
+    pushTitle: "Device alerts",
     pushDescription:
       "Allow meaningful IronClad alerts on this device. Nothing is requested until you choose Enable.",
     pushChecking: "Checking this device's notification status…",
@@ -30,6 +30,7 @@ const dictionary = {
     pushEnabling: "Enabling…",
     pushDisabling: "Disabling…",
     pushEnabled: "Notifications are enabled on this device.",
+    pushEnabledLabel: "Enabled",
     pushDisabled: "Notifications are off on this device.",
     pushBlocked:
       "Notifications are blocked in your browser or device settings.",
@@ -41,7 +42,11 @@ const dictionary = {
       "Alerts may appear on your lock screen. Keep notification previews private in your device settings.",
   },
   dashboard: {
-    title: "Notifications",
+    title: "Match Actions",
+    description:
+      "Result confirmations, disputes, rejected or resubmission items, and other actions that need your response.",
+    actionRequiredIndicator: "Action required",
+    noActionsRequired: "No actions required",
     noMessages: "No match messages",
     messageOne: "1 match message",
     messageFew: "{count} match messages",
@@ -51,8 +56,7 @@ const dictionary = {
     actionRequiredFew: "{count} require action",
     actionRequiredMany: "{count} require action",
     actionRequiredOther: "{count} require action",
-    empty:
-      "Match submissions and administrator decisions will appear here.",
+    empty: "There are no match actions waiting for your response.",
     clearSelection: "Clear selection",
     selectAll: "Select all",
     deleteSelected: "Delete selected",

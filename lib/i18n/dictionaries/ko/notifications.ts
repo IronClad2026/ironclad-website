@@ -30,6 +30,7 @@ const dictionary = {
     pushEnabling: "사용 설정 중…",
     pushDisabling: "사용 중지 중…",
     pushEnabled: "이 기기에서 알림이 사용 설정되었습니다.",
+    pushEnabledLabel: "사용 중",
     pushDisabled: "이 기기에서 알림이 꺼져 있습니다.",
     pushBlocked: "브라우저 또는 기기 설정에서 알림이 차단되었습니다.",
     pushInstallRequired:
@@ -40,7 +41,11 @@ const dictionary = {
       "알림이 잠금 화면에 표시될 수 있습니다. 기기 설정에서 알림 미리 보기의 개인정보를 보호하세요.",
   },
   dashboard: {
-    title: "알림",
+    title: "경기 조치",
+    description:
+      "결과 확인, 이의 제기, 반려 또는 재제출 항목과 응답이 필요한 기타 조치를 확인합니다.",
+    actionRequiredIndicator: "조치 필요",
+    noActionsRequired: "필요한 조치 없음",
     noMessages: "경기 메시지가 없습니다",
     messageOne: "경기 메시지 1개",
     messageFew: "경기 메시지 {count}개",
@@ -50,7 +55,7 @@ const dictionary = {
     actionRequiredFew: "조치 필요 {count}개",
     actionRequiredMany: "조치 필요 {count}개",
     actionRequiredOther: "조치 필요 {count}개",
-    empty: "경기 제출 내용과 관리자 결정이 여기에 표시됩니다.",
+    empty: "응답을 기다리는 경기 조치가 없습니다.",
     clearSelection: "선택 해제",
     selectAll: "모두 선택",
     deleteSelected: "선택 항목 삭제",

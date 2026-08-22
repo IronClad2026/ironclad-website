@@ -60,6 +60,11 @@ describe("notification permission control", () => {
     render(<NotificationPermissionControl />);
 
     await screen.findByRole("button", { name: "Enable notifications" });
+    expect(
+      screen.getByText(
+        "Allow meaningful IronClad alerts on this device. Nothing is requested until you choose Enable."
+      )
+    ).toBeInTheDocument();
     expect(browser.getRegistration).toHaveBeenCalledWith("/");
     expect(browser.register).not.toHaveBeenCalled();
     expect(browser.requestPermission).not.toHaveBeenCalled();
@@ -98,7 +103,15 @@ describe("notification permission control", () => {
       await screen.findByRole("button", { name: "Enable notifications" })
     );
 
-    await screen.findByText("Notifications are enabled on this device.");
+    await screen.findByText("Device alerts — Enabled");
+    expect(
+      screen.getByRole("button", { name: "Disable on this device" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Allow meaningful IronClad alerts on this device. Nothing is requested until you choose Enable."
+      )
+    ).not.toBeInTheDocument();
     expect(order).toEqual([
       "configuration",
       "register",
@@ -143,7 +156,7 @@ describe("notification permission control", () => {
 
     resolveConfiguration({ ok: true, vapidPublicKey: "AQID" });
 
-    await screen.findByText("Notifications are enabled on this device.");
+    await screen.findByText("Device alerts — Enabled");
     expect(saveSubscriptionMock).toHaveBeenCalledOnce();
   });
 
@@ -279,7 +292,7 @@ describe("notification permission control", () => {
       await screen.findByRole("button", { name: "Enable notifications" })
     );
 
-    await screen.findByText("Notifications are enabled on this device.");
+    await screen.findByText("Device alerts — Enabled");
     expect(order).toEqual(["unsubscribe", "close", "subscribe"]);
     expect(closeDisplayedNotificationsMock).toHaveBeenCalledOnce();
     expect(saveSubscriptionMock).toHaveBeenCalledWith(

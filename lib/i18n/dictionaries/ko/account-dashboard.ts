@@ -39,8 +39,8 @@ const dictionary = {
     },
     notificationCenter: {
       eyebrow: "알림",
-      title: "알림",
-      description: "IronClad 토너먼트, 등록, 대기 명단 변동 및 경기 결과 결정에 관한 최신 소식입니다.",
+      title: "알림 센터",
+      description: "등록, 대기 명단 변동, 경기 결과 결정을 포함한 모든 계정 및 토너먼트 업데이트입니다.",
       empty: "토너먼트, 등록 및 경기 소식이 여기에 표시됩니다.",
     },
     career: {

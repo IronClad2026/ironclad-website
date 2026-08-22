@@ -247,13 +247,21 @@ export default function NotificationPermissionControl({
   const enabled = existingSubscription !== null;
   const busy = phase === "enabling" || phase === "disabling";
   const status = getStatusCopy({ enabled, phase, t });
+  const compactEnabled =
+    enabled && (phase === "ready" || phase === "disabling");
 
   return (
     <section
-      className={`border border-white/10 bg-black/25 p-4 ${className}`}
+      className={`border border-white/10 bg-black/25 ${
+        compactEnabled ? "px-4 py-3" : "p-4"
+      } ${className}`}
       aria-label={t("center.pushTitle")}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={`flex flex-col sm:flex-row sm:items-center sm:justify-between ${
+          compactEnabled ? "gap-3" : "gap-4"
+        }`}
+      >
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             {enabled ? (
@@ -262,27 +270,47 @@ export default function NotificationPermissionControl({
               <BellOff className="h-4 w-4 text-zinc-500" aria-hidden="true" />
             )}
             <h3 className="text-sm font-black text-white">
-              {t("center.pushTitle")}
+              {compactEnabled
+                ? `${t("center.pushTitle")} — ${
+                    phase === "disabling"
+                      ? t("center.pushDisabling")
+                      : t("center.pushEnabledLabel")
+                  }`
+                : t("center.pushTitle")}
             </h3>
+            {compactEnabled && (
+              <span className="sr-only" role="status">
+                {status}
+              </span>
+            )}
           </div>
-          <p className="mt-2 text-xs leading-5 text-zinc-400">
-            {t("center.pushDescription")}
-          </p>
-          <p
-            className={`mt-2 text-xs font-semibold ${
-              phase === "error" || phase === "blocked"
-                ? "text-red-300"
-                : enabled
-                  ? "text-orange-200"
-                  : "text-zinc-500"
-            }`}
-            role={phase === "error" ? "alert" : "status"}
-          >
-            {status}
-          </p>
-          <p className="mt-2 text-[11px] leading-5 text-zinc-600">
-            {t("center.pushPrivacy")}
-          </p>
+          {!compactEnabled && (
+            <>
+              <p className="mt-2 text-xs leading-5 text-zinc-400">
+                {t("center.pushDescription")}
+              </p>
+              <p
+                className={`mt-2 text-xs font-semibold ${
+                  phase === "error" || phase === "blocked"
+                    ? "text-red-300"
+                    : enabled
+                      ? "text-orange-200"
+                      : "text-zinc-500"
+                }`}
+                role={phase === "error" ? "alert" : "status"}
+              >
+                {status}
+              </p>
+              <p className="mt-2 text-[11px] leading-5 text-zinc-600">
+                {t("center.pushPrivacy")}
+              </p>
+            </>
+          )}
+          {compactEnabled && (
+            <p className="sr-only">
+              {t("center.pushDescription")} {t("center.pushPrivacy")}
+            </p>
+          )}
         </div>
 
         {phase !== "checking" &&
@@ -294,7 +322,11 @@ export default function NotificationPermissionControl({
               enabled ? disableNotifications : enableNotifications
             }
             disabled={busy || (phase === "blocked" && !enabled)}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 border border-orange-400/40 bg-orange-500/10 px-4 py-2 text-xs font-black uppercase tracking-wider text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`inline-flex shrink-0 items-center justify-center gap-2 border border-orange-400/40 bg-orange-500/10 font-black uppercase tracking-wider text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50 ${
+              compactEnabled
+                ? "min-h-11 px-3 py-1.5 text-[10px]"
+                : "min-h-11 px-4 py-2 text-xs"
+            }`}
           >
             {busy && (
               <LoaderCircle

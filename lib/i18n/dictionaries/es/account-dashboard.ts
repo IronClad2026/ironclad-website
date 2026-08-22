@@ -286,8 +286,8 @@ const dictionary = {
     },
     notificationCenter: {
       eyebrow: "Notificaciones",
-      title: "Notificaciones",
-      description: "Novedades recientes sobre torneos, inscripciones, movimientos en la lista de espera y decisiones sobre resultados de partidas.",
+      title: "Centro de notificaciones",
+      description: "Todas las novedades de la cuenta y los torneos, incluidas inscripciones, movimientos de la lista de espera y decisiones sobre resultados.",
       empty: "Aquí aparecerán las novedades de torneos, inscripciones y partidas.",
     },
     career: {

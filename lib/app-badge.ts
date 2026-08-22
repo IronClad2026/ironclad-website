@@ -7,7 +7,6 @@ const CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE =
   "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS";
 const CLOSE_DISPLAYED_NOTIFICATIONS_RESULT =
   "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
-const CLEANUP_DIAGNOSTIC_WORKER_VERSION = "android-cleanup-diagnostic-v1";
 const CLOSE_DISPLAYED_NOTIFICATIONS_TIMEOUT_MS = 1_500;
 const MAX_CLOSE_NOTIFICATION_IDS = 100;
 const WORKER_CLEANUP_STATUSES = new Set([
@@ -35,11 +34,6 @@ type CloseDisplayedNotificationsOptions = {
   scope?: DisplayedNotificationScope;
 };
 
-type CleanupOriginStatus = "same" | "empty" | "mismatch";
-type CleanupSourceStatus =
-  | "same_origin_window"
-  | "cross_origin_window"
-  | "invalid";
 type WorkerCleanupStatus =
   | "closed"
   | "nothing_to_close"
@@ -50,7 +44,7 @@ type WorkerCleanupStatus =
   | "verification_failed"
   | "source_rejected";
 
-export type DisplayedNotificationCleanupDiagnostic = {
+export type DisplayedNotificationCleanupResult = {
   status:
     | WorkerCleanupStatus
     | "unsupported"
@@ -58,32 +52,21 @@ export type DisplayedNotificationCleanupDiagnostic = {
     | "registration_unavailable"
     | "worker_unavailable"
     | "message_failed"
-    | "message_timeout"
-    | "worker_version_mismatch";
-  sent: 0 | 1;
-  received: 0 | 1;
+    | "message_timeout";
   enumerated: number | null;
   matched: number | null;
   closed: number | null;
   remaining: number | null;
-  origin: CleanupOriginStatus | null;
-  source: CleanupSourceStatus | null;
-  workerVersion: string | null;
-  controller: "current" | "different" | "none" | null;
 };
 
 type WorkerCleanupResult = {
   type: typeof CLOSE_DISPLAYED_NOTIFICATIONS_RESULT;
-  workerVersion: typeof CLEANUP_DIAGNOSTIC_WORKER_VERSION;
   ok: boolean;
   status: WorkerCleanupStatus;
-  receivedCount: 1;
   enumeratedCount: number | null;
   matchedCount: number | null;
   closedCount: number | null;
   remainingCount: number | null;
-  originStatus: CleanupOriginStatus;
-  sourceStatus: CleanupSourceStatus;
 };
 
 export async function applyAuthoritativeAppBadge(
@@ -135,7 +118,7 @@ export function requestNotificationBadgeReconciliation() {
 
 export async function closeDisplayedIronCladNotifications(
   options: CloseDisplayedNotificationsOptions = {}
-): Promise<DisplayedNotificationCleanupDiagnostic> {
+): Promise<DisplayedNotificationCleanupResult> {
   if (
     typeof navigator === "undefined" ||
     !("serviceWorker" in navigator) ||
@@ -174,13 +157,8 @@ export async function closeDisplayedIronCladNotifications(
     return pageCleanupResult("worker_unavailable");
   }
 
-  const controller = serviceWorkers.controller
-    ? serviceWorkers.controller === matchingRegistration.active
-      ? "current"
-      : "different"
-    : "none";
   try {
-    const result = await requestServiceWorkerNotificationCleanup(
+    return await requestServiceWorkerNotificationCleanup(
       matchingRegistration.active,
       {
         type: CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE,
@@ -188,11 +166,10 @@ export async function closeDisplayedIronCladNotifications(
         ...(options.scope ? { scope: options.scope } : {}),
       }
     );
-    return { ...result, controller };
   } catch {
     // Persistent-notification cleanup is best effort. The durable database
     // mutation and authoritative badge reconciliation must remain successful.
-    return pageCleanupResult("message_failed", { controller });
+    return pageCleanupResult("message_failed");
   }
 }
 
@@ -203,12 +180,12 @@ async function requestServiceWorkerNotificationCleanup(
     notificationIds?: string[];
     scope?: DisplayedNotificationScope;
   }
-): Promise<DisplayedNotificationCleanupDiagnostic> {
+): Promise<DisplayedNotificationCleanupResult> {
   const channel = new MessageChannel();
 
-  return new Promise<DisplayedNotificationCleanupDiagnostic>((resolve) => {
+  return new Promise<DisplayedNotificationCleanupResult>((resolve) => {
     let settled = false;
-    const finish = (result: DisplayedNotificationCleanupDiagnostic) => {
+    const finish = (result: DisplayedNotificationCleanupResult) => {
       if (settled) {
         return;
       }
@@ -220,24 +197,17 @@ async function requestServiceWorkerNotificationCleanup(
       resolve(result);
     };
     const timeoutId = setTimeout(
-      () => finish(pageCleanupResult("message_timeout", { sent: 1 })),
+      () => finish(pageCleanupResult("message_timeout")),
       CLOSE_DISPLAYED_NOTIFICATIONS_TIMEOUT_MS
     );
 
     channel.port1.onmessage = (event: MessageEvent<unknown>) => {
       if (isCloseDisplayedNotificationsResult(event.data)) {
         finish(workerCleanupResult(event.data));
-      } else if (isCloseDisplayedNotificationsResultEnvelope(event.data)) {
-        finish(
-          pageCleanupResult("worker_version_mismatch", {
-            sent: 1,
-            received: 1,
-          })
-        );
       }
     };
     channel.port1.onmessageerror = () =>
-      finish(pageCleanupResult("message_failed", { sent: 1 }));
+      finish(pageCleanupResult("message_failed"));
     channel.port1.start();
 
     try {
@@ -259,11 +229,9 @@ function isCloseDisplayedNotificationsResult(
   const result = value as Record<string, unknown>;
   return (
     result.type === CLOSE_DISPLAYED_NOTIFICATIONS_RESULT &&
-    result.workerVersion === CLEANUP_DIAGNOSTIC_WORKER_VERSION &&
     typeof result.ok === "boolean" &&
     typeof result.status === "string" &&
     WORKER_CLEANUP_STATUSES.has(result.status) &&
-    result.receivedCount === 1 &&
     hasConsistentCleanupCounts(result) &&
     isNullableNonNegativeSafeInteger(result.enumeratedCount) &&
     isNullableNonNegativeSafeInteger(result.matchedCount) &&
@@ -271,22 +239,7 @@ function isCloseDisplayedNotificationsResult(
     (result.closedCount === null ||
       (result.matchedCount !== null &&
         Number(result.closedCount) <= Number(result.matchedCount))) &&
-    isNullableNonNegativeSafeInteger(result.remainingCount) &&
-    (result.originStatus === "same" ||
-      result.originStatus === "empty" ||
-      result.originStatus === "mismatch") &&
-    (result.sourceStatus === "same_origin_window" ||
-      result.sourceStatus === "cross_origin_window" ||
-      result.sourceStatus === "invalid")
-  );
-}
-
-function isCloseDisplayedNotificationsResultEnvelope(value: unknown) {
-  return (
-    Boolean(value) &&
-    typeof value === "object" &&
-    (value as Record<string, unknown>).type ===
-      CLOSE_DISPLAYED_NOTIFICATIONS_RESULT
+    isNullableNonNegativeSafeInteger(result.remainingCount)
   );
 }
 
@@ -318,41 +271,29 @@ function isNullableNonNegativeSafeInteger(value: unknown) {
 
 function workerCleanupResult(
   result: WorkerCleanupResult
-): DisplayedNotificationCleanupDiagnostic {
+): DisplayedNotificationCleanupResult {
   return {
     status: result.status,
-    sent: 1,
-    received: result.receivedCount,
     enumerated: result.enumeratedCount,
     matched: result.matchedCount,
     closed: result.closedCount,
     remaining: result.remainingCount,
-    origin: result.originStatus,
-    source: result.sourceStatus,
-    workerVersion: result.workerVersion,
-    controller: null,
   };
 }
 
 function pageCleanupResult(
   status: Exclude<
-    DisplayedNotificationCleanupDiagnostic["status"],
+    DisplayedNotificationCleanupResult["status"],
     WorkerCleanupStatus
   >,
-  overrides: Partial<DisplayedNotificationCleanupDiagnostic> = {}
-): DisplayedNotificationCleanupDiagnostic {
+  overrides: Partial<DisplayedNotificationCleanupResult> = {}
+): DisplayedNotificationCleanupResult {
   return {
     status,
-    sent: 0,
-    received: 0,
     enumerated: null,
     matched: null,
     closed: null,
     remaining: null,
-    origin: null,
-    source: null,
-    workerVersion: null,
-    controller: null,
     ...overrides,
   };
 }

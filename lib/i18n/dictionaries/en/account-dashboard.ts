@@ -278,9 +278,9 @@ const dictionary = {
     },
     notificationCenter: {
       eyebrow: "Notifications",
-      title: "Notifications",
+      title: "Notification Center",
       description:
-        "Recent IronClad updates for Tournaments, Registrations, waitlist movement, and Match-result decisions.",
+        "All account and Tournament updates, including Registrations, waitlist movement, and Match-result decisions.",
       empty: "Tournament, Registration, and Match updates will appear here.",
     },
     career: {

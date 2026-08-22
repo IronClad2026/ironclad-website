@@ -8,7 +8,6 @@ const CLOSE_DISPLAYED_NOTIFICATIONS_MESSAGE =
   "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS";
 const CLOSE_DISPLAYED_NOTIFICATIONS_RESULT =
   "IRONCLAD_CLOSE_DISPLAYED_NOTIFICATIONS_RESULT";
-const CLEANUP_DIAGNOSTIC_WORKER_VERSION = "android-cleanup-diagnostic-v1";
 const MAX_TITLE_LENGTH = 80;
 const MAX_BODY_LENGTH = 180;
 const MAX_UNREAD_COUNT = 999_999;
@@ -59,18 +58,14 @@ self.addEventListener("message", (event) => {
     return;
   }
 
-  const sourceValidation = validateCloseMessageSource(event);
-  if (!sourceValidation.ok) {
+  if (!isValidCloseMessageSource(event)) {
     postCloseDisplayedNotificationsResult(responsePort, {
       ok: false,
-      status: sourceValidation.status,
-      receivedCount: 1,
+      status: "source_rejected",
       enumeratedCount: null,
       matchedCount: null,
       closedCount: null,
       remainingCount: null,
-      originStatus: sourceValidation.originStatus,
-      sourceStatus: sourceValidation.sourceStatus,
     });
     return;
   }
@@ -80,71 +75,40 @@ self.addEventListener("message", (event) => {
       .then((result) => {
         postCloseDisplayedNotificationsResult(responsePort, {
           ...result,
-          receivedCount: 1,
-          originStatus: sourceValidation.originStatus,
-          sourceStatus: sourceValidation.sourceStatus,
         });
       })
       .catch(() => {
         postCloseDisplayedNotificationsResult(responsePort, {
           ok: false,
           status: "enumeration_failed",
-          receivedCount: 1,
           enumeratedCount: null,
           matchedCount: null,
           closedCount: null,
           remainingCount: null,
-          originStatus: sourceValidation.originStatus,
-          sourceStatus: sourceValidation.sourceStatus,
         });
       })
   );
 });
 
-function validateCloseMessageSource(event) {
-  const originStatus =
-    event.origin === self.location.origin
-      ? "same"
-      : event.origin === ""
-        ? "empty"
-        : "mismatch";
+function isValidCloseMessageSource(event) {
   const source = event.source;
   if (
     !source ||
     source.type !== "window" ||
     typeof source.url !== "string"
   ) {
-    return {
-      ok: false,
-      status: "source_rejected",
-      originStatus,
-      sourceStatus: "invalid",
-    };
+    return false;
   }
 
   try {
     if (new URL(source.url).origin !== self.location.origin) {
-      return {
-        ok: false,
-        status: "source_rejected",
-        originStatus,
-        sourceStatus: "cross_origin_window",
-      };
+      return false;
     }
   } catch {
-    return {
-      ok: false,
-      status: "source_rejected",
-      originStatus,
-      sourceStatus: "invalid",
-    };
+    return false;
   }
 
-  return {
-    ok: true,
-    originStatus,
-    sourceStatus: "same_origin_window",
-  };
+  return true;
 }
 
 function readPushPayload(data) {
@@ -347,28 +311,21 @@ function postCloseDisplayedNotificationsResult(
   {
     ok,
     status,
-    receivedCount,
     enumeratedCount,
     matchedCount,
     closedCount,
     remainingCount,
-    originStatus,
-    sourceStatus,
   }
 ) {
   try {
     responsePort.postMessage({
       type: CLOSE_DISPLAYED_NOTIFICATIONS_RESULT,
-      workerVersion: CLEANUP_DIAGNOSTIC_WORKER_VERSION,
       ok,
       status,
-      receivedCount,
       enumeratedCount,
       matchedCount,
       closedCount,
       remainingCount,
-      originStatus,
-      sourceStatus,
     });
   } catch {
     // The page may have navigated after its bounded acknowledgement window.

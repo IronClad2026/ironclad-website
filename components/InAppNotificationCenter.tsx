@@ -42,11 +42,7 @@ import type {
 import {
   closeDisplayedIronCladNotifications,
   requestNotificationBadgeReconciliation,
-  type DisplayedNotificationCleanupDiagnostic,
 } from "@/lib/app-badge";
-
-const CLEANUP_DIAGNOSTIC_SESSION_KEY =
-  "ironclad:android-cleanup-diagnostic-v1";
 
 type InAppNotificationCenterProps = {
   scope: NotificationScope;
@@ -96,9 +92,6 @@ export default function InAppNotificationCenter({
     Set<string>
   >(new Set());
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [cleanupDiagnostic, setCleanupDiagnostic] = useState<string | null>(
-    null
-  );
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const t = useOptionalTranslations(
@@ -140,24 +133,6 @@ export default function InAppNotificationCenter({
   const displayUnreadCount = unreadCount + matchActionNotifications.length;
   const visibleError = mutationError ?? error;
 
-  useEffect(() => {
-    if (!isVercelPreview()) {
-      return;
-    }
-
-    const restoreDiagnostic = window.setTimeout(() => {
-      try {
-        setCleanupDiagnostic(
-          window.sessionStorage.getItem(CLEANUP_DIAGNOSTIC_SESSION_KEY)
-        );
-      } catch {
-        // The diagnostic remains visible until refresh when storage is blocked.
-      }
-    }, 0);
-
-    return () => window.clearTimeout(restoreDiagnostic);
-  }, []);
-
   const reconcileAuthoritativeUnreadCount = async (
     nextUnreadCount: number,
     cleanup: {
@@ -166,19 +141,7 @@ export default function InAppNotificationCenter({
     }
   ) => {
     setUnreadCount(nextUnreadCount);
-    const showCleanupDiagnostic = isVercelPreview();
-    if (showCleanupDiagnostic) {
-      clearStoredCleanupDiagnostic();
-      setCleanupDiagnostic(null);
-    }
-    const cleanupResult = await closeDisplayedIronCladNotifications(
-      cleanup
-    ).catch(() => null);
-    if (cleanupResult && showCleanupDiagnostic) {
-      const formattedDiagnostic = formatCleanupDiagnostic(cleanupResult);
-      setCleanupDiagnostic(formattedDiagnostic);
-      storeCleanupDiagnostic(formattedDiagnostic);
-    }
+    await closeDisplayedIronCladNotifications(cleanup).catch(() => undefined);
     requestNotificationBadgeReconciliation();
   };
 
@@ -562,17 +525,6 @@ export default function InAppNotificationCenter({
         />
       </button>
 
-      {cleanupDiagnostic && (
-        <p
-          role="status"
-          aria-live="polite"
-          data-testid="notification-cleanup-diagnostic"
-          className="mx-4 mb-4 rounded-xl border border-sky-400/25 bg-sky-500/10 px-3 py-2 font-mono text-[10px] leading-5 text-sky-200 sm:mx-5"
-        >
-          {cleanupDiagnostic}
-        </p>
-      )}
-
       <AnimatePresence initial={false}>
         {playerExpanded && (
           <motion.div
@@ -659,47 +611,6 @@ export default function InAppNotificationCenter({
       </AnimatePresence>
     </section>
   );
-}
-
-function formatCleanupDiagnostic(
-  diagnostic: DisplayedNotificationCleanupDiagnostic
-) {
-  return [
-    `Cleanup diagnostic: status=${diagnostic.status}`,
-    `sent=${diagnostic.sent}`,
-    `received=${diagnostic.received}`,
-    `enumerated=${diagnostic.enumerated ?? "n/a"}`,
-    `matched=${diagnostic.matched ?? "n/a"}`,
-    `closed=${diagnostic.closed ?? "n/a"}`,
-    `remaining=${diagnostic.remaining ?? "n/a"}`,
-    `origin=${diagnostic.origin ?? "n/a"}`,
-    `source=${diagnostic.source ?? "n/a"}`,
-    `controller=${diagnostic.controller ?? "n/a"}`,
-    `worker=${diagnostic.workerVersion ?? "n/a"}`,
-  ].join(" ");
-}
-
-function isVercelPreview() {
-  return (
-    typeof window !== "undefined" &&
-    window.location.hostname.toLowerCase().endsWith(".vercel.app")
-  );
-}
-
-function storeCleanupDiagnostic(diagnostic: string) {
-  try {
-    window.sessionStorage.setItem(CLEANUP_DIAGNOSTIC_SESSION_KEY, diagnostic);
-  } catch {
-    // Preview diagnostics are best effort and never affect durable truth.
-  }
-}
-
-function clearStoredCleanupDiagnostic() {
-  try {
-    window.sessionStorage.removeItem(CLEANUP_DIAGNOSTIC_SESSION_KEY);
-  } catch {
-    // Preview diagnostics are best effort and never affect durable truth.
-  }
 }
 
 function BulkActionBar({

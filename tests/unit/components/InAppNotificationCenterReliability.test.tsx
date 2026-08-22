@@ -16,18 +16,12 @@ const markSelectedMock = vi.hoisted(() => vi.fn());
 const requestBadgeReconciliationMock = vi.hoisted(() => vi.fn());
 const closeDisplayedNotificationsMock = vi.hoisted(() => vi.fn());
 const dismissDashboardNotificationsMock = vi.hoisted(() => vi.fn());
-const cleanupDiagnostic = {
+const cleanupResult = {
   status: "closed",
-  sent: 1,
-  received: 1,
   enumerated: 1,
   matched: 1,
   closed: 1,
   remaining: 0,
-  origin: "same",
-  source: "same_origin_window",
-  workerVersion: "android-cleanup-diagnostic-v1",
-  controller: "current",
 } as const;
 
 vi.mock("next/navigation", () => ({
@@ -128,7 +122,7 @@ describe("notification-center mutation reliability", () => {
     markAllMock.mockResolvedValue({ ok: true, unreadCount: 0 });
     markReadMock.mockResolvedValue({ ok: true, unreadCount: 2 });
     markSelectedMock.mockResolvedValue({ ok: true, unreadCount: 0 });
-    closeDisplayedNotificationsMock.mockResolvedValue(cleanupDiagnostic);
+    closeDisplayedNotificationsMock.mockResolvedValue(cleanupResult);
     dismissDashboardNotificationsMock.mockResolvedValue({ status: "success" });
   });
 

@@ -66,7 +66,7 @@ describe("Phase 7 terminal recovery copy", () => {
     );
     expect(dashboardSource).toContain('t("dashboard.notificationCenter.empty")');
     expect(accountDashboardEnglish.dashboard.notificationCenter.description).toBe(
-      "Recent IronClad updates for Tournaments, Registrations, waitlist movement, and Match-result decisions."
+      "All account and Tournament updates, including Registrations, waitlist movement, and Match-result decisions."
     );
     expect(accountDashboardEnglish.dashboard.notificationCenter.empty).toBe(
       "Tournament, Registration, and Match updates will appear here."
