@@ -68,12 +68,12 @@ const dictionary = {
     eyebrow: "Mise à jour juridique importante",
     title: "Consultez et acceptez les conditions mises à jour",
     description:
-      "Pour continuer à utiliser les fonctionnalités d’IronClad après connexion, consultez et acceptez Terms of Service v1.1, puis confirmez avoir pris connaissance de Privacy Policy v1.1. L’analyse reste facultative et fait l’objet d’un choix distinct.",
+      "Pour continuer à utiliser les fonctionnalités d’IronClad après connexion, consultez et acceptez Terms of Service v{termsVersion}, puis confirmez avoir pris connaissance de Privacy Policy v{privacyVersion}. L’analyse reste facultative et fait l’objet d’un choix distinct.",
     termsLinkLabel: "Lire Terms of Service",
     privacyLinkLabel: "Lire Privacy Policy",
-    termsAgreement: "J’accepte Terms of Service v1.1.",
+    termsAgreement: "J’accepte Terms of Service v{termsVersion}.",
     privacyAcknowledgement:
-      "Je confirme avoir pris connaissance de Privacy Policy v1.1.",
+      "Je confirme avoir pris connaissance de Privacy Policy v{privacyVersion}.",
     continueAction: "Accepter et continuer",
     savingAction: "Enregistrement de l’acceptation…",
     signOutAction: "Se déconnecter",

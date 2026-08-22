@@ -4,8 +4,16 @@ import { anonymousIdentity, playerIdentity } from "@/tests/fixtures/auth";
 const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const legalCorpusMock = vi.hoisted(() => ({ documents: [] as unknown[] }));
+const legalSuccessorReleaseMock = vi.hoisted(() => ({
+  schemaVersion: 1,
+  status: "Final",
+  documents: [] as unknown[],
+}));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/content/legal-successor-release.json", () => ({
+  default: legalSuccessorReleaseMock,
+}));
 vi.mock("@/lib/legal-corpus-publication", () => ({
   legalCorpus: legalCorpusMock,
 }));
@@ -21,7 +29,13 @@ import {
 const TERMS_ID = "11111111-1111-4111-8111-111111111111";
 const PRIVACY_ID = "22222222-2222-4222-8222-222222222222";
 const ACCEPTANCE_ID = "33333333-3333-4333-8333-333333333333";
+const PRIVACY_V12_ID = "44444444-4444-4444-8444-444444444444";
 const LEGAL_LOOKUP_TIMEOUT_MS = 4_000;
+const PREVIEW_LEGAL_ORIGIN =
+  "https://ironclad-website-legal-release.vercel.app";
+const originalVercelEnvironment = process.env.VERCEL_ENV;
+const originalPreviewLegalOrigin =
+  process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN;
 const RELEASE_HASHES = {
   terms: {
     "1.0":
@@ -57,30 +71,42 @@ function setDeployedDocumentPair(termsVersion: string, privacyVersion: string) {
     deployedDocument("terms", termsVersion),
     deployedDocument("privacy", privacyVersion),
   ];
+
+  legalSuccessorReleaseMock.documents =
+    termsVersion === "1.1" && privacyVersion === "1.2"
+      ? [releaseDocument("privacy", "1.2")]
+      : [releaseDocument("terms", "1.1"), releaseDocument("privacy", "1.1")];
 }
 
-function documentRows(termsVersion: string, privacyVersion: string) {
+function releaseDocument(kind: "terms" | "privacy", version: string) {
+  return {
+    kind,
+    version,
+    publicPath: documentPath(kind, version),
+    sha256: documentHash(kind, version),
+  };
+}
+
+function documentRows(
+  termsVersion: string,
+  privacyVersion: string,
+  origin = "https://www.ironcladtournaments.com"
+) {
   return [
     {
       id: TERMS_ID,
       document_kind: "terms",
       version: termsVersion,
-      immutable_url: `https://www.ironcladtournaments.com${documentPath(
-        "terms",
-        termsVersion
-      )}`,
+      immutable_url: `${origin}${documentPath("terms", termsVersion)}`,
       status: "effective",
       effective_at: "2026-08-19T00:00:00.000Z",
       sha256: documentHash("terms", termsVersion),
     },
     {
-      id: PRIVACY_ID,
+      id: privacyVersion === "1.2" ? PRIVACY_V12_ID : PRIVACY_ID,
       document_kind: "privacy",
       version: privacyVersion,
-      immutable_url: `https://www.ironcladtournaments.com${documentPath(
-        "privacy",
-        privacyVersion
-      )}`,
+      immutable_url: `${origin}${documentPath("privacy", privacyVersion)}`,
       status: "effective",
       effective_at: "2026-08-19T00:00:00.000Z",
       sha256: documentHash("privacy", privacyVersion),
@@ -94,6 +120,18 @@ function documentHash(kind: "terms" | "privacy", version: string) {
   }
 
   return "a".repeat(64);
+}
+
+function restoreEnvironmentVariable(
+  name: string,
+  value: string | undefined
+) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
 }
 
 function clientFixture({
@@ -142,6 +180,11 @@ describe("account legal acceptance gate loader", () => {
   });
 
   afterEach(() => {
+    restoreEnvironmentVariable("VERCEL_ENV", originalVercelEnvironment);
+    restoreEnvironmentVariable(
+      "PREVIEW_LEGAL_DOCUMENT_ORIGIN",
+      originalPreviewLegalOrigin
+    );
     vi.useRealTimers();
   });
 
@@ -167,6 +210,184 @@ describe("account legal acceptance gate loader", () => {
       analyticsAvailable: true,
     });
     expect(fixture.from).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts one exact configured immutable Preview origin for Staging", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = PREVIEW_LEGAL_ORIGIN;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({
+      documents: documentRows("1.1", "1.1", PREVIEW_LEGAL_ORIGIN),
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toMatchObject({
+      status: "required",
+      terms: { version: "1.1" },
+      privacy: { version: "1.1" },
+    });
+  });
+
+  it("does not let a configured Preview origin weaken Production", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = PREVIEW_LEGAL_ORIGIN;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({ documents: documentRows("1.1", "1.1") });
+
+    await expect(loadAccountLegalGateState()).resolves.toMatchObject({
+      status: "required",
+    });
+  });
+
+  it("rejects Preview-origin legal rows in Production", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = PREVIEW_LEGAL_ORIGIN;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({
+      documents: documentRows("1.1", "1.1", PREVIEW_LEGAL_ORIGIN),
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
+  });
+
+  it.each([
+    "http://ironclad-website-legal-release.vercel.app",
+    "https://ironclad-website-legal-release.vercel.app/",
+    "https://nested.ironclad-website-legal-release.vercel.app",
+    "https://www.ironcladtournaments.com",
+    "https://ironclad-website-legal-release.vercel.app:8443",
+    "https://ironclad-website-legal-release.vercel.app/path",
+  ])("fails closed for an invalid configured Preview legal origin: %s", async (origin) => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = origin;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a different Preview origin than the configured immutable release", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.PREVIEW_LEGAL_DOCUMENT_ORIGIN = PREVIEW_LEGAL_ORIGIN;
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({
+      documents: documentRows(
+        "1.1",
+        "1.1",
+        "https://ironclad-website-other-release.vercel.app"
+      ),
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
+  });
+
+  it("keeps the current pair satisfied while a non-effective Privacy v1.2 draft exists", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    const fixture = clientFixture({
+      documents: documentRows("1.1", "1.1"),
+      acceptance: {
+        id: ACCEPTANCE_ID,
+        terms_document_id: TERMS_ID,
+        privacy_document_id: PRIVACY_ID,
+        terms_accepted: true,
+        privacy_acknowledged: true,
+      },
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "satisfied",
+    });
+    expect(fixture.documentQuery.eq).toHaveBeenCalledWith(
+      "status",
+      "effective"
+    );
+  });
+
+  it("supports deploying the v1.2-compatible application before activation", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.2");
+    clientFixture({
+      documents: documentRows("1.1", "1.1"),
+      acceptance: {
+        id: ACCEPTANCE_ID,
+        terms_document_id: TERMS_ID,
+        privacy_document_id: PRIVACY_ID,
+        terms_accepted: true,
+        privacy_acknowledged: true,
+      },
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "satisfied",
+    });
+  });
+
+  it("requires exact new evidence when Privacy v1.2 becomes Effective", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.2");
+    const fixture = clientFixture({ documents: documentRows("1.1", "1.2") });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "required",
+      terms: {
+        id: TERMS_ID,
+        version: "1.1",
+        url: documentPath("terms", "1.1"),
+      },
+      privacy: {
+        id: PRIVACY_V12_ID,
+        version: "1.2",
+        url: documentPath("privacy", "1.2"),
+      },
+    });
+    expect(fixture.acceptanceQuery.eq).toHaveBeenCalledWith(
+      "terms_document_id",
+      TERMS_ID
+    );
+    expect(fixture.acceptanceQuery.eq).toHaveBeenCalledWith(
+      "privacy_document_id",
+      PRIVACY_V12_ID
+    );
+  });
+
+  it("satisfies the v1.2 gate only with exact v1.1/v1.2 evidence", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.2");
+    clientFixture({
+      documents: documentRows("1.1", "1.2"),
+      acceptance: {
+        id: ACCEPTANCE_ID,
+        terms_document_id: TERMS_ID,
+        privacy_document_id: PRIVACY_V12_ID,
+        terms_accepted: true,
+        privacy_acknowledged: true,
+      },
+    });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "satisfied",
+    });
+  });
+
+  it("fails closed when an old application observes the new Effective pair", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+    setDeployedDocumentPair("1.1", "1.1");
+    clientFixture({ documents: documentRows("1.1", "1.2") });
+
+    await expect(loadAccountLegalGateState()).resolves.toEqual({
+      status: "unavailable",
+    });
   });
 
   it.each([
