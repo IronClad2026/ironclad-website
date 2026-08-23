@@ -20,13 +20,26 @@ vi.mock("@/lib/supabase-server", () => ({
 
 import { savePlayerProfile } from "@/app/profile/actions";
 
-function createProfileClient(options?: { uploadError?: unknown }) {
+type ExistingProfile = {
+  avatar_url: string;
+  id: string;
+  steam_username: string;
+};
+
+function createProfileClient(options?: {
+  uploadError?: unknown;
+  existingProfile?: ExistingProfile | null;
+}) {
+  const existingProfile =
+    options && "existingProfile" in options
+      ? options.existingProfile
+      : {
+          avatar_url: "/api/players/player-existing/avatar",
+          id: "player-existing",
+          steam_username: "Synced Steam 名 ✨",
+        };
   const maybeSingle = vi.fn(async () => ({
-    data: {
-      avatar_url: "/api/players/player-existing/avatar",
-      id: "player-existing",
-      steam_username: "Synced Steam 名 ✨",
-    },
+    data: existingProfile,
     error: null,
   }));
   const eq = vi.fn(() => ({ maybeSingle }));
@@ -133,6 +146,7 @@ describe("profile save validation and Steam identity regression", () => {
       id: "player-existing",
       discord_username: "test-discord",
     });
+    expect(profileUpdate).not.toHaveProperty("public_profile_enabled");
     expect(profileUpdate).not.toHaveProperty("discord_public_enabled");
     for (const protectedField of [
       "steam_username",
@@ -152,6 +166,35 @@ describe("profile save validation and Steam identity regression", () => {
     expect(fixture.select).toHaveBeenCalledWith("id");
     expect(options).toEqual({ onConflict: "clerk_user_id" });
     expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
+  });
+
+  it("leaves first-profile visibility to the private database default", async () => {
+    const fixture = createProfileClient({ existingProfile: null });
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(fixture.client);
+
+    await expect(
+      savePlayerProfile(
+        {
+          status: "idle",
+          message: "",
+          errors: {},
+        },
+        createValidProfileForm()
+      )
+    ).resolves.toMatchObject({ status: "success" });
+
+    expect(fixture.upsert).toHaveBeenCalledOnce();
+    const [profileInsert, options] = fixture.upsert.mock.calls[0];
+
+    expect(profileInsert).toMatchObject({
+      clerk_user_id: playerIdentity.userId,
+      discord_username: "test-discord",
+    });
+    expect(profileInsert.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
+    expect(profileInsert).not.toHaveProperty("public_profile_enabled");
+    expect(options).toEqual({ onConflict: "clerk_user_id" });
   });
 
   it("allows Discord to be cleared and neutralizes public visibility", async () => {
