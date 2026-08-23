@@ -35,7 +35,7 @@ const dictionary = {
       oneVOne: {
         eyebrow: "Compétition individuelle", title: "Règles 1V1",
         description: "Les tournois de lancement IronClad sont des événements CoH3 1v1 gratuits, avec des divisions distinctes de huit joueurs : Academy, Challenge et Main / Pro. Les quarts et demi-finales sont en BO3 ; la grande finale est en BO5.",
-        document: "Règlement v3.0",
+        document: "Règlement v3.1",
       },
       rankings: {
         eyebrow: "Palmarès compétitif", title: "Classements et saisons",
@@ -45,7 +45,7 @@ const dictionary = {
       conduct: {
         eyebrow: "Accord du joueur", title: "PPA et conduite",
         description: "Le PPA régit l’éligibilité, la propriété des comptes, la conduite, la coopération en matière de preuves, les obligations relatives à la vie privée, les sanctions, les médias et les prix conditionnels. La procédure détaillée des parties reste définie dans le Règlement.",
-        document: "PPA v3.0",
+        document: "PPA v3.1",
       },
     },
     quick: {

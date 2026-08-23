@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+import {
+  getLegalDocument,
+  getLegalDocumentEffectiveDateDisplay,
+} from "../lib/legal-corpus-publication";
+
 const publicRoutes = [
   "/",
   "/about",
@@ -8,12 +13,17 @@ const publicRoutes = [
   "/privacy",
   "/rankings",
 ];
+const localHostnames = new Set(["127.0.0.1", "localhost", "::1"]);
+const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.trim();
+const externalBaseOrigin = externalBaseUrl
+  ? new URL(externalBaseUrl).origin
+  : null;
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
 
-    if (["127.0.0.1", "localhost", "::1"].includes(url.hostname)) {
+    if (localHostnames.has(url.hostname) || url.origin === externalBaseOrigin) {
       await route.continue();
       return;
     }
@@ -63,6 +73,9 @@ test("Home presents the native 1v1 competition path", async ({ page }) => {
 test("Rules exposes the approved categories, document status, and accessible FAQ", async ({
   page,
 }) => {
+  const rulebook = getLegalDocument("rulebook");
+  const ppa = getLegalDocument("ppa");
+
   await page.goto("/rules", { waitUntil: "domcontentloaded" });
 
   await expect(
@@ -74,6 +87,10 @@ test("Rules exposes the approved categories, document status, and accessible FAQ
     name: /RANKINGS & SEASONS/,
   });
   const ppaTab = page.getByRole("tab", { name: /PPA & CONDUCT/ });
+
+  await expect(oneVOneTab).toContainText(`v${rulebook.version}`);
+  await expect(ppaTab).toContainText(`v${ppa.version}`);
+  await expect(page.locator("main")).not.toContainText(/\bdraft\b/i);
 
   await expect(oneVOneTab).toHaveAttribute("aria-selected", "true");
   await oneVOneTab.press("ArrowRight");
@@ -93,13 +110,32 @@ test("Rules exposes the approved categories, document status, and accessible FAQ
     page.getByText(/Screenshots are not accepted as substitute Match-result proof/)
   ).toBeVisible();
 
-  const rulebookStatus = page
+  const rulebookCard = page
     .locator("article")
-    .filter({ hasText: "Official Tournament Rulebook" });
-  await rulebookStatus.scrollIntoViewIfNeeded();
-  await expect(rulebookStatus).toContainText("Version 3.0");
-  await expect(rulebookStatus).toContainText("Effective");
-  await expect(rulebookStatus).toContainText("18 August 2026");
+    .filter({ hasText: rulebook.shortTitle });
+  const ppaCard = page
+    .locator("article")
+    .filter({ hasText: ppa.shortTitle });
+
+  await rulebookCard.scrollIntoViewIfNeeded();
+
+  for (const [card, document] of [
+    [rulebookCard, rulebook],
+    [ppaCard, ppa],
+  ] as const) {
+    await expect(card).toHaveCount(1);
+    await expect(card).toContainText(`Version ${document.version}`);
+    await expect(card.getByText(document.status, { exact: true })).toBeVisible();
+    await expect(card).toContainText(
+      getLegalDocumentEffectiveDateDisplay(document)
+    );
+    await expect(
+      card.getByRole("link", { name: /Read \(opens in a new tab\)/ })
+    ).toHaveAttribute("href", document.publicPath);
+    await expect(
+      card.getByRole("link", { name: "Download PDF" })
+    ).toHaveAttribute("href", document.publicPath);
+  }
 
   const discordFaq = page.getByRole("button", { name: "Is Discord required?" });
   await discordFaq.scrollIntoViewIfNeeded();

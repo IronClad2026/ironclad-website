@@ -50,7 +50,7 @@ const dictionary = {
         "Le categorie attive riportano l’esploratore delle regole al primo elemento, così il riepilogo riparte ogni volta dall’inizio.",
       aria: "Categorie delle regole",
       selected: "Selezionata",
-      primaryDraft: "Bozza principale: {document}",
+      primaryDraft: "Documento principale: {document}",
     },
     tabs: {
       oneVOne: {
@@ -58,7 +58,7 @@ const dictionary = {
         title: "REGOLE 1V1",
         description:
           "I Tornei di lancio IronClad sono Eventi 1v1 CoH3 gratuiti con Divisioni separate Academy, Challenge e Main / Pro da otto Giocatori. Quarti di finale e semifinali sono BO3; la finale è BO5.",
-        document: "Rulebook v3.0",
+        document: "Rulebook v3.1",
       },
       rankings: {
         eyebrow: "Storico competitivo",
@@ -72,7 +72,7 @@ const dictionary = {
         title: "PPA E CONDOTTA",
         description:
           "Il PPA disciplina idoneità, titolarità dell’account, condotta, collaborazione sulle prove, obblighi relativi alla privacy, sanzioni, media e premi condizionati. La procedura dettagliata di gioco resta nel Regolamento.",
-        document: "PPA v3.0",
+        document: "PPA v3.1",
       },
     },
     quick: {

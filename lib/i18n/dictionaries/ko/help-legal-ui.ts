@@ -35,7 +35,7 @@ const dictionary = {
       oneVOne: {
         eyebrow: "개인전", title: "1V1 규칙",
         description: "IronClad 출시 토너먼트는 무료 CoH3 1v1 이벤트이며, 각 8인 Academy, Challenge, Main / Pro 디비전으로 나뉩니다. 8강과 준결승은 BO3, 결승은 BO5입니다.",
-        document: "규칙서 v3.0",
+        document: "규칙서 v3.1",
       },
       rankings: {
         eyebrow: "대회 기록", title: "랭킹 및 시즌",
@@ -45,7 +45,7 @@ const dictionary = {
       conduct: {
         eyebrow: "선수 계약", title: "PPA 및 행동 규정",
         description: "PPA는 자격, 계정 소유, 행동, 증거 협조, 개인정보 관련 의무, 제재, 미디어 및 조건부 상금을 규정합니다. 구체적인 게임 절차는 규칙서에 따릅니다.",
-        document: "PPA v3.0",
+        document: "PPA v3.1",
       },
     },
     quick: {
