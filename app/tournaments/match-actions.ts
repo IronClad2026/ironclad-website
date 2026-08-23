@@ -7,8 +7,6 @@ import {
   createInAppNotifications,
 } from "@/lib/notifications";
 import {
-  notifyAdminsOfMatchDispute,
-  notifyNoShowReporterOfResponse,
   notifyPlayersOfLegacyMatchResultReview,
   notifyPlayersOfReportGroupReview,
 } from "@/lib/notification-events";
@@ -44,6 +42,7 @@ export type MatchResultActionCode =
   | "prepare_failed"
   | "cleanup_failed"
   | "operation_failed"
+  | "stale_conflict"
   | "result_submitted"
   | "opponent_required"
   | "notes_too_long"
@@ -351,40 +350,12 @@ export async function submitNoShowReport(
   }
 
   const reportDetails = report as {
-    report_group_id?: string;
     confirmation_deadline_at?: string;
   } | null;
-  const reportGroupId = reportDetails?.report_group_id ?? null;
-  const submitterName =
-    ownedRegistration.player_name ??
-    ownedRegistrationName(match, ownedRegistration.id);
   const missingRegistration = registrationById.get(noShowRegistrationId);
   const missingName =
     missingRegistration?.player_name ??
     ownedRegistrationName(match, noShowRegistrationId);
-
-  if (missingRegistration?.clerk_user_id && reportGroupId) {
-    await createInAppNotification({
-      recipientClerkUserId: missingRegistration.clerk_user_id,
-      recipientRole: "player",
-      type: "match.no_show_reported",
-      title: "No-Show Reported",
-      message: `${submitterName} reported you as a no-show for Match #${match.match_number}. Confirm or dispute before the deadline.`,
-      actorDisplayName: submitterName,
-      tournamentId: match.tournament_id,
-      tournamentTitle: match.tournament_title,
-      matchId,
-      reportGroupId,
-      eventKey: `match:${matchId}:report-group:${reportGroupId}:no-show-reported`,
-      metadata: {
-        roundName: match.round_name,
-        matchNumber: match.match_number,
-        resultType: "no_show",
-        noShowRegistrationId,
-        noShowPlayerName: missingName,
-      },
-    });
-  }
 
   revalidatePath("/tournaments");
   revalidatePath("/dashboard");
@@ -418,7 +389,7 @@ export async function confirmMatchResultReportGroup(
   }
 
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.rpc("confirm_match_result_report_group", {
+  const { error } = await supabase.rpc("confirm_match_result_report_group_api", {
     p_report_group_id: reportGroupId,
     p_confirmed_by_clerk_user_id: userId,
   });
@@ -430,14 +401,9 @@ export async function confirmMatchResultReportGroup(
         error,
         "The match result could not be confirmed. Please try again."
       ),
-      "operation_failed"
+      isMatchResultConflict(error) ? "stale_conflict" : "operation_failed"
     );
   }
-
-  await notifyNoShowReporterOfResponse(supabase, {
-    reportGroupId,
-    decision: "confirmed",
-  });
 
   revalidateTournamentPaths();
   return successState("Result confirmed. The winner has been advanced.", "confirmed");
@@ -465,7 +431,7 @@ export async function disputeMatchResultReportGroup(
   }
 
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.rpc("dispute_match_result_report_group", {
+  const { error } = await supabase.rpc("dispute_match_result_report_group_api", {
     p_report_group_id: reportGroupId,
     p_disputed_by_clerk_user_id: userId,
     p_dispute_notes: disputeNotes || null,
@@ -478,15 +444,9 @@ export async function disputeMatchResultReportGroup(
         error,
         "The match result could not be disputed. Please try again."
       ),
-      "operation_failed"
+      isMatchResultConflict(error) ? "stale_conflict" : "operation_failed"
     );
   }
-
-  await notifyAdminsOfMatchDispute(supabase, reportGroupId, userId);
-  await notifyNoShowReporterOfResponse(supabase, {
-    reportGroupId,
-    decision: "disputed",
-  });
 
   revalidateTournamentPaths();
   return successState("Result disputed. An administrator must review it.", "disputed");
@@ -519,7 +479,7 @@ export async function reviewMatchResultReportGroup(
   }
 
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.rpc("admin_finalize_match_result_report_group", {
+  const { error } = await supabase.rpc("admin_finalize_match_result_report_group_api", {
     p_report_group_id: reportGroupId,
     p_decision: decision,
     p_reviewed_by: admin.userId,
@@ -532,7 +492,8 @@ export async function reviewMatchResultReportGroup(
       getDatabaseMessage(
         error,
         "The match result review could not be saved. Please try again."
-      )
+      ),
+      isMatchResultConflict(error) ? "stale_conflict" : "operation_failed"
     );
   }
 
@@ -606,7 +567,7 @@ export async function saveAdminMatchResult(
 
   if (activeReportGroup) {
     const { error } = await supabase.rpc(
-      "admin_finalize_match_result_report_group",
+      "admin_finalize_match_result_report_group_api",
       {
         p_report_group_id: activeReportGroup.id,
         p_decision: "approved",
@@ -624,7 +585,8 @@ export async function saveAdminMatchResult(
         getDatabaseMessage(
           error,
           "The official result could not be saved. Please try again."
-        )
+        ),
+        isMatchResultConflict(error) ? "stale_conflict" : "operation_failed"
       );
     }
 
@@ -637,7 +599,7 @@ export async function saveAdminMatchResult(
     return successState("Report group overridden and winner advanced.");
   }
 
-  const { error } = await supabase.rpc("apply_admin_official_match_result", {
+  const { error } = await supabase.rpc("apply_admin_official_match_result_api", {
     p_match_id: matchId,
     p_player_one_score: playerOneScore,
     p_player_two_score: playerTwoScore,
@@ -651,7 +613,8 @@ export async function saveAdminMatchResult(
       getDatabaseMessage(
         error,
         "The official result could not be saved. Please try again."
-      )
+      ),
+      isMatchResultConflict(error) ? "stale_conflict" : "operation_failed"
     );
   }
 
@@ -737,7 +700,7 @@ export async function reviewMatchResult(
   }
 
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.rpc("review_match_series_result", {
+  const { error } = await supabase.rpc("review_match_series_result_api", {
     p_submission_id: submissionId,
     p_decision: decision,
     p_reviewed_by: admin.userId,
@@ -750,7 +713,8 @@ export async function reviewMatchResult(
       getDatabaseMessage(
         error,
         "The match result review could not be saved. Please try again."
-      )
+      ),
+      isMatchResultConflict(error) ? "stale_conflict" : "operation_failed"
     );
   }
 
@@ -1006,6 +970,10 @@ function getDatabaseMessage(error: unknown, fallback: string) {
     return `The replay retry budget is temporarily exhausted. Try again in ${replayBudgetWait[1]} seconds.`;
   }
   const safeMessages: Array<[string, string]> = [
+    [
+      "match result conflict:",
+      "This match result changed while the action was being applied. Refresh and review the current state before trying again.",
+    ],
     [
       "clean the current replay attempt before changing its result",
       "Clean the current replay attempt before changing the score or files.",
@@ -1265,6 +1233,15 @@ function getDatabaseMessage(error: unknown, fallback: string) {
   return (
     safeMessages.find(([fragment]) => message.includes(fragment))?.[1] ??
     fallback
+  );
+}
+
+function isMatchResultConflict(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error.code === "40001" || error.code === "PT409")
   );
 }
 

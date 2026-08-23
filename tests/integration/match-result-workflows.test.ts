@@ -47,11 +47,13 @@ import {
   resetAdminMatch,
   reviewMatchResult,
   reviewMatchResultReportGroup,
+  saveAdminMatchResult,
   submitNoShowReport,
 } from "@/app/tournaments/match-actions";
 import {
   confirmDashboardMatchResult,
   dismissDashboardNotifications,
+  disputeDashboardMatchResult,
 } from "@/app/dashboard/actions";
 
 const idleState = {
@@ -131,7 +133,7 @@ describe("match-result workflow contracts", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
-  it("preserves opponent confirmation and notification behavior", async () => {
+  it("commits confirmation with database-owned workflow notifications", async () => {
     const service = createRpcClient();
     authMock.mockResolvedValue(playerIdentity);
     createSupabaseAdminClientMock.mockReturnValue(service.client);
@@ -149,24 +151,18 @@ describe("match-result workflow contracts", () => {
     });
 
     expect(service.rpc).toHaveBeenCalledWith(
-      "confirm_match_result_report_group",
+      "confirm_match_result_report_group_api",
       {
         p_report_group_id: "report-group-1",
         p_confirmed_by_clerk_user_id: playerIdentity.userId,
       }
     );
-    expect(notifyNoShowReporterOfResponseMock).toHaveBeenCalledWith(
-      service.client,
-      {
-        reportGroupId: "report-group-1",
-        decision: "confirmed",
-      }
-    );
+    expect(notifyNoShowReporterOfResponseMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
   });
 
-  it("preserves dispute RPC parameters and both notification flows", async () => {
+  it("commits a dispute with database-owned workflow notifications", async () => {
     const service = createRpcClient();
     authMock.mockResolvedValue(playerIdentity);
     createSupabaseAdminClientMock.mockReturnValue(service.client);
@@ -187,22 +183,15 @@ describe("match-result workflow contracts", () => {
     });
 
     expect(service.rpc).toHaveBeenCalledWith(
-      "dispute_match_result_report_group",
+      "dispute_match_result_report_group_api",
       {
         p_report_group_id: "report-group-1",
         p_disputed_by_clerk_user_id: playerIdentity.userId,
         p_dispute_notes: "The recorded score is wrong.",
       }
     );
-    expect(notifyAdminsOfMatchDisputeMock).toHaveBeenCalledWith(
-      service.client,
-      "report-group-1",
-      playerIdentity.userId
-    );
-    expect(notifyNoShowReporterOfResponseMock).toHaveBeenCalledWith(
-      service.client,
-      expect.objectContaining({ decision: "disputed" })
-    );
+    expect(notifyAdminsOfMatchDisputeMock).not.toHaveBeenCalled();
+    expect(notifyNoShowReporterOfResponseMock).not.toHaveBeenCalled();
   });
 
   it("preserves participant ownership checks and no-show submission", async () => {
@@ -280,18 +269,7 @@ describe("match-result workflow contracts", () => {
       p_no_show_registration_id: "registration-player-two",
       p_notes: "Opponent did not arrive.",
     });
-    expect(createInAppNotificationMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        recipientClerkUserId: "user_test_opponent",
-        reportGroupId: "report-group-1",
-        type: "match.no_show_reported",
-        eventKey:
-          "match:match-1:report-group:report-group-1:no-show-reported",
-      })
-    );
-    expect(createInAppNotificationMock.mock.calls[0][0]).not.toHaveProperty(
-      "actorClerkUserId"
-    );
+    expect(createInAppNotificationMock).not.toHaveBeenCalled();
   });
 
   it("rejects match activity while the division bracket is still private", async () => {
@@ -366,7 +344,7 @@ describe("match-result workflow contracts", () => {
     });
 
     expect(service.rpc).toHaveBeenCalledWith(
-      "admin_finalize_match_result_report_group",
+      "admin_finalize_match_result_report_group_api",
       {
         p_report_group_id: "report-group-1",
         p_decision: "approved",
@@ -381,6 +359,145 @@ describe("match-result workflow contracts", () => {
         decision: "approved",
       }
     );
+  });
+
+  it("returns an explicit stale conflict and suppresses Admin success notifications", async () => {
+    const service = createRpcClient({
+      rpcError: {
+        code: "PT409",
+        message:
+          "Match result conflict: the Admin review is stale",
+      },
+    });
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+
+    await expect(
+      reviewMatchResultReportGroup(
+        idleState,
+        createFormData({
+          reportGroupId: "report-group-1",
+          decision: "approved",
+          reviewNotes: "Reviewed.",
+        })
+      )
+    ).resolves.toEqual({
+      status: "error",
+      code: "stale_conflict",
+      message:
+        "This match result changed while the action was being applied. Refresh and review the current state before trying again.",
+    });
+
+    expect(notifyPlayersOfReportGroupReviewMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an explicit dispute conflict without post-commit workflow work", async () => {
+    const service = createRpcClient({
+      rpcError: {
+        code: "PT409",
+        message:
+          "Match result conflict: this report group is no longer awaiting confirmation",
+      },
+    });
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+
+    await expect(
+      disputeMatchResultReportGroup(
+        idleState,
+        createFormData({
+          reportGroupId: "report-group-1",
+          disputeNotes: "The score changed.",
+        })
+      )
+    ).resolves.toEqual({
+      status: "error",
+      code: "stale_conflict",
+      message:
+        "This match result changed while the action was being applied. Refresh and review the current state before trying again.",
+    });
+
+    expect(notifyAdminsOfMatchDisputeMock).not.toHaveBeenCalled();
+    expect(notifyNoShowReporterOfResponseMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a direct official-result race as stale and emits no success event", async () => {
+    const matchQuery = createThenableQuery({
+      data: {
+        id: "match-1",
+        generated_bracket_id: "generated-1",
+        match_number: 1,
+        series_best_of: 3,
+        activation_version: 1,
+        player_one_registration_id: "registration-player-one",
+        player_two_registration_id: "registration-player-two",
+        player_one: { player_name: "Player One" },
+        player_two: { player_name: "Player Two" },
+        bracket_rounds: { name: "Final" },
+        generated_brackets: {
+          tournament_brackets: {
+            tournament_id: "tournament-1",
+            launched_at: "2026-08-06T03:00:00.000Z",
+            tournaments: {
+              id: "tournament-1",
+              title: "Test Tournament",
+            },
+          },
+        },
+      },
+      error: null,
+    });
+    const activeGroupQuery = createThenableQuery({
+      data: null,
+      error: null,
+    });
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: {
+        code: "PT409",
+        message:
+          "Match result conflict: adjudicate the active report group before entering a direct official result",
+      },
+    }));
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === "tournament_matches") return matchQuery;
+        if (table === "match_result_report_groups") return activeGroupQuery;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+      rpc,
+    };
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(client);
+
+    await expect(
+      saveAdminMatchResult(
+        idleState,
+        createFormData({
+          matchId: "match-1",
+          playerOneScore: "2",
+          playerTwoScore: "0",
+          winnerRegistrationId: "registration-player-one",
+        })
+      )
+    ).resolves.toEqual({
+      status: "error",
+      code: "stale_conflict",
+      message:
+        "This match result changed while the action was being applied. Refresh and review the current state before trying again.",
+    });
+
+    expect(rpc).toHaveBeenCalledWith("apply_admin_official_match_result_api", {
+      p_match_id: "match-1",
+      p_player_one_score: 2,
+      p_player_two_score: 0,
+      p_winner_registration_id: "registration-player-one",
+      p_decided_by: adminIdentity.userId,
+    });
+    expect(createInAppNotificationsMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it("preserves legacy administrator review without notification audit IDs", async () => {
@@ -402,7 +519,7 @@ describe("match-result workflow contracts", () => {
       message: "Resubmission requested. The bracket remains unchanged.",
     });
 
-    expect(service.rpc).toHaveBeenCalledWith("review_match_series_result", {
+    expect(service.rpc).toHaveBeenCalledWith("review_match_series_result_api", {
       p_submission_id: "submission-1",
       p_decision: "resubmission_requested",
       p_reviewed_by: adminIdentity.userId,
@@ -415,6 +532,36 @@ describe("match-result workflow contracts", () => {
         decision: "resubmission_requested",
       }
     );
+  });
+
+  it("maps the legacy wrapper's narrow PT409 without a success notification", async () => {
+    const service = createRpcClient({
+      rpcError: {
+        code: "PT409",
+        message:
+          "Match result conflict: the legacy submission changed before review",
+      },
+    });
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+
+    await expect(
+      reviewMatchResult(
+        idleState,
+        createFormData({
+          submissionId: "submission-1",
+          decision: "approved",
+        })
+      )
+    ).resolves.toEqual({
+      status: "error",
+      code: "stale_conflict",
+      message:
+        "This match result changed while the action was being applied. Refresh and review the current state before trying again.",
+    });
+
+    expect(notifyPlayersOfLegacyMatchResultReviewMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it("returns and logs a generic error for an internal path-bearing failure", async () => {
@@ -474,6 +621,55 @@ describe("match-result workflow contracts", () => {
     });
     expect(visibleOutput).not.toContain(secretPath);
     expect(visibleOutput).not.toContain("user_secret_dashboard");
+  });
+
+  it("returns a stable dashboard conflict when confirmation loses the race", async () => {
+    const service = createRpcClient({
+      rpcError: {
+        code: "PT409",
+        message:
+          "Match result conflict: this report group is no longer awaiting confirmation",
+      },
+    });
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+
+    await expect(
+      confirmDashboardMatchResult(
+        createFormData({ reportGroupId: REPORT_GROUP_UUID })
+      )
+    ).resolves.toEqual({
+      status: "error",
+      code: "confirm-conflict",
+      message:
+        "This match result changed while the action was being applied. Refresh before trying again.",
+    });
+  });
+
+  it("returns a stable dashboard conflict when dispute loses the race", async () => {
+    const service = createRpcClient({
+      rpcError: {
+        code: "PT409",
+        message:
+          "Match result conflict: this report group is no longer awaiting confirmation",
+      },
+    });
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+
+    await expect(
+      disputeDashboardMatchResult(
+        createFormData({
+          reportGroupId: REPORT_GROUP_UUID,
+          disputeNotes: "The score changed.",
+        })
+      )
+    ).resolves.toEqual({
+      status: "error",
+      code: "dispute-conflict",
+      message:
+        "This match result changed while the action was being applied. Refresh before trying again.",
+    });
   });
 
   it("keeps dashboard notification lookup errors out of logs", async () => {
