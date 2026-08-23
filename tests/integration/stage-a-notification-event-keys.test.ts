@@ -21,10 +21,14 @@ function sliceSource(source: string, startMarker: string, endMarker: string) {
 
 const notificationEvents = read("lib/notification-events.ts");
 const matchActions = read("app/tournaments/match-actions.ts");
+const dashboardActions = read("app/dashboard/actions.ts");
 const adminPage = read("app/admin/page.tsx");
 const assistanceAction = read("app/tournaments/support-actions.ts");
 const stageAMigration = read(
   "supabase/migrations/20260820130000_notification_truth_reliability.sql"
+);
+const matchResultTrustMigration = read(
+  "supabase/migrations/20260823100000_match_result_transactional_trust.sql"
 );
 const deadlineMigration = read(
   "supabase/migrations/20260808100000_matchup_deadlines_double_forfeit.sql"
@@ -40,8 +44,8 @@ describe("Stage A canonical notification event keys", () => {
   it("gives every report-group Player outcome stable report identity", () => {
     const normalized = compact(notificationEvents);
 
-    expect(normalized).toContain(
-      "eventKey: `match:${context.matchId}:report-group:${context.id}:response:${decision}`"
+    expect(compact(matchResultTrustMigration)).toContain(
+      "'match:%s:report-group:%s:response:%s'"
     );
     expect(normalized).toContain(
       "eventKey: `match:${context.matchId}:report-group:${context.id}:review:${decision}`"
@@ -49,8 +53,8 @@ describe("Stage A canonical notification event keys", () => {
     expect(normalized).toContain(
       "eventKey: `match:${context.matchId}:submission:${context.id}:review:${decision}`"
     );
-    expect(compact(matchActions)).toContain(
-      "eventKey: `match:${matchId}:report-group:${reportGroupId}:no-show-reported`"
+    expect(compact(matchResultTrustMigration)).toContain(
+      "'match:%s:report-group:%s:no-show-reported'"
     );
     expect(compact(matchActions)).toContain(
       "eventKey: `match:${match.id}:activation:${match.activation_version}:admin-official-result-approved`"
@@ -58,20 +62,26 @@ describe("Stage A canonical notification event keys", () => {
   });
 
   it("keeps all three future Admin Push-important producers deterministic", () => {
-    const disputeProducer = compact(
-      sliceSource(
-        notificationEvents,
-        "export async function notifyAdminsOfMatchDispute(",
-        "export async function notifyNoShowReporterOfResponse("
-      )
-    );
+    const disputeProducer = compact(matchResultTrustMigration);
     const assistanceProducer = compact(assistanceAction);
 
     expect(disputeProducer).toContain(
-      'type: isNoShow ? "match.no_show_disputed" : "match.dispute_opened"'
+      "when new.result_type = 'no_show' then 'match.no_show_disputed' else 'match.dispute_opened'"
     );
     expect(disputeProducer).toContain(
-      "eventKey: `match:${context.matchId}:report-group:${context.id}:dispute-opened`"
+      "'match:%s:report-group:%s:dispute-opened'"
+    );
+    expect(compact(matchActions)).not.toContain(
+      "await notifyadminsofmatchdispute("
+    );
+    expect(compact(matchActions)).not.toContain(
+      "await notifynoshowreporterofresponse("
+    );
+    expect(compact(dashboardActions)).not.toContain(
+      "await notifyadminsofmatchdispute("
+    );
+    expect(compact(dashboardActions)).not.toContain(
+      "await notifynoshowreporterofresponse("
     );
     expect(assistanceProducer).toContain(
       'type: "match.admin_assistance_requested"'

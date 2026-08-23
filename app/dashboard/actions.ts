@@ -2,10 +2,6 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import {
-  notifyAdminsOfMatchDispute,
-  notifyNoShowReporterOfResponse,
-} from "@/lib/notification-events";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -28,9 +24,11 @@ export type NotificationActionResult = {
   code:
     | "sign-in-required"
     | "result-unavailable"
+    | "confirm-conflict"
     | "confirm-failed"
     | "confirmed"
     | "dispute-notes-too-long"
+    | "dispute-conflict"
     | "dispute-failed"
     | "disputed";
   message: string;
@@ -262,23 +260,24 @@ export async function confirmDashboardMatchResult(
   }
 
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.rpc("confirm_match_result_report_group", {
+  const { error } = await supabase.rpc("confirm_match_result_report_group_api", {
     p_report_group_id: reportGroupId,
     p_confirmed_by_clerk_user_id: userId,
   });
 
   if (error) {
     logDashboardResultFailure("confirm-match-result", error);
+    if (isMatchResultConflict(error)) {
+      return actionErrorResult(
+        "confirm-conflict",
+        "This match result changed while the action was being applied. Refresh before trying again."
+      );
+    }
     return actionErrorResult(
       "confirm-failed",
       "The match result could not be confirmed. Please try again."
     );
   }
-
-  await notifyNoShowReporterOfResponse(supabase, {
-    reportGroupId,
-    decision: "confirmed",
-  });
 
   revalidateDashboardPaths();
   return {
@@ -318,7 +317,7 @@ export async function disputeDashboardMatchResult(
   }
 
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.rpc("dispute_match_result_report_group", {
+  const { error } = await supabase.rpc("dispute_match_result_report_group_api", {
     p_report_group_id: reportGroupId,
     p_disputed_by_clerk_user_id: userId,
     p_dispute_notes: disputeNotes || null,
@@ -326,17 +325,17 @@ export async function disputeDashboardMatchResult(
 
   if (error) {
     logDashboardResultFailure("dispute-match-result", error);
+    if (isMatchResultConflict(error)) {
+      return actionErrorResult(
+        "dispute-conflict",
+        "This match result changed while the action was being applied. Refresh before trying again."
+      );
+    }
     return actionErrorResult(
       "dispute-failed",
       "The match result could not be disputed. Please try again."
     );
   }
-
-  await notifyAdminsOfMatchDispute(supabase, reportGroupId, userId);
-  await notifyNoShowReporterOfResponse(supabase, {
-    reportGroupId,
-    decision: "disputed",
-  });
 
   revalidateDashboardPaths();
   return {
@@ -710,6 +709,15 @@ function actionErrorResult(
     code,
     message,
   };
+}
+
+function isMatchResultConflict(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error.code === "40001" || error.code === "PT409")
+  );
 }
 
 function logDashboardResultFailure(operation: string, error: unknown) {

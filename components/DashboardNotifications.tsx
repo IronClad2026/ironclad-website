@@ -1041,9 +1041,11 @@ function localizeNotificationActionResult(
     {
       "sign-in-required": "dashboard.actions.signInRequired",
       "result-unavailable": "dashboard.actions.resultUnavailable",
+      "confirm-conflict": "dashboard.actions.confirmFailed",
       "confirm-failed": "dashboard.actions.confirmFailed",
       confirmed: "dashboard.actions.confirmed",
       "dispute-notes-too-long": "dashboard.actions.disputeNotesTooLong",
+      "dispute-conflict": "dashboard.actions.disputeFailed",
       "dispute-failed": "dashboard.actions.disputeFailed",
       disputed: "dashboard.actions.disputed",
     }[result.code]
