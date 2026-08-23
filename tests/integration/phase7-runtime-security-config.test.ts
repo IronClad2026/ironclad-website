@@ -4,6 +4,7 @@ import nextConfig from "@/next.config";
 import { MAX_AVATAR_UPLOAD_SIZE_BYTES } from "@/lib/avatar";
 
 const SELECTED_NEXT_PATCH = "16.2.12";
+const SELECTED_SHARP_PATCH = "0.35.3";
 const MEBIBYTE_BYTES = 1024 * 1024;
 const NEXT_REQUEST_LIMIT_BYTES = 4_400_000;
 const VERCEL_FUNCTION_PAYLOAD_CEILING_BYTES = 4_500_000;
@@ -11,6 +12,7 @@ const VERCEL_FUNCTION_PAYLOAD_CEILING_BYTES = 4_500_000;
 type PackageManifest = {
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
+  overrides: Record<string, Record<string, string>>;
 };
 
 type PackageLock = {
@@ -73,6 +75,24 @@ describe("Phase 7 runtime security and Server Action payload contract", () => {
     expect(lock.packages["node_modules/eslint-config-next"]?.version).toBe(
       SELECTED_NEXT_PATCH
     );
+  });
+
+  it("replaces Next's optional Sharp runtime with one exact patched release", () => {
+    const manifest = readJson<PackageManifest>("package.json");
+    const lock = readJson<PackageLock>("package-lock.json");
+    const sharpPackages = Object.entries(lock.packages)
+      .filter(
+        ([path]) =>
+          path === "node_modules/sharp" || path.endsWith("/node_modules/sharp")
+      )
+      .map(([path, dependency]) => ({ path, version: dependency.version }));
+
+    expect(manifest.overrides["next@16.2.12"]?.sharp).toBe(
+      SELECTED_SHARP_PATCH
+    );
+    expect(sharpPackages).toEqual([
+      { path: "node_modules/sharp", version: SELECTED_SHARP_PATCH },
+    ]);
   });
 
   it("keeps the application avatar boundary at exactly 4 MiB", () => {
