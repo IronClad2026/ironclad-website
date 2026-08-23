@@ -36,7 +36,7 @@ const dictionary = {
       oneVOne: {
         eyebrow: "Competición individual", title: "Reglas 1V1",
         description: "Los Torneos iniciales de IronClad son Eventos gratuitos de CoH3 1v1 con Divisiones separadas de ocho Jugadores: Academy, Challenge y Main / Pro. Cuartos y semifinales son BO3; la gran final es BO5.",
-        document: "Reglamento v3.0",
+        document: "Reglamento v3.1",
       },
       rankings: {
         eyebrow: "Historial competitivo", title: "Clasificaciones y temporadas",
@@ -46,7 +46,7 @@ const dictionary = {
       conduct: {
         eyebrow: "Acuerdo del jugador", title: "PPA y conducta",
         description: "El PPA regula elegibilidad, titularidad de cuentas, conducta, colaboración con pruebas, obligaciones de privacidad, sanciones, medios y premios condicionales. El procedimiento de Juego detallado permanece en el Reglamento.",
-        document: "PPA v3.0",
+        document: "PPA v3.1",
       },
     },
     quick: {

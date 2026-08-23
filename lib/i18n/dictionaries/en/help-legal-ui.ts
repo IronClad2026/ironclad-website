@@ -50,7 +50,7 @@ const dictionary = {
         "Active categories reset the rule explorer to the first item so the briefing starts from the top each time.",
       aria: "Rule categories",
       selected: "Selected",
-      primaryDraft: "Primary draft: {document}",
+      primaryDraft: "Primary document: {document}",
     },
     tabs: {
       oneVOne: {
@@ -58,7 +58,7 @@ const dictionary = {
         title: "1V1 RULES",
         description:
           "IronClad launch Tournaments are free CoH3 1v1 Events with separate eight-Player Academy, Challenge and Main / Pro Divisions. Quarterfinals and semifinals are BO3; the grand final is BO5.",
-        document: "Rulebook v3.0",
+        document: "Rulebook v3.1",
       },
       rankings: {
         eyebrow: "Competitive Record",
@@ -72,7 +72,7 @@ const dictionary = {
         title: "PPA & CONDUCT",
         description:
           "The PPA governs eligibility, account ownership, conduct, evidence cooperation, privacy-facing obligations, sanctions, media and conditional prizes. Detailed Game procedure remains in the Rulebook.",
-        document: "PPA v3.0",
+        document: "PPA v3.1",
       },
     },
     quick: {

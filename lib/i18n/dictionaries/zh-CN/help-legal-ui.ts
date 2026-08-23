@@ -49,7 +49,7 @@ const dictionary = {
         eyebrow: "单人竞赛",
         title: "1V1 规则",
         description: "IronClad 首发锦标赛是免费的 CoH3 1v1 赛事，分别设有八人 Academy、Challenge 和 Main / Pro 组别。四分之一决赛及半决赛为 BO3，总决赛为 BO5。",
-        document: "规则手册 v3.0",
+        document: "规则手册 v3.1",
       },
       rankings: {
         eyebrow: "竞赛记录",
@@ -61,7 +61,7 @@ const dictionary = {
         eyebrow: "玩家协议",
         title: "PPA 与行为规范",
         description: "PPA 规范参赛资格、账户所有权、行为、证据配合、隐私义务、处罚、媒体和附条件奖金。具体游戏流程仍以规则手册为准。",
-        document: "PPA v3.0",
+        document: "PPA v3.1",
       },
     },
     quick: {

@@ -62,6 +62,46 @@ describe("help and legal localization contract", () => {
     ).toBe(8);
   });
 
+  it("aligns Rulebook and PPA category labels with the Effective legal corpus", () => {
+    const corpus = JSON.parse(
+      readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
+    ) as {
+      documents: { kind: string; status: string; version: string }[];
+    };
+    const rulebook = corpus.documents.find(
+      (document) => document.kind === "rulebook"
+    );
+    const ppa = corpus.documents.find((document) => document.kind === "ppa");
+
+    if (!rulebook || !ppa) {
+      throw new Error("The Effective Rulebook and PPA must exist in the legal corpus.");
+    }
+
+    expect(rulebook.status).toBe("Effective");
+    expect(ppa.status).toBe("Effective");
+
+    const draftTerms =
+      /(?:draft|provisional|bozza|provvisori|borrador|brouillon|provisoire|rascunho|provisóri|черновик|предварительн|초안|임시|草案|草稿|暂定|暫定)/iu;
+
+    for (const [locale, dictionary] of Object.entries(translations)) {
+      const categoryDocuments = [
+        ["oneVOne", dictionary.rules.tabs.oneVOne.document, rulebook],
+        ["conduct", dictionary.rules.tabs.conduct.document, ppa],
+      ] as const;
+
+      for (const [category, label, document] of categoryDocuments) {
+        expect(
+          label.match(/v\d+(?:\.\d+)*/g),
+          `${locale}/${category}`
+        ).toEqual([`v${document.version}`]);
+        expect(
+          dictionary.rules.category.primaryDraft.replace("{document}", label),
+          `${locale}/${category}`
+        ).not.toMatch(draftTerms);
+      }
+    }
+  });
+
   it("preserves locked IronClad and competition names in translated copy", () => {
     const englishText = [...flatten(en).values()].join("\n");
 
