@@ -8,21 +8,21 @@ const migration = readFileSync(
     "supabase/migrations/20260820130000_notification_truth_reliability.sql"
   ),
   "utf8"
-);
+).replace(/\r\n?/g, "\n");
 const functionFixMigration = readFileSync(
   resolve(
     process.cwd(),
     "supabase/migrations/20260820131000_fix_notification_truth_nullif.sql"
   ),
   "utf8"
-);
+).replace(/\r\n?/g, "\n");
 const transactionalEmailMigration = readFileSync(
   resolve(
     process.cwd(),
     "supabase/migrations/20260810162000_transactional_email_notifications.sql"
   ),
   "utf8"
-);
+).replace(/\r\n?/g, "\n");
 
 function compact(source: string) {
   return source.replace(/\s+/g, " ").trim();
