@@ -4,20 +4,23 @@ import { describe, expect, it } from "vitest";
 
 const migrationPath =
   "supabase/migrations/20260823100000_match_result_transactional_trust.sql";
-const migration = readFileSync(resolve(process.cwd(), migrationPath), "utf8");
+const migration = readFileSync(resolve(process.cwd(), migrationPath), "utf8").replace(
+  /\r\n?/g,
+  "\n"
+);
 const conflictTransportMigrationPath =
   "supabase/migrations/20260823110000_match_result_conflict_transport.sql";
 const conflictTransportMigration = readFileSync(
   resolve(process.cwd(), conflictTransportMigrationPath),
   "utf8"
-);
+).replace(/\r\n?/g, "\n");
 const triggerMigration = readFileSync(
   resolve(
     process.cwd(),
     "supabase/migrations/20260820130000_notification_truth_reliability.sql"
   ),
   "utf8"
-);
+).replace(/\r\n?/g, "\n");
 
 function compact(source: string) {
   return source.replace(/\s+/g, " ").trim().toLowerCase();
