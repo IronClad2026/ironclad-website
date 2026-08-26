@@ -7,6 +7,23 @@ import {
 } from "@/lib/i18n/loaders";
 import { SUPPORTED_LOCALES } from "@/lib/i18n/config";
 
+const PR3_REGISTRATION_MESSAGE_KEYS = [
+  "dialogDescription",
+  "selectedTournament",
+  "changeTournament",
+  "readinessTitle",
+  "profileReady",
+  "steamConnected",
+  "relicVerificationOnSubmit",
+  "reviewSavedDetails",
+  "stepProgress",
+  "waitlistJoinedTitle",
+  "waitlistPositionPending",
+  "waitlistResultDescription",
+  "submittedTitle",
+  "reviewTime",
+] as const;
+
 describe("server dictionary loader", () => {
   it("loads all seven Italian Player namespaces", async () => {
     expect(DICTIONARY_NAMESPACES).toEqual([
@@ -57,6 +74,29 @@ describe("server dictionary loader", () => {
     expect(SUPPORTED_LOCALES).toHaveLength(8);
     expect(messages.every((message) => message.trim().length > 0)).toBe(true);
     expect(new Set(messages).size).toBe(8);
+  });
+
+  it("loads distinct PR3 mobile registration copy in all eight Player locales", async () => {
+    const messagesByLocale = await Promise.all(
+      SUPPORTED_LOCALES.map(async (locale) => {
+        const competition = await loadDictionary(locale, "competition");
+        return PR3_REGISTRATION_MESSAGE_KEYS.map(
+          (key) => competition.registrationModal[key]
+        );
+      })
+    );
+
+    expect(SUPPORTED_LOCALES).toHaveLength(8);
+    for (const messages of messagesByLocale) {
+      expect(messages.every((message) => message.trim().length > 0)).toBe(true);
+      expect(new Set(messages).size).toBe(PR3_REGISTRATION_MESSAGE_KEYS.length);
+    }
+    for (let index = 0; index < PR3_REGISTRATION_MESSAGE_KEYS.length; index += 1) {
+      const localizedMessages = messagesByLocale.map(
+        (messages) => messages[index]
+      );
+      expect(new Set(localizedMessages).size).toBe(SUPPORTED_LOCALES.length);
+    }
   });
 
   it("validates every launch locale and namespace against English", async () => {

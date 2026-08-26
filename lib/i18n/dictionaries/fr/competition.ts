@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "Inscription IronClad",
     title: "Inscription du joueur esport",
+    dialogDescription:
+      "Choisissez un tournoi auquel vous êtes éligible, confirmez que le profil du joueur est prêt et acceptez chaque accord requis.",
     closeAria: "Fermer le formulaire d’inscription",
+    stepProgress: "Étape {current} sur {total}",
     tournamentSelection: "Sélection du tournoi",
     tournamentSelectionDescription:
       "Sélectionnez le tournoi et le type de tableau ou d’événement auquel vous souhaitez participer.",
+    selectedTournament: "Tournoi sélectionné",
+    changeTournament: "Changer de tournoi",
     cohortSummary:
       "{requirement} — groupe d’examen actif {active}/{capacity} — {waitlisted} en attente",
     activeCohortFull: "Groupe d’examen actif complet — liste d’attente uniquement",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "Confirmation du profil du joueur",
     profileDescription:
       "L’inscription utilise votre profil de joueur IronClad enregistré. Si une information est obsolète, mettez votre profil à jour avant de continuer.",
+    readinessTitle: "Préparation du joueur",
+    profileReady: "Profil du joueur prêt",
+    steamConnected: "Identité Steam connectée",
+    relicVerificationOnSubmit:
+      "Lors de l’envoi, une vérification en direct de l’ELO Relic en 1 contre 1 et de la division est exécutée de manière sécurisée.",
+    reviewSavedDetails: "Vérifier les informations enregistrées",
     displayName: "Nom d’affichage",
     ign: "IGN",
     discordOptional: "Discord (facultatif)",
@@ -148,8 +159,14 @@ const dictionary = {
     ownershipConfirmation:
       "Je confirme utiliser mon propre compte IronClad et être propriétaire du compte Steam associé.",
     submitRegistration: "Envoyer l’inscription",
-    submittedTitle: "Inscription envoyée",
-    reviewTime: "Les inscriptions sont examinées sous 24 heures.",
+    submittedTitle: "Inscription envoyée — en attente de validation administrative",
+    reviewTime:
+      "L’administration du tournoi examinera votre inscription. Consultez votre tableau de bord pour suivre son statut.",
+    waitlistJoinedTitle: "Ajout à la liste d’attente confirmé",
+    waitlistPositionPending:
+      "Confirmation de votre position sur la liste d’attente…",
+    waitlistResultDescription:
+      "Une place n’est pas garantie. La file suit l’ordre d’arrivée. Si une place se libère, vous pourrez recevoir une offre ; gérez les offres depuis votre tableau de bord.",
     back: "Retour",
     cancel: "Annuler",
     continue: "Continuer",

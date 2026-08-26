@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "Inscrição IronClad",
     title: "Inscrição de jogador de esports",
+    dialogDescription:
+      "Escolha um torneio para o qual você seja elegível, confirme que o perfil do jogador está pronto e aceite cada acordo obrigatório.",
     closeAria: "Fechar inscrição",
+    stepProgress: "Etapa {current} de {total}",
     tournamentSelection: "Seleção do torneio",
     tournamentSelectionDescription:
       "Selecione o torneio e o tipo de chave ou evento do qual deseja participar.",
+    selectedTournament: "Torneio selecionado",
+    changeTournament: "Mudar de torneio",
     cohortSummary:
       "{requirement} — grupo ativo de análise {active}/{capacity} — {waitlisted} na lista de espera",
     activeCohortFull: "Grupo ativo de análise lotado — somente lista de espera",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "Confirmação do perfil do jogador",
     profileDescription:
       "A inscrição usa seu perfil de jogador salvo no IronClad. Se alguma informação estiver desatualizada, atualize o perfil antes de continuar.",
+    readinessTitle: "Preparação do jogador",
+    profileReady: "Perfil do jogador pronto",
+    steamConnected: "Identidade Steam conectada",
+    relicVerificationOnSubmit:
+      "Ao enviar, uma verificação em tempo real do ELO 1v1 da Relic e da divisão é executada com segurança.",
+    reviewSavedDetails: "Revisar dados salvos",
     displayName: "Nome de exibição",
     ign: "IGN",
     discordOptional: "Discord (opcional)",
@@ -148,8 +159,14 @@ const dictionary = {
     ownershipConfirmation:
       "Confirmo que uso minha própria conta IronClad e que a conta Steam vinculada pertence a mim.",
     submitRegistration: "Enviar inscrição",
-    submittedTitle: "Inscrição enviada",
-    reviewTime: "As inscrições são analisadas em até 24 horas.",
+    submittedTitle: "Inscrição enviada — aguardando análise da Administração",
+    reviewTime:
+      "A administração do torneio analisará sua inscrição. Consulte o Dashboard para acompanhar as atualizações de status.",
+    waitlistJoinedTitle: "Entrada na lista de espera confirmada",
+    waitlistPositionPending:
+      "Confirmando sua posição na lista de espera…",
+    waitlistResultDescription:
+      "A vaga não é garantida. A fila segue a ordem de chegada. Se surgir uma vaga, você poderá receber uma oferta; gerencie as ofertas pelo Dashboard.",
     back: "Voltar",
     cancel: "Cancelar",
     continue: "Continuar",

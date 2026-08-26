@@ -317,10 +317,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "IronClad Registration",
     title: "Esports Player Registration",
+    dialogDescription:
+      "Choose an eligible Tournament, confirm Player readiness and accept each required agreement.",
     closeAria: "Close registration",
+    stepProgress: "Step {current} of {total}",
     tournamentSelection: "Tournament Selection",
     tournamentSelectionDescription:
       "Select the tournament and bracket/event type you want to join.",
+    selectedTournament: "Selected Tournament",
+    changeTournament: "Change Tournament",
     cohortSummary:
       "{requirement} — active review cohort {active}/{capacity} — {waitlisted} waitlisted",
     activeCohortFull: "Active review cohort full — waitlist only",
@@ -333,6 +338,12 @@ const dictionary = {
     profileTitle: "Player Profile Confirmation",
     profileDescription:
       "Registration uses your saved IronClad player profile. Update your profile before continuing if any information is outdated.",
+    readinessTitle: "Player Readiness",
+    profileReady: "Player profile ready",
+    steamConnected: "Steam identity connected",
+    relicVerificationOnSubmit:
+      "A live Relic 1v1 ELO and Division check runs securely when you submit.",
+    reviewSavedDetails: "Review saved details",
     displayName: "Display Name",
     ign: "IGN",
     discordOptional: "Discord (optional)",
@@ -359,8 +370,13 @@ const dictionary = {
     ownershipConfirmation:
       "I confirm that I am using my own IronClad account and that the linked Steam account belongs to me.",
     submitRegistration: "Submit Registration",
-    submittedTitle: "Registration Submitted",
-    reviewTime: "Registrations are reviewed within 24 hours.",
+    submittedTitle: "Registration submitted — Pending Admin review",
+    reviewTime:
+      "Tournament administration will review your submission. Check your Dashboard for status updates.",
+    waitlistJoinedTitle: "Waitlist joined",
+    waitlistPositionPending: "Confirming your waitlist position…",
+    waitlistResultDescription:
+      "A place is not guaranteed. The queue is first-in, first-out. If a vacancy opens, you may receive an offer; manage offers from your Dashboard.",
     back: "Back",
     cancel: "Cancel",
     continue: "Continue",

@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "IronClad 등록",
     title: "e스포츠 선수 등록",
+    dialogDescription:
+      "참가 자격이 있는 토너먼트를 선택하고 선수 준비 상태를 확인한 뒤 각 필수 동의 항목에 동의하세요.",
     closeAria: "등록 창 닫기",
+    stepProgress: "{total}단계 중 {current}단계",
     tournamentSelection: "토너먼트 선택",
     tournamentSelectionDescription:
       "참가할 토너먼트와 대진표 또는 이벤트 유형을 선택하세요.",
+    selectedTournament: "선택한 토너먼트",
+    changeTournament: "토너먼트 변경",
     cohortSummary:
       "{requirement} — 현재 심사 그룹 {active}/{capacity} — 대기 {waitlisted}명",
     activeCohortFull: "현재 심사 그룹 정원 마감 — 대기 명단만 가능",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "선수 프로필 확인",
     profileDescription:
       "등록에는 저장된 IronClad 선수 프로필이 사용됩니다. 오래된 정보가 있다면 계속하기 전에 프로필을 업데이트하세요.",
+    readinessTitle: "선수 준비 상태",
+    profileReady: "선수 프로필 준비 완료",
+    steamConnected: "Steam 신원 연결 완료",
+    relicVerificationOnSubmit:
+      "제출 시 Relic 1대1 ELO와 디비전을 실시간으로 안전하게 확인합니다.",
+    reviewSavedDetails: "저장된 정보 검토",
     displayName: "표시 이름",
     ign: "IGN",
     discordOptional: "Discord(선택 사항)",
@@ -147,8 +158,13 @@ const dictionary = {
     ownershipConfirmation:
       "본인의 IronClad 계정을 사용 중이며 연결된 Steam 계정도 본인 소유임을 확인합니다.",
     submitRegistration: "등록 제출",
-    submittedTitle: "등록 제출 완료",
-    reviewTime: "등록은 24시간 이내에 검토됩니다.",
+    submittedTitle: "등록 제출 완료 — 관리자 검토 대기 중",
+    reviewTime:
+      "토너먼트 운영진이 등록을 검토합니다. Dashboard에서 상태 업데이트를 확인하세요.",
+    waitlistJoinedTitle: "대기 명단 등록 완료",
+    waitlistPositionPending: "대기 명단 순위를 확인하는 중…",
+    waitlistResultDescription:
+      "참가 자리는 보장되지 않습니다. 대기열은 선착순으로 처리됩니다. 공석이 생기면 제안을 받을 수 있으며, 제안은 Dashboard에서 관리하세요.",
     back: "뒤로",
     cancel: "취소",
     continue: "계속",
