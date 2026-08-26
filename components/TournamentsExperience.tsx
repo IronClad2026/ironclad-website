@@ -3442,13 +3442,21 @@ export function RegisterModal({
       const last = focusable.at(-1);
       if (!first || !last) return;
 
-      if (!dialogRef.current?.contains(document.activeElement)) {
-        event.preventDefault();
-        (event.shiftKey ? last : first).focus();
-      } else if (event.shiftKey && document.activeElement === first) {
+      const activeElement = document.activeElement;
+      const focusIsOutsideSequence =
+        !(activeElement instanceof HTMLElement) ||
+        !focusable.includes(activeElement);
+
+      if (
+        event.shiftKey &&
+        (activeElement === first || focusIsOutsideSequence)
+      ) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (
+        !event.shiftKey &&
+        (activeElement === last || focusIsOutsideSequence)
+      ) {
         event.preventDefault();
         first.focus();
       }
@@ -3930,7 +3938,7 @@ export function RegisterModal({
                     {registrationAvailability === "waitlist"
                       ? t("registrationModal.waitlistOnly")
                       : registrationAvailability === "open"
-                        ? localizeTournamentStatus(selectedTournament.status, t)
+                        ? t("tournaments.status.open")
                         : t("tournaments.actions.registrationClosed")}
                   </span>
                 </div>

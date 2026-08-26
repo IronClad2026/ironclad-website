@@ -372,6 +372,40 @@ describe("Relic verified-division registration UI", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows open registration for an unlaunched division in a partially launched Tournament", () => {
+    const partiallyLaunched: TournamentCard = {
+      ...tournament,
+      status: "In Progress",
+      statusValue: "in_progress",
+      brackets: tournament.brackets.map((bracket) => ({
+        ...bracket,
+        launchedAt:
+          bracket.name === "Challenge Bracket"
+            ? "2026-08-06T02:00:00.000Z"
+            : null,
+      })),
+    };
+
+    renderModal("Academy", partiallyLaunched, { presentation: "phone" });
+
+    const selectedSummary = within(
+      document.querySelector(
+        '[data-registration-phone-step="tournament"]'
+      ) as HTMLElement
+    ).getByRole("region", {
+      name: competitionEnglish.registrationModal.selectedTournament,
+    });
+    expect(
+      within(selectedSummary).getByText(
+        competitionEnglish.tournaments.status.open
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(selectedSummary).queryByText("In Progress")
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+  });
+
   it("shows compact Player readiness with a closed saved-details disclosure", () => {
     renderModal("Challenge", tournament, { presentation: "phone" });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -506,6 +540,7 @@ describe("Relic verified-division registration UI", () => {
     advanceToAgreements();
 
     const register = screen.getByRole("button", { name: "Register" });
+    register.focus();
     fireEvent.click(register);
     fireEvent.click(register);
 
@@ -525,6 +560,10 @@ describe("Relic verified-division registration UI", () => {
         name: competitionEnglish.registrationModal.submitting,
       })
     ).toBeDisabled();
+
+    const firstPendingFocusable = screen.getAllByRole("checkbox")[0];
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(firstPendingFocusable).toHaveFocus();
 
     fireEvent.keyDown(window, { key: "Escape" });
     fireEvent.mouseDown(dialog.parentElement as HTMLElement);
