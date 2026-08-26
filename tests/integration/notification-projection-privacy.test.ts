@@ -24,7 +24,10 @@ import {
   notifyPlayersOfLegacyMatchResultReview,
   notifyPlayersOfReportGroupReview,
 } from "@/lib/notification-events";
-import { loadPlayerNotifications } from "@/lib/notifications";
+import {
+  loadAdminNotifications,
+  loadPlayerNotifications,
+} from "@/lib/notifications";
 
 const recipientClerkUserId = "user_synthetic_notification_recipient";
 const actorClerkUserId = "user_synthetic_notification_actor";
@@ -255,6 +258,73 @@ describe("notification browser privacy boundary", () => {
     );
   });
 
+  it("keeps a genuine successful zero-notification result distinct from failure", async () => {
+    createSupabaseAdminClientMock.mockReturnValue(
+      createNotificationLoadClient({
+        notification: { data: [], error: null, count: null },
+        total: { data: null, error: null, count: 0 },
+        unread: { data: null, error: null, count: 0 },
+      })
+    );
+
+    await expect(
+      loadPlayerNotifications(recipientClerkUserId)
+    ).resolves.toEqual({
+      notifications: [],
+      totalCount: 0,
+      unreadCount: 0,
+      error: null,
+    });
+  });
+
+  it("marks a backend notification failure instead of authoritatively reporting zero", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    createSupabaseAdminClientMock.mockReturnValue(
+      createNotificationLoadClient({
+        notification: {
+          data: null,
+          error: { message: "private backend detail" },
+          count: null,
+        },
+        total: { data: null, error: null, count: 0 },
+        unread: { data: null, error: null, count: 0 },
+      })
+    );
+
+    const result = await loadPlayerNotifications(recipientClerkUserId);
+
+    expect(result.error).toBe("Notifications could not be loaded.");
+    expect(consoleError).toHaveBeenCalledWith(
+      "Notification operation failed.",
+      expect.objectContaining({ operation: "load-player" })
+    );
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+      "private backend detail"
+    );
+    consoleError.mockRestore();
+  });
+
+  it("rejects invalid Admin notification counts instead of reporting empty work", async () => {
+    createSupabaseAdminClientMock.mockReturnValue(
+      createNotificationLoadClient({
+        notification: { data: [], error: null, count: null },
+        total: { data: null, error: null, count: null },
+        unread: { data: null, error: null, count: 0 },
+      })
+    );
+
+    const result = await loadAdminNotifications();
+
+    expect(result).toEqual({
+      notifications: [],
+      totalCount: 0,
+      unreadCount: 0,
+      error: "Notifications could not be loaded.",
+    });
+  });
+
   it("does not persist a reviewer Clerk ID in report-group review notifications", async () => {
     const client = createNotificationContextClient();
     createInAppNotificationsMock.mockResolvedValue(true);
@@ -432,4 +502,44 @@ function createNotificationProjectionClient(row: Record<string, unknown>) {
     calls,
     client: { from },
   };
+}
+
+function createNotificationLoadClient({
+  notification,
+  total,
+  unread,
+}: {
+  notification: NotificationQueryResult;
+  total: NotificationQueryResult;
+  unread: NotificationQueryResult;
+}) {
+  const results = [notification, total, unread];
+  let index = 0;
+  const from = vi.fn(() => createNotificationQuery(results[index++]));
+
+  return { from };
+}
+
+type NotificationQueryResult = {
+  data: unknown;
+  error: { message: string } | null;
+  count: number | null;
+};
+
+function createNotificationQuery(result: NotificationQueryResult) {
+  type MethodName = "eq" | "is" | "limit" | "order" | "select";
+  type Method = (...args: unknown[]) => Query;
+  type Query = PromiseLike<NotificationQueryResult> &
+    Record<MethodName, Method>;
+
+  const target: Partial<Query> = {};
+  const query = target as Query;
+
+  for (const method of ["eq", "is", "limit", "order", "select"] as const) {
+    target[method] = () => query;
+  }
+  target.then = (resolve, reject) =>
+    Promise.resolve(result).then(resolve, reject);
+
+  return query;
 }

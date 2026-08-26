@@ -121,6 +121,46 @@ describe("public-player projection", () => {
     ]);
   });
 
+  it("returns an empty directory after a successful zero-row response", async () => {
+    const supabase = createSupabaseQueryMock({ data: [] });
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
+
+    await expect(getPublicPlayers()).resolves.toEqual([]);
+  });
+
+  it("throws a generic failure when the directory query fails", async () => {
+    const supabase = createSupabaseQueryMock({
+      error: { message: "private database detail" },
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
+
+    await expect(getPublicPlayers()).rejects.toThrow(
+      "Public players could not be loaded."
+    );
+    expect(consoleError).toHaveBeenCalledWith("Public players load failed.");
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+      "private database detail"
+    );
+    consoleError.mockRestore();
+  });
+
+  it("rejects a null directory response instead of treating it as empty", async () => {
+    const supabase = createSupabaseQueryMock({ data: null, error: null });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
+
+    await expect(getPublicPlayers()).rejects.toThrow(
+      "Public players could not be loaded."
+    );
+    expect(consoleError).toHaveBeenCalledWith("Public players load failed.");
+    consoleError.mockRestore();
+  });
+
   it("rejects an invalid player ID before creating a Supabase client", async () => {
     await expect(getPublicPlayerById("not-a-uuid")).resolves.toBeNull();
     expect(publicSupabaseClientMock.from).not.toHaveBeenCalled();

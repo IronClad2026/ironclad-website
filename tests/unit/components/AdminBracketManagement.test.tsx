@@ -1,10 +1,16 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AdminBracketManagement, {
   type AdminBracketTournamentOption,
 } from "@/components/AdminBracketManagement";
+
+const refreshMock = vi.hoisted(() => vi.fn());
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: refreshMock }),
+}));
 
 vi.mock("@/app/admin/tournaments/actions", () => ({
   launchTournamentDivision: vi.fn(),
@@ -51,7 +57,60 @@ function tournamentOption(
 }
 
 describe("administrator private bracket launch controls", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    {
+      label: "an empty result",
+      tournaments: [] as AdminBracketTournamentOption[],
+      successfulEmptyCopy: "No generated tournament brackets are available.",
+    },
+    {
+      label: "a missing generated structure",
+      tournaments: [
+        tournamentOption({ generatedBracketId: null, format: null }),
+      ],
+      successfulEmptyCopy:
+        "The selected bracket has no generated structure yet.",
+    },
+  ])(
+    "shows a retryable failure instead of $label",
+    ({ tournaments, successfulEmptyCopy }) => {
+      render(
+        <AdminBracketManagement tournaments={tournaments} loadError />
+      );
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Operational Tournament/Match data could not be loaded."
+      );
+      expect(screen.queryByText(successfulEmptyCopy)).not.toBeInTheDocument();
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit Private Seeding" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Launch Division" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Open Tournament Administration" })
+      ).toHaveAttribute("href", "/admin/tournaments");
+
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(refreshMock).toHaveBeenCalledOnce();
+    }
+  );
+
+  it("preserves the normal empty state after a successful empty load", () => {
+    render(<AdminBracketManagement tournaments={[]} />);
+
+    expect(
+      screen.getByText("No generated tournament brackets are available.")
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 
   it("shows a responsive explicit launch action only for a complete private draft", () => {
     render(<AdminBracketManagement tournaments={[tournamentOption()]} />);

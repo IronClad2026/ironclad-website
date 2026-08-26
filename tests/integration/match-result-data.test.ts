@@ -207,6 +207,7 @@ const matchResultDataShape = {
     submissions: { array: submissionShape },
     reportGroups: { array: reportGroupShape },
     viewerRole: "value",
+    error: "value",
   },
 } satisfies ExactShape;
 
@@ -388,6 +389,7 @@ describe("match-result server data boundary", () => {
       submissions: [],
       reportGroups: [],
       viewerRole: "anonymous",
+      error: null,
     });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
@@ -406,9 +408,30 @@ describe("match-result server data boundary", () => {
       submissions: [],
       reportGroups: [],
       viewerRole: "participant",
+      error: null,
     });
     expect(supabase.from).toHaveBeenCalledOnce();
     expect(supabase.from).toHaveBeenCalledWith("registrations");
+  });
+
+  it("distinguishes an authenticated load failure from a genuine empty result", async () => {
+    const supabase = createQueuedClient({
+      registrations: [
+        { data: null, error: { message: SECRET_REPLAY_PATH } },
+      ],
+    });
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    const result = await loadMatchResultData();
+
+    expect(result).toEqual({
+      submissions: [],
+      reportGroups: [],
+      viewerRole: "participant",
+      error: "load-failed",
+    });
+    expectNoSensitiveBrowserData(result, [SECRET_REPLAY_PATH]);
   });
 
   it.each([
@@ -443,7 +466,7 @@ describe("match-result server data boundary", () => {
     }
   );
 
-  it("rejects unexpected database fields and returns an empty safe result", async () => {
+  it("rejects unexpected database fields and preserves a safe load-failure signal", async () => {
     const supabase = participantClient(SUBMITTER_REGISTRATION_ID);
     const submissionQueue = [
       {
@@ -482,6 +505,7 @@ describe("match-result server data boundary", () => {
       submissions: [],
       reportGroups: [],
       viewerRole: "participant",
+      error: "load-failed",
     });
     expectNoSensitiveBrowserData(result, [
       SECRET_REPLAY_PATH,

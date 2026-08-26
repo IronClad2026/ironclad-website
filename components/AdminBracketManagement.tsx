@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { GitBranch } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { GitBranch, RefreshCw } from "lucide-react";
 import AdminBracketPopulation, {
   type BracketPopulationData,
 } from "@/components/AdminBracketPopulation";
@@ -35,8 +36,10 @@ export type AdminBracketTournamentOption = {
 export default function AdminBracketManagement({
   tournaments,
   notice,
+  loadError = false,
 }: {
   tournaments: AdminBracketTournamentOption[];
+  loadError?: boolean;
   notice?:
     | "population-saved"
     | "population-failed"
@@ -44,6 +47,7 @@ export default function AdminBracketManagement({
     | "division-already-launched"
     | "division-launch-failed";
 }) {
+  const router = useRouter();
   const [tournamentId, setTournamentId] = useState(tournaments[0]?.id ?? "");
   const selectedTournament = useMemo(
     () =>
@@ -122,7 +126,38 @@ export default function AdminBracketManagement({
         </div>
       </div>
 
-      {notice && (
+      {loadError && (
+        <div
+          role="alert"
+          className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-100"
+        >
+          <p className="font-black uppercase tracking-wider text-red-300">
+            Operational data unavailable
+          </p>
+          <p className="mt-2 text-sm leading-6">
+            Operational Tournament/Match data could not be loaded. Retry before
+            making bracket, seeding, or launch decisions.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-black text-white transition hover:bg-red-400"
+            >
+              <RefreshCw aria-hidden="true" size={16} />
+              Retry
+            </button>
+            <Link
+              href="/admin/tournaments"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 py-2 text-sm font-black text-white transition hover:border-white/30 hover:bg-white/5"
+            >
+              Open Tournament Administration
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {!loadError && notice && (
         <div
           className={`mt-4 rounded-xl border p-3 text-sm font-bold ${
               notice === "population-saved" ||
@@ -144,7 +179,7 @@ export default function AdminBracketManagement({
         </div>
       )}
 
-      {tournaments.length === 0 ? (
+      {!loadError && (tournaments.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm text-zinc-500">
           No generated tournament brackets are available.
         </div>
@@ -310,7 +345,7 @@ export default function AdminBracketManagement({
             </p>
           )}
         </>
-      )}
+      ))}
     </section>
   );
 }

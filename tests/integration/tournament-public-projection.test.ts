@@ -348,7 +348,7 @@ describe("public tournament bracket data boundary", () => {
     });
   });
 
-  it("fails closed to the public projection when the admin audit query fails", async () => {
+  it("surfaces a failure when the Admin Match audit cannot be trusted", async () => {
     const publicQuery = createSupabaseQueryMock({
       data: [generatedBracketRow],
     });
@@ -363,16 +363,11 @@ describe("public tournament bracket data boundary", () => {
       .mockReturnValueOnce(publicQuery.client)
       .mockReturnValueOnce(auditQuery.client);
 
-    const result = await loadGeneratedBracketPageRows({
-      includeAdminAudit: true,
-    });
-    const payload = JSON.stringify(
-      mapGeneratedBrackets(result.data, tournamentRows).get("tournament-1")
-    );
-
-    expect(result.error).toBeNull();
-    expect(payload).not.toContain("officialResult");
-    expect(payload).not.toContain("submission_must_not_leak");
+    await expect(
+      loadGeneratedBracketPageRows({
+        includeAdminAudit: true,
+      })
+    ).rejects.toThrow("Tournament match audit unavailable.");
     expect(consoleError).toHaveBeenCalledWith(
       "Tournament match audit load failed.",
       {
@@ -394,6 +389,21 @@ describe("public tournament bracket data boundary", () => {
     ).resolves.toEqual({
       data: [],
       error: { message: "public query unavailable" },
+    });
+    expect(authMock).not.toHaveBeenCalled();
+  });
+
+  it("marks a null generated-bracket response as invalid instead of empty", async () => {
+    const publicQuery = createSupabaseQueryMock({ data: null });
+    createSupabaseAdminClientMock.mockReturnValue(publicQuery.client);
+
+    await expect(
+      loadGeneratedBracketPageRows({
+        includeAdminAudit: false,
+      })
+    ).resolves.toEqual({
+      data: [],
+      error: { message: "Generated tournament bracket response was invalid." },
     });
     expect(authMock).not.toHaveBeenCalled();
   });

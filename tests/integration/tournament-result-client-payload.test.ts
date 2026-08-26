@@ -368,7 +368,9 @@ function createPageClient(
     }
   > = {},
   viewerEloVerificationSource: string | null = "relic",
-  viewerVerifiedElo: number | null = 1500
+  viewerVerifiedElo: number | null = 1500,
+  tournamentError: QueryResult["error"] = null,
+  emptyTournaments = false
 ) {
   const rawTournament = {
     id: TOURNAMENT_ID,
@@ -488,7 +490,10 @@ function createPageClient(
     };
   });
   const results: Record<string, QueryResult> = {
-    tournaments: { data: [rawTournament], error: null },
+    tournaments: {
+      data: tournamentError ? null : emptyTournaments ? [] : [rawTournament],
+      error: tournamentError,
+    },
     registrations: { data: registrations, error: null },
     players: { data: players, error: null },
     tournament_bracket_map_pool_entries: { data: [], error: null },
@@ -571,6 +576,8 @@ async function loadClientProps({
   participantProfiles,
   viewerEloVerificationSource,
   viewerVerifiedElo,
+  tournamentError,
+  emptyTournaments,
 }: {
   admin: boolean;
   participantCurrentElo?: number;
@@ -584,6 +591,8 @@ async function loadClientProps({
   participantProfiles?: Parameters<typeof createPageClient>[9];
   viewerEloVerificationSource?: string | null;
   viewerVerifiedElo?: number | null;
+  tournamentError?: QueryResult["error"];
+  emptyTournaments?: boolean;
   viewerRegistrationStatus?:
     | "pending"
     | "manual_review"
@@ -608,7 +617,9 @@ async function loadClientProps({
     waitlistOfferStatus,
     participantProfiles,
     viewerEloVerificationSource,
-    viewerVerifiedElo
+    viewerVerifiedElo,
+    tournamentError,
+    emptyTournaments
   );
   createSupabaseAdminClientMock.mockReturnValue(client);
 
@@ -670,6 +681,7 @@ describe("tournament Client Component result payload", () => {
       submissions: [safeSubmission],
       reportGroups: [safeReportGroup],
       viewerRole: "participant",
+      error: null,
     });
     loadTournamentPollsForRequestMock.mockResolvedValue({
       pollsByTournament: { [TOURNAMENT_ID]: [] },
@@ -1011,27 +1023,70 @@ describe("tournament Client Component result payload", () => {
     }
   );
 
-  it("returns a safe null division when the private lookup fails", async () => {
+  it("fails the Tournament surface when the private division lookup fails", async () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
-    const { props } = await loadClientProps({
-      admin: false,
-      verifiedDivision: "Challenge",
-      verifiedDivisionError: {
-        message: `${SECRET_PLAYER_ID} private database detail`,
-      },
-    });
-    const viewer = props.viewer as {
-      relicVerifiedDivision: string | null;
-    };
 
-    expect(viewer.relicVerifiedDivision).toBeNull();
+    await expect(
+      loadClientProps({
+        admin: false,
+        verifiedDivision: "Challenge",
+        verifiedDivisionError: {
+          message: `${SECRET_PLAYER_ID} private database detail`,
+        },
+      })
+    ).rejects.toThrow("Tournament data could not be loaded.");
     expect(consoleError).toHaveBeenCalledWith(
       "Tournament verified division load failed."
     );
     expect(serializePrivacyValue(consoleError.mock.calls)).not.toContain(
       SECRET_PLAYER_ID
+    );
+  });
+
+  it("does not render generated-bracket empty states after a bracket load failure", async () => {
+    loadGeneratedBracketPageRowsMock.mockResolvedValue({
+      data: [],
+      error: { message: "generated brackets unavailable" },
+    });
+
+    await expect(loadClientProps({ admin: true })).rejects.toThrow(
+      "Tournament data could not be loaded."
+    );
+  });
+
+  it("does not render the normal empty-Tournament state after the primary query fails", async () => {
+    await expect(
+      loadClientProps({
+        admin: false,
+        tournamentError: { message: "tournaments unavailable" },
+      })
+    ).rejects.toThrow("Tournament data could not be loaded.");
+  });
+
+  it("preserves the normal empty-Tournament state after a successful zero-row response", async () => {
+    const { props } = await loadClientProps({
+      admin: false,
+      emptyTournaments: true,
+    });
+
+    expect(props).not.toHaveProperty("tournaments");
+    expect(props).toHaveProperty("t");
+    expect(loadTournamentPollsForRequestMock).not.toHaveBeenCalled();
+    expect(loadMatchResultDataMock).not.toHaveBeenCalled();
+  });
+
+  it("does not render Admin result controls after Match data fails to load", async () => {
+    loadMatchResultDataMock.mockResolvedValue({
+      submissions: [],
+      reportGroups: [],
+      viewerRole: "admin",
+      error: "load-failed",
+    });
+
+    await expect(loadClientProps({ admin: true })).rejects.toThrow(
+      "Tournament Match data could not be loaded."
     );
   });
 });

@@ -328,6 +328,15 @@ export default async function PlayerDashboardPage() {
                 ),
               ].join("|")}
               notifications={career.notifications}
+              error={
+                career.error
+                  ? t(
+                      career.error === "load-failed"
+                        ? "dashboard.career.loadError"
+                        : "dashboard.career.partialError"
+                    )
+                  : null
+              }
             />
           </div>
 
@@ -352,25 +361,17 @@ export default async function PlayerDashboardPage() {
           />
         </div>
 
-        {career.error && (
-          <div className="mt-6">
-            <DashboardError
-              message={t(
-                career.error === "load-failed"
-                  ? "dashboard.career.loadError"
-                  : "dashboard.career.partialError"
-              )}
+        {!career.error && (
+          <>
+            <PlayerStatisticsSection
+              statistics={career.statistics}
+              locale={locale}
+              t={t}
             />
-          </div>
+            <DashboardChampionHistory champions={career.champions} />
+            <DashboardMatchHistory matches={career.matchHistory} />
+          </>
         )}
-
-        <PlayerStatisticsSection
-          statistics={career.statistics}
-          locale={locale}
-          t={t}
-        />
-        <DashboardChampionHistory champions={career.champions} />
-        <DashboardMatchHistory matches={career.matchHistory} />
 
         <section className="mt-8">
           <div className="flex items-end justify-between gap-4">

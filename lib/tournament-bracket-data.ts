@@ -135,7 +135,14 @@ export async function loadGeneratedBracketPageRows({
     };
   }
 
-  const publicRows = sanitizeGeneratedBracketRows(data ?? []);
+  if (!Array.isArray(data)) {
+    return {
+      data: [],
+      error: { message: "Generated tournament bracket response was invalid." },
+    };
+  }
+
+  const publicRows = sanitizeGeneratedBracketRows(data);
 
   if (!includeAdminAudit) {
     return {
@@ -188,19 +195,30 @@ export async function loadAdminTournamentMatchAudit(
     console.error("Tournament match audit load failed.", {
       operation: "load-tournament-match-audit",
     });
-    return auditByMatchId;
+    throw new Error("Tournament match audit unavailable.");
+  }
+
+  if (
+    !Array.isArray(matchResult.data) ||
+    matchResult.data.length !== uniqueMatchIds.length ||
+    !Array.isArray(reminderResult.data)
+  ) {
+    console.error("Tournament match audit response was invalid.", {
+      operation: "load-tournament-match-audit",
+    });
+    throw new Error("Tournament match audit unavailable.");
   }
 
   const remindersByMatchId = new Map<
     string,
     { one: string | null; two: string | null }
   >();
-  const matchRows = (matchResult.data ?? []) as TournamentMatchAuditDatabaseRow[];
+  const matchRows = matchResult.data as TournamentMatchAuditDatabaseRow[];
   const activationVersionByMatchId = new Map(
     matchRows.map((row) => [row.id, row.activation_version])
   );
 
-  for (const row of (reminderResult.data ?? []) as ReminderNotificationRow[]) {
+  for (const row of reminderResult.data as ReminderNotificationRow[]) {
     if (!row.match_id) continue;
 
     const ordinal = Number(

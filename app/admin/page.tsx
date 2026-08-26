@@ -931,12 +931,27 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     ]);
   const registrationsData = registrationResult.data;
   const error = registrationResult.error;
+  const invalidRegistrationResponse = !Array.isArray(registrationsData);
+  const invalidTournamentResponse = !Array.isArray(tournamentResult.data);
+  const invalidGeneratedBracketResponse = !Array.isArray(
+    generatedResult.data
+  );
 
   if (error) {
     console.error("Supabase registrations fetch error:", error.message);
   }
 
-  const baseRegistrations = (registrationsData ?? []) as SupabaseRegistration[];
+  if (
+    (!error && invalidRegistrationResponse) ||
+    (!tournamentResult.error && invalidTournamentResponse) ||
+    (!generatedResult.error && invalidGeneratedBracketResponse)
+  ) {
+    console.error("Admin Tournament operations returned an invalid response.");
+  }
+
+  const baseRegistrations = (Array.isArray(registrationsData)
+    ? registrationsData
+    : []) as SupabaseRegistration[];
   const registrationOrderInputs: AdminRegistrationOrderInput[] =
     baseRegistrations.map((registration) => ({
       registrationId: registration.id,
@@ -950,7 +965,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     registrationOrderInputs
   );
   const tournaments = [
-    ...((tournamentResult.data ?? []) as AdminTournamentOption[]),
+    ...((Array.isArray(tournamentResult.data)
+      ? tournamentResult.data
+      : []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
   const tournamentBracketIds = tournaments.flatMap((tournament) =>
     (tournament.tournament_brackets ?? []).map((bracket) => bracket.id)
@@ -964,7 +981,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           .is("removed_at", null)
       : { data: [], error: null };
   const currentMapCountByBracket = new Map<string, number>();
-  for (const entry of (currentMapPoolResult.data ?? []) as {
+  const currentMapPoolRows = Array.isArray(currentMapPoolResult.data)
+    ? currentMapPoolResult.data
+    : [];
+  for (const entry of currentMapPoolRows as {
     tournament_bracket_id: string;
   }[]) {
     currentMapCountByBracket.set(
@@ -975,6 +995,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   if (currentMapPoolResult.error) {
     console.error("Admin map-pool readiness load failed.");
+  } else if (!Array.isArray(currentMapPoolResult.data)) {
+    console.error("Admin map-pool readiness returned an invalid response.");
   }
   const readinessResults = await Promise.all(
     tournaments.flatMap((tournament) =>
@@ -993,6 +1015,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         }
 
         const result = Array.isArray(data) ? data[0] : data;
+        if (!result) {
+          console.error("Admin division readiness returned an invalid response.");
+        }
         return result
           ? {
               bracketId: bracket.id,
@@ -1008,10 +1033,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       })
     )
   );
+  const readinessLoadFailed = readinessResults.some(
+    (result) => result === null
+  );
   const readinessByBracket = new Map(
     readinessResults
       .filter((result) => result !== null)
       .map((result) => [result.bracketId, result])
+  );
+  const bracketOperationsLoadFailed = Boolean(
+    error ||
+      tournamentResult.error ||
+      generatedResult.error ||
+      currentMapPoolResult.error ||
+      invalidRegistrationResponse ||
+      invalidTournamentResponse ||
+      invalidGeneratedBracketResponse ||
+      !Array.isArray(currentMapPoolResult.data) ||
+      readinessLoadFailed
   );
   const tournamentsById = new Map(
     tournaments.map((tournament) => [tournament.id, tournament.title])
@@ -1120,7 +1159,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     .slice(0, 6);
   const generatedByBracket = new Map(
     (
-      (generatedResult.data ?? []) as {
+      (Array.isArray(generatedResult.data) ? generatedResult.data : []) as {
         id: string;
         tournament_bracket_id: string;
         format: "single_elimination" | "round_robin";
@@ -1701,6 +1740,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <AdminBracketManagement
               tournaments={bracketManagementTournaments}
               notice={params?.bracketNotice}
+              loadError={bracketOperationsLoadFailed}
             />
 
             <AdminEloVerificationChecker

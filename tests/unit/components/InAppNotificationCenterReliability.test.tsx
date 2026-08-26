@@ -338,7 +338,7 @@ describe("notification-center mutation reliability", () => {
     });
   });
 
-  it("does not request badge reconciliation from a failed initial load", async () => {
+  it("preserves the authoritative empty state after a successful load", () => {
     render(
       <InAppNotificationCenter
         scope="player"
@@ -348,18 +348,48 @@ describe("notification-center mutation reliability", () => {
         notifications={[]}
         totalCount={0}
         unreadCount={0}
-        error="Notifications could not be loaded."
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: /Notifications/i }));
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Notifications could not be loaded.")
-      ).toBeInTheDocument();
-    });
-    expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+    expect(screen.getByText("0 total · 0 unread")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Notifications/i }));
+    expect(screen.getByText("No updates.")).toBeInTheDocument();
   });
+
+  it.each(["player", "admin"] as const)(
+    "shows an immediate retry state for a failed %s initial load",
+    (scope) => {
+      render(
+        <InAppNotificationCenter
+          scope={scope}
+          title={scope === "admin" ? "Admin Notification Center" : "Notifications"}
+          description="Recent updates."
+          emptyMessage="No updates."
+          notifications={[]}
+          totalCount={0}
+          unreadCount={0}
+          error="Notifications could not be loaded."
+        />
+      );
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Notifications could not be loaded."
+      );
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Retry to load the latest notifications"
+      );
+      expect(screen.queryByText("0 total · 0 unread")).not.toBeInTheDocument();
+      expect(screen.queryByText("Total")).not.toBeInTheDocument();
+      expect(screen.queryByText("Unread")).not.toBeInTheDocument();
+      expect(screen.queryByText("No updates.")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(refreshMock).toHaveBeenCalledOnce();
+      expect(requestBadgeReconciliationMock).not.toHaveBeenCalled();
+    }
+  );
 
   it("does not use projected Match actions as badge truth", () => {
     render(
