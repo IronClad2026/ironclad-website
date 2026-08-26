@@ -43,6 +43,7 @@ type AdminBracketPopulationProps = {
   tournamentTitle: string;
   bracket: BracketPopulationData;
   buttonLabel?: string;
+  workspaceTournamentId?: string;
 };
 
 export default function AdminBracketPopulation(
@@ -63,6 +64,7 @@ function AdminBracketPopulationWorkspace({
   tournamentTitle,
   bracket,
   buttonLabel = "Populate Bracket",
+  workspaceTournamentId,
 }: AdminBracketPopulationProps) {
   const [open, setOpen] = useState(false);
   const portalRoot =
@@ -586,6 +588,13 @@ function AdminBracketPopulationWorkspace({
                         name="assignments"
                         value={serializedAssignments}
                       />
+                      {workspaceTournamentId && (
+                        <input
+                          type="hidden"
+                          name="workspaceTournamentId"
+                          value={workspaceTournamentId}
+                        />
+                      )}
                       <button
                         type="submit"
                         className="min-h-11 w-full rounded-xl bg-orange-500 px-6 py-3 text-sm font-black text-white transition hover:bg-orange-400"

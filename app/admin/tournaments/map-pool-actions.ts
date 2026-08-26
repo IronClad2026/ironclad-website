@@ -55,7 +55,7 @@ export async function publishTournamentMapPools(formData: FormData) {
     redirectToTournament(tournamentId, "map-pool-failed");
   }
 
-  revalidateMapPoolPaths();
+  revalidateMapPoolPaths(tournamentId);
   redirectToTournament(tournamentId, "map-pool-published");
 }
 
@@ -101,7 +101,7 @@ export async function correctTournamentMapPool(formData: FormData) {
     redirectToTournament(tournamentId, "map-pool-failed");
   }
 
-  revalidateMapPoolPaths();
+  revalidateMapPoolPaths(tournamentId);
   redirectToTournament(tournamentId, "map-pool-corrected");
 }
 
@@ -132,17 +132,23 @@ function isUuid(value: string) {
   );
 }
 
-function revalidateMapPoolPaths() {
+function revalidateMapPoolPaths(tournamentId: string) {
   revalidatePath("/admin");
   revalidatePath("/admin/tournaments", "page");
+  if (isUuid(tournamentId)) {
+    revalidatePath(`/admin/tournaments/${tournamentId}`, "page");
+  }
   revalidatePath("/tournaments", "page");
 }
 
 function redirectToTournament(tournamentId: string, notice: string): never {
-  const selected = isUuid(tournamentId)
-    ? `?selected=${encodeURIComponent(tournamentId)}&notice=${notice}`
-    : `?notice=${notice}`;
-  redirect(`/admin/tournaments${selected}`);
+  if (isUuid(tournamentId)) {
+    redirect(
+      `/admin/tournaments/${encodeURIComponent(tournamentId)}?section=map-pool&notice=${encodeURIComponent(notice)}`
+    );
+  }
+
+  redirect(`/admin/tournaments?notice=${encodeURIComponent(notice)}`);
 }
 
 function logMapPoolFailure(operation: "publish" | "correct", error: unknown) {

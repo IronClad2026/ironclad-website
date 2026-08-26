@@ -6,6 +6,10 @@ const adminPageSource = readFileSync(
   resolve(process.cwd(), "app/admin/page.tsx"),
   "utf8"
 );
+const registrationActionsSource = readFileSync(
+  resolve(process.cwd(), "app/admin/registration-actions.ts"),
+  "utf8"
+);
 const reviewRowsSource = readFileSync(
   resolve(process.cwd(), "components/AdminRegistrationReviewRows.tsx"),
   "utf8"
@@ -41,24 +45,24 @@ function rpcNames(source: string) {
 }
 
 const notificationBuilder = sliceSource(
-  adminPageSource,
+  registrationActionsSource,
   "function buildRegistrationStatusNotification(",
-  "async function updateRegistrationStatus("
+  "export async function updateRegistrationStatus("
 );
 const updateRegistrationStatusAction = sliceSource(
-  adminPageSource,
-  "async function updateRegistrationStatus(",
-  "async function deleteSelectedRegistrations("
-);
-const approveSelectedRegistrationsAction = sliceSource(
-  adminPageSource,
-  "async function approveSelectedRegistrations(",
-  "export default async function AdminPage("
+  registrationActionsSource,
+  "export async function updateRegistrationStatus(",
+  "export async function deleteSelectedRegistrations("
 );
 const deleteSelectedRegistrationsAction = sliceSource(
-  adminPageSource,
-  "async function deleteSelectedRegistrations(",
-  "async function approveSelectedRegistrations("
+  registrationActionsSource,
+  "export async function deleteSelectedRegistrations(",
+  "export async function approveSelectedRegistrations("
+);
+const approveSelectedRegistrationsAction = registrationActionsSource.slice(
+  registrationActionsSource.indexOf(
+    "export async function approveSelectedRegistrations("
+  )
 );
 const selectedRegistrationModal = sliceSource(
   adminPageSource,
@@ -76,6 +80,60 @@ const menuActions = sliceSource(
   "function EvidenceValue("
 );
 describe("admin registration review action contracts", () => {
+  it("keeps registration mutations authoritative in one action module", () => {
+    const compactPage = compact(adminPageSource);
+    const compactActions = compact(registrationActionsSource);
+
+    expect(compactPage).toContain(
+      'from "@/app/admin/registration-actions"'
+    );
+    expect(adminPageSource).not.toContain(
+      "async function updateRegistrationStatus("
+    );
+    expect(adminPageSource).not.toContain(
+      "async function deleteSelectedRegistrations("
+    );
+    expect(adminPageSource).not.toContain(
+      "async function approveSelectedRegistrations("
+    );
+    expect(compactActions).toContain(
+      "export async function updateRegistrationStatus(formData: FormData)"
+    );
+    expect(compactActions).toContain(
+      "export async function deleteSelectedRegistrations(formData: FormData)"
+    );
+    expect(compactActions).toContain(
+      "export async function approveSelectedRegistrations(formData: FormData)"
+    );
+  });
+
+  it("accepts only a fixed UUID-scoped registration workspace return path", () => {
+    const compactActions = compact(registrationActionsSource);
+
+    expect(compactActions).toContain(
+      'formData.get("workspaceTournamentId")'
+    );
+    expect(compactActions).toContain('formData.get("workspaceSection")');
+    expect(compactActions).toContain(
+      'section !== "registrations" && section !== "players-waitlist"'
+    );
+    expect(compactActions).toContain("!isUuid(tournamentId)");
+    expect(compactActions).toContain(
+      "`/admin/tournaments/${workspaceContext.tournamentId}`"
+    );
+    expect(compactActions).toContain(': "/admin";');
+    expect(compactActions).toContain(
+      "revalidatePath(`/admin/tournaments/${workspaceContext.tournamentId}`)"
+    );
+    expect(compactActions).toContain('params.set("filter", filter)');
+    expect(compactActions).toContain('params.set("selected", selected)');
+    expect(compactActions).toContain('params.set("notice", notice)');
+    expect(compactActions).toContain('params.set("detail", detail)');
+    expect(compactActions).toContain('params.set("focus", focus)');
+    expect(compactActions).not.toContain("returnTo");
+    expect(compactActions).not.toContain("redirectUrl");
+  });
+
   it("excludes launched-division history from active FIFO queue projections", () => {
     const compactAdminPage = compact(adminPageSource);
 
@@ -257,7 +315,9 @@ describe("admin registration review action contracts", () => {
     expect(approveSelectedRegistrationsAction).not.toContain(
       "buildRegistrationStatusNotification"
     );
-    expect(adminPageSource).not.toContain("createInAppNotifications");
+    expect(registrationActionsSource).not.toContain(
+      "createInAppNotifications"
+    );
 
     expect(notificationCall).not.toContain("adminNotes");
     expect(notificationCall).not.toContain("admin_notes");

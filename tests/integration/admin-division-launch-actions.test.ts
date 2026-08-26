@@ -28,8 +28,11 @@ const actionsSource = readFileSync(
   resolve(process.cwd(), "app/admin/tournaments/actions.ts"),
   "utf8"
 );
-const pageSource = readFileSync(
-  resolve(process.cwd(), "app/admin/tournaments/page.tsx"),
+const editorSource = readFileSync(
+  resolve(
+    process.cwd(),
+    "components/admin/tournaments/TournamentEditor.tsx"
+  ),
   "utf8"
 );
 const generationActionSource = actionsSource.slice(
@@ -38,9 +41,14 @@ const generationActionSource = actionsSource.slice(
 );
 const bracketId = "323e4567-e89b-42d3-a456-426614174000";
 
-function launchFormData() {
+const tournamentId = "123e4567-e89b-42d3-a456-426614174000";
+
+function launchFormData({ workspace = false } = {}) {
   const formData = new FormData();
   formData.set("tournamentBracketId", bracketId);
+  if (workspace) {
+    formData.set("workspaceTournamentId", tournamentId);
+  }
   return formData;
 }
 
@@ -48,9 +56,10 @@ function generationFormData() {
   const formData = new FormData();
   formData.set(
     "tournamentId",
-    "123e4567-e89b-42d3-a456-426614174000"
+    tournamentId
   );
   formData.set("bracketId", bracketId);
+  formData.set("workspaceSection", "bracket");
   return formData;
 }
 
@@ -86,9 +95,9 @@ describe("explicit administrator division launch action", () => {
     authMock.mockResolvedValue(adminIdentity);
     createSupabaseAdminClientMock.mockReturnValue({ rpc });
 
-    await expect(launchTournamentDivision(launchFormData()))
+    await expect(launchTournamentDivision(launchFormData({ workspace: true })))
       .rejects.toThrow(
-        "NEXT_REDIRECT:/admin?bracketNotice=division-launched"
+        `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&bracketNotice=division-launched`
       );
     expect(rpc).toHaveBeenCalledExactlyOnceWith(
       "launch_tournament_division",
@@ -98,6 +107,10 @@ describe("explicit administrator division launch action", () => {
       }
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
+    expect(revalidatePathMock).toHaveBeenCalledWith(
+      `/admin/tournaments/${tournamentId}`,
+      "page"
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
   });
@@ -156,7 +169,7 @@ describe("private bracket generation action", () => {
 
     await expect(generateTournamentBracket(generationFormData()))
       .rejects.toThrow(
-        "NEXT_REDIRECT:/admin/tournaments?selected=123e4567-e89b-42d3-a456-426614174000&notice=bracket-generated"
+        `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&notice=bracket-generated`
       );
     expect(rpc).toHaveBeenCalledExactlyOnceWith(
       "generate_tournament_bracket",
@@ -170,13 +183,15 @@ describe("private bracket generation action", () => {
 
 describe("generic tournament editor lifecycle boundary", () => {
   it("does not expose ordinary start or reopen status choices", () => {
-    expect(pageSource).not.toContain('["in_progress", "In Progress"]');
-    expect(pageSource).toContain(
+    expect(editorSource).not.toContain('["in_progress", "In Progress"]');
+    expect(editorSource).toContain(
       'return [["in_progress", "In Progress — managed by division launch"]]'
     );
-    expect(pageSource).toContain(
+    expect(editorSource).toContain(
       'return [["completed", "Completed — managed by match lifecycle"]]'
     );
+    expect(editorSource).toContain('name="workspaceSection"');
+    expect(editorSource).toContain('value="bracket"');
   });
 
   it("validates lifecycle transitions against authoritative stored state", () => {

@@ -37,9 +37,11 @@ export default function AdminBracketManagement({
   tournaments,
   notice,
   loadError = false,
+  fixedTournamentId,
 }: {
   tournaments: AdminBracketTournamentOption[];
   loadError?: boolean;
+  fixedTournamentId?: string;
   notice?:
     | "population-saved"
     | "population-failed"
@@ -48,7 +50,9 @@ export default function AdminBracketManagement({
     | "division-launch-failed";
 }) {
   const router = useRouter();
-  const [tournamentId, setTournamentId] = useState(tournaments[0]?.id ?? "");
+  const [tournamentId, setTournamentId] = useState(
+    fixedTournamentId ?? tournaments[0]?.id ?? ""
+  );
   const selectedTournament = useMemo(
     () =>
       tournaments.find((tournament) => tournament.id === tournamentId) ??
@@ -185,23 +189,29 @@ export default function AdminBracketManagement({
         </div>
       ) : (
         <>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <label>
-              <span className="text-xs font-black uppercase tracking-wider text-zinc-500">
-                Tournament
-              </span>
-              <select
-                value={selectedTournament?.id ?? ""}
-                onChange={(event) => selectTournament(event.target.value)}
-                className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-orange-400"
-              >
-                {tournaments.map((tournament) => (
-                  <option key={tournament.id} value={tournament.id}>
-                    {tournament.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div
+            className={`mt-4 grid gap-3 ${
+              fixedTournamentId ? "" : "md:grid-cols-2"
+            }`}
+          >
+            {!fixedTournamentId && (
+              <label>
+                <span className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                  Tournament
+                </span>
+                <select
+                  value={selectedTournament?.id ?? ""}
+                  onChange={(event) => selectTournament(event.target.value)}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-orange-400"
+                >
+                  {tournaments.map((tournament) => (
+                    <option key={tournament.id} value={tournament.id}>
+                      {tournament.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             <label>
               <span className="text-xs font-black uppercase tracking-wider text-zinc-500">
@@ -249,7 +259,11 @@ export default function AdminBracketManagement({
                     requires reseeding.
                   </p>
                   <Link
-                    href={`/admin/tournaments?selected=${selectedTournament.id}`}
+                    href={
+                      fixedTournamentId
+                        ? `/admin/tournaments/${encodeURIComponent(selectedTournament.id)}?section=bracket`
+                        : `/admin/tournaments?selected=${selectedTournament.id}`
+                    }
                     className="mt-2 inline-flex min-h-11 items-center font-black text-amber-200 underline underline-offset-4"
                   >
                     Open Tournament Structure
@@ -301,6 +315,7 @@ export default function AdminBracketManagement({
                     format: selectedBracket.format,
                   }}
                   buttonLabel="Edit Private Seeding"
+                  workspaceTournamentId={fixedTournamentId}
                 />
               )}
 
@@ -314,6 +329,13 @@ export default function AdminBracketManagement({
                     name="tournamentBracketId"
                     value={selectedBracket.bracketId}
                   />
+                  {fixedTournamentId && (
+                    <input
+                      type="hidden"
+                      name="workspaceTournamentId"
+                      value={fixedTournamentId}
+                    />
+                  )}
                   <p className="text-xs font-black uppercase tracking-wider text-orange-300">
                     Final publication boundary
                   </p>

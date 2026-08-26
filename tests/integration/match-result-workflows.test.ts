@@ -359,6 +359,10 @@ describe("match-result workflow contracts", () => {
         decision: "approved",
       }
     );
+    expect(revalidatePathMock).toHaveBeenCalledWith(
+      "/admin/tournaments/[tournamentId]",
+      "page"
+    );
   });
 
   it("returns an explicit stale conflict and suppresses Admin success notifications", async () => {

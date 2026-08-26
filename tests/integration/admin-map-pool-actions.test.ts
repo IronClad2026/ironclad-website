@@ -78,7 +78,7 @@ describe("administrator Division map-pool actions", () => {
 
     await expect(publishTournamentMapPools(publishFormData()))
       .rejects.toThrow(
-        `NEXT_REDIRECT:/admin/tournaments?selected=${tournamentId}&notice=map-pool-published`
+        `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=map-pool&notice=map-pool-published`
       );
     expect(rpc).toHaveBeenCalledExactlyOnceWith(
       "publish_tournament_bracket_map_pools",
@@ -93,6 +93,10 @@ describe("administrator Division map-pool actions", () => {
       "/admin/tournaments",
       "page"
     );
+    expect(revalidatePathMock).toHaveBeenCalledWith(
+      `/admin/tournaments/${tournamentId}`,
+      "page"
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments", "page");
   });
 
@@ -104,7 +108,7 @@ describe("administrator Division map-pool actions", () => {
     createSupabaseAdminClientMock.mockReturnValue({ rpc });
 
     await expect(publishTournamentMapPools(formData)).rejects.toThrow(
-      `NEXT_REDIRECT:/admin/tournaments?selected=${tournamentId}&notice=map-pool-invalid`
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=map-pool&notice=map-pool-invalid`
     );
     expect(rpc).not.toHaveBeenCalled();
   });
@@ -115,7 +119,7 @@ describe("administrator Division map-pool actions", () => {
     authMock.mockResolvedValue(adminIdentity);
 
     await expect(correctTournamentMapPool(invalid)).rejects.toThrow(
-      `NEXT_REDIRECT:/admin/tournaments?selected=${tournamentId}&notice=map-pool-invalid`
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=map-pool&notice=map-pool-invalid`
     );
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
 
@@ -124,7 +128,7 @@ describe("administrator Division map-pool actions", () => {
 
     await expect(correctTournamentMapPool(correctionFormData()))
       .rejects.toThrow(
-        `NEXT_REDIRECT:/admin/tournaments?selected=${tournamentId}&notice=map-pool-corrected`
+        `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=map-pool&notice=map-pool-corrected`
       );
     expect(rpc).toHaveBeenCalledExactlyOnceWith(
       "correct_tournament_bracket_map_pool",

@@ -22,7 +22,7 @@ function sliceSource(source: string, startMarker: string, endMarker: string) {
 const notificationEvents = read("lib/notification-events.ts");
 const matchActions = read("app/tournaments/match-actions.ts");
 const dashboardActions = read("app/dashboard/actions.ts");
-const adminPage = read("app/admin/page.tsx");
+const adminRegistrationActions = read("app/admin/registration-actions.ts");
 const assistanceAction = read("app/tournaments/support-actions.ts");
 const stageAMigration = read(
   "supabase/migrations/20260820130000_notification_truth_reliability.sql"
@@ -112,9 +112,9 @@ describe("Stage A canonical notification event keys", () => {
   it("stabilizes registration and waitlist lifecycle events without free text", () => {
     const registrationBuilder = compact(
       sliceSource(
-        adminPage,
+        adminRegistrationActions,
         "function buildRegistrationStatusNotification(",
-        "async function updateRegistrationStatus("
+        "export async function updateRegistrationStatus("
       )
     );
     const assignmentTrigger = compact(
@@ -128,10 +128,10 @@ describe("Stage A canonical notification event keys", () => {
     expect(registrationBuilder).toContain(
       "eventKey: rejectionEventKey"
     );
-    expect(compact(adminPage)).toContain(
+    expect(compact(adminRegistrationActions)).toContain(
       "const rejectionCycle = previousRejection ? `after:${previousRejection.id}` : \"initial\""
     );
-    expect(compact(adminPage)).toContain(
+    expect(compact(adminRegistrationActions)).toContain(
       "`registration:${currentRegistration.id}:rejected:${rejectionCycle}`"
     );
     expect(registrationBuilder).not.toMatch(/eventKey:[^}]*adminNotes/);

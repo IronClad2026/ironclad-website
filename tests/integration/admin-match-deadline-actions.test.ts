@@ -147,9 +147,14 @@ describe("administrator matchup deadline actions", () => {
     );
     expect(revalidatePathMock.mock.calls.map(([path]) => path)).toEqual([
       "/admin",
+      "/admin/tournaments/[tournamentId]",
       "/dashboard",
       "/tournaments",
     ]);
+    expect(revalidatePathMock).toHaveBeenCalledWith(
+      "/admin/tournaments/[tournamentId]",
+      "page"
+    );
   });
 
   it("delegates hold and release without exposing an actor identifier in state", async () => {

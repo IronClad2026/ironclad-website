@@ -344,7 +344,7 @@ describe("tournament storage cleanup privacy", () => {
     await expect(
       saveTournament({ error: null }, formData)
     ).rejects.toThrow(
-      "NEXT_REDIRECT:/admin/tournaments?selected=tournament-1&notice=saved"
+      "NEXT_REDIRECT:/admin/tournaments/tournament-1?section=overview&notice=saved"
     );
     expect(referenceQueries).toBe(2);
     expect(client.rpc).toHaveBeenCalledWith(
@@ -436,7 +436,7 @@ describe("tournament storage cleanup privacy", () => {
         createTournamentFormData(bannerUrl)
       )
     ).rejects.toThrow(
-      "NEXT_REDIRECT:/admin/tournaments?selected=tournament-1&notice=saved"
+      "NEXT_REDIRECT:/admin/tournaments/tournament-1?section=overview&notice=saved"
     );
     expect(client.rpc).toHaveBeenCalledWith(
       "save_tournament",
@@ -777,7 +777,7 @@ describe("tournament storage cleanup privacy", () => {
     await expect(
       deleteTournament(createTournamentDeletionFormData())
     ).rejects.toThrow(
-      "NEXT_REDIRECT:/admin/tournaments?selected=tournament-1&notice=delete-protected"
+      "NEXT_REDIRECT:/admin/tournaments?notice=delete-protected"
     );
 
     expect(client.rpc).toHaveBeenCalledExactlyOnceWith(
@@ -824,7 +824,7 @@ describe("tournament storage cleanup privacy", () => {
     await expect(
       deleteTournament(createTournamentDeletionFormData())
     ).rejects.toThrow(
-      "NEXT_REDIRECT:/admin/tournaments?selected=tournament-1&notice=delete-failed"
+      "NEXT_REDIRECT:/admin/tournaments?notice=delete-failed"
     );
 
     expect(storageFrom).not.toHaveBeenCalled();
