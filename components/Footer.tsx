@@ -41,7 +41,7 @@ export default function Footer({
 
         <nav
           aria-label={copy.legalAndRules}
-          className="flex flex-wrap items-center gap-x-5 gap-y-1 leading-6 md:justify-end [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center [&>button]:inline-flex [&>button]:items-center"
+          className="flex flex-wrap items-center gap-x-5 gap-y-1 pr-20 leading-6 md:justify-end [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center [&>button]:inline-flex [&>button]:items-center"
         >
           <Link
             className="transition hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"

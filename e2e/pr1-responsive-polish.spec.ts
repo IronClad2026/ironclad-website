@@ -137,6 +137,10 @@ async function expectFooterToFit(page: Page) {
   const copyright = footer.locator("p").first();
   const navigation = footer.getByRole("navigation");
   const links = navigation.locator("a");
+  const footerActions = navigation.locator(":scope > a, :scope > button");
+  const musicPlayer = page.getByRole("complementary", {
+    name: "IronClad theme music player",
+  });
   const rulebook = getLegalDocument("rulebook");
   const participationAgreement = getLegalDocument("ppa");
   const expectedDestinations = [
@@ -172,6 +176,34 @@ async function expectFooterToFit(page: Page) {
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     await expectInside(link, navigation);
     await expectInside(link, footer);
+  }
+
+  if ((await musicPlayer.count()) === 1) {
+    const musicPlayerBox = await musicPlayer.boundingBox();
+    expect(musicPlayerBox).not.toBeNull();
+
+    if (musicPlayerBox) {
+      const actionCount = await footerActions.count();
+
+      for (let index = 0; index < actionCount; index += 1) {
+        const actionBox = await footerActions.nth(index).boundingBox();
+        expect(actionBox).not.toBeNull();
+
+        if (actionBox) {
+          const horizontalOverlap =
+            Math.min(actionBox.x + actionBox.width, musicPlayerBox.x + musicPlayerBox.width) -
+            Math.max(actionBox.x, musicPlayerBox.x);
+          const verticalOverlap =
+            Math.min(actionBox.y + actionBox.height, musicPlayerBox.y + musicPlayerBox.height) -
+            Math.max(actionBox.y, musicPlayerBox.y);
+
+          expect(
+            horizontalOverlap <= 0.5 || verticalOverlap <= 0.5,
+            `Footer action ${index} overlaps the fixed music player`
+          ).toBe(true);
+        }
+      }
+    }
   }
 
   const regions = await footer.locator("p, nav, nav > a").evaluateAll((elements) =>
