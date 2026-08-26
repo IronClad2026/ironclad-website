@@ -206,6 +206,7 @@ function isMutationResult(value: unknown): value is Record<string, unknown> {
 
 function revalidateDeadlinePaths() {
   revalidatePath("/admin");
+  revalidatePath("/admin/tournaments/[tournamentId]", "page");
   revalidatePath("/dashboard");
   revalidatePath("/tournaments");
 }

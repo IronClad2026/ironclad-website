@@ -39,11 +39,13 @@ export default function DeleteTournamentControl({
   tournamentTitle,
   editHref,
   preview,
+  variant = "menu",
 }: {
   tournamentId: string;
   tournamentTitle: string;
-  editHref: string;
+  editHref?: string;
   preview: TournamentDeletionPreview;
+  variant?: "menu" | "standalone";
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState(false);
@@ -83,54 +85,68 @@ export default function DeleteTournamentControl({
 
   return (
     <>
-      <div ref={menuRef} className="absolute top-3 right-3 z-20">
+      {variant === "standalone" ? (
         <button
           ref={actionsTriggerRef}
           type="button"
-          aria-label={`Tournament actions for ${tournamentTitle}`}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((current) => !current)}
-          className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-black/60 text-zinc-400 shadow-lg backdrop-blur-md transition hover:border-orange-400/60 hover:bg-orange-500/10 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+          onClick={() => setOpen(true)}
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm font-black text-red-100 transition hover:border-red-300 hover:bg-red-500/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300"
         >
-          <MoreVertical size={18} />
+          <Trash2 aria-hidden="true" size={17} />
+          Permanently Delete Tournament
         </button>
+      ) : (
+        <div ref={menuRef} className="absolute top-3 right-3 z-20">
+          <button
+            ref={actionsTriggerRef}
+            type="button"
+            aria-label={`Tournament actions for ${tournamentTitle}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((current) => !current)}
+            className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-black/60 text-zinc-400 shadow-lg backdrop-blur-md transition hover:border-orange-400/60 hover:bg-orange-500/10 hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+          >
+            <MoreVertical size={18} />
+          </button>
 
-        <AnimatePresence>
-          {menuOpen && (
-            <motion.div
-              role="menu"
-              initial={{ opacity: 0, scale: 0.96, y: -6 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: -4 }}
-              transition={{ duration: 0.15 }}
-              className="absolute top-12 right-0 w-52 overflow-hidden rounded-xl border border-white/15 bg-zinc-950/95 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl"
-            >
-              <Link
-                href={`${editHref}&edit=1`}
-                role="menuitem"
-                onClick={() => setMenuOpen(false)}
-                className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-zinc-200 transition hover:bg-orange-500/15 hover:text-orange-200"
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                role="menu"
+                initial={{ opacity: 0, scale: 0.96, y: -6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-12 right-0 w-52 overflow-hidden rounded-xl border border-white/15 bg-zinc-950/95 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl"
               >
-                <Pencil size={15} />
-                Edit Tournament
-              </Link>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setOpen(true);
-                }}
-                className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/15 hover:text-red-200"
-              >
-                <Trash2 size={15} />
-                Delete Tournament
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+                {editHref && (
+                  <Link
+                    href={`${editHref}&edit=1`}
+                    role="menuitem"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-zinc-200 transition hover:bg-orange-500/15 hover:text-orange-200"
+                  >
+                    <Pencil size={15} />
+                    Edit Tournament
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setOpen(true);
+                  }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/15 hover:text-red-200"
+                >
+                  <Trash2 size={15} />
+                  Delete Tournament
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {portalRoot &&
         createPortal(

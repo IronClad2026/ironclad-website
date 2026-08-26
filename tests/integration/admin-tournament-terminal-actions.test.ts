@@ -171,6 +171,7 @@ describe("administrator tournament terminal actions", () => {
       });
       expect(revalidatePathMock.mock.calls).toEqual([
         ["/admin/tournaments", "page"],
+        [`/admin/tournaments/${tournamentId}`, "page"],
         ["/dashboard"],
         ["/tournaments"],
         ["/rankings"],

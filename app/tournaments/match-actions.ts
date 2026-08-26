@@ -948,6 +948,7 @@ function revalidateTournamentPaths() {
   revalidatePath("/tournaments");
   revalidatePath("/admin");
   revalidatePath("/admin/tournaments");
+  revalidatePath("/admin/tournaments/[tournamentId]", "page");
   revalidatePath("/dashboard");
 }
 

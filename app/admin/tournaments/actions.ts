@@ -434,8 +434,11 @@ export async function saveTournament(
   }
 
   revalidatePath("/admin/tournaments", "page");
+  revalidatePath(`/admin/tournaments/${savedTournamentId}`, "page");
   revalidatePath("/tournaments");
-  redirect(`/admin/tournaments?selected=${savedTournamentId}&notice=saved`);
+  redirect(
+    `/admin/tournaments/${encodeURIComponent(savedTournamentId)}?section=overview&notice=saved`
+  );
 }
 
 export async function generateTournamentBracket(formData: FormData) {
@@ -448,10 +451,16 @@ export async function generateTournamentBracket(formData: FormData) {
 
   const tournamentId = getText(formData, "tournamentId");
   const bracketId = getText(formData, "bracketId");
+  const returnSection =
+    getText(formData, "workspaceSection") === "bracket" ? "bracket" : "edit";
 
   if (!isUuid(tournamentId) || !isUuid(bracketId)) {
     redirect(
-      `/admin/tournaments?selected=${tournamentId}&notice=generation-failed`
+      buildTournamentWorkspaceHref(
+        tournamentId,
+        returnSection,
+        "notice=generation-failed"
+      )
     );
   }
 
@@ -464,22 +473,29 @@ export async function generateTournamentBracket(formData: FormData) {
   if (error) {
     console.error("Tournament bracket generation failed:", error);
     redirect(
-      `/admin/tournaments?selected=${tournamentId}&notice=${
-        error.message.toLowerCase().includes("regenerat") ||
-        error.message.toLowerCase().includes("launched")
-          ? "generation-blocked"
-          : "generation-failed"
-      }`
+      buildTournamentWorkspaceHref(
+        tournamentId,
+        returnSection,
+        `notice=${
+          error.message.toLowerCase().includes("regenerat") ||
+          error.message.toLowerCase().includes("launched")
+            ? "generation-blocked"
+            : "generation-failed"
+        }`
+      )
     );
   }
 
   revalidatePath("/admin/tournaments", "page");
+  revalidatePath(`/admin/tournaments/${tournamentId}`, "page");
   revalidatePath("/admin");
   revalidatePath("/tournaments");
   redirect(
-    `/admin/tournaments?selected=${tournamentId}&notice=${
-      data ? "bracket-generated" : "generation-pending"
-    }`
+    buildTournamentWorkspaceHref(
+      tournamentId,
+      returnSection,
+      `notice=${data ? "bracket-generated" : "generation-pending"}`
+    )
   );
 }
 
@@ -499,9 +515,7 @@ export async function saveBracketAssignments(formData: FormData) {
   try {
     assignments = JSON.parse(rawAssignments);
   } catch {
-    redirect(
-      "/admin?bracketNotice=population-failed"
-    );
+    redirectToBracketManagement(formData, "population-failed");
   }
 
   if (
@@ -510,9 +524,7 @@ export async function saveBracketAssignments(formData: FormData) {
     !Array.isArray(assignments) ||
     assignments.length > 1024
   ) {
-    redirect(
-      "/admin?bracketNotice=population-failed"
-    );
+    redirectToBracketManagement(formData, "population-failed");
   }
 
   const supabase = createSupabaseAdminClient();
@@ -524,9 +536,7 @@ export async function saveBracketAssignments(formData: FormData) {
 
   if (error) {
     console.error("Bracket population save failed:", error);
-    redirect(
-      "/admin?bracketNotice=population-failed"
-    );
+    redirectToBracketManagement(formData, "population-failed");
   }
 
   const expectedAssignments = new Map(
@@ -576,13 +586,16 @@ export async function saveBracketAssignments(formData: FormData) {
       expectedSlotCount: expectedAssignments.size,
       savedSlotCount: savedAssignments.size,
     });
-    redirect("/admin?bracketNotice=population-failed");
+    redirectToBracketManagement(formData, "population-failed");
   }
 
   revalidatePath("/admin/tournaments", "page");
+  if (isUuid(tournamentId)) {
+    revalidatePath(`/admin/tournaments/${tournamentId}`, "page");
+  }
   revalidatePath("/admin");
   revalidatePath("/tournaments");
-  redirect("/admin?bracketNotice=population-saved");
+  redirectToBracketManagement(formData, "population-saved");
 }
 
 export async function launchTournamentDivision(formData: FormData) {
@@ -596,7 +609,7 @@ export async function launchTournamentDivision(formData: FormData) {
   const tournamentBracketId = getText(formData, "tournamentBracketId");
 
   if (!isUuid(tournamentBracketId)) {
-    redirect("/admin?bracketNotice=division-launch-failed");
+    redirectToBracketManagement(formData, "division-launch-failed");
   }
 
   const supabase = createSupabaseAdminClient();
@@ -607,14 +620,14 @@ export async function launchTournamentDivision(formData: FormData) {
 
   if (error) {
     console.error("Tournament division launch failed:", error.message);
-    redirect("/admin?bracketNotice=division-launch-failed");
+    redirectToBracketManagement(formData, "division-launch-failed");
   }
 
   const launchResult = Array.isArray(data) ? data[0] : data;
 
   if (!launchResult || typeof launchResult.launched_at !== "string") {
     console.error("Tournament division launch returned no verified state.");
-    redirect("/admin?bracketNotice=division-launch-failed");
+    redirectToBracketManagement(formData, "division-launch-failed");
   }
 
   revalidatePath("/");
@@ -622,13 +635,15 @@ export async function launchTournamentDivision(formData: FormData) {
   revalidatePath("/admin/tournaments", "page");
   revalidatePath("/dashboard");
   revalidatePath("/tournaments");
-  redirect(
-    `/admin?bracketNotice=${
-      launchResult.already_launched === true
-        ? "division-already-launched"
-        : "division-launched"
-    }`
-  );
+  const notice =
+    launchResult.already_launched === true
+      ? "division-already-launched"
+      : "division-launched";
+  const workspaceTournamentId = getWorkspaceTournamentId(formData);
+  if (workspaceTournamentId) {
+    revalidatePath(`/admin/tournaments/${workspaceTournamentId}`, "page");
+  }
+  redirectToBracketManagement(formData, notice);
 }
 
 export async function cancelTournamentAction(
@@ -712,6 +727,7 @@ async function mutateTournamentTerminalState(
   }
 
   revalidatePath("/admin/tournaments", "page");
+  revalidatePath(`/admin/tournaments/${tournamentId}`, "page");
   revalidatePath("/dashboard");
   revalidatePath("/tournaments");
   revalidatePath("/rankings");
@@ -738,7 +754,11 @@ export async function deleteTournament(formData: FormData) {
 
   if (!tournamentId || confirmation !== "DELETE") {
     redirect(
-      `/admin/tournaments?selected=${tournamentId}&notice=delete-invalid`
+      buildTournamentWorkspaceHref(
+        tournamentId,
+        "controls",
+        "notice=delete-invalid"
+      )
     );
   }
 
@@ -755,7 +775,11 @@ export async function deleteTournament(formData: FormData) {
   if (targetError || !expectedBanner) {
     logStorageCleanupFailure("validate-tournament-banner", targetError);
     redirect(
-      `/admin/tournaments?selected=${tournamentId}&notice=delete-failed`
+      buildTournamentWorkspaceHref(
+        tournamentId,
+        "controls",
+        "notice=delete-failed"
+      )
     );
   }
 
@@ -766,14 +790,22 @@ export async function deleteTournament(formData: FormData) {
 
   if (isTournamentHardDeleteGuardError(error)) {
     redirect(
-      `/admin/tournaments?selected=${tournamentId}&notice=delete-protected`
+      buildTournamentWorkspaceHref(
+        tournamentId,
+        "controls",
+        "notice=delete-protected"
+      )
     );
   }
 
   if (error || !data) {
     logStorageCleanupFailure("delete-tournament-data", error);
     redirect(
-      `/admin/tournaments?selected=${tournamentId}&notice=delete-failed`
+      buildTournamentWorkspaceHref(
+        tournamentId,
+        "controls",
+        "notice=delete-failed"
+      )
     );
   }
 
@@ -1149,6 +1181,42 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
   );
+}
+
+function buildTournamentWorkspaceHref(
+  tournamentId: string,
+  section: "overview" | "edit" | "bracket" | "controls",
+  query: string
+) {
+  if (!isUuid(tournamentId)) {
+    return `/admin/tournaments?${query}`;
+  }
+
+  return `/admin/tournaments/${encodeURIComponent(tournamentId)}?section=${section}&${query}`;
+}
+
+function getWorkspaceTournamentId(formData: FormData) {
+  const tournamentId = getText(formData, "workspaceTournamentId");
+  return isUuid(tournamentId) ? tournamentId : null;
+}
+
+function redirectToBracketManagement(
+  formData: FormData,
+  notice: string
+): never {
+  const workspaceTournamentId = getWorkspaceTournamentId(formData);
+
+  if (workspaceTournamentId) {
+    redirect(
+      buildTournamentWorkspaceHref(
+        workspaceTournamentId,
+        "bracket",
+        `bracketNotice=${encodeURIComponent(notice)}`
+      )
+    );
+  }
+
+  redirect(`/admin?bracketNotice=${encodeURIComponent(notice)}`);
 }
 
 function getOptionalText(formData: FormData, field: string) {

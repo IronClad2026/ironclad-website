@@ -47,6 +47,9 @@ export default function AdminRegistrationReviewRows({
   selectionScope,
   isTournamentTerminal,
   updateRegistrationStatusAction,
+  returnHref = "/admin",
+  workspaceTournamentId,
+  workspaceSection,
 }: {
   registrations: AdminRegistrationReviewRow[];
   activeFilter: FilterStatus;
@@ -54,6 +57,9 @@ export default function AdminRegistrationReviewRows({
   selectionScope?: string;
   isTournamentTerminal: boolean;
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
+  returnHref?: string;
+  workspaceTournamentId?: string;
+  workspaceSection?: "registrations" | "players-waitlist";
 }) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -132,6 +138,7 @@ export default function AdminRegistrationReviewRows({
             formId={formId}
             selectionScope={selectionScope}
             isTournamentTerminal={isTournamentTerminal}
+            returnHref={returnHref}
             menuOpen={
               menu?.registration.registrationId === registration.registrationId
             }
@@ -284,6 +291,9 @@ export default function AdminRegistrationReviewRows({
               activeFilter={activeFilter}
               updateRegistrationStatusAction={updateRegistrationStatusAction}
               isTournamentTerminal={isTournamentTerminal}
+              returnHref={returnHref}
+              workspaceTournamentId={workspaceTournamentId}
+              workspaceSection={workspaceSection}
               onClose={() => setMenu(null)}
             />,
             document.body
@@ -299,6 +309,7 @@ function RegistrationCard({
   formId,
   selectionScope,
   isTournamentTerminal,
+  returnHref,
   menuOpen,
   onOpenMenu,
 }: {
@@ -307,6 +318,7 @@ function RegistrationCard({
   formId: string;
   selectionScope?: string;
   isTournamentTerminal: boolean;
+  returnHref: string;
   menuOpen: boolean;
   onOpenMenu: (
     event: ReactMouseEvent<HTMLButtonElement>,
@@ -397,7 +409,11 @@ function RegistrationCard({
 
       <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <a
-          href={buildRegistrationHref(activeFilter, registration.registrationId)}
+          href={buildRegistrationHref(
+            returnHref,
+            activeFilter,
+            registration.registrationId
+          )}
           className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 py-2 text-xs font-black uppercase tracking-wider text-zinc-200 transition hover:border-orange-400/50 hover:text-orange-200"
         >
           Review details
@@ -477,6 +493,9 @@ function RegistrationContextMenu({
   activeFilter,
   updateRegistrationStatusAction,
   isTournamentTerminal,
+  returnHref,
+  workspaceTournamentId,
+  workspaceSection,
   onClose,
   menuRef,
 }: {
@@ -484,6 +503,9 @@ function RegistrationContextMenu({
   activeFilter: FilterStatus;
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
   isTournamentTerminal: boolean;
+  returnHref: string;
+  workspaceTournamentId?: string;
+  workspaceSection?: "registrations" | "players-waitlist";
   onClose: () => void;
   menuRef: RefObject<HTMLDivElement | null>;
 }) {
@@ -516,12 +538,15 @@ function RegistrationContextMenu({
               registration={registration}
               activeFilter={activeFilter}
               updateRegistrationStatusAction={updateRegistrationStatusAction}
+              workspaceTournamentId={workspaceTournamentId}
+              workspaceSection={workspaceSection}
               onSubmitStart={onClose}
             />
           ) : (
             <MenuLink
               key={`${action.kind}:${action.label}`}
               href={buildRegistrationHref(
+                returnHref,
                 activeFilter,
                 registration.registrationId,
                 action.focus
@@ -541,12 +566,16 @@ function DirectStatusAction({
   registration,
   activeFilter,
   updateRegistrationStatusAction,
+  workspaceTournamentId,
+  workspaceSection,
   onSubmitStart,
 }: {
   action: Extract<MenuAction, { kind: "direct" }>;
   registration: AdminRegistrationReviewRow;
   activeFilter: FilterStatus;
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
+  workspaceTournamentId?: string;
+  workspaceSection?: "registrations" | "players-waitlist";
   onSubmitStart: () => void;
 }) {
   return (
@@ -559,6 +588,20 @@ function DirectStatusAction({
       <input type="hidden" name="nextStatus" value={action.nextStatus} />
       <input type="hidden" name="activeFilter" value={activeFilter} />
       <input type="hidden" name="selected" value="" />
+      {workspaceTournamentId && (
+        <input
+          type="hidden"
+          name="workspaceTournamentId"
+          value={workspaceTournamentId}
+        />
+      )}
+      {workspaceSection && (
+        <input
+          type="hidden"
+          name="workspaceSection"
+          value={workspaceSection}
+        />
+      )}
       <input
         type="hidden"
         name="adminNotes"
@@ -596,6 +639,7 @@ function MenuLink({
 }
 
 function buildRegistrationHref(
+  returnHref: string,
   filter: FilterStatus,
   selected: string,
   focus?: FocusTarget
@@ -606,7 +650,8 @@ function buildRegistrationHref(
   if (focus) {
     params.set("focus", focus);
   }
-  return `/admin?${params.toString()}`;
+  const separator = returnHref.includes("?") ? "&" : "?";
+  return `${returnHref}${separator}${params.toString()}`;
 }
 
 function getMenuActions(

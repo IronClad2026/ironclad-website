@@ -153,7 +153,7 @@ describe("registration cohort presentation", () => {
   it("exposes one administrator closing-time control and division readiness labels", () => {
     const adminPageSource = readNormalizedSource("app/admin/page.tsx");
     const tournamentFormSource = readNormalizedSource(
-      "app/admin/tournaments/page.tsx"
+      "components/admin/tournaments/TournamentEditor.tsx"
     );
     const tournamentActionSource = readNormalizedSource(
       "app/admin/tournaments/actions.ts"

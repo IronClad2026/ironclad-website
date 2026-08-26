@@ -49,7 +49,17 @@ const actionsSource = readFileSync(
   "utf8"
 );
 const pageSource = readFileSync(
-  resolve(process.cwd(), "app/admin/tournaments/page.tsx"),
+  resolve(
+    process.cwd(),
+    "app/admin/tournaments/[tournamentId]/page.tsx"
+  ),
+  "utf8"
+);
+const editorSource = readFileSync(
+  resolve(
+    process.cwd(),
+    "components/admin/tournaments/TournamentEditor.tsx"
+  ),
   "utf8"
 );
 
@@ -225,7 +235,7 @@ describe("competitive hard-delete application contract", () => {
     expect(deleteAction).toContain("p_tournament_id: tournamentId");
     expect(deleteAction).toContain("p_deleted_by: userId");
     expect(deleteAction).not.toMatch(/force|override|skip_guard/i);
-    expect(pageSource).toContain('| "delete-protected"');
+    expect(editorSource).toContain('| "delete-protected"');
     expect(pageSource).toContain(
       "This tournament has launched or contains competitive history and can no longer be permanently deleted. Use the tournament recovery workflow instead."
     );
