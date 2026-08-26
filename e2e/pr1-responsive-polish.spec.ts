@@ -12,11 +12,27 @@ const desktopViewport = { width: 1440, height: 900 } as const;
 const smokeViewports = [
   ...mobileViewports.map((viewport) => ({
     ...viewport,
-    expectedOpacity: 0.42,
+    expectedContrast: 1.3,
+    expectedOpacity: 0.5,
   })),
-  { width: 1366, height: 768, expectedOpacity: 0.192 },
-  { width: 2560, height: 1440, expectedOpacity: 0.192 },
-  { width: 3440, height: 1440, expectedOpacity: 0.192 },
+  {
+    width: 1366,
+    height: 768,
+    expectedContrast: 1.05,
+    expectedOpacity: 0.23,
+  },
+  {
+    width: 2560,
+    height: 1440,
+    expectedContrast: 1.05,
+    expectedOpacity: 0.23,
+  },
+  {
+    width: 3440,
+    height: 1440,
+    expectedContrast: 1.05,
+    expectedOpacity: 0.23,
+  },
 ] as const;
 
 function getAllowedOrigin(baseURL: string | undefined) {
@@ -332,8 +348,15 @@ test("Global smoke preserves responsive visibility without intercepting content"
     const opacity = Number(await overlay.evaluate((element) =>
       window.getComputedStyle(element).opacity
     ));
+    const filter = await video.evaluate((element) =>
+      window.getComputedStyle(element).filter
+    );
+    const contrast = Number(
+      filter.match(/contrast\(([\d.]+)\)/)?.[1]
+    );
     const overlayBox = await overlay.boundingBox();
 
+    expect(contrast).toBeCloseTo(viewport.expectedContrast, 2);
     expect(opacity).toBeCloseTo(viewport.expectedOpacity, 3);
     expect(overlayBox).not.toBeNull();
     expect(overlayBox?.width ?? 0).toBeCloseTo(viewport.width, 0);
@@ -376,7 +399,7 @@ test("Android keeps the mobile smoke visibility override", async ({
 
     const overlay = smokeOverlay(page);
     await expect(overlay).toBeVisible();
-    await expect(overlay).toHaveCSS("opacity", "0.42");
+    await expect(overlay).toHaveCSS("opacity", "0.5");
     await expect(overlay).toHaveCSS("pointer-events", "none");
   } finally {
     await context.close();
