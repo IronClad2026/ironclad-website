@@ -5,6 +5,7 @@ import {
   loadDictionaries,
   loadDictionary,
 } from "@/lib/i18n/loaders";
+import { SUPPORTED_LOCALES } from "@/lib/i18n/config";
 
 describe("server dictionary loader", () => {
   it("loads all seven Italian Player namespaces", async () => {
@@ -43,6 +44,19 @@ describe("server dictionary loader", () => {
 
     expect(Object.keys(dictionaries)).toEqual(["common", "public"]);
     expect(dictionaries.common.nav.tournaments).toBe("锦标赛");
+  });
+
+  it("loads dedicated duplicate replay feedback in all eight Player locales", async () => {
+    const messages = await Promise.all(
+      SUPPORTED_LOCALES.map(async (locale) => {
+        const competition = await loadDictionary(locale, "competition");
+        return competition.matchAction.duplicateReplay;
+      })
+    );
+
+    expect(SUPPORTED_LOCALES).toHaveLength(8);
+    expect(messages.every((message) => message.trim().length > 0)).toBe(true);
+    expect(new Set(messages).size).toBe(8);
   });
 
   it("validates every launch locale and namespace against English", async () => {

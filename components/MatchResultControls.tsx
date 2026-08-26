@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 import {
   resetAdminMatch,
   saveAdminMatchResult,
@@ -449,10 +449,12 @@ export function ResultEntryForm({
   match,
   playerOneName,
   playerTwoName,
+  onPendingChange,
 }: {
   match: GeneratedTournamentMatch;
   playerOneName: string;
   playerTwoName: string;
+  onPendingChange?: (key: string, pending: boolean) => void;
 }) {
   const [state, formAction, pending] = useActionState(
     saveAdminMatchResult,
@@ -460,8 +462,14 @@ export function ResultEntryForm({
   );
   const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
 
+  useEffect(() => {
+    const key = `official-result:${match.id}`;
+    onPendingChange?.(key, pending);
+    return () => onPendingChange?.(key, false);
+  }, [match.id, onPendingChange, pending]);
+
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} aria-busy={pending} className="space-y-5">
       <input type="hidden" name="matchId" value={match.id} />
       <div>
         <p className="text-xs font-black uppercase tracking-wider text-white">
@@ -544,8 +552,10 @@ export function ResultEntryForm({
 
 export function AdminResetMatchForm({
   match,
+  onPendingChange,
 }: {
   match: GeneratedTournamentMatch;
+  onPendingChange?: (key: string, pending: boolean) => void;
 }) {
   const [confirmation, setConfirmation] = useState("");
   const [state, formAction, pending] = useActionState(
@@ -553,9 +563,16 @@ export function AdminResetMatchForm({
     initialState
   );
 
+  useEffect(() => {
+    const key = `reset-match:${match.id}`;
+    onPendingChange?.(key, pending);
+    return () => onPendingChange?.(key, false);
+  }, [match.id, onPendingChange, pending]);
+
   return (
     <form
       action={formAction}
+      aria-busy={pending}
       className="rounded-2xl border border-red-400/25 bg-red-500/[0.05] p-5"
     >
       <input type="hidden" name="matchId" value={match.id} />
@@ -607,6 +624,7 @@ export function ReportGroupReview({
   participantsById,
   t = translateCompetitionEnglish,
   locale = "en",
+  onPendingChange,
 }: {
   reportGroup: MatchResultReportGroup;
   match: GeneratedTournamentMatch;
@@ -614,6 +632,7 @@ export function ReportGroupReview({
   participantsById: Map<string, TournamentParticipant>;
   t?: CompetitionTranslator;
   locale?: Locale;
+  onPendingChange?: (key: string, pending: boolean) => void;
 }) {
   const [state, formAction, pending] = useActionState(
     reviewMatchResultReportGroup,
@@ -649,6 +668,12 @@ export function ReportGroupReview({
     ["pending_confirmation", "disputed", "under_review"].includes(
       reportGroup.status
     );
+
+  useEffect(() => {
+    const key = `report-group:${reportGroup.id}`;
+    onPendingChange?.(key, pending);
+    return () => onPendingChange?.(key, false);
+  }, [onPendingChange, pending, reportGroup.id]);
 
   return (
     <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5">
@@ -812,7 +837,11 @@ export function ReportGroupReview({
       </div>
 
       {isAdmin && actionable && (
-        <form action={formAction} className="mt-4 space-y-2">
+        <form
+          action={formAction}
+          aria-busy={pending}
+          className="mt-4 space-y-2"
+        >
           <input type="hidden" name="reportGroupId" value={reportGroup.id} />
           <textarea
             name="reviewNotes"

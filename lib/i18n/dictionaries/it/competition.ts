@@ -834,6 +834,7 @@ const dictionary = {
     prepareFailed: "Non è stato possibile preparare il caricamento del replay. Riprova.",
     cleanupFailed: "Non è stato possibile completare in sicurezza la pulizia del replay.",
     operationFailed: "Non è stato possibile completare la richiesta del Match. Aggiorna e riprova.",
+    duplicateReplay: "Questo replay è già stato inviato. Usa un file replay diverso.",
     resultSubmitted: "L'invio #{submission} attende la conferma dell'avversario.",
     resultSubmittedWarning:
       "L'invio #{submission} attende la conferma dell'avversario. Il risultato è stato salvato, ma non è stato possibile completare un aggiornamento successivo; aggiorna questo Match prima di eseguire un'altra azione.",

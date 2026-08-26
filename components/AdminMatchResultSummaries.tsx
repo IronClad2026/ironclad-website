@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import {
   reviewMatchResult,
   type MatchResultActionState,
@@ -20,10 +20,12 @@ export default function AdminMatchResultSummaries({
   match,
   submissions,
   participantsById,
+  onPendingChange,
 }: {
   match: GeneratedTournamentMatch;
   submissions: MatchResultSubmission[];
   participantsById: Map<string, TournamentParticipant>;
+  onPendingChange?: (key: string, pending: boolean) => void;
 }) {
   const pending = submissions.filter(
     (submission) => submission.status === "pending"
@@ -136,6 +138,7 @@ export default function AdminMatchResultSummaries({
           <ReviewForm
             submissionId={pending[0].id}
             approvalDisabled={!seriesComplete}
+            onPendingChange={onPendingChange}
           />
         </div>
       )}
@@ -306,17 +309,29 @@ function GameSummary({
 function ReviewForm({
   submissionId,
   approvalDisabled = false,
+  onPendingChange,
 }: {
   submissionId: string;
   approvalDisabled?: boolean;
+  onPendingChange?: (key: string, pending: boolean) => void;
 }) {
   const [state, formAction, pending] = useActionState(
     reviewMatchResult,
     initialState
   );
 
+  useEffect(() => {
+    const key = `legacy-result:${submissionId}`;
+    onPendingChange?.(key, pending);
+    return () => onPendingChange?.(key, false);
+  }, [onPendingChange, pending, submissionId]);
+
   return (
-    <form action={formAction} className="mt-4 space-y-2">
+    <form
+      action={formAction}
+      aria-busy={pending}
+      className="mt-4 space-y-2"
+    >
       <input type="hidden" name="submissionId" value={submissionId} />
       <textarea
         name="reviewNotes"

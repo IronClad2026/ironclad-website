@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isFactualNoShow } from "@/lib/admin-operations-metrics";
 import type { Locale } from "@/lib/i18n/config";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { translate } from "@/lib/i18n/translate";
@@ -146,7 +147,7 @@ type ReportGroupRow = {
   id: string;
   match_id: string;
   tournament_id: string;
-  result_type: "normal" | "no_show" | null;
+  result_type: "normal" | "no_show";
   submitted_by_registration_id: string;
   opponent_registration_id: string;
   winner_registration_id: string;
@@ -845,13 +846,21 @@ function buildCareerDashboard({
       new Date(left.submittedAt).getTime()
   );
 
+  const factualNoShowMatchIds = new Set(
+    reportGroups
+      .filter(isFactualNoShow)
+      .map((reportGroup) => reportGroup.match_id)
+  );
   const completedMatches = matches.filter(
     (match) =>
       match.status === "completed" &&
       (match.outcome_type ?? null) === null &&
+      match.player_one_registration_id !== null &&
+      match.player_two_registration_id !== null &&
       match.player_one_score !== null &&
       match.player_two_score !== null &&
-      match.winner_registration_id
+      match.winner_registration_id !== null &&
+      !factualNoShowMatchIds.has(match.id)
   );
   const matchesWon = completedMatches.filter(
     (match) =>
