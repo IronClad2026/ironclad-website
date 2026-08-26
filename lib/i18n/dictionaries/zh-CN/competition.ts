@@ -114,9 +114,14 @@ const dictionary = {
   registrationModal: {
     eyebrow: "IronClad 报名",
     title: "电竞选手报名",
+    dialogDescription:
+      "选择符合资格的锦标赛，确认选手已准备就绪，并逐项接受所有必需协议。",
     closeAria: "关闭报名窗口",
+    stepProgress: "第 {current} 步，共 {total} 步",
     tournamentSelection: "选择锦标赛",
     tournamentSelectionDescription: "选择你想参加的锦标赛和对阵表/赛事类型。",
+    selectedTournament: "已选择的锦标赛",
+    changeTournament: "更换锦标赛",
     cohortSummary:
       "{requirement} — 当前审核批次 {active}/{capacity} — {waitlisted} 人候补",
     activeCohortFull: "当前审核批次已满 — 仅开放候补",
@@ -129,6 +134,12 @@ const dictionary = {
     profileTitle: "确认选手资料",
     profileDescription:
       "报名将使用你保存的 IronClad 选手资料。如有任何信息过时，请先更新资料再继续。",
+    readinessTitle: "选手准备情况",
+    profileReady: "选手资料已就绪",
+    steamConnected: "Steam 身份已连接",
+    relicVerificationOnSubmit:
+      "提交时，系统会安全地实时检查 Relic 1v1 ELO 和组别。",
+    reviewSavedDetails: "查看已保存的资料",
     displayName: "显示名称",
     ign: "游戏内名称（IGN）",
     discordOptional: "Discord（可选）",
@@ -154,8 +165,12 @@ const dictionary = {
     ownershipConfirmation:
       "我确认正在使用自己的 IronClad 账户，并且所连接的 Steam 账户属于我本人。",
     submitRegistration: "提交报名",
-    submittedTitle: "报名已提交",
-    reviewTime: "报名会在 24 小时内审核。",
+    submittedTitle: "报名已提交 — 等待管理员审核",
+    reviewTime: "锦标赛管理员将审核你的报名。请在控制面板中查看状态更新。",
+    waitlistJoinedTitle: "已加入候补名单",
+    waitlistPositionPending: "正在确认你的候补队列位置…",
+    waitlistResultDescription:
+      "名额不作保证。候补队列按先到先得顺序处理。如有空缺，你可能会收到名额邀请；请在控制面板中管理邀请。",
     back: "返回",
     cancel: "取消",
     continue: "继续",

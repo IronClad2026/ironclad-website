@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "Inscripción en IronClad",
     title: "Inscripción de jugador de esports",
+    dialogDescription:
+      "Elige un torneo para el que cumplas los requisitos, confirma que tu perfil de jugador esté listo y acepta cada acuerdo obligatorio.",
     closeAria: "Cerrar la inscripción",
+    stepProgress: "Paso {current} de {total}",
     tournamentSelection: "Selección del torneo",
     tournamentSelectionDescription:
       "Selecciona el torneo y el tipo de cuadro o evento al que quieres unirte.",
+    selectedTournament: "Torneo seleccionado",
+    changeTournament: "Cambiar de torneo",
     cohortSummary:
       "{requirement} — grupo de revisión activo {active}/{capacity} — {waitlisted} en espera",
     activeCohortFull: "Grupo de revisión activo completo — solo lista de espera",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "Confirmación del perfil de jugador",
     profileDescription:
       "La inscripción usa tu perfil de jugador guardado en IronClad. Si algún dato está desactualizado, modifica el perfil antes de continuar.",
+    readinessTitle: "Preparación del jugador",
+    profileReady: "Perfil de jugador listo",
+    steamConnected: "Identidad de Steam conectada",
+    relicVerificationOnSubmit:
+      "Al enviar, se ejecuta de forma segura una comprobación en directo del ELO 1v1 de Relic y de la División.",
+    reviewSavedDetails: "Revisar datos guardados",
     displayName: "Nombre visible",
     ign: "IGN",
     discordOptional: "Discord (opcional)",
@@ -148,8 +159,13 @@ const dictionary = {
     ownershipConfirmation:
       "Confirmo que uso mi propia cuenta de IronClad y que la cuenta de Steam vinculada me pertenece.",
     submitRegistration: "Enviar inscripción",
-    submittedTitle: "Inscripción enviada",
-    reviewTime: "Las inscripciones se revisan en un plazo de 24 horas.",
+    submittedTitle: "Inscripción enviada — pendiente de revisión administrativa",
+    reviewTime:
+      "La administración del torneo revisará tu inscripción. Consulta el Dashboard para ver las actualizaciones de estado.",
+    waitlistJoinedTitle: "Te has unido a la lista de espera",
+    waitlistPositionPending: "Confirmando tu posición en la lista de espera…",
+    waitlistResultDescription:
+      "La plaza no está garantizada. La cola sigue el orden de llegada. Si queda una vacante, podrías recibir una oferta; gestiona las ofertas desde tu Dashboard.",
     back: "Atrás",
     cancel: "Cancelar",
     continue: "Continuar",

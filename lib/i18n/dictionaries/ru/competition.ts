@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "Регистрация IronClad",
     title: "Регистрация киберспортсмена",
+    dialogDescription:
+      "Выберите подходящий Турнир, подтвердите готовность профиля игрока и примите каждое обязательное соглашение.",
     closeAria: "Закрыть форму регистрации",
+    stepProgress: "Шаг {current} из {total}",
     tournamentSelection: "Выбор турнира",
     tournamentSelectionDescription:
       "Выберите турнир и тип сетки или события, в котором хотите участвовать.",
+    selectedTournament: "Выбранный Турнир",
+    changeTournament: "Сменить Турнир",
     cohortSummary:
       "{requirement} — активная группа проверки {active}/{capacity} — в списке ожидания {waitlisted}",
     activeCohortFull: "Активная группа проверки заполнена — только список ожидания",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "Подтверждение профиля игрока",
     profileDescription:
       "Для регистрации используется сохранённый профиль игрока IronClad. Если какие-либо сведения устарели, обновите профиль перед продолжением.",
+    readinessTitle: "Готовность игрока",
+    profileReady: "Профиль игрока готов",
+    steamConnected: "Учётная запись Steam подключена",
+    relicVerificationOnSubmit:
+      "При отправке безопасно выполняется актуальная проверка ELO Relic 1 на 1 и дивизиона.",
+    reviewSavedDetails: "Проверить сохранённые данные",
     displayName: "Отображаемое имя",
     ign: "IGN",
     discordOptional: "Discord (необязательно)",
@@ -148,8 +159,14 @@ const dictionary = {
     ownershipConfirmation:
       "Я подтверждаю, что использую собственную учётную запись IronClad и что подключённая учётная запись Steam принадлежит мне.",
     submitRegistration: "Отправить регистрацию",
-    submittedTitle: "Регистрация отправлена",
-    reviewTime: "Регистрации проверяются в течение 24 часов.",
+    submittedTitle: "Регистрация отправлена — ожидает проверки администратором",
+    reviewTime:
+      "Администрация Турнира рассмотрит вашу регистрацию. Проверяйте обновления статуса в личном кабинете.",
+    waitlistJoinedTitle: "Вы добавлены в список ожидания",
+    waitlistPositionPending:
+      "Подтверждаем вашу позицию в списке ожидания…",
+    waitlistResultDescription:
+      "Место не гарантировано. Очередь обрабатывается в порядке поступления заявок. Если освободится место, вы можете получить предложение; управляйте предложениями в личном кабинете.",
     back: "Назад",
     cancel: "Отмена",
     continue: "Продолжить",
