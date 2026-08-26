@@ -129,6 +129,7 @@ describe("dashboard notification reachability", () => {
     expect(dashboardNotifications).toHaveLength(1);
     expect(dashboardNotifications[0].props).toEqual({
       notifications: matchNotifications,
+      error: null,
     });
 
     expect(unifiedNotificationCenters).toHaveLength(1);
@@ -149,6 +150,35 @@ describe("dashboard notification reachability", () => {
       surface: "community",
       initialPolls: [],
       initialError: null,
+    });
+  });
+
+  it("passes career load failures to the dedicated Match Actions failure state", async () => {
+    loadPlayerCareerDashboardMock.mockResolvedValue({
+      notifications: [],
+      champions: [],
+      statistics: {
+        matchesPlayed: 0,
+        matchesWon: 0,
+        matchesLost: 0,
+        winRate: 0,
+        tournamentsParticipated: 0,
+        tournamentsWon: 0,
+      },
+      matchHistory: [],
+      error: "load-failed",
+    });
+
+    const page = await PlayerDashboardPage();
+    const dashboardNotifications = findElements(
+      page,
+      dashboardNotificationsMock
+    );
+
+    expect(dashboardNotifications).toHaveLength(1);
+    expect(dashboardNotifications[0].props).toMatchObject({
+      notifications: [],
+      error: "Your competitive history could not be loaded.",
     });
   });
 });

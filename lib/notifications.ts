@@ -179,10 +179,19 @@ export async function loadPlayerNotifications(
     loadDictionary(locale, "notifications"),
   ]);
 
-  if (notificationResult.error || totalResult.error || unreadResult.error) {
+  const loadError =
+    notificationResult.error ?? totalResult.error ?? unreadResult.error;
+  const counts = getValidNotificationCounts(
+    totalResult.count,
+    unreadResult.count
+  );
+  const invalidResponse =
+    !Array.isArray(notificationResult.data) || counts === null;
+
+  if (loadError || invalidResponse) {
     logNotificationFailure(
       "load-player",
-      notificationResult.error ?? totalResult.error ?? unreadResult.error
+      loadError ?? { code: "INVALID_RESPONSE" }
     );
     return {
       notifications: [],
@@ -193,11 +202,11 @@ export async function loadPlayerNotifications(
   }
 
   return {
-    notifications: ((notificationResult.data ?? []) as NotificationRow[]).map(
+    notifications: (notificationResult.data as NotificationRow[]).map(
       (notification) => mapNotification(notification, "player", dictionary)
     ),
-    totalCount: totalResult.count ?? 0,
-    unreadCount: unreadResult.count ?? 0,
+    totalCount: counts.totalCount,
+    unreadCount: counts.unreadCount,
     error: null,
   };
 }
@@ -227,10 +236,19 @@ export async function loadAdminNotifications(
       .is("read_at", null),
   ]);
 
-  if (notificationResult.error || totalResult.error || unreadResult.error) {
+  const loadError =
+    notificationResult.error ?? totalResult.error ?? unreadResult.error;
+  const counts = getValidNotificationCounts(
+    totalResult.count,
+    unreadResult.count
+  );
+  const invalidResponse =
+    !Array.isArray(notificationResult.data) || counts === null;
+
+  if (loadError || invalidResponse) {
     logNotificationFailure(
       "load-admin",
-      notificationResult.error ?? totalResult.error ?? unreadResult.error
+      loadError ?? { code: "INVALID_RESPONSE" }
     );
     return {
       notifications: [],
@@ -241,12 +259,29 @@ export async function loadAdminNotifications(
   }
 
   return {
-    notifications: ((notificationResult.data ?? []) as NotificationRow[]).map(
+    notifications: (notificationResult.data as NotificationRow[]).map(
       (notification) => mapNotification(notification, "admin")
     ),
-    totalCount: totalResult.count ?? 0,
-    unreadCount: unreadResult.count ?? 0,
+    totalCount: counts.totalCount,
+    unreadCount: counts.unreadCount,
     error: null,
+  };
+}
+
+function getValidNotificationCounts(total: unknown, unread: unknown) {
+  if (
+    !Number.isSafeInteger(total) ||
+    Number(total) < 0 ||
+    !Number.isSafeInteger(unread) ||
+    Number(unread) < 0 ||
+    Number(unread) > Number(total)
+  ) {
+    return null;
+  }
+
+  return {
+    totalCount: Number(total),
+    unreadCount: Number(unread),
   };
 }
 

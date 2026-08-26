@@ -122,6 +122,37 @@ describe("player dashboard result privacy", () => {
     }
   });
 
+  it("preserves a genuine empty career after a successful zero-registration response", async () => {
+    const dashboardClient = createDashboardClient({
+      registrationResponse: "empty",
+    });
+    createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
+
+    const dashboard = await loadPlayerCareerDashboard(viewerClerkUserId);
+
+    expect(dashboard.error).toBeNull();
+    expect(dashboard.notifications).toEqual([]);
+    expect(dashboard.matchHistory).toEqual([]);
+  });
+
+  it("marks a null registration response as failed instead of empty", async () => {
+    const dashboardClient = createDashboardClient({
+      registrationResponse: "null",
+    });
+    createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
+
+    const dashboard = await loadPlayerCareerDashboard(viewerClerkUserId);
+
+    expect(dashboard.error).toBe("load-failed");
+    expect(vi.mocked(console.error)).toHaveBeenCalledWith(
+      "Dashboard career load failed.",
+      {
+        operation: "load-registrations",
+        code: "UPSTREAM_UNAVAILABLE",
+      }
+    );
+  });
+
   it("does not expose matches, results, or standings from an unlaunched draft", async () => {
     const dashboardClient = createDashboardClient({ launchedAt: null });
     createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
@@ -201,12 +232,14 @@ function createDashboardClient({
   matchOverrides = {},
   roundNumber = 1,
   slotCount = 4,
+  registrationResponse = "normal",
 }: {
   metadataError?: unknown;
   launchedAt?: string | null;
   matchOverrides?: Record<string, unknown>;
   roundNumber?: number;
   slotCount?: number;
+  registrationResponse?: "normal" | "empty" | "null";
 } = {}) {
   const selects: { table: string; columns: string }[] = [];
 
@@ -244,7 +277,8 @@ function createDashboardClient({
               launchedAt,
               matchOverrides,
               roundNumber,
-              slotCount
+              slotCount,
+              registrationResponse
             )
           ).then(resolve, reject);
 
@@ -262,7 +296,8 @@ function resolveDashboardQuery(
   launchedAt: string | null,
   matchOverrides: Record<string, unknown>,
   roundNumber: number,
-  slotCount: number
+  slotCount: number,
+  registrationResponse: "normal" | "empty" | "null"
 ): QueryResult {
   const viewerRegistration = {
     id: "registration-1",
@@ -360,9 +395,14 @@ function resolveDashboardQuery(
 
   if (table === "registrations") {
     return {
-      data: filters.has("clerk_user_id")
-        ? [viewerRegistration]
-        : [viewerRegistration, opponentRegistration],
+      data:
+        registrationResponse === "null"
+          ? null
+          : registrationResponse === "empty"
+            ? []
+            : filters.has("clerk_user_id")
+              ? [viewerRegistration]
+              : [viewerRegistration, opponentRegistration],
       error: null,
     };
   }

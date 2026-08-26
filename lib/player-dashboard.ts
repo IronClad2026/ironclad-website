@@ -233,7 +233,7 @@ export async function loadPlayerCareerDashboard(
     )
     .eq("clerk_user_id", clerkUserId);
 
-  if (registrationError) {
+  if (registrationError || !Array.isArray(registrationData)) {
     logDashboardCareerFailure("load-registrations");
     return {
       ...emptyCareer,
@@ -241,7 +241,7 @@ export async function loadPlayerCareerDashboard(
     };
   }
 
-  const registrations = (registrationData ?? []) as RegistrationRow[];
+  const registrations = registrationData as RegistrationRow[];
   const registrationIds = registrations.map((registration) => registration.id);
   const approvedTournamentIds = new Set(
     registrations
@@ -278,7 +278,12 @@ export async function loadPlayerCareerDashboard(
       .in("player_two_registration_id", registrationIds),
   ]);
 
-  if (playerOneMatchesResult.error || playerTwoMatchesResult.error) {
+  if (
+    playerOneMatchesResult.error ||
+    playerTwoMatchesResult.error ||
+    !Array.isArray(playerOneMatchesResult.data) ||
+    !Array.isArray(playerTwoMatchesResult.data)
+  ) {
     logDashboardCareerFailure("load-matches");
     return {
       ...emptyCareer,
@@ -293,8 +298,8 @@ export async function loadPlayerCareerDashboard(
   const matches = [
     ...new Map(
       [
-        ...((playerOneMatchesResult.data ?? []) as MatchRow[]),
-        ...((playerTwoMatchesResult.data ?? []) as MatchRow[]),
+        ...(playerOneMatchesResult.data as MatchRow[]),
+        ...(playerTwoMatchesResult.data as MatchRow[]),
       ].map((match) => [match.id, match])
     ).values(),
   ];
@@ -368,13 +373,20 @@ export async function loadPlayerCareerDashboard(
       .eq("rank", 1),
   ]);
 
-  const metadataError =
-    submissionsResult.error ??
-    reportGroupsResult.error ??
-    generatedBracketsResult.error ??
-    roundsResult.error ??
-    participantsResult.error ??
-    standingsResult.error;
+  const metadataError = Boolean(
+    submissionsResult.error ||
+      reportGroupsResult.error ||
+      generatedBracketsResult.error ||
+      roundsResult.error ||
+      participantsResult.error ||
+      standingsResult.error ||
+      !Array.isArray(submissionsResult.data) ||
+      !Array.isArray(reportGroupsResult.data) ||
+      !Array.isArray(generatedBracketsResult.data) ||
+      !Array.isArray(roundsResult.data) ||
+      !Array.isArray(participantsResult.data) ||
+      !Array.isArray(standingsResult.data)
+  );
 
   if (metadataError) {
     logDashboardCareerFailure("load-result-metadata");
@@ -388,8 +400,7 @@ export async function loadPlayerCareerDashboard(
     };
   }
 
-  const generatedBrackets = (generatedBracketsResult.data ??
-    []) as GeneratedBracketRow[];
+  const generatedBrackets = generatedBracketsResult.data as GeneratedBracketRow[];
   const roundRobinGeneratedBracketIds = generatedBrackets
     .filter((generated) => generated.format === "round_robin")
     .map((generated) => generated.id);
@@ -401,7 +412,10 @@ export async function loadPlayerCareerDashboard(
           .in("generated_bracket_id", roundRobinGeneratedBracketIds)
       : { data: [], error: null };
 
-  if (roundRobinMatchesResult.error) {
+  if (
+    roundRobinMatchesResult.error ||
+    !Array.isArray(roundRobinMatchesResult.data)
+  ) {
     logDashboardCareerFailure("load-round-robin-status");
   }
 
@@ -415,7 +429,7 @@ export async function loadPlayerCareerDashboard(
     .select("id, tournament_id, name, launched_at")
     .in("id", bracketIds);
 
-  if (bracketError) {
+  if (bracketError || !Array.isArray(bracketData)) {
     logDashboardCareerFailure("load-brackets");
     return {
       ...emptyCareer,
@@ -427,7 +441,7 @@ export async function loadPlayerCareerDashboard(
     };
   }
 
-  const tournamentBrackets = (bracketData ?? []) as TournamentBracketRow[];
+  const tournamentBrackets = bracketData as TournamentBracketRow[];
   const launchedBracketIds = new Set(
     tournamentBrackets
       .filter((bracket) => bracket.launched_at !== null)
@@ -455,12 +469,12 @@ export async function loadPlayerCareerDashboard(
     .select("id, title, banner_image_url")
     .in("id", tournamentIds);
 
-  if (tournamentError) {
+  if (tournamentError || !Array.isArray(tournamentData)) {
     logDashboardCareerFailure("load-tournaments");
   }
 
-  const submissionRows = (submissionsResult.data ?? []) as SubmissionRow[];
-  const reportGroupRows = (reportGroupsResult.data ?? []) as ReportGroupRow[];
+  const submissionRows = submissionsResult.data as SubmissionRow[];
+  const reportGroupRows = reportGroupsResult.data as ReportGroupRow[];
   const legacyNotificationSubmissions = submissionRows.filter(
     (submission) => submission.report_group_id === null
   );
@@ -492,15 +506,18 @@ export async function loadPlayerCareerDashboard(
     error: reportGroupDismissalError,
   } = reportGroupDismissalResult;
 
-  if (dismissalError) {
+  if (dismissalError || !Array.isArray(dismissalData)) {
     logDashboardCareerFailure("load-submission-dismissals");
   }
-  if (reportGroupDismissalError) {
+  if (
+    reportGroupDismissalError ||
+    !Array.isArray(reportGroupDismissalData)
+  ) {
     logDashboardCareerFailure("load-report-group-dismissals");
   }
 
   const dismissedSubmissionNotifications = new Set(
-    (dismissalData ?? []).map(
+    (Array.isArray(dismissalData) ? dismissalData : []).map(
       (dismissal) =>
         `${dismissal.submission_id as string}:${
           dismissal.dismissed_status as string
@@ -508,7 +525,10 @@ export async function loadPlayerCareerDashboard(
     )
   );
   const dismissedReportGroupNotifications = new Set(
-    (reportGroupDismissalData ?? []).map(
+    (Array.isArray(reportGroupDismissalData)
+      ? reportGroupDismissalData
+      : []
+    ).map(
       (dismissal) =>
         `${dismissal.report_group_id as string}:${
           dismissal.dismissed_status as string
@@ -530,16 +550,17 @@ export async function loadPlayerCareerDashboard(
     generatedBrackets: generatedBrackets.filter((generated) =>
       launchedGeneratedBracketIds.has(generated.id)
     ),
-    rounds: (roundsResult.data ?? []) as RoundRow[],
-    participants: (participantsResult.data ?? []) as RegistrationRow[],
+    rounds: roundsResult.data as RoundRow[],
+    participants: participantsResult.data as RegistrationRow[],
     tournamentBrackets,
-    tournaments: (tournamentData ?? []) as TournamentRow[],
-    standings: ((standingsResult.data ?? []) as StandingRow[]).filter(
+    tournaments: (Array.isArray(tournamentData) ? tournamentData : []) as TournamentRow[],
+    standings: (standingsResult.data as StandingRow[]).filter(
       (standing) =>
         launchedGeneratedBracketIds.has(standing.generated_bracket_id)
     ),
-    roundRobinMatches: ((roundRobinMatchesResult.data ??
-      []) as BracketMatchStatusRow[]).filter((match) =>
+    roundRobinMatches: ((Array.isArray(roundRobinMatchesResult.data)
+      ? roundRobinMatchesResult.data
+      : []) as BracketMatchStatusRow[]).filter((match) =>
       launchedGeneratedBracketIds.has(match.generated_bracket_id)
     ),
     approvedTournamentIds,
@@ -547,9 +568,13 @@ export async function loadPlayerCareerDashboard(
     dismissedReportGroupNotifications,
     metadataIncomplete: Boolean(
       tournamentError ||
+        !Array.isArray(tournamentData) ||
         dismissalError ||
+        !Array.isArray(dismissalData) ||
         reportGroupDismissalError ||
-        roundRobinMatchesResult.error
+        !Array.isArray(reportGroupDismissalData) ||
+        roundRobinMatchesResult.error ||
+        !Array.isArray(roundRobinMatchesResult.data)
     ),
   });
 }

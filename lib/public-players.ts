@@ -59,12 +59,12 @@ export async function getPublicPlayers(): Promise<PublicPlayerProfile[]> {
     .order("current_elo", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("Public players load failed:", error);
-    return [];
+  if (error || !Array.isArray(data)) {
+    console.error("Public players load failed.");
+    throw new Error("Public players could not be loaded.");
   }
 
-  return ((data ?? []) as unknown as PublicPlayerProfileRow[]).map(
+  return (data as unknown as PublicPlayerProfileRow[]).map(
     mapPublicPlayerProfile
   );
 }

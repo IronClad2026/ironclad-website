@@ -44,8 +44,10 @@ type NotificationTranslator = (
 
 export default function DashboardNotifications({
   notifications: initialNotifications,
+  error = null,
 }: {
   notifications: DashboardNotification[];
+  error?: string | null;
 }) {
   const [notifications, setNotifications] = useState(initialNotifications);
   const [expanded, setExpanded] = useState(false);
@@ -90,6 +92,39 @@ export default function DashboardNotifications({
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [selected]);
+
+  if (error) {
+    return (
+      <section
+        role="alert"
+        className="relative w-full border border-red-500/30 bg-red-500/10 p-5 shadow-xl shadow-black/20"
+        data-testid="match-actions-card"
+      >
+        <div className="flex items-start gap-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center border border-red-400/30 bg-red-500/10 text-red-200">
+            <ShieldAlert size={20} />
+          </span>
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-red-100">
+              Match Actions unavailable
+            </p>
+            <p className="mt-2 text-sm leading-6 text-red-100">{error}</p>
+            <p className="mt-1 text-xs leading-5 text-red-100/75">
+              Retry to load current confirmations, disputes, and other required
+              actions.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="mt-4 border border-red-300/40 bg-red-950/40 px-4 py-2 text-xs font-black uppercase tracking-wider text-red-100 transition hover:border-red-200/70 hover:bg-red-900/50"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   const deleteNotifications = (
     notificationIds: string[],

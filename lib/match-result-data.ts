@@ -123,12 +123,14 @@ export type MatchResultData = {
   submissions: MatchResultSubmission[];
   reportGroups: MatchResultReportGroup[];
   viewerRole: "anonymous" | "participant" | "admin";
+  error: "load-failed" | null;
 };
 
 const emptyAnonymousResult: MatchResultData = {
   submissions: [],
   reportGroups: [],
   viewerRole: "anonymous",
+  error: null,
 };
 
 export async function loadMatchResultData(): Promise<MatchResultData> {
@@ -153,6 +155,7 @@ export async function loadMatchResultData(): Promise<MatchResultData> {
         submissions: [],
         reportGroups: [],
         viewerRole,
+        error: null,
       };
     }
 
@@ -195,6 +198,7 @@ export async function loadMatchResultData(): Promise<MatchResultData> {
         )
       ),
       viewerRole,
+      error: null,
     };
   } catch {
     console.error("Match result data load failed.", {
@@ -204,6 +208,7 @@ export async function loadMatchResultData(): Promise<MatchResultData> {
       submissions: [],
       reportGroups: [],
       viewerRole,
+      error: "load-failed",
     };
   }
 }
@@ -245,12 +250,19 @@ export async function loadAdminMatchResultAudit({
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  if (submissionResult.error || reportGroupResult.error) {
+  if (
+    submissionResult.error ||
+    reportGroupResult.error ||
+    !Array.isArray(submissionResult.data) ||
+    !Array.isArray(reportGroupResult.data) ||
+    submissionResult.data.length !== scopedSubmissionIds.length ||
+    reportGroupResult.data.length !== scopedReportGroupIds.length
+  ) {
     throw new Error("Match result audit unavailable.");
   }
 
   const submissions = new Map<string, Omit<SubmissionAuditRow, "id">>();
-  for (const candidate of submissionResult.data ?? []) {
+  for (const candidate of submissionResult.data) {
     const row = assertExactRow<SubmissionAuditRow>(
       candidate,
       submissionAuditRowKeys,
@@ -263,7 +275,7 @@ export async function loadAdminMatchResultAudit({
   }
 
   const reportGroups = new Map<string, Omit<ReportGroupAuditRow, "id">>();
-  for (const candidate of reportGroupResult.data ?? []) {
+  for (const candidate of reportGroupResult.data) {
     const row = assertExactRow<ReportGroupAuditRow>(
       candidate,
       reportGroupAuditRowKeys,
@@ -421,11 +433,11 @@ async function loadViewerRegistrationIds(
     .select("id")
     .eq("clerk_user_id", userId);
 
-  if (error) {
+  if (error || !Array.isArray(data)) {
     throw new Error("Viewer registrations unavailable.");
   }
 
-  return uniqueIds((data ?? []).map((registration) => registration.id));
+  return uniqueIds(data.map((registration) => registration.id));
 }
 
 async function loadParticipantMatchIds(
@@ -445,13 +457,18 @@ async function loadParticipantMatchIds(
       .in("player_two_registration_id", registrationIds),
   ]);
 
-  if (playerOneResult.error || playerTwoResult.error) {
+  if (
+    playerOneResult.error ||
+    playerTwoResult.error ||
+    !Array.isArray(playerOneResult.data) ||
+    !Array.isArray(playerTwoResult.data)
+  ) {
     throw new Error("Participant matches unavailable.");
   }
 
   return uniqueIds([
-    ...(playerOneResult.data ?? []).map((match) => match.id),
-    ...(playerTwoResult.data ?? []).map((match) => match.id),
+    ...playerOneResult.data.map((match) => match.id),
+    ...playerTwoResult.data.map((match) => match.id),
   ]);
 }
 
@@ -475,11 +492,11 @@ async function loadVisibleSubmissionRows(
   }
 
   const { data, error } = await query;
-  if (error) {
+  if (error || !Array.isArray(data)) {
     throw new Error("Match-result submissions unavailable.");
   }
 
-  return (data ?? []).map((candidate) =>
+  return data.map((candidate) =>
     assertExactRow<MatchResultSubmissionRow>(
       candidate,
       submissionRowKeys,
@@ -499,11 +516,11 @@ async function loadVisibleReportGroupRows(
       .select(MATCH_RESULT_REPORT_GROUP_SELECT)
       .order("created_at", { ascending: false });
 
-    if (error) {
+    if (error || !Array.isArray(data)) {
       throw new Error("Match-result report groups unavailable.");
     }
 
-    return (data ?? []).map((candidate) =>
+    return data.map((candidate) =>
       assertExactRow<MatchResultReportGroupRow>(
         candidate,
         reportGroupRowKeys,
@@ -527,14 +544,19 @@ async function loadVisibleReportGroupRows(
       .order("created_at", { ascending: false }),
   ]);
 
-  if (submittedResult.error || opponentResult.error) {
+  if (
+    submittedResult.error ||
+    opponentResult.error ||
+    !Array.isArray(submittedResult.data) ||
+    !Array.isArray(opponentResult.data)
+  ) {
     throw new Error("Match-result report groups unavailable.");
   }
 
   const rowsById = new Map<string, MatchResultReportGroupRow>();
   for (const candidate of [
-    ...(submittedResult.data ?? []),
-    ...(opponentResult.data ?? []),
+    ...submittedResult.data,
+    ...opponentResult.data,
   ]) {
     const row = assertExactRow<MatchResultReportGroupRow>(
       candidate,
@@ -562,11 +584,11 @@ async function loadReplayProofRows(
     .not("replay_storage_path", "is", null)
     .order("game_number", { ascending: true });
 
-  if (error) {
+  if (error || !Array.isArray(data)) {
     throw new Error("Match-result replay proofs unavailable.");
   }
 
-  return (data ?? []).map((candidate) =>
+  return data.map((candidate) =>
     assertExactRow<MatchResultReplayProofRow>(
       candidate,
       replayProofRowKeys,

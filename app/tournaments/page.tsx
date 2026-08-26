@@ -129,34 +129,42 @@ export default async function TournamentsPage({
       );
 
   if (tournamentResult.error) {
-    console.error(
-      "Tournament list load failed:",
-      tournamentResult.error.message
-    );
+    console.error("Tournament list load failed.");
   }
 
   if (capacityResult.error) {
-    console.error(
-      "Tournament capacity load failed:",
-      capacityResult.error.message
-    );
+    console.error("Tournament capacity load failed.");
   }
 
   if (registrationResult.error) {
-    console.error(
-      "Tournament registrations load failed:",
-      registrationResult.error.message
-    );
+    console.error("Tournament registrations load failed.");
   }
 
   if (generatedBracketResult.error) {
-    console.error(
-      "Generated tournament brackets load failed:",
-      generatedBracketResult.error.message
-    );
+    console.error("Generated tournament brackets load failed.");
   }
 
-  const allTournamentRows = (tournamentResult.data ?? []) as TournamentRow[];
+  if (
+    tournamentResult.error ||
+    capacityResult.error ||
+    registrationResult.error ||
+    generatedBracketResult.error ||
+    viewerDivisionResult.error
+  ) {
+    throw new Error("Tournament data could not be loaded.");
+  }
+
+  if (
+    !Array.isArray(tournamentResult.data) ||
+    !Array.isArray(capacityResult.data) ||
+    !Array.isArray(registrationResult.data) ||
+    !Array.isArray(generatedBracketResult.data)
+  ) {
+    console.error("Tournament data load returned an invalid response.");
+    throw new Error("Tournament data could not be loaded.");
+  }
+
+  const allTournamentRows = tournamentResult.data as TournamentRow[];
   const requestedTournament = getSingleSearchParam(params?.tournament);
   const tournamentRows = getPublicTournamentRowsForRequest(
     allTournamentRows,
@@ -184,10 +192,16 @@ export default async function TournamentsPage({
 
   if (mapPoolEntryResult.error) {
     console.error("Published tournament map pools failed to load.");
+    throw new Error("Tournament data could not be loaded.");
+  }
+
+  if (!Array.isArray(mapPoolEntryResult.data)) {
+    console.error("Published tournament map pools returned an invalid response.");
+    throw new Error("Tournament data could not be loaded.");
   }
 
   const mapPoolEntriesByBracket = groupPublicTournamentMapPoolEntries(
-    (mapPoolEntryResult.data ?? []) as unknown as PublicTournamentMapPoolEntryDatabaseRow[]
+    mapPoolEntryResult.data as unknown as PublicTournamentMapPoolEntryDatabaseRow[]
   );
   const publicBracketIds = new Set(
     tournamentRows.flatMap((tournament) =>
@@ -283,15 +297,18 @@ export default async function TournamentsPage({
       : { data: [], error: null };
 
   if (playerResult.error) {
-    console.error(
-      "Bracket participant profiles load failed:",
-      playerResult.error.message
-    );
+    console.error("Bracket participant profiles load failed.");
+    throw new Error("Tournament data could not be loaded.");
+  }
+
+  if (!Array.isArray(playerResult.data)) {
+    console.error("Bracket participant profiles returned an invalid response.");
+    throw new Error("Tournament data could not be loaded.");
   }
 
   const playersByClerkId = new Map(
     (
-      (playerResult.data ?? []) as {
+      playerResult.data as {
         clerk_user_id: string;
         public_profile_enabled: boolean;
         account_closed_at: string | null;
@@ -405,26 +422,38 @@ export default async function TournamentsPage({
     tournament.bracketParticipants =
       bracketParticipantsByTournament.get(row.id) ?? [];
     tournament.generatedBrackets = generatedByTournament.get(row.id) ?? [];
-    tournament.mapPools = mapPoolEntryResult.error
-      ? []
-      : projectPublishedTournamentMapPools(
-          (row.tournament_brackets ?? []).map((bracket) => ({
-            id: bracket.id,
-            name: getTournamentBracketDisplayName(bracket.name),
-            mapPoolPublishedAt: bracket.map_pool_published_at,
-            launchedAt: bracket.launched_at,
-            entries: mapPoolEntriesByBracket.get(bracket.id) ?? [],
-          }))
-        );
+    tournament.mapPools = projectPublishedTournamentMapPools(
+      (row.tournament_brackets ?? []).map((bracket) => ({
+        id: bracket.id,
+        name: getTournamentBracketDisplayName(bracket.name),
+        mapPoolPublishedAt: bracket.map_pool_published_at,
+        launchedAt: bracket.launched_at,
+        entries: mapPoolEntriesByBracket.get(bracket.id) ?? [],
+      }))
+    );
     tournament.players = tournament.participants.length;
     return tournament;
   });
   tournaments.sort(compareTournamentCards);
+
+  if (tournaments.length === 0) {
+    return <TournamentEmptyState t={t} />;
+  }
+
   const tournamentPolls = await loadTournamentPollsForRequest(
     tournaments.map((tournament) => tournament.id),
     Boolean(userId)
   );
   const matchResultData = await loadMatchResultData();
+
+  if (
+    matchResultData.error ||
+    !Array.isArray(matchResultData.submissions) ||
+    !Array.isArray(matchResultData.reportGroups)
+  ) {
+    throw new Error("Tournament Match data could not be loaded.");
+  }
+
   const includedMatchIds = new Set(
     tournaments.flatMap((tournament) =>
       tournament.generatedBrackets.flatMap((bracket) =>
@@ -432,29 +461,6 @@ export default async function TournamentsPage({
       )
     )
   );
-
-  if (tournaments.length === 0) {
-    return (
-      <main
-        className="min-h-screen bg-black bg-cover bg-center bg-fixed px-6 pt-32 text-white"
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
-          backgroundAttachment: "fixed",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          backgroundSize: "cover",
-        }}
-      >
-        <div className="mx-auto max-w-3xl border border-orange-500/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-10 text-center shadow-2xl shadow-black/30 backdrop-blur">
-          <h1 className="text-3xl font-black">{t("emptyState.title")}</h1>
-          <p className="mt-4 text-zinc-400">
-            {t("emptyState.description")}
-          </p>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <TournamentsExperience
@@ -476,6 +482,31 @@ export default async function TournamentsPage({
       )}
       eloVerificationEnabled={true}
     />
+  );
+}
+
+function TournamentEmptyState({
+  t,
+}: {
+  t: (path: string, values?: MessageValues) => string;
+}) {
+  return (
+    <main
+      className="min-h-screen bg-black bg-cover bg-center bg-fixed px-6 pt-32 text-white"
+      style={{
+        backgroundImage:
+          "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
+        backgroundAttachment: "fixed",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      }}
+    >
+      <div className="mx-auto max-w-3xl border border-orange-500/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-10 text-center shadow-2xl shadow-black/30 backdrop-blur">
+        <h1 className="text-3xl font-black">{t("emptyState.title")}</h1>
+        <p className="mt-4 text-zinc-400">{t("emptyState.description")}</p>
+      </div>
+    </main>
   );
 }
 
