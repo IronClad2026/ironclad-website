@@ -24,6 +24,25 @@ const PR3_REGISTRATION_MESSAGE_KEYS = [
   "reviewTime",
 ] as const;
 
+const PR4_ANNOUNCEMENT_MESSAGE_KEYS = [
+  "metadataTitle",
+  "metadataDescription",
+  "eyebrow",
+  "title",
+  "description",
+  "feedLabel",
+  "emptyTitle",
+  "emptyDescription",
+  "published",
+  "publicationTimeUnavailable",
+  "imageAltFallback",
+  "videoLabelFallback",
+  "videoUnsupported",
+  "loadErrorTitle",
+  "loadErrorDescription",
+  "retry",
+] as const;
+
 describe("server dictionary loader", () => {
   it("loads all seven Italian Player namespaces", async () => {
     expect(DICTIONARY_NAMESPACES).toEqual([
@@ -96,6 +115,34 @@ describe("server dictionary loader", () => {
         (messages) => messages[index]
       );
       expect(new Set(localizedMessages).size).toBe(SUPPORTED_LOCALES.length);
+    }
+  });
+
+  it("loads complete localized PR4 Announcement system UI in all eight Player locales", async () => {
+    const messagesByLocale = await Promise.all(
+      SUPPORTED_LOCALES.map(async (locale) => {
+        const [common, publicDictionary] = await Promise.all([
+          loadDictionary(locale, "common"),
+          loadDictionary(locale, "public"),
+        ]);
+        return [
+          common.nav.announcements,
+          common.nav.announcementsUnread,
+          ...PR4_ANNOUNCEMENT_MESSAGE_KEYS.map(
+            (key) => publicDictionary.announcements[key]
+          ),
+        ];
+      })
+    );
+
+    expect(SUPPORTED_LOCALES).toHaveLength(8);
+    for (const messages of messagesByLocale) {
+      expect(messages.every((message) => message.trim().length > 0)).toBe(true);
+    }
+    for (const index of [0, 1, 2, 5]) {
+      expect(
+        new Set(messagesByLocale.map((messages) => messages[index])).size
+      ).toBe(SUPPORTED_LOCALES.length);
     }
   });
 

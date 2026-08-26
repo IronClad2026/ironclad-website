@@ -30,6 +30,30 @@ const dictionary = {
   rankings: {
     metadataTitle: "Classificação geral | IronClad", metadataDescription: "Temporadas Main / Pro de seis eventos e classificações de carreira permanentes de Academy e Challenge.", mainSeason: "Temporada Main / Pro", academyCareer: "Carreira Academy", challengeCareer: "Carreira Challenge", loadWarning: "Alguns dados da classificação não foram carregados. Exibimos todos os dados públicos seguros disponíveis.", publicLeaderboard: "Classificação pública", dynamicStandings: "Tabela dinâmica", mainDescription: "Classificação oficial da temporada Main / Pro selecionada, composta por seis eventos elegíveis.", academyDescription: "Pontos e resultados de Academy permanecem em uma carreira contínua.", challengeDescription: "Pontos e resultados de Challenge permanecem em uma carreira contínua.", safeData: "Todas as linhas vêm de visualizações públicas seguras.", visibleCompetitors: "Competidores visíveis", rankingModel: "Modelo de classificação", sixEventSeason: "Temporada de seis eventos", permanentCareer: "Carreira permanente", seasonState: "Estado da temporada", division: "Divisão", heroEyebrow: "Comando competitivo IronClad", heroTitle: "Classificação geral", heroDescription: "Main / Pro usa uma temporada oficial de seis eventos elegíveis. Academy e Challenge mantêm classificações de carreira separadas e permanentes.", featuredSeason: "Temporada Main / Pro em destaque", careerStandings: "Classificação de carreira", seasonNotStarted: "Temporada ainda não iniciada", noSeason: "Nenhuma temporada classificatória está ativa. A classificação começa com o primeiro evento Main / Pro elegível.", careerRecord: "Os pontos permanecem no registro competitivo da divisão.", validEvents: "Eventos classificatórios elegíveis", underReviewNotice: "Os resultados da temporada estão em análise. As classificações exibidas não são definitivas enquanto a análise estiver aberta.", careerNoReset: "Pontos de carreira não são zerados após uma temporada Main / Pro e permanecem separados da outra divisão de carreira.", competitors: "Competidores", season: "Temporada", state: "Estado", scope: "Escopo", permanent: "Permanente", reset: "Zerar", never: "Nunca", tba: "A definir", careerTitle: "{division} usa uma classificação de carreira permanente.", careerSeparation: "Os pontos não são zerados após uma temporada Main / Pro. Os registros de Academy e Challenge permanecem separados e não migram para Main / Pro.", entrantBonus: "Um novo participante da carreira pode receber +5 pontos por evento elegível anterior, uma vez por divisão, até +25.", notStarted: "Não iniciada", notStartedDescription: "A temporada ainda não começou.", underReview: "Em análise", underReviewDescription: "Classificações históricas congeladas são exibidas durante a análise de uma temporada concluída.", finalized: "Finalizada", finalizedDescription: "Finalizada. A classificação Main / Pro está bloqueada.", finalizationPending: "Finalização pendente", finalizationPendingDescription: "Finalização pendente. A pontuação e o encerramento normalmente ocorrem automaticamente após o sexto evento elegível.", inProgress: "Em andamento", inProgressDescription: "A temporada está em andamento.", topUnavailable: "Pódio Main / Pro ainda indisponível", topUnavailableText: "As posições oficiais aparecerão após a publicação de resultados Main / Pro elegíveis.", topAria: "Pódio Main / Pro", finalStandings: "Classificação final Main / Pro", currentStandings: "Classificação atual Main / Pro", topStandings: "Pódio", tieNotice: "Todos os competidores que compartilham oficialmente a 1ª, 2ª ou 3ª posição Main / Pro são exibidos. A ordem visual não altera a posição oficial. Qualquer evento com prêmio é regido separadamente pelos Termos de Premiação publicados.", rank: "Posição", player: "Jogador", country: "País", elo: "ELO", points: "Pontos", played: "Torneios", rounds: "Rodadas", wins: "Vitórias", winRate: "Taxa de vitórias", lastPoints: "Últimos pontos", movement: "Movimento", new: "NOVO", noStandings: "Nenhuma classificação publicada", noStandingsText: "As linhas aparecerão após o recálculo automático de um torneio elegível concluído.", history: "Histórico de torneios", historyTitle: "Impacto publicado dos torneios", historyEmpty: "O histórico aparecerá após a publicação de um recálculo de classificação.", dateTba: "Data a definir", pointsShort: "{points} pts", topScorer: "Maior pontuação publicada: {name}", championArchive: "Arquivo de campeões Main / Pro", latestFinalized: "Últimos resultados finalizados", championsEmpty: "Os campeões aparecerão após o encerramento de uma temporada.", rankNumber: "Posição nº {rank}", unknown: "Desconhecido", unrated: "Sem classificação", academyBracket: "Chave Academy", challengeBracket: "Chave Challenge", aggregate: "Geral"
   },
+  announcements: {
+    metadataTitle: "Anúncios oficiais | IronClad",
+    metadataDescription:
+      "Confira as últimas notícias e atualizações oficiais do IronClad.",
+    eyebrow: "Canal IronClad",
+    title: "Anúncios oficiais",
+    description:
+      "Notícias, avisos de Torneios e atualizações da plataforma que o IronClad publica.",
+    feedLabel: "Lista de anúncios oficiais",
+    emptyTitle: "Ainda não há anúncios",
+    emptyDescription:
+      "As atualizações oficiais do IronClad aparecerão aqui quando forem publicadas.",
+    published: "Publicado",
+    publicationTimeUnavailable:
+      "Data e hora de publicação indisponíveis",
+    imageAltFallback: "Imagem de “{title}”",
+    videoLabelFallback: "Vídeo de “{title}”",
+    videoUnsupported:
+      "Seu navegador não oferece suporte à reprodução de vídeo.",
+    loadErrorTitle: "Anúncios indisponíveis",
+    loadErrorDescription:
+      "O IronClad não conseguiu carregar os anúncios oficiais. Tente novamente.",
+    retry: "Tentar novamente",
+  },
   select: { noOptions: "Nenhuma opção encontrada." },
   playerCount: { one: "jogador", few: "jogadores", many: "jogadores" },
 } satisfies PublicDictionary;

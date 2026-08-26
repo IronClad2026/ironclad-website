@@ -8,12 +8,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { setLocalePreference } from "@/app/locale-actions";
+import announcementStyles from "@/components/AnnouncementsNavLink.module.css";
 import InstallAppPrompt from "@/components/InstallAppPrompt";
 import LanguageSelector, {
   LanguageSelectorTrigger,
   type LanguageSelectorCopy,
 } from "@/components/i18n/LanguageSelector";
 import LocalePreferenceSync from "@/components/i18n/LocalePreferenceSync";
+import { useAnnouncementUnreadState } from "@/components/useAnnouncementUnreadState";
 import {
   useOptionalLocale,
   useOptionalTranslations,
@@ -73,11 +75,32 @@ function mobileNavLinkClass(isActive: boolean, emphasis = false) {
   return "relative transition hover:text-white";
 }
 
+function AnnouncementNavLabel({
+  label,
+  unread,
+}: {
+  label: string;
+  unread: boolean;
+}) {
+  return (
+    <span
+      className={`${announcementStyles.label} ${
+        unread ? announcementStyles.unread : ""
+      }`}
+    >
+      {label}
+      {unread ? (
+        <span className={announcementStyles.dot} aria-hidden="true" />
+      ) : null}
+    </span>
+  );
+}
+
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const pathname = usePathname();
-  const { isSignedIn, sessionClaims } = useAuth();
+  const { isLoaded, isSignedIn, sessionClaims } = useAuth();
   const selectedLocale = useOptionalLocale();
   const selectedTranslator = useOptionalTranslations("common", englishCommon);
   const languageReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -95,6 +118,13 @@ export default function Navbar() {
 
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
   const isAdmin = role === "admin";
+  const announcementUnread = useAnnouncementUnreadState({
+    isLoaded,
+    isSignedIn,
+    pathname,
+  });
+  const announcementHref = "/announcements";
+  const announcementActive = isActiveRoute(pathname, announcementHref);
 
   const playerNavItems: NavItem[] = [
     { href: "/", label: t("nav.home") },
@@ -198,25 +228,45 @@ export default function Navbar() {
       >
         <nav
           aria-label={t("nav.primaryNavigation")}
-          className="relative z-[95] mx-auto flex max-w-7xl items-center justify-between px-6 py-5 text-white"
+          className="relative z-[95] mx-auto flex max-w-7xl items-center justify-between px-6 py-5 text-white min-[1800px]:max-w-[1600px]"
         >
-          <Link
-            href="/"
-            className="flex shrink-0 items-center"
-            onClick={() => setIsOpen(false)}
-          >
-            <Image
-              src="/images/ironclad-logo.png"
-              alt="IronClad"
-              width={1365}
-              height={768}
-              className="h-14 w-auto sm:h-16"
-              priority
-            />
-          </Link>
+          <div className="flex min-w-0 shrink-0 items-center text-xs font-medium text-zinc-300 min-[1800px]:text-sm">
+            <Link
+              href="/"
+              className="flex shrink-0 items-center"
+              onClick={() => setIsOpen(false)}
+            >
+              <Image
+                src="/images/ironclad-logo.png"
+                alt="IronClad"
+                width={1365}
+                height={768}
+                className="h-14 w-auto sm:h-16 xl:h-14 min-[1800px]:h-16"
+                priority
+              />
+            </Link>
 
-          <div className="hidden min-w-0 flex-1 items-center pl-8 text-sm font-medium text-zinc-300 xl:flex">
-            <div className="ml-auto flex items-center gap-5 2xl:gap-7">
+            <div className="ml-3 hidden shrink-0 border-l border-white/10 pl-3 xl:block min-[1800px]:ml-7 min-[1800px]:pl-7">
+              <Link
+                href={announcementHref}
+                className={`${navLinkClass(announcementActive)} whitespace-nowrap`}
+                aria-current={announcementActive ? "page" : undefined}
+                aria-label={
+                  announcementUnread
+                    ? t("nav.announcementsUnread")
+                    : undefined
+                }
+              >
+                <AnnouncementNavLabel
+                  label={t("nav.announcements")}
+                  unread={announcementUnread}
+                />
+              </Link>
+            </div>
+          </div>
+
+          <div className="hidden min-w-0 flex-1 items-center pl-4 text-xs font-medium text-zinc-300 xl:flex min-[1800px]:pl-8 min-[1800px]:text-sm">
+            <div className="ml-auto flex items-center gap-3 min-[1800px]:gap-7">
               {playerNavItems.map((item) => {
                 const isActive = isActiveRoute(pathname, item.href);
 
@@ -246,7 +296,7 @@ export default function Navbar() {
                 );
               })}
             </div>
-            <div className="ml-5 shrink-0 border-l border-white/10 pl-5 2xl:ml-7 2xl:pl-7">
+            <div className="ml-3 shrink-0 border-l border-white/10 pl-3 min-[1800px]:ml-7 min-[1800px]:pl-7">
               <LanguageSelectorTrigger
                 currentLocale={selectedLocale}
                 copy={languageCopy}
@@ -288,6 +338,25 @@ export default function Navbar() {
             className="relative z-[95] mx-4 mb-4 max-h-[calc(100dvh-120px)] overflow-y-auto border border-white/10 bg-black/95 p-5 text-white shadow-[0_0_60px_rgba(0,0,0,0.8)] xl:hidden"
           >
             <div className="flex flex-col gap-4 text-sm font-medium">
+              <div className="border-b border-white/10 pb-4">
+                <Link
+                  href={announcementHref}
+                  onClick={() => setIsOpen(false)}
+                  className={mobileNavLinkClass(announcementActive)}
+                  aria-current={announcementActive ? "page" : undefined}
+                  aria-label={
+                    announcementUnread
+                      ? t("nav.announcementsUnread")
+                      : undefined
+                  }
+                >
+                  <AnnouncementNavLabel
+                    label={t("nav.announcements")}
+                    unread={announcementUnread}
+                  />
+                </Link>
+              </div>
+
               {navItems.map((item) => {
                 const isActive = isActiveRoute(pathname, item.href);
 

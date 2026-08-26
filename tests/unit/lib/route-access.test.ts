@@ -21,6 +21,7 @@ describe("public route access", () => {
     "/players",
     "/players/11111111-1111-4111-8111-111111111111",
     "/players/11111111-1111-4111-8111-111111111111/avatar",
+    "/announcements",
   ])("allows the intended public pathname %s", (pathname) => {
     expect(isPublicPathname(pathname)).toBe(true);
   });
@@ -42,6 +43,7 @@ describe("public route access", () => {
     "/terms-private",
     "/privacy-private",
     "/documents-rules-ppa-private/ironclad-privacy-policy-v1.0.pdf",
+    "/announcements-private",
   ])("keeps the pathname %s protected", (pathname) => {
     expect(isPublicPathname(pathname)).toBe(false);
   });

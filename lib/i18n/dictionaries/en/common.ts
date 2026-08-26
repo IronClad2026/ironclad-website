@@ -10,6 +10,8 @@ const dictionary = {
     about: "About",
     dashboard: "Dashboard",
     admin: "Admin",
+    announcements: "Announcements",
+    announcementsUnread: "Announcements — new official announcement",
     primaryNavigation: "Primary navigation",
     mobileNavigation: "Mobile navigation",
     openMenu: "Open navigation menu",

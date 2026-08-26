@@ -10,6 +10,8 @@ const dictionary = {
     about: "关于",
     dashboard: "控制面板",
     admin: "管理",
+    announcements: "公告",
+    announcementsUnread: "公告 — 有新的官方公告",
     primaryNavigation: "主导航",
     mobileNavigation: "移动端导航",
     openMenu: "打开导航菜单",

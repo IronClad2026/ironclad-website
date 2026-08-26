@@ -10,6 +10,8 @@ const dictionary = {
     about: "О проекте",
     dashboard: "Панель игрока",
     admin: "Администрирование",
+    announcements: "Объявления",
+    announcementsUnread: "Объявления — новое официальное объявление",
     primaryNavigation: "Основная навигация",
     mobileNavigation: "Мобильная навигация",
     openMenu: "Открыть меню навигации",

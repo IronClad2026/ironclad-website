@@ -21,6 +21,29 @@ const dictionary = {
   },
   players: { metadataTitle: "플레이어 디렉터리 | IronClad", metadataDescription: "IronClad Company of Heroes 3 플레이어의 공개 프로필과 경쟁 순위입니다.", eyebrow: "IronClad 참가 명단", title: "플레이어 디렉터리", description: "IronClad 공개 플레이어, ELO, 지역 및 선택적으로 공개된 Discord 연락처입니다.", privacy: "플레이어가 승인한 항목만 표시됩니다. 비공개 프로필은 나타나지 않습니다.", commanders: "공개 플레이어", directorySafe: "디렉터리에는 공개해도 안전한 프로필 항목만 포함됩니다.", search: "플레이어 검색", searchPlaceholder: "이름으로 검색", eloFilter: "ELO", eloPlaceholder: "ELO로 필터링", countryFilter: "국가", countryPlaceholder: "국가 검색", playerOne: "플레이어", playerMany: "플레이어", noPlayers: "아직 공개 플레이어가 없습니다.", noMatches: "필터와 일치하는 플레이어가 없습니다.", emptyHelp: "공개 가능한 IronClad 프로필이 생기면 카드가 표시됩니다.", allCountries: "모든 국가", allElo: "모든 ELO", unrated: "미평가", unknown: "알 수 없음", regionUnknown: "지역 미상", viewProfile: "공개 프로필 보기", avatarLabel: "{name}의 아바타", back: "플레이어 목록으로", profileEyebrow: "IronClad 공개 프로필", currentElo: "현재 ELO", country: "국가", region: "지역", division: "디비전", discordAvailable: "Discord 연락 가능", unknownCountry: "국가 미상", competitiveRecord: "경쟁 기록", publicStats: "공개 통계", publicStatsText: "IronClad 공개 영역에 표시하도록 플레이어가 승인한 정보입니다.", tournamentHistory: "토너먼트 기록", tournamentHistoryText: "안전한 토너먼트 요약이 제공되면 공개 기록이 표시됩니다.", matchStatistics: "경기 통계", matchStatisticsText: "승리, 패배와 경기 정보가 공개 경계를 통해 제공되면 공개 통계가 표시됩니다.", comingLater: "추후 제공", discordUnavailable: "Discord 연락처를 사용할 수 없습니다.", discordUnavailableText: "이 플레이어는 공개 Discord 연락을 허용하지 않았습니다.", discordContact: "Discord 연락처", discordOptedIn: "이 플레이어는 공개 Discord 연락을 허용했습니다.", contactPlayer: "플레이어에게 연락", discordUsername: "Discord 사용자명", copied: "클립보드에 복사했습니다.", copyFailed: "클립보드를 사용할 수 없습니다. 이름을 직접 복사하세요.", notFoundTitle: "플레이어를 찾을 수 없음 | IronClad", profileMetadataTitle: "{name} | IronClad 플레이어 프로필", profileMetadataDescription: "{name}의 공개 IronClad 플레이어 프로필입니다." },
   rankings: { metadataTitle: "순위표 및 순위 | IronClad", metadataDescription: "6개 이벤트 Main / Pro 시즌과 Academy 및 Challenge 영구 커리어 순위입니다.", mainSeason: "Main / Pro 시즌", academyCareer: "Academy 커리어", challengeCareer: "Challenge 커리어", loadWarning: "일부 순위 데이터를 불러오지 못했습니다. 사용 가능한 안전한 공개 데이터를 모두 표시합니다.", publicLeaderboard: "공개 순위", dynamicStandings: "실시간 순위표", mainDescription: "선택한 6개 유효 예선 이벤트로 구성된 Main / Pro 시즌의 공식 순위입니다.", academyDescription: "Academy 포인트와 결과는 영구 커리어 순위에 유지됩니다.", challengeDescription: "Challenge 포인트와 결과는 영구 커리어 순위에 유지됩니다.", safeData: "모든 행은 안전한 공개 보기에서 가져옵니다.", visibleCompetitors: "표시된 경쟁자", rankingModel: "순위 모델", sixEventSeason: "6개 이벤트 시즌", permanentCareer: "영구 커리어 순위", seasonState: "시즌 상태", division: "디비전", heroEyebrow: "IronClad 경쟁 지휘부", heroTitle: "순위표 및 순위", heroDescription: "Main / Pro는 6개의 유효 예선 이벤트로 공식 시즌을 운영합니다. Academy와 Challenge는 각각 별도의 영구 커리어 순위를 유지합니다.", featuredSeason: "현재 Main / Pro 시즌", careerStandings: "커리어 순위", seasonNotStarted: "시즌 시작 전", noSeason: "현재 활성화된 순위 시즌이 없습니다. 첫 번째 유효한 Main / Pro 예선 이벤트부터 순위가 시작됩니다.", careerRecord: "포인트는 해당 디비전의 경쟁 기록에 영구히 남습니다.", validEvents: "유효한 예선 순위 이벤트", underReviewNotice: "시즌 결과를 검토 중입니다. 검토가 진행되는 동안 표시된 순위는 최종 결과가 아닙니다.", careerNoReset: "커리어 포인트는 Main / Pro 시즌 후 초기화되지 않으며 다른 커리어 디비전과 분리됩니다.", competitors: "경쟁자", season: "시즌", state: "상태", scope: "범위", permanent: "영구", reset: "초기화", never: "안 함", tba: "추후 발표", careerTitle: "{division}은 영구 커리어 순위를 사용합니다.", careerSeparation: "포인트는 Main / Pro 시즌 후 초기화되지 않습니다. Academy와 Challenge 기록은 서로 분리되며 Main / Pro로 이전되지 않습니다.", entrantBonus: "커리어 순위에 새로 진입한 선수는 디비전별 1회, 자격을 충족한 이전 이벤트마다 +5포인트를 최대 +25포인트까지 받을 수 있습니다.", notStarted: "시작 전", notStartedDescription: "시즌이 아직 시작되지 않았습니다.", underReview: "검토 중", underReviewDescription: "완료된 시즌을 검토하는 동안 확정된 과거 순위가 표시됩니다.", finalized: "확정", finalizedDescription: "확정되었습니다. Main / Pro 순위가 고정되었습니다.", finalizationPending: "확정 대기", finalizationPendingDescription: "확정을 기다리고 있습니다. 점수 계산과 최종 확정은 보통 여섯 번째 유효 예선 이벤트 후 자동으로 진행됩니다.", inProgress: "진행 중", inProgressDescription: "시즌이 진행 중입니다.", topUnavailable: "Main / Pro 상위 순위가 아직 없습니다", topUnavailableText: "유효한 Main / Pro 예선 결과가 게시되면 공식 순위가 표시됩니다.", topAria: "Main / Pro 상위 순위", finalStandings: "Main / Pro 최종 순위", currentStandings: "Main / Pro 현재 순위", topStandings: "상위 순위", tieNotice: "Main / Pro 공식 1위, 2위 또는 3위에 공동으로 오른 모든 경쟁자를 표시합니다. 표시 순서는 공식 순위를 바꾸지 않습니다. 상금 이벤트는 게시된 상금 약관이 별도로 적용됩니다.", rank: "순위", player: "플레이어", country: "국가", elo: "ELO", points: "포인트", played: "토너먼트", rounds: "라운드", wins: "승리", winRate: "승률", lastPoints: "최근 포인트", movement: "변동", new: "신규", noStandings: "게시된 순위 없음", noStandingsText: "참가 자격을 충족한 토너먼트가 완료되고 순위가 자동 재계산되면 행이 표시됩니다.", history: "토너먼트 기록", historyTitle: "게시된 토너먼트 영향", historyEmpty: "순위 재계산 결과가 게시되면 기록이 표시됩니다.", dateTba: "날짜 추후 발표", pointsShort: "{points}점", topScorer: "공개 순위 최고 득점자: {name}", championArchive: "Main / Pro 챔피언 기록", latestFinalized: "최근 확정 결과", championsEmpty: "시즌이 종료되면 챔피언이 표시됩니다.", rankNumber: "{rank}위", unknown: "알 수 없음", unrated: "미평가", academyBracket: "Academy 대진표", challengeBracket: "Challenge 대진표", aggregate: "종합" },
+  announcements: {
+    metadataTitle: "공식 공지사항 | IronClad",
+    metadataDescription:
+      "IronClad의 최신 공식 소식과 업데이트를 확인하세요.",
+    eyebrow: "IronClad 소식",
+    title: "공식 공지사항",
+    description:
+      "IronClad가 게시한 소식, 토너먼트 안내 및 플랫폼 업데이트입니다.",
+    feedLabel: "공식 공지사항 목록",
+    emptyTitle: "아직 공지사항이 없습니다",
+    emptyDescription:
+      "IronClad의 공식 업데이트가 게시되면 여기에 표시됩니다.",
+    published: "게시",
+    publicationTimeUnavailable:
+      "게시 날짜와 시간을 확인할 수 없습니다",
+    imageAltFallback: "‘{title}’ 이미지",
+    videoLabelFallback: "‘{title}’ 동영상",
+    videoUnsupported: "브라우저에서 동영상 재생을 지원하지 않습니다.",
+    loadErrorTitle: "공지사항을 이용할 수 없습니다",
+    loadErrorDescription:
+      "IronClad 공식 공지사항을 불러오지 못했습니다. 다시 시도해 주세요.",
+    retry: "다시 시도",
+  },
   select: { noOptions: "옵션을 찾을 수 없습니다." },
   playerCount: { one: "플레이어", few: "플레이어", many: "플레이어" },
 } satisfies PublicDictionary;
