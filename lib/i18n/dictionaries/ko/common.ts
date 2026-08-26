@@ -10,6 +10,8 @@ const dictionary = {
     about: "소개",
     dashboard: "대시보드",
     admin: "관리자",
+    announcements: "공지사항",
+    announcementsUnread: "공지사항 — 새로운 공식 공지",
     primaryNavigation: "기본 탐색 메뉴",
     mobileNavigation: "모바일 탐색 메뉴",
     openMenu: "탐색 메뉴 열기",

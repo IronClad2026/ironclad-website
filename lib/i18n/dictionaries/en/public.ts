@@ -303,6 +303,28 @@ const dictionary = {
     challengeBracket: "Challenge Bracket",
     aggregate: "Aggregate",
   },
+  announcements: {
+    metadataTitle: "Official Announcements | IronClad",
+    metadataDescription:
+      "Read the latest official news and updates from IronClad.",
+    eyebrow: "IronClad Broadcast",
+    title: "Official Announcements",
+    description:
+      "News, Tournament notices, and platform updates published by IronClad.",
+    feedLabel: "Official announcements feed",
+    emptyTitle: "No announcements yet",
+    emptyDescription:
+      "Official IronClad updates will appear here when they are published.",
+    published: "Published",
+    publicationTimeUnavailable: "Publication time unavailable",
+    imageAltFallback: "Image for “{title}”",
+    videoLabelFallback: "Video for “{title}”",
+    videoUnsupported: "Your browser does not support video playback.",
+    loadErrorTitle: "Announcements unavailable",
+    loadErrorDescription:
+      "IronClad could not load official announcements. Please try again.",
+    retry: "Try again",
+  },
   select: {
     noOptions: "No options found.",
   },

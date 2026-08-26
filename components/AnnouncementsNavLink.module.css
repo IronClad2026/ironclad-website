@@ -1,0 +1,41 @@
+.label {
+  transition: color 180ms ease, text-shadow 180ms ease;
+}
+
+.unread {
+  color: rgb(251 146 60);
+  text-shadow: 0 0 10px rgb(249 115 22 / 45%);
+  animation: announcement-label-glow 3.6s ease-in-out infinite;
+}
+
+.dot {
+  display: inline-block;
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-left: 0.4rem;
+  border-radius: 9999px;
+  background: currentColor;
+  box-shadow: 0 0 8px rgb(249 115 22 / 65%);
+  vertical-align: 0.12em;
+}
+
+@keyframes announcement-label-glow {
+  0%,
+  100% {
+    color: rgb(251 146 60);
+    text-shadow: 0 0 8px rgb(249 115 22 / 35%);
+  }
+
+  50% {
+    color: rgb(253 186 116);
+    text-shadow:
+      0 0 10px rgb(249 115 22 / 70%),
+      0 0 20px rgb(249 115 22 / 35%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unread {
+    animation: none;
+  }
+}

@@ -306,6 +306,29 @@ const dictionary = {
     challengeBracket: "Cuadro Challenge",
     aggregate: "Total",
   },
+  announcements: {
+    metadataTitle: "Anuncios oficiales | IronClad",
+    metadataDescription:
+      "Consulta las últimas noticias y actualizaciones oficiales de IronClad.",
+    eyebrow: "Canal de IronClad",
+    title: "Anuncios oficiales",
+    description:
+      "Noticias, avisos de Torneos y actualizaciones de la plataforma que publica IronClad.",
+    feedLabel: "Lista de anuncios oficiales",
+    emptyTitle: "Todavía no hay anuncios",
+    emptyDescription:
+      "Las actualizaciones oficiales de IronClad aparecerán aquí cuando se publiquen.",
+    published: "Publicado",
+    publicationTimeUnavailable:
+      "Fecha y hora de publicación no disponibles",
+    imageAltFallback: "Imagen de «{title}»",
+    videoLabelFallback: "Vídeo de «{title}»",
+    videoUnsupported: "Tu navegador no admite la reproducción de vídeo.",
+    loadErrorTitle: "Anuncios no disponibles",
+    loadErrorDescription:
+      "IronClad no ha podido cargar los anuncios oficiales. Inténtalo de nuevo.",
+    retry: "Reintentar",
+  },
   select: { noOptions: "No se encontraron opciones." },
   playerCount: { one: "Jugador", few: "Jugadores", many: "Jugadores" },
 } satisfies PublicDictionary;

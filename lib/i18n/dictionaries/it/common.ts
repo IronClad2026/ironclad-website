@@ -10,6 +10,8 @@ const dictionary = {
     about: "Chi siamo",
     dashboard: "Pannello di controllo",
     admin: "Admin",
+    announcements: "Annunci",
+    announcementsUnread: "Annunci — nuovo annuncio ufficiale",
     primaryNavigation: "Navigazione principale",
     mobileNavigation: "Navigazione mobile",
     openMenu: "Apri il menu di navigazione",

@@ -48,6 +48,7 @@ import {
   CheckCircle,
   Clock,
   MapPinned,
+  Megaphone,
   ShieldAlert,
   Trophy,
   Vote,
@@ -1486,6 +1487,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               >
                 <Vote className="h-4 w-4" />
                 Polls &amp; Decisions
+              </Link>
+              <Link
+                href="/admin/announcements"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/40 bg-black/45 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/10"
+              >
+                <Megaphone className="h-4 w-4" />
+                Official Announcements
               </Link>
             </div>
           </div>
