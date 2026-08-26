@@ -32,8 +32,8 @@ export default function Footer({
       className="border-t border-white/10 bg-black px-6 py-8 text-zinc-400"
       lang={adminRoute ? "en" : undefined}
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm md:flex-row md:items-center md:justify-between">
-        <p>
+      <div className="mx-auto flex max-w-7xl flex-col gap-x-8 gap-y-2 text-sm md:flex-row md:items-center md:justify-between">
+        <p className="flex min-h-11 items-center leading-6 md:shrink-0">
           {interpolateMessage(copy.copyright, {
             year: new Date().getFullYear(),
           })}
@@ -41,7 +41,7 @@ export default function Footer({
 
         <nav
           aria-label={copy.legalAndRules}
-          className="flex flex-wrap gap-x-5 gap-y-3"
+          className="flex flex-wrap items-center gap-x-5 gap-y-1 pr-20 leading-6 md:justify-end [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center [&>button]:inline-flex [&>button]:items-center"
         >
           <Link
             className="transition hover:text-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
