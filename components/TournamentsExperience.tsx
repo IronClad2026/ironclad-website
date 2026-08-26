@@ -1856,6 +1856,16 @@ export function AdminMatchManagementModal({
 }) {
   const portalRoot =
     typeof document === "undefined" ? null : document.body;
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const eyebrowId = useId();
+  const titleId = useId();
+  const descriptionId = useId();
+  const [pendingActions, setPendingActions] = useState<Set<string>>(
+    () => new Set()
+  );
   const displayMatch = toDisplayMatch(match, participantsById);
   const playerOne = match.playerOneRegistrationId
     ? participantsById.get(match.playerOneRegistrationId)
@@ -1886,19 +1896,94 @@ export function AdminMatchManagementModal({
     !activeReportGroup &&
     !hasPendingSubmission;
 
+  const handlePendingChange = useCallback(
+    (key: string, isPending: boolean) => {
+      setPendingActions((current) => {
+        if (current.has(key) === isPending) return current;
+        const next = new Set(current);
+        if (isPending) {
+          next.add(key);
+        } else {
+          next.delete(key);
+        }
+        return next;
+      });
+    },
+    []
+  );
+  const actionPending = pendingActions.size > 0;
   useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const requestClose = useCallback(() => {
+    const dialogPending =
+      dialogRef.current?.getAttribute("aria-busy") === "true";
+    const formPending = dialogRef.current?.querySelector(
+      '[aria-busy="true"]'
+    );
+    if (!dialogPending && !formPending) onCloseRef.current();
+  }, []);
+
+  useEffect(() => {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+        ? document.activeElement
+        : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    window.addEventListener("keydown", closeOnEscape);
+    closeButtonRef.current?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
+      if (openerRef.current?.isConnected) openerRef.current.focus();
     };
-  }, [onClose]);
+  }, []);
+
+  useEffect(() => {
+    const handleDialogKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        requestClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), select:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), a[href], [tabindex]'
+        ) ?? []
+      ).filter((element) => element.tabIndex >= 0);
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+      const activeElement = document.activeElement;
+      const focusIsOutsideSequence =
+        !(activeElement instanceof HTMLElement) ||
+        !focusable.includes(activeElement);
+
+      if (
+        event.shiftKey &&
+        (activeElement === first || focusIsOutsideSequence)
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (activeElement === last || focusIsOutsideSequence)
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleDialogKeyDown);
+    return () => window.removeEventListener("keydown", handleDialogKeyDown);
+  }, [requestClose]);
 
   if (!portalRoot) {
     return null;
@@ -1907,19 +1992,26 @@ export function AdminMatchManagementModal({
   return createPortal(
     <AnimatePresence>
       <div className="fixed inset-0 z-[10000] grid place-items-center p-3 sm:p-6">
-        <motion.button
-          type="button"
-          aria-label="Close match management"
-          onClick={onClose}
+        <motion.div
+          aria-hidden="true"
+          data-admin-match-dialog-backdrop
+          onMouseDown={(event) => {
+            event.preventDefault();
+            requestClose();
+          }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="absolute inset-0 h-full w-full cursor-default bg-black/85 backdrop-blur-md"
         />
         <motion.section
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-labelledby={`admin-match-${match.id}`}
+          aria-labelledby={`${eyebrowId} ${titleId}`}
+          aria-describedby={descriptionId}
+          aria-busy={actionPending}
+          tabIndex={-1}
           initial={{ opacity: 0, scale: 0.96, y: 18 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 12 }}
@@ -1930,23 +2022,31 @@ export function AdminMatchManagementModal({
             <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.9)]" />
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
+                <p
+                  id={eyebrowId}
+                  className="text-xs font-black uppercase tracking-[0.28em] text-orange-300"
+                >
                   {readOnly ? "Read-Only Match History" : "Direct Match Management"}
                 </p>
                 <h2
-                  id={`admin-match-${match.id}`}
+                  id={titleId}
                   className="mt-2 break-words text-2xl font-black text-white"
                 >
                   {tournament.title}
                 </h2>
-                <p className="mt-2 text-sm text-zinc-400">
+                <p
+                  id={descriptionId}
+                  className="mt-2 text-sm text-zinc-400"
+                >
                   {match.roundName} - Match {match.matchNumber}
                 </p>
               </div>
               <button
+                ref={closeButtonRef}
                 type="button"
-                onClick={onClose}
-                className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
+                onClick={requestClose}
+                disabled={actionPending}
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 disabled:cursor-wait disabled:opacity-50"
                 aria-label="Close match management"
               >
                 <X size={20} />
@@ -2038,6 +2138,7 @@ export function AdminMatchManagementModal({
                       match={match}
                       isAdmin={!readOnly && viewer.isAdmin}
                       participantsById={participantsById}
+                      onPendingChange={handlePendingChange}
                     />
                   ))}
                   {submissions.length > 0 && (
@@ -2045,6 +2146,7 @@ export function AdminMatchManagementModal({
                       match={match}
                       submissions={submissions}
                       participantsById={participantsById}
+                      onPendingChange={handlePendingChange}
                     />
                   )}
                   {reportGroups.length === 0 && submissions.length === 0 && (
@@ -2069,7 +2171,10 @@ export function AdminMatchManagementModal({
 
             {!readOnly && deadlineManaged && (
               <div className="mt-5 w-full max-w-full min-w-0">
-                <AdminMatchDeadlineControls match={match} />
+                <AdminMatchDeadlineControls
+                  match={match}
+                  onPendingChange={handlePendingChange}
+                />
               </div>
             )}
 
@@ -2084,6 +2189,7 @@ export function AdminMatchManagementModal({
                     match={match}
                     playerOneName={playerOne?.name ?? "Player 1"}
                     playerTwoName={playerTwo?.name ?? "Player 2"}
+                    onPendingChange={handlePendingChange}
                   />
                 ) : (
                   <div>
@@ -2106,7 +2212,10 @@ export function AdminMatchManagementModal({
               </div>
 
               <div className="min-w-0 max-w-full">
-                <AdminResetMatchForm match={match} />
+                <AdminResetMatchForm
+                  match={match}
+                  onPendingChange={handlePendingChange}
+                />
               </div>
               </div>
             )}

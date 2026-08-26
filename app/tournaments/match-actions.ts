@@ -42,6 +42,7 @@ export type MatchResultActionCode =
   | "prepare_failed"
   | "cleanup_failed"
   | "operation_failed"
+  | "duplicate_replay"
   | "stale_conflict"
   | "result_submitted"
   | "opponent_required"
@@ -143,13 +144,17 @@ export async function finalizeMatchResult(
     );
   } catch (error) {
     logMatchResultFailure("finalize-match-result", error);
+    const duplicateReplay =
+      error instanceof MatchReplayUploadError && error.code === "DUP_REPLAY";
     return {
       ...errorState(
-        getReplayUploadMessage(
-          error,
-          "The match result could not be submitted. Please try again."
-        ),
-        "operation_failed"
+        duplicateReplay
+          ? "This replay has already been submitted. Use a different replay file."
+          : getReplayUploadMessage(
+              error,
+              "The match result could not be submitted. Please try again."
+            ),
+        duplicateReplay ? "duplicate_replay" : "operation_failed"
       ),
       requiresRefresh:
         error instanceof MatchReplayUploadError &&

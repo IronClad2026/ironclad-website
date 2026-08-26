@@ -229,6 +229,37 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     expect(refreshMock).toHaveBeenCalled();
   });
 
+  it("shows localized duplicate replay feedback and keeps selected files available", async () => {
+    const serverFallback = "SERVER_FALLBACK_MUST_NOT_RENDER";
+    finalizeMatchResultMock.mockResolvedValue({
+      status: "error",
+      code: "duplicate_replay",
+      message: serverFallback,
+    });
+    const { container } = renderResultForm();
+    const { fileInput, files } = selectValidResult(container);
+
+    fireEvent.submit(
+      screen.getByRole("button", {
+        name: "Submit for Opponent Confirmation",
+      }).closest("form") as HTMLFormElement
+    );
+
+    expect(
+      await screen.findByText(competitionEnglish.matchAction.duplicateReplay)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(competitionEnglish.matchAction.operationFailed)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(serverFallback)).not.toBeInTheDocument();
+    expect(fileInput.files).toHaveLength(2);
+    expect(fileInput.files?.[0]).toBe(files[0]);
+    expect(fileInput.files?.[1]).toBe(files[1]);
+    expect(finalizeMatchResultMock).toHaveBeenCalledOnce();
+    expect(cleanupPreparedReplayUploadsMock).not.toHaveBeenCalled();
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
   it("shows bounded upload state and disables conflicting submission", async () => {
     let resolvePreparation!: (value: unknown) => void;
     prepareMatchReplayUploadsMock.mockReturnValue(

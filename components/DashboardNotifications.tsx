@@ -14,7 +14,15 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   confirmDashboardMatchResult,
@@ -76,22 +84,6 @@ export default function DashboardNotifications({
   ).length;
   const allSelected =
     notifications.length > 0 && selectedIds.size === notifications.length;
-
-  useEffect(() => {
-    if (!selected) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelected(null);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [selected]);
 
   if (error) {
     return (
@@ -332,7 +324,10 @@ export default function DashboardNotifications({
                       locale={locale}
                       t={t}
                       onToggle={() => toggleSelected(notification.id)}
-                      onOpen={() => setSelected(notification)}
+                      onOpen={() => {
+                        setMessage("");
+                        setSelected(notification);
+                      }}
                       onDelete={() =>
                         deleteNotifications([notification.id])
                       }
@@ -342,7 +337,7 @@ export default function DashboardNotifications({
               </>
             )}
 
-            {message && (
+            {message && !selected && (
               <p
                 aria-live="polite"
                 className="border-t border-white/10 px-4 py-3 text-xs text-zinc-400"
@@ -360,6 +355,7 @@ export default function DashboardNotifications({
             notification={selected}
             now={now}
             pending={pending}
+            message={message}
             locale={locale}
             t={t}
             roundName={localizeBracketRoundName(
@@ -416,7 +412,8 @@ function NotificationRow({
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 items-start gap-3 rounded-lg px-1 py-1 text-left"
+        disabled={pending}
+        className="flex min-w-0 flex-1 items-start gap-3 rounded-lg px-1 py-1 text-left disabled:cursor-wait disabled:opacity-50"
       >
         <span className={`mt-0.5 shrink-0 ${content.iconClassName}`}>
           <Icon size={17} />
@@ -467,6 +464,7 @@ function NotificationModal({
   notification,
   now,
   pending,
+  message,
   locale,
   t,
   roundName,
@@ -476,6 +474,7 @@ function NotificationModal({
   notification: DashboardNotification;
   now: number | null;
   pending: boolean;
+  message: string;
   locale: Locale;
   t: NotificationTranslator;
   roundName: string;
@@ -487,6 +486,13 @@ function NotificationModal({
   onClose: () => void;
 }) {
   const [disputeNotes, setDisputeNotes] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  const descriptionId = useId();
+  const disputeNotesId = useId();
   const content = notificationContent(notification, t);
   const Icon = content.icon;
   const responseAvailable =
@@ -499,21 +505,99 @@ function NotificationModal({
     notification.status === "pending_confirmation";
   const isNoShow = notification.resultType === "no_show";
 
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const requestClose = useCallback(() => {
+    const dialogPending =
+      dialogRef.current?.getAttribute("aria-busy") === "true";
+    if (!dialogPending) onCloseRef.current();
+  }, []);
+
+  useEffect(() => {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+        ? document.activeElement
+        : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      if (openerRef.current?.isConnected) openerRef.current.focus();
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleDialogKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        requestClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), select:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), a[href], [tabindex]'
+        ) ?? []
+      ).filter((element) => element.tabIndex >= 0);
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+      const activeElement = document.activeElement;
+      const focusIsOutsideSequence =
+        !(activeElement instanceof HTMLElement) ||
+        !focusable.includes(activeElement);
+
+      if (
+        event.shiftKey &&
+        (activeElement === first || focusIsOutsideSequence)
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (activeElement === last || focusIsOutsideSequence)
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleDialogKeyDown);
+    return () => window.removeEventListener("keydown", handleDialogKeyDown);
+  }, [requestClose]);
+
   return (
     <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
-      <motion.button
-        type="button"
-        aria-label={t("dashboard.close")}
-        onClick={onClose}
+      <motion.div
+        aria-hidden="true"
+        data-notification-dialog-backdrop
+        onMouseDown={(event) => {
+          event.preventDefault();
+          requestClose();
+        }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="absolute inset-0 h-full w-full cursor-default bg-black/85 backdrop-blur-md"
       />
       <motion.article
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={`notification-${notification.sourceId}`}
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        aria-busy={pending}
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.96, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 12 }}
@@ -531,21 +615,26 @@ function NotificationModal({
                 {t("dashboard.modalEyebrow")}
               </p>
               <h2
-                id={`notification-${notification.sourceId}`}
+                id={titleId}
                 className="mt-1.5 break-words text-lg font-black text-white sm:text-xl"
               >
                 {content.title}
               </h2>
-              <p className="mt-1.5 text-xs leading-5 text-zinc-400">
+              <p
+                id={descriptionId}
+                className="mt-1.5 text-xs leading-5 text-zinc-400"
+              >
                 {content.message}
               </p>
             </div>
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
+            disabled={pending}
             aria-label={t("dashboard.close")}
-            className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 transition hover:border-orange-400/40 hover:text-white"
+            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 transition hover:border-orange-400/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 disabled:cursor-wait disabled:opacity-50"
           >
             <X size={17} />
           </button>
@@ -585,20 +674,26 @@ function NotificationModal({
 
             {responseAvailable && (
               <div className="space-y-3 rounded-xl border border-orange-400/20 bg-orange-500/5 p-3">
+                <label
+                  htmlFor={disputeNotesId}
+                  className="block text-[10px] font-black uppercase tracking-wider text-zinc-300"
+                >
+                  {t("dashboard.disputeNotes")}
+                </label>
                 <textarea
+                  id={disputeNotesId}
                   value={disputeNotes}
                   onChange={(event) => setDisputeNotes(event.target.value)}
                   maxLength={2000}
                   rows={2}
-                  placeholder={t("dashboard.disputeNotes")}
-                  className="w-full resize-none rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                  className="min-h-11 w-full resize-none rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-300"
                 />
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button
                     type="button"
                     disabled={pending}
                     onClick={() => onRespond(notification, "confirm")}
-                    className="rounded-lg bg-emerald-600 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                    className="min-h-11 rounded-lg bg-emerald-600 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-50"
                   >
                     {isNoShow
                       ? t("dashboard.confirmNoShow")
@@ -610,7 +705,7 @@ function NotificationModal({
                     onClick={() =>
                       onRespond(notification, "dispute", disputeNotes)
                     }
-                    className="rounded-lg bg-red-700 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
+                    className="min-h-11 rounded-lg bg-red-700 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 disabled:cursor-wait disabled:opacity-50"
                   >
                     {isNoShow
                       ? t("dashboard.disputeNoShow")
@@ -720,6 +815,15 @@ function NotificationModal({
               {t("dashboard.expiredNotice")}
             </div>
           )}
+
+        <p
+          aria-live="polite"
+          className={`mx-4 mb-4 text-xs leading-5 sm:mx-5 sm:mb-5 ${
+            pending || message ? "text-zinc-300" : "sr-only"
+          }`}
+        >
+          {pending ? t("dashboard.updating") : message}
+        </p>
       </motion.article>
     </div>
   );

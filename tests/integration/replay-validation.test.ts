@@ -1043,6 +1043,7 @@ describe("replay direct-upload actions and trusted finalization", () => {
     const prepared = await prepareMatchReplayUploads(validPreparationInput());
     if (prepared.status !== "success") throw new Error("Preparation failed");
     const duplicate = new TextEncoder().encode("same-stored-payload");
+    const duplicateHash = createHash("sha256").update(duplicate).digest("hex");
     prepared.uploads.forEach((upload) =>
       replayClient.payloads.set(upload.path, [duplicate])
     );
@@ -1053,12 +1054,73 @@ describe("replay direct-upload actions and trusted finalization", () => {
 
     expect(result).toMatchObject({
       status: "error",
-      message: expect.stringContaining("unique replay"),
+      code: "duplicate_replay",
+      message:
+        "This replay has already been submitted. Use a different replay file.",
+      requiresRefresh: false,
     });
     expect(
       replayClient.rpcCallsFor("commit_match_replay_attempt_result")
     ).toHaveLength(0);
     expect(replayClient.remove).toHaveBeenCalledOnce();
+    expect(replayClient.state.activeReport).toBe(false);
+    expect(replayClient.state.referencedPaths.size).toBe(0);
+    expect(replayClient.payloads.size).toBe(0);
+
+    const visibleOutput = JSON.stringify({
+      result,
+      logs: vi.mocked(console.error).mock.calls,
+    });
+    for (const privateValue of [
+      duplicateHash,
+      ...prepared.uploads.flatMap((upload) => [upload.path, upload.token]),
+      "https://private.invalid",
+      "must-not-leak",
+    ]) {
+      expect(visibleOutput).not.toContain(privateValue);
+    }
+  });
+
+  it("does not promote an untyped duplicate-looking database error", async () => {
+    const privateDatabaseDetail =
+      "Each game requires a unique replay file; private/path?token=secret";
+    const replayClient = createReplayClient({
+      rpcError: { code: "P0001", message: privateDatabaseDetail },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+    const prepared = await prepareMatchReplayUploads(validPreparationInput());
+    if (prepared.status !== "success") throw new Error("Preparation failed");
+    prepared.uploads.forEach((upload, index) =>
+      replayClient.payloads.set(
+        upload.path,
+        [new TextEncoder().encode(`unique-stored-payload-${index}`)]
+      )
+    );
+
+    const result = await finalizeMatchResult(
+      validFinalizationInput(prepared.attemptId)
+    );
+
+    expect(result).toMatchObject({
+      status: "error",
+      code: "operation_failed",
+      message: "Each completed game requires a unique replay file.",
+      requiresRefresh: false,
+    });
+    expect(
+      replayClient.rpcCallsFor("commit_match_replay_attempt_result")
+    ).toHaveLength(1);
+    expect(replayClient.remove).toHaveBeenCalledOnce();
+    expect(replayClient.state.activeReport).toBe(false);
+    expect(replayClient.state.referencedPaths.size).toBe(0);
+    expect(replayClient.payloads.size).toBe(0);
+
+    const visibleOutput = JSON.stringify({
+      result,
+      logs: vi.mocked(console.error).mock.calls,
+    });
+    expect(visibleOutput).not.toContain("private/path");
+    expect(visibleOutput).not.toContain("token=secret");
   });
 
   it("rejects malformed, wrong-match, and wrong-owner attempts without unsafe deletion", async () => {

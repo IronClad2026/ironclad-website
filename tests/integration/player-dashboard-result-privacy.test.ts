@@ -224,12 +224,196 @@ describe("player dashboard result privacy", () => {
     expect(dashboard.matchHistory).toEqual([]);
     expect(dashboard.champions).toEqual([]);
   });
+
+  it.each([
+    {
+      label: "win",
+      matchOverrides: {},
+      expectedWon: 1,
+      expectedLost: 0,
+      expectedResult: "win",
+    },
+    {
+      label: "loss",
+      matchOverrides: {
+        player_one_score: 0,
+        player_two_score: 2,
+        winner_registration_id: "registration-2",
+      },
+      expectedWon: 0,
+      expectedLost: 1,
+      expectedResult: "loss",
+    },
+  ])(
+    "counts a normal completed Match $label in both statistics and history",
+    async ({ matchOverrides, expectedWon, expectedLost, expectedResult }) => {
+      const dashboardClient = createDashboardClient({ matchOverrides });
+      createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
+
+      const dashboard = await loadPlayerCareerDashboard(viewerClerkUserId);
+
+      expect(dashboard.statistics).toMatchObject({
+        matchesPlayed: 1,
+        matchesWon: expectedWon,
+        matchesLost: expectedLost,
+      });
+      expect(dashboard.matchHistory).toEqual([
+        expect.objectContaining({ result: expectedResult }),
+      ]);
+    }
+  );
+
+  it.each([
+    {
+      label: "opponent-confirmed no-show win",
+      viewerWon: true,
+      status: "confirmed",
+      noShowStatus: "confirmed",
+      finalizedSource: "opponent_confirmation",
+      finalRound: true,
+    },
+    {
+      label: "automatically confirmed no-show loss",
+      viewerWon: false,
+      status: "auto_approved",
+      noShowStatus: "auto_confirmed",
+      finalizedSource: "cron_auto_approval",
+      finalRound: false,
+    },
+    {
+      label: "Admin-approved no-show win",
+      viewerWon: true,
+      status: "approved",
+      noShowStatus: "approved",
+      finalizedSource: "admin_approval",
+      finalRound: false,
+    },
+  ])(
+    "excludes a finalized accepted $label from played statistics and history",
+    async ({
+      viewerWon,
+      status,
+      noShowStatus,
+      finalizedSource,
+      finalRound,
+    }) => {
+      const winnerRegistrationId = viewerWon
+        ? "registration-1"
+        : "registration-2";
+      const noShowRegistrationId = viewerWon
+        ? "registration-2"
+        : "registration-1";
+      const playerOneScore = viewerWon ? 2 : 0;
+      const playerTwoScore = viewerWon ? 0 : 2;
+      const dashboardClient = createDashboardClient({
+        roundNumber: finalRound ? 2 : 1,
+        slotCount: 4,
+        matchOverrides: {
+          player_one_score: playerOneScore,
+          player_two_score: playerTwoScore,
+          winner_registration_id: winnerRegistrationId,
+          official_result_submission_id: null,
+        },
+        reportGroupOverrides: {
+          submitted_by_registration_id: winnerRegistrationId,
+          opponent_registration_id: noShowRegistrationId,
+          winner_registration_id: winnerRegistrationId,
+          player_one_score: playerOneScore,
+          player_two_score: playerTwoScore,
+          status,
+          no_show_registration_id: noShowRegistrationId,
+          no_show_status: noShowStatus,
+          finalized_source: finalizedSource,
+        },
+      });
+      createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
+
+      const dashboard = await loadPlayerCareerDashboard(viewerClerkUserId);
+
+      expect(dashboard.statistics).toMatchObject({
+        matchesPlayed: 0,
+        matchesWon: 0,
+        matchesLost: 0,
+        winRate: 0,
+        tournamentsWon: finalRound && viewerWon ? 1 : 0,
+      });
+      expect(dashboard.matchHistory).toEqual([]);
+      expect(dashboard.notifications).toEqual([
+        expect.objectContaining({
+          resultType: "no_show",
+          noShowRegistrationId,
+          noShowStatus,
+          status,
+          reportedWinner: viewerWon ? "Viewer" : "Opponent",
+        }),
+      ]);
+      expect(dashboard.champions).toHaveLength(finalRound && viewerWon ? 1 : 0);
+    }
+  );
+
+  it.each([
+    {
+      label: "pending no-show",
+      reportGroupOverrides: {
+        status: "pending_confirmation",
+        no_show_status: "pending",
+        finalized_at: null,
+        finalized_source: null,
+      },
+    },
+    {
+      label: "disputed no-show",
+      reportGroupOverrides: {
+        status: "disputed",
+        no_show_status: "disputed",
+        finalized_at: null,
+        finalized_source: null,
+      },
+    },
+    {
+      label: "rejected no-show",
+      reportGroupOverrides: {
+        status: "rejected",
+        no_show_status: "rejected",
+        finalized_source: "admin_override",
+      },
+    },
+    {
+      label: "Admin-corrected normal result",
+      reportGroupOverrides: {
+        result_type: "normal",
+        status: "approved",
+        no_show_registration_id: null,
+        no_show_status: null,
+        finalized_source: "admin_override",
+      },
+    },
+  ])(
+    "does not exclude a completed official result for a $label report group",
+    async ({ reportGroupOverrides }) => {
+      const dashboardClient = createDashboardClient({ reportGroupOverrides });
+      createSupabaseAdminClientMock.mockReturnValue(dashboardClient.client);
+
+      const dashboard = await loadPlayerCareerDashboard(viewerClerkUserId);
+
+      expect(dashboard.statistics).toMatchObject({
+        matchesPlayed: 1,
+        matchesWon: 1,
+        matchesLost: 0,
+        winRate: 100,
+      });
+      expect(dashboard.matchHistory).toEqual([
+        expect.objectContaining({ result: "win" }),
+      ]);
+    }
+  );
 });
 
 function createDashboardClient({
   metadataError = null,
   launchedAt = "2026-08-06T03:00:00.000Z",
   matchOverrides = {},
+  reportGroupOverrides = null,
   roundNumber = 1,
   slotCount = 4,
   registrationResponse = "normal",
@@ -237,6 +421,7 @@ function createDashboardClient({
   metadataError?: unknown;
   launchedAt?: string | null;
   matchOverrides?: Record<string, unknown>;
+  reportGroupOverrides?: Record<string, unknown> | null;
   roundNumber?: number;
   slotCount?: number;
   registrationResponse?: "normal" | "empty" | "null";
@@ -276,6 +461,7 @@ function createDashboardClient({
               metadataError,
               launchedAt,
               matchOverrides,
+              reportGroupOverrides,
               roundNumber,
               slotCount,
               registrationResponse
@@ -295,6 +481,7 @@ function resolveDashboardQuery(
   metadataError: unknown,
   launchedAt: string | null,
   matchOverrides: Record<string, unknown>,
+  reportGroupOverrides: Record<string, unknown> | null,
   roundNumber: number,
   slotCount: number,
   registrationResponse: "normal" | "empty" | "null"
@@ -336,6 +523,33 @@ function resolveDashboardQuery(
     updated_at: "2026-07-25T00:00:00.000Z",
     ...matchOverrides,
   };
+  const reportGroup =
+    reportGroupOverrides === null
+      ? null
+      : {
+          id: "report-group-1",
+          match_id: "match-1",
+          tournament_id: "tournament-1",
+          result_type: "no_show",
+          submitted_by_registration_id: "registration-1",
+          opponent_registration_id: "registration-2",
+          winner_registration_id: match.winner_registration_id,
+          player_one_score: match.player_one_score,
+          player_two_score: match.player_two_score,
+          status: "approved",
+          confirmation_deadline_at: "2026-07-24T12:00:00.000Z",
+          confirmed_at: null,
+          disputed_at: null,
+          dispute_notes: null,
+          reviewed_at: "2026-07-25T00:00:00.000Z",
+          review_notes: null,
+          no_show_registration_id: "registration-2",
+          no_show_status: "approved",
+          finalized_at: "2026-07-25T00:00:00.000Z",
+          finalized_source: "admin_approval",
+          created_at: "2026-07-24T00:00:00.000Z",
+          ...reportGroupOverrides,
+        };
 
   const dataByTable: Record<string, unknown> = {
     bracket_rounds: [
@@ -353,7 +567,7 @@ function resolveDashboardQuery(
         slot_count: slotCount,
       },
     ],
-    match_result_report_groups: [],
+    match_result_report_groups: reportGroup ? [reportGroup] : [],
     match_result_submissions: [
       {
         id: "submission-1",
@@ -383,6 +597,7 @@ function resolveDashboardQuery(
         launched_at: launchedAt,
       },
     ],
+    player_report_group_notification_dismissals: [],
     tournament_standings: [],
     tournaments: [
       {

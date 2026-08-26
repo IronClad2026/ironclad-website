@@ -1,27 +1,32 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DashboardNotifications from "@/components/DashboardNotifications";
+import type { NotificationActionResult } from "@/app/dashboard/actions";
 import type { DashboardNotification } from "@/lib/player-dashboard";
 
 const refreshMock = vi.hoisted(() => vi.fn());
+const confirmDashboardMatchResultMock = vi.hoisted(() => vi.fn());
 const dismissDashboardNotificationsMock = vi.hoisted(() => vi.fn());
+const disputeDashboardMatchResultMock = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: refreshMock }),
 }));
 
 vi.mock("@/app/dashboard/actions", () => ({
-  confirmDashboardMatchResult: vi.fn(),
+  confirmDashboardMatchResult: confirmDashboardMatchResultMock,
   dismissDashboardNotifications: dismissDashboardNotificationsMock,
-  disputeDashboardMatchResult: vi.fn(),
+  disputeDashboardMatchResult: disputeDashboardMatchResultMock,
 }));
 
 describe("match actions card presentation", () => {
@@ -103,9 +108,166 @@ describe("match actions card presentation", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("1 requires action")).toBeInTheDocument();
   });
+
+  it("makes result confirmation and dispute a named, trapped, touch-safe dialog that returns focus", async () => {
+    render(
+      <DashboardNotifications
+        notifications={[
+          actionNotification({
+            confirmationDeadlineAt: "2099-08-21T01:00:00.000Z",
+          }),
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Match Actions/i }));
+    const opener = screen
+      .getByText("Match result confirmation required")
+      .closest("button") as HTMLButtonElement;
+
+    const openDialog = async () => {
+      opener.focus();
+      fireEvent.click(opener);
+      const dialog = await screen.findByRole("dialog", {
+        name: "Match result confirmation required",
+      });
+      const closeButton = within(dialog).getByRole("button", {
+        name: "Close notification",
+      });
+      await waitFor(() => expect(closeButton).toHaveFocus());
+      return { closeButton, dialog };
+    };
+
+    let { closeButton, dialog } = await openDialog();
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAccessibleDescription(
+      "Your opponent submitted the result for your match in IronClad Cup. Confirm or dispute it before the confirmation window expires."
+    );
+    expect(dialog).toHaveClass("w-[min(92vw,30rem)]", "max-h-[88vh]");
+    expect(closeButton).toHaveClass("min-h-11", "min-w-11");
+
+    const notes = await within(dialog).findByLabelText(
+      "Optional dispute notes"
+    );
+    const confirmButton = within(dialog).getByRole("button", {
+      name: "Confirm result",
+    });
+    const disputeButton = within(dialog).getByRole("button", {
+      name: "Dispute result",
+    });
+    expect(notes).toHaveClass("min-h-11");
+    expect(confirmButton).toHaveClass("min-h-11");
+    expect(disputeButton).toHaveClass("min-h-11");
+
+    disputeButton.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(closeButton).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(disputeButton).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+
+    ({ closeButton, dialog } = await openDialog());
+    fireEvent.click(closeButton);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+
+    ({ dialog } = await openDialog());
+    const backdrop = dialog.parentElement?.querySelector<HTMLElement>(
+      "[data-notification-dialog-backdrop]"
+    );
+    expect(backdrop).toHaveAttribute("aria-hidden", "true");
+    fireEvent.mouseDown(backdrop as HTMLElement);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+  });
+
+  it("keeps the player dialog open and non-dismissible while a dispute is pending", async () => {
+    let resolveDispute!: (result: NotificationActionResult) => void;
+    const disputeResult = new Promise<NotificationActionResult>((resolve) => {
+      resolveDispute = resolve;
+    });
+    disputeDashboardMatchResultMock.mockReturnValueOnce(disputeResult);
+
+    render(
+      <DashboardNotifications
+        notifications={[
+          actionNotification({
+            confirmationDeadlineAt: "2099-08-21T01:00:00.000Z",
+          }),
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Match Actions/i }));
+    const opener = screen
+      .getByText("Match result confirmation required")
+      .closest("button") as HTMLButtonElement;
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Match result confirmation required",
+    });
+    const notes = await within(dialog).findByLabelText(
+      "Optional dispute notes"
+    );
+    const disputeButton = await within(dialog).findByRole("button", {
+      name: "Dispute result",
+    });
+    fireEvent.change(notes, { target: { value: "The reported score is wrong." } });
+    fireEvent.click(disputeButton);
+
+    await waitFor(() => {
+      expect(disputeDashboardMatchResultMock).toHaveBeenCalledOnce();
+      expect(dialog).toHaveAttribute("aria-busy", "true");
+    });
+    const submittedData = disputeDashboardMatchResultMock.mock.calls[0][0] as FormData;
+    expect(submittedData.get("disputeNotes")).toBe("The reported score is wrong.");
+
+    const closeButton = within(dialog).getByRole("button", {
+      name: "Close notification",
+    });
+    const backdrop = dialog.parentElement?.querySelector<HTMLElement>(
+      "[data-notification-dialog-backdrop]"
+    );
+    expect(closeButton).toBeDisabled();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(notes).toHaveFocus();
+    fireEvent.click(closeButton);
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.mouseDown(backdrop as HTMLElement);
+    expect(screen.getByRole("dialog")).toBe(dialog);
+
+    await act(async () => {
+      resolveDispute({
+        status: "error",
+        code: "dispute-failed",
+        message: "The match result could not be disputed. Please try again.",
+      });
+      await disputeResult;
+    });
+    await waitFor(() => {
+      expect(dialog).toHaveAttribute("aria-busy", "false");
+      expect(closeButton).toBeEnabled();
+      expect(
+        within(dialog).getByText(
+          "The Match result could not be disputed. Please try again."
+        )
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(closeButton);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+  });
 });
 
-function actionNotification(): DashboardNotification {
+function actionNotification(
+  overrides: Partial<DashboardNotification> = {}
+): DashboardNotification {
   return {
     id: "report_group:11111111-1111-4111-8111-111111111111",
     source: "report_group",
@@ -132,5 +294,6 @@ function actionNotification(): DashboardNotification {
     finalizedAt: null,
     canConfirm: true,
     canDispute: true,
+    ...overrides,
   };
 }
