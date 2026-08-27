@@ -28,6 +28,7 @@ const imagePath =
   "media/123e4567-e89b-42d3-a456-426614174000.jpg";
 const videoPath =
   "media/123e4567-e89b-42d3-a456-426614174000.mp4";
+const tournamentId = "323e4567-e89b-42d3-a456-426614174000";
 
 describe("Admin official announcement actions", () => {
   beforeEach(() => {
@@ -65,6 +66,8 @@ describe("Admin official announcement actions", () => {
         body: "Body",
         mediaPath: null,
         mediaDescription: null,
+        linkToTournament: false,
+        linkedTournamentId: null,
       })
     ).rejects.toThrow("Unauthorized");
     await expect(
@@ -138,6 +141,8 @@ describe("Admin official announcement actions", () => {
       body: "  Plain body  ",
       mediaPath: null,
       mediaDescription: null,
+      linkToTournament: false,
+      linkedTournamentId: null,
     });
 
     expect(result).toEqual({
@@ -153,6 +158,98 @@ describe("Admin official announcement actions", () => {
       p_actor_clerk_user_id: "user_admin",
     });
     expect(rpcInput).not.toHaveProperty("p_published_at");
+  });
+
+  it("publishes one server-verified linked Tournament through the atomic linked RPC", async () => {
+    const fixture = storageClient();
+    fixture.client.rpc.mockResolvedValue({
+      data: {
+        id: "223e4567-e89b-42d3-a456-426614174000",
+        published_at: "2026-08-26T02:00:00.000Z",
+      },
+      error: null,
+    });
+    createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+
+    await expect(
+      publishAnnouncement({
+        title: "Academy registration",
+        body: "Registration is open.",
+        mediaPath: null,
+        mediaDescription: null,
+        linkToTournament: true,
+        linkedTournamentId: tournamentId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(fixture.client.from).toHaveBeenCalledWith("tournaments");
+    expect(fixture.tournamentQuery.select).toHaveBeenCalledWith("id");
+    expect(fixture.tournamentQuery.eq).toHaveBeenCalledWith("id", tournamentId);
+    expect(fixture.client.rpc).toHaveBeenCalledWith(
+      "publish_official_announcement_with_tournament",
+      expect.objectContaining({ p_linked_tournament_id: tournamentId })
+    );
+  });
+
+  it("rejects missing, nonexistent, and toggle-off injected Tournament links safely", async () => {
+    await expect(
+      publishAnnouncement({
+        title: "Missing link",
+        body: "Body",
+        mediaPath: null,
+        mediaDescription: null,
+        linkToTournament: true,
+        linkedTournamentId: null,
+      })
+    ).resolves.toEqual({ ok: false, message: "Select an existing Tournament." });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+
+    await expect(
+      publishAnnouncement({
+        title: "Injected link",
+        body: "Body",
+        mediaPath: null,
+        mediaDescription: null,
+        linkToTournament: false,
+        linkedTournamentId: tournamentId,
+      })
+    ).resolves.toEqual({ ok: false, message: "Select an existing Tournament." });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+
+    const fixture = storageClient({ tournamentExists: false });
+    createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+    await expect(
+      publishAnnouncement({
+        title: "Deleted Tournament",
+        body: "Body",
+        mediaPath: null,
+        mediaDescription: null,
+        linkToTournament: true,
+        linkedTournamentId: tournamentId,
+      })
+    ).resolves.toEqual({ ok: false, message: "Select an existing Tournament." });
+    expect(fixture.client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("retires unreferenced media when linked Tournament validation fails", async () => {
+    const fixture = storageClient({ tournamentExists: false });
+    fixture.bucket.remove.mockResolvedValue({ error: null });
+    fixture.bucket.list.mockResolvedValue({ data: [], error: null });
+    createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+
+    await expect(
+      publishAnnouncement({
+        title: "Deleted Tournament",
+        body: "Body",
+        mediaPath: imagePath,
+        mediaDescription: "Announcement art",
+        linkToTournament: true,
+        linkedTournamentId: tournamentId,
+      })
+    ).resolves.toEqual({ ok: false, message: "Select an existing Tournament." });
+
+    expect(fixture.bucket.remove).toHaveBeenCalledWith([imagePath]);
+    expect(fixture.client.rpc).not.toHaveBeenCalled();
   });
 
   it("validates actual video metadata and signature without proxying its body", async () => {
@@ -188,6 +285,8 @@ describe("Admin official announcement actions", () => {
       body: "Plain body",
       mediaPath: videoPath,
       mediaDescription: "Captioned Admin briefing",
+      linkToTournament: false,
+      linkedTournamentId: null,
     });
 
     expect(result.ok).toBe(true);
@@ -229,6 +328,8 @@ describe("Admin official announcement actions", () => {
       body: "Plain body",
       mediaPath: imagePath,
       mediaDescription: "Announcement art",
+      linkToTournament: false,
+      linkedTournamentId: null,
     });
 
     expect(result).toMatchObject({ ok: false });
@@ -270,6 +371,8 @@ describe("Admin official announcement actions", () => {
       body: "Plain body",
       mediaPath: imagePath,
       mediaDescription: "Announcement art",
+      linkToTournament: false,
+      linkedTournamentId: null,
     });
 
     expect(result).toMatchObject({ ok: false });
@@ -314,6 +417,8 @@ describe("Admin official announcement actions", () => {
       body: "Plain body",
       mediaPath: imagePath,
       mediaDescription: "Announcement art",
+      linkToTournament: false,
+      linkedTournamentId: null,
     });
 
     expect(result).toMatchObject({ ok: false });
@@ -394,7 +499,15 @@ function exactBucket() {
   };
 }
 
-function storageClient({ referenced = false } = {}) {
+function storageClient({
+  referenced = false,
+  tournamentExists = true,
+  tournamentError = null,
+}: {
+  referenced?: boolean;
+  tournamentExists?: boolean;
+  tournamentError?: { code: string } | null;
+} = {}) {
   const bucket = {
     createSignedUploadUrl: vi.fn(),
     list: vi.fn(),
@@ -414,10 +527,24 @@ function storageClient({ referenced = false } = {}) {
   };
   referenceQuery.select.mockReturnValue(referenceQuery);
   referenceQuery.eq.mockReturnValue(referenceQuery);
+  const tournamentQuery = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    maybeSingle: vi.fn(async () => ({
+      data: tournamentExists
+        ? { id: "323e4567-e89b-42d3-a456-426614174000" }
+        : null,
+      error: tournamentError,
+    })),
+  };
+  tournamentQuery.select.mockReturnValue(tournamentQuery);
+  tournamentQuery.eq.mockReturnValue(tournamentQuery);
   const client = {
     storage,
     rpc: vi.fn(),
-    from: vi.fn(() => referenceQuery),
+    from: vi.fn((table: string) =>
+      table === "tournaments" ? tournamentQuery : referenceQuery
+    ),
   };
-  return { bucket, storage, client, referenceQuery };
+  return { bucket, storage, client, referenceQuery, tournamentQuery };
 }

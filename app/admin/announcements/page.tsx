@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import AdminAnnouncements from "@/components/AdminAnnouncements";
-import { loadAdminAnnouncements } from "@/lib/announcements";
+import {
+  loadAdminAnnouncements,
+  loadAdminAnnouncementTournamentOptions,
+} from "@/lib/announcements";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +22,16 @@ export default async function AdminAnnouncementsPage() {
 
   if (!userId || role !== "admin") redirect("/");
 
-  const result = await loadAdminAnnouncements();
+  const [result, tournamentOptionsResult] = await Promise.all([
+    loadAdminAnnouncements(),
+    loadAdminAnnouncementTournamentOptions(),
+  ]);
   return (
     <AdminAnnouncements
       announcements={result.announcements}
       loadFailed={!result.ok}
+      tournamentOptions={tournamentOptionsResult.tournaments}
+      tournamentOptionsLoadFailed={!tournamentOptionsResult.ok}
     />
   );
 }

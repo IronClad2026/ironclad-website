@@ -48,6 +48,17 @@ const announcement: AdminAnnouncement = {
   publishedAt: "2026-08-26T02:30:00.000Z",
   withdrawnAt: null,
 };
+const tournamentId = "323e4567-e89b-42d3-a456-426614174000";
+const tournamentProps = {
+  tournamentOptions: [
+    {
+      id: tournamentId,
+      title: "Academy Owner Check",
+      status: "registration_open" as const,
+    },
+  ],
+  tournamentOptionsLoadFailed: false,
+};
 
 describe("AdminAnnouncements", () => {
   const createObjectURLMock = vi.fn(() => "blob:announcement-preview");
@@ -73,7 +84,13 @@ describe("AdminAnnouncements", () => {
   });
 
   it("previews the current title, body, and image locally before upload", () => {
-    render(<AdminAnnouncements announcements={[]} loadFailed={false} />);
+    render(
+      <AdminAnnouncements
+        announcements={[]}
+        loadFailed={false}
+        {...tournamentProps}
+      />
+    );
     const preview = screen.getByRole("region", {
       name: "Announcement preview",
     });
@@ -109,7 +126,13 @@ describe("AdminAnnouncements", () => {
     createObjectURLMock
       .mockReturnValueOnce("blob:image-preview")
       .mockReturnValueOnce("blob:video-preview");
-    render(<AdminAnnouncements announcements={[]} loadFailed={false} />);
+    render(
+      <AdminAnnouncements
+        announcements={[]}
+        loadFailed={false}
+        {...tournamentProps}
+      />
+    );
     const input = screen.getByLabelText("Choose image or video");
     const preview = screen.getByRole("region", {
       name: "Announcement preview",
@@ -153,7 +176,13 @@ describe("AdminAnnouncements", () => {
         resolvePublication = resolve;
       })
     );
-    render(<AdminAnnouncements announcements={[]} loadFailed={false} />);
+    render(
+      <AdminAnnouncements
+        announcements={[]}
+        loadFailed={false}
+        {...tournamentProps}
+      />
+    );
 
     const title = screen.getByLabelText("Title");
     const message = screen.getByLabelText("Message");
@@ -184,7 +213,13 @@ describe("AdminAnnouncements", () => {
   });
 
   it("clears a previous valid media selection when its replacement is invalid", async () => {
-    render(<AdminAnnouncements announcements={[]} loadFailed={false} />);
+    render(
+      <AdminAnnouncements
+        announcements={[]}
+        loadFailed={false}
+        {...tournamentProps}
+      />
+    );
     const input = screen.getByLabelText("Choose image or video");
 
     fireEvent.change(input, {
@@ -230,9 +265,62 @@ describe("AdminAnnouncements", () => {
         body: "No stale media should publish.",
         mediaPath: null,
         mediaDescription: null,
+        linkToTournament: false,
+        linkedTournamentId: null,
       });
     });
     expect(createAnnouncementMediaUploadMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps Tournament linking off by default and requires one existing selection when enabled", async () => {
+    render(
+      <AdminAnnouncements
+        announcements={[]}
+        loadFailed={false}
+        {...tournamentProps}
+      />
+    );
+
+    const toggle = screen.getByRole("checkbox", {
+      name: "Link this announcement to a Tournament",
+    });
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByLabelText("Select Tournament")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.getByLabelText("Select Tournament")).toBeRequired();
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Academy registration opens" },
+    });
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Registration is now open." },
+    });
+
+    fireEvent.submit(screen.getByRole("button", { name: "Publish now" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Select an existing Tournament."
+    );
+    expect(publishAnnouncementMock).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Select Tournament"), {
+      target: { value: tournamentId },
+    });
+    expect(
+      within(screen.getByRole("region", { name: "Announcement preview" }))
+        .getByText("View Tournament")
+    ).toBeInTheDocument();
+    fireEvent.submit(screen.getByRole("button", { name: "Publish now" }));
+
+    await waitFor(() => {
+      expect(publishAnnouncementMock).toHaveBeenCalledWith({
+        title: "Academy registration opens",
+        body: "Registration is now open.",
+        mediaPath: null,
+        mediaDescription: null,
+        linkToTournament: true,
+        linkedTournamentId: tournamentId,
+      });
+    });
   });
 
   it("announces withdrawal failures inside the open confirmation dialog", async () => {
@@ -241,7 +329,11 @@ describe("AdminAnnouncements", () => {
       message: "Withdrawal is temporarily unavailable.",
     });
     render(
-      <AdminAnnouncements announcements={[announcement]} loadFailed={false} />
+      <AdminAnnouncements
+        announcements={[announcement]}
+        loadFailed={false}
+        {...tournamentProps}
+      />
     );
 
     fireEvent.click(
@@ -271,7 +363,11 @@ describe("AdminAnnouncements", () => {
     );
     document.body.style.overflow = "clip";
     render(
-      <AdminAnnouncements announcements={[announcement]} loadFailed={false} />
+      <AdminAnnouncements
+        announcements={[announcement]}
+        loadFailed={false}
+        {...tournamentProps}
+      />
     );
 
     const trigger = screen.getByRole("button", {

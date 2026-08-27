@@ -46,6 +46,7 @@ export type AnnouncementMarker = {
 export type PublicAnnouncement = AnnouncementMarker & {
   title: string;
   body: string;
+  tournamentHref: string | null;
   mediaKind: AnnouncementMediaKind | null;
   mediaMimeType: AnnouncementMediaMimeType | null;
   mediaDescription: string | null;
@@ -93,6 +94,7 @@ const mimeTypeByExtension: Record<
 
 const mediaPathPattern =
   /^media\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(jpg|png|webp|mp4|webm)$/i;
+const tournamentSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const publicUrlPrefix =
   `${supabaseUrl}/storage/v1/object/public/${ANNOUNCEMENT_MEDIA_BUCKET}/`;
 
@@ -405,6 +407,7 @@ function parsePublicAnnouncement(value: unknown): PublicAnnouncement | null {
     "media_path",
     "media_mime_type",
     "media_description",
+    "linked_tournament_slug",
     "published_at",
   ];
   if (!isRecord(value) || !hasOnlyKeys(value, keys)) return null;
@@ -425,6 +428,16 @@ function parsePublicAnnouncement(value: unknown): PublicAnnouncement | null {
     return null;
   }
 
+  const tournamentHref = value.linked_tournament_slug === null
+    ? null
+    : typeof value.linked_tournament_slug === "string" &&
+        tournamentSlugPattern.test(value.linked_tournament_slug)
+      ? `/tournaments?tournament=${encodeURIComponent(
+          value.linked_tournament_slug
+        )}`
+      : undefined;
+  if (tournamentHref === undefined) return null;
+
   if (
     value.media_kind === null &&
     value.media_path === null &&
@@ -435,6 +448,7 @@ function parsePublicAnnouncement(value: unknown): PublicAnnouncement | null {
       ...marker,
       title: value.title,
       body: value.body,
+      tournamentHref,
       mediaKind: null,
       mediaMimeType: null,
       mediaDescription: null,
@@ -471,6 +485,7 @@ function parsePublicAnnouncement(value: unknown): PublicAnnouncement | null {
     ...marker,
     title: value.title,
     body: value.body,
+    tournamentHref,
     mediaKind: value.media_kind,
     mediaMimeType: mimeType,
     mediaDescription: value.media_description,

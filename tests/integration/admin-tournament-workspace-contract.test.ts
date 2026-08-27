@@ -921,18 +921,21 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.experience).toContain('activeTab === "announcements"');
   });
 
-  it("adds no migration, dependency, or environment contract", () => {
+  it("preserves the PR 5 migration boundary, dependencies, and environment contract", () => {
     const migrationNames = readdirSync(
       resolve(process.cwd(), "supabase/migrations")
     )
       .filter((name) => name.endsWith(".sql"))
       .sort();
 
-    expect(migrationNames).toHaveLength(117);
-    expect(migrationNames.at(-1)).toBe(
+    expect(migrationNames).toHaveLength(118);
+    expect(migrationNames.at(-2)).toBe(
       "20260826100000_official_announcements.sql"
     );
-    expect(migrationTreeSha256(migrationNames)).toBe(
+    expect(migrationNames.at(-1)).toBe(
+      "20260827100000_announcement_tournament_link.sql"
+    );
+    expect(migrationTreeSha256(migrationNames.slice(0, -1))).toBe(
       "8a66ada7bd7cae2874b3d4f6919462a1c2f74439850efac5d99aeddb0cf8b7cb"
     );
     expect(normalizedSha256(read("package.json"))).toBe(

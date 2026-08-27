@@ -21,7 +21,10 @@ import {
   ANNOUNCEMENT_LIMITS,
   getAnnouncementMediaExtension,
 } from "@/lib/announcement-contract";
-import type { AdminAnnouncement } from "@/lib/announcements";
+import type {
+  AdminAnnouncement,
+  AdminAnnouncementTournamentOption,
+} from "@/lib/announcements";
 import { supabase } from "@/lib/supabase";
 
 const acceptedMediaTypes =
@@ -33,14 +36,20 @@ const textareaClass = `${inputClass} py-3`;
 export default function AdminAnnouncements({
   announcements,
   loadFailed,
+  tournamentOptions,
+  tournamentOptionsLoadFailed,
 }: {
   announcements: AdminAnnouncement[];
   loadFailed: boolean;
+  tournamentOptions: AdminAnnouncementTournamentOption[];
+  tournamentOptionsLoadFailed: boolean;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [mediaDescription, setMediaDescription] = useState("");
+  const [linkToTournament, setLinkToTournament] = useState(false);
+  const [linkedTournamentId, setLinkedTournamentId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -53,6 +62,9 @@ export default function AdminAnnouncements({
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedTournament = tournamentOptions.find(
+    (tournament) => tournament.id === linkedTournamentId
+  );
 
   useEffect(
     () => () => {
@@ -109,6 +121,13 @@ export default function AdminAnnouncements({
       });
       return;
     }
+    if (linkToTournament && !linkedTournamentId) {
+      setNotice({
+        tone: "error",
+        message: "Select an existing Tournament.",
+      });
+      return;
+    }
 
     setPending(true);
     setNotice(null);
@@ -134,6 +153,8 @@ export default function AdminAnnouncements({
         body,
         mediaPath: uploadedPath,
         mediaDescription: file ? mediaDescription : null,
+        linkToTournament,
+        linkedTournamentId: linkToTournament ? linkedTournamentId : null,
       });
       if (!result.ok) {
         if (uploadedPath) {
@@ -147,6 +168,8 @@ export default function AdminAnnouncements({
 
       setTitle("");
       setBody("");
+      setLinkToTournament(false);
+      setLinkedTournamentId("");
       clearMedia();
       setNotice({
         tone: "success",
@@ -222,6 +245,66 @@ export default function AdminAnnouncements({
                 className={textareaClass}
               />
             </label>
+
+            <div className="mt-5 border border-white/10 bg-black/30 p-4">
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-bold text-white">
+                <input
+                  type="checkbox"
+                  checked={linkToTournament}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setLinkToTournament(checked);
+                    if (!checked) setLinkedTournamentId("");
+                    setNotice(null);
+                  }}
+                  disabled={
+                    pending ||
+                    loadFailed ||
+                    tournamentOptionsLoadFailed ||
+                    tournamentOptions.length === 0
+                  }
+                  className="h-5 w-5 shrink-0 accent-orange-500"
+                />
+                <span>Link this announcement to a Tournament</span>
+              </label>
+
+              {tournamentOptionsLoadFailed ? (
+                <p role="alert" className="mt-2 text-xs leading-5 text-red-200">
+                  Tournament choices could not be loaded. General announcements
+                  remain available.
+                </p>
+              ) : tournamentOptions.length === 0 ? (
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  No Tournaments are available to link. General announcements
+                  remain available.
+                </p>
+              ) : null}
+
+              {linkToTournament ? (
+                <label className="mt-4 block min-w-0">
+                  <span className="text-sm font-bold">Select Tournament</span>
+                  <select
+                    value={linkedTournamentId}
+                    onChange={(event) => {
+                      setLinkedTournamentId(event.target.value);
+                      setNotice(null);
+                    }}
+                    required
+                    disabled={pending || loadFailed}
+                    className={inputClass}
+                  >
+                    <option value="">Select Tournament</option>
+                    {tournamentOptions.map((tournament) => (
+                      <option key={tournament.id} value={tournament.id}>
+                        {tournament.title} — {formatTournamentStatus(
+                          tournament.status
+                        )}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
 
             <div className="mt-5 min-w-0">
               <span className="text-sm font-bold">Optional media</span>
@@ -315,6 +398,11 @@ export default function AdminAnnouncements({
                 <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">
                   {body || "Announcement message preview."}
                 </p>
+                {linkToTournament && selectedTournament ? (
+                  <span className="mt-5 inline-flex min-h-11 items-center border border-orange-400/40 bg-orange-500/10 px-4 text-sm font-black text-orange-200">
+                    View Tournament
+                  </span>
+                ) : null}
               </div>
             </section>
 
@@ -444,6 +532,14 @@ export default function AdminAnnouncements({
       ) : null}
     </main>
   );
+}
+
+function formatTournamentStatus(
+  status: AdminAnnouncementTournamentOption["status"]
+) {
+  if (status === "registration_open") return "Registration Open";
+  if (status === "in_progress") return "In Progress";
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 function WithdrawalDialog({

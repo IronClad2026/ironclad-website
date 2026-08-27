@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
+import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { markAnnouncementSeen } from "@/app/announcements/actions";
@@ -148,6 +149,14 @@ export default function AnnouncementsFeed({
               <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-300 sm:text-base sm:leading-8">
                 {announcement.body}
               </p>
+              {announcement.tournamentHref ? (
+                <Link
+                  href={announcement.tournamentHref}
+                  className="mt-6 inline-flex min-h-11 items-center justify-center border border-orange-400/40 bg-orange-500/10 px-5 text-sm font-black text-orange-200 transition hover:border-orange-300 hover:bg-orange-500/20 hover:text-orange-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+                >
+                  {copy.viewTournament}
+                </Link>
+              ) : null}
             </div>
           </article>
         </li>

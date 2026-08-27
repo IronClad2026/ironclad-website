@@ -40,6 +40,7 @@ const dictionary = {
     videoLabelFallback: "Vidéo pour « {title} »",
     videoUnsupported:
       "Votre navigateur ne prend pas en charge la lecture vidéo.",
+    viewTournament: "Voir le tournoi",
     loadErrorTitle: "Annonces indisponibles",
     loadErrorDescription:
       "IronClad n’a pas pu charger les annonces officielles. Réessayez.",

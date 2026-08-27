@@ -279,6 +279,7 @@ const dictionary = {
     videoLabelFallback: "Видео к объявлению «{title}»",
     videoUnsupported:
       "Ваш браузер не поддерживает воспроизведение видео.",
+    viewTournament: "Посмотреть Турнир",
     loadErrorTitle: "Объявления недоступны",
     loadErrorDescription:
       "Не удалось загрузить официальные объявления IronClad. Повторите попытку.",

@@ -320,6 +320,7 @@ const dictionary = {
     imageAltFallback: "Image for “{title}”",
     videoLabelFallback: "Video for “{title}”",
     videoUnsupported: "Your browser does not support video playback.",
+    viewTournament: "View Tournament",
     loadErrorTitle: "Announcements unavailable",
     loadErrorDescription:
       "IronClad could not load official announcements. Please try again.",

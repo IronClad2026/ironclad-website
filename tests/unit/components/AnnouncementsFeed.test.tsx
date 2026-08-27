@@ -32,6 +32,7 @@ const latest: PublicAnnouncement = {
   mediaMimeType: "image/jpeg",
   mediaDescription: "Orange IronClad shield on a dark field",
   mediaUrl: "https://example.supabase.co/storage/v1/object/public/announcement-media/media/223e4567-e89b-42d3-a456-426614174000.jpg",
+  tournamentHref: null,
 };
 const video: PublicAnnouncement = {
   id: "123e4567-e89b-42d3-a456-426614174000",
@@ -42,6 +43,7 @@ const video: PublicAnnouncement = {
   mediaMimeType: "video/webm",
   mediaDescription: "Admin briefing with captions",
   mediaUrl: "https://example.supabase.co/storage/v1/object/public/announcement-media/media/123e4567-e89b-42d3-a456-426614174000.webm",
+  tournamentHref: null,
 };
 
 describe("AnnouncementsFeed", () => {
@@ -127,6 +129,38 @@ describe("AnnouncementsFeed", () => {
     expect(localStorage.getItem(ANNOUNCEMENT_SEEN_STORAGE_KEY)).toContain(
       video.id
     );
+  });
+
+  it("shows a localized canonical CTA only for a linked Tournament", () => {
+    const linked = {
+      ...latest,
+      tournamentHref: "/tournaments?tournament=academy-owner-check",
+    };
+    const view = render(
+      <AnnouncementsFeed
+        announcements={[linked]}
+        copy={copy}
+        loadFailed={false}
+      />
+    );
+
+    expect(
+      screen.getByRole("link", { name: copy.viewTournament })
+    ).toHaveAttribute(
+      "href",
+      "/tournaments?tournament=academy-owner-check"
+    );
+
+    view.rerender(
+      <AnnouncementsFeed
+        announcements={[latest]}
+        copy={copy}
+        loadFailed={false}
+      />
+    );
+    expect(
+      screen.queryByRole("link", { name: copy.viewTournament })
+    ).not.toBeInTheDocument();
   });
 
   it("leaves the feed usable when localStorage is blocked", () => {

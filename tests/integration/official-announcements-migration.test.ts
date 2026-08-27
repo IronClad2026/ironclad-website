@@ -8,7 +8,7 @@ const migration = readFileSync(
     "supabase/migrations/20260826100000_official_announcements.sql"
   ),
   "utf8"
-).toLowerCase();
+).replace(/\r\n?/g, "\n").toLowerCase();
 const normalizedMigration = migration.replace(/\s+/g, " ");
 const databaseContract = readFileSync(
   join(process.cwd(), "tests/database/official-announcements.sql"),

@@ -33,6 +33,8 @@ export type AnnouncementPublishInput = {
   body: string;
   mediaPath: string | null;
   mediaDescription: string | null;
+  linkToTournament: boolean;
+  linkedTournamentId: string | null;
 };
 
 export type AnnouncementPublishResult =
@@ -47,6 +49,7 @@ const invalidMediaMessage =
   "Choose one JPG, JPEG, PNG, or WEBP image up to 10 MiB, or one MP4 or WEBM video up to 50 MiB.";
 const publishFailedMessage =
   "The announcement could not be published. Any uploaded media was safely retired where possible. Try again.";
+const invalidTournamentMessage = "Select an existing Tournament.";
 
 export async function createAnnouncementMediaUpload(input: {
   fileName: string;
@@ -127,6 +130,24 @@ export async function publishAnnouncement(
     return { ok: false, message: invalidMediaMessage };
   }
 
+  if (parsed.linkedTournamentId) {
+    const tournamentExists = await verifyLinkedTournament(
+      client,
+      parsed.linkedTournamentId
+    );
+    if (tournamentExists === null) {
+      if (media) await cleanupFailedPublicationMedia(client, media.path);
+      return {
+        ok: false,
+        message: "Tournament selection could not be verified. Try again.",
+      };
+    }
+    if (!tournamentExists) {
+      if (media) await cleanupFailedPublicationMedia(client, media.path);
+      return { ok: false, message: invalidTournamentMessage };
+    }
+  }
+
   if (media) {
     try {
       await verifyAnnouncementMediaBucket(client);
@@ -145,7 +166,7 @@ export async function publishAnnouncement(
   }
 
   try {
-    const { data, error } = await client.rpc("publish_official_announcement", {
+    const publicationInput = {
       p_title: parsed.title,
       p_body: parsed.body,
       p_media_kind: media?.kind ?? null,
@@ -153,7 +174,13 @@ export async function publishAnnouncement(
       p_media_mime_type: media?.mimeType ?? null,
       p_media_description: media ? parsed.mediaDescription : null,
       p_actor_clerk_user_id: userId,
-    });
+    };
+    const { data, error } = parsed.linkedTournamentId
+      ? await client.rpc("publish_official_announcement_with_tournament", {
+          ...publicationInput,
+          p_linked_tournament_id: parsed.linkedTournamentId,
+        })
+      : await client.rpc("publish_official_announcement", publicationInput);
     const publication = error ? null : parsePublicationResult(data);
     if (!publication) {
       logAnnouncementAdminFailure("publish", error);
@@ -226,6 +253,7 @@ function parsePublishInput(input: AnnouncementPublishInput):
       body: string;
       mediaPath: string | null;
       mediaDescription: string | null;
+      linkedTournamentId: string | null;
     }
   | { ok: false; message: string } {
   if (!input || typeof input !== "object") {
@@ -241,6 +269,11 @@ function parsePublishInput(input: AnnouncementPublishInput):
       input.mediaDescription.trim()
     ? input.mediaDescription.trim()
     : null;
+  const linkedTournamentId = typeof input.linkedTournamentId === "string"
+    ? input.linkedTournamentId.trim()
+    : input.linkedTournamentId === null
+      ? null
+      : undefined;
 
   if (!title || !body) {
     return { ok: false, message: "Enter a title and message." };
@@ -267,7 +300,44 @@ function parsePublishInput(input: AnnouncementPublishInput):
     };
   }
 
-  return { ok: true, title, body, mediaPath, mediaDescription };
+  if (
+    typeof input.linkToTournament !== "boolean" ||
+    linkedTournamentId === undefined ||
+    (input.linkToTournament && !isUuid(linkedTournamentId)) ||
+    (!input.linkToTournament && linkedTournamentId !== null)
+  ) {
+    return { ok: false, message: invalidTournamentMessage };
+  }
+
+  return {
+    ok: true,
+    title,
+    body,
+    mediaPath,
+    mediaDescription,
+    linkedTournamentId: linkedTournamentId?.toLowerCase() ?? null,
+  };
+}
+
+async function verifyLinkedTournament(
+  client: ReturnType<typeof createSupabaseAdminClient>,
+  tournamentId: string
+) {
+  try {
+    const { data, error } = await client
+      .from("tournaments")
+      .select("id")
+      .eq("id", tournamentId)
+      .maybeSingle();
+    if (error) {
+      logAnnouncementAdminFailure("verify-linked-tournament", error);
+      return null;
+    }
+    return isRecord(data) && data.id === tournamentId;
+  } catch {
+    logAnnouncementAdminFailure("verify-linked-tournament");
+    return null;
+  }
 }
 
 async function verifyAnnouncementMediaBucket(

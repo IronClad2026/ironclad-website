@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { UserRound } from "lucide-react";
 import Link from "next/link";
-import IronCladUserButton from "@/components/IronCladUserButton";
 import ScrollReveal from "@/components/ScrollReveal";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import { getLocalizedCountryName } from "@/lib/countries";
@@ -91,7 +90,6 @@ export default async function HomeAccountSection() {
           <Link href="/profile" className={primaryActionClass}>
             {t("homeAccount.completeAction")}
           </Link>
-          <IronCladUserButton />
         </div>
       </AccountShell>
     );
@@ -146,7 +144,6 @@ export default async function HomeAccountSection() {
         <Link href="/tournaments" className={primaryActionClass}>
           {t("homeAccount.goTournaments")}
         </Link>
-        <IronCladUserButton />
       </div>
     </AccountShell>
   );

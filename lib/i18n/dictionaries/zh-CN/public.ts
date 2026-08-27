@@ -284,6 +284,7 @@ const dictionary = {
     imageAltFallback: "“{title}”的图片",
     videoLabelFallback: "“{title}”的视频",
     videoUnsupported: "您的浏览器不支持视频播放。",
+    viewTournament: "查看锦标赛",
     loadErrorTitle: "公告暂时不可用",
     loadErrorDescription: "IronClad 无法加载官方公告。请重试。",
     retry: "重试",

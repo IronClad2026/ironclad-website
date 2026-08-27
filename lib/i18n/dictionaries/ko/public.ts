@@ -39,6 +39,7 @@ const dictionary = {
     imageAltFallback: "‘{title}’ 이미지",
     videoLabelFallback: "‘{title}’ 동영상",
     videoUnsupported: "브라우저에서 동영상 재생을 지원하지 않습니다.",
+    viewTournament: "토너먼트 보기",
     loadErrorTitle: "공지사항을 이용할 수 없습니다",
     loadErrorDescription:
       "IronClad 공식 공지사항을 불러오지 못했습니다. 다시 시도해 주세요.",
