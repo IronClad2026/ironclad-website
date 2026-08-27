@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import nextConfig from "@/next.config";
 import { MAX_AVATAR_UPLOAD_SIZE_BYTES } from "@/lib/avatar";
 
-const SELECTED_NEXT_PATCH = "16.2.12";
-const SELECTED_SHARP_PATCH = "0.35.3";
+const SELECTED_NEXT_PATCH = "16.3.3";
+const SELECTED_SHARP_PATCH = "0.35.4";
 const MEBIBYTE_BYTES = 1024 * 1024;
 const NEXT_REQUEST_LIMIT_BYTES = 4_400_000;
 const VERCEL_FUNCTION_PAYLOAD_CEILING_BYTES = 4_500_000;
@@ -22,6 +22,10 @@ type PackageLock = {
       version?: string;
     }
   >;
+};
+
+type NextPackageManifest = {
+  optionalDependencies: Record<string, string>;
 };
 
 function readJson<T>(path: string): T {
@@ -61,7 +65,7 @@ function createMaximumValidProfileForm() {
 }
 
 describe("Phase 7 runtime security and Server Action payload contract", () => {
-  it("pins the newest stable patched Next 16.2.x release and matching ESLint config", () => {
+  it("pins the newest stable patched Next 16.3.x release and matching ESLint config", () => {
     const manifest = readJson<PackageManifest>("package.json");
     const lock = readJson<PackageLock>("package-lock.json");
 
@@ -87,12 +91,28 @@ describe("Phase 7 runtime security and Server Action payload contract", () => {
       )
       .map(([path, dependency]) => ({ path, version: dependency.version }));
 
-    expect(manifest.overrides["next@16.2.12"]?.sharp).toBe(
+    expect(manifest.overrides[`next@${SELECTED_NEXT_PATCH}`]?.sharp).toBe(
       SELECTED_SHARP_PATCH
     );
     expect(sharpPackages).toEqual([
       { path: "node_modules/sharp", version: SELECTED_SHARP_PATCH },
     ]);
+  });
+
+  it("keeps the patched AVIF bypass ahead of the compatible Sharp runtime", () => {
+    const nextManifest = readJson<NextPackageManifest>(
+      "node_modules/next/package.json"
+    );
+    const imageOptimizer = readFileSync(
+      "node_modules/next/dist/server/image-optimizer.js",
+      "utf8"
+    );
+
+    expect(nextManifest.optionalDependencies.sharp).toBe("^0.35.3");
+    expect(imageOptimizer).toMatch(
+      /const BYPASS_TYPES = \[[\s\S]*?HEIC,[\s\S]*?AVIF[\s\S]*?\];/
+    );
+    expect(imageOptimizer).not.toContain("VipsForeignLoadHeif");
   });
 
   it("keeps the application avatar boundary at exactly 4 MiB", () => {
