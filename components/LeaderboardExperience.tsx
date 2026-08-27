@@ -237,13 +237,13 @@ function LeaderboardHero({
   return (
     <section className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-20">
       <div
-        className="absolute inset-0 bg-cover bg-center opacity-100"
+        className="absolute inset-0 bg-cover bg-center opacity-78"
         style={{
           backgroundImage: "url('/images/ironclad-background.jpg')",
         }}
       />
 
-      <div className="absolute inset-0 bg-black/0" />
+      <div className="absolute inset-0 bg-black/34" />
 
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.64),rgba(249,115,22,0.16))]" />
 
