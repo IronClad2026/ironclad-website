@@ -1419,7 +1419,7 @@ function Brackets({
                 </div>
                 <p className="mt-1 text-sm text-zinc-400">
                   {generated
-                    ? t("bracketSummary.emptySlots", {
+                    ? t("bracketSummary.playerSlots", {
                         format: formatCompetitionFormat(generated.format, t),
                         count: formatNumber(generated.slotCount, locale),
                       })
@@ -5689,7 +5689,7 @@ function MobileBrackets({
                 </div>
                 <p className="mt-1 break-words text-sm text-zinc-400">
                   {generated
-                    ? t("bracketSummary.emptySlots", {
+                    ? t("bracketSummary.playerSlots", {
                         format: formatCompetitionFormat(generated.format, t),
                         count: formatNumber(generated.slotCount, locale),
                       })

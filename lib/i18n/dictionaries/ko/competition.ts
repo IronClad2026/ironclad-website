@@ -362,7 +362,7 @@ const dictionary = {
   emptyState: { title: "공개된 토너먼트가 없습니다", description: "관리자가 이벤트를 공개하면 토너먼트 정보가 여기에 표시됩니다." },
   deadlines: { unavailable: "사용할 수 없음", extension: "{duration} 연장이 포함됩니다.", minutes: "{count}분", minute: "{count}분", hours: "{count}시간", hour: "{count}시간" },
   pollAction: { invalid: "투표용지 요청이 올바르지 않습니다.", failed: "투표용지를 저장할 수 없습니다. 투표를 새로고침한 후 다시 시도하세요." },
-  bracketSummary: { emptySlots: "{format} — 빈 자리 {count}개", approvedMinimum: "승인 {count}명 — 최소 2명 필요" },
+  bracketSummary: { playerSlots: "{format} — 플레이어 자리 {count}개", approvedMinimum: "승인 {count}명 — 최소 2명 필요" },
   pollDates: { opensAt: "{date} 시작", closesAt: "{date} 종료", decisionPublishedAt: "{date}에 결정 게시" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "제출된 투표용지 {count}개", ballotCountOne: "제출된 투표용지 {count}개", ballotCountTwo: "제출된 투표용지 {count}개", ballotCountFew: "제출된 투표용지 {count}개", ballotCountMany: "제출된 투표용지 {count}개", ballotCountOther: "제출된 투표용지 {count}개", voteCountZero: "{count}표", voteCountOne: "{count}표", voteCountTwo: "{count}표", voteCountFew: "{count}표", voteCountMany: "{count}표", voteCountOther: "{count}표" },
   announcements: { update: "IronClad 업데이트 {number}", status: "{title} 현재 상태: {status}.", grandFinal: "그랜드 파이널: {date}.", participants: "승인된 참가자: {players}명. 대진표: {brackets}개. 등록 기간에는 정원이 찼거나 기존 대기열이 있는 대진표도 대기 명단 등록을 받습니다." },

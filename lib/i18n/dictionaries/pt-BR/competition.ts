@@ -364,7 +364,7 @@ const dictionary = {
   emptyState: { title: "Nenhum torneio publicado", description: "Os dados aparecerão aqui depois que um administrador publicar um evento." },
   deadlines: { unavailable: "indisponível", extension: "Inclui uma prorrogação de {duration}.", minutes: "{count} minutos", minute: "{count} minuto", hours: "{count} horas", hour: "{count} hora" },
   pollAction: { invalid: "A solicitação de cédula é inválida.", failed: "Não foi possível salvar sua cédula. Atualize a enquete e tente novamente." },
-  bracketSummary: { emptySlots: "{format} — {count} vagas vazias", approvedMinimum: "{count} aprovados — são necessários pelo menos 2" },
+  bracketSummary: { playerSlots: "{format} — {count} vagas para jogadores", approvedMinimum: "{count} aprovados — são necessários pelo menos 2" },
   pollDates: { opensAt: "Abre em {date}", closesAt: "Fecha em {date}", decisionPublishedAt: "Decisão publicada em {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "{count} cédulas enviadas", ballotCountOne: "{count} cédula enviada", ballotCountTwo: "{count} cédulas enviadas", ballotCountFew: "{count} cédulas enviadas", ballotCountMany: "{count} cédulas enviadas", ballotCountOther: "{count} cédulas enviadas", voteCountZero: "{count} votos", voteCountOne: "{count} voto", voteCountTwo: "{count} votos", voteCountFew: "{count} votos", voteCountMany: "{count} votos", voteCountOther: "{count} votos" },
   announcements: { update: "Atualização IronClad {number}", status: "Status atual de {title}: {status}.", grandFinal: "Grande Final: {date}.", participants: "Participantes aprovados: {players}. Chaves: {brackets}. Enquanto as inscrições estiverem abertas, chaves lotadas ou com fila aceitam inscrições na lista de espera." },

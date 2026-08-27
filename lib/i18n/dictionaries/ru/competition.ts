@@ -364,7 +364,7 @@ const dictionary = {
   emptyState: { title: "Опубликованных турниров пока нет", description: "Данные появятся здесь после публикации турнира администратором." },
   deadlines: { unavailable: "недоступно", extension: "Продление: {duration}.", minutes: "{count} мин.", minute: "{count} мин.", hours: "{count} ч.", hour: "{count} ч." },
   pollAction: { invalid: "Некорректный запрос бюллетеня.", failed: "Бюллетень не удалось сохранить. Обновите опрос и повторите попытку." },
-  bracketSummary: { emptySlots: "{format} — свободных мест: {count}", approvedMinimum: "Одобрено: {count} — требуется не менее 2" },
+  bracketSummary: { playerSlots: "{format} — количество мест для игроков: {count}", approvedMinimum: "Одобрено: {count} — требуется не менее 2" },
   pollDates: { opensAt: "Открытие: {date}", closesAt: "Закрытие: {date}", decisionPublishedAt: "Решение опубликовано {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "Отправлено {count} бюллетеней", ballotCountOne: "Отправлен {count} бюллетень", ballotCountTwo: "Отправлено {count} бюллетеня", ballotCountFew: "Отправлено {count} бюллетеня", ballotCountMany: "Отправлено {count} бюллетеней", ballotCountOther: "Отправлено {count} бюллетеня", voteCountZero: "{count} голосов", voteCountOne: "{count} голос", voteCountTwo: "{count} голоса", voteCountFew: "{count} голоса", voteCountMany: "{count} голосов", voteCountOther: "{count} голоса" },
   announcements: { update: "Новости IronClad {number}", status: "Текущий статус «{title}»: {status}.", grandFinal: "Гранд-финал: {date}.", participants: "Одобрено участников: {players}. Сеток: {brackets}. Пока регистрация открыта, заполненные сетки и сетки с очередью принимают заявки в список ожидания." },
