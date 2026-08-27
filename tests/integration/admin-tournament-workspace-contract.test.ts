@@ -939,10 +939,10 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "8a66ada7bd7cae2874b3d4f6919462a1c2f74439850efac5d99aeddb0cf8b7cb"
     );
     expect(normalizedSha256(read("package.json"))).toBe(
-      "d0c54028bd19037a25d085ba3c391695e76e8cb8bf644ac90ca71c7fedb9c29d"
+      "0fa600694cee0d7bfbcb2ddd545ed8f46b0c33ea79d4e9953b39c0b3e7ae5db9"
     );
     expect(normalizedSha256(read("package-lock.json"))).toBe(
-      "52f8d0b0383e05b8e17f98c5ab5badc943877b3871696ae935ca4f1ab67625ce"
+      "520e696974594503ed6f61f05f5937dd64f75fc9255d56f16bf9c9b57ff238a0"
     );
     expect(normalizedSha256(read(".env.example"))).toBe(
       "a36a452c337407aa53c29a8499cb1658023caed00bd41b605859d07ce166dbd4"
