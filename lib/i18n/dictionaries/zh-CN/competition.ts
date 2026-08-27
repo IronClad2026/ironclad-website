@@ -366,7 +366,7 @@ const dictionary = {
   emptyState: { title: "尚无已发布锦标赛", description: "管理员发布赛事后，锦标赛数据会显示在这里。" },
   deadlines: { unavailable: "不可用", extension: "包含 {duration} 的延长时间。", minutes: "{count} 分钟", minute: "{count} 分钟", hours: "{count} 小时", hour: "{count} 小时" },
   pollAction: { invalid: "此投票选票请求无效。", failed: "无法保存选票。请刷新投票后重试。" },
-  bracketSummary: { emptySlots: "{format} — {count} 个空位", approvedMinimum: "已批准 {count} 人 — 至少需要 2 人" },
+  bracketSummary: { playerSlots: "{format} — {count} 个参赛名额", approvedMinimum: "已批准 {count} 人 — 至少需要 2 人" },
   pollDates: { opensAt: "{date} 开放", closesAt: "{date} 关闭", decisionPublishedAt: "决定发布于 {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "已提交 {count} 张选票", ballotCountOne: "已提交 {count} 张选票", ballotCountTwo: "已提交 {count} 张选票", ballotCountFew: "已提交 {count} 张选票", ballotCountMany: "已提交 {count} 张选票", ballotCountOther: "已提交 {count} 张选票", voteCountZero: "{count} 票", voteCountOne: "{count} 票", voteCountTwo: "{count} 票", voteCountFew: "{count} 票", voteCountMany: "{count} 票", voteCountOther: "{count} 票" },
   announcements: { update: "IronClad 更新 {number}", status: "{title} 当前状态：{status}。", grandFinal: "总决赛：{date}。", participants: "已批准参赛者：{players}。对阵表：{brackets}。报名开放期间，已满或已有候补队列的对阵表仍接受候补报名。" },

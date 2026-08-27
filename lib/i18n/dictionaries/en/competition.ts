@@ -598,7 +598,7 @@ const dictionary = {
   emptyState: { title: "No Tournaments Published", description: "Tournament data will appear here after an administrator publishes an event." },
   deadlines: { unavailable: "unavailable", extension: "Includes a {duration} extension.", minutes: "{count} minutes", minute: "{count} minute", hours: "{count} hours", hour: "{count} hour" },
   pollAction: { invalid: "This Poll ballot request is invalid.", failed: "Your ballot could not be saved. Refresh the Poll and try again." },
-  bracketSummary: { emptySlots: "{format} — {count} empty player slots", approvedMinimum: "{count} approved — at least 2 required" },
+  bracketSummary: { playerSlots: "{format} — {count} player slots", approvedMinimum: "{count} approved — at least 2 required" },
   pollDates: { opensAt: "Opens {date}", closesAt: "Closes {date}", decisionPublishedAt: "Decision published {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "{count} submitted ballots", ballotCountOne: "{count} submitted ballot", ballotCountTwo: "{count} submitted ballots", ballotCountFew: "{count} submitted ballots", ballotCountMany: "{count} submitted ballots", ballotCountOther: "{count} submitted ballots", voteCountZero: "{count} votes", voteCountOne: "{count} vote", voteCountTwo: "{count} votes", voteCountFew: "{count} votes", voteCountMany: "{count} votes", voteCountOther: "{count} votes" },
   announcements: { update: "IronClad Update {number}", status: "{title} is currently {status}.", grandFinal: "Grand Final: {date}.", participants: "Approved participants: {players}. Brackets: {brackets}. Full Brackets and Brackets with an existing queue accept waitlist Registrations while Registration remains open." },

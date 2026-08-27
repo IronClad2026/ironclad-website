@@ -690,7 +690,7 @@ const dictionary = {
     failed: "Non è stato possibile salvare il voto. Aggiorna il Sondaggio e riprova.",
   },
   bracketSummary: {
-    emptySlots: "{format} — {count} posti giocatore liberi",
+    playerSlots: "{format} — {count} posti per giocatori",
     approvedMinimum: "{count} approvati — almeno 2 richiesti",
   },
   pollDates: {
