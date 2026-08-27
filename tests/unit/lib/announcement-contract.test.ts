@@ -106,6 +106,17 @@ describe("official announcement contract", () => {
         ],
       })
     ).toBeNull();
+
+    expect(
+      parseAnnouncementFeedProjection({
+        announcements: [announcementRow(newer, "academy-owner-check")],
+      })?.announcements[0].tournamentHref
+    ).toBe("/tournaments?tournament=academy-owner-check");
+    expect(
+      parseAnnouncementFeedProjection({
+        announcements: [announcementRow(newer, "../private")],
+      })
+    ).toBeNull();
   });
 
   it("uses a monotonic timestamp and id cursor for withdrawal fallback", () => {
@@ -188,7 +199,10 @@ describe("official announcement contract", () => {
   });
 });
 
-function announcementRow(marker: { id: string; publishedAt: string }) {
+function announcementRow(
+  marker: { id: string; publishedAt: string },
+  linkedTournamentSlug: string | null = null
+) {
   return {
     id: marker.id,
     title: `Title ${marker.id}`,
@@ -197,6 +211,7 @@ function announcementRow(marker: { id: string; publishedAt: string }) {
     media_path: null,
     media_mime_type: null,
     media_description: null,
+    linked_tournament_slug: linkedTournamentSlug,
     published_at: marker.publishedAt,
   };
 }

@@ -7,6 +7,7 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 
 import {
+  loadAdminAnnouncementTournamentOptions,
   loadAuthenticatedAnnouncementNavigationState,
   loadLatestPublicAnnouncement,
   loadPublicAnnouncements,
@@ -33,6 +34,7 @@ describe("official announcement server data access", () => {
             media_path: `media/${id}.png`,
             media_mime_type: "image/png",
             media_description: "Orange shield on a dark field",
+            linked_tournament_slug: "academy-owner-check",
             published_at: publishedAt,
           },
         ],
@@ -49,12 +51,45 @@ describe("official announcement server data access", () => {
       id,
       mediaKind: "image",
       mediaMimeType: "image/png",
+      tournamentHref: "/tournaments?tournament=academy-owner-check",
     });
     expect(result.announcements[0]).not.toHaveProperty("mediaPath");
     expect(result.announcements[0].mediaUrl).toContain(
       `/announcement-media/media/${id}.png`
     );
-    expect(rpc).toHaveBeenCalledWith("list_active_announcements");
+    expect(rpc).toHaveBeenCalledWith(
+      "list_active_announcements_with_tournament"
+    );
+  });
+
+  it("loads only narrow existing Tournament options for the protected Admin composer", async () => {
+    const order = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id,
+          title: "Academy Owner Check",
+          status: "registration_open",
+        },
+      ],
+      error: null,
+    });
+    const select = vi.fn(() => ({ order }));
+    const from = vi.fn(() => ({ select }));
+    createSupabaseAdminClientMock.mockReturnValue({ from });
+
+    await expect(loadAdminAnnouncementTournamentOptions()).resolves.toEqual({
+      ok: true,
+      tournaments: [
+        {
+          id,
+          title: "Academy Owner Check",
+          status: "registration_open",
+        },
+      ],
+    });
+    expect(from).toHaveBeenCalledWith("tournaments");
+    expect(select).toHaveBeenCalledWith("id, title, status");
+    expect(order).toHaveBeenCalledWith("created_at", { ascending: false });
   });
 
   it("keeps feed load failure distinct from a valid empty feed", async () => {

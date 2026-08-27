@@ -324,6 +324,7 @@ const dictionary = {
     imageAltFallback: "Imagen de «{title}»",
     videoLabelFallback: "Vídeo de «{title}»",
     videoUnsupported: "Tu navegador no admite la reproducción de vídeo.",
+    viewTournament: "Ver Torneo",
     loadErrorTitle: "Anuncios no disponibles",
     loadErrorDescription:
       "IronClad no ha podido cargar los anuncios oficiales. Inténtalo de nuevo.",

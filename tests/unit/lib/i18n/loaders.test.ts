@@ -38,6 +38,7 @@ const PR4_ANNOUNCEMENT_MESSAGE_KEYS = [
   "imageAltFallback",
   "videoLabelFallback",
   "videoUnsupported",
+  "viewTournament",
   "loadErrorTitle",
   "loadErrorDescription",
   "retry",
