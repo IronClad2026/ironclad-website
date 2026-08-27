@@ -118,7 +118,7 @@ function HeroSection({ copy }: { copy: PublicDictionary }) {
       />
 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] lg:items-end">
-        <ScrollReveal className="max-w-5xl">
+        <ScrollReveal className="min-w-0 max-w-5xl">
 
           <p className="text-sm font-black uppercase text-orange-300">
             {t("home.hero.eyebrow")}
@@ -135,23 +135,27 @@ function HeroSection({ copy }: { copy: PublicDictionary }) {
             {t("home.hero.description")}
           </p>
 
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-9 flex w-full min-w-0 max-w-full flex-col gap-3 sm:flex-row">
             <Link
-              className="inline-flex min-h-12 items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+              className="inline-flex min-h-12 w-full min-w-0 max-w-full items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto"
               href="/tournaments"
             >
-              {t("home.hero.viewTournaments")}
-              <ArrowRight size={17} aria-hidden="true" />
+              <span className="min-w-0 text-center leading-5 [overflow-wrap:anywhere]">
+                {t("home.hero.viewTournaments")}
+              </span>
+              <ArrowRight className="shrink-0" size={17} aria-hidden="true" />
             </Link>
 
             <a
-              className="inline-flex min-h-12 items-center justify-center gap-2 border border-white/20 bg-white/[0.035] px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+              className="inline-flex min-h-12 w-full min-w-0 max-w-full items-center justify-center gap-2 border border-white/20 bg-white/[0.035] px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto"
               href={discordUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
-              {t("home.hero.joinDiscord")}
-              <Flag size={17} aria-hidden="true" />
+              <span className="min-w-0 text-center leading-5 [overflow-wrap:anywhere]">
+                {t("home.hero.joinDiscord")}
+              </span>
+              <Flag className="shrink-0" size={17} aria-hidden="true" />
             </a>
           </div>
 

@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "Inscripción en IronClad",
     title: "Inscripción de jugador de esports",
+    dialogDescription:
+      "Elige un torneo para el que cumplas los requisitos, confirma que tu perfil de jugador esté listo y acepta cada acuerdo obligatorio.",
     closeAria: "Cerrar la inscripción",
+    stepProgress: "Paso {current} de {total}",
     tournamentSelection: "Selección del torneo",
     tournamentSelectionDescription:
       "Selecciona el torneo y el tipo de cuadro o evento al que quieres unirte.",
+    selectedTournament: "Torneo seleccionado",
+    changeTournament: "Cambiar de torneo",
     cohortSummary:
       "{requirement} — grupo de revisión activo {active}/{capacity} — {waitlisted} en espera",
     activeCohortFull: "Grupo de revisión activo completo — solo lista de espera",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "Confirmación del perfil de jugador",
     profileDescription:
       "La inscripción usa tu perfil de jugador guardado en IronClad. Si algún dato está desactualizado, modifica el perfil antes de continuar.",
+    readinessTitle: "Preparación del jugador",
+    profileReady: "Perfil de jugador listo",
+    steamConnected: "Identidad de Steam conectada",
+    relicVerificationOnSubmit:
+      "Al enviar, se ejecuta de forma segura una comprobación en directo del ELO 1v1 de Relic y de la División.",
+    reviewSavedDetails: "Revisar datos guardados",
     displayName: "Nombre visible",
     ign: "IGN",
     discordOptional: "Discord (opcional)",
@@ -148,8 +159,13 @@ const dictionary = {
     ownershipConfirmation:
       "Confirmo que uso mi propia cuenta de IronClad y que la cuenta de Steam vinculada me pertenece.",
     submitRegistration: "Enviar inscripción",
-    submittedTitle: "Inscripción enviada",
-    reviewTime: "Las inscripciones se revisan en un plazo de 24 horas.",
+    submittedTitle: "Inscripción enviada — pendiente de revisión administrativa",
+    reviewTime:
+      "La administración del torneo revisará tu inscripción. Consulta el Dashboard para ver las actualizaciones de estado.",
+    waitlistJoinedTitle: "Te has unido a la lista de espera",
+    waitlistPositionPending: "Confirmando tu posición en la lista de espera…",
+    waitlistResultDescription:
+      "La plaza no está garantizada. La cola sigue el orden de llegada. Si queda una vacante, podrías recibir una oferta; gestiona las ofertas desde tu Dashboard.",
     back: "Atrás",
     cancel: "Cancelar",
     continue: "Continuar",
@@ -347,7 +363,7 @@ const dictionary = {
   emptyState: { title: "No hay torneos publicados", description: "Los datos aparecerán aquí cuando un administrador publique un evento." },
   deadlines: { unavailable: "no disponible", extension: "Incluye una prórroga de {duration}.", minutes: "{count} minutos", minute: "{count} minuto", hours: "{count} horas", hour: "{count} hora" },
   pollAction: { invalid: "La solicitud de papeleta no es válida.", failed: "No se pudo guardar tu papeleta. Actualiza la encuesta e inténtalo de nuevo." },
-  bracketSummary: { emptySlots: "{format} — {count} plazas vacías", approvedMinimum: "{count} aprobados — se necesitan al menos 2" },
+  bracketSummary: { playerSlots: "{format} — {count} plazas para jugadores", approvedMinimum: "{count} aprobados — se necesitan al menos 2" },
   pollDates: { opensAt: "Abre {date}", closesAt: "Cierra {date}", decisionPublishedAt: "Decisión publicada {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "{count} papeletas enviadas", ballotCountOne: "{count} papeleta enviada", ballotCountTwo: "{count} papeletas enviadas", ballotCountFew: "{count} papeletas enviadas", ballotCountMany: "{count} papeletas enviadas", ballotCountOther: "{count} papeletas enviadas", voteCountZero: "{count} votos", voteCountOne: "{count} voto", voteCountTwo: "{count} votos", voteCountFew: "{count} votos", voteCountMany: "{count} votos", voteCountOther: "{count} votos" },
   announcements: { update: "Novedad de IronClad {number}", status: "Estado actual de {title}: {status}.", grandFinal: "Gran Final: {date}.", participants: "Participantes aprobados: {players}. Cuadros: {brackets}. Mientras la inscripción esté abierta, los cuadros completos o con una lista de espera activa aceptan inscripciones en la lista de espera." },
@@ -359,7 +375,7 @@ const dictionary = {
   matchControls: {
     yourNoShowPending: "Tu informe de incomparecencia espera la confirmación del rival.", yourResultPending: "Tu resultado espera la confirmación del rival.", opponentNoShowPending: "Tu rival informó de una incomparecencia. Confírmala o impúgnala desde la notificación del panel.", opponentResultPending: "Tu rival envió un resultado. Confírmalo o impúgnalo desde la notificación del panel.", legacyPending: "Esta partida tiene un informe antiguo pendiente de revisión administrativa.", waitingOpponent: "Esperando al rival: tu plazo aún no ha comenzado.", participantsRequired: "Deben asignarse ambos participantes antes de registrar un resultado.", hold: "Esta partida está suspendida por la administración. El envío de resultados y la aplicación del plazo se reanudarán al levantar la suspensión.", notActivated: "Esta partida aún no está activa. Los controles de resultado e incomparecencia estarán disponibles cuando se inicie la División y ambos participantes oficiales estén listos.", deadlinePassedMessage: "El plazo aplicable ha vencido. No se aceptan nuevos informes de jugadores mientras se procesa la resolución definitiva.", open: "Abrir", hide: "Ocultar", pendingConfirmation: "Resultado pendiente de confirmación", pendingReview: "Resultado pendiente de revisión", submitResult: "Enviar resultado de la partida", doubleForfeit: "Resolución de derrota doble", automaticAdvancement: "Avance automático", noEligiblePlayer: "Ningún jugador elegible avanzó", completed: "Partida completada", notActive: "Partida inactiva", waitingOpponentShort: "Esperando al rival", deadlinePaused: "Plazo de la partida pausado", deadlinePassed: "Plazo vencido", outcomeDoubleForfeit: "La resolución del plazo eliminó a ambos jugadores. No se puede enviar ningún resultado.", outcomeAutomaticBye: "El único jugador elegible avanzó automáticamente. No se jugó la partida y no hace falta un resultado.", outcomeEmptyFeeder: "Este cruce anterior se cerró sin participantes elegibles. No se puede enviar ningún resultado.", participant: "Participante", noShowReport: "Informe de incomparecencia", confirmationPackage: "Paquete de confirmación", noShowReported: "{reporter} informó de la incomparecencia de {player}", scoreReported: "Se informó {score} a favor de {winner}", match: "Partida", matchReference: "{round} — partida {number}", reportingPlayer: "Jugador que informa", opponent: "Rival", forfeitWinner: "Ganador por incomparecencia", reportedWinner: "Ganador informado", missingPlayer: "Jugador ausente", reportedLoser: "Perdedor informado", noShowStatus: "Estado de incomparecencia", confirmationDeadline: "Plazo de confirmación", finalizedBy: "Finalizado mediante", disputeNotes: "Notas de la disputa", noShowNote: "Nota de incomparecencia", reviewNotes: "Notas de revisión", noReplayNoShow: "Un informe de incomparecencia no requiere repetición", gameReplay: "Repetición de la partida {number}", gameReplayUnavailable: "Repetición de la partida {number} no disponible", replayUnavailable: "Repetición no disponible", submission: "Envío n.º {number}", claimedWinner: "Ganador declarado", score: "Marcador", adminMessage: "Mensaje de administración", downloadReplay: "Descargar la repetición aportada como prueba", viewLegacyScreenshot: "Ver captura adjunta antigua", statusUnderReview: "En revisión", statusApproved: "Aprobado", statusRejected: "Rechazado", statusResubmission: "Nuevo envío solicitado", statusPendingConfirmation: "Pendiente de confirmación del rival", statusConfirmed: "Confirmado", statusAutoApproved: "Aprobado automáticamente", statusDisputed: "Impugnado", statusReset: "Restablecido", statusNotNoShow: "No es una incomparecencia", statusWaitingOpponent: "Esperando al rival", statusApprovedAdmin: "Aprobado por administración", statusAutoConfirmed: "Confirmado automáticamente", sourceOpponent: "Confirmación del rival", sourceAutomatic: "Aprobación automática", sourceAdminApproval: "Aprobación administrativa", sourceAdminOverride: "Decisión administrativa"
   },
-  matchAction: { prepareFailed: "No se pudo preparar la subida de repeticiones. Inténtalo de nuevo.", cleanupFailed: "No se pudo completar de forma segura la limpieza de las repeticiones subidas.", operationFailed: "No se pudo completar la solicitud de la partida. Actualiza e inténtalo de nuevo.", resultSubmitted: "El envío n.º {submission} espera la confirmación del rival.", resultSubmittedWarning: "El envío n.º {submission} espera la confirmación del rival. El resultado se guardó, pero una actualización posterior falló; actualiza la partida antes de actuar de nuevo.", opponentRequired: "Elige al rival que no se presentó.", notesTooLong: "Las notas de incomparecencia no pueden superar los 2.000 caracteres.", matchUnavailable: "Esta partida ya no está disponible.", participantsUnavailable: "Deben estar asignados y verificados ambos participantes de la partida.", participantOnly: "Solo puedes actuar en partidas en las que participas.", selfNoShow: "No puedes denunciar tu propia incomparecencia.", invalidParticipant: "El jugador indicado no participa en esta partida.", noShowSubmitted: "Informe de incomparecencia enviado. {player} debe confirmarlo o impugnarlo.", reportUnavailable: "No se encontró la confirmación del resultado de la partida.", confirmed: "Resultado confirmado. El ganador ha avanzado.", disputeNotesTooLong: "Las notas de la disputa no pueden superar los 2.000 caracteres.", disputed: "Resultado impugnado. Debe revisarlo un administrador." },
+  matchAction: { prepareFailed: "No se pudo preparar la subida de repeticiones. Inténtalo de nuevo.", cleanupFailed: "No se pudo completar de forma segura la limpieza de las repeticiones subidas.", operationFailed: "No se pudo completar la solicitud de la partida. Actualiza e inténtalo de nuevo.", duplicateReplay: "Esta repetición ya se ha enviado. Usa un archivo de repetición diferente.", resultSubmitted: "El envío n.º {submission} espera la confirmación del rival.", resultSubmittedWarning: "El envío n.º {submission} espera la confirmación del rival. El resultado se guardó, pero una actualización posterior falló; actualiza la partida antes de actuar de nuevo.", opponentRequired: "Elige al rival que no se presentó.", notesTooLong: "Las notas de incomparecencia no pueden superar los 2.000 caracteres.", matchUnavailable: "Esta partida ya no está disponible.", participantsUnavailable: "Deben estar asignados y verificados ambos participantes de la partida.", participantOnly: "Solo puedes actuar en partidas en las que participas.", selfNoShow: "No puedes denunciar tu propia incomparecencia.", invalidParticipant: "El jugador indicado no participa en esta partida.", noShowSubmitted: "Informe de incomparecencia enviado. {player} debe confirmarlo o impugnarlo.", reportUnavailable: "No se encontró la confirmación del resultado de la partida.", confirmed: "Resultado confirmado. El ganador ha avanzado.", disputeNotesTooLong: "Las notas de la disputa no pueden superar los 2.000 caracteres.", disputed: "Resultado impugnado. Debe revisarlo un administrador." },
   gate: {
     title: "Inscripción disponible solo en inglés",
     description: "Los documentos rectores vinculantes solo están disponibles actualmente en inglés. Para inscribirte o unirte a la lista de espera, continúa en inglés y revisa los documentos vigentes en inglés antes de aceptarlos.",

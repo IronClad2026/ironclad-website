@@ -11,7 +11,20 @@ function count(source: string, value: string) {
 }
 
 const adminPage = readSource("app/admin/page.tsx");
-const tournamentAdminPage = readSource("app/admin/tournaments/page.tsx");
+const tournamentListPage = readSource("app/admin/tournaments/page.tsx");
+const tournamentNewPage = readSource("app/admin/tournaments/new/page.tsx");
+const tournamentWorkspacePage = readSource(
+  "app/admin/tournaments/[tournamentId]/page.tsx"
+);
+const tournamentEditor = readSource(
+  "components/admin/tournaments/TournamentEditor.tsx"
+);
+const tournamentManagementMenu = readSource(
+  "components/admin/tournaments/TournamentManagementMenu.tsx"
+);
+const registrationDetailDialog = readSource(
+  "components/admin/tournaments/AdminRegistrationDetailDialog.tsx"
+);
 const bracketManagement = readSource("components/AdminBracketManagement.tsx");
 const bracketPopulation = readSource("components/AdminBracketPopulation.tsx");
 const matchSummaries = readSource("components/AdminMatchResultSummaries.tsx");
@@ -34,29 +47,35 @@ describe("admin responsive component and CSS contracts", () => {
     expect(adminPage).toContain(
       'className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-5"'
     );
-    expect(tournamentAdminPage).toContain(
-      'className="min-h-screen min-w-0 bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32"'
+    expect(tournamentListPage).toContain(
+      'className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32"'
     );
-    expect(tournamentAdminPage).toContain(
+    expect(tournamentListPage).toContain(
+      'className="group min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-5 transition'
+    );
+    expect(tournamentNewPage).toContain(
+      'className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32"'
+    );
+    expect(tournamentWorkspacePage).toContain(
+      'className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-24 pb-20 text-white sm:px-6 sm:pt-28"'
+    );
+    expect(tournamentEditor).toContain(
       'className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 sm:p-6 md:p-8"'
-    );
-    expect(tournamentAdminPage).toContain(
-      'className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"'
     );
   });
 
   it("keeps the tournament editor and banner preview within narrow grid tracks", () => {
-    expect(tournamentAdminPage).toContain(
+    expect(tournamentEditor).toContain(
       'className="mt-8 grid gap-5 md:grid-cols-2"'
     );
-    expect(tournamentAdminPage).toContain(
+    expect(tournamentEditor).toContain(
       'className="mt-8 grid gap-5 lg:grid-cols-3"'
     );
-    expect(tournamentAdminPage).toContain(
-      'className="mt-8 grid gap-8 xl:grid-cols-[360px_1fr]"'
+    expect(tournamentEditor).toContain(
+      'className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"'
     );
-    expect(tournamentAdminPage).toContain("break-words text-4xl");
-    expect(tournamentAdminPage).toContain("break-words text-3xl");
+    expect(tournamentListPage).toContain("break-words text-4xl");
+    expect(tournamentEditor).toContain("break-words text-3xl");
     expect(tournamentBannerPicker).toContain(
       "relative aspect-[16/6] sm:min-h-44 overflow-hidden bg-zinc-950"
     );
@@ -67,29 +86,53 @@ describe("admin responsive component and CSS contracts", () => {
   });
 
   it("keeps registration-review modal content, header, close, and actions reachable", () => {
-    expect(adminPage).toContain(
+    expect(registrationDetailDialog).toContain(
       "max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl overflow-y-auto overscroll-contain"
     );
-    expect(adminPage).toContain(
+    expect(registrationDetailDialog).toContain(
       "sm:max-h-[calc(100dvh-3rem)] sm:p-6"
     );
-    expect(adminPage).toContain(
+    expect(registrationDetailDialog).toContain(
       "sticky top-0 z-10 -mx-1 mb-5 flex items-start justify-between"
     );
-    expect(adminPage).toContain(
+    expect(registrationDetailDialog).toContain(
       "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center"
     );
-    expect(adminPage).toContain(
+    expect(registrationDetailDialog).toContain(
       "mt-6 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-2 lg:flex lg:flex-wrap"
     );
-    expect(count(adminPage, "inline-flex min-h-11 w-full items-center justify-center"))
-      .toBeGreaterThanOrEqual(5);
+    expect(
+      count(
+        registrationDetailDialog,
+        "inline-flex min-h-11 w-full items-center justify-center"
+      )
+    ).toBeGreaterThanOrEqual(4);
+  });
+
+  it("keeps the right-side management drawer touch-safe and phone-safe", () => {
+    expect(tournamentManagementMenu).toContain(
+      'aria-label="Open Tournament management menu"'
+    );
+    expect(tournamentManagementMenu).toContain("grid h-11 w-11 shrink-0");
+    expect(tournamentManagementMenu).toContain(
+      "h-[100dvh] w-[min(22rem,100vw)] overflow-y-auto"
+    );
+    expect(tournamentManagementMenu).toContain(
+      "[padding-bottom:max(1rem,env(safe-area-inset-bottom))]"
+    );
+    expect(tournamentManagementMenu).toContain(
+      "[padding-top:max(1rem,env(safe-area-inset-top))]"
+    );
+    expect(tournamentManagementMenu).toContain("flex min-h-11 items-center");
   });
 
   it("makes bracket administration usable without desktop-only drag interactions", () => {
     expect(count(bracketManagement, "min-h-11")).toBeGreaterThanOrEqual(4);
     expect(bracketManagement).toContain(
-      'className="mt-4 grid gap-3 md:grid-cols-2"'
+      'className={`mt-4 grid gap-3 ${'
+    );
+    expect(bracketManagement).toContain(
+      'fixedTournamentId ? "" : "md:grid-cols-2"'
     );
     expect(bracketManagement).toContain("break-words font-black text-white");
 

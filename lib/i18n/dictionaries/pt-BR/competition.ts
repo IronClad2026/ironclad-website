@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "Inscrição IronClad",
     title: "Inscrição de jogador de esports",
+    dialogDescription:
+      "Escolha um torneio para o qual você seja elegível, confirme que o perfil do jogador está pronto e aceite cada acordo obrigatório.",
     closeAria: "Fechar inscrição",
+    stepProgress: "Etapa {current} de {total}",
     tournamentSelection: "Seleção do torneio",
     tournamentSelectionDescription:
       "Selecione o torneio e o tipo de chave ou evento do qual deseja participar.",
+    selectedTournament: "Torneio selecionado",
+    changeTournament: "Mudar de torneio",
     cohortSummary:
       "{requirement} — grupo ativo de análise {active}/{capacity} — {waitlisted} na lista de espera",
     activeCohortFull: "Grupo ativo de análise lotado — somente lista de espera",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "Confirmação do perfil do jogador",
     profileDescription:
       "A inscrição usa seu perfil de jogador salvo no IronClad. Se alguma informação estiver desatualizada, atualize o perfil antes de continuar.",
+    readinessTitle: "Preparação do jogador",
+    profileReady: "Perfil do jogador pronto",
+    steamConnected: "Identidade Steam conectada",
+    relicVerificationOnSubmit:
+      "Ao enviar, uma verificação em tempo real do ELO 1v1 da Relic e da divisão é executada com segurança.",
+    reviewSavedDetails: "Revisar dados salvos",
     displayName: "Nome de exibição",
     ign: "IGN",
     discordOptional: "Discord (opcional)",
@@ -148,8 +159,14 @@ const dictionary = {
     ownershipConfirmation:
       "Confirmo que uso minha própria conta IronClad e que a conta Steam vinculada pertence a mim.",
     submitRegistration: "Enviar inscrição",
-    submittedTitle: "Inscrição enviada",
-    reviewTime: "As inscrições são analisadas em até 24 horas.",
+    submittedTitle: "Inscrição enviada — aguardando análise da Administração",
+    reviewTime:
+      "A administração do torneio analisará sua inscrição. Consulte o Dashboard para acompanhar as atualizações de status.",
+    waitlistJoinedTitle: "Entrada na lista de espera confirmada",
+    waitlistPositionPending:
+      "Confirmando sua posição na lista de espera…",
+    waitlistResultDescription:
+      "A vaga não é garantida. A fila segue a ordem de chegada. Se surgir uma vaga, você poderá receber uma oferta; gerencie as ofertas pelo Dashboard.",
     back: "Voltar",
     cancel: "Cancelar",
     continue: "Continuar",
@@ -347,7 +364,7 @@ const dictionary = {
   emptyState: { title: "Nenhum torneio publicado", description: "Os dados aparecerão aqui depois que um administrador publicar um evento." },
   deadlines: { unavailable: "indisponível", extension: "Inclui uma prorrogação de {duration}.", minutes: "{count} minutos", minute: "{count} minuto", hours: "{count} horas", hour: "{count} hora" },
   pollAction: { invalid: "A solicitação de cédula é inválida.", failed: "Não foi possível salvar sua cédula. Atualize a enquete e tente novamente." },
-  bracketSummary: { emptySlots: "{format} — {count} vagas vazias", approvedMinimum: "{count} aprovados — são necessários pelo menos 2" },
+  bracketSummary: { playerSlots: "{format} — {count} vagas para jogadores", approvedMinimum: "{count} aprovados — são necessários pelo menos 2" },
   pollDates: { opensAt: "Abre em {date}", closesAt: "Fecha em {date}", decisionPublishedAt: "Decisão publicada em {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "{count} cédulas enviadas", ballotCountOne: "{count} cédula enviada", ballotCountTwo: "{count} cédulas enviadas", ballotCountFew: "{count} cédulas enviadas", ballotCountMany: "{count} cédulas enviadas", ballotCountOther: "{count} cédulas enviadas", voteCountZero: "{count} votos", voteCountOne: "{count} voto", voteCountTwo: "{count} votos", voteCountFew: "{count} votos", voteCountMany: "{count} votos", voteCountOther: "{count} votos" },
   announcements: { update: "Atualização IronClad {number}", status: "Status atual de {title}: {status}.", grandFinal: "Grande Final: {date}.", participants: "Participantes aprovados: {players}. Chaves: {brackets}. Enquanto as inscrições estiverem abertas, chaves lotadas ou com fila aceitam inscrições na lista de espera." },
@@ -359,7 +376,7 @@ const dictionary = {
   matchControls: {
     yourNoShowPending: "Seu relato de ausência aguarda confirmação do adversário.", yourResultPending: "Seu resultado aguarda confirmação do adversário.", opponentNoShowPending: "Seu adversário relatou uma ausência. Confirme ou conteste pela notificação do painel.", opponentResultPending: "Seu adversário enviou um resultado. Confirme ou conteste pela notificação do painel.", legacyPending: "Esta partida tem um relato antigo aguardando análise administrativa.", waitingOpponent: "Aguardando o adversário — seu prazo ainda não começou.", participantsRequired: "Os dois participantes precisam ser definidos antes de registrar um resultado.", hold: "Esta partida está suspensa pela administração. O envio de resultados e a aplicação do prazo serão retomados após a liberação da suspensão.", notActivated: "Esta partida ainda não foi ativada. Os controles de resultado e ausência serão liberados após o início da divisão e quando os dois participantes oficiais estiverem prontos.", deadlinePassedMessage: "O prazo efetivo terminou. Novos relatos de jogadores não serão aceitos enquanto a decisão oficial sobre o prazo estiver sendo processada.", open: "Abrir", hide: "Ocultar", pendingConfirmation: "Resultado aguardando confirmação", pendingReview: "Resultado aguardando análise", submitResult: "Enviar resultado da partida", doubleForfeit: "Decisão de derrota dupla", automaticAdvancement: "Avanço automático", noEligiblePlayer: "Nenhum jogador elegível avançou", completed: "Partida concluída", notActive: "Partida inativa", waitingOpponentShort: "Aguardando adversário", deadlinePaused: "Prazo da partida pausado", deadlinePassed: "Prazo encerrado", outcomeDoubleForfeit: "A decisão sobre o prazo eliminou os dois jogadores. Nenhum resultado pode ser enviado.", outcomeAutomaticBye: "O único jogador elegível avançou automaticamente. A partida não foi disputada e nenhum resultado é necessário.", outcomeEmptyFeeder: "Este confronto anterior foi encerrado sem participante elegível. Nenhum resultado pode ser enviado.", participant: "Participante", noShowReport: "Relato de ausência", confirmationPackage: "Pacote de confirmação", noShowReported: "{reporter} relatou que {player} não compareceu", scoreReported: "Placar {score} relatado a favor de {winner}", match: "Partida", matchReference: "{round} — partida {number}", reportingPlayer: "Jogador que relatou", opponent: "Adversário", forfeitWinner: "Vencedor por ausência", reportedWinner: "Vencedor relatado", missingPlayer: "Jogador ausente", reportedLoser: "Perdedor relatado", noShowStatus: "Status da ausência", confirmationDeadline: "Prazo de confirmação", finalizedBy: "Finalizado por", disputeNotes: "Observações da contestação", noShowNote: "Observação de ausência", reviewNotes: "Observações da análise", noReplayNoShow: "Um relato de ausência não exige replay", gameReplay: "Replay do jogo {number}", gameReplayUnavailable: "Replay do jogo {number} indisponível", replayUnavailable: "Replay indisponível", submission: "Envio nº {number}", claimedWinner: "Vencedor declarado", score: "Placar", adminMessage: "Mensagem da administração", downloadReplay: "Baixar replay de comprovação", viewLegacyScreenshot: "Ver captura antiga anexada", statusUnderReview: "Em análise", statusApproved: "Aprovado", statusRejected: "Rejeitado", statusResubmission: "Novo envio solicitado", statusPendingConfirmation: "Aguardando confirmação do adversário", statusConfirmed: "Confirmado", statusAutoApproved: "Aprovado automaticamente", statusDisputed: "Contestado", statusReset: "Redefinido", statusNotNoShow: "Não é ausência", statusWaitingOpponent: "Aguardando adversário", statusApprovedAdmin: "Aprovado pela administração", statusAutoConfirmed: "Confirmado automaticamente", sourceOpponent: "Confirmação do adversário", sourceAutomatic: "Aprovação automática", sourceAdminApproval: "Aprovação administrativa", sourceAdminOverride: "Decisão administrativa"
   },
-  matchAction: { prepareFailed: "Não foi possível preparar o envio dos replays. Tente novamente.", cleanupFailed: "Não foi possível limpar os envios de replay com segurança.", operationFailed: "Não foi possível concluir a solicitação da partida. Atualize e tente novamente.", resultSubmitted: "O envio nº {submission} aguarda confirmação do adversário.", resultSubmittedWarning: "O envio nº {submission} aguarda confirmação do adversário. O resultado foi salvo, mas uma atualização posterior falhou; atualize a partida antes de outra ação.", opponentRequired: "Escolha o adversário que não compareceu.", notesTooLong: "As observações de ausência devem ter no máximo 2.000 caracteres.", matchUnavailable: "Esta partida não está mais disponível.", participantsUnavailable: "Os dois participantes da partida devem estar definidos e verificados.", participantOnly: "Você só pode agir em partidas das quais participa.", selfNoShow: "Você não pode denunciar a própria ausência.", invalidParticipant: "O jogador informado não participa desta partida.", noShowSubmitted: "Relato de ausência enviado. {player} deve confirmar ou contestar.", reportUnavailable: "A confirmação do resultado da partida não foi encontrada.", confirmed: "Resultado confirmado. O vencedor avançou.", disputeNotesTooLong: "As observações da contestação devem ter no máximo 2.000 caracteres.", disputed: "Resultado contestado. Um administrador deve analisá-lo." },
+  matchAction: { prepareFailed: "Não foi possível preparar o envio dos replays. Tente novamente.", cleanupFailed: "Não foi possível limpar os envios de replay com segurança.", operationFailed: "Não foi possível concluir a solicitação da partida. Atualize e tente novamente.", duplicateReplay: "Este replay já foi enviado. Use um arquivo de replay diferente.", resultSubmitted: "O envio nº {submission} aguarda confirmação do adversário.", resultSubmittedWarning: "O envio nº {submission} aguarda confirmação do adversário. O resultado foi salvo, mas uma atualização posterior falhou; atualize a partida antes de outra ação.", opponentRequired: "Escolha o adversário que não compareceu.", notesTooLong: "As observações de ausência devem ter no máximo 2.000 caracteres.", matchUnavailable: "Esta partida não está mais disponível.", participantsUnavailable: "Os dois participantes da partida devem estar definidos e verificados.", participantOnly: "Você só pode agir em partidas das quais participa.", selfNoShow: "Você não pode denunciar a própria ausência.", invalidParticipant: "O jogador informado não participa desta partida.", noShowSubmitted: "Relato de ausência enviado. {player} deve confirmar ou contestar.", reportUnavailable: "A confirmação do resultado da partida não foi encontrada.", confirmed: "Resultado confirmado. O vencedor avançou.", disputeNotesTooLong: "As observações da contestação devem ter no máximo 2.000 caracteres.", disputed: "Resultado contestado. Um administrador deve analisá-lo." },
   gate: {
     title: "Inscrição disponível somente em inglês",
     description: "Os documentos normativos vinculantes atualmente em vigor estão disponíveis em inglês. Para se inscrever ou entrar na lista de espera, continue em inglês e leia esses documentos antes de aceitá-los.",

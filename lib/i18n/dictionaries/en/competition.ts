@@ -317,10 +317,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "IronClad Registration",
     title: "Esports Player Registration",
+    dialogDescription:
+      "Choose an eligible Tournament, confirm Player readiness and accept each required agreement.",
     closeAria: "Close registration",
+    stepProgress: "Step {current} of {total}",
     tournamentSelection: "Tournament Selection",
     tournamentSelectionDescription:
       "Select the tournament and bracket/event type you want to join.",
+    selectedTournament: "Selected Tournament",
+    changeTournament: "Change Tournament",
     cohortSummary:
       "{requirement} — active review cohort {active}/{capacity} — {waitlisted} waitlisted",
     activeCohortFull: "Active review cohort full — waitlist only",
@@ -333,6 +338,12 @@ const dictionary = {
     profileTitle: "Player Profile Confirmation",
     profileDescription:
       "Registration uses your saved IronClad player profile. Update your profile before continuing if any information is outdated.",
+    readinessTitle: "Player Readiness",
+    profileReady: "Player profile ready",
+    steamConnected: "Steam identity connected",
+    relicVerificationOnSubmit:
+      "A live Relic 1v1 ELO and Division check runs securely when you submit.",
+    reviewSavedDetails: "Review saved details",
     displayName: "Display Name",
     ign: "IGN",
     discordOptional: "Discord (optional)",
@@ -359,8 +370,13 @@ const dictionary = {
     ownershipConfirmation:
       "I confirm that I am using my own IronClad account and that the linked Steam account belongs to me.",
     submitRegistration: "Submit Registration",
-    submittedTitle: "Registration Submitted",
-    reviewTime: "Registrations are reviewed within 24 hours.",
+    submittedTitle: "Registration submitted — Pending Admin review",
+    reviewTime:
+      "Tournament administration will review your submission. Check your Dashboard for status updates.",
+    waitlistJoinedTitle: "Waitlist joined",
+    waitlistPositionPending: "Confirming your waitlist position…",
+    waitlistResultDescription:
+      "A place is not guaranteed. The queue is first-in, first-out. If a vacancy opens, you may receive an offer; manage offers from your Dashboard.",
     back: "Back",
     cancel: "Cancel",
     continue: "Continue",
@@ -582,7 +598,7 @@ const dictionary = {
   emptyState: { title: "No Tournaments Published", description: "Tournament data will appear here after an administrator publishes an event." },
   deadlines: { unavailable: "unavailable", extension: "Includes a {duration} extension.", minutes: "{count} minutes", minute: "{count} minute", hours: "{count} hours", hour: "{count} hour" },
   pollAction: { invalid: "This Poll ballot request is invalid.", failed: "Your ballot could not be saved. Refresh the Poll and try again." },
-  bracketSummary: { emptySlots: "{format} — {count} empty player slots", approvedMinimum: "{count} approved — at least 2 required" },
+  bracketSummary: { playerSlots: "{format} — {count} player slots", approvedMinimum: "{count} approved — at least 2 required" },
   pollDates: { opensAt: "Opens {date}", closesAt: "Closes {date}", decisionPublishedAt: "Decision published {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "{count} submitted ballots", ballotCountOne: "{count} submitted ballot", ballotCountTwo: "{count} submitted ballots", ballotCountFew: "{count} submitted ballots", ballotCountMany: "{count} submitted ballots", ballotCountOther: "{count} submitted ballots", voteCountZero: "{count} votes", voteCountOne: "{count} vote", voteCountTwo: "{count} votes", voteCountFew: "{count} votes", voteCountMany: "{count} votes", voteCountOther: "{count} votes" },
   announcements: { update: "IronClad Update {number}", status: "{title} is currently {status}.", grandFinal: "Grand Final: {date}.", participants: "Approved participants: {players}. Brackets: {brackets}. Full Brackets and Brackets with an existing queue accept waitlist Registrations while Registration remains open." },
@@ -594,7 +610,7 @@ const dictionary = {
   matchControls: {
     yourNoShowPending: "Your no-show report is awaiting opponent confirmation.", yourResultPending: "Your result is awaiting opponent confirmation.", opponentNoShowPending: "Your opponent reported a no-show. Confirm or dispute it from your dashboard notification.", opponentResultPending: "Your opponent submitted a result. Confirm or dispute it from your dashboard notification.", legacyPending: "This Match has a legacy report awaiting administrator review.", waitingOpponent: "Waiting for opponent — your deadline has not started.", participantsRequired: "Both participants must be assigned before a result can be recorded.", hold: "This Match is on an administrative hold. Result submission and deadline enforcement resume after the hold is released.", notActivated: "This Match has not activated. Result and no-show controls become available only after the Division launches and both official participants are ready.", deadlinePassedMessage: "The effective deadline has passed. New player reports are closed while the authoritative deadline ruling is processed.", open: "Open", hide: "Hide", pendingConfirmation: "Result Pending Confirmation", pendingReview: "Result Pending Review", submitResult: "Submit Match Result", doubleForfeit: "Double Forfeit Ruling", automaticAdvancement: "Automatic Advancement", noEligiblePlayer: "No Eligible Player Advanced", completed: "Match Completed", notActive: "Match Not Active", waitingOpponentShort: "Waiting for Opponent", deadlinePaused: "Match Deadline Paused", deadlinePassed: "Deadline Passed", outcomeDoubleForfeit: "The deadline ruling eliminated both players. No result may be submitted.", outcomeAutomaticBye: "The sole eligible player advanced automatically. No Match was played and no result is required.", outcomeEmptyFeeder: "This feeder closed without an eligible participant. No result may be submitted.", participant: "Participant", noShowReport: "No-Show Report", confirmationPackage: "Confirmation Package", noShowReported: "{reporter} reported {player} as a no-show", scoreReported: "{score} reported for {winner}", match: "Match", matchReference: "{round} — Match {number}", reportingPlayer: "Reporting Player", opponent: "Opponent", forfeitWinner: "Forfeit Winner", reportedWinner: "Reported Winner", missingPlayer: "Missing Player", reportedLoser: "Reported Loser", noShowStatus: "No-Show Status", confirmationDeadline: "Confirmation Deadline", finalizedBy: "Finalized By", disputeNotes: "Dispute Notes", noShowNote: "No-Show Note", reviewNotes: "Review Notes", noReplayNoShow: "No Replay required for a no-show report", gameReplay: "Game {number} Replay", gameReplayUnavailable: "Game {number} Replay unavailable", replayUnavailable: "Replay unavailable", submission: "Submission #{number}", claimedWinner: "Claimed Winner", score: "Score", adminMessage: "Administrator Message", downloadReplay: "Download Replay Proof", viewLegacyScreenshot: "View Legacy Screenshot Attachment", statusUnderReview: "Under Review", statusApproved: "Approved", statusRejected: "Rejected", statusResubmission: "Resubmission Requested", statusPendingConfirmation: "Pending Opponent Confirmation", statusConfirmed: "Confirmed", statusAutoApproved: "Auto-Approved", statusDisputed: "Disputed", statusReset: "Reset", statusNotNoShow: "Not a no-show", statusWaitingOpponent: "Waiting for Opponent", statusApprovedAdmin: "Approved by Admin", statusAutoConfirmed: "Auto-Confirmed", sourceOpponent: "Opponent Confirmation", sourceAutomatic: "Automatic Approval", sourceAdminApproval: "Admin Approval", sourceAdminOverride: "Admin Override"
   },
-  matchAction: { prepareFailed: "The replay upload could not be prepared. Please try again.", cleanupFailed: "Replay cleanup could not be completed safely.", operationFailed: "The Match request could not be completed. Refresh and try again.", resultSubmitted: "Submission #{submission} is awaiting opponent confirmation.", resultSubmittedWarning: "Submission #{submission} is awaiting opponent confirmation. The result was saved, but one follow-up update could not be completed; refresh this Match before another action.", opponentRequired: "Choose the opponent who did not show up.", notesTooLong: "No-show notes must be 2,000 characters or fewer.", matchUnavailable: "This Match is no longer available.", participantsUnavailable: "Both Match participants must be assigned and verified.", participantOnly: "You can act only on Matches you are participating in.", selfNoShow: "You cannot report yourself as a no-show.", invalidParticipant: "The reported player is not a participant in this Match.", noShowSubmitted: "No-show report submitted. {player} must confirm or dispute.", reportUnavailable: "The Match-result confirmation could not be found.", confirmed: "Result confirmed. The winner has advanced.", disputeNotesTooLong: "Dispute notes must be 2,000 characters or fewer.", disputed: "Result disputed. An administrator must review it." },
+  matchAction: { prepareFailed: "The replay upload could not be prepared. Please try again.", cleanupFailed: "Replay cleanup could not be completed safely.", operationFailed: "The Match request could not be completed. Refresh and try again.", duplicateReplay: "This replay has already been submitted. Use a different replay file.", resultSubmitted: "Submission #{submission} is awaiting opponent confirmation.", resultSubmittedWarning: "Submission #{submission} is awaiting opponent confirmation. The result was saved, but one follow-up update could not be completed; refresh this Match before another action.", opponentRequired: "Choose the opponent who did not show up.", notesTooLong: "No-show notes must be 2,000 characters or fewer.", matchUnavailable: "This Match is no longer available.", participantsUnavailable: "Both Match participants must be assigned and verified.", participantOnly: "You can act only on Matches you are participating in.", selfNoShow: "You cannot report yourself as a no-show.", invalidParticipant: "The reported player is not a participant in this Match.", noShowSubmitted: "No-show report submitted. {player} must confirm or dispute.", reportUnavailable: "The Match-result confirmation could not be found.", confirmed: "Result confirmed. The winner has advanced.", disputeNotesTooLong: "Dispute notes must be 2,000 characters or fewer.", disputed: "Result disputed. An administrator must review it." },
   gate: {
     title: "Registration available in English only",
     description:

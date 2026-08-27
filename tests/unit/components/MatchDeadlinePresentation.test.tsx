@@ -2,7 +2,16 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,10 +21,14 @@ import type {
   TournamentParticipant,
 } from "@/lib/tournaments";
 
+const extendTournamentMatchDeadlineMock = vi.hoisted(() => vi.fn());
+const holdTournamentMatchDeadlineMock = vi.hoisted(() => vi.fn());
+const releaseTournamentMatchDeadlineMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/app/admin/tournaments/deadline-actions", () => ({
-  extendTournamentMatchDeadline: vi.fn(),
-  holdTournamentMatchDeadline: vi.fn(),
-  releaseTournamentMatchDeadline: vi.fn(),
+  extendTournamentMatchDeadline: extendTournamentMatchDeadlineMock,
+  holdTournamentMatchDeadline: holdTournamentMatchDeadlineMock,
+  releaseTournamentMatchDeadline: releaseTournamentMatchDeadlineMock,
 }));
 
 vi.mock("@/app/tournaments/match-actions", () => ({
@@ -53,7 +66,10 @@ import {
   MatchDeadlinePresentation,
 } from "@/components/TournamentsExperience";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const participantOne: TournamentParticipant = {
   registrationId: "11111111-1111-4111-8111-111111111111",
@@ -312,8 +328,22 @@ describe("matchup deadline player and administrator presentation", () => {
     );
 
     const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAccessibleName(
+      "Direct Match Management Responsive Match Management Validation"
+    );
+    expect(dialog).toHaveAccessibleDescription("Quarterfinals - Match 1");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(dialog).toHaveClass("w-full", "max-w-5xl", "min-w-0");
     expect(dialog).not.toHaveClass("w-[94vw]");
+
+    const closeButton = screen.getByRole("button", {
+      name: "Close match management",
+    });
+    expect(closeButton).toHaveFocus();
+    expect(closeButton).toHaveClass("min-h-11", "min-w-11");
+    expect(
+      dialog.parentElement?.querySelector("[data-admin-match-dialog-backdrop]")
+    ).toHaveAttribute("aria-hidden", "true");
 
     const scrollport = dialog.querySelector("[data-admin-match-scrollport]");
     const overviewGrid = dialog.querySelector(
@@ -438,7 +468,194 @@ describe("matchup deadline player and administrator presentation", () => {
     expect(screen.getByRole("button", { name: "Reset Match" })).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: "Close match management" })
-    ).toHaveLength(2);
+    ).toHaveLength(1);
+  });
+
+  it("traps administrator dialog focus and returns it after Escape, close, and backdrop dismissal", async () => {
+    type ModalProps = Parameters<typeof AdminMatchManagementModal>[0];
+
+    function AdminDialogHarness() {
+      const [open, setOpen] = useState(false);
+
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open administrator adjudication
+          </button>
+          {open && (
+            <AdminMatchManagementModal
+              tournament={
+                {
+                  title: "Accessibility Cup",
+                } as ModalProps["tournament"]
+              }
+              match={matchFixture()}
+              bracketFormat="single_elimination"
+              participantsById={participants(participantOne, participantTwo)}
+              viewer={
+                {
+                  isAdmin: true,
+                  relicVerifiedDivision: null,
+                  registrationIds: [],
+                  registrations: [],
+                } as ModalProps["viewer"]
+              }
+              submissions={[]}
+              reportGroups={[]}
+              onClose={() => setOpen(false)}
+            />
+          )}
+        </>
+      );
+    }
+
+    render(<AdminDialogHarness />);
+    const opener = screen.getByRole("button", {
+      name: "Open administrator adjudication",
+    });
+    const openDialog = async () => {
+      opener.focus();
+      fireEvent.click(opener);
+      const dialog = await screen.findByRole("dialog", {
+        name: "Direct Match Management Accessibility Cup",
+      });
+      const closeButton = within(dialog).getByRole("button", {
+        name: "Close match management",
+      });
+      await waitFor(() => expect(closeButton).toHaveFocus());
+      return { closeButton, dialog };
+    };
+
+    let { closeButton, dialog } = await openDialog();
+    expect(dialog).toHaveAccessibleDescription("Quarterfinals - Match 1");
+    expect(dialog.parentElement).toHaveClass("p-3", "sm:p-6");
+    expect(closeButton).toHaveClass("min-h-11", "min-w-11");
+
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), select:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), a[href], [tabindex]'
+      )
+    ).filter((element) => element.tabIndex >= 0);
+    expect(focusable.length).toBeGreaterThan(1);
+    const lastFocusable = focusable[focusable.length - 1];
+    lastFocusable.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(closeButton).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(lastFocusable).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+
+    ({ closeButton } = await openDialog());
+    fireEvent.click(closeButton);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+
+    ({ dialog } = await openDialog());
+    const backdrop = dialog.parentElement?.querySelector<HTMLElement>(
+      "[data-admin-match-dialog-backdrop]"
+    );
+    expect(backdrop).toHaveAttribute("aria-hidden", "true");
+    fireEvent.mouseDown(backdrop as HTMLElement);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+  });
+
+  it("keeps administrator adjudication open while an in-dialog action is pending", async () => {
+    type ModalProps = Parameters<typeof AdminMatchManagementModal>[0];
+    let resolveExtension!: (result: {
+      status: "success";
+      message: string;
+    }) => void;
+    const extensionResult = new Promise<{
+      status: "success";
+      message: string;
+    }>((resolve) => {
+      resolveExtension = resolve;
+    });
+    extendTournamentMatchDeadlineMock.mockReturnValueOnce(extensionResult);
+    const onClose = vi.fn();
+
+    render(
+      <AdminMatchManagementModal
+        tournament={
+          {
+            title: "Pending Adjudication Cup",
+          } as ModalProps["tournament"]
+        }
+        match={matchFixture()}
+        bracketFormat="single_elimination"
+        participantsById={participants(participantOne, participantTwo)}
+        viewer={
+          {
+            isAdmin: true,
+            relicVerifiedDivision: null,
+            registrationIds: [],
+            registrations: [],
+          } as ModalProps["viewer"]
+        }
+        submissions={[]}
+        reportGroups={[]}
+        onClose={onClose}
+      />
+    );
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Direct Match Management Pending Adjudication Cup",
+    });
+    const applyExtension = await within(dialog).findByRole("button", {
+      name: "Apply One-Time Extension",
+    });
+    fireEvent.change(within(dialog).getByLabelText("Administrator reason"), {
+      target: { value: "Accessibility pending-state check" },
+    });
+    applyExtension.focus();
+    fireEvent.submit(applyExtension.closest("form") as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(extendTournamentMatchDeadlineMock).toHaveBeenCalledOnce();
+      expect(dialog).toHaveAttribute("aria-busy", "true");
+    });
+    const closeButton = within(dialog).getByRole("button", {
+      name: "Close match management",
+    });
+    const backdrop = dialog.parentElement?.querySelector<HTMLElement>(
+      "[data-admin-match-dialog-backdrop]"
+    );
+    expect(closeButton).toBeDisabled();
+    const pendingFocusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), select:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), a[href], [tabindex]'
+      )
+    ).filter((element) => element.tabIndex >= 0);
+    expect(pendingFocusable).not.toContain(applyExtension);
+    expect(pendingFocusable[0]).toBe(
+      within(dialog).getByLabelText("Extension minutes")
+    );
+    expect(fireEvent.keyDown(window, { key: "Tab" })).toBe(false);
+    expect(within(dialog).getByLabelText("Extension minutes")).toHaveFocus();
+    fireEvent.click(closeButton);
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.mouseDown(backdrop as HTMLElement);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBe(dialog);
+
+    await act(async () => {
+      resolveExtension({
+        status: "success",
+        message: "The match deadline was extended.",
+      });
+      await extensionResult;
+    });
+    await waitFor(() => {
+      expect(dialog).toHaveAttribute("aria-busy", "false");
+      expect(closeButton).toBeEnabled();
+    });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("names the dynamic-viewport player workspace and restores its opener focus", () => {

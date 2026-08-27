@@ -1419,7 +1419,7 @@ function Brackets({
                 </div>
                 <p className="mt-1 text-sm text-zinc-400">
                   {generated
-                    ? t("bracketSummary.emptySlots", {
+                    ? t("bracketSummary.playerSlots", {
                         format: formatCompetitionFormat(generated.format, t),
                         count: formatNumber(generated.slotCount, locale),
                       })
@@ -1856,6 +1856,16 @@ export function AdminMatchManagementModal({
 }) {
   const portalRoot =
     typeof document === "undefined" ? null : document.body;
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const eyebrowId = useId();
+  const titleId = useId();
+  const descriptionId = useId();
+  const [pendingActions, setPendingActions] = useState<Set<string>>(
+    () => new Set()
+  );
   const displayMatch = toDisplayMatch(match, participantsById);
   const playerOne = match.playerOneRegistrationId
     ? participantsById.get(match.playerOneRegistrationId)
@@ -1886,19 +1896,94 @@ export function AdminMatchManagementModal({
     !activeReportGroup &&
     !hasPendingSubmission;
 
+  const handlePendingChange = useCallback(
+    (key: string, isPending: boolean) => {
+      setPendingActions((current) => {
+        if (current.has(key) === isPending) return current;
+        const next = new Set(current);
+        if (isPending) {
+          next.add(key);
+        } else {
+          next.delete(key);
+        }
+        return next;
+      });
+    },
+    []
+  );
+  const actionPending = pendingActions.size > 0;
   useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const requestClose = useCallback(() => {
+    const dialogPending =
+      dialogRef.current?.getAttribute("aria-busy") === "true";
+    const formPending = dialogRef.current?.querySelector(
+      '[aria-busy="true"]'
+    );
+    if (!dialogPending && !formPending) onCloseRef.current();
+  }, []);
+
+  useEffect(() => {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+        ? document.activeElement
+        : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    window.addEventListener("keydown", closeOnEscape);
+    closeButtonRef.current?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
+      if (openerRef.current?.isConnected) openerRef.current.focus();
     };
-  }, [onClose]);
+  }, []);
+
+  useEffect(() => {
+    const handleDialogKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        requestClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), select:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), a[href], [tabindex]'
+        ) ?? []
+      ).filter((element) => element.tabIndex >= 0);
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+      const activeElement = document.activeElement;
+      const focusIsOutsideSequence =
+        !(activeElement instanceof HTMLElement) ||
+        !focusable.includes(activeElement);
+
+      if (
+        event.shiftKey &&
+        (activeElement === first || focusIsOutsideSequence)
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (activeElement === last || focusIsOutsideSequence)
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleDialogKeyDown);
+    return () => window.removeEventListener("keydown", handleDialogKeyDown);
+  }, [requestClose]);
 
   if (!portalRoot) {
     return null;
@@ -1907,19 +1992,26 @@ export function AdminMatchManagementModal({
   return createPortal(
     <AnimatePresence>
       <div className="fixed inset-0 z-[10000] grid place-items-center p-3 sm:p-6">
-        <motion.button
-          type="button"
-          aria-label="Close match management"
-          onClick={onClose}
+        <motion.div
+          aria-hidden="true"
+          data-admin-match-dialog-backdrop
+          onMouseDown={(event) => {
+            event.preventDefault();
+            requestClose();
+          }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="absolute inset-0 h-full w-full cursor-default bg-black/85 backdrop-blur-md"
         />
         <motion.section
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-labelledby={`admin-match-${match.id}`}
+          aria-labelledby={`${eyebrowId} ${titleId}`}
+          aria-describedby={descriptionId}
+          aria-busy={actionPending}
+          tabIndex={-1}
           initial={{ opacity: 0, scale: 0.96, y: 18 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 12 }}
@@ -1930,23 +2022,31 @@ export function AdminMatchManagementModal({
             <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.9)]" />
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-300">
+                <p
+                  id={eyebrowId}
+                  className="text-xs font-black uppercase tracking-[0.28em] text-orange-300"
+                >
                   {readOnly ? "Read-Only Match History" : "Direct Match Management"}
                 </p>
                 <h2
-                  id={`admin-match-${match.id}`}
+                  id={titleId}
                   className="mt-2 break-words text-2xl font-black text-white"
                 >
                   {tournament.title}
                 </h2>
-                <p className="mt-2 text-sm text-zinc-400">
+                <p
+                  id={descriptionId}
+                  className="mt-2 text-sm text-zinc-400"
+                >
                   {match.roundName} - Match {match.matchNumber}
                 </p>
               </div>
               <button
+                ref={closeButtonRef}
                 type="button"
-                onClick={onClose}
-                className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
+                onClick={requestClose}
+                disabled={actionPending}
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-3 text-zinc-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 disabled:cursor-wait disabled:opacity-50"
                 aria-label="Close match management"
               >
                 <X size={20} />
@@ -2038,6 +2138,7 @@ export function AdminMatchManagementModal({
                       match={match}
                       isAdmin={!readOnly && viewer.isAdmin}
                       participantsById={participantsById}
+                      onPendingChange={handlePendingChange}
                     />
                   ))}
                   {submissions.length > 0 && (
@@ -2045,6 +2146,7 @@ export function AdminMatchManagementModal({
                       match={match}
                       submissions={submissions}
                       participantsById={participantsById}
+                      onPendingChange={handlePendingChange}
                     />
                   )}
                   {reportGroups.length === 0 && submissions.length === 0 && (
@@ -2069,7 +2171,10 @@ export function AdminMatchManagementModal({
 
             {!readOnly && deadlineManaged && (
               <div className="mt-5 w-full max-w-full min-w-0">
-                <AdminMatchDeadlineControls match={match} />
+                <AdminMatchDeadlineControls
+                  match={match}
+                  onPendingChange={handlePendingChange}
+                />
               </div>
             )}
 
@@ -2084,6 +2189,7 @@ export function AdminMatchManagementModal({
                     match={match}
                     playerOneName={playerOne?.name ?? "Player 1"}
                     playerTwoName={playerTwo?.name ?? "Player 2"}
+                    onPendingChange={handlePendingChange}
                   />
                 ) : (
                   <div>
@@ -2106,7 +2212,10 @@ export function AdminMatchManagementModal({
               </div>
 
               <div className="min-w-0 max-w-full">
-                <AdminResetMatchForm match={match} />
+                <AdminResetMatchForm
+                  match={match}
+                  onPendingChange={handlePendingChange}
+                />
               </div>
               </div>
             )}
@@ -3099,6 +3208,12 @@ type RegistrationStep =
   | "agreements"
   | "submitted";
 
+export type RegistrationPresentation = "phone" | "desktop";
+
+type RegistrationSubmissionOutcome =
+  | { kind: "registration" }
+  | { kind: "waitlist"; position: string | number | null };
+
 export type RelicVerifiedDivision =
   | "Academy"
   | "Challenge"
@@ -3192,7 +3307,7 @@ type RegistrationFormState = {
 };
 
 type RegistrationErrors = Partial<
-  Record<keyof RegistrationFormState | "agreements", string>
+  Record<keyof RegistrationFormState | "agreements" | "profile", string>
 >;
 
 type RegistrationPlayerProfile = Pick<
@@ -3215,6 +3330,8 @@ export function RegisterModal({
   initialTournamentId,
   verifiedDivision,
   registrationDocuments,
+  viewerRegistrations = [],
+  presentation = "desktop",
 }: {
   onClose: () => void;
   onLocaleGate?: () => void;
@@ -3223,10 +3340,23 @@ export function RegisterModal({
   initialTournamentId: string;
   verifiedDivision: RelicVerifiedDivision | null;
   registrationDocuments: RegistrationDocumentSet;
+  viewerRegistrations?: TournamentViewerRegistration[];
+  presentation?: RegistrationPresentation;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
   const router = useRouter();
+  const dialogTitleId = useId();
+  const dialogDescriptionId = useId();
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const dialogBodyRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const stepHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const isSubmittingRef = useRef(false);
+  const initialStepRef = useRef(true);
+  const portalRoot = typeof document === "undefined" ? null : document.body;
+  const isPhonePresentation = presentation === "phone";
   const initialTournament =
     tournaments.find((tournament) => tournament.id === initialTournamentId) ??
     tournaments[0];
@@ -3248,6 +3378,9 @@ export function RegisterModal({
   const [successMessage, setSuccessMessage] = useState(
     t("registrationServer.submitted")
   );
+  const [submissionOutcome, setSubmissionOutcome] =
+    useState<RegistrationSubmissionOutcome | null>(null);
+  const [showTournamentChoices, setShowTournamentChoices] = useState(false);
   const [selectedTournament, setSelectedTournament] =
     useState<TournamentCard>(initialTournament);
   const [form, setForm] = useState<RegistrationFormState>({
@@ -3260,6 +3393,102 @@ export function RegisterModal({
     age18Confirmation: false,
     accountAndSteamOwnershipConfirmation: false,
   });
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    isSubmittingRef.current = isSubmitting;
+  }, [isSubmitting]);
+
+  const requestClose = useCallback(() => {
+    if (!isSubmittingRef.current) {
+      onCloseRef.current();
+    }
+  }, []);
+
+  useEffect(() => {
+    const opener =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+        ? document.activeElement
+        : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleDialogKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        requestClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])"
+        ) ?? []
+      ).filter((element) => {
+        const style = window.getComputedStyle(element);
+        return (
+          element.tabIndex >= 0 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden"
+        );
+      });
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+
+      const activeElement = document.activeElement;
+      const focusIsOutsideSequence =
+        !(activeElement instanceof HTMLElement) ||
+        !focusable.includes(activeElement);
+
+      if (
+        event.shiftKey &&
+        (activeElement === first || focusIsOutsideSequence)
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (activeElement === last || focusIsOutsideSequence)
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleDialogKeyDown);
+    const focusFrame = window.requestAnimationFrame(() => {
+      closeButtonRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleDialogKeyDown);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [requestClose]);
+
+  useEffect(() => {
+    if (initialStepRef.current) {
+      initialStepRef.current = false;
+      return;
+    }
+
+    if (dialogBodyRef.current) {
+      dialogBodyRef.current.scrollTop = 0;
+    }
+    const focusFrame = window.requestAnimationFrame(() => {
+      stepHeadingRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [step]);
 
   const updateField = <K extends keyof RegistrationFormState>(field: K, value: RegistrationFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -3284,6 +3513,7 @@ export function RegisterModal({
 
   const selectTournament = (event: TournamentCard) => {
     setSelectedTournament(event);
+    setShowTournamentChoices(false);
     setWaitlistConfirmationRequired(false);
     setSubmissionError("");
     setForm((current) => ({
@@ -3384,7 +3614,27 @@ export function RegisterModal({
       }
     }
 
+    if (targetStep === "profile") {
+      if (!profile.profile_completed) {
+        nextErrors.profile = t("registrationServer.profileRequired");
+      } else if (!verifiedDivision) {
+        nextErrors.profile = t(
+          "registrationModal.errors.verifiedDivisionRequired"
+        );
+      }
+    }
+
     setErrors(nextErrors);
+    const firstInvalidField = Object.keys(nextErrors)[0];
+    if (firstInvalidField) {
+      window.requestAnimationFrame(() => {
+        dialogRef.current
+          ?.querySelector<HTMLElement>(
+            `[data-registration-field="${firstInvalidField}"]`
+          )
+          ?.focus();
+      });
+    }
     return Object.keys(nextErrors).length === 0;
   };
 
@@ -3401,6 +3651,8 @@ export function RegisterModal({
   };
 
   const submitRegistration = async () => {
+    if (isSubmittingRef.current) return;
+
     const registrationAvailability = getRegistrationDivisionAvailability(
       selectedTournament,
       verifiedDivision
@@ -3433,33 +3685,43 @@ export function RegisterModal({
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setSubmissionError("");
 
-    const result = await submitTournamentRegistration({
-      tournamentId: selectedTournament.id,
-      bracketId:
-        selectedTournament.brackets.find(
-          (bracket) => bracket.name === form.bracketName
-        )?.id ?? "",
-      tournamentTitle: form.tournamentTitle,
-      bracketName: form.bracketName,
-      rulebookDocumentId: registrationDocuments.rulebook.id,
-      ppaDocumentId: registrationDocuments.ppa.id,
-      termsDocumentId: registrationDocuments.terms.id,
-      privacyDocumentId: registrationDocuments.privacy.id,
-      rulebookAgreement: form.rulebookAgreement,
-      playerParticipationAgreement: form.playerParticipationAgreement,
-      termsAgreement: form.termsAgreement,
-      privacyAcknowledgement: form.privacyAcknowledgement,
-      age18Confirmation: form.age18Confirmation,
-      accountAndSteamOwnershipConfirmation:
-        form.accountAndSteamOwnershipConfirmation,
-      waitlistConfirmed:
-        registrationAvailability === "waitlist" ||
-        waitlistConfirmationRequired,
-    });
+    let result: TournamentRegistrationResult;
+    try {
+      result = await submitTournamentRegistration({
+        tournamentId: selectedTournament.id,
+        bracketId:
+          selectedTournament.brackets.find(
+            (bracket) => bracket.name === form.bracketName
+          )?.id ?? "",
+        tournamentTitle: form.tournamentTitle,
+        bracketName: form.bracketName,
+        rulebookDocumentId: registrationDocuments.rulebook.id,
+        ppaDocumentId: registrationDocuments.ppa.id,
+        termsDocumentId: registrationDocuments.terms.id,
+        privacyDocumentId: registrationDocuments.privacy.id,
+        rulebookAgreement: form.rulebookAgreement,
+        playerParticipationAgreement: form.playerParticipationAgreement,
+        termsAgreement: form.termsAgreement,
+        privacyAcknowledgement: form.privacyAcknowledgement,
+        age18Confirmation: form.age18Confirmation,
+        accountAndSteamOwnershipConfirmation:
+          form.accountAndSteamOwnershipConfirmation,
+        waitlistConfirmed:
+          registrationAvailability === "waitlist" ||
+          waitlistConfirmationRequired,
+      });
+    } catch {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+      setSubmissionError(t("registrationServer.failed"));
+      return;
+    }
 
+    isSubmittingRef.current = false;
     setIsSubmitting(false);
 
     if (!result.success) {
@@ -3469,9 +3731,11 @@ export function RegisterModal({
         return;
       }
 
-      setSubmissionError(getRegistrationResultMessage(result, t));
       if (result.requiresWaitlistConfirmation) {
         setWaitlistConfirmationRequired(true);
+        setSubmissionError("");
+      } else {
+        setSubmissionError(getRegistrationResultMessage(result, t));
       }
       return;
     }
@@ -3479,6 +3743,14 @@ export function RegisterModal({
     router.refresh();
     setStep("submitted");
     setSuccessMessage(getRegistrationResultMessage(result, t));
+    setSubmissionOutcome(
+      result.code === "WAITLIST_SUBMITTED"
+        ? {
+            kind: "waitlist",
+            position: result.values?.position ?? null,
+          }
+        : { kind: "registration" }
+    );
   };
 
   const steps: RegistrationStep[] = [
@@ -3497,41 +3769,301 @@ export function RegisterModal({
   );
   const waitlistSubmission =
     registrationAvailability === "waitlist" || waitlistConfirmationRequired;
+  const selectedBracket = selectedTournament.brackets.find(
+    (bracket) => bracket.name === form.bracketName
+  );
+  const refreshedWaitlistPosition =
+    viewerRegistrations.find(
+      (registration) =>
+        registration.tournamentId === selectedTournament.id &&
+        registration.tournamentBracketId === selectedBracket?.id &&
+        registration.status === "waitlisted"
+    )?.waitlistPosition ?? null;
+  const displayedWaitlistPosition =
+    submissionOutcome?.kind === "waitlist"
+      ? submissionOutcome.position ?? refreshedWaitlistPosition
+      : null;
+  const profileReady = profile.profile_completed === true;
+  // profile_completed is derived from the protected Steam identity link.
+  const steamConnected = profileReady;
+  const divisionReady = Boolean(verifiedDivision && selectedBracket);
+  const playerReadinessComplete =
+    profileReady && steamConnected && divisionReady;
+  const eligibleTournaments = tournaments.filter((tournament) => {
+    const availability = getRegistrationDivisionAvailability(
+      tournament,
+      verifiedDivision
+    );
+    return (
+      (availability === "open" || availability === "waitlist") &&
+      Boolean(getVerifiedBracket(tournament))
+    );
+  });
 
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 px-4 py-6">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto border border-orange-500/25 bg-[linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-2xl shadow-black/50">
-        <div className="sticky top-0 z-10 border-b border-white/10 bg-black/90 p-5 backdrop-blur">
+  if (!portalRoot) return null;
+
+  return createPortal(
+    <div
+      className={classNames(
+        "fixed inset-0 z-[9999] grid place-items-center bg-black/85",
+        isPhonePresentation
+          ? "p-0"
+          : "px-4 py-6 [padding-bottom:max(1.5rem,env(safe-area-inset-bottom))] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] [padding-top:max(1.5rem,env(safe-area-inset-top))]"
+      )}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) requestClose();
+      }}
+    >
+      <section
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        aria-describedby={dialogDescriptionId}
+        aria-busy={isSubmitting}
+        className={classNames(
+          "relative flex w-full max-w-3xl flex-col overflow-hidden border border-orange-500/25 bg-[linear-gradient(145deg,rgba(12,12,12,0.98),rgba(0,0,0,0.99))] shadow-2xl shadow-black/50",
+          isPhonePresentation ? "h-[100dvh] border-x-0" : "max-h-[92dvh]"
+        )}
+      >
+        <header
+          className={classNames(
+            "z-10 shrink-0 border-b border-white/10 bg-black/90 backdrop-blur",
+            isPhonePresentation
+              ? "px-4 pb-3 [padding-top:max(0.75rem,env(safe-area-inset-top))]"
+              : "p-5"
+          )}
+        >
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-300">
                 {t("registrationModal.eyebrow")}
               </p>
-              <h3 className="mt-1 break-words text-2xl font-black text-white">
+              <h2
+                id={dialogTitleId}
+                className={classNames(
+                  "mt-1 break-words font-black text-white",
+                  isPhonePresentation ? "text-xl" : "text-2xl"
+                )}
+              >
                 {t("registrationModal.title")}
-              </h3>
+              </h2>
+              <p id={dialogDescriptionId} className="sr-only">
+                {t("registrationModal.dialogDescription")}
+              </p>
             </div>
             <button
+              ref={closeButtonRef}
+              type="button"
               aria-label={t("registrationModal.closeAria")}
-              onClick={onClose}
-              className="shrink-0 rounded bg-slate-800 p-2 text-zinc-200 transition hover:bg-slate-700"
+              disabled={isSubmitting}
+              onClick={requestClose}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded bg-slate-800 text-zinc-200 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <X size={18} />
             </button>
           </div>
 
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.min((currentStepNumber / steps.length) * 100, 100)}%` }} />
+          <div
+            role="progressbar"
+            aria-label={t("registrationModal.stepProgress", {
+              current: currentStepNumber,
+              total: steps.length,
+            })}
+            aria-valuemin={1}
+            aria-valuemax={steps.length}
+            aria-valuenow={currentStepNumber}
+            className={classNames(
+              "h-2 overflow-hidden rounded-full bg-white/10",
+              isPhonePresentation ? "mt-3" : "mt-4"
+            )}
+          >
+            <div
+              className="h-full rounded-full bg-orange-500 transition-all duration-300"
+              style={{
+                width: `${Math.min(
+                  (currentStepNumber / steps.length) * 100,
+                  100
+                )}%`,
+              }}
+            />
           </div>
-        </div>
+        </header>
 
-        <div className="p-5">
-          {step === "tournament" && (
+        <div
+          ref={dialogBodyRef}
+          className={classNames(
+            "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+            isPhonePresentation ? "p-4" : "p-5"
+          )}
+        >
+          {step === "tournament" && isPhonePresentation && (
+            <div className="space-y-4" data-registration-phone-step="tournament">
+              <div>
+                <h3
+                  ref={stepHeadingRef}
+                  tabIndex={-1}
+                  className="text-lg font-black text-white outline-none"
+                >
+                  {t("registrationModal.selectedTournament")}
+                </h3>
+                <p className="mt-1 text-sm leading-5 text-zinc-400">
+                  {t("registrationModal.dialogDescription")}
+                </p>
+              </div>
+
+              <section
+                aria-label={t("registrationModal.selectedTournament")}
+                className={classNames("p-4", tournamentInsetCardClass)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words text-lg font-black text-white">
+                      {selectedTournament.title}
+                    </p>
+                    <p className="mt-1 break-words text-sm font-bold text-orange-200">
+                      {form.bracketName || t("registrationModal.notSelected")}
+                    </p>
+                  </div>
+                  <span
+                    className={classNames(
+                      "shrink-0 border px-2 py-1 text-[10px] font-black uppercase tracking-wider",
+                      registrationAvailability === "waitlist"
+                        ? "border-amber-400/45 bg-amber-500/10 text-amber-200"
+                        : registrationAvailability === "open"
+                          ? "border-emerald-400/45 bg-emerald-500/10 text-emerald-200"
+                          : "border-zinc-600 bg-zinc-900 text-zinc-300"
+                    )}
+                  >
+                    {registrationAvailability === "waitlist"
+                      ? t("registrationModal.waitlistOnly")
+                      : registrationAvailability === "open"
+                        ? t("tournaments.status.open")
+                        : t("tournaments.actions.registrationClosed")}
+                  </span>
+                </div>
+
+                {selectedBracket && (
+                  <p className="mt-3 break-words border-t border-white/10 pt-3 text-sm leading-5 text-zinc-300">
+                    {t("registrationModal.cohortSummary", {
+                      requirement: selectedBracket.requirement,
+                      active: formatNumber(
+                        selectedBracket.activeCohortPlayers,
+                        locale
+                      ),
+                      capacity: formatNumber(
+                        selectedBracket.activeCohortSize,
+                        locale
+                      ),
+                      waitlisted: formatNumber(
+                        selectedBracket.waitlistedPlayers,
+                        locale
+                      ),
+                    })}
+                  </p>
+                )}
+              </section>
+
+              {eligibleTournaments.length > 1 && (
+                <div>
+                  <button
+                    type="button"
+                    aria-expanded={showTournamentChoices}
+                    aria-controls="registration-tournament-choices"
+                    onClick={() =>
+                      setShowTournamentChoices((current) => !current)
+                    }
+                    className="flex min-h-11 w-full items-center justify-between gap-3 border border-white/12 bg-white/[0.04] px-4 py-3 text-left text-sm font-black text-orange-200 transition hover:border-orange-400/50 hover:bg-orange-500/10"
+                  >
+                    {t("registrationModal.changeTournament")}
+                    <ChevronDown
+                      aria-hidden="true"
+                      size={18}
+                      className={classNames(
+                        "shrink-0 transition-transform",
+                        showTournamentChoices && "rotate-180"
+                      )}
+                    />
+                  </button>
+                  {showTournamentChoices && (
+                    <div
+                      id="registration-tournament-choices"
+                      className="mt-2 space-y-2"
+                    >
+                      {eligibleTournaments.map((event) => {
+                        const availability =
+                          getRegistrationDivisionAvailability(
+                            event,
+                            verifiedDivision
+                          );
+                        const selected = selectedTournament.id === event.id;
+                        return (
+                          <button
+                            type="button"
+                            key={event.id}
+                            aria-pressed={selected}
+                            onClick={() => selectTournament(event)}
+                            className={classNames(
+                              "min-h-11 w-full border px-4 py-3 text-left transition",
+                              selected
+                                ? "border-orange-400 bg-orange-500/15"
+                                : "border-white/12 bg-black/45 hover:border-orange-400/45"
+                            )}
+                          >
+                            <span className="block break-words text-sm font-black text-white">
+                              {event.title}
+                            </span>
+                            <span className="mt-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">
+                              {getVerifiedBracket(event)} ·{" "}
+                              {availability === "waitlist"
+                                ? t("registrationModal.waitlistOnly")
+                                : localizeTournamentStatus(event.status, t)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(!verifiedDivision || !selectedBracket) && (
+                <div
+                  role="alert"
+                  data-registration-field="bracketName"
+                  tabIndex={-1}
+                  className="border border-orange-500/40 bg-orange-500/10 p-4 outline-none"
+                >
+                  <p className="text-sm font-bold text-orange-200">
+                    {t("registrationModal.errors.verifiedDivisionRequired")}
+                  </p>
+                  <Link
+                    href="/profile"
+                    className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-orange-300 transition hover:text-orange-200"
+                  >
+                    {t("tournaments.actions.openProfile")}
+                  </Link>
+                </div>
+              )}
+              {errors.tournamentTitle && (
+                <FieldError message={errors.tournamentTitle} />
+              )}
+              {errors.bracketName && verifiedDivision && (
+                <FieldError message={errors.bracketName} />
+              )}
+            </div>
+          )}
+
+          {step === "tournament" && !isPhonePresentation && (
             <div className="space-y-5">
               <div>
-                <h4 className="text-xl font-black text-white">
+                <h3
+                  ref={stepHeadingRef}
+                  tabIndex={-1}
+                  className="text-xl font-black text-white outline-none"
+                >
                   {t("registrationModal.tournamentSelection")}
-                </h4>
+                </h3>
                 <p className="mt-2 text-sm leading-6 text-zinc-300">
                   {t("registrationModal.tournamentSelectionDescription")}
                 </p>
@@ -3695,24 +4227,108 @@ export function RegisterModal({
                 {errors.bracketName && <FieldError message={errors.bracketName} />}
               </div>
 
-              <ModalButtons
-                onClose={onClose}
-                onNext={goToProfileStep}
-                isDisabled={
-                  !verifiedBracketAvailable ||
-                  registrationAvailability === "closed" ||
-                  registrationAvailability === "launched"
-                }
-              />
             </div>
           )}
 
-          {step === "profile" && (
+          {step === "profile" && isPhonePresentation && (
+            <div className="space-y-4" data-registration-phone-step="readiness">
+              <div>
+                <h3
+                  ref={stepHeadingRef}
+                  tabIndex={-1}
+                  className="text-lg font-black text-white outline-none"
+                >
+                  {t("registrationModal.readinessTitle")}
+                </h3>
+                <p className="mt-1 text-sm leading-5 text-zinc-400">
+                  {t("registrationModal.profileDescription")}
+                </p>
+              </div>
+
+              <ul className="space-y-2" aria-label={t("registrationModal.readinessTitle")}>
+                <RegistrationReadinessItem
+                  ready={profileReady}
+                  label={t("registrationModal.profileReady")}
+                />
+                <RegistrationReadinessItem
+                  ready={steamConnected}
+                  label={t("registrationModal.steamConnected")}
+                />
+                <RegistrationReadinessItem
+                  ready={divisionReady}
+                  label={`${t("registrationModal.verifiedDivision")}: ${
+                    form.bracketName || t("registrationModal.notSelected")
+                  }`}
+                />
+              </ul>
+
+              <div className="flex gap-3 border border-emerald-500/35 bg-emerald-950/20 p-3">
+                <Info
+                  aria-hidden="true"
+                  size={18}
+                  className="mt-0.5 shrink-0 text-emerald-300"
+                />
+                <p className="text-sm leading-5 text-zinc-200">
+                  {t("registrationModal.relicVerificationOnSubmit")}
+                </p>
+              </div>
+
+              <details className="group border border-white/12 bg-black/35">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-orange-200 marker:content-none">
+                  {t("registrationModal.reviewSavedDetails")}
+                  <ChevronDown
+                    aria-hidden="true"
+                    size={18}
+                    className="shrink-0 transition-transform group-open:rotate-180"
+                  />
+                </summary>
+                <div className="grid gap-2 border-t border-white/10 p-3 sm:grid-cols-2">
+                  <RegistrationProfileValue label={t("registrationModal.displayName")} value={profile.display_name} />
+                  <RegistrationProfileValue label={t("registrationModal.ign")} value={profile.in_game_name} />
+                  <RegistrationProfileValue label={t("registrationModal.discordOptional")} value={profile.discord_username} />
+                  <RegistrationProfileValue label={t("registrationModal.steam")} value={profile.steam_username} />
+                  <RegistrationProfileValue label={t("registrationModal.country")} value={profile.country} />
+                  <RegistrationProfileValue label={t("registrationModal.region")} value={profile.region} />
+                  <RegistrationProfileValue label={t("registrationModal.timezone")} value={profile.timezone} />
+                </div>
+              </details>
+
+              {!playerReadinessComplete && (
+                <div
+                  role="alert"
+                  data-registration-field="profile"
+                  tabIndex={-1}
+                  className="border border-orange-500/40 bg-orange-500/10 p-4 outline-none"
+                >
+                  <p className="text-sm font-bold text-orange-200">
+                    {!profileReady
+                      ? t("registrationServer.profileRequired")
+                      : t("registrationModal.errors.verifiedDivisionRequired")}
+                  </p>
+                  <Link
+                    href="/profile"
+                    className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-orange-300 transition hover:text-orange-200"
+                  >
+                    {t("tournaments.actions.openProfile")}
+                  </Link>
+                </div>
+              )}
+              {errors.profile && playerReadinessComplete === false && (
+                <FieldError message={errors.profile} />
+              )}
+            </div>
+          )}
+
+          {step === "profile" && !isPhonePresentation && (
             <div className="space-y-5">
               <div>
-                <h4 className="text-xl font-black text-white">
+                <h3
+                  ref={stepHeadingRef}
+                  tabIndex={-1}
+                  className="text-xl font-black text-white outline-none"
+                >
                   {t("registrationModal.profileTitle")}
-                </h4>
+                </h3>
                 <p className="mt-2 text-sm leading-6 text-zinc-300">
                   {t("registrationModal.profileDescription")}
                 </p>
@@ -3743,23 +4359,43 @@ export function RegisterModal({
 
               <Link href="/profile" className="inline-flex text-sm font-bold text-orange-300 transition hover:text-orange-200">{t("registrationModal.updateProfile")}</Link>
 
-              <ModalButtons onBack={() => setStep("tournament")} onNext={goToAgreementsStep} />
             </div>
           )}
 
           {step === "agreements" && (
-            <div className="space-y-5">
+            <div
+              className={classNames(
+                isPhonePresentation ? "space-y-4" : "space-y-5"
+              )}
+              data-registration-phone-step={
+                isPhonePresentation ? "agreements" : undefined
+              }
+            >
               <div>
-                <h4 className="text-xl font-black text-white">
+                <h3
+                  ref={stepHeadingRef}
+                  tabIndex={-1}
+                  className={classNames(
+                    "font-black text-white outline-none",
+                    isPhonePresentation ? "text-lg" : "text-xl"
+                  )}
+                >
                   {t("registrationModal.agreementsTitle")}
-                </h4>
-                <p className="mt-2 text-sm leading-6 text-zinc-300">
+                </h3>
+                <p
+                  className={classNames(
+                    "mt-2 text-sm text-zinc-300",
+                    isPhonePresentation ? "leading-5" : "leading-6"
+                  )}
+                >
                   {t("registrationModal.agreementsDescription")}
                 </p>
               </div>
 
-              <div className="space-y-3">
+              <div className={isPhonePresentation ? "space-y-2" : "space-y-3"}>
                 <AgreementCheckbox
+                  field="playerParticipationAgreement"
+                  compact={isPhonePresentation}
                   label={
                     <DocumentAgreementLabel
                       prefix={t("registrationModal.acceptPrefix")}
@@ -3774,6 +4410,8 @@ export function RegisterModal({
                   error={errors.playerParticipationAgreement}
                 />
                 <AgreementCheckbox
+                  field="rulebookAgreement"
+                  compact={isPhonePresentation}
                   label={
                     <DocumentAgreementLabel
                       prefix={t("registrationModal.acceptPrefix")}
@@ -3788,6 +4426,8 @@ export function RegisterModal({
                   error={errors.rulebookAgreement}
                 />
                 <AgreementCheckbox
+                  field="termsAgreement"
+                  compact={isPhonePresentation}
                   label={
                     <DocumentAgreementLabel
                       prefix={t("registrationModal.acceptPrefix")}
@@ -3800,6 +4440,8 @@ export function RegisterModal({
                   error={errors.termsAgreement}
                 />
                 <AgreementCheckbox
+                  field="privacyAcknowledgement"
+                  compact={isPhonePresentation}
                   label={
                     <DocumentAgreementLabel
                       prefix={t("registrationModal.acknowledgePrefix")}
@@ -3812,12 +4454,16 @@ export function RegisterModal({
                   error={errors.privacyAcknowledgement}
                 />
                 <AgreementCheckbox
+                  field="age18Confirmation"
+                  compact={isPhonePresentation}
                   label={t("registrationModal.ageConfirmation")}
                   checked={form.age18Confirmation}
                   onChange={(checked) => updateField("age18Confirmation", checked)}
                   error={errors.age18Confirmation}
                 />
                 <AgreementCheckbox
+                  field="accountAndSteamOwnershipConfirmation"
+                  compact={isPhonePresentation}
                   label={t("registrationModal.ownershipConfirmation")}
                   checked={form.accountAndSteamOwnershipConfirmation}
                   onChange={(checked) => updateField("accountAndSteamOwnershipConfirmation", checked)}
@@ -3840,33 +4486,104 @@ export function RegisterModal({
               )}
 
               {submissionError && (
-                <div className="whitespace-pre-line border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200">
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="whitespace-pre-line border border-orange-500/50 bg-orange-500/10 p-4 text-sm font-bold text-orange-200"
+                >
                   {submissionError}
                 </div>
               )}
-
-              <ModalButtons onBack={() => setStep("profile")} onNext={submitRegistration} nextLabel={waitlistSubmission ? t("tournaments.actions.joinWaitlist") : t("registrationModal.submitRegistration")} isLoading={isSubmitting} />
             </div>
           )}
 
           {step === "submitted" && (
-            <div className="grid place-items-center py-10 text-center">
+            <div
+              role="status"
+              aria-live="polite"
+              className={classNames(
+                "grid place-items-center text-center",
+                isPhonePresentation ? "py-6" : "py-10"
+              )}
+            >
               <div className="grid h-16 w-16 place-items-center rounded-full border border-emerald-400/70 bg-emerald-950/40 shadow-[0_0_32px_rgba(16,185,129,0.35)]">
                 <CheckCircle2 className="text-emerald-300" size={30} />
               </div>
-              <h4 className="mt-5 text-2xl font-black text-white">
-                {t("registrationModal.submittedTitle")}
-              </h4>
-              <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">{successMessage}</p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-300">
-                {t("registrationModal.reviewTime")}
+              <h3
+                ref={stepHeadingRef}
+                tabIndex={-1}
+                className="mt-5 text-2xl font-black text-white outline-none"
+              >
+                {submissionOutcome?.kind === "waitlist"
+                  ? t("registrationModal.waitlistJoinedTitle")
+                  : t("registrationModal.submittedTitle")}
+              </h3>
+              <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">
+                {submissionOutcome?.kind === "waitlist" &&
+                displayedWaitlistPosition !== null
+                  ? t("registrationServer.waitlistSubmittedPosition", {
+                      position: displayedWaitlistPosition,
+                    })
+                  : submissionOutcome?.kind === "waitlist"
+                    ? t("registrationModal.waitlistPositionPending")
+                    : successMessage}
               </p>
-              <button onClick={onClose} className="mt-6 rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400">{t("tournaments.actions.close")}</button>
+              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-300">
+                {submissionOutcome?.kind === "waitlist"
+                  ? t("registrationModal.waitlistResultDescription")
+                  : t("registrationModal.reviewTime")}
+              </p>
             </div>
           )}
         </div>
-      </div>
-    </div>
+
+        {step === "tournament" && (
+          <ModalButtons
+            persistent={isPhonePresentation}
+            onClose={requestClose}
+            onNext={goToProfileStep}
+            isLoading={isSubmitting}
+            isDisabled={
+              !verifiedBracketAvailable ||
+              registrationAvailability === "closed" ||
+              registrationAvailability === "launched"
+            }
+          />
+        )}
+        {step === "profile" && (
+          <ModalButtons
+            persistent={isPhonePresentation}
+            onBack={() => setStep("tournament")}
+            onNext={goToAgreementsStep}
+            isLoading={isSubmitting}
+            isDisabled={!playerReadinessComplete}
+          />
+        )}
+        {step === "agreements" && (
+          <ModalButtons
+            persistent={isPhonePresentation}
+            onBack={() => setStep("profile")}
+            onNext={submitRegistration}
+            nextLabel={
+              waitlistSubmission
+                ? t("tournaments.actions.joinWaitlist")
+                : isPhonePresentation
+                  ? t("tournaments.actions.register")
+                  : t("registrationModal.submitRegistration")
+            }
+            isLoading={isSubmitting}
+          />
+        )}
+        {step === "submitted" && (
+          <ModalButtons
+            persistent={isPhonePresentation}
+            onNext={requestClose}
+            nextLabel={t("tournaments.actions.close")}
+          />
+        )}
+      </section>
+    </div>,
+    portalRoot
   );
 }
 
@@ -3911,10 +4628,52 @@ function getRegistrationResultMessage(
     : result.message;
 }
 
-function FieldError({ message }: { message?: string }) {
+function FieldError({ message, id }: { message?: string; id?: string }) {
   if (!message) return null;
 
-  return <p className="mt-2 break-words text-xs font-bold text-orange-300">{message}</p>;
+  return (
+    <p
+      id={id}
+      role="alert"
+      className="mt-2 break-words text-xs font-bold text-orange-300"
+    >
+      {message}
+    </p>
+  );
+}
+
+function RegistrationReadinessItem({
+  label,
+  ready,
+}: {
+  label: string;
+  ready: boolean;
+}) {
+  return (
+    <li
+      className={classNames(
+        "flex min-h-11 items-center gap-3 border px-3 py-2.5 text-sm font-bold",
+        ready
+          ? "border-emerald-500/35 bg-emerald-950/20 text-zinc-100"
+          : "border-orange-500/40 bg-orange-500/10 text-orange-100"
+      )}
+    >
+      {ready ? (
+        <CheckCircle2
+          aria-hidden="true"
+          size={18}
+          className="shrink-0 text-emerald-300"
+        />
+      ) : (
+        <Info
+          aria-hidden="true"
+          size={18}
+          className="shrink-0 text-orange-300"
+        />
+      )}
+      <span className="min-w-0 break-words">{label}</span>
+    </li>
+  );
 }
 
 function RegistrationProfileValue({
@@ -3987,35 +4746,119 @@ function DocumentAgreementLabel({
   );
 }
 
-function AgreementCheckbox({ label, checked, onChange, error }: { label: ReactNode; checked: boolean; onChange: (checked: boolean) => void; error?: string }) {
+function AgreementCheckbox({
+  field,
+  label,
+  checked,
+  onChange,
+  error,
+  compact = false,
+}: {
+  field: keyof RegistrationFormState;
+  label: ReactNode;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  error?: string;
+  compact?: boolean;
+}) {
+  const errorId = useId();
+
   return (
     <div>
-      <label className={classNames("flex cursor-pointer items-start gap-3 border bg-black/45 p-4 transition hover:border-orange-500/70 hover:bg-orange-500/10", error ? "border-orange-400/80" : "border-white/12")}>
+      <label
+        className={classNames(
+          "flex min-h-11 cursor-pointer items-start gap-3 border bg-black/45 transition hover:border-orange-500/70 hover:bg-orange-500/10",
+          compact ? "p-3" : "p-4",
+          error ? "border-orange-400/80" : "border-white/12"
+        )}
+      >
         <input
+          data-registration-field={field}
           type="checkbox"
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
           className="mt-1 h-4 w-4 shrink-0 accent-orange-500"
           aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
         />
         <span className="break-words text-sm font-bold text-zinc-200">{label}</span>
       </label>
-      <FieldError message={error} />
+      <FieldError id={errorId} message={error} />
     </div>
   );
 }
 
-function ModalButtons({ onClose, onBack, onNext, nextLabel, isLoading = false, isDisabled = false }: { onClose?: () => void; onBack?: () => void; onNext: () => void | Promise<void>; nextLabel?: string; isLoading?: boolean; isDisabled?: boolean }) {
+function ModalButtons({
+  onClose,
+  onBack,
+  onNext,
+  nextLabel,
+  isLoading = false,
+  isDisabled = false,
+  persistent = false,
+}: {
+  onClose?: () => void;
+  onBack?: () => void;
+  onNext: () => void | Promise<void>;
+  nextLabel?: string;
+  isLoading?: boolean;
+  isDisabled?: boolean;
+  persistent?: boolean;
+}) {
   const t = useOptionalTranslations("competition", competitionEnglish);
 
   return (
-    <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-between">
-      <div>
-        {onBack && <button onClick={onBack} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">{t("registrationModal.back")}</button>}
-        {onClose && <button onClick={onClose} className="w-full rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white sm:w-auto">{t("registrationModal.cancel")}</button>}
+    <footer
+      data-registration-action-footer={persistent ? "persistent" : "standard"}
+      className={classNames(
+        "flex shrink-0 gap-3 border-t border-slate-800",
+        persistent
+          ? "flex-row items-center bg-black/95 px-4 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]"
+          : "mx-5 mb-5 flex-col-reverse pt-5 sm:flex-row sm:justify-between"
+      )}
+    >
+      <div className={persistent ? "shrink-0" : undefined}>
+        {onBack && (
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={onBack}
+            className={classNames(
+              "min-h-11 rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60",
+              persistent ? "w-auto" : "w-full sm:w-auto"
+            )}
+          >
+            {t("registrationModal.back")}
+          </button>
+        )}
+        {onClose && (
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={onClose}
+            className={classNames(
+              "min-h-11 rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60",
+              persistent ? "w-auto" : "w-full sm:w-auto"
+            )}
+          >
+            {t("registrationModal.cancel")}
+          </button>
+        )}
       </div>
-      <button disabled={isLoading || isDisabled} onClick={onNext} className="w-full rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{isLoading ? t("registrationModal.submitting") : nextLabel ?? t("registrationModal.continue")}</button>
-    </div>
+      <button
+        type="button"
+        disabled={isLoading || isDisabled}
+        onClick={onNext}
+        className={classNames(
+          "min-h-11 rounded bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60",
+          persistent ? "min-w-0 flex-1" : "w-full sm:w-auto"
+        )}
+      >
+        {isLoading
+          ? t("registrationModal.submitting")
+          : nextLabel ?? t("registrationModal.continue")}
+      </button>
+    </footer>
   );
 }
 
@@ -4846,7 +5689,7 @@ function MobileBrackets({
                 </div>
                 <p className="mt-1 break-words text-sm text-zinc-400">
                   {generated
-                    ? t("bracketSummary.emptySlots", {
+                    ? t("bracketSummary.playerSlots", {
                         format: formatCompetitionFormat(generated.format, t),
                         count: formatNumber(generated.slotCount, locale),
                       })
@@ -5520,6 +6363,8 @@ export default function TournamentsExperience({
   const [showMobilePanel, setShowMobilePanel] = useState(false);
   const mobileHeroStartRef = useRef<HTMLDivElement | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [registrationPresentation, setRegistrationPresentation] =
+    useState<RegistrationPresentation>("desktop");
   const [registrationProfile, setRegistrationProfile] =
     useState<RegistrationPlayerProfile | null>(null);
   const [registrationGate, setRegistrationGate] =
@@ -5683,6 +6528,14 @@ export default function TournamentsExperience({
   };
 
   const beginRegistration = async () => {
+    setRegistrationPresentation(
+      typeof window !== "undefined" &&
+        (typeof window.matchMedia === "function"
+          ? window.matchMedia("(max-width: 767px)").matches
+          : window.innerWidth < 768)
+        ? "phone"
+        : "desktop"
+    );
     const registrationAvailability = getRegistrationDivisionAvailability(
       selectedTournament,
       viewer.relicVerifiedDivision
@@ -5869,6 +6722,8 @@ export default function TournamentsExperience({
           initialTournamentId={selectedTournament.id}
           verifiedDivision={viewer.relicVerifiedDivision}
           registrationDocuments={registrationDocuments}
+          viewerRegistrations={viewer.registrations}
+          presentation={registrationPresentation}
           onClose={() => setShowRegisterModal(false)}
           onLocaleGate={() => setRegistrationGate("locale")}
         />

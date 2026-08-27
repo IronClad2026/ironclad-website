@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "IronClad 등록",
     title: "e스포츠 선수 등록",
+    dialogDescription:
+      "참가 자격이 있는 토너먼트를 선택하고 선수 준비 상태를 확인한 뒤 각 필수 동의 항목에 동의하세요.",
     closeAria: "등록 창 닫기",
+    stepProgress: "{total}단계 중 {current}단계",
     tournamentSelection: "토너먼트 선택",
     tournamentSelectionDescription:
       "참가할 토너먼트와 대진표 또는 이벤트 유형을 선택하세요.",
+    selectedTournament: "선택한 토너먼트",
+    changeTournament: "토너먼트 변경",
     cohortSummary:
       "{requirement} — 현재 심사 그룹 {active}/{capacity} — 대기 {waitlisted}명",
     activeCohortFull: "현재 심사 그룹 정원 마감 — 대기 명단만 가능",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "선수 프로필 확인",
     profileDescription:
       "등록에는 저장된 IronClad 선수 프로필이 사용됩니다. 오래된 정보가 있다면 계속하기 전에 프로필을 업데이트하세요.",
+    readinessTitle: "선수 준비 상태",
+    profileReady: "선수 프로필 준비 완료",
+    steamConnected: "Steam 신원 연결 완료",
+    relicVerificationOnSubmit:
+      "제출 시 Relic 1대1 ELO와 디비전을 실시간으로 안전하게 확인합니다.",
+    reviewSavedDetails: "저장된 정보 검토",
     displayName: "표시 이름",
     ign: "IGN",
     discordOptional: "Discord(선택 사항)",
@@ -147,8 +158,13 @@ const dictionary = {
     ownershipConfirmation:
       "본인의 IronClad 계정을 사용 중이며 연결된 Steam 계정도 본인 소유임을 확인합니다.",
     submitRegistration: "등록 제출",
-    submittedTitle: "등록 제출 완료",
-    reviewTime: "등록은 24시간 이내에 검토됩니다.",
+    submittedTitle: "등록 제출 완료 — 관리자 검토 대기 중",
+    reviewTime:
+      "토너먼트 운영진이 등록을 검토합니다. Dashboard에서 상태 업데이트를 확인하세요.",
+    waitlistJoinedTitle: "대기 명단 등록 완료",
+    waitlistPositionPending: "대기 명단 순위를 확인하는 중…",
+    waitlistResultDescription:
+      "참가 자리는 보장되지 않습니다. 대기열은 선착순으로 처리됩니다. 공석이 생기면 제안을 받을 수 있으며, 제안은 Dashboard에서 관리하세요.",
     back: "뒤로",
     cancel: "취소",
     continue: "계속",
@@ -346,7 +362,7 @@ const dictionary = {
   emptyState: { title: "공개된 토너먼트가 없습니다", description: "관리자가 이벤트를 공개하면 토너먼트 정보가 여기에 표시됩니다." },
   deadlines: { unavailable: "사용할 수 없음", extension: "{duration} 연장이 포함됩니다.", minutes: "{count}분", minute: "{count}분", hours: "{count}시간", hour: "{count}시간" },
   pollAction: { invalid: "투표용지 요청이 올바르지 않습니다.", failed: "투표용지를 저장할 수 없습니다. 투표를 새로고침한 후 다시 시도하세요." },
-  bracketSummary: { emptySlots: "{format} — 빈 자리 {count}개", approvedMinimum: "승인 {count}명 — 최소 2명 필요" },
+  bracketSummary: { playerSlots: "{format} — 플레이어 자리 {count}개", approvedMinimum: "승인 {count}명 — 최소 2명 필요" },
   pollDates: { opensAt: "{date} 시작", closesAt: "{date} 종료", decisionPublishedAt: "{date}에 결정 게시" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "제출된 투표용지 {count}개", ballotCountOne: "제출된 투표용지 {count}개", ballotCountTwo: "제출된 투표용지 {count}개", ballotCountFew: "제출된 투표용지 {count}개", ballotCountMany: "제출된 투표용지 {count}개", ballotCountOther: "제출된 투표용지 {count}개", voteCountZero: "{count}표", voteCountOne: "{count}표", voteCountTwo: "{count}표", voteCountFew: "{count}표", voteCountMany: "{count}표", voteCountOther: "{count}표" },
   announcements: { update: "IronClad 업데이트 {number}", status: "{title} 현재 상태: {status}.", grandFinal: "그랜드 파이널: {date}.", participants: "승인된 참가자: {players}명. 대진표: {brackets}개. 등록 기간에는 정원이 찼거나 기존 대기열이 있는 대진표도 대기 명단 등록을 받습니다." },
@@ -358,7 +374,7 @@ const dictionary = {
   matchControls: {
     yourNoShowPending: "불참 신고가 상대 확인을 기다리고 있습니다.", yourResultPending: "결과가 상대 확인을 기다리고 있습니다.", opponentNoShowPending: "상대가 불참을 신고했습니다. 대시보드 알림에서 확인하거나 이의를 제기하세요.", opponentResultPending: "상대가 결과를 제출했습니다. 대시보드 알림에서 확인하거나 이의를 제기하세요.", legacyPending: "이 경기에는 관리자 검토를 기다리는 이전 방식의 보고가 있습니다.", waitingOpponent: "상대를 기다리는 중이며 마감 시간은 아직 시작되지 않았습니다.", participantsRequired: "결과를 기록하려면 두 참가자가 모두 배정되어야 합니다.", hold: "이 경기는 관리자에 의해 보류되었습니다. 보류가 해제되면 결과 제출과 마감 시간 적용이 재개됩니다.", notActivated: "이 경기는 아직 활성화되지 않았습니다. 디비전이 시작되고 두 공식 참가자가 준비되면 결과 및 불참 기능이 열립니다.", deadlinePassedMessage: "유효 마감 시간이 지났습니다. 공식 마감 판정이 처리되는 동안 새로운 플레이어 보고는 접수되지 않습니다.", open: "열기", hide: "숨기기", pendingConfirmation: "결과 확인 대기", pendingReview: "결과 검토 대기", submitResult: "경기 결과 제출", doubleForfeit: "양측 몰수패 판정", automaticAdvancement: "자동 진출", noEligiblePlayer: "진출 가능한 플레이어 없음", completed: "경기 완료", notActive: "경기 비활성", waitingOpponentShort: "상대 대기", deadlinePaused: "경기 마감 시간 일시 중지", deadlinePassed: "마감 시간 경과", outcomeDoubleForfeit: "마감 판정으로 두 플레이어가 모두 탈락했습니다. 결과를 제출할 수 없습니다.", outcomeAutomaticBye: "유일하게 자격 있는 플레이어가 자동 진출했습니다. 경기는 진행되지 않았으며 결과가 필요하지 않습니다.", outcomeEmptyFeeder: "이전 대진이 자격 있는 참가자 없이 종료되었습니다. 결과를 제출할 수 없습니다.", participant: "참가자", noShowReport: "불참 신고", confirmationPackage: "확인 자료", noShowReported: "{reporter} 님이 {player} 님의 불참을 신고했습니다", scoreReported: "{winner} 님의 승리로 {score} 점수가 보고되었습니다", match: "경기", matchReference: "{round} — 경기 {number}", reportingPlayer: "보고한 플레이어", opponent: "상대", forfeitWinner: "부전승자", reportedWinner: "보고된 승자", missingPlayer: "불참 플레이어", reportedLoser: "보고된 패자", noShowStatus: "불참 상태", confirmationDeadline: "확인 마감 시간", finalizedBy: "최종 확정 방식", disputeNotes: "이의 제기 메모", noShowNote: "불참 메모", reviewNotes: "검토 메모", noReplayNoShow: "불참 신고에는 리플레이가 필요하지 않습니다", gameReplay: "게임 {number} 리플레이", gameReplayUnavailable: "게임 {number} 리플레이를 사용할 수 없음", replayUnavailable: "리플레이를 사용할 수 없음", submission: "제출 #{number}", claimedWinner: "승자로 주장된 선수", score: "점수", adminMessage: "관리자 메시지", downloadReplay: "증빙 리플레이 다운로드", viewLegacyScreenshot: "이전 스크린샷 첨부 보기", statusUnderReview: "검토 중", statusApproved: "승인됨", statusRejected: "거부됨", statusResubmission: "재제출 요청됨", statusPendingConfirmation: "상대 확인 대기", statusConfirmed: "확인됨", statusAutoApproved: "자동 승인됨", statusDisputed: "이의 제기됨", statusReset: "초기화됨", statusNotNoShow: "불참 신고 아님", statusWaitingOpponent: "상대 대기", statusApprovedAdmin: "관리자 승인", statusAutoConfirmed: "자동 확인됨", sourceOpponent: "상대 확인", sourceAutomatic: "자동 승인", sourceAdminApproval: "관리자 승인", sourceAdminOverride: "관리자 판정"
   },
-  matchAction: { prepareFailed: "리플레이 업로드를 준비할 수 없습니다. 다시 시도하세요.", cleanupFailed: "리플레이 업로드를 안전하게 정리할 수 없습니다.", operationFailed: "경기 요청을 완료할 수 없습니다. 새로고침 후 다시 시도하세요.", resultSubmitted: "제출 #{submission}이 상대 확인을 기다리고 있습니다.", resultSubmittedWarning: "제출 #{submission}이 상대 확인을 기다리고 있습니다. 결과는 저장됐지만 후속 업데이트 하나가 완료되지 않았습니다. 다음 작업 전에 경기를 새로고침하세요.", opponentRequired: "불참한 상대를 선택하세요.", notesTooLong: "불참 메모는 2,000자 이하여야 합니다.", matchUnavailable: "이 경기는 더 이상 사용할 수 없습니다.", participantsUnavailable: "경기 참가자 두 명이 모두 배정되고 확인되어야 합니다.", participantOnly: "본인이 참가한 경기에서만 작업할 수 있습니다.", selfNoShow: "자신을 불참으로 신고할 수 없습니다.", invalidParticipant: "신고된 플레이어는 이 경기 참가자가 아닙니다.", noShowSubmitted: "불참 신고를 제출했습니다. {player} 님이 확인하거나 이의를 제기해야 합니다.", reportUnavailable: "경기 결과 확인을 찾을 수 없습니다.", confirmed: "결과가 확인되어 승자가 진출했습니다.", disputeNotesTooLong: "이의 제기 메모는 2,000자 이하여야 합니다.", disputed: "결과에 이의가 제기되었습니다. 관리자가 검토해야 합니다." },
+  matchAction: { prepareFailed: "리플레이 업로드를 준비할 수 없습니다. 다시 시도하세요.", cleanupFailed: "리플레이 업로드를 안전하게 정리할 수 없습니다.", operationFailed: "경기 요청을 완료할 수 없습니다. 새로고침 후 다시 시도하세요.", duplicateReplay: "이 리플레이는 이미 제출되었습니다. 다른 리플레이 파일을 사용하세요.", resultSubmitted: "제출 #{submission}이 상대 확인을 기다리고 있습니다.", resultSubmittedWarning: "제출 #{submission}이 상대 확인을 기다리고 있습니다. 결과는 저장됐지만 후속 업데이트 하나가 완료되지 않았습니다. 다음 작업 전에 경기를 새로고침하세요.", opponentRequired: "불참한 상대를 선택하세요.", notesTooLong: "불참 메모는 2,000자 이하여야 합니다.", matchUnavailable: "이 경기는 더 이상 사용할 수 없습니다.", participantsUnavailable: "경기 참가자 두 명이 모두 배정되고 확인되어야 합니다.", participantOnly: "본인이 참가한 경기에서만 작업할 수 있습니다.", selfNoShow: "자신을 불참으로 신고할 수 없습니다.", invalidParticipant: "신고된 플레이어는 이 경기 참가자가 아닙니다.", noShowSubmitted: "불참 신고를 제출했습니다. {player} 님이 확인하거나 이의를 제기해야 합니다.", reportUnavailable: "경기 결과 확인을 찾을 수 없습니다.", confirmed: "결과가 확인되어 승자가 진출했습니다.", disputeNotesTooLong: "이의 제기 메모는 2,000자 이하여야 합니다.", disputed: "결과에 이의가 제기되었습니다. 관리자가 검토해야 합니다." },
   gate: {
     title: "등록은 현재 영어로만 가능합니다",
     description: "효력이 있는 준거 문서는 현재 영어로 제공됩니다. 등록하거나 대기 명단에 참여하려면 영어로 계속 진행하고, 동의하기 전에 현행 영어 문서를 검토하세요.",

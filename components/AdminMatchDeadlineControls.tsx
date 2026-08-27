@@ -18,8 +18,10 @@ const initialState: MatchDeadlineActionState = {
 
 export default function AdminMatchDeadlineControls({
   match,
+  onPendingChange,
 }: {
   match: GeneratedTournamentMatch;
+  onPendingChange?: (key: string, pending: boolean) => void;
 }) {
   const [extensionState, extensionAction, extensionPending] = useActionState(
     extendTournamentMatchDeadline,
@@ -33,6 +35,7 @@ export default function AdminMatchDeadlineControls({
     releaseTournamentMatchDeadline,
     initialState
   );
+  const actionPending = extensionPending || holdPending || releasePending;
   const [now, setNow] = useState<number | null>(null);
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
   const extensionAppliesToCurrentActivation = timestampFallsInActivation(
@@ -62,6 +65,12 @@ export default function AdminMatchDeadlineControls({
     match.holdStartedAt === null;
 
   useEffect(() => {
+    const key = `match-deadline:${match.id}`;
+    onPendingChange?.(key, actionPending);
+    return () => onPendingChange?.(key, false);
+  }, [actionPending, match.id, onPendingChange]);
+
+  useEffect(() => {
     if (!isActive || holdActive) return;
 
     const updateNow = () => setNow(Date.now());
@@ -74,7 +83,10 @@ export default function AdminMatchDeadlineControls({
   }, [holdActive, isActive]);
 
   return (
-    <section className="border border-orange-400/20 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20">
+    <section
+      aria-busy={actionPending}
+      className="border border-orange-400/20 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-wider text-orange-300">

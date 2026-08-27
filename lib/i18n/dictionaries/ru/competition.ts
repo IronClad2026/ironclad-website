@@ -106,10 +106,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "Регистрация IronClad",
     title: "Регистрация киберспортсмена",
+    dialogDescription:
+      "Выберите подходящий Турнир, подтвердите готовность профиля игрока и примите каждое обязательное соглашение.",
     closeAria: "Закрыть форму регистрации",
+    stepProgress: "Шаг {current} из {total}",
     tournamentSelection: "Выбор турнира",
     tournamentSelectionDescription:
       "Выберите турнир и тип сетки или события, в котором хотите участвовать.",
+    selectedTournament: "Выбранный Турнир",
+    changeTournament: "Сменить Турнир",
     cohortSummary:
       "{requirement} — активная группа проверки {active}/{capacity} — в списке ожидания {waitlisted}",
     activeCohortFull: "Активная группа проверки заполнена — только список ожидания",
@@ -122,6 +127,12 @@ const dictionary = {
     profileTitle: "Подтверждение профиля игрока",
     profileDescription:
       "Для регистрации используется сохранённый профиль игрока IronClad. Если какие-либо сведения устарели, обновите профиль перед продолжением.",
+    readinessTitle: "Готовность игрока",
+    profileReady: "Профиль игрока готов",
+    steamConnected: "Учётная запись Steam подключена",
+    relicVerificationOnSubmit:
+      "При отправке безопасно выполняется актуальная проверка ELO Relic 1 на 1 и дивизиона.",
+    reviewSavedDetails: "Проверить сохранённые данные",
     displayName: "Отображаемое имя",
     ign: "IGN",
     discordOptional: "Discord (необязательно)",
@@ -148,8 +159,14 @@ const dictionary = {
     ownershipConfirmation:
       "Я подтверждаю, что использую собственную учётную запись IronClad и что подключённая учётная запись Steam принадлежит мне.",
     submitRegistration: "Отправить регистрацию",
-    submittedTitle: "Регистрация отправлена",
-    reviewTime: "Регистрации проверяются в течение 24 часов.",
+    submittedTitle: "Регистрация отправлена — ожидает проверки администратором",
+    reviewTime:
+      "Администрация Турнира рассмотрит вашу регистрацию. Проверяйте обновления статуса в личном кабинете.",
+    waitlistJoinedTitle: "Вы добавлены в список ожидания",
+    waitlistPositionPending:
+      "Подтверждаем вашу позицию в списке ожидания…",
+    waitlistResultDescription:
+      "Место не гарантировано. Очередь обрабатывается в порядке поступления заявок. Если освободится место, вы можете получить предложение; управляйте предложениями в личном кабинете.",
     back: "Назад",
     cancel: "Отмена",
     continue: "Продолжить",
@@ -347,7 +364,7 @@ const dictionary = {
   emptyState: { title: "Опубликованных турниров пока нет", description: "Данные появятся здесь после публикации турнира администратором." },
   deadlines: { unavailable: "недоступно", extension: "Продление: {duration}.", minutes: "{count} мин.", minute: "{count} мин.", hours: "{count} ч.", hour: "{count} ч." },
   pollAction: { invalid: "Некорректный запрос бюллетеня.", failed: "Бюллетень не удалось сохранить. Обновите опрос и повторите попытку." },
-  bracketSummary: { emptySlots: "{format} — свободных мест: {count}", approvedMinimum: "Одобрено: {count} — требуется не менее 2" },
+  bracketSummary: { playerSlots: "{format} — количество мест для игроков: {count}", approvedMinimum: "Одобрено: {count} — требуется не менее 2" },
   pollDates: { opensAt: "Открытие: {date}", closesAt: "Закрытие: {date}", decisionPublishedAt: "Решение опубликовано {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "Отправлено {count} бюллетеней", ballotCountOne: "Отправлен {count} бюллетень", ballotCountTwo: "Отправлено {count} бюллетеня", ballotCountFew: "Отправлено {count} бюллетеня", ballotCountMany: "Отправлено {count} бюллетеней", ballotCountOther: "Отправлено {count} бюллетеня", voteCountZero: "{count} голосов", voteCountOne: "{count} голос", voteCountTwo: "{count} голоса", voteCountFew: "{count} голоса", voteCountMany: "{count} голосов", voteCountOther: "{count} голоса" },
   announcements: { update: "Новости IronClad {number}", status: "Текущий статус «{title}»: {status}.", grandFinal: "Гранд-финал: {date}.", participants: "Одобрено участников: {players}. Сеток: {brackets}. Пока регистрация открыта, заполненные сетки и сетки с очередью принимают заявки в список ожидания." },
@@ -359,7 +376,7 @@ const dictionary = {
   matchControls: {
     yourNoShowPending: "Ваше сообщение о неявке ожидает подтверждения соперника.", yourResultPending: "Ваш результат ожидает подтверждения соперника.", opponentNoShowPending: "Соперник сообщил о неявке. Подтвердите или оспорьте сообщение через уведомление на панели игрока.", opponentResultPending: "Соперник отправил результат. Подтвердите или оспорьте его через уведомление на панели игрока.", legacyPending: "У этого матча есть старый отчёт, ожидающий проверки администратора.", waitingOpponent: "Ожидание соперника — отсчёт вашего срока ещё не начался.", participantsRequired: "Для записи результата должны быть назначены оба участника.", hold: "Матч приостановлен администратором. Отправка результатов и отсчёт срока возобновятся после снятия паузы.", notActivated: "Матч ещё не активирован. Отправка результата и сообщение о неявке станут доступны после запуска дивизиона и готовности обоих официальных участников.", deadlinePassedMessage: "Действующий срок истёк. Новые сообщения игроков закрыты до вынесения окончательного решения по сроку.", open: "Открыть", hide: "Скрыть", pendingConfirmation: "Результат ожидает подтверждения", pendingReview: "Результат ожидает проверки", submitResult: "Отправить результат матча", doubleForfeit: "Решение об обоюдном техническом поражении", automaticAdvancement: "Автоматический проход", noEligiblePlayer: "Ни один игрок не прошёл дальше", completed: "Матч завершён", notActive: "Матч не активен", waitingOpponentShort: "Ожидание соперника", deadlinePaused: "Срок матча приостановлен", deadlinePassed: "Срок истёк", outcomeDoubleForfeit: "Решение по сроку исключило обоих игроков. Результат отправить нельзя.", outcomeAutomaticBye: "Единственный допущенный игрок прошёл автоматически. Матч не проводился, результат не требуется.", outcomeEmptyFeeder: "Предыдущий этап завершился без допущенного участника. Результат отправить нельзя.", participant: "Участник", noShowReport: "Сообщение о неявке", confirmationPackage: "Пакет подтверждения", noShowReported: "{reporter} сообщил о неявке игрока {player}", scoreReported: "В пользу {winner} заявлен счёт {score}", match: "Матч", matchReference: "{round} — матч {number}", reportingPlayer: "Отправивший игрок", opponent: "Соперник", forfeitWinner: "Победитель из-за неявки", reportedWinner: "Заявленный победитель", missingPlayer: "Неявившийся игрок", reportedLoser: "Заявленный проигравший", noShowStatus: "Статус неявки", confirmationDeadline: "Срок подтверждения", finalizedBy: "Способ утверждения", disputeNotes: "Примечание к спору", noShowNote: "Примечание о неявке", reviewNotes: "Примечание проверки", noReplayNoShow: "Для сообщения о неявке реплей не требуется", gameReplay: "Реплей игры {number}", gameReplayUnavailable: "Реплей игры {number} недоступен", replayUnavailable: "Реплей недоступен", submission: "Отправка №{number}", claimedWinner: "Заявленный победитель", score: "Счёт", adminMessage: "Сообщение администратора", downloadReplay: "Скачать реплей-доказательство", viewLegacyScreenshot: "Открыть старое вложение со снимком", statusUnderReview: "На проверке", statusApproved: "Одобрено", statusRejected: "Отклонено", statusResubmission: "Запрошена повторная отправка", statusPendingConfirmation: "Ожидает подтверждения соперника", statusConfirmed: "Подтверждено", statusAutoApproved: "Одобрено автоматически", statusDisputed: "Оспорено", statusReset: "Сброшено", statusNotNoShow: "Не относится к неявке", statusWaitingOpponent: "Ожидание соперника", statusApprovedAdmin: "Одобрено администратором", statusAutoConfirmed: "Подтверждено автоматически", sourceOpponent: "Подтверждение соперника", sourceAutomatic: "Автоматическое одобрение", sourceAdminApproval: "Одобрение администратора", sourceAdminOverride: "Решение администратора"
   },
-  matchAction: { prepareFailed: "Не удалось подготовить загрузку реплеев. Повторите попытку.", cleanupFailed: "Не удалось безопасно выполнить очистку загруженных реплеев.", operationFailed: "Не удалось выполнить запрос матча. Обновите страницу и повторите попытку.", resultSubmitted: "Отправка №{submission} ожидает подтверждения соперника.", resultSubmittedWarning: "Отправка №{submission} ожидает подтверждения соперника. Результат сохранён, но одно последующее обновление не выполнено; обновите матч перед следующим действием.", opponentRequired: "Выберите соперника, который не явился.", notesTooLong: "Примечание о неявке не должно превышать 2 000 символов.", matchUnavailable: "Этот матч больше недоступен.", participantsUnavailable: "Оба участника матча должны быть назначены и проверены.", participantOnly: "Можно действовать только в матчах, где вы участвуете.", selfNoShow: "Нельзя сообщить о собственной неявке.", invalidParticipant: "Указанный игрок не участвует в этом матче.", noShowSubmitted: "Сообщение о неявке отправлено. {player} должен подтвердить его или открыть спор.", reportUnavailable: "Подтверждение результата матча не найдено.", confirmed: "Результат подтверждён. Победитель прошёл дальше.", disputeNotesTooLong: "Примечание к спору не должно превышать 2 000 символов.", disputed: "Результат оспорен. Его должен проверить администратор." },
+  matchAction: { prepareFailed: "Не удалось подготовить загрузку реплеев. Повторите попытку.", cleanupFailed: "Не удалось безопасно выполнить очистку загруженных реплеев.", operationFailed: "Не удалось выполнить запрос матча. Обновите страницу и повторите попытку.", duplicateReplay: "Этот реплей уже был отправлен. Используйте другой файл реплея.", resultSubmitted: "Отправка №{submission} ожидает подтверждения соперника.", resultSubmittedWarning: "Отправка №{submission} ожидает подтверждения соперника. Результат сохранён, но одно последующее обновление не выполнено; обновите матч перед следующим действием.", opponentRequired: "Выберите соперника, который не явился.", notesTooLong: "Примечание о неявке не должно превышать 2 000 символов.", matchUnavailable: "Этот матч больше недоступен.", participantsUnavailable: "Оба участника матча должны быть назначены и проверены.", participantOnly: "Можно действовать только в матчах, где вы участвуете.", selfNoShow: "Нельзя сообщить о собственной неявке.", invalidParticipant: "Указанный игрок не участвует в этом матче.", noShowSubmitted: "Сообщение о неявке отправлено. {player} должен подтвердить его или открыть спор.", reportUnavailable: "Подтверждение результата матча не найдено.", confirmed: "Результат подтверждён. Победитель прошёл дальше.", disputeNotesTooLong: "Примечание к спору не должно превышать 2 000 символов.", disputed: "Результат оспорен. Его должен проверить администратор." },
   gate: {
     title: "Регистрация доступна только на английском",
     description: "Документы, имеющие обязательную силу, сейчас представлены на английском языке. Чтобы зарегистрироваться или вступить в список ожидания, перейдите на английский и изучите действующие английские документы перед их принятием.",

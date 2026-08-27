@@ -114,9 +114,14 @@ const dictionary = {
   registrationModal: {
     eyebrow: "IronClad 报名",
     title: "电竞选手报名",
+    dialogDescription:
+      "选择符合资格的锦标赛，确认选手已准备就绪，并逐项接受所有必需协议。",
     closeAria: "关闭报名窗口",
+    stepProgress: "第 {current} 步，共 {total} 步",
     tournamentSelection: "选择锦标赛",
     tournamentSelectionDescription: "选择你想参加的锦标赛和对阵表/赛事类型。",
+    selectedTournament: "已选择的锦标赛",
+    changeTournament: "更换锦标赛",
     cohortSummary:
       "{requirement} — 当前审核批次 {active}/{capacity} — {waitlisted} 人候补",
     activeCohortFull: "当前审核批次已满 — 仅开放候补",
@@ -129,6 +134,12 @@ const dictionary = {
     profileTitle: "确认选手资料",
     profileDescription:
       "报名将使用你保存的 IronClad 选手资料。如有任何信息过时，请先更新资料再继续。",
+    readinessTitle: "选手准备情况",
+    profileReady: "选手资料已就绪",
+    steamConnected: "Steam 身份已连接",
+    relicVerificationOnSubmit:
+      "提交时，系统会安全地实时检查 Relic 1v1 ELO 和组别。",
+    reviewSavedDetails: "查看已保存的资料",
     displayName: "显示名称",
     ign: "游戏内名称（IGN）",
     discordOptional: "Discord（可选）",
@@ -154,8 +165,12 @@ const dictionary = {
     ownershipConfirmation:
       "我确认正在使用自己的 IronClad 账户，并且所连接的 Steam 账户属于我本人。",
     submitRegistration: "提交报名",
-    submittedTitle: "报名已提交",
-    reviewTime: "报名会在 24 小时内审核。",
+    submittedTitle: "报名已提交 — 等待管理员审核",
+    reviewTime: "锦标赛管理员将审核你的报名。请在控制面板中查看状态更新。",
+    waitlistJoinedTitle: "已加入候补名单",
+    waitlistPositionPending: "正在确认你的候补队列位置…",
+    waitlistResultDescription:
+      "名额不作保证。候补队列按先到先得顺序处理。如有空缺，你可能会收到名额邀请；请在控制面板中管理邀请。",
     back: "返回",
     cancel: "取消",
     continue: "继续",
@@ -351,7 +366,7 @@ const dictionary = {
   emptyState: { title: "尚无已发布锦标赛", description: "管理员发布赛事后，锦标赛数据会显示在这里。" },
   deadlines: { unavailable: "不可用", extension: "包含 {duration} 的延长时间。", minutes: "{count} 分钟", minute: "{count} 分钟", hours: "{count} 小时", hour: "{count} 小时" },
   pollAction: { invalid: "此投票选票请求无效。", failed: "无法保存选票。请刷新投票后重试。" },
-  bracketSummary: { emptySlots: "{format} — {count} 个空位", approvedMinimum: "已批准 {count} 人 — 至少需要 2 人" },
+  bracketSummary: { playerSlots: "{format} — {count} 个参赛名额", approvedMinimum: "已批准 {count} 人 — 至少需要 2 人" },
   pollDates: { opensAt: "{date} 开放", closesAt: "{date} 关闭", decisionPublishedAt: "决定发布于 {date}" },
   pollCounts: { ballotEligibility: "{ballots} / {eligible}", ballotCountZero: "已提交 {count} 张选票", ballotCountOne: "已提交 {count} 张选票", ballotCountTwo: "已提交 {count} 张选票", ballotCountFew: "已提交 {count} 张选票", ballotCountMany: "已提交 {count} 张选票", ballotCountOther: "已提交 {count} 张选票", voteCountZero: "{count} 票", voteCountOne: "{count} 票", voteCountTwo: "{count} 票", voteCountFew: "{count} 票", voteCountMany: "{count} 票", voteCountOther: "{count} 票" },
   announcements: { update: "IronClad 更新 {number}", status: "{title} 当前状态：{status}。", grandFinal: "总决赛：{date}。", participants: "已批准参赛者：{players}。对阵表：{brackets}。报名开放期间，已满或已有候补队列的对阵表仍接受候补报名。" },
@@ -363,7 +378,7 @@ const dictionary = {
   matchControls: {
     yourNoShowPending: "你的未到场报告正在等待对手确认。", yourResultPending: "你的结果正在等待对手确认。", opponentNoShowPending: "对手报告了未到场情况。请从仪表板通知中确认或提出异议。", opponentResultPending: "对手提交了结果。请从仪表板通知中确认或提出异议。", legacyPending: "本场比赛有一份旧版报告正在等待管理员审核。", waitingOpponent: "正在等待对手，你的截止时间尚未开始。", participantsRequired: "必须分配双方参赛者后才能记录结果。", hold: "本场比赛处于管理员暂停状态。解除暂停后，结果提交和截止时间执行将恢复。", notActivated: "本场比赛尚未激活。组别开赛且双方正式参赛者就绪后，结果与未到场操作才会开放。", deadlinePassedMessage: "有效截止时间已过。正式裁定处理期间，不再接受新的玩家报告。", open: "打开", hide: "收起", pendingConfirmation: "结果待确认", pendingReview: "结果待审核", submitResult: "提交比赛结果", doubleForfeit: "双方判负裁定", automaticAdvancement: "自动晋级", noEligiblePlayer: "无符合条件的玩家晋级", completed: "比赛已完成", notActive: "比赛未激活", waitingOpponentShort: "等待对手", deadlinePaused: "比赛截止时间已暂停", deadlinePassed: "截止时间已过", outcomeDoubleForfeit: "截止时间裁定淘汰了双方玩家，无法再提交结果。", outcomeAutomaticBye: "唯一符合条件的玩家已自动晋级。本场比赛未进行，无需提交结果。", outcomeEmptyFeeder: "此前置节点关闭时没有符合条件的参赛者，无法提交结果。", participant: "参赛者", noShowReport: "未到场报告", confirmationPackage: "确认资料", noShowReported: "{reporter} 报告 {player} 未到场", scoreReported: "为 {winner} 报告比分 {score}", match: "比赛", matchReference: "{round} — 第 {number} 场比赛", reportingPlayer: "提交报告的玩家", opponent: "对手", forfeitWinner: "不战而胜者", reportedWinner: "报告的获胜者", missingPlayer: "未到场玩家", reportedLoser: "报告的落败者", noShowStatus: "未到场状态", confirmationDeadline: "确认截止时间", finalizedBy: "最终确定方式", disputeNotes: "异议备注", noShowNote: "未到场备注", reviewNotes: "审核备注", noReplayNoShow: "未到场报告无需回放", gameReplay: "第 {number} 局回放", gameReplayUnavailable: "第 {number} 局回放不可用", replayUnavailable: "回放不可用", submission: "提交 #{number}", claimedWinner: "申报的获胜者", score: "比分", adminMessage: "管理员消息", downloadReplay: "下载回放证明", viewLegacyScreenshot: "查看旧版截图附件", statusUnderReview: "审核中", statusApproved: "已批准", statusRejected: "已拒绝", statusResubmission: "要求重新提交", statusPendingConfirmation: "等待对手确认", statusConfirmed: "已确认", statusAutoApproved: "已自动批准", statusDisputed: "已提出异议", statusReset: "已重置", statusNotNoShow: "非未到场", statusWaitingOpponent: "等待对手", statusApprovedAdmin: "管理员已批准", statusAutoConfirmed: "已自动确认", sourceOpponent: "对手确认", sourceAutomatic: "自动批准", sourceAdminApproval: "管理员批准", sourceAdminOverride: "管理员改判"
   },
-  matchAction: { prepareFailed: "无法准备回放上传，请重试。", cleanupFailed: "无法安全清理回放上传。", operationFailed: "无法完成比赛请求，请刷新后重试。", resultSubmitted: "提交 #{submission} 正在等待对手确认。", resultSubmittedWarning: "提交 #{submission} 正在等待对手确认。结果已保存，但一项后续更新未完成；请刷新此比赛后再操作。", opponentRequired: "请选择未到场的对手。", notesTooLong: "未到场备注不得超过 2,000 个字符。", matchUnavailable: "此比赛已不可用。", participantsUnavailable: "必须分配并验证双方比赛参赛者。", participantOnly: "你只能操作自己参加的比赛。", selfNoShow: "不能将自己报告为未到场。", invalidParticipant: "被报告的玩家不是本场比赛参赛者。", noShowSubmitted: "未到场报告已提交。{player} 必须确认或提出异议。", reportUnavailable: "找不到比赛结果确认。", confirmed: "结果已确认，获胜者已晋级。", disputeNotesTooLong: "异议备注不得超过 2,000 个字符。", disputed: "结果已提出异议，必须由管理员审核。" },
+  matchAction: { prepareFailed: "无法准备回放上传，请重试。", cleanupFailed: "无法安全清理回放上传。", operationFailed: "无法完成比赛请求，请刷新后重试。", duplicateReplay: "此回放已经提交过。请使用其他回放文件。", resultSubmitted: "提交 #{submission} 正在等待对手确认。", resultSubmittedWarning: "提交 #{submission} 正在等待对手确认。结果已保存，但一项后续更新未完成；请刷新此比赛后再操作。", opponentRequired: "请选择未到场的对手。", notesTooLong: "未到场备注不得超过 2,000 个字符。", matchUnavailable: "此比赛已不可用。", participantsUnavailable: "必须分配并验证双方比赛参赛者。", participantOnly: "你只能操作自己参加的比赛。", selfNoShow: "不能将自己报告为未到场。", invalidParticipant: "被报告的玩家不是本场比赛参赛者。", noShowSubmitted: "未到场报告已提交。{player} 必须确认或提出异议。", reportUnavailable: "找不到比赛结果确认。", confirmed: "结果已确认，获胜者已晋级。", disputeNotesTooLong: "异议备注不得超过 2,000 个字符。", disputed: "结果已提出异议，必须由管理员审核。" },
   gate: {
     title: "报名目前仅提供英文流程",
     description: "具有约束力的文件目前仅提供英文版。若要报名或加入候补名单，请切换到英文，并在同意前阅读现行有效的英文文件。",

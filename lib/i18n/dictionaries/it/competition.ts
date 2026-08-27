@@ -362,10 +362,15 @@ const dictionary = {
   registrationModal: {
     eyebrow: "Iscrizione IronClad",
     title: "Iscrizione del giocatore esports",
+    dialogDescription:
+      "Scegli un Torneo per cui sei idoneo, verifica la preparazione del giocatore e accetta ogni accordo richiesto.",
     closeAria: "Chiudi l'iscrizione",
+    stepProgress: "Passaggio {current} di {total}",
     tournamentSelection: "Selezione del torneo",
     tournamentSelectionDescription:
       "Seleziona il torneo e il tipo di tabellone/evento a cui vuoi partecipare.",
+    selectedTournament: "Torneo selezionato",
+    changeTournament: "Cambia Torneo",
     cohortSummary:
       "{requirement} — gruppo in revisione attiva {active}/{capacity} — {waitlisted} in lista d'attesa",
     activeCohortFull:
@@ -379,6 +384,12 @@ const dictionary = {
     profileTitle: "Conferma del profilo giocatore",
     profileDescription:
       "L'iscrizione usa il profilo giocatore IronClad che hai salvato. Aggiornalo prima di continuare se qualche informazione non è più valida.",
+    readinessTitle: "Preparazione del giocatore",
+    profileReady: "Profilo giocatore pronto",
+    steamConnected: "Identità Steam collegata",
+    relicVerificationOnSubmit:
+      "Al momento dell'invio viene eseguito in modo sicuro un controllo in tempo reale dell'ELO Relic 1v1 e della Divisione.",
+    reviewSavedDetails: "Rivedi i dati salvati",
     displayName: "Nome visualizzato",
     ign: "IGN",
     discordOptional: "Discord (facoltativo)",
@@ -405,8 +416,14 @@ const dictionary = {
     ownershipConfirmation:
       "Confermo di usare il mio account IronClad e che l'account Steam collegato mi appartiene.",
     submitRegistration: "Invia iscrizione",
-    submittedTitle: "Iscrizione inviata",
-    reviewTime: "Le iscrizioni vengono esaminate entro 24 ore.",
+    submittedTitle: "Iscrizione inviata — in attesa di revisione dell'amministrazione",
+    reviewTime:
+      "L'amministrazione del Torneo esaminerà la tua iscrizione. Controlla la Dashboard per gli aggiornamenti sullo stato.",
+    waitlistJoinedTitle: "Aggiunto alla lista d'attesa",
+    waitlistPositionPending:
+      "Conferma della tua posizione in lista d'attesa…",
+    waitlistResultDescription:
+      "Il posto non è garantito. La coda segue l'ordine di arrivo. Se si libera un posto, potresti ricevere un'offerta; gestisci le offerte dalla Dashboard.",
     back: "Indietro",
     cancel: "Annulla",
     continue: "Continua",
@@ -673,7 +690,7 @@ const dictionary = {
     failed: "Non è stato possibile salvare il voto. Aggiorna il Sondaggio e riprova.",
   },
   bracketSummary: {
-    emptySlots: "{format} — {count} posti giocatore liberi",
+    playerSlots: "{format} — {count} posti per giocatori",
     approvedMinimum: "{count} approvati — almeno 2 richiesti",
   },
   pollDates: {
@@ -834,6 +851,7 @@ const dictionary = {
     prepareFailed: "Non è stato possibile preparare il caricamento del replay. Riprova.",
     cleanupFailed: "Non è stato possibile completare in sicurezza la pulizia del replay.",
     operationFailed: "Non è stato possibile completare la richiesta del Match. Aggiorna e riprova.",
+    duplicateReplay: "Questo replay è già stato inviato. Usa un file replay diverso.",
     resultSubmitted: "L'invio #{submission} attende la conferma dell'avversario.",
     resultSubmittedWarning:
       "L'invio #{submission} attende la conferma dell'avversario. Il risultato è stato salvato, ma non è stato possibile completare un aggiornamento successivo; aggiorna questo Match prima di eseguire un'altra azione.",

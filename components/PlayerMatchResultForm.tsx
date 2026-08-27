@@ -648,6 +648,8 @@ function getMatchActionMessage(
       return t("matchAction.cleanupFailed");
     case "operation_failed":
       return t("matchAction.operationFailed");
+    case "duplicate_replay":
+      return t("matchAction.duplicateReplay");
     case "result_submitted":
       return t(
         Number(state.values?.warning) === 1
