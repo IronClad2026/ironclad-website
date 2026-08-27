@@ -53,12 +53,12 @@ const rankingOptions: Array<{
     labelKey: "rankings.mainSeason",
   },
   {
-    value: "academy",
-    labelKey: "rankings.academyCareer",
-  },
-  {
     value: "challenge",
     labelKey: "rankings.challengeCareer",
+  },
+  {
+    value: "academy",
+    labelKey: "rankings.academyCareer",
   },
 ];
 
