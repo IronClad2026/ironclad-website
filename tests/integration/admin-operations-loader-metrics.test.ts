@@ -510,6 +510,7 @@ describe("Admin Operations canonical loader metrics", () => {
       primary: "Closed Player",
       href: "/admin/operations#who-left",
     });
+    expect(metrics.overview.registrations.href).toBe("/admin/registrations");
 
     expect(metrics.registrations.statusGroups).toEqual([
       { label: "Pending", value: 1 },
@@ -530,7 +531,7 @@ describe("Admin Operations canonical loader metrics", () => {
     expect(metrics.registrations.withdrawnInPeriod).toBe(1);
     expect(metrics.registrations.who.pending[0]).toMatchObject({
       primary: "Pending Player",
-      href: "/admin?filter=pending&selected=registration-pending",
+      href: "/admin/registrations?filter=pending&selected=registration-pending",
     });
     expect(metrics.registrations.who.manualReview[0].primary).toBe(
       "Manual Player"

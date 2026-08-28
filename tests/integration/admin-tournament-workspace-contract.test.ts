@@ -66,6 +66,7 @@ const source = {
     "components/admin/tournaments/AdminTournamentRegistrations.tsx"
   ),
   registrationRows: read("components/AdminRegistrationReviewRows.tsx"),
+  system: read("app/admin/system/page.tsx"),
   registrationWorkspace: read(
     "lib/admin-tournament-registration-workspace.ts"
   ),
@@ -727,14 +728,19 @@ const capabilities: Capability[] = [
     section: "outside-workspace",
     evidence: [
       {
-        file: "admin",
+        file: "system",
         includes: [
           "AdminEloVerificationChecker",
           "AdminLeaderboardControls",
+        ],
+      },
+      {
+        file: "admin",
+        includes: [
           "InAppNotificationCenter",
-          'href="/admin/maps"',
-          'href="/admin/polls"',
-          'href="/admin/announcements"',
+          'href: "/admin/maps"',
+          'href: "/admin/polls"',
+          'href: "/admin/announcements"',
         ],
       },
     ],
@@ -917,7 +923,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.announcementsAdmin).toContain("<AdminAnnouncements");
     expect(source.navbar).toContain('const announcementHref = "/announcements"');
     expect(source.navbar).toContain("useAnnouncementUnreadState");
-    expect(source.admin).toContain('href="/admin/announcements"');
+    expect(source.admin).toContain('href: "/admin/announcements"');
     expect(source.experience).toContain('activeTab === "announcements"');
   });
 

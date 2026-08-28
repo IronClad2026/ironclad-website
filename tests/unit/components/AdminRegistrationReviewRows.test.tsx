@@ -50,7 +50,8 @@ function setViewport(width: number, height: number) {
 function renderRows(
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>,
   registration = reviewRow(),
-  isTournamentTerminal = false
+  isTournamentTerminal = false,
+  desktopPresentation?: "standard" | "tournament-workbench"
 ) {
   return render(
     <form id="registration-bulk-form">
@@ -59,6 +60,7 @@ function renderRows(
         activeFilter="pending"
         formId="registration-bulk-form"
         selectionScope="pending:tournament-1"
+        desktopPresentation={desktopPresentation}
         isTournamentTerminal={isTournamentTerminal}
         updateRegistrationStatusAction={updateRegistrationStatusAction}
       />
@@ -140,18 +142,18 @@ describe("administrator registration review responsive interaction", () => {
     expect(within(menu).getByRole("menuitem", { name: "Review Details" }))
       .toHaveAttribute(
         "href",
-        "/admin?filter=pending&selected=registration-main-1"
+        "/admin/registrations?filter=pending&selected=registration-main-1"
       );
     expect(within(menu).getByRole("menuitem", { name: "Reject" }))
       .toHaveAttribute(
         "href",
-        "/admin?filter=pending&selected=registration-main-1&focus=reject"
+        "/admin/registrations?filter=pending&selected=registration-main-1&focus=reject"
       );
     expect(
       within(menu).getByRole("menuitem", { name: "Mark Manual Review" })
     ).toHaveAttribute(
       "href",
-      "/admin?filter=pending&selected=registration-main-1&focus=manual_review"
+      "/admin/registrations?filter=pending&selected=registration-main-1&focus=manual_review"
     );
     expect(within(menu).queryByRole("menuitem", { name: /Waitlist/i }))
       .not.toBeInTheDocument();
@@ -259,7 +261,7 @@ describe("administrator registration review responsive interaction", () => {
     const table = container.querySelector("table");
 
     expect(cards).toHaveClass("grid", "min-w-0", "xl:hidden");
-    expect(table).toHaveClass("min-w-[1080px]");
+    expect(table).toHaveClass("min-w-[900px]", "2xl:min-w-[1080px]");
     expect(table?.parentElement).toHaveClass(
       "hidden",
       "max-w-full",
@@ -267,6 +269,102 @@ describe("administrator registration review responsive interaction", () => {
       "overscroll-x-contain",
       "xl:block"
     );
+  });
+
+  it("preserves the standard Tournament-specific desktop presentation by default", () => {
+    const { container } = renderRows(vi.fn());
+    const table = container.querySelector("table");
+    expect(table).not.toBeNull();
+    const tableQueries = within(table as HTMLTableElement);
+
+    expect(
+      tableQueries.getByRole("columnheader", {
+        name: "Tournament / Division",
+      })
+    ).toBeInTheDocument();
+    expect(
+      tableQueries.getByRole("columnheader", { name: "Registration ELO" })
+    ).toBeInTheDocument();
+    expect(tableQueries.getByText(longTournamentName)).toBeInTheDocument();
+    expect(
+      tableQueries.getByText(
+        "Frozen at registration, not current profile ELO"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("compacts only the workbench desktop table while preserving accessible evidence and controls", () => {
+    const { container } = renderRows(
+      vi.fn(),
+      reviewRow(),
+      false,
+      "tournament-workbench"
+    );
+    const table = container.querySelector("table");
+    expect(table).not.toBeNull();
+    const tableQueries = within(table as HTMLTableElement);
+
+    expect(
+      tableQueries.getByRole("columnheader", { name: "Division" })
+    ).toBeInTheDocument();
+    expect(
+      tableQueries.getByRole("columnheader", { name: "Frozen ELO" })
+    ).toBeInTheDocument();
+    expect(
+      tableQueries.getByRole("columnheader", {
+        name: "Verification Evidence",
+      })
+    ).toBeInTheDocument();
+    expect(tableQueries.queryByText(longTournamentName)).not.toBeInTheDocument();
+    expect(
+      tableQueries.queryByText(
+        "Frozen at registration, not current profile ELO"
+      )
+    ).not.toBeInTheDocument();
+    expect(tableQueries.getByText((1_425).toLocaleString())).toBeInTheDocument();
+    expect(tableQueries.getAllByText("Challenge")).toHaveLength(2);
+    expect(tableQueries.getByText("British Forces")).toBeInTheDocument();
+    expect(tableQueries.getByText("Relic")).toBeInTheDocument();
+    expect(
+      tableQueries.getByText(
+        new Date("2026-08-05T09:59:00.000Z").toLocaleString()
+      )
+    ).toBeInTheDocument();
+    expect(
+      tableQueries.getByText("relic-highest-1v1-v1")
+    ).toBeInTheDocument();
+
+    for (const label of [
+      "Verified division:",
+      "Verification source:",
+      "Verified faction:",
+      "Verification checked:",
+    ]) {
+      expect(tableQueries.getByText(label)).toHaveClass("sr-only");
+    }
+
+    const checkbox = tableQueries.getByRole("checkbox", {
+      name: `Select registration for ${longPlayerName}`,
+    });
+    expect(checkbox).toHaveAttribute("form", "registration-bulk-form");
+    expect(checkbox).toHaveAttribute(
+      "data-registration-selection-scope",
+      "pending:tournament-1"
+    );
+    expect(checkbox).toBeEnabled();
+    expect(
+      tableQueries.getByRole("button", {
+        name: `Open actions for ${longPlayerName}`,
+      })
+    ).toBeInTheDocument();
+
+    const card = getCard(container);
+    expect(within(card).getByText(longTournamentName)).toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        "Captured at registration; not current profile ELO."
+      )
+    ).toBeInTheDocument();
   });
 
   it("labels safe evidence and wraps long player and tournament names", () => {

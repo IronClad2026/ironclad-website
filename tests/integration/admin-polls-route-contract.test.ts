@@ -13,8 +13,8 @@ const pollComponent = source("components/AdminPolls.tsx");
 
 describe("Feature C Admin route contract", () => {
   it("adds one Polls & Decisions entry to the existing Command Center", () => {
-    expect(adminPage).toContain('href="/admin/polls"');
-    expect(adminPage).toContain("Polls &amp; Decisions");
+    expect(adminPage).toContain('href: "/admin/polls"');
+    expect(adminPage).toContain('label: "Polls & Decisions"');
   });
 
   it("authenticates before service-role creation and uses safe Poll RPC projections", () => {

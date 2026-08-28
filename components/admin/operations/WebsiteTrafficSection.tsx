@@ -140,7 +140,7 @@ export default function WebsiteTrafficSection({
     <section
       id="website-traffic"
       aria-labelledby="website-traffic-title"
-      className="scroll-mt-28 rounded-3xl border border-orange-500/20 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.12),transparent_36%),linear-gradient(145deg,rgba(24,24,27,0.96),rgba(9,9,11,0.98))] p-4 sm:p-6"
+      className="scroll-mt-28 rounded-3xl border border-orange-500/20 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.12),transparent_36%),linear-gradient(145deg,rgba(24,24,27,0.96),rgba(9,9,11,0.98))] p-4 sm:p-6 xl:scroll-mt-44"
     >
       <div className="flex min-w-0 items-start gap-3">
         <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-400/25 bg-orange-500/10 text-orange-300">

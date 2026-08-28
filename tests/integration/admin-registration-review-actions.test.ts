@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const adminPageSource = readFileSync(
-  resolve(process.cwd(), "app/admin/page.tsx"),
+  resolve(process.cwd(), "app/admin/registrations/page.tsx"),
   "utf8"
 );
 const registrationActionsSource = readFileSync(
@@ -121,7 +121,11 @@ describe("admin registration review action contracts", () => {
     expect(compactActions).toContain(
       "`/admin/tournaments/${workspaceContext.tournamentId}`"
     );
-    expect(compactActions).toContain(': "/admin";');
+    expect(compactActions).toContain(': "/admin/registrations";');
+    expect(compactActions).toContain('revalidatePath("/admin")');
+    expect(compactActions).toContain(
+      'revalidatePath("/admin/registrations")'
+    );
     expect(compactActions).toContain(
       "revalidatePath(`/admin/tournaments/${workspaceContext.tournamentId}`)"
     );

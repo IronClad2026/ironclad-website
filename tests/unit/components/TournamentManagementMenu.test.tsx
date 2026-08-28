@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -8,10 +9,22 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import TournamentManagementMenu from "@/components/admin/tournaments/TournamentManagementMenu";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import TournamentManagementMenu, {
+  TournamentDesktopSectionNavigation,
+} from "@/components/admin/tournaments/TournamentManagementMenu";
 
 const tournamentId = "11111111-1111-4111-8111-111111111111";
+const expectedSections = [
+  ["Overview", "overview"],
+  ["Edit Tournament", "edit"],
+  ["Registrations", "registrations"],
+  ["Players / Waitlist", "players-waitlist"],
+  ["Bracket", "bracket"],
+  ["Matches / Results", "matches"],
+  ["Map Pool", "map-pool"],
+  ["Tournament Controls", "controls"],
+] as const;
 
 function renderMenu() {
   render(
@@ -44,6 +57,7 @@ describe("TournamentManagementMenu", () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     document.body.style.overflow = "";
   });
 
@@ -53,7 +67,7 @@ describe("TournamentManagementMenu", () => {
 
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
-    expect(trigger).toHaveClass("h-11", "w-11");
+    expect(trigger).toHaveClass("h-11", "w-11", "xl:hidden");
 
     fireEvent.click(trigger);
 
@@ -75,17 +89,6 @@ describe("TournamentManagementMenu", () => {
       "[padding-bottom:max(1rem,env(safe-area-inset-bottom))]"
     );
     expect(document.body.style.overflow).toBe("hidden");
-
-    const expectedSections = [
-      ["Overview", "overview"],
-      ["Edit Tournament", "edit"],
-      ["Registrations", "registrations"],
-      ["Players / Waitlist", "players-waitlist"],
-      ["Bracket", "bracket"],
-      ["Matches / Results", "matches"],
-      ["Map Pool", "map-pool"],
-      ["Tournament Controls", "controls"],
-    ] as const;
 
     for (const [label, section] of expectedSections) {
       expect(within(navigation).getByRole("link", { name: label })).toHaveAttribute(
@@ -172,5 +175,71 @@ describe("TournamentManagementMenu", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(trigger).toHaveFocus();
     });
+  });
+
+  it("closes the mobile drawer when the viewport crosses into desktop navigation", async () => {
+    let desktopChangeListener:
+      | ((event: MediaQueryListEvent) => void)
+      | undefined;
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: (
+        _type: string,
+        listener: (event: MediaQueryListEvent) => void
+      ) => {
+        desktopChangeListener = listener;
+      },
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => true,
+    }));
+
+    const { trigger } = openMenu();
+    expect(screen.getByRole("dialog", { name: "Manage Tournament" })).toBeInTheDocument();
+
+    act(() => {
+      desktopChangeListener?.({ matches: true } as MediaQueryListEvent);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      expect(document.body.style.overflow).toBe("");
+    });
+  });
+
+  it("reuses the exact section destinations in an always-visible desktop navigator", () => {
+    render(
+      <TournamentDesktopSectionNavigation
+        activeSection="bracket"
+        tournamentId={tournamentId}
+      />
+    );
+
+    const navigation = screen.getByRole("navigation", {
+      name: "Tournament management sections",
+    });
+    expect(navigation).toHaveClass("hidden", "xl:block");
+
+    for (const [label, section] of expectedSections) {
+      expect(within(navigation).getByRole("link", { name: label })).toHaveAttribute(
+        "href",
+        `/admin/tournaments/${tournamentId}?section=${section}`
+      );
+    }
+
+    expect(
+      within(navigation).getByRole("link", { name: "Bracket" })
+    ).toHaveAttribute("aria-current", "page");
+    expect(within(navigation).getAllByRole("link", { current: "page" }))
+      .toHaveLength(1);
+    expect(
+      within(navigation)
+        .getByRole("link", { name: "Tournament Controls" })
+        .closest("li")
+    ).toHaveAttribute("data-management-group", "tournament-controls");
   });
 });

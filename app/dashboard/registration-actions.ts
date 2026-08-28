@@ -180,7 +180,13 @@ async function loadOwnedRegistration(
 }
 
 function revalidatePlayerRegistrationPaths() {
-  for (const path of ["/admin", "/admin/tournaments", "/dashboard", "/tournaments"]) {
+  for (const path of [
+    "/admin",
+    "/admin/registrations",
+    "/admin/tournaments",
+    "/dashboard",
+    "/tournaments",
+  ]) {
     revalidatePath(path);
   }
 }

@@ -79,6 +79,24 @@ describe("notification destination ownership resolution", () => {
     });
   });
 
+  it("routes an Admin registration notification to the global registrations workspace", async () => {
+    const supabase = createSupabaseQueryMock({
+      data: destinationRow({
+        recipient_role: "admin",
+        tournament_id: null,
+        registration_id: "registration-1",
+        match_id: null,
+      }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    await expect(
+      resolveNotificationDestination(NOTIFICATION_ID, "admin")
+    ).resolves.toBe(
+      "/admin/registrations?filter=all&selected=registration-1"
+    );
+  });
+
   it("rejects invalid identity before service-role access", async () => {
     await expect(
       resolveNotificationDestination("not-a-uuid", "player", "user_player_a")

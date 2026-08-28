@@ -64,11 +64,13 @@ describe("trusted notification click route", () => {
       userId: "user_click_admin",
       sessionClaims: { metadata: { role: "admin" } },
     });
-    resolveNotificationDestinationMock.mockResolvedValue("/admin?filter=all");
+    resolveNotificationDestinationMock.mockResolvedValue(
+      "/admin/registrations?filter=all"
+    );
 
     const response = await GET(request("admin"));
 
-    await expectRedirect(response, "/admin?filter=all");
+    await expectRedirect(response, "/admin/registrations?filter=all");
     expect(resolveNotificationDestinationMock).toHaveBeenCalledWith(
       NOTIFICATION_ID,
       "admin",

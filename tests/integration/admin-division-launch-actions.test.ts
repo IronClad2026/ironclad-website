@@ -107,6 +107,7 @@ describe("explicit administrator division launch action", () => {
       }
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/registrations");
     expect(revalidatePathMock).toHaveBeenCalledWith(
       `/admin/tournaments/${tournamentId}`,
       "page"
@@ -157,6 +158,9 @@ describe("private bracket generation action", () => {
       '.from("generated_brackets")'
     );
     expect(generationActionSource).toContain('revalidatePath("/admin")');
+    expect(generationActionSource).toContain(
+      'revalidatePath("/admin/registrations")'
+    );
   });
 
   it("routes a repeat admin request through the launch-aware generator", async () => {

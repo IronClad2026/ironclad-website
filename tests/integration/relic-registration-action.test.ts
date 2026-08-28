@@ -627,6 +627,7 @@ describe("Relic-authoritative tournament registration action", () => {
         /current_elo|coh3|relic_verified|relic_elo_last_attempt/i
       );
       expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin/registrations");
       expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
     }
   );

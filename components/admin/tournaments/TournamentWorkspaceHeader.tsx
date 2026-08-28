@@ -1,6 +1,7 @@
 import { ChevronLeft, Users } from "lucide-react";
 import Link from "next/link";
 import TournamentManagementMenu, {
+  TournamentDesktopSectionNavigation,
   type TournamentManagementSection,
 } from "@/components/admin/tournaments/TournamentManagementMenu";
 import type {
@@ -76,6 +77,11 @@ export default function TournamentWorkspaceHeader({
           )}
         </div>
       </div>
+
+      <TournamentDesktopSectionNavigation
+        activeSection={activeSection}
+        tournamentId={tournament.id}
+      />
     </header>
   );
 }
