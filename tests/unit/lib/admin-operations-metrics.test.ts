@@ -525,7 +525,10 @@ describe("Admin Operations attention queues", () => {
       { key: "admin-holds", count: 8 },
     ]);
     expect(attention.find((item) => item.key === "expired-waitlist-offers"))
-      .toMatchObject({ href: "/admin?filter=waitlisted", tone: "warning" });
+      .toMatchObject({
+        href: "/admin/registrations?filter=waitlisted",
+        tone: "warning",
+      });
     expect(
       attention
         .filter((item) => item.key !== "expired-waitlist-offers")

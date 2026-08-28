@@ -38,7 +38,7 @@ export async function updateEloVerificationMode(formData: FormData) {
     updatedByClerkUserId: userId,
   });
 
-  revalidatePath("/admin");
+  revalidatePath("/admin/system");
 }
 
 export async function updateEloVerificationSupportLink(
@@ -66,7 +66,7 @@ export async function updateEloVerificationSupportLink(
     };
   }
 
-  revalidatePath("/admin");
+  revalidatePath("/admin/system");
 
   return {
     status: "success",

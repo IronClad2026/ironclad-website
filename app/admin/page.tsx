@@ -1,60 +1,23 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { loadAdminNotifications } from "@/lib/notifications";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import {
-  approveSelectedRegistrations,
-  deleteSelectedRegistrations,
-  updateRegistrationStatus,
-} from "@/app/admin/registration-actions";
-import AdminRegistrationReviewRows from "@/components/AdminRegistrationReviewRows";
-import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
-import AdminBracketManagement, {
-  type AdminBracketTournamentOption,
-} from "@/components/AdminBracketManagement";
-import AdminEloVerificationChecker from "@/components/AdminEloVerificationChecker";
-import AdminLeaderboardControls from "@/components/AdminLeaderboardControls";
-import InAppNotificationCenter from "@/components/InAppNotificationCenter";
-import {
-  getCompletedLeaderboardTournaments,
-  getRecentLeaderboardRecalculationRuns,
-} from "@/lib/leaderboard/admin";
-import {
-  getEloVerificationSetting,
-  getEloVerificationSupportLinkSetting,
-} from "@/lib/platform-settings";
-import {
-  getTournamentBracketDisplayName,
-  isTournamentTerminalStatus,
-  type TournamentStatus,
-} from "@/lib/tournaments";
-import {
-  PHASE_FOUR_ACTIVE_COHORT_SIZE,
-  isActiveReviewCohortStatus,
-} from "@/lib/tournament-registration-cohort";
-import {
-  buildAdminRegistrationEvidence,
-  buildRegistrationOrderMap,
-  buildWaitlistPositionMap,
-  type AdminRegistrationOrderInput,
-  type AdminRegistrationReviewRow,
-  type AdminRegistrationStatus,
-  type AdminWaitlistOfferStatus,
-} from "@/lib/admin-registration-review";
 import {
   Activity,
-  AlertTriangle,
-  CheckCircle,
+  ClipboardCheck,
   Clock,
   MapPinned,
   Megaphone,
+  Plus,
   ShieldAlert,
   Trophy,
   Vote,
-  X,
-  XCircle,
 } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import InAppNotificationCenter from "@/components/InAppNotificationCenter";
+import type { AdminRegistrationStatus } from "@/lib/admin-registration-review";
+import { loadAdminNotifications } from "@/lib/notifications";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import type { TournamentStatus } from "@/lib/tournaments";
 
 type CustomClaims = {
   metadata?: {
@@ -62,10 +25,7 @@ type CustomClaims = {
   };
 };
 
-type RegistrationStatus = AdminRegistrationStatus;
-type FilterStatus = "all" | RegistrationStatus;
-type AdminFocusTarget = "note" | "reject" | "manual_review";
-type AdminNotice =
+type LegacyRegistrationNotice =
   | "note-required"
   | "saved"
   | "save-failed"
@@ -78,60 +38,139 @@ type AdminNotice =
   | "registration-bulk-approved"
   | "registration-bulk-partial"
   | "registration-bulk-failed";
+type LegacyRegistrationFocus = "note" | "reject" | "manual_review";
+type LegacyRegistrationFilter = "all" | AdminRegistrationStatus;
+type AdminBracketNotice =
+  | "population-saved"
+  | "population-failed"
+  | "division-launched"
+  | "division-already-launched"
+  | "division-launch-failed";
+
+type AdminPageSearchParams = {
+  filter?: string | string[];
+  selected?: string | string[];
+  notice?: string | string[];
+  detail?: string | string[];
+  focus?: string | string[];
+  bracketNotice?: string | string[];
+};
 
 type AdminPageProps = {
-  searchParams?: Promise<{
-    filter?: FilterStatus;
-    selected?: string;
-    notice?: AdminNotice;
-    detail?: string;
-    focus?: AdminFocusTarget;
-    bracketNotice?:
-      | "population-saved"
-      | "population-failed"
-      | "division-launched"
-      | "division-already-launched"
-      | "division-launch-failed";
-  }>;
+  searchParams?: Promise<AdminPageSearchParams>;
 };
 
-type SupabaseRegistration = {
-  id: string;
-  player_name: string;
-  country: string | null;
-  submitted_elo: number | null;
-  elo_verified_elo: number | null;
-  elo_highest_faction: string | null;
-  elo_checked_at: string | null;
-  elo_verification_source: string | null;
-  elo_verified_division: string | null;
-  elo_calculation_version: string | null;
-  registration_status: RegistrationStatus;
-  admin_notes: string | null;
-  created_at: string;
-  tournament_id: string | null;
-  tournament_bracket_id: string | null;
-  tournament_title: string | null;
-  bracket_name: string | null;
-  waitlist_offer_status: AdminWaitlistOfferStatus | null;
-  waitlist_position?: number | null;
-  registration_order?: number | null;
+type RegistrationSummaryRow = {
+  registration_status: AdminRegistrationStatus;
 };
 
-type AdminTournamentOption = {
+type TournamentSummaryRow = {
   id: string;
   title: string;
   status: TournamentStatus;
   grand_final_at: string | null;
   created_at: string;
-  tournament_brackets?: {
-    id: string;
-    name: string;
-    max_players: number;
-    launched_at: string | null;
-    map_pool_published_at: string | null;
-  }[];
 };
+
+const registrationFilters: LegacyRegistrationFilter[] = [
+  "all",
+  "pending",
+  "manual_review",
+  "approved",
+  "rejected",
+  "waitlisted",
+  "withdrawn",
+];
+const registrationNotices: LegacyRegistrationNotice[] = [
+  "note-required",
+  "saved",
+  "save-failed",
+  "registration-deleted",
+  "registration-delete-failed",
+  "registration-delete-blocked",
+  "bracket-full",
+  "registration-closed",
+  "registration-locked",
+  "registration-bulk-approved",
+  "registration-bulk-partial",
+  "registration-bulk-failed",
+];
+const registrationFocusTargets: LegacyRegistrationFocus[] = [
+  "note",
+  "reject",
+  "manual_review",
+];
+const bracketNoticeMessages: Record<AdminBracketNotice, string> = {
+  "population-saved":
+    "Bracket assignments saved privately. The division remains unpublished until Launch Division.",
+  "population-failed":
+    "Bracket assignments could not be saved. Open the Tournament workspace and verify every selected Player is approved and unique.",
+  "division-launched":
+    "Division launched. Its bracket is now public and its roster is locked.",
+  "division-already-launched":
+    "This division was already launched; its original launch time and notifications were preserved.",
+  "division-launch-failed":
+    "Division launch failed. Open the Tournament workspace and confirm readiness, assignments, and private-draft integrity.",
+};
+
+function singleValue(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : undefined;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
+function getLegacyRegistrationRedirect(params?: AdminPageSearchParams) {
+  if (
+    !params ||
+    !["filter", "selected", "notice", "detail", "focus"].some(
+      (key) => params[key as keyof AdminPageSearchParams] !== undefined
+    )
+  ) {
+    return null;
+  }
+
+  const target = new URLSearchParams();
+  const requestedFilter = singleValue(params.filter);
+  const filter = registrationFilters.includes(
+    requestedFilter as LegacyRegistrationFilter
+  )
+    ? (requestedFilter as LegacyRegistrationFilter)
+    : "all";
+  target.set("filter", filter);
+
+  const selected = singleValue(params.selected)?.trim();
+  if (selected && isUuid(selected)) {
+    target.set("selected", selected);
+  }
+
+  const notice = singleValue(params.notice);
+  if (registrationNotices.includes(notice as LegacyRegistrationNotice)) {
+    target.set("notice", notice as LegacyRegistrationNotice);
+  }
+
+  const detail = singleValue(params.detail)?.trim();
+  if (detail) {
+    target.set("detail", detail.slice(0, 2_000));
+  }
+
+  const focus = singleValue(params.focus);
+  if (registrationFocusTargets.includes(focus as LegacyRegistrationFocus)) {
+    target.set("focus", focus as LegacyRegistrationFocus);
+  }
+
+  return `/admin/registrations?${target.toString()}`;
+}
+
+function getTournamentSortTime(tournament: TournamentSummaryRow) {
+  const timestamp = new Date(
+    tournament.grand_final_at ?? tournament.created_at
+  ).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
 
 function formatStatus(status: string) {
   return status
@@ -139,1317 +178,330 @@ function formatStatus(status: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatAdminVerificationSource(source: string | null) {
-  if (!source) {
-    return null;
-  }
-
-  if (source.toLowerCase() === "relic") {
-    return "Relic";
-  }
-
-  if (source.toLowerCase() === "coh3stats") {
-    return "CoH3 Stats";
-  }
-
-  return formatStatus(source);
-}
-
-function formatAdminEvidenceDateTime(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const timestamp = new Date(value).getTime();
-
-  return Number.isFinite(timestamp)
-    ? new Date(value).toLocaleString()
-    : "Unavailable";
-}
-
-function compareAdminRegistrationReviewRows(
-  left: AdminRegistrationReviewRow,
-  right: AdminRegistrationReviewRow
-) {
-  return (
-    (left.tournamentId ?? "").localeCompare(right.tournamentId ?? "") ||
-    (left.selectedBracket ?? "").localeCompare(right.selectedBracket ?? "") ||
-    (left.registrationOrder ?? Number.MAX_SAFE_INTEGER) -
-      (right.registrationOrder ?? Number.MAX_SAFE_INTEGER) ||
-    left.registrationId.localeCompare(right.registrationId)
-  );
-}
-
-function getSafeFilter(filter?: string): FilterStatus {
-  const validFilters: FilterStatus[] = [
-    "all",
-    "pending",
-    "manual_review",
-    "approved",
-    "rejected",
-    "waitlisted",
-    "withdrawn",
-  ];
-
-  return validFilters.includes(filter as FilterStatus)
-    ? (filter as FilterStatus)
-    : "all";
-}
-
-function buildHref({
-  filter,
-  selected,
-  notice,
-  detail,
-  focus,
-}: {
-  filter: FilterStatus;
-  selected?: string;
-  notice?: AdminNotice;
-  detail?: string;
-  focus?: AdminFocusTarget;
-}) {
-  const params = new URLSearchParams();
-  params.set("filter", filter);
-
-  if (selected) {
-    params.set("selected", selected);
-  }
-
-  if (notice) {
-    params.set("notice", notice);
-  }
-
-  if (detail) {
-    params.set("detail", detail);
-  }
-
-  if (focus) {
-    params.set("focus", focus);
-  }
-
-  return `/admin?${params.toString()}`;
-}
-
-function compareAdminTournaments(
-  left: AdminTournamentOption,
-  right: AdminTournamentOption
-) {
-  const leftHistorical = left.status === "completed" ? 1 : 0;
-  const rightHistorical = right.status === "completed" ? 1 : 0;
-
-  if (leftHistorical !== rightHistorical) {
-    return leftHistorical - rightHistorical;
-  }
-
-  return getAdminTournamentSortTime(right) - getAdminTournamentSortTime(left);
-}
-
-function getAdminTournamentSortTime(tournament: AdminTournamentOption) {
-  const dateValue = tournament.grand_final_at ?? tournament.created_at;
-  const timestamp = new Date(dateValue).getTime();
-
-  return Number.isFinite(timestamp) ? timestamp : 0;
-}
-
-function compareWaitlistedRegistrations(
-  left: SupabaseRegistration,
-  right: SupabaseRegistration
-) {
-  const leftTime = new Date(left.created_at).getTime();
-  const rightTime = new Date(right.created_at).getTime();
-  const timeDelta =
-    (Number.isFinite(leftTime) ? leftTime : 0) -
-    (Number.isFinite(rightTime) ? rightTime : 0);
-
-  return timeDelta || left.id.localeCompare(right.id);
-}
-
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { userId, sessionClaims } = await auth();
-
   const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-  const isAdmin = role === "admin";
 
-  if (!userId || !isAdmin) {
+  if (!userId || role !== "admin") {
     redirect("/");
   }
 
   const params = await searchParams;
-  const activeFilter = getSafeFilter(params?.filter);
+  const legacyRegistrationRedirect = getLegacyRegistrationRedirect(params);
+  if (legacyRegistrationRedirect) {
+    redirect(legacyRegistrationRedirect);
+  }
 
   const supabase = createSupabaseAdminClient();
-  const [
-    registrationResult,
-    tournamentResult,
-    generatedResult,
-    adminNotifications,
-    completedLeaderboardTournaments,
-    leaderboardRecalculationRuns,
-    eloVerificationSetting,
-    eloVerificationSupportLinkSetting,
-  ] =
+  const [registrationResult, tournamentResult, adminNotifications] =
     await Promise.all([
-      supabase
-        .from("registrations")
-        .select(
-          "id, player_name, country, submitted_elo, elo_verified_elo, elo_highest_faction, elo_checked_at, elo_verification_source, elo_verified_division, elo_calculation_version, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name, waitlist_offer_status"
-        )
-        .order("created_at", { ascending: false }),
+      supabase.from("registrations").select("registration_status"),
       supabase
         .from("tournaments")
-        .select(
-          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, max_players, launched_at, map_pool_published_at)"
-        )
+        .select("id, title, status, grand_final_at, created_at")
         .order("grand_final_at", { ascending: false, nullsFirst: false }),
-      supabase
-        .from("generated_brackets")
-        .select(
-          "id, tournament_bracket_id, format, slot_count, tournament_matches(player_one_slot, player_two_slot, player_one_registration_id, player_two_registration_id)"
-        ),
       loadAdminNotifications(50),
-      getCompletedLeaderboardTournaments(),
-      getRecentLeaderboardRecalculationRuns(8),
-      getEloVerificationSetting(),
-      getEloVerificationSupportLinkSetting(),
     ]);
-  const registrationsData = registrationResult.data;
-  const error = registrationResult.error;
-  const invalidRegistrationResponse = !Array.isArray(registrationsData);
-  const invalidTournamentResponse = !Array.isArray(tournamentResult.data);
-  const invalidGeneratedBracketResponse = !Array.isArray(
-    generatedResult.data
-  );
 
-  if (error) {
-    console.error("Supabase registrations fetch error:", error.message);
-  }
-
-  if (
-    (!error && invalidRegistrationResponse) ||
-    (!tournamentResult.error && invalidTournamentResponse) ||
-    (!generatedResult.error && invalidGeneratedBracketResponse)
-  ) {
-    console.error("Admin Tournament operations returned an invalid response.");
-  }
-
-  const baseRegistrations = (Array.isArray(registrationsData)
-    ? registrationsData
-    : []) as SupabaseRegistration[];
-  const registrationOrderInputs: AdminRegistrationOrderInput[] =
-    baseRegistrations.map((registration) => ({
-      registrationId: registration.id,
-      tournamentId: registration.tournament_id,
-      tournamentBracketId: registration.tournament_bracket_id,
-      createdAt: registration.created_at,
-      status: registration.registration_status,
-      waitlistOfferStatus: registration.waitlist_offer_status,
-    }));
-  const registrationPriorityById = buildRegistrationOrderMap(
-    registrationOrderInputs
-  );
-  const tournaments = [
-    ...((Array.isArray(tournamentResult.data)
-      ? tournamentResult.data
-      : []) as AdminTournamentOption[]),
-  ].sort(compareAdminTournaments);
-  const tournamentBracketIds = tournaments.flatMap((tournament) =>
-    (tournament.tournament_brackets ?? []).map((bracket) => bracket.id)
-  );
-  const currentMapPoolResult =
-    tournamentBracketIds.length > 0
-      ? await supabase
-          .from("tournament_bracket_map_pool_entries")
-          .select("tournament_bracket_id")
-          .in("tournament_bracket_id", tournamentBracketIds)
-          .is("removed_at", null)
-      : { data: [], error: null };
-  const currentMapCountByBracket = new Map<string, number>();
-  const currentMapPoolRows = Array.isArray(currentMapPoolResult.data)
-    ? currentMapPoolResult.data
-    : [];
-  for (const entry of currentMapPoolRows as {
-    tournament_bracket_id: string;
-  }[]) {
-    currentMapCountByBracket.set(
-      entry.tournament_bracket_id,
-      (currentMapCountByBracket.get(entry.tournament_bracket_id) ?? 0) + 1
+  if (registrationResult.error) {
+    console.error(
+      "Admin Command Center registration summary failed:",
+      registrationResult.error.message
     );
   }
-
-  if (currentMapPoolResult.error) {
-    console.error("Admin map-pool readiness load failed.");
-  } else if (!Array.isArray(currentMapPoolResult.data)) {
-    console.error("Admin map-pool readiness returned an invalid response.");
-  }
-  const readinessResults = await Promise.all(
-    tournaments.flatMap((tournament) =>
-      (tournament.tournament_brackets ?? []).map(async (bracket) => {
-        const { data, error: readinessError } = await supabase.rpc(
-          "get_tournament_bracket_readiness",
-          { p_tournament_bracket_id: bracket.id }
-        );
-
-        if (readinessError) {
-          console.error(
-            "Admin division readiness load failed:",
-            readinessError.message
-          );
-          return null;
-        }
-
-        const result = Array.isArray(data) ? data[0] : data;
-        if (!result) {
-          console.error("Admin division readiness returned an invalid response.");
-        }
-        return result
-          ? {
-              bracketId: bracket.id,
-              approvedCount: Number(result.approved_count),
-              requiredCount: Number(result.required_count),
-              isReady: result.is_ready === true,
-              launchedAt:
-                typeof result.launched_at === "string"
-                  ? result.launched_at
-                  : bracket.launched_at,
-            }
-          : null;
-      })
-    )
-  );
-  const readinessLoadFailed = readinessResults.some(
-    (result) => result === null
-  );
-  const readinessByBracket = new Map(
-    readinessResults
-      .filter((result) => result !== null)
-      .map((result) => [result.bracketId, result])
-  );
-  const bracketOperationsLoadFailed = Boolean(
-    error ||
-      tournamentResult.error ||
-      generatedResult.error ||
-      currentMapPoolResult.error ||
-      invalidRegistrationResponse ||
-      invalidTournamentResponse ||
-      invalidGeneratedBracketResponse ||
-      !Array.isArray(currentMapPoolResult.data) ||
-      readinessLoadFailed
-  );
-  const tournamentsById = new Map(
-    tournaments.map((tournament) => [tournament.id, tournament.title])
-  );
-  const terminalTournamentIds = new Set(
-    tournaments
-      .filter((tournament) => isTournamentTerminalStatus(tournament.status))
-      .map((tournament) => tournament.id)
-  );
-  const bracketMetaById = new Map(
-    tournaments.flatMap((tournament) =>
-      (tournament.tournament_brackets ?? []).map((bracket) => [
-        bracket.id,
-        {
-          tournamentId: tournament.id,
-          tournamentTitle: tournament.title,
-          bracketName: getTournamentBracketDisplayName(bracket.name),
-          launchedAt: bracket.launched_at,
-          isTournamentTerminal: isTournamentTerminalStatus(tournament.status),
-        },
-      ])
-    )
-  );
-  const isBracketWaitlistOpen = (bracketId: string | null) =>
-    bracketId !== null &&
-    bracketMetaById.get(bracketId)?.launchedAt === null &&
-    bracketMetaById.get(bracketId)?.isTournamentTerminal === false;
-  const activeCohortCountByBracket = new Map<string, number>();
-  const approvedCountByBracket = new Map<string, number>();
-  const waitlistCountByBracket = new Map<string, number>();
-  for (const registration of baseRegistrations) {
-    if (!registration.tournament_bracket_id) {
-      continue;
-    }
-
-    if (isActiveReviewCohortStatus(registration.registration_status)) {
-      activeCohortCountByBracket.set(
-        registration.tournament_bracket_id,
-        (activeCohortCountByBracket.get(
-          registration.tournament_bracket_id
-        ) ?? 0) + 1
-      );
-      if (registration.registration_status === "approved") {
-        approvedCountByBracket.set(
-          registration.tournament_bracket_id,
-          (approvedCountByBracket.get(registration.tournament_bracket_id) ??
-            0) + 1
-        );
-      }
-    } else if (
-      registration.registration_status === "waitlisted" &&
-      registration.waitlist_offer_status === null &&
-      isBracketWaitlistOpen(registration.tournament_bracket_id)
-    ) {
-      waitlistCountByBracket.set(
-        registration.tournament_bracket_id,
-        (waitlistCountByBracket.get(registration.tournament_bracket_id) ?? 0) +
-          1
-      );
-    }
-  }
-  const registrationCohortSummaries = Array.from(
-    bracketMetaById,
-    ([bracketId, meta]) => {
-      const activeCohortCount =
-        activeCohortCountByBracket.get(bracketId) ?? 0;
-
-      return {
-        bracketId,
-        ...meta,
-        activeCohortCount,
-        approvedCount:
-          readinessByBracket.get(bracketId)?.approvedCount ??
-          approvedCountByBracket.get(bracketId) ??
-          0,
-        requiredCount:
-          readinessByBracket.get(bracketId)?.requiredCount ??
-          PHASE_FOUR_ACTIVE_COHORT_SIZE,
-        waitlistCount: waitlistCountByBracket.get(bracketId) ?? 0,
-        isReady: readinessByBracket.get(bracketId)?.isReady ?? false,
-        launchedAt:
-          readinessByBracket.get(bracketId)?.launchedAt ?? meta.launchedAt,
-      };
-    }
-  );
-  const waitlistPositionByRegistration = buildWaitlistPositionMap(
-    registrationOrderInputs.filter(({ tournamentBracketId }) =>
-      isBracketWaitlistOpen(tournamentBracketId)
-    )
-  );
-  const registrations = baseRegistrations.map((registration) => ({
-    ...registration,
-    waitlist_position: waitlistPositionByRegistration.get(registration.id) ?? null,
-    registration_order: registrationPriorityById.get(registration.id) ?? null,
-  }));
-  const waitlistNotices = registrations
-    .filter(
-      (registration) =>
-        registration.registration_status === "waitlisted" &&
-        registration.waitlist_offer_status === null &&
-        registration.tournament_bracket_id &&
-        isBracketWaitlistOpen(registration.tournament_bracket_id)
-    )
-    .slice()
-    .sort(compareWaitlistedRegistrations)
-    .slice(0, 6);
-  const generatedByBracket = new Map(
-    (
-      (Array.isArray(generatedResult.data) ? generatedResult.data : []) as {
-        id: string;
-        tournament_bracket_id: string;
-        format: "single_elimination" | "round_robin";
-        slot_count: number;
-        tournament_matches?: {
-          player_one_slot: number | null;
-          player_two_slot: number | null;
-          player_one_registration_id: string | null;
-          player_two_registration_id: string | null;
-        }[];
-      }[]
-    ).map((generated) => [generated.tournament_bracket_id, generated])
-  );
-  const bracketManagementTournaments: AdminBracketTournamentOption[] =
-    tournaments
-      .map((tournament) => ({
-        id: tournament.id,
-        title: tournament.title,
-        status: tournament.status,
-        brackets: (tournament.tournament_brackets ?? [])
-          .map((bracket) => {
-            const generated = generatedByBracket.get(bracket.id);
-            const readiness = readinessByBracket.get(bracket.id);
-            const assignments: Record<number, string | null> = {};
-            for (const match of generated?.tournament_matches ?? []) {
-              if (match.player_one_slot) {
-                assignments[match.player_one_slot] =
-                  match.player_one_registration_id;
-              }
-              if (match.player_two_slot) {
-                assignments[match.player_two_slot] =
-                  match.player_two_registration_id;
-              }
-            }
-
-            return {
-              generatedBracketId: generated?.id ?? null,
-              bracketId: bracket.id,
-              bracketName: getTournamentBracketDisplayName(bracket.name),
-              format: generated?.format ?? null,
-              slotCount: generated?.slot_count ?? 0,
-              actualMatchCount: generated?.tournament_matches?.length ?? 0,
-              expectedMatchCount: generated
-                ? generated.format === "single_elimination"
-                  ? generated.slot_count - 1
-                  : (generated.slot_count * (generated.slot_count - 1)) / 2
-                : 0,
-              assignments,
-              approvedCount:
-                readiness?.approvedCount ??
-                approvedCountByBracket.get(bracket.id) ??
-                0,
-              requiredCount:
-                readiness?.requiredCount ?? PHASE_FOUR_ACTIVE_COHORT_SIZE,
-              isReady: readiness?.isReady ?? false,
-              launchedAt: readiness?.launchedAt ?? bracket.launched_at,
-              mapPoolPublishedAt: bracket.map_pool_published_at,
-              currentMapCount:
-                currentMapCountByBracket.get(bracket.id) ?? 0,
-              participants: registrations
-                .filter(
-                  (registration) =>
-                    registration.registration_status === "approved" &&
-                    registration.tournament_id === tournament.id &&
-                    registration.tournament_bracket_id === bracket.id
-                )
-                .map((registration) => ({
-                  id: registration.id,
-                  name: registration.player_name,
-                  country: registration.country || "N/A",
-                  elo: registration.submitted_elo ?? 0,
-                })),
-            };
-          }),
-      }))
-      .filter((tournament) => tournament.brackets.length > 0);
-
   if (tournamentResult.error) {
     console.error(
-      "Admin tournament operations load failed:",
+      "Admin Command Center Tournament summary failed:",
       tournamentResult.error.message
     );
   }
 
-  if (generatedResult.error) {
-    console.error(
-      "Admin generated brackets load failed:",
-      generatedResult.error.message
+  const registrations = (Array.isArray(registrationResult.data)
+    ? registrationResult.data
+    : []) as RegistrationSummaryRow[];
+  const tournaments = (Array.isArray(tournamentResult.data)
+    ? tournamentResult.data
+    : []) as TournamentSummaryRow[];
+  const activeTournaments = tournaments
+    .filter(
+      (tournament) =>
+        tournament.status === "registration_open" ||
+        tournament.status === "in_progress"
+    )
+    .sort(
+      (left, right) => getTournamentSortTime(right) - getTournamentSortTime(left)
     );
-  }
-
-  const allRegistrationReviewRows: AdminRegistrationReviewRow[] =
-    registrations.map((registration) => ({
-      registrationId: registration.id,
-      tournamentId: registration.tournament_id,
-      privateAdminNote: registration.admin_notes,
-      isDivisionLaunched: Boolean(
-        registration.tournament_bracket_id &&
-          bracketMetaById.get(registration.tournament_bracket_id)?.launchedAt
-      ),
-      ...buildAdminRegistrationEvidence({
-        playerDisplayName: registration.player_name,
-        tournamentName:
-          registration.tournament_title ||
-          (registration.tournament_id
-            ? tournamentsById.get(registration.tournament_id) ?? ""
-            : ""),
-        selectedBracket: registration.bracket_name,
-        submittedElo: registration.submitted_elo,
-        verifiedElo: registration.elo_verified_elo,
-        verifiedDivision: registration.elo_verified_division,
-        verifiedFaction: registration.elo_highest_faction,
-        verificationSource: registration.elo_verification_source,
-        verificationCheckedAt: registration.elo_checked_at,
-        eligibilityRulesVersion: registration.elo_calculation_version,
-        status: registration.registration_status,
-        registeredAt: registration.created_at,
-        waitlistPosition: registration.waitlist_position,
-        registrationOrder: registration.registration_order,
-        waitlistOfferStatus: registration.waitlist_offer_status,
-      }),
-    }));
-  const selectedRegistration = allRegistrationReviewRows.find(
-    (registration) => registration.registrationId === params?.selected
-  );
-  const selectedRegistrationIsTerminal = Boolean(
-    selectedRegistration?.tournamentId &&
-      terminalTournamentIds.has(selectedRegistration.tournamentId)
-  );
-  const registrationReviewRows =
-    activeFilter === "all"
-      ? allRegistrationReviewRows.slice().sort(compareAdminRegistrationReviewRows)
-      : allRegistrationReviewRows.filter(
-          (registration) => registration.status === activeFilter
-        ).sort(compareAdminRegistrationReviewRows);
-  const hasBulkApprovableRegistration = registrationReviewRows.some(
-    (registration) =>
-      !registration.isDivisionLaunched &&
-      (!registration.tournamentId ||
-        !terminalTournamentIds.has(registration.tournamentId)) &&
-      registration.status !== "waitlisted" &&
-      registration.status !== "withdrawn" &&
-      registration.status !== "approved"
-  );
-  const totalRegistrationCountByTournament = registrations.reduce(
-    (counts, registration) => {
-      const key = registration.tournament_id ?? "unassigned";
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-      return counts;
-    },
-    new Map<string, number>()
-  );
-  const registrationRowsByTournament = registrationReviewRows.reduce(
-    (groups, registration) => {
-      const key = registration.tournamentId ?? "unassigned";
-      const group = groups.get(key) ?? [];
-      group.push(registration);
-      groups.set(key, group);
-      return groups;
-    },
-    new Map<string, AdminRegistrationReviewRow[]>()
-  );
-  const tournamentIdsWithMetadata = new Set(
-    tournaments.map((tournament) => tournament.id)
-  );
-  const registrationReviewGroups: {
-    key: string;
-    title: string;
-    status: TournamentStatus | "metadata_unavailable" | "unknown";
-    rows: AdminRegistrationReviewRow[];
-    totalCount: number;
-  }[] = tournaments.map((tournament) => ({
-    key: tournament.id,
-    title: tournament.title,
-    status: tournament.status,
-    rows: registrationRowsByTournament.get(tournament.id) ?? [],
-    totalCount: totalRegistrationCountByTournament.get(tournament.id) ?? 0,
-  }));
-  const fallbackRegistrationGroupKeys = new Set([
-    ...totalRegistrationCountByTournament.keys(),
-    ...registrationRowsByTournament.keys(),
-  ]);
-
-  for (const key of fallbackRegistrationGroupKeys) {
-    if (key === "unassigned" || tournamentIdsWithMetadata.has(key)) {
-      continue;
-    }
-
-    const rows = registrationRowsByTournament.get(key) ?? [];
-    const storedTitle =
-      rows.find((row) => row.tournamentName.trim())?.tournamentName.trim() ||
-      registrations
-        .find((registration) => registration.tournament_id === key)
-        ?.tournament_title?.trim();
-
-    registrationReviewGroups.push({
-      key,
-      title: storedTitle
-        ? `${storedTitle} (metadata unavailable)`
-        : "Tournament metadata unavailable",
-      status: "metadata_unavailable",
-      rows,
-      totalCount: totalRegistrationCountByTournament.get(key) ?? rows.length,
-    });
-  }
-
-  const unassignedRegistrationRows =
-    registrationRowsByTournament.get("unassigned") ?? [];
-
-  if (
-    unassignedRegistrationRows.length > 0 ||
-    (totalRegistrationCountByTournament.get("unassigned") ?? 0) > 0
-  ) {
-    registrationReviewGroups.push({
-      key: "unassigned",
-      title: "Unknown tournament",
-      status: "unknown",
-      rows: unassignedRegistrationRows,
-      totalCount: totalRegistrationCountByTournament.get("unassigned") ?? 0,
-    });
-  }
-
-  const stats = [
+  const registrationSummaryAvailable = !registrationResult.error;
+  const tournamentSummaryAvailable = !tournamentResult.error;
+  const summaryCards = [
     {
       label: "Pending Registrations",
-      value: registrations.filter(
-        (item) => item.registration_status === "pending"
-      ).length,
-      filter: "pending" as FilterStatus,
+      value: registrationSummaryAvailable
+        ? registrations.filter(
+            (registration) => registration.registration_status === "pending"
+          ).length
+        : null,
+      href: "/admin/registrations?filter=pending",
       icon: Clock,
     },
     {
-      label: "Manual Reviews",
-      value: registrations.filter(
-        (item) => item.registration_status === "manual_review"
-      ).length,
-      filter: "manual_review" as FilterStatus,
+      label: "Manual Review Registrations",
+      value: registrationSummaryAvailable
+        ? registrations.filter(
+            (registration) =>
+              registration.registration_status === "manual_review"
+          ).length
+        : null,
+      href: "/admin/registrations?filter=manual_review",
       icon: ShieldAlert,
     },
     {
-      label: "Approved Players",
-      value: registrations.filter(
-        (item) => item.registration_status === "approved"
-      ).length,
-      filter: "approved" as FilterStatus,
-      icon: CheckCircle,
-    },
-    {
-      label: "Rejected Players",
-      value: registrations.filter(
-        (item) => item.registration_status === "rejected"
-      ).length,
-      filter: "rejected" as FilterStatus,
-      icon: XCircle,
-    },
-    {
-      label: "Waitlisted Players",
-      value: registrations.filter(
-        (item) => item.registration_status === "waitlisted"
-      ).length,
-      filter: "waitlisted" as FilterStatus,
-      icon: Clock,
-    },
-    {
       label: "Active Tournaments",
-      value: tournaments.filter(
-        (tournament) =>
-          tournament.status === "registration_open" ||
-          tournament.status === "in_progress"
-      ).length,
-      filter: "all" as FilterStatus,
+      value: tournamentSummaryAvailable ? activeTournaments.length : null,
+      href: "/admin/tournaments",
       icon: Trophy,
     },
   ];
+  const bracketNotice = singleValue(params?.bracketNotice) as
+    | AdminBracketNotice
+    | undefined;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-black px-4 pt-28 pb-16 text-white sm:px-6 sm:pt-32">
-      <section className="mx-auto max-w-7xl space-y-8">
-        <div
+    <main className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32">
+      <div className="mx-auto max-w-7xl space-y-8">
+        <header
           className="relative overflow-hidden rounded-3xl border border-orange-500/30 bg-cover bg-center p-5 shadow-2xl sm:p-8"
           style={{ backgroundImage: "url('/images/ironclad-background.jpg')" }}
         >
           <div className="absolute inset-0 bg-black/75" />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-orange-950/40" />
 
-          <div className="relative z-10 max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
-              Private Admin Area
-            </p>
-
-            <h1 className="mt-4 break-words text-3xl font-bold tracking-tight sm:text-4xl md:text-6xl">
-              IronClad Admin Command Center
-            </h1>
-
-            <p className="mt-5 max-w-3xl text-zinc-300">
-              Control registrations, ELO checks, approvals, player verification,
-              and the full IronClad tournament workflow.
-            </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Link
-                href="/admin/operations"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/50 bg-orange-500/10 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20"
-              >
-                <Activity className="h-4 w-4" />
-                Operations &amp; Analytics
-              </Link>
-              <Link
-                href="/admin/tournaments"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 font-bold text-white transition hover:bg-orange-400"
-              >
-                <Trophy className="h-4 w-4" />
-                Create Or Manage Tournaments
-              </Link>
-              <Link
-                href="/admin/maps"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/40 bg-black/45 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/10"
-              >
-                <MapPinned className="h-4 w-4" />
-                Manage CoH3 Map Catalogue
-              </Link>
-              <Link
-                href="/admin/polls"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/40 bg-black/45 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/10"
-              >
-                <Vote className="h-4 w-4" />
-                Polls &amp; Decisions
-              </Link>
-              <Link
-                href="/admin/announcements"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/40 bg-black/45 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/10"
-              >
-                <Megaphone className="h-4 w-4" />
-                Official Announcements
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            const isActive =
-              activeFilter === stat.filter && stat.filter !== "all";
-
-            return (
-              <Link
-                key={stat.label}
-                href={buildHref({ filter: stat.filter })}
-                className={`rounded-2xl border p-5 backdrop-blur transition hover:-translate-y-1 ${
-                  isActive
-                    ? "border-orange-400 bg-orange-500/20 shadow-lg shadow-orange-500/10"
-                    : "border-white/10 bg-white/[0.04] hover:border-orange-500/60 hover:bg-orange-500/10"
-                }`}
-              >
-                <Icon className="h-6 w-6 text-orange-400" />
-                <p className="mt-4 text-3xl font-bold">{stat.value}</p>
-                <p className="mt-1 text-sm text-zinc-400">{stat.label}</p>
-              </Link>
-            );
-          })}
-        </div>
-
-        <section className="relative z-10 space-y-5">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-6">
-          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Registration Review</h2>
-              <p className="mt-1 text-sm text-zinc-400">
-                Showing {registrationReviewRows.length} registration(s).
+          <div className="relative z-10 flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-3xl">
+              <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-400">
+                Private Admin Area
+              </p>
+              <h1 className="mt-4 break-words text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
+                IronClad Admin Command Center
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">
+                See what needs administrative attention now, then move directly
+                into the authoritative workspace for the task.
               </p>
             </div>
 
-            <form
-              id="registration-bulk-form"
-              action={deleteSelectedRegistrations}
-            >
-              <input type="hidden" name="activeFilter" value={activeFilter} />
-            </form>
-            <div className="grid w-full gap-3 sm:flex sm:w-auto sm:flex-wrap">
-              <button
-                type="submit"
-                form="registration-bulk-form"
-                formAction={approveSelectedRegistrations}
-                disabled={!hasBulkApprovableRegistration}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-zinc-600 sm:w-auto"
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/admin/tournaments/new"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 font-black text-white transition hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
               >
-                <CheckCircle className="h-4 w-4" />
-                Approve Selected
-              </button>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Create Tournament
+              </Link>
+              <Link
+                href="/admin/operations#attention-required"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/50 bg-orange-500/10 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+              >
+                <Activity className="h-4 w-4" aria-hidden="true" />
+                Operations Attention
+              </Link>
             </div>
           </div>
 
-          {params?.notice === "registration-deleted" && (
-            <div className="mb-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-semibold text-green-300">
-              Selected registration(s) deleted.
-            </div>
-          )}
-
-          {params?.notice === "registration-bulk-approved" && (
-            <div className="mb-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-semibold text-green-300">
-              {params.detail || "Selected registration(s) approved."}
-            </div>
-          )}
-
-          {params?.notice === "registration-bulk-partial" && (
-            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold leading-6 text-amber-200">
-              {params.detail ||
-                "Some selected registration(s) were approved. Others failed validation."}
-            </div>
-          )}
-
-          {params?.notice === "registration-bulk-failed" && (
-            <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold leading-6 text-red-300">
-              {params.detail ||
-                "Selected registration(s) could not be approved."}
-            </div>
-          )}
-
-          {params?.notice === "registration-delete-blocked" && (
-            <div className="mb-5 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-semibold leading-6 text-orange-200">
-              Selected registration(s) are tied to generated bracket data,
-              matches, standings, submissions, or report groups. Reset or
-              remove the related tournament data before deleting them.
-            </div>
-          )}
-
-          {params?.notice === "registration-delete-failed" && (
-            <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold text-red-300">
-              Registration deletion failed. Select at least one registration and
-              confirm the selected records are not protected by active
-              tournament data.
-            </div>
-          )}
-
-          {params?.notice === "bracket-full" && (
-            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold leading-6 text-amber-200">
-              Approval blocked because the bracket already has eight active
-              review-cohort registrations.
-            </div>
-          )}
-
-          {params?.notice === "registration-closed" && (
-            <div className="mb-5 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-semibold leading-6 text-orange-200">
-              Registration update blocked because this division is closed for
-              roster changes.
-            </div>
-          )}
-
-          {params?.notice === "registration-locked" && (
-            <div className="mb-5 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-semibold leading-6 text-orange-200">
-              Registration update blocked because this division has launched
-              and its roster is locked.
-            </div>
-          )}
-
-          {registrationCohortSummaries.length > 0 && (
-            <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {registrationCohortSummaries.map((summary) => (
-                <div
-                  key={summary.bracketId}
-                  className={`rounded-2xl border p-4 ${
-                    summary.isReady
-                      ? "border-orange-400/35 bg-orange-500/10"
-                      : summary.launchedAt
-                        ? "border-sky-400/35 bg-sky-500/10"
-                      : "border-white/10 bg-black/30"
-                  }`}
+          <nav
+            aria-label="Admin mobile workspace navigation"
+            className="relative z-10 mt-7 grid gap-3 sm:grid-cols-2 xl:hidden"
+          >
+            {[
+              {
+                href: "/admin/registrations",
+                label: "Registration Review",
+                icon: ClipboardCheck,
+              },
+              {
+                href: "/admin/operations",
+                label: "Operations & Analytics",
+                icon: Activity,
+              },
+              {
+                href: "/admin/tournaments",
+                label: "Manage Tournaments",
+                icon: Trophy,
+              },
+              {
+                href: "/admin/maps",
+                label: "Global Map Catalogue",
+                icon: MapPinned,
+              },
+              {
+                href: "/admin/polls",
+                label: "Polls & Decisions",
+                icon: Vote,
+              },
+              {
+                href: "/admin/announcements",
+                label: "Official Announcements",
+                icon: Megaphone,
+              },
+              {
+                href: "/admin/system",
+                label: "System & Recovery",
+                icon: ShieldAlert,
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-black/45 px-4 py-3 text-sm font-bold text-zinc-200 transition hover:border-orange-400/50 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
                 >
-                  <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
-                    {summary.tournamentTitle}
+                  <Icon className="h-4 w-4 text-orange-400" aria-hidden="true" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </header>
+
+        {bracketNotice && bracketNoticeMessages[bracketNotice] && (
+          <div
+            role="status"
+            className={`flex flex-col gap-3 rounded-2xl border p-4 text-sm font-bold sm:flex-row sm:items-center sm:justify-between ${
+              bracketNotice === "population-saved" ||
+              bracketNotice === "division-launched" ||
+              bracketNotice === "division-already-launched"
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                : "border-red-500/30 bg-red-500/10 text-red-200"
+            }`}
+          >
+            <p>{bracketNoticeMessages[bracketNotice]}</p>
+            <Link
+              href="/admin/tournaments"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-current/30 px-4 py-2 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+            >
+              Open Tournament workspace
+            </Link>
+          </div>
+        )}
+
+        {(registrationResult.error || tournamentResult.error) && (
+          <div
+            role="alert"
+            className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200"
+          >
+            One or more Command Center summaries could not be loaded. Open the
+            focused workspace to retry the authoritative data view.
+          </div>
+        )}
+
+        <section aria-labelledby="needs-attention-heading" className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-400">
+                Current Work
+              </p>
+              <h2 id="needs-attention-heading" className="mt-2 text-2xl font-black">
+                Needs Attention
+              </h2>
+            </div>
+            <Link
+              href="/admin/operations#attention-required"
+              className="text-sm font-bold text-orange-300 underline decoration-orange-400/40 underline-offset-4 transition hover:text-orange-200"
+            >
+              Open Operations attention queue
+            </Link>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {summaryCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <Link
+                  key={card.label}
+                  href={card.href}
+                  className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:-translate-y-0.5 hover:border-orange-400/50 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+                >
+                  <Icon className="h-5 w-5 text-orange-400" aria-hidden="true" />
+                  <p className="mt-4 text-3xl font-black">
+                    {card.value === null ? "—" : card.value}
                   </p>
-                  <p className="mt-2 font-black text-white">
-                    {summary.bracketName}
+                  <p className="mt-1 text-sm text-zinc-400">{card.label}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="active-tournaments-heading"
+          className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-6"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-400">
+                Competition Context
+              </p>
+              <h2 id="active-tournaments-heading" className="mt-2 text-2xl font-black">
+                Active Tournaments
+              </h2>
+            </div>
+            <Link
+              href="/admin/tournaments"
+              className="text-sm font-bold text-orange-300 underline decoration-orange-400/40 underline-offset-4 transition hover:text-orange-200"
+            >
+              View all Tournaments
+            </Link>
+          </div>
+
+          {tournamentResult.error ? (
+            <p className="mt-5 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
+              Active Tournament context is temporarily unavailable.
+            </p>
+          ) : activeTournaments.length === 0 ? (
+            <p className="mt-5 rounded-2xl border border-dashed border-white/10 p-5 text-sm text-zinc-400">
+              No Tournaments are currently open for registration or in progress.
+            </p>
+          ) : (
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {activeTournaments.slice(0, 6).map((tournament) => (
+                <Link
+                  key={tournament.id}
+                  href={`/admin/tournaments/${tournament.id}?section=overview`}
+                  className="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:border-orange-400/45 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+                >
+                  <p className="break-words font-black text-white">
+                    {tournament.title}
                   </p>
-                  <p className="mt-3 text-2xl font-black text-orange-300">
-                    {summary.approvedCount} / {summary.requiredCount}
+                  <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">
+                    {formatStatus(tournament.status)}
                   </p>
-                  <p className="mt-1 text-xs uppercase tracking-wider text-zinc-400">
-                    Approved players
-                  </p>
-                  <p className="mt-3 text-sm font-bold text-zinc-200">
-                    {summary.launchedAt
-                      ? "Division launched — roster locked"
-                      : summary.isReady
-                        ? `${summary.approvedCount}/${summary.requiredCount} approved — ready for private bracket preparation`
-                        : `${summary.approvedCount}/${summary.requiredCount} approved — review incomplete`}
-                  </p>
-                  <p className="mt-1 text-sm text-zinc-400">
-                    Active cohort: {summary.activeCohortCount} · Waiting:{" "}
-                    {summary.waitlistCount}
-                  </p>
-                </div>
+                </Link>
               ))}
-            </div>
-          )}
-
-          {waitlistNotices.length > 0 && (
-            <div className="mb-5">
-              {waitlistNotices.length > 0 && (
-                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
-                  <p className="text-xs font-black uppercase tracking-wider text-amber-300">
-                    Waiting for a FIFO spot offer
-                  </p>
-                  <div className="mt-3 space-y-2 text-sm text-amber-50/90">
-                    {waitlistNotices.map((registration) => (
-                      <p key={registration.id}>
-                        {registration.player_name || "Player"} is Waitlist
-                        Position #{registration.waitlist_position ?? "?"} for{" "}
-                        {registration.tournament_title ||
-                          (registration.tournament_id
-                            ? tournamentsById.get(registration.tournament_id)
-                            : null) ||
-                          "this tournament"}
-                        . Vacancies are offered transactionally in FIFO order.
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          </div>
-
-          <div className="space-y-5">
-            {registrationReviewGroups.map((group) => (
-              <div
-                key={group.key}
-                className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-5"
-              >
-                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
-                      Tournament Registrations
-                    </p>
-                    <h3 className="mt-2 text-xl font-bold text-white">
-                      {group.title}
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-400">
-                      Showing {group.rows.length} of {group.totalCount}{" "}
-                      registration(s)
-                      {activeFilter === "all"
-                        ? "."
-                        : ` matching ${formatStatus(activeFilter)}.`}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="xl:hidden">
-                      <AdminRegistrationSelectAll
-                        formId="registration-bulk-form"
-                        name="registrationId"
-                        scope={group.key}
-                        showLabel
-                      />
-                    </div>
-                    <span className="w-fit rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-black uppercase tracking-wider text-zinc-300">
-                      {formatStatus(group.status)}
-                    </span>
-                  </div>
-                </div>
-
-                <AdminRegistrationReviewRows
-                  registrations={group.rows}
-                  activeFilter={activeFilter}
-                  formId="registration-bulk-form"
-                  selectionScope={group.key}
-                  isTournamentTerminal={terminalTournamentIds.has(group.key)}
-                  updateRegistrationStatusAction={updateRegistrationStatus}
-                />
-              </div>
-            ))}
-          </div>
-
-          {error && (
-            <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-              Could not load registrations from Supabase. Check your table name,
-              column names, and Row Level Security policy.
             </div>
           )}
         </section>
 
-        <div className="relative z-0 grid gap-8 lg:grid-cols-[1.2fr_1fr]">
-          <div className="grid gap-5 self-start">
-            <AdminBracketManagement
-              tournaments={bracketManagementTournaments}
-              notice={params?.bracketNotice}
-              loadError={bracketOperationsLoadFailed}
-            />
-
-            <AdminEloVerificationChecker
-              setting={eloVerificationSetting}
-              supportLinkSetting={eloVerificationSupportLinkSetting}
-            />
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <AdminLeaderboardControls
-              completedTournaments={completedLeaderboardTournaments}
-              recentRuns={leaderboardRecalculationRuns}
-              className="sm:col-span-2"
-            />
-
-            <InAppNotificationCenter
-              key={[
-                adminNotifications.unreadCount,
-                ...adminNotifications.notifications.map(
-                  (notification) =>
-                    `${notification.id}:${notification.readAt ?? ""}`
-                ),
-              ].join("|")}
-              scope="admin"
-              title="Admin Notification Center"
-              description="Recent registration, match result, and dispute events that need administrative awareness."
-              emptyMessage="New registrations, submitted results, and disputes will appear here."
-              notifications={adminNotifications.notifications}
-              totalCount={adminNotifications.totalCount}
-              unreadCount={adminNotifications.unreadCount}
-              error={adminNotifications.error}
-              className="sm:col-span-2"
-            />
-          </div>
+        <div className="relative z-0 max-w-4xl">
+          <InAppNotificationCenter
+            key={[
+              adminNotifications.unreadCount,
+              ...adminNotifications.notifications.map(
+                (notification) =>
+                  `${notification.id}:${notification.readAt ?? ""}`
+              ),
+            ].join("|")}
+            scope="admin"
+            title="Admin Notification Center"
+            description="Recent registration, match result, and dispute events that need administrative awareness."
+            emptyMessage="New registrations, submitted results, and disputes will appear here."
+            notifications={adminNotifications.notifications}
+            totalCount={adminNotifications.totalCount}
+            unreadCount={adminNotifications.unreadCount}
+            error={adminNotifications.error}
+          />
         </div>
-      </section>
-
-      {selectedRegistration && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-3 backdrop-blur sm:p-6">
-          <div className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl overflow-y-auto overscroll-contain rounded-3xl border border-orange-500/30 bg-zinc-950 p-4 shadow-2xl shadow-orange-950/40 sm:max-h-[calc(100dvh-3rem)] sm:p-6">
-            <div className="sticky top-0 z-10 -mx-1 mb-5 flex items-start justify-between gap-4 border-b border-white/10 bg-zinc-950/95 px-1 pb-4 backdrop-blur">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">
-                  Registration Details
-                </p>
-
-                <h2 className="mt-3 break-words text-2xl font-bold sm:text-3xl">
-                  {selectedRegistration.playerDisplayName || "N/A"}
-                </h2>
-
-                <p className="mt-2 text-sm text-zinc-400">
-                  Immutable tournament evidence and private administrator review.
-                </p>
-              </div>
-
-              <Link
-                href={buildHref({ filter: activeFilter })}
-                aria-label="Close registration details"
-                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] p-2 text-zinc-400 transition hover:border-orange-500/50 hover:text-orange-300"
-              >
-                <X className="h-5 w-5" />
-              </Link>
-            </div>
-
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-              {[
-                {
-                  label: "Player display name",
-                  value: selectedRegistration.playerDisplayName,
-                },
-                {
-                  label: "Tournament",
-                  value: selectedRegistration.tournamentName,
-                },
-                {
-                  label: "Selected bracket / division",
-                  value: selectedRegistration.selectedBracket,
-                },
-                {
-                  label: "Registration order (tournament division)",
-                  value: selectedRegistration.registrationOrder
-                    ? `#${selectedRegistration.registrationOrder}`
-                    : null,
-                },
-                {
-                  label: "Frozen tournament registration ELO",
-                  value: selectedRegistration.frozenRegistrationElo,
-                  detail:
-                    "Authoritative for this tournament. This is not the player's current profile ELO.",
-                },
-                {
-                  label: "Verified division",
-                  value: selectedRegistration.verifiedDivision,
-                },
-                {
-                  label: "Verified faction",
-                  value: selectedRegistration.verifiedFaction,
-                },
-                {
-                  label: "Verification source",
-                  value: formatAdminVerificationSource(
-                    selectedRegistration.verificationSource
-                  ),
-                },
-                {
-                  label: "Verification / check time",
-                  value: formatAdminEvidenceDateTime(
-                    selectedRegistration.verificationCheckedAt
-                  ),
-                },
-                {
-                  label: "Eligibility rules version",
-                  value: selectedRegistration.eligibilityRulesVersion,
-                },
-                {
-                  label: "Current registration status",
-                  value: formatStatus(selectedRegistration.status),
-                },
-                {
-                  label: "Waitlist position",
-                  value:
-                    selectedRegistration.status === "waitlisted"
-                      ? selectedRegistration.waitlistPosition
-                        ? `#${selectedRegistration.waitlistPosition}`
-                        : null
-                      : "Not waitlisted",
-                },
-                {
-                  label: "Waitlist offer",
-                  value: selectedRegistration.waitlistOfferStatus
-                    ? formatStatus(selectedRegistration.waitlistOfferStatus)
-                    : "No active or historical offer",
-                },
-                {
-                  label: "Division launch state",
-                  value: selectedRegistration.isDivisionLaunched
-                    ? "Launched — roster locked"
-                    : "Not launched",
-                },
-                {
-                  label: "Registered at",
-                  value: formatAdminEvidenceDateTime(
-                    selectedRegistration.registeredAt
-                  ),
-                },
-              ].map(({ label, value, detail }) => (
-                <div
-                  key={label}
-                  className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
-                >
-                  <p className="text-xs uppercase tracking-wider text-zinc-500">
-                    {label}
-                  </p>
-
-                  <p className="mt-2 break-words font-semibold text-white">
-                    {value === null || value === "" ? "Unavailable" : value}
-                  </p>
-                  {detail && (
-                    <p className="mt-2 text-xs leading-5 text-orange-200/75">
-                      {detail}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <form action={updateRegistrationStatus} className="mt-4">
-              <input
-                type="hidden"
-                name="registrationId"
-                value={selectedRegistration.registrationId}
-              />
-              <input
-                type="hidden"
-                name="activeFilter"
-                value={activeFilter}
-              />
-              <input
-                type="hidden"
-                name="selected"
-                value={selectedRegistration.registrationId}
-              />
-
-              <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
-                <label
-                  htmlFor="adminNotes"
-                  className="text-xs font-bold uppercase tracking-wider text-orange-300"
-                >
-                  Private Admin Note
-                  {selectedRegistrationIsTerminal ? " (read-only)" : ""}
-                </label>
-                <p className="mt-2 text-xs leading-5 text-zinc-400">
-                  {selectedRegistrationIsTerminal
-                    ? "Terminal tournament notes are retained as read-only administrator history."
-                    : "Required when rejecting a registration or marking it for manual review. This note is restricted to administrators and is never included in player-facing status messages."}
-                </p>
-                <textarea
-                  id="adminNotes"
-                  name="adminNotes"
-                  defaultValue={selectedRegistration.privateAdminNote ?? ""}
-                  maxLength={1000}
-                  rows={5}
-                  readOnly={selectedRegistrationIsTerminal}
-                  autoFocus={
-                    !selectedRegistrationIsTerminal &&
-                    (params?.focus === "note" || params?.focus === "reject")
-                  }
-                  className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-400 read-only:cursor-default read-only:border-white/5 read-only:text-zinc-400"
-                  placeholder="Record private review context for administrators."
-                />
-              </div>
-
-              {params?.notice && (
-                <div
-                  className={`mt-4 rounded-xl border p-4 text-sm ${
-                    params.notice === "saved"
-                      ? "border-green-500/30 bg-green-500/10 text-green-300"
-                      : "border-red-500/30 bg-red-500/10 text-red-300"
-                  }`}
-                >
-                  {params.notice === "note-required"
-                    ? "Add an admin note before rejecting or marking this registration for manual review."
-                    : params.notice === "saved"
-                      ? "Registration decision and admin note saved."
-                      : params.notice === "registration-locked"
-                          ? selectedRegistrationIsTerminal
-                            ? "This tournament is terminal, so registration decisions and private administrator notes are read-only."
-                            : "This division has launched, so its roster decisions are locked. Private administrator notes remain editable."
-                          : "The registration decision could not be saved. Check the note length and try again."}
-                </div>
-              )}
-
-              <div className="mt-6 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-2 lg:flex lg:flex-wrap">
-                <button
-                  type="submit"
-                  name="nextStatus"
-                  value={selectedRegistration.status}
-                  disabled={selectedRegistrationIsTerminal}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:border-white/30 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:border-white/5 disabled:text-zinc-600 lg:w-auto"
-                >
-                  Save Private Note
-                </button>
-
-                {!selectedRegistration.isDivisionLaunched &&
-                  !selectedRegistrationIsTerminal &&
-                  selectedRegistration.status !== "waitlisted" &&
-                  selectedRegistration.status !== "withdrawn" && (
-                    <button
-                      type="submit"
-                      name="nextStatus"
-                      value="approved"
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 transition hover:bg-green-500/20 lg:w-auto"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Approve
-                    </button>
-                  )}
-
-                {!selectedRegistration.isDivisionLaunched &&
-                  !selectedRegistrationIsTerminal &&
-                  selectedRegistration.status !== "withdrawn" && (
-                    <button
-                      type="submit"
-                      name="nextStatus"
-                      value="rejected"
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 lg:w-auto"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Reject
-                    </button>
-                  )}
-
-                {!selectedRegistration.isDivisionLaunched &&
-                  !selectedRegistrationIsTerminal &&
-                  selectedRegistration.status !== "waitlisted" &&
-                  selectedRegistration.status !== "withdrawn" && (
-                    <button
-                      type="submit"
-                      name="nextStatus"
-                      value="manual_review"
-                      autoFocus={params?.focus === "manual_review"}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/20 lg:w-auto"
-                    >
-                      <AlertTriangle className="h-4 w-4" />
-                      Mark Manual Review
-                    </button>
-                  )}
-
-              </div>
-
-              {selectedRegistration.status === "waitlisted" &&
-                !selectedRegistration.isDivisionLaunched &&
-                !selectedRegistrationIsTerminal && (
-                  <p className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
-                    A waitlisted player cannot be promoted by an administrator.
-                    The player must receive the oldest eligible FIFO offer,
-                    accept it, and return to Pending review first.
-                  </p>
-                )}
-
-              {selectedRegistration.isDivisionLaunched && (
-                <p className="mt-4 rounded-xl border border-sky-500/25 bg-sky-500/10 p-4 text-sm leading-6 text-sky-100">
-                  This division has launched. Registration status decisions are
-                  locked; private administrator notes remain editable.
-                </p>
-              )}
-
-              {selectedRegistrationIsTerminal && (
-                <p className="mt-4 rounded-xl border border-amber-400/25 bg-amber-950/20 p-4 text-sm leading-6 text-amber-100">
-                  This tournament is terminal. Competition decisions are locked;
-                  factual registration history and private administrator notes
-                  remain available in read-only form.
-                </p>
-              )}
-            </form>
-          </div>
-        </div>
-      )}
+      </div>
     </main>
   );
 }

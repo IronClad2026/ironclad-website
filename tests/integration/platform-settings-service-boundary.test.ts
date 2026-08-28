@@ -76,7 +76,7 @@ describe("platform settings protected server workflow", () => {
       enabled: true,
       updatedByClerkUserId: adminIdentity.userId,
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/system");
   });
 
   it.each([
@@ -123,6 +123,6 @@ describe("platform settings protected server workflow", () => {
       url: "https://support.example.test/elo",
       updatedByClerkUserId: adminIdentity.userId,
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/system");
   });
 });
