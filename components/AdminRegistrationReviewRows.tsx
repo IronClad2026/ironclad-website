@@ -154,7 +154,7 @@ export default function AdminRegistrationReviewRows({
       </div>
 
       <div className="hidden max-w-full overflow-x-auto overscroll-x-contain xl:block">
-        <table className="w-full min-w-[1080px] text-left text-sm">
+        <table className="w-full min-w-[900px] text-left text-sm 2xl:min-w-[1080px]">
           <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
             <tr>
               <th className="py-3 pr-3">

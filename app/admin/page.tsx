@@ -10,20 +10,7 @@ import {
 } from "@/app/admin/registration-actions";
 import AdminRegistrationReviewRows from "@/components/AdminRegistrationReviewRows";
 import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
-import AdminBracketManagement, {
-  type AdminBracketTournamentOption,
-} from "@/components/AdminBracketManagement";
-import AdminEloVerificationChecker from "@/components/AdminEloVerificationChecker";
-import AdminLeaderboardControls from "@/components/AdminLeaderboardControls";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
-import {
-  getCompletedLeaderboardTournaments,
-  getRecentLeaderboardRecalculationRuns,
-} from "@/lib/leaderboard/admin";
-import {
-  getEloVerificationSetting,
-  getEloVerificationSupportLinkSetting,
-} from "@/lib/platform-settings";
 import {
   getTournamentBracketDisplayName,
   isTournamentTerminalStatus,
@@ -78,6 +65,12 @@ type AdminNotice =
   | "registration-bulk-approved"
   | "registration-bulk-partial"
   | "registration-bulk-failed";
+type AdminBracketNotice =
+  | "population-saved"
+  | "population-failed"
+  | "division-launched"
+  | "division-already-launched"
+  | "division-launch-failed";
 
 type AdminPageProps = {
   searchParams?: Promise<{
@@ -86,13 +79,21 @@ type AdminPageProps = {
     notice?: AdminNotice;
     detail?: string;
     focus?: AdminFocusTarget;
-    bracketNotice?:
-      | "population-saved"
-      | "population-failed"
-      | "division-launched"
-      | "division-already-launched"
-      | "division-launch-failed";
+    bracketNotice?: AdminBracketNotice;
   }>;
+};
+
+const bracketNoticeMessages: Record<AdminBracketNotice, string> = {
+  "population-saved":
+    "Bracket assignments saved privately. The division remains unpublished until Launch Division.",
+  "population-failed":
+    "Bracket assignments could not be saved. Open the Tournament workspace and verify every selected Player is approved and unique.",
+  "division-launched":
+    "Division launched. Its bracket is now public and its roster is locked.",
+  "division-already-launched":
+    "This division was already launched; its original launch time and notifications were preserved.",
+  "division-launch-failed":
+    "Division launch failed. Open the Tournament workspace and confirm readiness, assignments, and private-draft integrity.",
 };
 
 type SupabaseRegistration = {
@@ -127,9 +128,7 @@ type AdminTournamentOption = {
   tournament_brackets?: {
     id: string;
     name: string;
-    max_players: number;
     launched_at: string | null;
-    map_pool_published_at: string | null;
   }[];
 };
 
@@ -282,12 +281,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const [
     registrationResult,
     tournamentResult,
-    generatedResult,
     adminNotifications,
-    completedLeaderboardTournaments,
-    leaderboardRecalculationRuns,
-    eloVerificationSetting,
-    eloVerificationSupportLinkSetting,
   ] =
     await Promise.all([
       supabase
@@ -299,27 +293,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, max_players, launched_at, map_pool_published_at)"
+          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, launched_at)"
         )
         .order("grand_final_at", { ascending: false, nullsFirst: false }),
-      supabase
-        .from("generated_brackets")
-        .select(
-          "id, tournament_bracket_id, format, slot_count, tournament_matches(player_one_slot, player_two_slot, player_one_registration_id, player_two_registration_id)"
-        ),
       loadAdminNotifications(50),
-      getCompletedLeaderboardTournaments(),
-      getRecentLeaderboardRecalculationRuns(8),
-      getEloVerificationSetting(),
-      getEloVerificationSupportLinkSetting(),
     ]);
   const registrationsData = registrationResult.data;
   const error = registrationResult.error;
   const invalidRegistrationResponse = !Array.isArray(registrationsData);
   const invalidTournamentResponse = !Array.isArray(tournamentResult.data);
-  const invalidGeneratedBracketResponse = !Array.isArray(
-    generatedResult.data
-  );
 
   if (error) {
     console.error("Supabase registrations fetch error:", error.message);
@@ -327,8 +309,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   if (
     (!error && invalidRegistrationResponse) ||
-    (!tournamentResult.error && invalidTournamentResponse) ||
-    (!generatedResult.error && invalidGeneratedBracketResponse)
+    (!tournamentResult.error && invalidTournamentResponse)
   ) {
     console.error("Admin Tournament operations returned an invalid response.");
   }
@@ -353,35 +334,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       ? tournamentResult.data
       : []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
-  const tournamentBracketIds = tournaments.flatMap((tournament) =>
-    (tournament.tournament_brackets ?? []).map((bracket) => bracket.id)
-  );
-  const currentMapPoolResult =
-    tournamentBracketIds.length > 0
-      ? await supabase
-          .from("tournament_bracket_map_pool_entries")
-          .select("tournament_bracket_id")
-          .in("tournament_bracket_id", tournamentBracketIds)
-          .is("removed_at", null)
-      : { data: [], error: null };
-  const currentMapCountByBracket = new Map<string, number>();
-  const currentMapPoolRows = Array.isArray(currentMapPoolResult.data)
-    ? currentMapPoolResult.data
-    : [];
-  for (const entry of currentMapPoolRows as {
-    tournament_bracket_id: string;
-  }[]) {
-    currentMapCountByBracket.set(
-      entry.tournament_bracket_id,
-      (currentMapCountByBracket.get(entry.tournament_bracket_id) ?? 0) + 1
-    );
-  }
-
-  if (currentMapPoolResult.error) {
-    console.error("Admin map-pool readiness load failed.");
-  } else if (!Array.isArray(currentMapPoolResult.data)) {
-    console.error("Admin map-pool readiness returned an invalid response.");
-  }
   const readinessResults = await Promise.all(
     tournaments.flatMap((tournament) =>
       (tournament.tournament_brackets ?? []).map(async (bracket) => {
@@ -417,24 +369,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       })
     )
   );
-  const readinessLoadFailed = readinessResults.some(
-    (result) => result === null
-  );
   const readinessByBracket = new Map(
     readinessResults
       .filter((result) => result !== null)
       .map((result) => [result.bracketId, result])
-  );
-  const bracketOperationsLoadFailed = Boolean(
-    error ||
-      tournamentResult.error ||
-      generatedResult.error ||
-      currentMapPoolResult.error ||
-      invalidRegistrationResponse ||
-      invalidTournamentResponse ||
-      invalidGeneratedBracketResponse ||
-      !Array.isArray(currentMapPoolResult.data) ||
-      readinessLoadFailed
   );
   const tournamentsById = new Map(
     tournaments.map((tournament) => [tournament.id, tournament.title])
@@ -541,97 +479,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     .slice()
     .sort(compareWaitlistedRegistrations)
     .slice(0, 6);
-  const generatedByBracket = new Map(
-    (
-      (Array.isArray(generatedResult.data) ? generatedResult.data : []) as {
-        id: string;
-        tournament_bracket_id: string;
-        format: "single_elimination" | "round_robin";
-        slot_count: number;
-        tournament_matches?: {
-          player_one_slot: number | null;
-          player_two_slot: number | null;
-          player_one_registration_id: string | null;
-          player_two_registration_id: string | null;
-        }[];
-      }[]
-    ).map((generated) => [generated.tournament_bracket_id, generated])
-  );
-  const bracketManagementTournaments: AdminBracketTournamentOption[] =
-    tournaments
-      .map((tournament) => ({
-        id: tournament.id,
-        title: tournament.title,
-        status: tournament.status,
-        brackets: (tournament.tournament_brackets ?? [])
-          .map((bracket) => {
-            const generated = generatedByBracket.get(bracket.id);
-            const readiness = readinessByBracket.get(bracket.id);
-            const assignments: Record<number, string | null> = {};
-            for (const match of generated?.tournament_matches ?? []) {
-              if (match.player_one_slot) {
-                assignments[match.player_one_slot] =
-                  match.player_one_registration_id;
-              }
-              if (match.player_two_slot) {
-                assignments[match.player_two_slot] =
-                  match.player_two_registration_id;
-              }
-            }
-
-            return {
-              generatedBracketId: generated?.id ?? null,
-              bracketId: bracket.id,
-              bracketName: getTournamentBracketDisplayName(bracket.name),
-              format: generated?.format ?? null,
-              slotCount: generated?.slot_count ?? 0,
-              actualMatchCount: generated?.tournament_matches?.length ?? 0,
-              expectedMatchCount: generated
-                ? generated.format === "single_elimination"
-                  ? generated.slot_count - 1
-                  : (generated.slot_count * (generated.slot_count - 1)) / 2
-                : 0,
-              assignments,
-              approvedCount:
-                readiness?.approvedCount ??
-                approvedCountByBracket.get(bracket.id) ??
-                0,
-              requiredCount:
-                readiness?.requiredCount ?? PHASE_FOUR_ACTIVE_COHORT_SIZE,
-              isReady: readiness?.isReady ?? false,
-              launchedAt: readiness?.launchedAt ?? bracket.launched_at,
-              mapPoolPublishedAt: bracket.map_pool_published_at,
-              currentMapCount:
-                currentMapCountByBracket.get(bracket.id) ?? 0,
-              participants: registrations
-                .filter(
-                  (registration) =>
-                    registration.registration_status === "approved" &&
-                    registration.tournament_id === tournament.id &&
-                    registration.tournament_bracket_id === bracket.id
-                )
-                .map((registration) => ({
-                  id: registration.id,
-                  name: registration.player_name,
-                  country: registration.country || "N/A",
-                  elo: registration.submitted_elo ?? 0,
-                })),
-            };
-          }),
-      }))
-      .filter((tournament) => tournament.brackets.length > 0);
-
   if (tournamentResult.error) {
     console.error(
       "Admin tournament operations load failed:",
       tournamentResult.error.message
-    );
-  }
-
-  if (generatedResult.error) {
-    console.error(
-      "Admin generated brackets load failed:",
-      generatedResult.error.message
     );
   }
 
@@ -839,10 +690,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </h1>
 
             <p className="mt-5 max-w-3xl text-zinc-300">
-              Control registrations, ELO checks, approvals, player verification,
-              and the full IronClad tournament workflow.
+              Control registrations, approvals, player verification, and the
+              full IronClad tournament workflow.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap xl:hidden">
               <Link
                 href="/admin/operations"
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/50 bg-orange-500/10 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/20"
@@ -878,9 +729,37 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <Megaphone className="h-4 w-4" />
                 Official Announcements
               </Link>
+              <Link
+                href="/admin/system"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-400/40 bg-black/45 px-5 py-3 font-bold text-orange-100 transition hover:border-orange-300 hover:bg-orange-500/10"
+              >
+                <ShieldAlert className="h-4 w-4" />
+                System &amp; Recovery
+              </Link>
             </div>
           </div>
         </div>
+
+        {params?.bracketNotice && (
+          <div
+            role="status"
+            className={`flex flex-col gap-3 rounded-2xl border p-4 text-sm font-bold sm:flex-row sm:items-center sm:justify-between ${
+              params.bracketNotice === "population-saved" ||
+              params.bracketNotice === "division-launched" ||
+              params.bracketNotice === "division-already-launched"
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                : "border-red-500/30 bg-red-500/10 text-red-200"
+            }`}
+          >
+            <p>{bracketNoticeMessages[params.bracketNotice]}</p>
+            <Link
+              href="/admin/tournaments"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-current/30 px-4 py-2 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+            >
+              Open Tournament workspace
+            </Link>
+          </div>
+        )}
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           {stats.map((stat) => {
@@ -906,7 +785,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           })}
         </div>
 
-        <section className="relative z-10 space-y-5">
+        <section
+          id="registration-review"
+          className="relative z-10 scroll-mt-28 space-y-5"
+        >
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-6">
           <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -1126,46 +1008,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           )}
         </section>
 
-        <div className="relative z-0 grid gap-8 lg:grid-cols-[1.2fr_1fr]">
-          <div className="grid gap-5 self-start">
-            <AdminBracketManagement
-              tournaments={bracketManagementTournaments}
-              notice={params?.bracketNotice}
-              loadError={bracketOperationsLoadFailed}
-            />
-
-            <AdminEloVerificationChecker
-              setting={eloVerificationSetting}
-              supportLinkSetting={eloVerificationSupportLinkSetting}
-            />
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <AdminLeaderboardControls
-              completedTournaments={completedLeaderboardTournaments}
-              recentRuns={leaderboardRecalculationRuns}
-              className="sm:col-span-2"
-            />
-
-            <InAppNotificationCenter
-              key={[
-                adminNotifications.unreadCount,
-                ...adminNotifications.notifications.map(
-                  (notification) =>
-                    `${notification.id}:${notification.readAt ?? ""}`
-                ),
-              ].join("|")}
-              scope="admin"
-              title="Admin Notification Center"
-              description="Recent registration, match result, and dispute events that need administrative awareness."
-              emptyMessage="New registrations, submitted results, and disputes will appear here."
-              notifications={adminNotifications.notifications}
-              totalCount={adminNotifications.totalCount}
-              unreadCount={adminNotifications.unreadCount}
-              error={adminNotifications.error}
-              className="sm:col-span-2"
-            />
-          </div>
+        <div className="relative z-0 max-w-4xl">
+          <InAppNotificationCenter
+            key={[
+              adminNotifications.unreadCount,
+              ...adminNotifications.notifications.map(
+                (notification) =>
+                  `${notification.id}:${notification.readAt ?? ""}`
+              ),
+            ].join("|")}
+            scope="admin"
+            title="Admin Notification Center"
+            description="Recent registration, match result, and dispute events that need administrative awareness."
+            emptyMessage="New registrations, submitted results, and disputes will appear here."
+            notifications={adminNotifications.notifications}
+            totalCount={adminNotifications.totalCount}
+            unreadCount={adminNotifications.unreadCount}
+            error={adminNotifications.error}
+          />
         </div>
       </section>
 

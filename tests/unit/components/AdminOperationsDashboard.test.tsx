@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -320,6 +320,45 @@ describe("Admin Operations dashboard contracts", () => {
     expect(withdrawn).toHaveClass("min-h-11", "flex-col", "sm:flex-row");
     expect(dispute).toHaveClass("min-h-11", "flex-col", "sm:flex-row");
     expect(screen.queryByText("No open operational issues.")).not.toBeInTheDocument();
+  });
+
+  it("provides desktop anchors for every section without dropping the selected period", () => {
+    const metrics = emptyMetrics();
+    metrics.period.key = "30d";
+
+    const { container } = render(
+      <AdminOperationsDashboard
+        metrics={metrics}
+        websiteTraffic={previewTraffic}
+      />
+    );
+
+    const navigation = screen.getByRole("navigation", {
+      name: "Operations sections",
+    });
+    expect(navigation).toHaveClass("hidden", "xl:block", "sticky");
+
+    const expectedSections = [
+      ["Overview", "operations-overview"],
+      ["Attention", "attention-required"],
+      ["Traffic", "website-traffic"],
+      ["Players", "players"],
+      ["Registrations", "registrations"],
+      ["Tournaments", "tournaments"],
+      ["Matches", "matches"],
+      ["Health", "platform-health"],
+    ] as const;
+
+    for (const [label, id] of expectedSections) {
+      expect(within(navigation).getByRole("link", { name: label })).toHaveAttribute(
+        "href",
+        `#${id}`
+      );
+      expect(container.querySelector(`#${id}`)).toHaveClass(
+        "scroll-mt-28",
+        "xl:scroll-mt-44"
+      );
+    }
   });
 
   it("keeps period, KPI, disclosure, and Who-row layouts usable on narrow screens", () => {
