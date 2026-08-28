@@ -671,7 +671,7 @@ export function buildAdminOperationsAttention(
       label: "Expired vacancy offers",
       count: counts.expiredWaitlistOffers,
       tone: "warning",
-      href: "/admin?filter=waitlisted",
+      href: "/admin/registrations?filter=waitlisted",
       description: "Open waitlist offers past their expiry time.",
     },
     {

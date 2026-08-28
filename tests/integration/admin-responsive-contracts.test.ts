@@ -11,6 +11,7 @@ function count(source: string, value: string) {
 }
 
 const adminPage = readSource("app/admin/page.tsx");
+const registrationsPage = readSource("app/admin/registrations/page.tsx");
 const tournamentListPage = readSource("app/admin/tournaments/page.tsx");
 const tournamentNewPage = readSource("app/admin/tournaments/new/page.tsx");
 const tournamentWorkspacePage = readSource(
@@ -42,9 +43,12 @@ const tournamentBannerPicker = readSource(
 describe("admin responsive component and CSS contracts", () => {
   it("contains page width and narrow-screen spacing in the changed admin pages", () => {
     expect(adminPage).toContain(
+      'className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32"'
+    );
+    expect(registrationsPage).toContain(
       'className="min-h-screen overflow-x-hidden bg-black px-4 pt-28 pb-16 text-white sm:px-6 sm:pt-32"'
     );
-    expect(adminPage).toContain(
+    expect(registrationsPage).toContain(
       'className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-5"'
     );
     expect(tournamentListPage).toContain(

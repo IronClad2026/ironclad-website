@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const navigationMock = vi.hoisted(() => ({ pathname: "/admin" }));
@@ -15,7 +15,7 @@ import AdminSidebar from "@/components/admin/AdminSidebar";
 const expectedLinks = [
   ["Command Center", "/admin"],
   ["Operations", "/admin/operations"],
-  ["Registrations", "/admin#registration-review"],
+  ["Registrations", "/admin/registrations"],
   ["Tournaments", "/admin/tournaments"],
   ["Announcements", "/admin/announcements"],
   ["Polls & Decisions", "/admin/polls"],
@@ -71,20 +71,20 @@ describe("Admin desktop sidebar", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
-  it("marks the interim Registration Review hash without also marking Command Center", async () => {
-    window.history.replaceState(null, "", "/admin#registration-review");
-    render(<AdminSidebar />);
+  it.each(["/admin/registrations", "/admin/registrations/registration-123"])(
+    "marks the Registrations workspace current for %s",
+    (pathname) => {
+      navigationMock.pathname = pathname;
+      render(<AdminSidebar />);
 
-    await waitFor(() =>
-      expect(screen.getByRole("link", { name: "Registrations" })).toHaveAttribute(
-        "aria-current",
-        "page"
-      )
-    );
-    expect(
-      screen.getByRole("link", { name: "Command Center" })
-    ).not.toHaveAttribute("aria-current");
-  });
+      expect(
+        screen.getByRole("link", { name: "Registrations" })
+      ).toHaveAttribute("aria-current", "page");
+      expect(
+        screen.getByRole("link", { name: "Command Center" })
+      ).not.toHaveAttribute("aria-current");
+    }
+  );
 
   it("keeps the shell desktop-only, bounded, scrollable, and focus-visible", () => {
     const { container } = render(

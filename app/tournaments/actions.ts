@@ -779,7 +779,12 @@ function failure(
 }
 
 function revalidateRegistrationPaths() {
-  for (const path of ["/admin", "/dashboard", "/tournaments"]) {
+  for (const path of [
+    "/admin",
+    "/admin/registrations",
+    "/dashboard",
+    "/tournaments",
+  ]) {
     try {
       revalidatePath(path);
     } catch {

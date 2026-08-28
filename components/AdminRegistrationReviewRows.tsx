@@ -47,7 +47,7 @@ export default function AdminRegistrationReviewRows({
   selectionScope,
   isTournamentTerminal,
   updateRegistrationStatusAction,
-  returnHref = "/admin",
+  returnHref = "/admin/registrations",
   workspaceTournamentId,
   workspaceSection,
 }: {

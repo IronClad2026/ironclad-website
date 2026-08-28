@@ -604,7 +604,7 @@ function buildNotificationHref(
     }
 
     if (row.registration_id) {
-      return `/admin?filter=all&selected=${encodeURIComponent(
+      return `/admin/registrations?filter=all&selected=${encodeURIComponent(
         row.registration_id
       )}`;
     }

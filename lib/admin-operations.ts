@@ -522,7 +522,7 @@ function buildMetrics(input: {
       },
       registrations: {
         value: currentRegistrations.length,
-        href: "/admin",
+        href: "/admin/registrations",
         detail: `Registrations Submitted · ${period.label}`,
         changePercent: calculateAdminOperationsGrowth(
           currentRegistrations.length,
@@ -722,7 +722,7 @@ function registrationWho(row: RegistrationRow, timestamp: string | null): AdminO
     secondary: row.tournament_title || "Tournament",
     meta: `${displayDivision(row.bracket_name)} · ${sentenceCase(row.registration_status)}`,
     timestamp: timestamp ?? row.created_at,
-    href: `/admin?filter=${encodeURIComponent(row.registration_status)}&selected=${encodeURIComponent(row.id)}`,
+    href: `/admin/registrations?filter=${encodeURIComponent(row.registration_status)}&selected=${encodeURIComponent(row.id)}`,
   };
 }
 

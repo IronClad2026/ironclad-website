@@ -101,6 +101,8 @@ describe("player registration lifecycle actions", () => {
       "withdraw_tournament_registration",
       { p_registration_id: REGISTRATION_ID }
     );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/registrations");
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
   });

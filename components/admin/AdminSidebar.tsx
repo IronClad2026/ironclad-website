@@ -13,13 +13,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 
 type AdminNavigationItem = {
   href: string;
   icon: LucideIcon;
   label: string;
-  match: "exact" | "hash" | "prefix";
+  match: "exact" | "prefix";
 };
 
 type AdminNavigationGroup = {
@@ -49,10 +48,10 @@ const ADMIN_NAVIGATION_GROUPS: AdminNavigationGroup[] = [
     label: "Competition",
     items: [
       {
-        href: "/admin#registration-review",
+        href: "/admin/registrations",
         icon: ClipboardCheck,
         label: "Registrations",
-        match: "hash",
+        match: "prefix",
       },
       {
         href: "/admin/tournaments",
@@ -105,19 +104,10 @@ const ADMIN_NAVIGATION_GROUPS: AdminNavigationGroup[] = [
 
 function isActiveRoute(
   pathname: string,
-  hash: string,
   item: AdminNavigationItem
 ): boolean {
-  if (item.match === "hash") {
-    const [itemPathname, itemHash] = item.href.split("#");
-    return pathname === itemPathname && hash === `#${itemHash}`;
-  }
-
   if (item.match === "exact") {
-    return (
-      pathname === item.href &&
-      !(item.href === "/admin" && hash === "#registration-review")
-    );
+    return pathname === item.href;
   }
 
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -125,15 +115,6 @@ function isActiveRoute(
 
 export default function AdminSidebar() {
   const pathname = usePathname() ?? "";
-  const [hash, setHash] = useState("");
-
-  useEffect(() => {
-    const syncHash = () => setHash(window.location.hash);
-
-    syncHash();
-    window.addEventListener("hashchange", syncHash);
-    return () => window.removeEventListener("hashchange", syncHash);
-  }, [pathname]);
 
   return (
     <aside className="sticky top-24 hidden h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain border-r border-white/10 bg-black/70 xl:block">
@@ -155,7 +136,7 @@ export default function AdminSidebar() {
               </p>
               <ul className="mt-2 space-y-1">
                 {group.items.map((item) => {
-                  const active = isActiveRoute(pathname, hash, item);
+                  const active = isActiveRoute(pathname, item);
                   const Icon = item.icon;
 
                   return (

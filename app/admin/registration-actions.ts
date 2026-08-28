@@ -123,7 +123,7 @@ function buildHref(
 
   const basePath = workspaceContext
     ? `/admin/tournaments/${workspaceContext.tournamentId}`
-    : "/admin";
+    : "/admin/registrations";
 
   return `${basePath}?${params.toString()}`;
 }
@@ -133,6 +133,7 @@ function revalidateRegistrationPaths(
   includeAdminTournaments = false
 ) {
   revalidatePath("/admin");
+  revalidatePath("/admin/registrations");
   revalidatePath("/dashboard");
   revalidatePath("/tournaments");
 
