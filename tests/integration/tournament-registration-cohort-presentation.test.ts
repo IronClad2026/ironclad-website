@@ -165,14 +165,15 @@ describe("registration cohort presentation", () => {
     );
 
     expect(adminRegistrationsSource).toContain(
-      "approved — ready for private bracket preparation"
+      "data-registration-readiness-summary={group.key}"
     );
-    expect(adminRegistrationsSource).toContain("approved — review incomplete");
+    expect(adminRegistrationsSource).toContain('" · READY"');
+    expect(adminRegistrationsSource).toContain('" · LAUNCHED / LOCKED"');
     expect(adminRegistrationsSource).toContain(
-      "Division launched — roster locked"
+      "data-registration-fifo-summary={group.key}"
     );
     expect(adminRegistrationsSource).toContain(
-      "Waiting for a FIFO spot offer"
+      "Vacancy offers remain transactional and follow Division FIFO."
     );
     expect(tournamentFormSource).toContain('label="Registration Closes"');
     expect(tournamentFormSource).toContain('name="registrationCloseAt"');

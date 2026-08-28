@@ -36,9 +36,9 @@ describe("global Admin Registrations workspace route contract", () => {
       'id="registration-review"',
       "get_tournament_bracket_readiness",
       "buildWaitlistPositionMap",
-      "Waiting for a FIFO spot offer",
+      "FIFO Waitlist",
       "Tournament metadata unavailable",
-      "Unknown tournament",
+      "Unassigned registrations",
       "Registration Details",
       "Private Admin Note",
       "A waitlisted player cannot be promoted by an administrator.",
@@ -48,6 +48,32 @@ describe("global Admin Registrations workspace route contract", () => {
       expect(registrationsPage).toContain(value);
     }
     expect(registrationsPage).not.toContain("InAppNotificationCenter");
+  });
+
+  it("uses one compact workbench instead of the old monolithic visual layer", () => {
+    expect(registrationsPage).toContain(
+      'data-registration-workbench-toolbar="true"'
+    );
+    expect(registrationsPage).toContain(
+      'data-registration-workbench-section="active"'
+    );
+    expect(registrationsPage).toContain(
+      'data-registration-workbench-section="exceptions"'
+    );
+    expect(registrationsPage).toContain(
+      'data-registration-workbench-section="archive"'
+    );
+    expect(registrationsPage).toContain(
+      "data-registration-tournament-group={group.key}"
+    );
+    expect(registrationsPage).toContain(
+      'desktopPresentation="tournament-workbench"'
+    );
+    expect(registrationsPage).not.toMatch(
+      /<h2[^>]*>\s*Registration Review\s*<\/h2>/
+    );
+    expect(registrationsPage).not.toContain("Delete Selected");
+    expect(registrationsPage).not.toContain("registrationSearch");
   });
 
   it("exposes every existing status as a compact direct filter", () => {
@@ -73,6 +99,20 @@ describe("global Admin Registrations workspace route contract", () => {
     );
     expect(registrationsPage).toContain(
       'returnHref="/admin/registrations"'
+    );
+    expect(registrationsPage).toContain(
+      'form="registration-bulk-form"'
+    );
+    expect(registrationsPage).toContain("approveSelectedRegistrations");
+    expect(registrationRows).toContain(
+      'data-registration-review-cards="true"'
+    );
+    expect(registrationRows).toContain(
+      'className="hidden max-w-full overflow-x-auto overscroll-x-contain xl:block"'
+    );
+    expect(registrationRows).toContain("Review Details");
+    expect(registrationRows).toContain(
+      "data-registration-selection-scope={selectionScope}"
     );
   });
 

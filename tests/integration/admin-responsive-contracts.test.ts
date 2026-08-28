@@ -49,7 +49,25 @@ describe("admin responsive component and CSS contracts", () => {
       'className="min-h-screen overflow-x-hidden bg-black px-4 pt-28 pb-16 text-white sm:px-6 sm:pt-32"'
     );
     expect(registrationsPage).toContain(
-      'className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-5"'
+      "data-registration-tournament-group={group.key}"
+    );
+    expect(registrationsPage).toContain(
+      'className="group min-w-0 overflow-hidden rounded-2xl border border-white/10'
+    );
+    expect(registrationsPage).toContain(
+      'className="cursor-pointer list-none px-4 py-4'
+    );
+    expect(registrationsPage).toContain(
+      'className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1"'
+    );
+    expect(registrationsPage).toContain(
+      'className="group/archive rounded-2xl border border-white/10'
+    );
+    expect(registrationsPage).toContain(
+      'className="flex min-h-11 cursor-pointer list-none items-center justify-between'
+    );
+    expect(registrationsPage).toContain(
+      "group-open/archive:rotate-180"
     );
     expect(tournamentListPage).toContain(
       'className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32"'

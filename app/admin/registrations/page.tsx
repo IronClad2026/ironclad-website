@@ -30,6 +30,7 @@ import {
 import {
   AlertTriangle,
   CheckCircle,
+  ChevronDown,
   ChevronLeft,
   ClipboardCheck,
   X,
@@ -103,6 +104,56 @@ type AdminTournamentOption = {
     launched_at: string | null;
   }[];
 };
+
+type RegistrationCohortSummary = {
+  bracketId: string;
+  tournamentId: string;
+  tournamentTitle: string;
+  bracketName: string;
+  activeCohortCount: number;
+  approvedCount: number;
+  requiredCount: number;
+  waitlistCount: number;
+  isReady: boolean;
+  launchedAt: string | null;
+};
+
+type RegistrationReviewGroupStatus =
+  | TournamentStatus
+  | "metadata_unavailable"
+  | "unknown";
+
+type RegistrationReviewGroup = {
+  key: string;
+  title: string;
+  status: RegistrationReviewGroupStatus;
+  rows: AdminRegistrationReviewRow[];
+  totalCount: number;
+  statusCounts: Record<RegistrationStatus, number>;
+  readiness: RegistrationCohortSummary[];
+  waitlistRows: SupabaseRegistration[];
+};
+
+const ACTIVE_TOURNAMENT_STATUSES: readonly TournamentStatus[] = [
+  "upcoming",
+  "registration_open",
+  "in_progress",
+];
+
+const ARCHIVED_TOURNAMENT_STATUSES: readonly TournamentStatus[] = [
+  "completed",
+  "cancelled",
+  "voided",
+];
+
+const REGISTRATION_STATUSES: readonly RegistrationStatus[] = [
+  "pending",
+  "manual_review",
+  "approved",
+  "rejected",
+  "waitlisted",
+  "withdrawn",
+];
 
 function formatStatus(status: string) {
   return status
@@ -216,6 +267,46 @@ function compareAdminTournaments(
   return getAdminTournamentSortTime(right) - getAdminTournamentSortTime(left);
 }
 
+function isActiveTournamentStatus(status: RegistrationReviewGroupStatus) {
+  return ACTIVE_TOURNAMENT_STATUSES.includes(status as TournamentStatus);
+}
+
+function isArchivedTournamentStatus(status: RegistrationReviewGroupStatus) {
+  return ARCHIVED_TOURNAMENT_STATUSES.includes(status as TournamentStatus);
+}
+
+function getRegistrationStatusCounts(rows: AdminRegistrationReviewRow[]) {
+  const counts = Object.fromEntries(
+    REGISTRATION_STATUSES.map((status) => [status, 0])
+  ) as Record<RegistrationStatus, number>;
+
+  for (const row of rows) {
+    counts[row.status] += 1;
+  }
+
+  return counts;
+}
+
+function getContextualWaitlistGroups(rows: SupabaseRegistration[]) {
+  const rowsByBracket = new Map<string, SupabaseRegistration[]>();
+
+  for (const row of rows) {
+    const key = row.tournament_bracket_id ?? "unassigned";
+    const bracketRows = rowsByBracket.get(key) ?? [];
+    bracketRows.push(row);
+    rowsByBracket.set(key, bracketRows);
+  }
+
+  return Array.from(rowsByBracket, ([key, bracketRows]) => ({
+    key,
+    bracketName:
+      bracketRows[0]?.bracket_name?.trim()
+        ? getTournamentBracketDisplayName(bracketRows[0].bracket_name.trim())
+        : "Division not assigned",
+    rows: bracketRows,
+  }));
+}
+
 function getAdminTournamentSortTime(tournament: AdminTournamentOption) {
   const dateValue = tournament.grand_final_at ?? tournament.created_at;
   const timestamp = new Date(dateValue).getTime();
@@ -234,6 +325,160 @@ function compareWaitlistedRegistrations(
     (Number.isFinite(rightTime) ? rightTime : 0);
 
   return timeDelta || left.id.localeCompare(right.id);
+}
+
+function RegistrationWorkbenchGroup({
+  group,
+  activeFilter,
+  defaultOpen,
+  isTournamentTerminal,
+}: {
+  group: RegistrationReviewGroup;
+  activeFilter: FilterStatus;
+  defaultOpen: boolean;
+  isTournamentTerminal: boolean;
+}) {
+  const statusCounts = [
+    ["Pending", group.statusCounts.pending],
+    ["Manual", group.statusCounts.manual_review],
+    ["Approved", group.statusCounts.approved],
+    ["Rejected", group.statusCounts.rejected],
+    ["Waitlist", group.statusCounts.waitlisted],
+    ["Withdrawn", group.statusCounts.withdrawn],
+  ].filter((entry): entry is [string, number] => Number(entry[1]) > 0);
+  const waitlistGroups = getContextualWaitlistGroups(group.waitlistRows);
+
+  return (
+    <details
+      open={defaultOpen}
+      data-registration-tournament-group={group.key}
+      data-registration-group-status={group.status}
+      className="group min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] open:border-orange-400/25 open:bg-white/[0.05]"
+    >
+      <summary className="cursor-pointer list-none px-4 py-4 marker:text-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-400 sm:px-5 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <span className="min-w-0">
+            <span className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="break-words text-base font-black text-white sm:text-lg">
+                {group.title}
+              </span>
+              <span className="rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-wider text-zinc-300">
+                {formatStatus(group.status)}
+              </span>
+            </span>
+            <span className="mt-2 block text-xs font-semibold text-zinc-400">
+              {group.rows.length} matching · {group.totalCount} total
+            </span>
+            {statusCounts.length > 0 && (
+              <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-300">
+                {statusCounts.map(([label, count]) => (
+                  <span key={label}>
+                    <span className="font-bold text-zinc-100">{label}</span>{" "}
+                    {count}
+                  </span>
+                ))}
+              </span>
+            )}
+          </span>
+
+          {group.readiness.length > 0 && (
+            <span
+              data-registration-readiness-summary={group.key}
+              className="flex min-w-0 flex-wrap gap-2 xl:max-w-[58%] xl:justify-end"
+            >
+              {group.readiness.map((readiness) => (
+                <span
+                  key={readiness.bracketId}
+                  className={`rounded-xl border px-3 py-2 text-xs leading-5 ${
+                    readiness.launchedAt
+                      ? "border-sky-400/30 bg-sky-500/10 text-sky-100"
+                      : readiness.isReady
+                        ? "border-orange-400/35 bg-orange-500/10 text-orange-100"
+                        : "border-white/10 bg-black/30 text-zinc-300"
+                  }`}
+                >
+                  <span className="font-black text-white">
+                    {readiness.bracketName}
+                  </span>{" "}
+                  {readiness.approvedCount}/{readiness.requiredCount} approved ·{" "}
+                  {readiness.activeCohortCount} active · {readiness.waitlistCount}{" "}
+                  waiting
+                  {readiness.launchedAt
+                    ? " · LAUNCHED / LOCKED"
+                    : readiness.isReady
+                      ? " · READY"
+                      : ""}
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+        <span className="mt-3 block text-[0.65rem] font-black uppercase tracking-[0.22em] text-orange-300 group-open:text-orange-200">
+          <span className="group-open:hidden">Open Tournament registrations</span>
+          <span className="hidden group-open:inline">
+            Hide Tournament registrations
+          </span>
+        </span>
+      </summary>
+
+      <div className="border-t border-white/10 px-4 py-4 sm:px-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-5 text-zinc-500">
+            Frozen ELO is captured at registration and is not the current
+            profile ELO. Full immutable evidence remains in Registration
+            Details.
+          </p>
+          <div className="shrink-0 xl:hidden">
+            <AdminRegistrationSelectAll
+              formId="registration-bulk-form"
+              name="registrationId"
+              scope={group.key}
+              showLabel
+            />
+          </div>
+        </div>
+
+        {waitlistGroups.length > 0 && (
+          <div
+            data-registration-fifo-summary={group.key}
+            className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3"
+          >
+            <p className="text-xs font-black uppercase tracking-wider text-amber-300">
+              FIFO Waitlist · {group.waitlistRows.length} waiting
+            </p>
+            <div className="mt-2 space-y-1 text-xs leading-5 text-amber-50/85">
+              {waitlistGroups.map((waitlistGroup) => {
+                const oldest = waitlistGroup.rows[0];
+
+                return (
+                  <p key={waitlistGroup.key}>
+                    <span className="font-bold text-amber-100">
+                      {waitlistGroup.bracketName}
+                    </span>{" "}
+                    · {waitlistGroup.rows.length} waiting · Oldest: {" "}
+                    {oldest.player_name || "Player"} · Position #{" "}
+                    {oldest.waitlist_position ?? "?"}
+                  </p>
+                );
+              })}
+              <p>Vacancy offers remain transactional and follow Division FIFO.</p>
+            </div>
+          </div>
+        )}
+
+        <AdminRegistrationReviewRows
+          registrations={group.rows}
+          activeFilter={activeFilter}
+          formId="registration-bulk-form"
+          selectionScope={group.key}
+          isTournamentTerminal={isTournamentTerminal}
+          updateRegistrationStatusAction={updateRegistrationStatus}
+          returnHref="/admin/registrations"
+          desktopPresentation="tournament-workbench"
+        />
+      </div>
+    </details>
+  );
 }
 
 export default async function AdminRegistrationsPage({
@@ -402,7 +647,7 @@ export default async function AdminRegistrationsPage({
       );
     }
   }
-  const registrationCohortSummaries = Array.from(
+  const registrationCohortSummaries: RegistrationCohortSummary[] = Array.from(
     bracketMetaById,
     ([bracketId, meta]) => {
       const activeCohortCount =
@@ -445,8 +690,7 @@ export default async function AdminRegistrationsPage({
         isBracketWaitlistOpen(registration.tournament_bracket_id)
     )
     .slice()
-    .sort(compareWaitlistedRegistrations)
-    .slice(0, 6);
+    .sort(compareWaitlistedRegistrations);
   if (tournamentResult.error) {
     console.error(
       "Admin tournament operations load failed:",
@@ -525,26 +769,63 @@ export default async function AdminRegistrationsPage({
     },
     new Map<string, AdminRegistrationReviewRow[]>()
   );
+  const allRegistrationRowsByTournament = allRegistrationReviewRows.reduce(
+    (groups, registration) => {
+      const key = registration.tournamentId ?? "unassigned";
+      const group = groups.get(key) ?? [];
+      group.push(registration);
+      groups.set(key, group);
+      return groups;
+    },
+    new Map<string, AdminRegistrationReviewRow[]>()
+  );
+  const readinessByTournament = registrationCohortSummaries.reduce(
+    (groups, readiness) => {
+      const group = groups.get(readiness.tournamentId) ?? [];
+      group.push(readiness);
+      groups.set(readiness.tournamentId, group);
+      return groups;
+    },
+    new Map<string, RegistrationCohortSummary[]>()
+  );
+  const waitlistNoticesByTournament = waitlistNotices.reduce(
+    (groups, registration) => {
+      const key = registration.tournament_id ?? "unassigned";
+      const group = groups.get(key) ?? [];
+      group.push(registration);
+      groups.set(key, group);
+      return groups;
+    },
+    new Map<string, SupabaseRegistration[]>()
+  );
   const tournamentIdsWithMetadata = new Set(
     tournaments.map((tournament) => tournament.id)
   );
-  const registrationReviewGroups: {
+  const registrationReviewGroupsBase: {
     key: string;
     title: string;
-    status: TournamentStatus | "metadata_unavailable" | "unknown";
+    status: RegistrationReviewGroupStatus;
     rows: AdminRegistrationReviewRow[];
     totalCount: number;
-  }[] = tournaments.map((tournament) => ({
-    key: tournament.id,
-    title: tournament.title,
-    status: tournament.status,
-    rows: registrationRowsByTournament.get(tournament.id) ?? [],
-    totalCount: totalRegistrationCountByTournament.get(tournament.id) ?? 0,
-  }));
-  const fallbackRegistrationGroupKeys = new Set([
-    ...totalRegistrationCountByTournament.keys(),
-    ...registrationRowsByTournament.keys(),
-  ]);
+  }[] = tournaments.flatMap((tournament) => {
+    const rows = registrationRowsByTournament.get(tournament.id) ?? [];
+
+    return rows.length > 0
+      ? [
+          {
+            key: tournament.id,
+            title: tournament.title,
+            status: tournament.status,
+            rows,
+            totalCount:
+              totalRegistrationCountByTournament.get(tournament.id) ?? 0,
+          },
+        ]
+      : [];
+  });
+  const fallbackRegistrationGroupKeys = new Set(
+    registrationRowsByTournament.keys()
+  );
 
   for (const key of fallbackRegistrationGroupKeys) {
     if (key === "unassigned" || tournamentIdsWithMetadata.has(key)) {
@@ -558,7 +839,7 @@ export default async function AdminRegistrationsPage({
         .find((registration) => registration.tournament_id === key)
         ?.tournament_title?.trim();
 
-    registrationReviewGroups.push({
+    registrationReviewGroupsBase.push({
       key,
       title: storedTitle
         ? `${storedTitle} (metadata unavailable)`
@@ -572,18 +853,46 @@ export default async function AdminRegistrationsPage({
   const unassignedRegistrationRows =
     registrationRowsByTournament.get("unassigned") ?? [];
 
-  if (
-    unassignedRegistrationRows.length > 0 ||
-    (totalRegistrationCountByTournament.get("unassigned") ?? 0) > 0
-  ) {
-    registrationReviewGroups.push({
+  if (unassignedRegistrationRows.length > 0) {
+    registrationReviewGroupsBase.push({
       key: "unassigned",
-      title: "Unknown tournament",
+      title: "Unassigned registrations",
       status: "unknown",
       rows: unassignedRegistrationRows,
       totalCount: totalRegistrationCountByTournament.get("unassigned") ?? 0,
     });
   }
+
+  const registrationReviewGroups: RegistrationReviewGroup[] =
+    registrationReviewGroupsBase.map((group) => ({
+      ...group,
+      statusCounts: getRegistrationStatusCounts(
+        allRegistrationRowsByTournament.get(group.key) ?? []
+      ),
+      readiness: readinessByTournament.get(group.key) ?? [],
+      waitlistRows: waitlistNoticesByTournament.get(group.key) ?? [],
+    }));
+  const activeTournamentGroups = registrationReviewGroups.filter((group) =>
+    isActiveTournamentStatus(group.status)
+  );
+  const archivedTournamentGroups = registrationReviewGroups.filter((group) =>
+    isArchivedTournamentStatus(group.status)
+  );
+  const exceptionGroups = registrationReviewGroups.filter(
+    (group) =>
+      group.status === "metadata_unavailable" || group.status === "unknown"
+  );
+  const selectedGroupKey = selectedRegistration
+    ? selectedRegistration.tournamentId ?? "unassigned"
+    : undefined;
+  const selectedGroupIsArchived = archivedTournamentGroups.some(
+    (group) => group.key === selectedGroupKey
+  );
+  const shouldOpenArchive =
+    selectedGroupIsArchived ||
+    (activeFilter !== "all" &&
+      activeTournamentGroups.length === 0 &&
+      archivedTournamentGroups.length > 0);
 
   const filterOptions = [
     {
@@ -681,55 +990,51 @@ export default async function AdminRegistrationsPage({
           </div>
         </header>
 
-        <nav
-          aria-label="Registration status filters"
-          className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur"
-        >
-          <div className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1">
-            {filterOptions.map((option) => {
-              const isActive = activeFilter === option.filter;
-
-              return (
-                <Link
-                  key={option.filter}
-                  href={buildHref({ filter: option.filter })}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 ${
-                    isActive
-                      ? "border-orange-400/60 bg-orange-500/20 text-orange-100"
-                      : "border-white/10 bg-black/30 text-zinc-300 hover:border-orange-400/40 hover:text-white"
-                  }`}
-                >
-                  <span>{option.label}</span>
-                  <span className="rounded-full bg-black/40 px-2 py-0.5 text-xs text-orange-300">
-                    {option.value}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
-
         <section
           id="registration-review"
           className="relative z-10 scroll-mt-28 space-y-5"
         >
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-6">
-          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Registration Review</h2>
-              <p className="mt-1 text-sm text-zinc-400">
-                Showing {registrationReviewRows.length} registration(s).
-              </p>
-            </div>
-
+          <div
+            data-registration-workbench-toolbar="true"
+            className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur"
+          >
             <form
               id="registration-bulk-form"
               action={deleteSelectedRegistrations}
             >
               <input type="hidden" name="activeFilter" value={activeFilter} />
             </form>
-            <div className="grid w-full gap-3 sm:flex sm:w-auto sm:flex-wrap">
+
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <nav
+                aria-label="Registration status filters"
+                className="min-w-0 flex-1"
+              >
+                <div className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1">
+                  {filterOptions.map((option) => {
+                    const isActive = activeFilter === option.filter;
+
+                    return (
+                      <Link
+                        key={option.filter}
+                        href={buildHref({ filter: option.filter })}
+                        aria-current={isActive ? "page" : undefined}
+                        className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 ${
+                          isActive
+                            ? "border-orange-400/60 bg-orange-500/20 text-orange-100"
+                            : "border-white/10 bg-black/30 text-zinc-300 hover:border-orange-400/40 hover:text-white"
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        <span className="rounded-full bg-black/40 px-2 py-0.5 text-xs text-orange-300">
+                          {option.value}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </nav>
+
               <button
                 type="submit"
                 form="registration-bulk-form"
@@ -741,6 +1046,9 @@ export default async function AdminRegistrationsPage({
                 Approve Selected
               </button>
             </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              Showing {registrationReviewRows.length} registration(s).
+            </p>
           </div>
 
           {params?.notice === "registration-deleted" && (
@@ -806,125 +1114,111 @@ export default async function AdminRegistrationsPage({
             </div>
           )}
 
-          {registrationCohortSummaries.length > 0 && (
-            <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {registrationCohortSummaries.map((summary) => (
-                <div
-                  key={summary.bracketId}
-                  className={`rounded-2xl border p-4 ${
-                    summary.isReady
-                      ? "border-orange-400/35 bg-orange-500/10"
-                      : summary.launchedAt
-                        ? "border-sky-400/35 bg-sky-500/10"
-                      : "border-white/10 bg-black/30"
-                  }`}
+          {activeTournamentGroups.length > 0 && (
+            <section
+              data-registration-workbench-section="active"
+              aria-labelledby="active-registration-tournaments"
+              className="space-y-3"
+            >
+              <div className="flex items-center justify-between gap-3 px-1">
+                <h2
+                  id="active-registration-tournaments"
+                  className="text-sm font-black uppercase tracking-[0.24em] text-orange-300"
                 >
-                  <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
-                    {summary.tournamentTitle}
-                  </p>
-                  <p className="mt-2 font-black text-white">
-                    {summary.bracketName}
-                  </p>
-                  <p className="mt-3 text-2xl font-black text-orange-300">
-                    {summary.approvedCount} / {summary.requiredCount}
-                  </p>
-                  <p className="mt-1 text-xs uppercase tracking-wider text-zinc-400">
-                    Approved players
-                  </p>
-                  <p className="mt-3 text-sm font-bold text-zinc-200">
-                    {summary.launchedAt
-                      ? "Division launched — roster locked"
-                      : summary.isReady
-                        ? `${summary.approvedCount}/${summary.requiredCount} approved — ready for private bracket preparation`
-                        : `${summary.approvedCount}/${summary.requiredCount} approved — review incomplete`}
-                  </p>
-                  <p className="mt-1 text-sm text-zinc-400">
-                    Active cohort: {summary.activeCohortCount} · Waiting:{" "}
-                    {summary.waitlistCount}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {waitlistNotices.length > 0 && (
-            <div className="mb-5">
-              {waitlistNotices.length > 0 && (
-                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
-                  <p className="text-xs font-black uppercase tracking-wider text-amber-300">
-                    Waiting for a FIFO spot offer
-                  </p>
-                  <div className="mt-3 space-y-2 text-sm text-amber-50/90">
-                    {waitlistNotices.map((registration) => (
-                      <p key={registration.id}>
-                        {registration.player_name || "Player"} is Waitlist
-                        Position #{registration.waitlist_position ?? "?"} for{" "}
-                        {registration.tournament_title ||
-                          (registration.tournament_id
-                            ? tournamentsById.get(registration.tournament_id)
-                            : null) ||
-                          "this tournament"}
-                        . Vacancies are offered transactionally in FIFO order.
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          </div>
-
-          <div className="space-y-5">
-            {registrationReviewGroups.map((group) => (
-              <div
-                key={group.key}
-                className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:p-5"
-              >
-                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
-                      Tournament Registrations
-                    </p>
-                    <h3 className="mt-2 text-xl font-bold text-white">
-                      {group.title}
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-400">
-                      Showing {group.rows.length} of {group.totalCount}{" "}
-                      registration(s)
-                      {activeFilter === "all"
-                        ? "."
-                        : ` matching ${formatStatus(activeFilter)}.`}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="xl:hidden">
-                      <AdminRegistrationSelectAll
-                        formId="registration-bulk-form"
-                        name="registrationId"
-                        scope={group.key}
-                        showLabel
-                      />
-                    </div>
-                    <span className="w-fit rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-black uppercase tracking-wider text-zinc-300">
-                      {formatStatus(group.status)}
-                    </span>
-                  </div>
-                </div>
-
-                <AdminRegistrationReviewRows
-                  registrations={group.rows}
-                  activeFilter={activeFilter}
-                  formId="registration-bulk-form"
-                  selectionScope={group.key}
-                  isTournamentTerminal={terminalTournamentIds.has(group.key)}
-                  updateRegistrationStatusAction={updateRegistrationStatus}
-                  returnHref="/admin/registrations"
-                />
+                  Active Tournaments
+                </h2>
+                <span className="text-xs text-zinc-500">
+                  {activeTournamentGroups.length} Tournament(s)
+                </span>
               </div>
-            ))}
-          </div>
+              {activeTournamentGroups.map((group, index) => (
+                <RegistrationWorkbenchGroup
+                  key={group.key}
+                  group={group}
+                  activeFilter={activeFilter}
+                  defaultOpen={
+                    group.key === selectedGroupKey ||
+                    (index === 0 && !selectedGroupKey)
+                  }
+                  isTournamentTerminal={terminalTournamentIds.has(group.key)}
+                />
+              ))}
+            </section>
+          )}
+
+          {exceptionGroups.length > 0 && (
+            <section
+              data-registration-workbench-section="exceptions"
+              aria-labelledby="registration-exceptions"
+              className="space-y-3 rounded-2xl border border-amber-500/25 bg-amber-500/[0.06] p-3 sm:p-4"
+            >
+              <div className="flex items-center gap-2 px-1">
+                <AlertTriangle
+                  className="h-4 w-4 text-amber-300"
+                  aria-hidden="true"
+                />
+                <h2
+                  id="registration-exceptions"
+                  className="text-sm font-black uppercase tracking-[0.2em] text-amber-200"
+                >
+                  Attention / Exceptions
+                </h2>
+              </div>
+              {exceptionGroups.map((group, index) => (
+                <RegistrationWorkbenchGroup
+                  key={group.key}
+                  group={group}
+                  activeFilter={activeFilter}
+                  defaultOpen={
+                    group.key === selectedGroupKey ||
+                    (index === 0 && !selectedGroupKey)
+                  }
+                  isTournamentTerminal={terminalTournamentIds.has(group.key)}
+                />
+              ))}
+            </section>
+          )}
+
+          {archivedTournamentGroups.length > 0 && (
+            <details
+              open={shouldOpenArchive}
+              data-registration-workbench-section="archive"
+              className="group/archive rounded-2xl border border-white/10 bg-white/[0.025] p-3 open:bg-white/[0.04] sm:p-4"
+            >
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-black uppercase tracking-[0.2em] text-zinc-300 marker:text-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 [&::-webkit-details-marker]:hidden">
+                <span>
+                  Past Tournaments ({archivedTournamentGroups.length})
+                  <span className="ml-2 text-xs normal-case tracking-normal text-zinc-500">
+                    Archive
+                  </span>
+                </span>
+                <ChevronDown
+                  className="h-5 w-5 shrink-0 text-orange-300 transition-transform group-open/archive:rotate-180"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="mt-4 space-y-3">
+                {archivedTournamentGroups.map((group, index) => (
+                  <RegistrationWorkbenchGroup
+                    key={group.key}
+                    group={group}
+                    activeFilter={activeFilter}
+                    defaultOpen={
+                      group.key === selectedGroupKey ||
+                      (shouldOpenArchive && !selectedGroupIsArchived && index === 0)
+                    }
+                    isTournamentTerminal={terminalTournamentIds.has(group.key)}
+                  />
+                ))}
+              </div>
+            </details>
+          )}
+
+          {registrationReviewGroups.length === 0 && !error && (
+            <p className="rounded-2xl border border-dashed border-white/10 bg-white/[0.025] p-8 text-center text-sm text-zinc-500">
+              No registrations found for this status.
+            </p>
+          )}
 
           {error && (
             <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
