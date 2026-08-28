@@ -738,9 +738,9 @@ const capabilities: Capability[] = [
         file: "admin",
         includes: [
           "InAppNotificationCenter",
-          'href="/admin/maps"',
-          'href="/admin/polls"',
-          'href="/admin/announcements"',
+          'href: "/admin/maps"',
+          'href: "/admin/polls"',
+          'href: "/admin/announcements"',
         ],
       },
     ],
@@ -923,7 +923,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.announcementsAdmin).toContain("<AdminAnnouncements");
     expect(source.navbar).toContain('const announcementHref = "/announcements"');
     expect(source.navbar).toContain("useAnnouncementUnreadState");
-    expect(source.admin).toContain('href="/admin/announcements"');
+    expect(source.admin).toContain('href: "/admin/announcements"');
     expect(source.experience).toContain('activeTab === "announcements"');
   });
 

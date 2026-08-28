@@ -140,18 +140,18 @@ describe("administrator registration review responsive interaction", () => {
     expect(within(menu).getByRole("menuitem", { name: "Review Details" }))
       .toHaveAttribute(
         "href",
-        "/admin?filter=pending&selected=registration-main-1"
+        "/admin/registrations?filter=pending&selected=registration-main-1"
       );
     expect(within(menu).getByRole("menuitem", { name: "Reject" }))
       .toHaveAttribute(
         "href",
-        "/admin?filter=pending&selected=registration-main-1&focus=reject"
+        "/admin/registrations?filter=pending&selected=registration-main-1&focus=reject"
       );
     expect(
       within(menu).getByRole("menuitem", { name: "Mark Manual Review" })
     ).toHaveAttribute(
       "href",
-      "/admin?filter=pending&selected=registration-main-1&focus=manual_review"
+      "/admin/registrations?filter=pending&selected=registration-main-1&focus=manual_review"
     );
     expect(within(menu).queryByRole("menuitem", { name: /Waitlist/i }))
       .not.toBeInTheDocument();

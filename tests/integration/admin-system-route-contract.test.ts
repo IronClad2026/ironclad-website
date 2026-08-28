@@ -7,6 +7,7 @@ function source(path: string) {
 }
 
 const adminPage = source("app/admin/page.tsx");
+const registrationsPage = source("app/admin/registrations/page.tsx");
 const systemPage = source("app/admin/system/page.tsx");
 const eloActions = source("app/admin/elo-verification-actions.ts");
 const leaderboardActions = source("app/admin/leaderboard-actions.ts");
@@ -22,16 +23,17 @@ describe("Admin System & Recovery route contract", () => {
     expect(systemPage).toContain("Legacy Compatibility");
   });
 
-  it("stops only the duplicate advanced and global bracket surfaces on /admin", () => {
+  it("keeps focused Admin presentations on their authoritative routes", () => {
     expect(adminPage).not.toContain("AdminBracketManagement");
     expect(adminPage).not.toContain("AdminLeaderboardControls");
     expect(adminPage).not.toContain("AdminEloVerificationChecker");
     expect(adminPage).not.toContain('.from("generated_brackets")');
     expect(adminPage).not.toContain("tournament_bracket_map_pool_entries");
+    expect(adminPage).not.toContain("AdminRegistrationReviewRows");
 
-    expect(adminPage).toContain("AdminRegistrationReviewRows");
-    expect(adminPage).toContain("approveSelectedRegistrations");
-    expect(adminPage).toContain('id="registration-review"');
+    expect(registrationsPage).toContain("AdminRegistrationReviewRows");
+    expect(registrationsPage).toContain("approveSelectedRegistrations");
+    expect(registrationsPage).toContain('id="registration-review"');
     expect(adminPage).toContain("InAppNotificationCenter");
     expect(adminPage).toContain("bracketNoticeMessages");
     expect(adminPage).toContain("Open Tournament workspace");

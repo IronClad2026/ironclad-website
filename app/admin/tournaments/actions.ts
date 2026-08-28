@@ -424,6 +424,8 @@ export async function saveTournament(
       }
     } catch {
       console.error("Tournament banner replacement cleanup failed.");
+      revalidatePath("/admin");
+      revalidatePath("/admin/registrations");
       revalidatePath("/admin/tournaments", "page");
       revalidatePath("/tournaments");
       return {
@@ -433,6 +435,8 @@ export async function saveTournament(
     }
   }
 
+  revalidatePath("/admin");
+  revalidatePath("/admin/registrations");
   revalidatePath("/admin/tournaments", "page");
   revalidatePath(`/admin/tournaments/${savedTournamentId}`, "page");
   revalidatePath("/tournaments");
@@ -489,6 +493,7 @@ export async function generateTournamentBracket(formData: FormData) {
   revalidatePath("/admin/tournaments", "page");
   revalidatePath(`/admin/tournaments/${tournamentId}`, "page");
   revalidatePath("/admin");
+  revalidatePath("/admin/registrations");
   revalidatePath("/tournaments");
   redirect(
     buildTournamentWorkspaceHref(
@@ -594,6 +599,7 @@ export async function saveBracketAssignments(formData: FormData) {
     revalidatePath(`/admin/tournaments/${tournamentId}`, "page");
   }
   revalidatePath("/admin");
+  revalidatePath("/admin/registrations");
   revalidatePath("/tournaments");
   redirectToBracketManagement(formData, "population-saved");
 }
@@ -632,6 +638,7 @@ export async function launchTournamentDivision(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath("/admin/registrations");
   revalidatePath("/admin/tournaments", "page");
   revalidatePath("/dashboard");
   revalidatePath("/tournaments");
@@ -728,6 +735,8 @@ async function mutateTournamentTerminalState(
 
   revalidatePath("/admin/tournaments", "page");
   revalidatePath(`/admin/tournaments/${tournamentId}`, "page");
+  revalidatePath("/admin");
+  revalidatePath("/admin/registrations");
   revalidatePath("/dashboard");
   revalidatePath("/tournaments");
   revalidatePath("/rankings");
@@ -982,6 +991,7 @@ async function removeStorageObjects(
 function revalidateTournamentDeletionPaths() {
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath("/admin/registrations");
   revalidatePath("/admin/tournaments", "page");
   revalidatePath("/dashboard");
   revalidatePath("/tournaments");

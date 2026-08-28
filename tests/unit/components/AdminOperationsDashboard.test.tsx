@@ -50,7 +50,7 @@ function emptyMetrics(): AdminOperationsMetrics {
       players: { value: 0, detail: "New Player Profiles · Today", changePercent: 0 },
       registrations: {
         value: 0,
-        href: "/admin",
+        href: "/admin/registrations",
         detail: "Registrations Submitted · Today",
         changePercent: 0,
       },
@@ -179,7 +179,7 @@ function whoRow(overrides: Partial<AdminOperationsRow> = {}): AdminOperationsRow
     secondary: "IronClad Live",
     meta: "Main / Pro · Withdrawn",
     timestamp: "2026-08-19T10:00:00.000Z",
-    href: "/admin?filter=withdrawn&selected=registration-withdrawn",
+    href: "/admin/registrations?filter=withdrawn&selected=registration-withdrawn",
     ...overrides,
   };
 }
@@ -311,7 +311,7 @@ describe("Admin Operations dashboard contracts", () => {
     });
     expect(withdrawn).toHaveAttribute(
       "href",
-      "/admin?filter=withdrawn&selected=registration-withdrawn"
+      "/admin/registrations?filter=withdrawn&selected=registration-withdrawn"
     );
     expect(dispute).toHaveAttribute(
       "href",
