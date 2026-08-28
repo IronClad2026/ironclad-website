@@ -19,6 +19,7 @@ export type { AdminRegistrationReviewRow } from "@/lib/admin-registration-review
 
 type FilterStatus = "all" | AdminRegistrationStatus;
 type FocusTarget = "note" | "reject" | "manual_review";
+type DesktopPresentation = "standard" | "tournament-workbench";
 
 type ContextMenuState = {
   registration: AdminRegistrationReviewRow;
@@ -45,6 +46,7 @@ export default function AdminRegistrationReviewRows({
   activeFilter,
   formId,
   selectionScope,
+  desktopPresentation = "standard",
   isTournamentTerminal,
   updateRegistrationStatusAction,
   returnHref = "/admin/registrations",
@@ -55,6 +57,7 @@ export default function AdminRegistrationReviewRows({
   activeFilter: FilterStatus;
   formId: string;
   selectionScope?: string;
+  desktopPresentation?: DesktopPresentation;
   isTournamentTerminal: boolean;
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
   returnHref?: string;
@@ -165,8 +168,16 @@ export default function AdminRegistrationReviewRows({
                 />
               </th>
               <th className="py-3 pr-5">Player / Order</th>
-              <th className="py-3 pr-5">Tournament / Division</th>
-              <th className="py-3 pr-5">Registration ELO</th>
+              <th className="py-3 pr-5">
+                {desktopPresentation === "tournament-workbench"
+                  ? "Division"
+                  : "Tournament / Division"}
+              </th>
+              <th className="py-3 pr-5">
+                {desktopPresentation === "tournament-workbench"
+                  ? "Frozen ELO"
+                  : "Registration ELO"}
+              </th>
               <th className="py-3 pr-5">Verification Evidence</th>
               <th className="py-3 pr-5">Status</th>
               <th className="py-3 text-right">Actions</th>
@@ -196,44 +207,60 @@ export default function AdminRegistrationReviewRows({
                   </p>
                 </td>
                 <td className="max-w-64 py-4 pr-5">
-                  <p className="break-words font-semibold text-white">
-                    {registration.tournamentName || "N/A"}
-                  </p>
-                  <p className="mt-1 break-words text-xs text-zinc-500">
-                    {registration.selectedBracket || "Division not assigned"}
-                  </p>
+                  {desktopPresentation === "tournament-workbench" ? (
+                    <p className="break-words font-semibold text-white">
+                      {registration.selectedBracket || "Division not assigned"}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="break-words font-semibold text-white">
+                        {registration.tournamentName || "N/A"}
+                      </p>
+                      <p className="mt-1 break-words text-xs text-zinc-500">
+                        {registration.selectedBracket || "Division not assigned"}
+                      </p>
+                    </>
+                  )}
                 </td>
                 <td className="py-4 pr-5">
                   <p className="font-black text-orange-200">
                     {formatElo(registration.frozenRegistrationElo)}
                   </p>
-                  <p className="mt-1 max-w-40 text-xs leading-5 text-zinc-500">
-                    Frozen at registration, not current profile ELO
-                  </p>
+                  {desktopPresentation === "standard" && (
+                    <p className="mt-1 max-w-40 text-xs leading-5 text-zinc-500">
+                      Frozen at registration, not current profile ELO
+                    </p>
+                  )}
                 </td>
                 <td className="max-w-64 py-4 pr-5 text-xs leading-5">
-                  <EvidenceLine
-                    label="Verified division"
-                    value={registration.verifiedDivision}
-                  />
-                  <EvidenceLine
-                    label="Faction"
-                    value={registration.verifiedFaction}
-                  />
-                  <EvidenceLine
-                    label="Source"
-                    value={formatVerificationSource(
-                      registration.verificationSource
-                    )}
-                  />
-                  <EvidenceLine
-                    label="Checked"
-                    value={formatDateTime(registration.verificationCheckedAt)}
-                  />
-                  <EvidenceLine
-                    label="Rules"
-                    value={registration.eligibilityRulesVersion}
-                  />
+                  {desktopPresentation === "tournament-workbench" ? (
+                    <CompactVerificationEvidence registration={registration} />
+                  ) : (
+                    <>
+                      <EvidenceLine
+                        label="Verified division"
+                        value={registration.verifiedDivision}
+                      />
+                      <EvidenceLine
+                        label="Faction"
+                        value={registration.verifiedFaction}
+                      />
+                      <EvidenceLine
+                        label="Source"
+                        value={formatVerificationSource(
+                          registration.verificationSource
+                        )}
+                      />
+                      <EvidenceLine
+                        label="Checked"
+                        value={formatDateTime(registration.verificationCheckedAt)}
+                      />
+                      <EvidenceLine
+                        label="Rules"
+                        value={registration.eligibilityRulesVersion}
+                      />
+                    </>
+                  )}
                 </td>
                 <td className="py-4 pr-5">
                   <StatusBadge status={registration.status} />
@@ -796,6 +823,47 @@ function EvidenceLine({
       <span className="text-zinc-500">{label}:</span>{" "}
       <span className="font-semibold text-zinc-200">{formatValue(value)}</span>
     </p>
+  );
+}
+
+function CompactVerificationEvidence({
+  registration,
+}: {
+  registration: AdminRegistrationReviewRow;
+}) {
+  return (
+    <div className="space-y-1 break-words">
+      <p className="font-semibold text-zinc-200">
+        <span className="sr-only">Verified division: </span>
+        <span>{formatValue(registration.verifiedDivision)}</span>
+        <span aria-hidden="true" className="text-zinc-600">
+          {" "}·{" "}
+        </span>
+        <span className="sr-only">Verification source: </span>
+        <span>
+          {formatValue(
+            formatVerificationSource(registration.verificationSource)
+          )}
+        </span>
+      </p>
+      <p className="text-zinc-400">
+        <span className="sr-only">Verified faction: </span>
+        <span>{formatValue(registration.verifiedFaction)}</span>
+        <span aria-hidden="true" className="text-zinc-600">
+          {" "}·{" "}
+        </span>
+        <span className="sr-only">Verification checked: </span>
+        <span>
+          {formatValue(formatDateTime(registration.verificationCheckedAt))}
+        </span>
+      </p>
+      <p className="text-zinc-400">
+        <span className="text-zinc-500">Rules:</span>{" "}
+        <span className="font-semibold text-zinc-200">
+          {formatValue(registration.eligibilityRulesVersion)}
+        </span>
+      </p>
+    </div>
   );
 }
 
