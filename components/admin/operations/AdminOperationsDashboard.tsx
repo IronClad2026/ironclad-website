@@ -46,6 +46,17 @@ const periodOptions: Array<{
   { key: "all", label: "All time" },
 ];
 
+const operationsSectionLinks = [
+  { id: "operations-overview", label: "Overview" },
+  { id: "attention-required", label: "Attention" },
+  { id: "website-traffic", label: "Traffic" },
+  { id: "players", label: "Players" },
+  { id: "registrations", label: "Registrations" },
+  { id: "tournaments", label: "Tournaments" },
+  { id: "matches", label: "Matches" },
+  { id: "platform-health", label: "Health" },
+] as const;
+
 const chartColors = ["#fb923c", "#38bdf8", "#34d399", "#facc15"];
 const barColors = [
   "bg-orange-400",
@@ -102,6 +113,24 @@ export default function AdminOperationsDashboard({
           </div>
         </header>
 
+        <nav
+          aria-label="Operations sections"
+          className="sticky top-24 z-20 hidden rounded-2xl border border-white/10 bg-zinc-950/90 p-2 shadow-xl shadow-black/30 backdrop-blur-md xl:block"
+        >
+          <ul className="grid grid-cols-8 gap-1">
+            {operationsSectionLinks.map((item) => (
+              <li key={item.id} className="min-w-0">
+                <a
+                  href={`#${item.id}`}
+                  className="flex min-h-11 min-w-0 items-center justify-center rounded-xl border border-transparent px-2 py-2 text-center text-xs font-black text-zinc-400 transition hover:border-orange-400/35 hover:bg-orange-500/10 hover:text-orange-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+                >
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
         <section
           aria-label="Dashboard period"
           className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-5"
@@ -153,7 +182,11 @@ export default function AdminOperationsDashboard({
           </p>
         </section>
 
-        <section aria-labelledby="operations-overview-title">
+        <section
+          id="operations-overview"
+          aria-labelledby="operations-overview-title"
+          className="scroll-mt-28 xl:scroll-mt-44"
+        >
           <SectionHeading
             id="operations-overview-title"
             eyebrow="Overview"
@@ -199,7 +232,7 @@ export default function AdminOperationsDashboard({
         <section
           id="attention-required"
           aria-labelledby="attention-required-title"
-          className="scroll-mt-28 rounded-3xl border border-amber-500/25 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_36%),linear-gradient(145deg,rgba(24,24,27,0.96),rgba(9,9,11,0.98))] p-4 sm:p-6"
+          className="scroll-mt-28 rounded-3xl border border-amber-500/25 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_36%),linear-gradient(145deg,rgba(24,24,27,0.96),rgba(9,9,11,0.98))] p-4 sm:p-6 xl:scroll-mt-44"
         >
           <SectionHeading
             id="attention-required-title"
@@ -757,7 +790,7 @@ function SectionShell({
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="scroll-mt-28 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl shadow-black/20 sm:p-6"
+      className="scroll-mt-28 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl shadow-black/20 sm:p-6 xl:scroll-mt-44"
     >
       <SectionHeading
         id={`${id}-title`}

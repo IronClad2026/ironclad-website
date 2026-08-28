@@ -44,7 +44,7 @@ export async function runLeaderboardRecalculation(
               )
             : initialError;
 
-    revalidatePath("/admin");
+    revalidatePath("/admin/system");
 
     return {
       status: result.status,
@@ -91,7 +91,7 @@ export async function deleteLeaderboardRecalculationRunRecords(
     });
 
     if (result.status === "success") {
-      revalidatePath("/admin");
+      revalidatePath("/admin/system");
     }
 
     return {

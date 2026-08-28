@@ -85,6 +85,7 @@ export default function TournamentManagementMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
+  const returnFocusOnCloseRef = useRef(true);
   const reactId = useId();
   const idSuffix = reactId.replaceAll(":", "");
   const dialogId = `tournament-management-menu-${idSuffix}`;
@@ -108,14 +109,31 @@ export default function TournamentManagementMenu({
       window.clearTimeout(focusTimer);
       document.body.style.overflow = previousOverflow;
 
-      if (returnTarget?.isConnected) {
+      if (returnFocusOnCloseRef.current && returnTarget?.isConnected) {
         window.setTimeout(
           () => returnTarget.focus({ preventScroll: true }),
           0
         );
       }
+
+      returnFocusOnCloseRef.current = true;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+
+    const desktopQuery = window.matchMedia("(min-width: 80rem)");
+    const closeAtDesktop = (event: MediaQueryListEvent) => {
+      if (!event.matches) return;
+
+      returnFocusOnCloseRef.current = false;
+      setOpen(false);
+    };
+
+    desktopQuery.addEventListener("change", closeAtDesktop);
+    return () => desktopQuery.removeEventListener("change", closeAtDesktop);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -169,8 +187,11 @@ export default function TournamentManagementMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={dialogId}
-        onClick={() => setOpen(true)}
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/15 bg-black/55 text-zinc-200 shadow-lg backdrop-blur-md transition hover:border-orange-400/60 hover:bg-orange-500/10 hover:text-orange-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
+        onClick={() => {
+          returnFocusOnCloseRef.current = true;
+          setOpen(true);
+        }}
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/15 bg-black/55 text-zinc-200 shadow-lg backdrop-blur-md transition hover:border-orange-400/60 hover:bg-orange-500/10 hover:text-orange-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 xl:hidden"
       >
         <Menu aria-hidden="true" size={20} />
       </button>
@@ -275,5 +296,56 @@ export default function TournamentManagementMenu({
           portalRoot
         )}
     </>
+  );
+}
+
+export function TournamentDesktopSectionNavigation({
+  activeSection,
+  tournamentId,
+}: {
+  activeSection: TournamentManagementSection;
+  tournamentId: string;
+}) {
+  return (
+    <nav
+      aria-label="Tournament management sections"
+      className="mt-4 hidden border-t border-white/10 pt-4 xl:block"
+    >
+      <ul className="grid grid-cols-4 gap-1.5 2xl:grid-cols-8">
+        {TOURNAMENT_MANAGEMENT_SECTIONS.map((item) => {
+          const Icon = item.icon;
+          const active = activeSection === item.section;
+
+          return (
+            <li
+              key={item.section}
+              data-management-group={
+                item.separated ? "tournament-controls" : "standard"
+              }
+              className="min-w-0"
+            >
+              <Link
+                href={`/admin/tournaments/${encodeURIComponent(
+                  tournamentId
+                )}?section=${item.section}`}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-center text-[11px] font-black leading-4 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 ${
+                  item.separated
+                    ? active
+                      ? "border-red-400/50 bg-red-500/15 text-red-100"
+                      : "border-red-500/20 bg-red-500/[0.06] text-red-300 hover:border-red-400/50 hover:bg-red-500/15 hover:text-red-100"
+                    : active
+                      ? "border-orange-400/50 bg-orange-500/15 text-orange-100"
+                      : "border-transparent bg-black/20 text-zinc-400 hover:border-white/10 hover:bg-white/[0.06] hover:text-white"
+                }`}
+              >
+                <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 break-words">{item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

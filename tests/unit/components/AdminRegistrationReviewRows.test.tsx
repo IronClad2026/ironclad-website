@@ -259,7 +259,7 @@ describe("administrator registration review responsive interaction", () => {
     const table = container.querySelector("table");
 
     expect(cards).toHaveClass("grid", "min-w-0", "xl:hidden");
-    expect(table).toHaveClass("min-w-[1080px]");
+    expect(table).toHaveClass("min-w-[900px]", "2xl:min-w-[1080px]");
     expect(table?.parentElement).toHaveClass(
       "hidden",
       "max-w-full",

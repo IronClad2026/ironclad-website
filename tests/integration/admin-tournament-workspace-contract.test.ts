@@ -66,6 +66,7 @@ const source = {
     "components/admin/tournaments/AdminTournamentRegistrations.tsx"
   ),
   registrationRows: read("components/AdminRegistrationReviewRows.tsx"),
+  system: read("app/admin/system/page.tsx"),
   registrationWorkspace: read(
     "lib/admin-tournament-registration-workspace.ts"
   ),
@@ -727,10 +728,15 @@ const capabilities: Capability[] = [
     section: "outside-workspace",
     evidence: [
       {
-        file: "admin",
+        file: "system",
         includes: [
           "AdminEloVerificationChecker",
           "AdminLeaderboardControls",
+        ],
+      },
+      {
+        file: "admin",
+        includes: [
           "InAppNotificationCenter",
           'href="/admin/maps"',
           'href="/admin/polls"',
