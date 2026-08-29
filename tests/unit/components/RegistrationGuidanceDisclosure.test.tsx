@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import RegistrationGuidanceDisclosure from "@/components/RegistrationGuidanceDisclosure";
@@ -21,8 +21,13 @@ describe("RegistrationGuidanceDisclosure", () => {
     expect(details).not.toBeNull();
     expect(details).not.toHaveAttribute("open");
     expect(summary).toHaveClass("min-h-11");
-    expect(summary?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(
+      summary?.querySelector("[data-registration-guidance-icon]")
+    ).toHaveClass("h-7", "w-7", "rounded-full", "border");
     expect(details?.querySelector("button")).toBeNull();
+
+    fireEvent.click(summary as HTMLElement);
+    expect(details).toHaveAttribute("open");
   });
 
   it("explains the approved Registration lifecycle and Match timing", () => {

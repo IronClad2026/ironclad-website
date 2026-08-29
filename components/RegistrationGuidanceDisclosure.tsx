@@ -28,12 +28,15 @@ export default function RegistrationGuidanceDisclosure() {
   ];
 
   return (
-    <details className="group mt-3 w-full max-w-full min-w-0 overflow-hidden border border-white/12 bg-black/35 text-left">
+    <details className="group mt-3 w-full max-w-full min-w-0 overflow-hidden border border-orange-300/25 bg-black/55 text-left">
       <summary className="flex min-h-11 w-full min-w-0 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-bold text-zinc-200 transition marker:content-none hover:border-orange-400/40 hover:bg-orange-500/8 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-300">
-        <Info
+        <span
           aria-hidden="true"
-          className="h-4 w-4 shrink-0 text-orange-300"
-        />
+          data-registration-guidance-icon
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-orange-300/55 bg-orange-500/10 text-orange-200 shadow-[0_0_14px_rgba(249,115,22,0.16)]"
+        >
+          <Info className="h-4 w-4" />
+        </span>
         <span className="min-w-0 flex-1 break-words">
           {t("registrationGuidance.controlLabel")}
         </span>

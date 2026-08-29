@@ -372,6 +372,76 @@ describe("Relic verified-division registration UI", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders only eligible Tournaments in desktop selection and preserves mobile filtering", () => {
+    const completedTournament: TournamentCard = {
+      ...alternateTournament,
+      id: "11111111-1111-4111-8111-111111111113",
+      slug: "completed-tournament",
+      title: "Completed Historical Tournament",
+      status: "Completed",
+      statusValue: "completed",
+      registrationEnabled: false,
+    };
+    const closedTournament: TournamentCard = {
+      ...alternateTournament,
+      id: "11111111-1111-4111-8111-111111111114",
+      slug: "closed-tournament",
+      title: "Closed Registration Tournament",
+      registrationEnabled: false,
+    };
+    const voidedTournament: TournamentCard = {
+      ...alternateTournament,
+      id: "11111111-1111-4111-8111-111111111115",
+      slug: "voided-tournament",
+      title: "Voided Tournament",
+      status: "Voided",
+      statusValue: "voided",
+      registrationEnabled: false,
+    };
+    const availableTournaments = [
+      tournament,
+      alternateTournament,
+      completedTournament,
+      closedTournament,
+      voidedTournament,
+    ];
+
+    const desktopView = renderModal("Challenge", tournament, {
+      availableTournaments,
+    });
+
+    expect(screen.getAllByText("Safe Tournament").length).toBeGreaterThan(0);
+    expect(screen.getByText("Alternate Safe Tournament")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Completed Historical Tournament")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Closed Registration Tournament")
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Voided Tournament")).not.toBeInTheDocument();
+
+    desktopView.unmount();
+
+    renderModal("Challenge", tournament, {
+      availableTournaments,
+      presentation: "phone",
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: competitionEnglish.registrationModal.changeTournament,
+      })
+    );
+
+    expect(screen.getByText("Alternate Safe Tournament")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Completed Historical Tournament")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Closed Registration Tournament")
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Voided Tournament")).not.toBeInTheDocument();
+  });
+
   it("shows open registration for an unlaunched division in a partially launched Tournament", () => {
     const partiallyLaunched: TournamentCard = {
       ...tournament,

@@ -4077,7 +4077,7 @@ export function RegisterModal({
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                {tournaments.map((event) => {
+                {eligibleTournaments.map((event) => {
                   const selected = selectedTournament.title === event.title;
                   const registrationAvailable =
                     getRegistrationDivisionAvailability(
@@ -5194,14 +5194,14 @@ function MobileTabs({
               onClick={() => setActiveTab(tab.key)}
               className={classNames(
                 spanClass,
-                "flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-center text-[10px] font-black uppercase leading-tight tracking-[0.04em] transition",
+                "flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-center text-[10px] font-black uppercase leading-tight tracking-normal transition",
                 selected
                   ? "border-orange-400/70 bg-orange-500/15 text-white"
                   : "border-white/12 bg-black/45 text-zinc-400 hover:border-orange-400/45 hover:text-white"
               )}
             >
               <Icon size={15} className="shrink-0 text-orange-300" />
-              <span className="min-w-0 max-w-full break-words">
+              <span className="min-w-0 max-w-full break-normal">
                 {t(`tournaments.tabs.${tab.key}`)}
               </span>
             </button>
