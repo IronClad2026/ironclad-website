@@ -314,6 +314,33 @@ const dictionary = {
     withdraw: "Withdraw Registration",
     statedDeadline: "the stated deadline",
   },
+  registrationGuidance: {
+    controlLabel: "How Registration Works",
+    title: "What Happens After You Register?",
+    adminReviewTitle: "Admin Review",
+    adminReviewBody:
+      "We review your Registration and verified Tournament ELO. Your place is not confirmed yet.",
+    approvalTitle: "Approval",
+    approvalBody:
+      "If approved, your place in the Division is confirmed. If your Division is currently full, registration uses the FIFO Waitlist.",
+    divisionReadyTitle: "Division Ready",
+    divisionReadyBody:
+      "Exactly 8 approved Players are required before the Division can be prepared for launch.",
+    launchTitle: "Tournament Launch",
+    launchBody:
+      "IronClad prepares the Bracket, seeding and Map Pool, then an Admin launches the Division. Launch is not automatic.",
+    matchTimingTitle: "Match Deadline",
+    matchTimingBody:
+      "Once your matchup becomes active, you normally have 7 days to complete it.",
+    matchTimingDeadline:
+      "Your exact deadline is shown with the Match, and IronClad sends deadline reminders.",
+    matchTimingExtension:
+      "Any extension is exceptional, must be granted by an Admin, and is not guaranteed.",
+    dashboardGuidance:
+      "Check your Dashboard for Registration status and Waitlist offers.",
+    bracketGuidance:
+      "After launch, open the Tournament's Brackets tab to see your Bracket, opponent and Match details.",
+  },
   registrationModal: {
     eyebrow: "IronClad Registration",
     title: "Esports Player Registration",
@@ -370,13 +397,25 @@ const dictionary = {
     ownershipConfirmation:
       "I confirm that I am using my own IronClad account and that the linked Steam account belongs to me.",
     submitRegistration: "Submit Registration",
-    submittedTitle: "Registration submitted — Pending Admin review",
-    reviewTime:
-      "Tournament administration will review your submission. Check your Dashboard for status updates.",
+    submittedTitle: "Registration submitted",
+    pendingAdminReview: "Pending Admin Review",
+    whatHappensNext: "What Happens Next?",
+    eightApprovedPlayers: "8 Approved Players",
+    divisionLaunch: "Division Launch",
+    matchTimingTitle: "Match Timing",
+    reviewTime: "You don't need to do anything right now.",
+    successGuidance:
+      "Check your Dashboard for Registration status. We'll notify you about key decisions and Match updates. After launch, open the Tournament's Brackets tab for your Bracket, opponent and Match details.",
+    matchTimingDescription:
+      "Once your matchup becomes active, you normally have 7 days to complete it.",
+    matchTimingDeadline:
+      "Your exact deadline and reminders will appear with your Match.",
+    openDashboard: "Open Dashboard",
     waitlistJoinedTitle: "Waitlist joined",
     waitlistPositionPending: "Confirming your waitlist position…",
     waitlistResultDescription:
-      "A place is not guaranteed. The queue is first-in, first-out. If a vacancy opens, you may receive an offer; manage offers from your Dashboard.",
+      "A place is not guaranteed. The queue is first-in, first-out. If a place opens before launch, you may receive an offer in your Dashboard. Respond before its displayed deadline. Accepting the offer returns your Registration to Admin Review and does not guarantee approval.",
+    waitlistNoAction: "You don't need to do anything unless an offer appears.",
     back: "Back",
     cancel: "Cancel",
     continue: "Continue",

@@ -111,6 +111,33 @@ const dictionary = {
     withdraw: "撤回报名",
     statedDeadline: "所示截止时间",
   },
+  registrationGuidance: {
+    controlLabel: "报名流程说明",
+    title: "提交报名后会发生什么？",
+    adminReviewTitle: "管理员审核",
+    adminReviewBody:
+      "我们会审核你的报名和已验证的锦标赛 ELO。你的参赛名额尚未确认。",
+    approvalTitle: "批准",
+    approvalBody:
+      "如果报名获批，你在该组别中的名额就会确认。如果组别当前已满，报名将进入先进先出的候补名单。",
+    divisionReadyTitle: "组别准备就绪",
+    divisionReadyBody:
+      "组别必须恰好有 8 名已获批准的玩家，才能开始筹备开赛。",
+    launchTitle: "锦标赛开赛",
+    launchBody:
+      "IronClad 会准备对阵表、种子排序和地图池，然后由管理员启动该组别。开赛不会自动进行。",
+    matchTimingTitle: "比赛期限",
+    matchTimingBody:
+      "当你的对局激活后，通常有 7 天时间完成比赛。",
+    matchTimingDeadline:
+      "准确的截止时间会显示在比赛中，IronClad 也会发送期限提醒。",
+    matchTimingExtension:
+      "任何延期都属于例外情况，必须由管理员批准，并且不保证获批。",
+    dashboardGuidance:
+      "请在控制面板中查看报名状态和候补名额邀请。",
+    bracketGuidance:
+      "开赛后，请打开锦标赛的对阵表标签页，查看你的对阵表、对手和比赛详情。",
+  },
   registrationModal: {
     eyebrow: "IronClad 报名",
     title: "电竞选手报名",
@@ -165,12 +192,25 @@ const dictionary = {
     ownershipConfirmation:
       "我确认正在使用自己的 IronClad 账户，并且所连接的 Steam 账户属于我本人。",
     submitRegistration: "提交报名",
-    submittedTitle: "报名已提交 — 等待管理员审核",
-    reviewTime: "锦标赛管理员将审核你的报名。请在控制面板中查看状态更新。",
+    submittedTitle: "报名已提交",
+    pendingAdminReview: "等待管理员审核",
+    whatHappensNext: "接下来会怎样？",
+    eightApprovedPlayers: "8 名已获批准的玩家",
+    divisionLaunch: "组别开赛",
+    matchTimingTitle: "比赛时间",
+    reviewTime: "你现在无需进行任何操作。",
+    successGuidance:
+      "请在控制面板中查看报名状态。我们会通知你重要决定和比赛更新。开赛后，请打开锦标赛的对阵表标签页，查看你的对阵表、对手和比赛详情。",
+    matchTimingDescription:
+      "当你的对局激活后，通常有 7 天时间完成比赛。",
+    matchTimingDeadline:
+      "准确的截止时间和提醒会显示在你的比赛中。",
+    openDashboard: "打开控制面板",
     waitlistJoinedTitle: "已加入候补名单",
     waitlistPositionPending: "正在确认你的候补队列位置…",
     waitlistResultDescription:
-      "名额不作保证。候补队列按先到先得顺序处理。如有空缺，你可能会收到名额邀请；请在控制面板中管理邀请。",
+      "名额不作保证。候补队列按先到先得顺序处理。如果开赛前出现空缺，你可能会在控制面板中收到名额邀请。请在所示截止时间前回应。接受邀请后，你的报名会重新进入管理员审核，并不保证获批。",
+    waitlistNoAction: "除非收到名额邀请，否则你无需进行任何操作。",
     back: "返回",
     cancel: "取消",
     continue: "继续",

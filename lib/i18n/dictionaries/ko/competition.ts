@@ -103,6 +103,33 @@ const dictionary = {
     withdraw: "등록 철회",
     statedDeadline: "표시된 기한",
   },
+  registrationGuidance: {
+    controlLabel: "등록 절차 안내",
+    title: "등록 후에는 어떻게 진행되나요?",
+    adminReviewTitle: "관리자 검토",
+    adminReviewBody:
+      "IronClad가 등록 내용과 검증된 토너먼트 ELO를 검토합니다. 아직 참가 자리가 확정된 것은 아닙니다.",
+    approvalTitle: "승인",
+    approvalBody:
+      "승인되면 디비전 참가 자리가 확정됩니다. 디비전이 현재 정원에 도달했다면 선착순 대기 명단으로 등록됩니다.",
+    divisionReadyTitle: "디비전 준비",
+    divisionReadyBody:
+      "디비전 시작 준비를 진행하려면 정확히 8명의 승인을 받은 선수가 필요합니다.",
+    launchTitle: "토너먼트 시작",
+    launchBody:
+      "IronClad가 대진표, 시드 배정, 맵 풀을 준비한 뒤 관리자가 디비전을 시작합니다. 자동으로 시작되지 않습니다.",
+    matchTimingTitle: "매치 기한",
+    matchTimingBody:
+      "내 매치업이 활성화되면 일반적으로 완료까지 7일이 주어집니다.",
+    matchTimingDeadline:
+      "정확한 기한은 매치에 표시되며 IronClad가 기한 알림을 보냅니다.",
+    matchTimingExtension:
+      "기한 연장은 예외적인 경우에만 관리자가 승인할 수 있으며 보장되지 않습니다.",
+    dashboardGuidance:
+      "등록 상태와 대기 명단 제안은 대시보드에서 확인하세요.",
+    bracketGuidance:
+      "시작 후 토너먼트의 대진표 탭에서 대진표, 상대 선수, 매치 세부 정보를 확인하세요.",
+  },
   registrationModal: {
     eyebrow: "IronClad 등록",
     title: "e스포츠 선수 등록",
@@ -158,13 +185,25 @@ const dictionary = {
     ownershipConfirmation:
       "본인의 IronClad 계정을 사용 중이며 연결된 Steam 계정도 본인 소유임을 확인합니다.",
     submitRegistration: "등록 제출",
-    submittedTitle: "등록 제출 완료 — 관리자 검토 대기 중",
-    reviewTime:
-      "토너먼트 운영진이 등록을 검토합니다. Dashboard에서 상태 업데이트를 확인하세요.",
+    submittedTitle: "등록이 제출되었습니다",
+    pendingAdminReview: "관리자 검토 대기 중",
+    whatHappensNext: "다음 단계",
+    eightApprovedPlayers: "승인된 선수 8명",
+    divisionLaunch: "디비전 시작",
+    matchTimingTitle: "매치 일정",
+    reviewTime: "지금은 별도로 할 일이 없습니다.",
+    successGuidance:
+      "등록 상태는 대시보드에서 확인하세요. 주요 결정과 매치 업데이트를 알려드립니다. 시작 후 토너먼트의 대진표 탭에서 대진표, 상대 선수, 매치 세부 정보를 확인하세요.",
+    matchTimingDescription:
+      "내 매치업이 활성화되면 일반적으로 완료까지 7일이 주어집니다.",
+    matchTimingDeadline:
+      "정확한 기한과 알림은 매치에 표시됩니다.",
+    openDashboard: "대시보드 열기",
     waitlistJoinedTitle: "대기 명단 등록 완료",
     waitlistPositionPending: "대기 명단 순위를 확인하는 중…",
     waitlistResultDescription:
-      "참가 자리는 보장되지 않습니다. 대기열은 선착순으로 처리됩니다. 공석이 생기면 제안을 받을 수 있으며, 제안은 Dashboard에서 관리하세요.",
+      "참가 자리는 보장되지 않습니다. 대기열은 선착순으로 처리됩니다. 시작 전에 자리가 나면 대시보드에서 제안을 받을 수 있습니다. 표시된 기한 전에 응답하세요. 제안을 수락하면 등록이 관리자 검토로 돌아가며 승인이 보장되지는 않습니다.",
+    waitlistNoAction: "제안이 표시되지 않는 한 지금은 할 일이 없습니다.",
     back: "뒤로",
     cancel: "취소",
     continue: "계속",

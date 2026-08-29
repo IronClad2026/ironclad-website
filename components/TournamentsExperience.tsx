@@ -24,6 +24,7 @@ import MatchDiceRollOff, {
   type MatchDiceLoadResult,
 } from "@/components/MatchDiceRollOff";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
+import RegistrationGuidanceDisclosure from "@/components/RegistrationGuidanceDisclosure";
 import RequestAdminAssistanceButton from "@/components/RequestAdminAssistanceButton";
 import MatchResultControls, {
   AdminResetMatchForm,
@@ -597,21 +598,24 @@ function Hero({
             ) : registrationState ? (
               <RegistrationStateCard state={registrationState} />
             ) : (
-              <ActionCard
-                label={actionLabel}
-                description={
-                  divisionLaunched
-                    ? t("tournaments.hero.divisionInProgress")
-                    : registrationOpen
-                    ? registrationIsWaitlistOnly
-                      ? t("tournaments.hero.waitlistOpen")
-                      : t("tournaments.hero.openEvents")
-                    : t("tournaments.hero.scheduleHint")
-                }
-                icon={registrationOpen ? CheckCircle2 : Clock3}
-                onClick={onRegisterClick}
-                disabled={divisionLaunched}
-              />
+              <>
+                <ActionCard
+                  label={actionLabel}
+                  description={
+                    divisionLaunched
+                      ? t("tournaments.hero.divisionInProgress")
+                      : registrationOpen
+                        ? registrationIsWaitlistOnly
+                          ? t("tournaments.hero.waitlistOpen")
+                          : t("tournaments.hero.openEvents")
+                        : t("tournaments.hero.scheduleHint")
+                  }
+                  icon={registrationOpen ? CheckCircle2 : Clock3}
+                  onClick={onRegisterClick}
+                  disabled={divisionLaunched}
+                />
+                {registrationOpen && <RegistrationGuidanceDisclosure />}
+              </>
             )}
           </div>
         </div>
@@ -3375,9 +3379,6 @@ export function RegisterModal({
   const [submissionError, setSubmissionError] = useState("");
   const [waitlistConfirmationRequired, setWaitlistConfirmationRequired] =
     useState(false);
-  const [successMessage, setSuccessMessage] = useState(
-    t("registrationServer.submitted")
-  );
   const [submissionOutcome, setSubmissionOutcome] =
     useState<RegistrationSubmissionOutcome | null>(null);
   const [showTournamentChoices, setShowTournamentChoices] = useState(false);
@@ -3742,7 +3743,6 @@ export function RegisterModal({
 
     router.refresh();
     setStep("submitted");
-    setSuccessMessage(getRegistrationResultMessage(result, t));
     setSubmissionOutcome(
       result.code === "WAITLIST_SUBMITTED"
         ? {
@@ -3783,6 +3783,13 @@ export function RegisterModal({
     submissionOutcome?.kind === "waitlist"
       ? submissionOutcome.position ?? refreshedWaitlistPosition
       : null;
+  const isWaitlistOutcome = submissionOutcome?.kind === "waitlist";
+  const registrationSuccessStages = [
+    t("registrationGuidance.adminReviewTitle"),
+    t("registrationGuidance.approvalTitle"),
+    t("registrationModal.eightApprovedPlayers"),
+    t("registrationModal.divisionLaunch"),
+  ];
   const profileReady = profile.profile_completed === true;
   // profile_completed is derived from the protected Steam identity link.
   const steamConnected = profileReady;
@@ -4502,7 +4509,7 @@ export function RegisterModal({
               role="status"
               aria-live="polite"
               className={classNames(
-                "grid place-items-center text-center",
+                "grid w-full place-items-center text-center",
                 isPhonePresentation ? "py-6" : "py-10"
               )}
             >
@@ -4514,25 +4521,72 @@ export function RegisterModal({
                 tabIndex={-1}
                 className="mt-5 text-2xl font-black text-white outline-none"
               >
-                {submissionOutcome?.kind === "waitlist"
+                {isWaitlistOutcome
                   ? t("registrationModal.waitlistJoinedTitle")
                   : t("registrationModal.submittedTitle")}
               </h3>
               <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">
-                {submissionOutcome?.kind === "waitlist" &&
-                displayedWaitlistPosition !== null
+                {isWaitlistOutcome && displayedWaitlistPosition !== null
                   ? t("registrationServer.waitlistSubmittedPosition", {
                       position: displayedWaitlistPosition,
                     })
-                  : submissionOutcome?.kind === "waitlist"
+                  : isWaitlistOutcome
                     ? t("registrationModal.waitlistPositionPending")
-                    : successMessage}
+                    : t("registrationModal.pendingAdminReview")}
               </p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-300">
-                {submissionOutcome?.kind === "waitlist"
-                  ? t("registrationModal.waitlistResultDescription")
-                  : t("registrationModal.reviewTime")}
-              </p>
+              {isWaitlistOutcome ? (
+                <div className="mt-4 max-w-xl space-y-3 text-sm leading-6 text-zinc-300">
+                  <p>{t("registrationModal.waitlistResultDescription")}</p>
+                  <p className="font-bold text-zinc-100">
+                    {t("registrationModal.waitlistNoAction")}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 w-full max-w-2xl">
+                  <h4 className="text-sm font-black uppercase tracking-[0.18em] text-orange-200">
+                    {t("registrationModal.whatHappensNext")}
+                  </h4>
+                  <ol
+                    data-registration-success-stages
+                    className="mt-3 grid gap-2 text-left sm:grid-cols-2"
+                  >
+                    {registrationSuccessStages.map((label, index) => (
+                      <li
+                        key={label}
+                        className="flex min-h-11 items-center gap-3 border border-white/10 bg-black/35 px-3 py-2.5 text-sm font-bold text-zinc-100"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-orange-400/45 bg-orange-500/10 text-xs font-black text-orange-200"
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 break-words">{label}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="mt-4 space-y-2 text-sm leading-6 text-zinc-300">
+                    <p className="font-bold text-white">
+                      {t("registrationModal.reviewTime")}
+                    </p>
+                    <p>{t("registrationModal.successGuidance")}</p>
+                  </div>
+                  <div
+                    data-registration-match-timing
+                    className="mt-4 border border-amber-300/25 bg-amber-500/10 p-4 text-left"
+                  >
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-200">
+                      {t("registrationModal.matchTimingTitle")}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-zinc-200">
+                      {t("registrationModal.matchTimingDescription")}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-zinc-300">
+                      {t("registrationModal.matchTimingDeadline")}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -4575,10 +4629,9 @@ export function RegisterModal({
           />
         )}
         {step === "submitted" && (
-          <ModalButtons
+          <SubmittedModalButtons
             persistent={isPhonePresentation}
-            onNext={requestClose}
-            nextLabel={t("tournaments.actions.close")}
+            onClose={requestClose}
           />
         )}
       </section>
@@ -4862,6 +4915,48 @@ function ModalButtons({
   );
 }
 
+function SubmittedModalButtons({
+  onClose,
+  persistent = false,
+}: {
+  onClose: () => void;
+  persistent?: boolean;
+}) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
+  return (
+    <footer
+      data-registration-action-footer={persistent ? "persistent" : "standard"}
+      className={classNames(
+        "flex shrink-0 gap-3 border-t border-slate-800",
+        persistent
+          ? "flex-row items-center bg-black/95 px-4 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]"
+          : "mx-5 mb-5 flex-col pt-5 sm:flex-row sm:justify-end"
+      )}
+    >
+      <Link
+        href="/dashboard"
+        className={classNames(
+          "inline-flex min-h-11 items-center justify-center rounded bg-orange-500 px-5 py-3 text-center text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+          persistent ? "min-w-0 flex-1" : "w-full sm:w-auto"
+        )}
+      >
+        {t("registrationModal.openDashboard")}
+      </Link>
+      <button
+        type="button"
+        onClick={onClose}
+        className={classNames(
+          "min-h-11 rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+          persistent ? "shrink-0" : "w-full sm:w-auto"
+        )}
+      >
+        {t("tournaments.actions.close")}
+      </button>
+    </footer>
+  );
+}
+
 function MobileCard({
   children,
   className,
@@ -5028,21 +5123,24 @@ function MobileHero({
           ) : registrationState ? (
             <RegistrationStateCard state={registrationState} />
           ) : (
-            <ActionCard
-              label={actionLabel}
-              description={
-                divisionLaunched
-                  ? t("tournaments.hero.divisionInProgress")
-                  : registrationOpen
-                  ? registrationIsWaitlistOnly
-                    ? t("tournaments.hero.waitlistOpen")
-                    : t("tournaments.hero.openEvents")
-                  : t("tournaments.hero.scheduleHint")
-              }
-              icon={registrationOpen ? CheckCircle2 : Clock3}
-              onClick={onRegisterClick}
-              disabled={divisionLaunched}
-            />
+            <>
+              <ActionCard
+                label={actionLabel}
+                description={
+                  divisionLaunched
+                    ? t("tournaments.hero.divisionInProgress")
+                    : registrationOpen
+                      ? registrationIsWaitlistOnly
+                        ? t("tournaments.hero.waitlistOpen")
+                        : t("tournaments.hero.openEvents")
+                      : t("tournaments.hero.scheduleHint")
+                }
+                icon={registrationOpen ? CheckCircle2 : Clock3}
+                onClick={onRegisterClick}
+                disabled={divisionLaunched}
+              />
+              {registrationOpen && <RegistrationGuidanceDisclosure />}
+            </>
           )}
         </div>
       </div>

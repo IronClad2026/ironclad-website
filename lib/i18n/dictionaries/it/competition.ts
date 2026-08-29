@@ -359,6 +359,33 @@ const dictionary = {
     withdraw: "Ritira l'iscrizione",
     statedDeadline: "la scadenza indicata",
   },
+  registrationGuidance: {
+    controlLabel: "Come funziona l'iscrizione",
+    title: "Cosa succede dopo l'iscrizione?",
+    adminReviewTitle: "Revisione amministrativa",
+    adminReviewBody:
+      "Esaminiamo la tua iscrizione e il tuo ELO verificato per il Torneo. Il tuo posto non è ancora confermato.",
+    approvalTitle: "Approvazione",
+    approvalBody:
+      "Se approvata, il tuo posto nella Divisione è confermato. Se la Divisione è al completo, l'iscrizione passa alla lista d'attesa FIFO.",
+    divisionReadyTitle: "Divisione pronta",
+    divisionReadyBody:
+      "Servono esattamente 8 giocatori approvati prima che la Divisione possa essere preparata per l'avvio.",
+    launchTitle: "Avvio del Torneo",
+    launchBody:
+      "IronClad prepara il Tabellone, le teste di serie e il pool di mappe, poi un amministratore avvia la Divisione. L'avvio non è automatico.",
+    matchTimingTitle: "Scadenza del Match",
+    matchTimingBody:
+      "Quando il tuo abbinamento diventa attivo, normalmente hai 7 giorni per completarlo.",
+    matchTimingDeadline:
+      "La scadenza esatta è mostrata con il Match e IronClad invia promemoria sulla scadenza.",
+    matchTimingExtension:
+      "Qualsiasi proroga è eccezionale, deve essere concessa da un amministratore e non è garantita.",
+    dashboardGuidance:
+      "Controlla la Dashboard per lo stato dell'iscrizione e le offerte della lista d'attesa.",
+    bracketGuidance:
+      "Dopo l'avvio, apri la scheda Tabelloni del Torneo per vedere il tuo Tabellone, l'avversario e i dettagli del Match.",
+  },
   registrationModal: {
     eyebrow: "Iscrizione IronClad",
     title: "Iscrizione del giocatore esports",
@@ -416,14 +443,27 @@ const dictionary = {
     ownershipConfirmation:
       "Confermo di usare il mio account IronClad e che l'account Steam collegato mi appartiene.",
     submitRegistration: "Invia iscrizione",
-    submittedTitle: "Iscrizione inviata — in attesa di revisione dell'amministrazione",
-    reviewTime:
-      "L'amministrazione del Torneo esaminerà la tua iscrizione. Controlla la Dashboard per gli aggiornamenti sullo stato.",
+    submittedTitle: "Iscrizione inviata",
+    pendingAdminReview: "In attesa di revisione amministrativa",
+    whatHappensNext: "Cosa succede ora?",
+    eightApprovedPlayers: "8 giocatori approvati",
+    divisionLaunch: "Avvio della Divisione",
+    matchTimingTitle: "Tempistiche del Match",
+    reviewTime: "Non devi fare nulla per il momento.",
+    successGuidance:
+      "Controlla la Dashboard per lo stato dell'iscrizione. Ti avviseremo delle decisioni importanti e degli aggiornamenti sui Match. Dopo l'avvio, apri la scheda Tabelloni del Torneo per vedere il tuo Tabellone, l'avversario e i dettagli del Match.",
+    matchTimingDescription:
+      "Quando il tuo abbinamento diventa attivo, normalmente hai 7 giorni per completarlo.",
+    matchTimingDeadline:
+      "La scadenza esatta e i promemoria appariranno con il tuo Match.",
+    openDashboard: "Apri Dashboard",
     waitlistJoinedTitle: "Aggiunto alla lista d'attesa",
     waitlistPositionPending:
       "Conferma della tua posizione in lista d'attesa…",
     waitlistResultDescription:
-      "Il posto non è garantito. La coda segue l'ordine di arrivo. Se si libera un posto, potresti ricevere un'offerta; gestisci le offerte dalla Dashboard.",
+      "Il posto non è garantito. La coda segue l'ordine di arrivo. Se si libera un posto prima dell'avvio, potresti ricevere un'offerta nella Dashboard. Rispondi entro la scadenza indicata. Accettare l'offerta riporta la tua iscrizione alla revisione amministrativa e non ne garantisce l'approvazione.",
+    waitlistNoAction:
+      "Non devi fare nulla a meno che non compaia un'offerta.",
     back: "Indietro",
     cancel: "Annulla",
     continue: "Continua",

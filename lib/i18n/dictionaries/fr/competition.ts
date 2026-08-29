@@ -103,6 +103,33 @@ const dictionary = {
     withdraw: "Retirer l'inscription",
     statedDeadline: "la date limite indiquée",
   },
+  registrationGuidance: {
+    controlLabel: "Comment fonctionne l’inscription",
+    title: "Que se passe-t-il après votre inscription ?",
+    adminReviewTitle: "Examen administratif",
+    adminReviewBody:
+      "Nous examinons votre inscription et votre ELO de tournoi vérifié. Votre place n’est pas encore confirmée.",
+    approvalTitle: "Validation",
+    approvalBody:
+      "Si votre inscription est validée, votre place dans la Division est confirmée. Si votre Division est complète, l’inscription passe par la liste d’attente selon l’ordre d’arrivée.",
+    divisionReadyTitle: "Division prête",
+    divisionReadyBody:
+      "Il faut exactement 8 joueurs approuvés avant de pouvoir préparer la Division pour son lancement.",
+    launchTitle: "Lancement du tournoi",
+    launchBody:
+      "IronClad prépare le tableau, le placement des têtes de série et la sélection de cartes, puis un administrateur lance la Division. Le lancement n’est pas automatique.",
+    matchTimingTitle: "Délai du match",
+    matchTimingBody:
+      "Une fois votre confrontation active, vous disposez normalement de 7 jours pour la terminer.",
+    matchTimingDeadline:
+      "La date limite exacte est affichée avec le Match et IronClad envoie des rappels.",
+    matchTimingExtension:
+      "Toute prolongation est exceptionnelle, doit être accordée par un administrateur et n’est pas garantie.",
+    dashboardGuidance:
+      "Consultez votre tableau de bord pour suivre le statut de votre inscription et les offres de la liste d’attente.",
+    bracketGuidance:
+      "Après le lancement, ouvrez l’onglet Tableaux du tournoi pour voir votre tableau, votre adversaire et les détails du Match.",
+  },
   registrationModal: {
     eyebrow: "Inscription IronClad",
     title: "Inscription du joueur esport",
@@ -159,14 +186,27 @@ const dictionary = {
     ownershipConfirmation:
       "Je confirme utiliser mon propre compte IronClad et être propriétaire du compte Steam associé.",
     submitRegistration: "Envoyer l’inscription",
-    submittedTitle: "Inscription envoyée — en attente de validation administrative",
-    reviewTime:
-      "L’administration du tournoi examinera votre inscription. Consultez votre tableau de bord pour suivre son statut.",
+    submittedTitle: "Inscription envoyée",
+    pendingAdminReview: "En attente d’examen administratif",
+    whatHappensNext: "Que se passe-t-il ensuite ?",
+    eightApprovedPlayers: "8 joueurs approuvés",
+    divisionLaunch: "Lancement de la Division",
+    matchTimingTitle: "Délai du Match",
+    reviewTime: "Vous n’avez rien à faire pour le moment.",
+    successGuidance:
+      "Consultez votre tableau de bord pour suivre le statut de votre inscription. Nous vous informerons des décisions importantes et des actualités de vos Matchs. Après le lancement, ouvrez l’onglet Tableaux du tournoi pour voir votre tableau, votre adversaire et les détails du Match.",
+    matchTimingDescription:
+      "Une fois votre confrontation active, vous disposez normalement de 7 jours pour la terminer.",
+    matchTimingDeadline:
+      "La date limite exacte et les rappels apparaîtront avec votre Match.",
+    openDashboard: "Ouvrir le tableau de bord",
     waitlistJoinedTitle: "Ajout à la liste d’attente confirmé",
     waitlistPositionPending:
       "Confirmation de votre position sur la liste d’attente…",
     waitlistResultDescription:
-      "Une place n’est pas garantie. La file suit l’ordre d’arrivée. Si une place se libère, vous pourrez recevoir une offre ; gérez les offres depuis votre tableau de bord.",
+      "Une place n’est pas garantie. La file suit l’ordre d’arrivée. Si une place se libère avant le lancement, vous pourrez recevoir une offre dans votre tableau de bord. Répondez avant la date limite affichée. Accepter l’offre renvoie votre inscription à l’examen administratif et ne garantit pas sa validation.",
+    waitlistNoAction:
+      "Vous n’avez rien à faire, sauf si une offre apparaît.",
     back: "Retour",
     cancel: "Annuler",
     continue: "Continuer",
