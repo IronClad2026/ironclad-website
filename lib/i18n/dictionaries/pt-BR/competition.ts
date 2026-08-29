@@ -103,6 +103,33 @@ const dictionary = {
     withdraw: "Retirar inscrição",
     statedDeadline: "o prazo informado",
   },
+  registrationGuidance: {
+    controlLabel: "Como funciona a inscrição",
+    title: "O que acontece depois da inscrição?",
+    adminReviewTitle: "Análise da Administração",
+    adminReviewBody:
+      "Analisamos sua inscrição e seu ELO verificado para o torneio. Sua vaga ainda não está confirmada.",
+    approvalTitle: "Aprovação",
+    approvalBody:
+      "Se aprovada, sua vaga na Divisão é confirmada. Se a Divisão estiver lotada, a inscrição segue para a lista de espera FIFO.",
+    divisionReadyTitle: "Divisão pronta",
+    divisionReadyBody:
+      "São necessários exatamente 8 jogadores aprovados antes que a Divisão possa ser preparada para o início.",
+    launchTitle: "Início do torneio",
+    launchBody:
+      "O IronClad prepara a chave, a distribuição das cabeças de chave e o conjunto de mapas; depois, um administrador inicia a Divisão. O início não é automático.",
+    matchTimingTitle: "Prazo da partida",
+    matchTimingBody:
+      "Quando seu confronto fica ativo, você normalmente tem 7 dias para concluí-lo.",
+    matchTimingDeadline:
+      "O prazo exato aparece junto da partida, e o IronClad envia lembretes.",
+    matchTimingExtension:
+      "Qualquer prorrogação é excepcional, deve ser concedida por um administrador e não é garantida.",
+    dashboardGuidance:
+      "Consulte o Dashboard para ver o status da inscrição e as ofertas da lista de espera.",
+    bracketGuidance:
+      "Após o início, abra a aba Chaves do torneio para ver sua chave, seu adversário e os detalhes da partida.",
+  },
   registrationModal: {
     eyebrow: "Inscrição IronClad",
     title: "Inscrição de jogador de esports",
@@ -159,14 +186,27 @@ const dictionary = {
     ownershipConfirmation:
       "Confirmo que uso minha própria conta IronClad e que a conta Steam vinculada pertence a mim.",
     submitRegistration: "Enviar inscrição",
-    submittedTitle: "Inscrição enviada — aguardando análise da Administração",
-    reviewTime:
-      "A administração do torneio analisará sua inscrição. Consulte o Dashboard para acompanhar as atualizações de status.",
+    submittedTitle: "Inscrição enviada",
+    pendingAdminReview: "Aguardando análise da Administração",
+    whatHappensNext: "O que acontece agora?",
+    eightApprovedPlayers: "8 jogadores aprovados",
+    divisionLaunch: "Início da Divisão",
+    matchTimingTitle: "Prazo da partida",
+    reviewTime: "Você não precisa fazer nada agora.",
+    successGuidance:
+      "Consulte o Dashboard para ver o status da inscrição. Avisaremos sobre decisões importantes e atualizações de partidas. Após o início, abra a aba Chaves do torneio para ver sua chave, seu adversário e os detalhes da partida.",
+    matchTimingDescription:
+      "Quando seu confronto fica ativo, você normalmente tem 7 dias para concluí-lo.",
+    matchTimingDeadline:
+      "O prazo exato e os lembretes aparecerão junto da sua partida.",
+    openDashboard: "Abrir o Dashboard",
     waitlistJoinedTitle: "Entrada na lista de espera confirmada",
     waitlistPositionPending:
       "Confirmando sua posição na lista de espera…",
     waitlistResultDescription:
-      "A vaga não é garantida. A fila segue a ordem de chegada. Se surgir uma vaga, você poderá receber uma oferta; gerencie as ofertas pelo Dashboard.",
+      "A vaga não é garantida. A fila segue a ordem de chegada. Se surgir uma vaga antes do início, você poderá receber uma oferta no Dashboard. Responda antes do prazo exibido. Aceitar a oferta devolve sua inscrição à análise da Administração e não garante a aprovação.",
+    waitlistNoAction:
+      "Você não precisa fazer nada, a menos que apareça uma oferta.",
     back: "Voltar",
     cancel: "Cancelar",
     continue: "Continuar",

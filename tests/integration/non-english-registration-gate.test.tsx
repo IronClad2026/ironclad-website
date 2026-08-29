@@ -7,6 +7,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
@@ -85,7 +86,9 @@ vi.mock("@/lib/supabase-browser", () => ({
   createAuthenticatedBrowserSupabaseClient: vi.fn(() => browserClientMock),
 }));
 
-import TournamentsExperience from "@/components/TournamentsExperience";
+import TournamentsExperience, {
+  type TournamentViewerRegistration,
+} from "@/components/TournamentsExperience";
 
 const TOURNAMENT_URL =
   "/tournaments?tournament=registration-gate-fixture&tab=overview&panel=details#registration-review";
@@ -185,9 +188,16 @@ const tournament: TournamentCard = {
   mapPools: [],
 };
 
-const viewer = {
+type TestViewer = {
+  isAdmin: boolean;
+  relicVerifiedDivision: "Challenge";
+  registrationIds: string[];
+  registrations: TournamentViewerRegistration[];
+};
+
+const viewer: TestViewer = {
   isAdmin: false,
-  relicVerifiedDivision: "Challenge" as const,
+  relicVerifiedDivision: "Challenge",
   registrationIds: [],
   registrations: [],
 };
@@ -230,6 +240,103 @@ describe("non-English registration gate", () => {
   afterEach(() => {
     cleanup();
     window.history.replaceState({}, "", "/");
+  });
+
+  it("renders an expandable guidance sibling beside each actionable Register card", () => {
+    renderExperience("en");
+
+    const registerActions = screen.getAllByRole("button", {
+      name: /^Register/,
+    });
+    const guidanceLabels = screen.getAllByText("How Registration Works");
+
+    expect(registerActions).toHaveLength(2);
+    expect(guidanceLabels).toHaveLength(2);
+
+    guidanceLabels.forEach((label, index) => {
+      const summary = label.closest("summary");
+      const details = summary?.closest("details");
+
+      expect(summary).toBeVisible();
+      expect(details).not.toHaveAttribute("open");
+      expect(details?.previousElementSibling).toBe(registerActions[index]);
+      expect(registerActions[index]).not.toContainElement(summary);
+      expect(
+        details?.querySelector("[data-registration-guidance-icon]")
+      ).not.toBeNull();
+
+      fireEvent.click(summary as HTMLElement);
+      expect(details).toHaveAttribute("open");
+      expect(
+        within(details as HTMLElement).getByRole("heading", {
+          name: "What Happens After You Register?",
+        })
+      ).toBeVisible();
+    });
+  });
+
+  it("renders the same guidance beside each actionable Join Waitlist card", () => {
+    const waitlistTournament: TournamentCard = {
+      ...tournament,
+      id: "11111111-1111-4111-8111-111111111112",
+      slug: "waitlist-guidance-fixture",
+      title: "Waitlist Guidance Fixture",
+      brackets: tournament.brackets.map((bracket) =>
+        bracket.id === BRACKET_ID
+          ? {
+              ...bracket,
+              activeCohortPlayers: 8,
+              registeredPlayers: 8,
+              isFull: true,
+              isWaitlistOnly: true,
+            }
+          : bracket
+      ),
+    };
+
+    renderExperience("en", waitlistTournament);
+
+    expect(
+      screen.getAllByRole("button", { name: /^Join Waitlist/ })
+    ).toHaveLength(2);
+    expect(screen.getAllByText("How Registration Works")).toHaveLength(2);
+  });
+
+  it("does not show guidance for an unavailable Tournament or duplicate an existing Registration state", () => {
+    const completedTournament: TournamentCard = {
+      ...tournament,
+      status: "Completed",
+      statusValue: "completed",
+      registrationEnabled: false,
+    };
+    const completedView = renderExperience("en", completedTournament);
+
+    expect(
+      screen.queryByText("How Registration Works")
+    ).not.toBeInTheDocument();
+
+    completedView.unmount();
+
+    const registration: TournamentViewerRegistration = {
+      id: "33333333-3333-4333-8333-333333333333",
+      tournamentId: TOURNAMENT_ID,
+      tournamentBracketId: BRACKET_ID,
+      bracketName: "Challenge Bracket",
+      status: "pending",
+      createdAt: "2026-08-29T00:00:00.000Z",
+      waitlistPosition: null,
+      waitlistOfferStatus: null,
+    };
+    renderExperience("en", tournament, {
+      ...viewer,
+      registrationIds: [registration.id],
+      registrations: [registration],
+    });
+
+    expect(
+      screen.queryByText("How Registration Works")
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Registration Submitted/)).toHaveLength(2);
   });
 
   it("presents the existing controlling-English registration gate in Italian", () => {
@@ -356,11 +463,19 @@ describe("non-English registration gate", () => {
   });
 });
 
-function renderExperience(locale: "en" | "es" | "it") {
-  return render(experience(locale));
+function renderExperience(
+  locale: "en" | "es" | "it",
+  selectedTournament: TournamentCard = tournament,
+  selectedViewer: TestViewer = viewer
+) {
+  return render(experience(locale, selectedTournament, selectedViewer));
 }
 
-function experience(locale: "en" | "es" | "it") {
+function experience(
+  locale: "en" | "es" | "it",
+  selectedTournament: TournamentCard = tournament,
+  selectedViewer: TestViewer = viewer
+) {
   return (
     <LocaleProvider
       locale={locale}
@@ -374,8 +489,8 @@ function experience(locale: "en" | "es" | "it") {
       }}
     >
       <TournamentsExperience
-        tournaments={[tournament]}
-        viewer={viewer}
+        tournaments={[selectedTournament]}
+        viewer={selectedViewer}
         matchResultSubmissions={[]}
         matchResultReportGroups={[]}
         registrationDocuments={registrationDocuments}
