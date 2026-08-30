@@ -37,6 +37,7 @@ import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime"
 import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import ScrollReveal from "@/components/ScrollReveal";
 import TournamentMapPools from "@/components/TournamentMapPools";
+import TournamentRulesEssentials from "@/components/TournamentRulesEssentials";
 import {
   useOptionalLocale,
   useOptionalTranslations,
@@ -1046,12 +1047,7 @@ function renderOverviewPanel(
 ) {
   const shared = "leading-7 text-zinc-300";
   if (panel === "rules") {
-    return (
-      <div className="space-y-4">
-        <Detail label={t("tournaments.overview.tournamentRuleFormat")} value={tournament.ruleFormatLabel} />
-        <p className={shared}>{tournament.rules}</p>
-      </div>
-    );
+    return <TournamentRulesEssentials tournament={tournament} />;
   }
   if (panel === "prizes") {
     return (
@@ -5379,15 +5375,7 @@ function renderMobileOverviewPanel(
   const shared = "break-words leading-7 text-zinc-300";
 
   if (panel === "rules") {
-    return (
-      <div className="space-y-4">
-        <MobileDetail
-          label={t("tournaments.overview.tournamentRuleFormat")}
-          value={tournament.ruleFormatLabel}
-        />
-        <p className={shared}>{tournament.rules}</p>
-      </div>
-    );
+    return <TournamentRulesEssentials tournament={tournament} />;
   }
 
   if (panel === "prizes") {
