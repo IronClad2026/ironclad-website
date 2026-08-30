@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import BadgeArtwork from "@/components/badges/BadgeArtwork";
 import BadgeDetailModal from "@/components/badges/BadgeDetailModal";
+import BadgeQueue from "@/components/badges/BadgeQueue";
 import {
   BADGE_RARITY_TOKENS,
   getBadgeProgressSummary,
@@ -15,20 +16,33 @@ import {
   getDashboardBadgeShowcaseItems,
   type DashboardBadgeData,
 } from "@/lib/badges/dashboard";
-import type { BadgeCollectionItem } from "@/lib/badges/types";
+import type {
+  BadgeCollectionItem,
+  BadgeRevealAcknowledgeResult,
+  BadgeRevealQueueItem,
+} from "@/lib/badges/types";
 
 export type DashboardBadgesSectionProps = {
   badgeData: DashboardBadgeData;
+  pendingReveals?: readonly BadgeRevealQueueItem[];
+  acknowledgeRevealAction?: (
+    awardId: string
+  ) => Promise<BadgeRevealAcknowledgeResult>;
 };
 
 const SHOWCASE_LIMIT = 6;
 
 export default function DashboardBadgesSection({
   badgeData,
+  pendingReveals = [],
+  acknowledgeRevealAction,
 }: DashboardBadgesSectionProps) {
   const [selectedItem, setSelectedItem] = useState<BadgeCollectionItem | null>(
     null
   );
+  const [acknowledgedAwardIds, setAcknowledgedAwardIds] = useState<
+    readonly string[]
+  >([]);
   const progress = getBadgeProgressSummary(badgeData.collection);
   const showcaseItems = getDashboardBadgeShowcaseItems(
     badgeData.collection,
@@ -37,11 +51,20 @@ export default function DashboardBadgesSection({
   const hasEarnedBadges = progress.earnedCount > 0;
 
   return (
-    <section
-      id="dashboard-badges"
-      aria-labelledby="dashboard-badges-title"
-      className="mt-10 scroll-mt-28 border border-orange-500/20 bg-black/65 p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-6"
-    >
+    <>
+      <BadgeQueue
+        items={pendingReveals}
+        entitlement={badgeData.entitlement}
+        acknowledgeItemAction={acknowledgeRevealAction}
+        onItemSeen={(item) =>
+          setAcknowledgedAwardIds((current) => [...current, item.id])
+        }
+      />
+      <section
+        id="dashboard-badges"
+        aria-labelledby="dashboard-badges-title"
+        className="mt-10 scroll-mt-28 border border-orange-500/20 bg-black/65 p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-6"
+      >
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
@@ -94,6 +117,12 @@ export default function DashboardBadgesSection({
           <div key={item.definition.slug} role="listitem">
             <DashboardBadgeShowcaseCard
               item={item}
+              isNew={
+                item.state === "earned" &&
+                item.award.isUnrevealed === true &&
+                Boolean(item.award.awardId) &&
+                !acknowledgedAwardIds.includes(item.award.awardId as string)
+              }
               onSelect={() => setSelectedItem(item)}
             />
           </div>
@@ -122,15 +151,18 @@ export default function DashboardBadgesSection({
           onClose={() => setSelectedItem(null)}
         />
       ) : null}
-    </section>
+      </section>
+    </>
   );
 }
 
 function DashboardBadgeShowcaseCard({
   item,
+  isNew,
   onSelect,
 }: {
   item: BadgeCollectionItem;
+  isNew: boolean;
   onSelect: () => void;
 }) {
   const isEarned = item.state === "earned";
@@ -177,6 +209,11 @@ function DashboardBadgeShowcaseCard({
             {String(item.definition.number).padStart(2, "0")}
           </span>
         </span>
+        {isNew ? (
+          <span className="mt-2 w-fit border border-orange-300/45 bg-orange-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-orange-200">
+            New
+          </span>
+        ) : null}
         <span className="mt-2 flex h-10 shrink-0 items-start line-clamp-2 text-sm font-black leading-5 text-white">
           {item.definition.name}
         </span>

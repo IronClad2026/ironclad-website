@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import { buildDashboardBadgeData } from "@/lib/badges/dashboard";
+import { mockNewUnlockQueued } from "@/lib/badges/fixtures";
 import type { PlayerBadgeAward } from "@/lib/badges/types";
 
 type MockImageProps = ImgHTMLAttributes<HTMLImageElement> & {
@@ -147,6 +148,59 @@ describe("DashboardBadgesSection", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("Earned");
     expect(screen.getByRole("dialog")).toHaveTextContent("Original awarded");
     fireEvent.keyDown(window, { key: "Escape" });
+  });
+
+  it("marks an owned unrevealed showcase badge as new", () => {
+    render(
+      <DashboardBadgesSection
+        badgeData={buildDashboardBadgeData({
+          awards: [
+            {
+              badgeSlug: "ironclad-recruit",
+              awardId: "award-new-recruit",
+              awardedAt: "2026-08-01T12:00:00.000Z",
+              isUnrevealed: true,
+            },
+          ],
+        })}
+      />
+    );
+
+    expect(screen.getByText("New")).toBeInTheDocument();
+  });
+
+  it("clears the new marker immediately after acknowledgement", async () => {
+    const acknowledgeRevealAction = vi.fn(async () => ({
+      status: "success" as const,
+      code: "acknowledged" as const,
+    }));
+
+    render(
+      <DashboardBadgesSection
+        badgeData={buildDashboardBadgeData({
+          awards: [
+            {
+              badgeSlug: "first-victory",
+              awardId: mockNewUnlockQueued.id,
+              awardedAt: mockNewUnlockQueued.queuedAt,
+              isUnrevealed: true,
+            },
+          ],
+        })}
+        pendingReveals={[mockNewUnlockQueued]}
+        acknowledgeRevealAction={acknowledgeRevealAction}
+      />
+    );
+
+    expect(screen.getByText("New")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => {
+      expect(acknowledgeRevealAction).toHaveBeenCalledWith(
+        mockNewUnlockQueued.id
+      );
+      expect(screen.queryByText("New")).not.toBeInTheDocument();
+    });
   });
 
   it("keeps development laboratory controls off the dashboard", () => {

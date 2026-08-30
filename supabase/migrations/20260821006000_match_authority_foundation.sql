@@ -558,7 +558,7 @@ begin
   if new.outcome_type = 'deadline_double_forfeit'
     and new.player_one_registration_id is not null
     and new.player_two_registration_id is not null then
-    foreach v_participant_id in array[
+    foreach v_participant_id in array ARRAY[
       new.player_one_registration_id,
       new.player_two_registration_id
     ] loop
@@ -586,7 +586,7 @@ begin
       old.outcome_type is not null
       and new.outcome_type is null
     ) then
-      foreach v_participant_id in array[
+      foreach v_participant_id in array ARRAY[
         old.player_one_registration_id,
         old.player_two_registration_id
       ] loop
@@ -718,7 +718,7 @@ begin
     v_proven_played := false;
   end if;
 
-  foreach v_participant_id in array[
+  foreach v_participant_id in array ARRAY[
     new.player_one_registration_id,
     new.player_two_registration_id
   ] loop

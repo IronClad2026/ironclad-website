@@ -622,7 +622,7 @@ begin
 
   v_expected_count := v_round_count;
 
-  foreach v_registration_id in array[
+  foreach v_registration_id in array ARRAY[
     new.player_one_registration_id,
     new.player_two_registration_id
   ] loop

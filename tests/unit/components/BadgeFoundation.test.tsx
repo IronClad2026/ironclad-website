@@ -8,7 +8,12 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from "react";
+import {
+  useState,
+  type HTMLAttributes,
+  type ImgHTMLAttributes,
+  type ReactNode,
+} from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import BadgeDetailModal from "@/components/badges/BadgeDetailModal";
@@ -72,6 +77,8 @@ vi.mock("framer-motion", async () => {
         react.createElement("article", stripMotionProps(props), children),
       button: ({ children, ...props }: MotionMockProps) =>
         react.createElement("button", stripMotionProps(props), children),
+      div: ({ children, ...props }: MotionMockProps) =>
+        react.createElement("div", stripMotionProps(props), children),
       span: ({ children, ...props }: MotionMockProps) =>
         react.createElement("span", stripMotionProps(props), children),
     },
@@ -412,9 +419,7 @@ describe("badge foundation components", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("Elite Champion");
     expect(screen.queryByText("First Victory")).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Close badge reveal" })[0]
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toHaveTextContent("First Victory");
@@ -423,15 +428,188 @@ describe("badge foundation components", () => {
       mockRetroactivePremiumRevealPending
     );
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Close badge reveal" })[0]
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
     expect(onItemSeen).toHaveBeenCalledWith(mockNewUnlockQueued);
     expect(onItemSeen).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders no reveal overlay when the queue is empty", () => {
+    render(<BadgeQueue items={[]} reducedMotion />);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("acknowledges the current award before closing the final reveal", async () => {
+    const acknowledgeItemAction = vi.fn(async () => ({
+      status: "success" as const,
+      code: "acknowledged" as const,
+    }));
+
+    render(
+      <BadgeQueue
+        items={[mockNewUnlockQueued]}
+        acknowledgeItemAction={acknowledgeItemAction}
+        reducedMotion
+      />
+    );
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("First Victory");
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => {
+      expect(acknowledgeItemAction).toHaveBeenCalledWith(
+        mockNewUnlockQueued.id
+      );
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps the current reveal open with a retryable error after failure", async () => {
+    const acknowledgeItemAction = vi.fn(async () => ({
+      status: "error" as const,
+      code: "acknowledge-failed" as const,
+      message: "Reveal save failed. Retry now.",
+    }));
+
+    render(
+      <BadgeQueue
+        items={[mockNewUnlockQueued]}
+        acknowledgeItemAction={acknowledgeItemAction}
+        reducedMotion
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Reveal save failed. Retry now."
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent("First Victory");
+
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(acknowledgeItemAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses the queue on Escape without acknowledging", async () => {
+    const acknowledgeItemAction = vi.fn();
+    const onItemSeen = vi.fn();
+
+    render(
+      <BadgeQueue
+        items={[mockNewUnlockQueued]}
+        acknowledgeItemAction={acknowledgeItemAction}
+        onItemSeen={onItemSeen}
+        reducedMotion
+      />
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(acknowledgeItemAction).not.toHaveBeenCalled();
+    expect(onItemSeen).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("temporarily dismisses the entire queue without revealing any badge", async () => {
+    const acknowledgeItemAction = vi.fn();
+    const onItemSeen = vi.fn();
+    const queueItems = [
+      mockRetroactivePremiumRevealPending,
+      mockNewUnlockQueued,
+    ];
+    const view = render(
+      <BadgeQueue
+        items={queueItems}
+        acknowledgeItemAction={acknowledgeItemAction}
+        onItemSeen={onItemSeen}
+        reducedMotion
+      />
+    );
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("Elite Champion");
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(acknowledgeItemAction).not.toHaveBeenCalled();
+    expect(onItemSeen).not.toHaveBeenCalled();
+
+    view.rerender(
+      <BadgeQueue
+        items={queueItems}
+        acknowledgeItemAction={acknowledgeItemAction}
+        onItemSeen={onItemSeen}
+        reducedMotion
+      />
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    view.unmount();
+    render(
+      <BadgeQueue
+        items={queueItems}
+        acknowledgeItemAction={acknowledgeItemAction}
+        onItemSeen={onItemSeen}
+        reducedMotion
+      />
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent("Elite Champion");
+    expect(screen.queryByText("First Victory")).not.toBeInTheDocument();
+  });
+
+  it("starts focus inside the modal and makes the background inert", () => {
+    const { container } = render(
+      <BadgeQueue items={[mockNewUnlockQueued]} reducedMotion />
+    );
+
+    expect(screen.getByRole("button", { name: "Continue" })).toHaveFocus();
+    expect(container).toHaveAttribute("aria-hidden", "true");
+    expect(container.inert).toBe(true);
+  });
+
+  it("wraps Tab and Shift+Tab focus within the modal", () => {
+    render(<BadgeQueue items={[mockNewUnlockQueued]} reducedMotion />);
+
+    const continueButton = screen.getByRole("button", { name: "Continue" });
+    const notNowButton = screen.getByRole("button", { name: "Not now" });
+
+    notNowButton.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(continueButton).toHaveFocus();
+
+    continueButton.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(notNowButton).toHaveFocus();
+  });
+
+  it("restores focus after a temporary dismissal", async () => {
+    render(<BadgeRevealFocusRestoreFixture />);
+
+    const openButton = screen.getByRole("button", { name: "Open reveal" });
+    const backgroundRoot = openButton.parentElement;
+    openButton.focus();
+    fireEvent.click(openButton);
+
+    expect(screen.getByRole("button", { name: "Continue" })).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(openButton).toHaveFocus();
+      expect(backgroundRoot).not.toHaveAttribute("aria-hidden");
+      expect(backgroundRoot?.inert).not.toBe(true);
+    });
   });
 
   it("keeps missing image assets from breaking BadgeSlot rendering", () => {
@@ -449,6 +627,25 @@ describe("badge foundation components", () => {
         name: "IronClad Recruit, Common, earned",
       })
     ).toBeInTheDocument();
+  });
+
+  it("keeps missing image assets from breaking the reveal overlay", () => {
+    render(
+      <BadgeRevealOverlay
+        item={mockEarnedBadge}
+        onContinue={vi.fn()}
+        reducedMotion
+      />
+    );
+
+    fireEvent.error(
+      screen.getByRole("img", {
+        name: "IronClad Recruit badge artwork",
+      })
+    );
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("IronClad Recruit");
+    expect(screen.getByTestId("badge-artwork-fallback")).toBeInTheDocument();
   });
 
   it("renders final artwork for a previously fallback-only badge", () => {
@@ -677,7 +874,7 @@ describe("badge foundation components", () => {
         })
       ).toHaveAttribute("src", pilot.src);
       fireEvent.click(
-        screen.getByRole("button", { name: "Close badge reveal" })
+        screen.getByRole("button", { name: "Not now" })
       );
       await waitFor(() => {
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -698,7 +895,7 @@ describe("badge foundation components", () => {
         document.querySelector('[data-premium-badge-effects="true"]')
       ).toBeInTheDocument();
       fireEvent.click(
-        screen.getByRole("button", { name: "Close badge reveal" })
+        screen.getByRole("button", { name: "Not now" })
       );
       await waitFor(() => {
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -706,6 +903,21 @@ describe("badge foundation components", () => {
     }
   });
 });
+
+function BadgeRevealFocusRestoreFixture() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Open reveal
+      </button>
+      {open ? (
+        <BadgeQueue items={[mockNewUnlockQueued]} reducedMotion />
+      ) : null}
+    </>
+  );
+}
 
 function requireItemByNumber(
   collection: ReturnType<typeof mapBadgeCollection>,

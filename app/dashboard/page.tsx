@@ -23,7 +23,8 @@ import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCar
 import PlayerRegistrationActions from "@/components/PlayerRegistrationActions";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
-import { buildDashboardBadgeDataFromAwards } from "@/lib/badges/read";
+import { acknowledgeBadgeReveal } from "@/app/dashboard/badge-reveal-actions";
+import { loadPlayerBadgeRevealDashboardState } from "@/lib/badges/reveals";
 import {
   getLocalizedCountryName,
   getLocalizedPlayerRegion,
@@ -167,10 +168,11 @@ export default async function PlayerDashboardPage() {
       first(registration.tournaments)?.status ?? "upcoming",
   }));
   const profileComplete = profile?.profile_completed === true;
-  const dashboardBadgeData = await buildDashboardBadgeDataFromAwards(
+  const badgeRevealState = await loadPlayerBadgeRevealDashboardState(
     supabase,
     profile?.id ?? null
   );
+  const dashboardBadgeData = badgeRevealState.badgeData;
 
   return (
     <main
@@ -375,6 +377,8 @@ export default async function PlayerDashboardPage() {
         />
         <DashboardBadgesSection
           badgeData={dashboardBadgeData}
+          pendingReveals={badgeRevealState.pendingReveals}
+          acknowledgeRevealAction={acknowledgeBadgeReveal}
         />
         <DashboardChampionHistory champions={career.champions} />
         <DashboardMatchHistory matches={career.matchHistory} />

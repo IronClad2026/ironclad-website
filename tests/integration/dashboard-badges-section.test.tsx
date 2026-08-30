@@ -146,10 +146,12 @@ describe("dashboard badge section integration", () => {
     expect(badgeSectionProps.badgeData).not.toHaveProperty(
       "pendingRevealQueue"
     );
+    expect(badgeSectionProps.pendingReveals).toHaveLength(1);
     expect(client.from.mock.calls.map(([table]: [string]) => table)).toEqual([
       "players",
       "registrations",
       "player_badge_awards",
+      "player_badge_reveals",
     ]);
     expect(findElements(page, dashboardNotificationsMock)).toHaveLength(1);
     expect(findElements(page, inAppNotificationCenterMock)).toHaveLength(1);
@@ -234,11 +236,18 @@ function createDashboardClient({
   badgeAwardsQuery.select.mockReturnValue(badgeAwardsQuery);
   badgeAwardsQuery.eq.mockReturnValue(badgeAwardsQuery);
 
+  const badgeRevealsQuery = {
+    select: vi.fn(),
+    eq: vi.fn(async () => ({ data: [], error: null })),
+  };
+  badgeRevealsQuery.select.mockReturnValue(badgeRevealsQuery);
+
   return {
     from: vi.fn((table: string) => {
       if (table === "players") return profileQuery;
       if (table === "registrations") return registrationsQuery;
       if (table === "player_badge_awards") return badgeAwardsQuery;
+      if (table === "player_badge_reveals") return badgeRevealsQuery;
       throw new Error(`Unexpected dashboard table: ${table}`);
     }),
   };

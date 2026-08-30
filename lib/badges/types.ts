@@ -88,6 +88,7 @@ export type PlayerBadgeAward = {
   originalAwardedAt?: string | null;
   awardId?: string | null;
   evidenceLabel?: string | null;
+  isUnrevealed?: boolean;
 };
 
 export type LockedBadgeCollectionItem = {
@@ -125,3 +126,20 @@ export type BadgeRevealQueueItem = {
   entitlement: BadgePresentationEntitlement;
   seenAt: string | null;
 };
+
+export type BadgeRevealAcknowledgeResult =
+  | {
+      status: "success";
+      code: "acknowledged" | "already-acknowledged";
+    }
+  | {
+      status: "error";
+      code:
+        | "sign-in-required"
+        | "invalid-award"
+        | "profile-required"
+        | "award-not-owned"
+        | "lookup-failed"
+        | "acknowledge-failed";
+      message: string;
+    };

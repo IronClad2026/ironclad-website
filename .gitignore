@@ -53,3 +53,5 @@ supabase.temp/
 _recovery_backup/
 
 _recovery_backup_*/
+
+/artifacts/badge-e2e/
