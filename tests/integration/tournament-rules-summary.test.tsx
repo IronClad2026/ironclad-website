@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 
 import type { ReactNode } from "react";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TournamentCard } from "@/lib/tournaments";
 
@@ -14,15 +20,17 @@ vi.mock("@clerk/nextjs", () => ({
   }),
 }));
 
+const routerPush = vi.hoisted(() => vi.fn());
+const routerReplace = vi.hoisted(() => vi.fn());
+
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/tournaments",
+  usePathname: () => window.location.pathname,
   useRouter: () => ({
-    push: vi.fn(),
+    push: routerPush,
     refresh: vi.fn(),
-    replace: vi.fn(),
+    replace: routerReplace,
   }),
-  useSearchParams: () =>
-    new URLSearchParams("tab=overview&panel=rules"),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
 vi.mock("next/link", () => ({
@@ -53,6 +61,11 @@ vi.mock("@/lib/supabase-browser", () => ({
 }));
 
 import TournamentsExperience from "@/components/TournamentsExperience";
+
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+  Element.prototype,
+  "scrollIntoView"
+);
 
 const tournament: TournamentCard = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -104,85 +117,190 @@ const tournament: TournamentCard = {
   participants: [],
   bracketParticipants: [],
   generatedBrackets: [],
-  mapPools: [],
+  mapPools: [
+    {
+      bracketId: "22222222-2222-4222-8222-222222222222",
+      divisionName: "Academy",
+      publishedAt: "2026-08-01T00:00:00.000Z",
+      launchedAt: null,
+      maps: [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          slug: "road-to-tunis",
+          displayName: "Road to Tunis",
+          sourceType: "official",
+          creatorName: null,
+          gameMode: "1v1",
+          status: "active",
+          thumbnailPath: null,
+          sourceReference: null,
+        },
+      ],
+    },
+  ],
 };
 
-describe("Tournament Rules essentials summary", () => {
-  afterEach(cleanup);
+function experience() {
+  return (
+    <TournamentsExperience
+      tournaments={[tournament]}
+      viewer={{
+        isAdmin: false,
+        relicVerifiedDivision: null,
+        registrationIds: [],
+        registrations: [],
+      }}
+      matchResultSubmissions={[]}
+      matchResultReportGroups={[]}
+      eloVerificationEnabled
+    />
+  );
+}
 
-  it("renders the same authoritative essentials in desktop and mobile Rules panels", () => {
-    render(
-      <TournamentsExperience
-        tournaments={[tournament]}
-        viewer={{
-          isAdmin: false,
-          relicVerifiedDivision: null,
-          registrationIds: [],
-          registrations: [],
-        }}
-        matchResultSubmissions={[]}
-        matchResultReportGroups={[]}
-        eloVerificationEnabled
-      />
+function getMobileExperience() {
+  const mobile = screen
+    .getByRole("button", { name: "Tournament Menu" })
+    .closest(".lg\\:hidden");
+
+  if (!(mobile instanceof HTMLElement)) {
+    throw new Error("Mobile Tournament experience was not rendered.");
+  }
+
+  return mobile;
+}
+
+describe("Tournament Rules essentials summary", () => {
+  beforeEach(() => {
+    window.history.replaceState({}, "", "/tournaments");
+    routerPush.mockReset();
+    routerReplace.mockReset();
+    routerPush.mockImplementation((href: string) => {
+      window.history.pushState({}, "", href);
+    });
+    routerReplace.mockImplementation((href: string) => {
+      window.history.replaceState({}, "", href);
+    });
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    if (originalScrollIntoView) {
+      Object.defineProperty(
+        Element.prototype,
+        "scrollIntoView",
+        originalScrollIntoView
+      );
+    } else {
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    }
+  });
+
+  it("reaches the authoritative summary through the real mobile Tournament Rules path", () => {
+    const view = render(experience());
+
+    let mobile = getMobileExperience();
+    expect(
+      within(mobile).queryByRole("region", { name: "Tournament Essentials" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(mobile).getByRole("button", { name: "Tournament Menu" })
     );
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Tournament Menu" })).getByRole(
+        "button",
+        { name: /Rules Summary Tournament/ }
+      )
+    );
+    view.rerender(experience());
+
+    mobile = getMobileExperience();
+    const rulesControl = within(mobile).getByRole("button", { name: "Rules" });
+    const mapPools = within(mobile).getByRole("region", {
+      name: "Published division map pools",
+    });
+
+    expect(rulesControl).toHaveAttribute("type", "button");
+    expect(rulesControl).toHaveClass("min-h-11");
+    expect(
+      rulesControl.compareDocumentPosition(mapPools) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).not.toBe(0);
+
+    fireEvent.click(rulesControl);
+    expect(routerPush).toHaveBeenLastCalledWith(
+      expect.stringContaining("tab=overview&panel=rules"),
+      { scroll: false }
+    );
+    view.rerender(experience());
+
+    mobile = getMobileExperience();
+    const summary = within(mobile).getByRole("region", {
+      name: "Tournament Essentials",
+    });
+    const rules = within(summary);
+
+    expect(rules.getByText("Format A")).toBeInTheDocument();
+    expect(summary).toHaveTextContent(
+      "CoH3 · 1v1 · 8 Players per Division · Independent single-elimination brackets."
+    );
+    expect(summary).toHaveTextContent(
+      "Quarterfinals: BO3 · Semifinals: BO3 · Grand Final: BO5."
+    );
+    expect(summary).toHaveTextContent(
+      "Each individual Match normally has 7 days from activation."
+    );
+    expect(summary).toHaveTextContent(
+      "Later Matches activate when both Players are known."
+    );
+    expect(summary).toHaveTextContent(
+      "The exact deadline shown with the Match controls"
+    );
+    expect(summary).toHaveTextContent("within 24 hours");
+    expect(summary).toHaveTextContent("after 48 hours");
+    expect(summary).toHaveTextContent(
+      "These timings are not automatic-forfeit timers."
+    );
+    expect(summary).toHaveTextContent(
+      "one unique .rec replay for every Game played"
+    );
+    expect(summary).toHaveTextContent(
+      "Your opponent confirms or disputes by the displayed deadline."
+    );
+    expect(summary).toHaveTextContent("Never self-award a no-show.");
+    expect(summary).toHaveTextContent("double forfeit");
+    expect(summary).toHaveTextContent(
+      "Players coordinate Map and Side choices manually"
+    );
+    expect(summary).toHaveTextContent(
+      "Tournament-specific Format A rules remain in effect."
+    );
+    expect(
+      rules.getByRole("link", { name: /Open Tournament Rules/ })
+    ).toHaveAttribute("href", "https://example.test/tournament-rules");
+    expect(
+      rules.getByRole("link", { name: "Read Full Official Rulebook" })
+    ).toHaveAttribute("href", "/rules");
+
+    const copy = (summary.textContent ?? "").toLowerCase();
+    expect(copy).not.toContain("9 days");
+    expect(copy).not.toContain("automatic extension");
+    expect(copy).not.toContain("automatic win after 48 hours");
+    expect(copy).not.toContain("7 days per round");
 
     const summaries = screen.getAllByRole("region", {
       name: "Tournament Essentials",
     });
-
     expect(summaries).toHaveLength(2);
-    for (const summary of summaries) {
-      const rules = within(summary);
-
-      expect(rules.getByText("Format A")).toBeInTheDocument();
-      expect(summary).toHaveTextContent(
-        "CoH3 · 1v1 · 8 Players per Division · Independent single-elimination brackets."
-      );
-      expect(summary).toHaveTextContent(
-        "Quarterfinals: BO3 · Semifinals: BO3 · Grand Final: BO5."
-      );
-      expect(summary).toHaveTextContent(
-        "Each individual Match normally has 7 days from activation."
-      );
-      expect(summary).toHaveTextContent(
-        "Later Matches activate when both Players are known."
-      );
-      expect(summary).toHaveTextContent(
-        "The exact deadline shown with the Match controls"
-      );
-      expect(summary).toHaveTextContent("within 24 hours");
-      expect(summary).toHaveTextContent("after 48 hours");
-      expect(summary).toHaveTextContent(
-        "These timings are not automatic-forfeit timers."
-      );
-      expect(summary).toHaveTextContent(
-        "one unique .rec replay for every Game played"
-      );
-      expect(summary).toHaveTextContent(
-        "Your opponent confirms or disputes by the displayed deadline."
-      );
-      expect(summary).toHaveTextContent("Never self-award a no-show.");
-      expect(summary).toHaveTextContent("double forfeit");
-      expect(summary).toHaveTextContent(
-        "Players coordinate Map and Side choices manually"
-      );
-      expect(summary).toHaveTextContent(
-        "Tournament-specific Format A rules remain in effect."
-      );
-      expect(
-        rules.getByRole("link", { name: /Open Tournament Rules/ })
-      ).toHaveAttribute("href", "https://example.test/tournament-rules");
-      expect(
-        rules.getByRole("link", { name: "Read Full Official Rulebook" })
-      ).toHaveAttribute("href", "/rules");
-
-      const copy = (summary.textContent ?? "").toLowerCase();
-      expect(copy).not.toContain("9 days");
-      expect(copy).not.toContain("automatic extension");
-      expect(copy).not.toContain("automatic win after 48 hours");
-      expect(copy).not.toContain("7 days per round");
-    }
-
     expect(summaries[0]?.textContent).toBe(summaries[1]?.textContent);
   });
 });

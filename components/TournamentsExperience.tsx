@@ -5253,10 +5253,6 @@ function MobileOverview({
         </div>
       </MobileCard>
 
-      {tournament.mapPools.length > 0 ? (
-        <TournamentMapPools pools={tournament.mapPools} />
-      ) : null}
-
       <MobileCard>
         <div
           className={classNames(
@@ -5293,6 +5289,10 @@ function MobileOverview({
         </div>
         <div className="mt-5">{renderMobileOverviewPanel(visiblePanel, tournament, t, locale)}</div>
       </MobileCard>
+
+      {tournament.mapPools.length > 0 ? (
+        <TournamentMapPools pools={tournament.mapPools} />
+      ) : null}
 
       <MobileCard>
         <h3 className="text-sm font-black uppercase tracking-wider text-white">
