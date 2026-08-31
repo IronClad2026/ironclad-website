@@ -238,6 +238,18 @@ const dictionary = {
       empty: "No tournament resources have been published.",
       update: "IronClad Update",
     },
+    media: {
+      title: "Tournament Media",
+      empty: "No Tournament media has been published.",
+      watch: "Watch",
+      opensNewTab: "Opens in a new tab",
+      types: {
+        fullTournament: "Full Tournament",
+        matchCast: "Match Cast",
+        video: "Video",
+        other: "Other",
+      },
+    },
     workspace: {
       matchCount: "{count} Match",
       matchCountPlural: "{count} Matches",

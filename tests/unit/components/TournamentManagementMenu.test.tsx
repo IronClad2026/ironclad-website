@@ -22,6 +22,7 @@ const expectedSections = [
   ["Players / Waitlist", "players-waitlist"],
   ["Bracket", "bracket"],
   ["Matches / Results", "matches"],
+  ["Media", "media"],
   ["Map Pool", "map-pool"],
   ["Tournament Controls", "controls"],
 ] as const;
