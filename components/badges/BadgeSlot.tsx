@@ -112,10 +112,12 @@ export default function BadgeSlot({
             : "border-zinc-800/80 bg-[linear-gradient(180deg,rgba(28,28,31,0.96),rgba(11,11,12,0.98))] text-zinc-500"
       } ${className}`}
     >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-4 top-0 z-10 h-px bg-gradient-to-r from-transparent via-orange-200/32 to-transparent"
-      />
+      {isVisuallyEarned ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-4 top-0 z-10 h-px bg-gradient-to-r from-transparent via-orange-200/32 to-transparent"
+        />
+      ) : null}
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_50%_0%,rgba(249,115,22,0.1),transparent_38%)]"
@@ -127,16 +129,23 @@ export default function BadgeSlot({
       />
 
       <span
-        ref={destinationRef}
-        data-badge-reveal-destination={isEarned ? "true" : undefined}
-        className="relative z-10 flex h-60 shrink-0 items-center justify-center"
+        className="relative z-10 isolate flex h-60 shrink-0 items-center justify-center"
       >
+        {!isVisuallyEarned ? (
+          <span
+            aria-hidden="true"
+            data-badge-card-divider="steel"
+            className="pointer-events-none absolute left-[-0.625rem] right-[-0.625rem] top-1/2 z-0 h-px -translate-y-1/2 bg-[linear-gradient(90deg,rgba(113,113,122,0.38)_0%,rgba(244,244,245,0.68)_18%,rgba(161,161,170,0.52)_50%,rgba(244,244,245,0.68)_82%,rgba(113,113,122,0.38)_100%)] opacity-80 shadow-[0_1px_0_rgba(0,0,0,0.72)] sm:left-[-0.75rem] sm:right-[-0.75rem]"
+          />
+        ) : null}
         <BadgeArtwork
           item={localizedItem}
           variant="slot"
-          className="h-full w-full"
+          className="relative z-10 w-full max-w-60"
           presentation={isUnrevealed ? "unrevealed" : "revealed"}
           dictionary={copy}
+          rootRef={destinationRef}
+          revealDestination={isEarned}
         />
       </span>
 

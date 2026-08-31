@@ -319,7 +319,7 @@ function DashboardBadgeShowcaseCard({
           : { scale: 1 }
       }
       transition={{ duration: prefersReducedMotion ? 0.24 : 0.62 }}
-      className={`group flex h-full min-h-[17rem] w-full cursor-pointer flex-col border p-3 text-left transition hover:-translate-y-0.5 hover:border-orange-300/45 hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 ${
+      className={`group relative isolate flex h-full min-h-[17rem] w-full cursor-pointer flex-col border p-3 text-left transition hover:-translate-y-0.5 hover:border-orange-300/45 hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 ${
         isEarned && !isNew
           ? `${tokens.borderClassName} bg-[linear-gradient(180deg,rgba(31,26,21,0.88),rgba(7,7,8,0.94))] shadow-[0_18px_34px_rgba(0,0,0,0.25)]`
           : isNew
@@ -328,16 +328,23 @@ function DashboardBadgeShowcaseCard({
       }`}
     >
       <span
-        ref={destinationRef}
-        data-badge-reveal-destination={isEarned ? "true" : undefined}
-        className="flex h-40 shrink-0 items-center justify-center"
+        className="relative isolate flex h-40 shrink-0 items-center justify-center"
       >
+        {!isEarned || isNew ? (
+          <span
+            aria-hidden="true"
+            data-badge-card-divider="steel"
+            className="pointer-events-none absolute left-[-0.75rem] right-[-0.75rem] top-1/2 z-0 h-px -translate-y-1/2 bg-[linear-gradient(90deg,rgba(113,113,122,0.38)_0%,rgba(244,244,245,0.68)_18%,rgba(161,161,170,0.52)_50%,rgba(244,244,245,0.68)_82%,rgba(113,113,122,0.38)_100%)] opacity-80 shadow-[0_1px_0_rgba(0,0,0,0.72)]"
+          />
+        ) : null}
         <BadgeArtwork
           item={localizedItem}
           variant="slot"
-          className="h-full w-full max-w-32"
+          className="relative z-10 w-full max-w-32"
           presentation={isNew ? "unrevealed" : "revealed"}
           dictionary={dictionary}
+          rootRef={destinationRef}
+          revealDestination={isEarned}
         />
       </span>
       <span className="mt-3 flex min-w-0 flex-1 flex-col">

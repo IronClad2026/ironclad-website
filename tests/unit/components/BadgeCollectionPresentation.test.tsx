@@ -15,6 +15,7 @@ import type {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import DashboardBadgeCollection from "@/components/badges/DashboardBadgeCollection";
+import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import { buildDashboardBadgeData } from "@/lib/badges/dashboard";
 import italianBadges from "@/lib/i18n/dictionaries/it/badges";
 
@@ -119,6 +120,117 @@ describe("Badge collection presentation", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Ottenuti" })).toBeInTheDocument();
     expect(screen.getByLabelText("0 Badge ottenuti su 30")).toBeInTheDocument();
+  });
+
+  it("uses a full-card steel divider only behind locked and unrevealed artwork", () => {
+    const badgeData = buildDashboardBadgeData({
+      awards: [
+        {
+          badgeSlug: "first-deployment",
+          awardId: "award-unrevealed",
+          awardedAt: "2026-08-30T10:00:00.000Z",
+          isUnrevealed: true,
+        },
+        {
+          badgeSlug: "first-victory",
+          awardId: "award-revealed",
+          awardedAt: "2026-08-29T10:00:00.000Z",
+          isUnrevealed: false,
+        },
+      ],
+    });
+
+    render(<DashboardBadgeCollection badgeData={badgeData} />);
+
+    const lockedCard = document.querySelector<HTMLElement>(
+      'button[data-badge-slug="ironclad-recruit"]'
+    );
+    const unrevealedCard = document.querySelector<HTMLElement>(
+      'button[data-badge-slug="first-deployment"]'
+    );
+    const earnedCard = document.querySelector<HTMLElement>(
+      'button[data-badge-slug="first-victory"]'
+    );
+
+    expect(lockedCard).toBeInTheDocument();
+    const lockedDivider = lockedCard?.querySelector(
+      '[data-badge-card-divider="steel"]'
+    );
+    expect(lockedDivider).toBeInTheDocument();
+    expect(lockedDivider).toHaveAttribute("aria-hidden", "true");
+    expect(lockedDivider).toHaveClass(
+      "left-[-0.625rem]",
+      "right-[-0.625rem]",
+      "top-1/2",
+      "z-0"
+    );
+    expect(
+      unrevealedCard?.querySelector('[data-badge-card-divider="steel"]')
+    ).toBeInTheDocument();
+    expect(
+      earnedCard?.querySelector('[data-badge-card-divider="steel"]')
+    ).not.toBeInTheDocument();
+
+    const revealDestination = unrevealedCard?.querySelector(
+      '[data-badge-reveal-destination="true"]'
+    );
+    expect(revealDestination).toHaveAttribute("data-badge-artwork", "real");
+    expect(revealDestination).toHaveClass("z-10", "max-w-60");
+    expect(revealDestination?.parentElement).not.toHaveAttribute(
+      "data-badge-reveal-destination"
+    );
+  });
+
+  it("keeps the dashboard showcase divider and artwork destination consistent", () => {
+    const unrevealedData = buildDashboardBadgeData({
+      awards: [
+        {
+          badgeSlug: "first-victory",
+          awardId: "showcase-unrevealed",
+          awardedAt: "2026-08-30T10:00:00.000Z",
+          isUnrevealed: true,
+        },
+      ],
+    });
+    const view = render(<DashboardBadgesSection badgeData={unrevealedData} />);
+    const unrevealedCard = document.querySelector<HTMLElement>(
+      'button[data-dashboard-badge-showcase-item="true"]'
+    );
+
+    expect(unrevealedCard).not.toHaveClass("overflow-hidden");
+    const showcaseDivider = unrevealedCard?.querySelector(
+      '[data-badge-card-divider="steel"]'
+    );
+    expect(showcaseDivider).toBeInTheDocument();
+    expect(showcaseDivider).toHaveClass(
+      "left-[-0.75rem]",
+      "right-[-0.75rem]",
+      "z-0"
+    );
+    expect(
+      unrevealedCard?.querySelector('[data-badge-reveal-destination="true"]')
+    ).toHaveAttribute("data-badge-artwork", "real");
+
+    view.unmount();
+
+    const revealedData = buildDashboardBadgeData({
+      awards: [
+        {
+          badgeSlug: "first-victory",
+          awardId: "showcase-revealed",
+          awardedAt: "2026-08-30T10:00:00.000Z",
+          isUnrevealed: false,
+        },
+      ],
+    });
+    render(<DashboardBadgesSection badgeData={revealedData} />);
+    const earnedCard = document.querySelector<HTMLElement>(
+      'button[data-dashboard-badge-showcase-item="true"]'
+    );
+
+    expect(
+      earnedCard?.querySelector('[data-badge-card-divider="steel"]')
+    ).not.toBeInTheDocument();
   });
 
   it("traps detail focus, makes the background inert, closes on Escape, and restores focus", async () => {

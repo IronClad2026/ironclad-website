@@ -40,6 +40,7 @@ const getServerHydratedSnapshot = () => false;
 type RevealPhase =
   | "intro"
   | "revealed"
+  | "orbiting"
   | "transferring"
   | "saving"
   | "complete";
@@ -55,6 +56,14 @@ type TransferGeometry = {
   source: RectSnapshot;
   destination: RectSnapshot;
   hasDestination: boolean;
+};
+
+type OrbitGeometry = {
+  source: RectSnapshot;
+  end: RectSnapshot;
+  left: number[];
+  top: number[];
+  compact: boolean;
 };
 
 export type BadgeRevealOverlayProps = {
@@ -93,7 +102,11 @@ export default function BadgeRevealOverlay({
   const dismissButtonRef = useRef<HTMLButtonElement>(null);
   const artworkAnchorRef = useRef<HTMLDivElement>(null);
   const completingTransferRef = useRef(false);
+  const lockInAttemptRef = useRef(0);
   const [phase, setPhase] = useState<RevealPhase>("intro");
+  const [orbitGeometry, setOrbitGeometry] = useState<OrbitGeometry | null>(
+    null
+  );
   const [transferGeometry, setTransferGeometry] =
     useState<TransferGeometry | null>(null);
   const copy = resolveBadgesDictionary(dictionary);
@@ -116,7 +129,10 @@ export default function BadgeRevealOverlay({
     hydrationComplete && typeof document !== "undefined"
       ? document.body
       : null;
-  const transferOrSavePending = phase === "transferring" || pending;
+  const motionInProgress = phase === "orbiting" || phase === "transferring";
+  const accessibleBusy = motionInProgress || phase === "saving";
+  const transferOrSavePending =
+    accessibleBusy || pending;
   const { dialogRef, overlayRootRef } = useBadgeModalDialog({
     open,
     onDismiss: onClose,
@@ -127,7 +143,7 @@ export default function BadgeRevealOverlay({
   useEffect(() => {
     completingTransferRef.current = false;
 
-    const revealDelay = shouldReduceMotion ? 180 : 900;
+    const revealDelay = shouldReduceMotion ? 180 : 520;
     const timer = window.setTimeout(() => setPhase("revealed"), revealDelay);
 
     return () => window.clearTimeout(timer);
@@ -144,11 +160,18 @@ export default function BadgeRevealOverlay({
   }, [errorMessage, phase]);
 
   useEffect(() => {
-    if (phase !== "saving") return;
+    if (!accessibleBusy) return;
 
     const focusTimer = window.setTimeout(() => dialogRef.current?.focus(), 0);
     return () => window.clearTimeout(focusTimer);
-  }, [dialogRef, phase]);
+  }, [accessibleBusy, dialogRef, phase]);
+
+  useEffect(
+    () => () => {
+      lockInAttemptRef.current += 1;
+    },
+    []
+  );
 
   const completeTransfer = useCallback(async () => {
     if (completingTransferRef.current) return;
@@ -161,6 +184,7 @@ export default function BadgeRevealOverlay({
 
       if (completed === false) {
         completingTransferRef.current = false;
+        setOrbitGeometry(null);
         setTransferGeometry(null);
         setPhase("revealed");
         return;
@@ -170,10 +194,62 @@ export default function BadgeRevealOverlay({
       setPhase("complete");
     } catch {
       completingTransferRef.current = false;
+      setOrbitGeometry(null);
       setTransferGeometry(null);
       setPhase("revealed");
     }
   }, [onContinue, onDestinationSettle]);
+
+  const beginLockIn = useCallback(() => {
+    if (!orbitGeometry) return;
+
+    const attempt = lockInAttemptRef.current + 1;
+    lockInAttemptRef.current = attempt;
+    const measuredDestination = getDestinationRect?.() ?? null;
+    const destinationElement = findRevealDestination(
+      localizedItem.definition.slug
+    );
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+    const finishLockIn = (destination: DOMRect | null) => {
+      if (lockInAttemptRef.current !== attempt) return;
+
+      setTransferGeometry(
+        buildTransferGeometry(orbitGeometry.end, destination)
+      );
+      setPhase("transferring");
+    };
+
+    if (
+      measuredDestination &&
+      destinationElement &&
+      isOutsideViewport(measuredDestination, viewport)
+    ) {
+      try {
+        destinationElement.scrollIntoView({
+          block: "center",
+          inline: "nearest",
+          behavior: "auto",
+        });
+      } catch {
+        finishLockIn(measuredDestination);
+        return;
+      }
+
+      void waitForAnimationFrames(2).then(() => {
+        finishLockIn(getDestinationRect?.() ?? null);
+      });
+      return;
+    }
+
+    finishLockIn(measuredDestination);
+  }, [
+    getDestinationRect,
+    localizedItem.definition.slug,
+    orbitGeometry,
+  ]);
 
   const beginTransfer = () => {
     if (phase !== "revealed" || pending) return;
@@ -181,22 +257,24 @@ export default function BadgeRevealOverlay({
     const sourceRect = artworkAnchorRef.current?.getBoundingClientRect();
     if (!sourceRect) return;
 
-    const measuredDestination = getDestinationRect?.() ?? null;
-    const fallbackDestination = {
-      left: sourceRect.left + sourceRect.width * 0.35,
-      top: sourceRect.top + sourceRect.height * 0.35,
-      width: sourceRect.width * 0.3,
-      height: sourceRect.height * 0.3,
-    };
+    const source = snapshotRect(sourceRect);
+    const preliminaryDestination = getDestinationRect?.() ?? null;
 
-    setTransferGeometry({
-      source: snapshotRect(sourceRect),
-      destination: measuredDestination
-        ? snapshotRect(measuredDestination)
-        : fallbackDestination,
-      hasDestination: Boolean(measuredDestination),
-    });
-    setPhase("transferring");
+    if (shouldReduceMotion) {
+      setTransferGeometry(
+        buildTransferGeometry(source, preliminaryDestination)
+      );
+      setPhase("transferring");
+      return;
+    }
+
+    setOrbitGeometry(
+      buildOrbitGeometry(source, preliminaryDestination, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      })
+    );
+    setPhase("orbiting");
   };
 
   if (!portalTarget) return null;
@@ -227,25 +305,42 @@ export default function BadgeRevealOverlay({
           />
 
           <AnimatePresence>
-            {phase !== "transferring" && phase !== "complete" ? (
+            {phase !== "complete" ? (
               <motion.article
                 ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
+                aria-busy={accessibleBusy || undefined}
                 tabIndex={-1}
                 aria-labelledby={`badge-reveal-${localizedItem.definition.slug}`}
                 aria-describedby={`badge-reveal-description-${localizedItem.definition.slug}`}
-                className={`relative max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto border bg-[linear-gradient(145deg,rgba(31,31,35,0.98),rgba(7,7,8,0.98))] p-5 text-center shadow-2xl shadow-black/60 sm:p-8 ${tokens.borderClassName}`}
+                data-badge-reveal-progress={
+                  accessibleBusy ? phase : undefined
+                }
+                className={`relative z-10 w-full max-w-xl text-center ${
+                  motionInProgress
+                    ? "pointer-events-none opacity-0"
+                    : `max-h-[calc(100dvh-2rem)] overflow-y-auto border bg-[linear-gradient(145deg,rgba(31,31,35,0.98),rgba(7,7,8,0.98))] p-5 shadow-2xl shadow-black/60 sm:p-8 ${tokens.borderClassName}`
+                }`}
                 initial={
                   shouldReduceMotion
                     ? { opacity: 0 }
                     : { opacity: 0, scale: 0.96, y: 18 }
                 }
-                animate={{ opacity: 1, scale: 1, y: 0 }}
+                animate={
+                  motionInProgress
+                    ? { opacity: 0, scale: 0.98, y: 0 }
+                    : { opacity: 1, scale: 1, y: 0 }
+                }
                 exit={
                   shouldReduceMotion
                     ? { opacity: 0 }
-                    : { opacity: 0, scale: 0.97, y: 10 }
+                    : {
+                        opacity: 0,
+                        scale: 0.98,
+                        y: 4,
+                        transition: { duration: 0.12, ease: "easeOut" },
+                      }
                 }
               >
                 <h2
@@ -277,6 +372,10 @@ export default function BadgeRevealOverlay({
                       </p>
                     </div>
                   </div>
+                ) : motionInProgress ? (
+                  <p role="status" aria-live="polite" className="sr-only">
+                    {copy.reveal.unlocked}
+                  </p>
                 ) : (
                   <>
                 <PremiumBadgeEffects
@@ -285,12 +384,10 @@ export default function BadgeRevealOverlay({
                   reducedMotion={shouldReduceMotion}
                 />
 
-                <div
-                  ref={artworkAnchorRef}
-                  className="relative z-10 mx-auto w-fit pt-2 [perspective:900px]"
-                  data-testid="badge-reveal-artwork-anchor"
-                >
+                <div className="relative z-10 mx-auto w-fit pt-2 [perspective:900px]">
                   <motion.div
+                    ref={artworkAnchorRef}
+                    data-testid="badge-reveal-artwork-anchor"
                     className="relative [transform-style:preserve-3d]"
                     initial={
                       shouldReduceMotion
@@ -303,23 +400,21 @@ export default function BadgeRevealOverlay({
                         : phase === "intro"
                           ? {
                               opacity: [0, 1, 1],
-                              scale: [0.72, 1.035, 1],
-                              rotateY: [0, -14, 202, 360],
-                              rotateZ: [0, -1.5, 0],
+                              scale: [0.82, 1.025, 1],
+                              rotateY: [0, -18, 0],
+                              rotateZ: [0, -0.8, 0],
                             }
-                          : { opacity: 1, scale: 1, rotateY: 360, rotateZ: 0 }
+                          : { opacity: 1, scale: 1, rotateY: 0, rotateZ: 0 }
                     }
                     transition={{
-                      duration: shouldReduceMotion ? 0.18 : 0.82,
+                      duration: shouldReduceMotion ? 0.18 : 0.52,
                       ease: [0.2, 0.75, 0.25, 1],
                     }}
                   >
                     <BadgeArtwork
                       item={localizedItem}
                       variant="reveal"
-                      presentation={
-                        phase === "intro" ? "unrevealed" : "revealed"
-                      }
+                      presentation="unrevealed"
                       dictionary={copy}
                     />
                     {!shouldReduceMotion && phase === "intro" ? (
@@ -420,7 +515,95 @@ export default function BadgeRevealOverlay({
             ) : null}
           </AnimatePresence>
 
-          {phase === "transferring" && transferGeometry ? (
+          {phase === "orbiting" && orbitGeometry ? (
+            <motion.div
+              aria-hidden="true"
+              className="pointer-events-none fixed z-[10020] grid place-items-center [transform-style:preserve-3d]"
+              data-badge-reveal-orbit={
+                orbitGeometry.compact ? "compact" : "wide"
+              }
+              initial={{
+                left: orbitGeometry.source.left,
+                top: orbitGeometry.source.top,
+                width: orbitGeometry.source.width,
+                height: orbitGeometry.source.height,
+                opacity: 0,
+                scale: 1,
+                rotateY: 0,
+                rotateZ: 0,
+                transformPerspective: 1000,
+              }}
+              animate={{
+                left: orbitGeometry.left,
+                top: orbitGeometry.top,
+                opacity: 1,
+                scale: orbitGeometry.compact
+                  ? [1, 1.04, 1.06, 1.025, 0.98]
+                  : [1, 1.08, 1.12, 1.04, 0.98],
+                rotateY: [0, 260, 520, 760, 900],
+                rotateZ: [0, -2.2, 2.7, -1.3, -0.4],
+                transformPerspective: 1000,
+              }}
+              transition={{
+                duration: 1.9,
+                times: [0, 0.22, 0.5, 0.74, 1],
+                ease: [0.2, 0.72, 0.2, 1],
+                opacity: { duration: 0.12, ease: "easeOut" },
+              }}
+              onAnimationComplete={beginLockIn}
+            >
+              <motion.div
+                className="absolute inset-0"
+                initial={{ opacity: 1 }}
+                animate={{ opacity: [1, 0.96, 0.65, 0.12, 0] }}
+                transition={{
+                  duration: 1.9,
+                  times: [0, 0.22, 0.5, 0.74, 1],
+                  ease: "easeInOut",
+                }}
+              >
+                <BadgeArtwork
+                  item={localizedItem}
+                  variant="slot"
+                  presentation="unrevealed"
+                  className="h-full w-full"
+                  dictionary={copy}
+                />
+              </motion.div>
+              <motion.div
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 0.04, 0.42, 0.94, 1] }}
+                transition={{
+                  duration: 1.9,
+                  times: [0, 0.22, 0.5, 0.74, 1],
+                  ease: "easeInOut",
+                }}
+              >
+                <BadgeArtwork
+                  item={localizedItem}
+                  variant="slot"
+                  presentation="revealed"
+                  className="h-full w-full"
+                  dictionary={copy}
+                />
+              </motion.div>
+              <motion.span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-[5%] -left-1/3 z-30 w-1/4 skew-x-[-16deg] bg-gradient-to-r from-transparent via-zinc-100/48 to-transparent mix-blend-screen blur-[1px]"
+                initial={{ x: "0%", opacity: 0 }}
+                animate={{ x: "560%", opacity: [0, 0.78, 0] }}
+                transition={{
+                  delay: 0.38,
+                  duration: 1.1,
+                  ease: "easeInOut",
+                }}
+              />
+            </motion.div>
+          ) : null}
+
+          {(phase === "transferring" || phase === "saving") &&
+          transferGeometry ? (
             <motion.div
               aria-hidden="true"
               className="pointer-events-none fixed z-[10020] grid place-items-center"
@@ -428,13 +611,17 @@ export default function BadgeRevealOverlay({
                 transferGeometry.hasDestination ? "measured" : "fallback"
               }
               data-transfer-motion={shouldReduceMotion ? "fade" : "flight"}
+              data-transfer-state={phase}
               initial={{
                 left: transferGeometry.source.left,
                 top: transferGeometry.source.top,
                 width: transferGeometry.source.width,
                 height: transferGeometry.source.height,
                 opacity: 1,
-                scale: 1,
+                scale: shouldReduceMotion ? 1 : 0.98,
+                rotateY: shouldReduceMotion ? 0 : 900,
+                rotateZ: shouldReduceMotion ? 0 : -0.4,
+                transformPerspective: 1000,
               }}
               animate={{
                 left: shouldReduceMotion
@@ -449,18 +636,27 @@ export default function BadgeRevealOverlay({
                 height: shouldReduceMotion
                   ? transferGeometry.source.height
                   : transferGeometry.destination.height,
-                opacity: shouldReduceMotion ? [1, 0.35, 0] : [1, 1, 0.2],
-                scale: shouldReduceMotion ? [1, 0.96] : [1, 0.98],
+                opacity: shouldReduceMotion ? [1, 0.35, 0] : 1,
+                scale: shouldReduceMotion
+                  ? [1, 0.96]
+                  : [0.98, 1.035, 0.995, 1],
+                rotateY: shouldReduceMotion
+                  ? 0
+                  : [900, 990, 1050, 1080],
+                rotateZ: shouldReduceMotion ? 0 : [-0.4, 0.7, -0.2, 0],
+                transformPerspective: 1000,
               }}
               transition={{
-                duration: shouldReduceMotion ? 0.2 : 0.58,
-                ease: [0.2, 0.75, 0.25, 1],
+                duration: shouldReduceMotion ? 0.2 : 0.72,
+                ease: [0.16, 0.8, 0.2, 1],
               }}
-              onAnimationComplete={completeTransfer}
+              onAnimationComplete={
+                phase === "transferring" ? completeTransfer : undefined
+              }
             >
               <BadgeArtwork
                 item={localizedItem}
-                variant="reveal"
+                variant="slot"
                 presentation="revealed"
                 className="h-full w-full"
                 dictionary={copy}
@@ -481,4 +677,153 @@ function snapshotRect(rect: DOMRect): RectSnapshot {
     width: rect.width,
     height: rect.height,
   };
+}
+
+function buildTransferGeometry(
+  source: RectSnapshot,
+  measuredDestination: DOMRect | null
+): TransferGeometry {
+  const fallbackDestination = {
+    left: source.left + source.width * 0.35,
+    top: source.top + source.height * 0.35,
+    width: source.width * 0.3,
+    height: source.height * 0.3,
+  };
+
+  return {
+    source,
+    destination: measuredDestination
+      ? snapshotRect(measuredDestination)
+      : fallbackDestination,
+    hasDestination: Boolean(measuredDestination),
+  };
+}
+
+function buildOrbitGeometry(
+  source: RectSnapshot,
+  preliminaryDestination: DOMRect | null,
+  viewport: { width: number; height: number }
+): OrbitGeometry {
+  const compact = viewport.width < 640 || viewport.height < 680;
+  const scalePeak = compact ? 1.06 : 1.12;
+  const scaledInset =
+    (Math.max(source.width, source.height) * (scalePeak - 1)) / 2;
+  const margin = (compact ? 12 : 24) + scaledInset;
+  const minLeft = margin;
+  const minTop = margin;
+  const maxLeft = Math.max(minLeft, viewport.width - source.width - margin);
+  const maxTop = Math.max(minTop, viewport.height - source.height - margin);
+  const normalizedSource = {
+    ...source,
+    left: clamp(source.left, minLeft, maxLeft),
+    top: clamp(source.top, minTop, maxTop),
+  };
+  const xReach = compact
+    ? Math.min(viewport.width * 0.11, 44)
+    : Math.min(viewport.width * 0.16, 200);
+  const yReach = compact
+    ? Math.min(viewport.height * 0.08, 56)
+    : Math.min(viewport.height * 0.13, 120);
+  const endXOffset = preliminaryDestination
+    ? clamp(
+        (preliminaryDestination.left - normalizedSource.left) * 0.08,
+        -xReach * 0.24,
+        xReach * 0.24
+      )
+    : 0;
+  const endYOffset = preliminaryDestination
+    ? clamp(
+        (preliminaryDestination.top - normalizedSource.top) * 0.08,
+        -yReach * 0.2,
+        yReach * 0.2
+      )
+    : 0;
+  const point = (left: number, top: number) => ({
+    left: clamp(left, minLeft, maxLeft),
+    top: clamp(top, minTop, maxTop),
+  });
+  const upperRight = point(
+    normalizedSource.left + xReach,
+    normalizedSource.top - yReach * 0.78
+  );
+  const upperLeft = point(
+    normalizedSource.left - xReach * 0.92,
+    normalizedSource.top - yReach * 0.28
+  );
+  const lowerRight = point(
+    normalizedSource.left + xReach * 0.72,
+    normalizedSource.top + yReach * 0.72
+  );
+  const end = point(
+    normalizedSource.left + endXOffset,
+    normalizedSource.top + endYOffset
+  );
+
+  return {
+    source: normalizedSource,
+    end: { ...normalizedSource, ...end },
+    left: [
+      normalizedSource.left,
+      upperRight.left,
+      upperLeft.left,
+      lowerRight.left,
+      end.left,
+    ],
+    top: [
+      normalizedSource.top,
+      upperRight.top,
+      upperLeft.top,
+      lowerRight.top,
+      end.top,
+    ],
+    compact,
+  };
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function findRevealDestination(slug: string) {
+  if (typeof document === "undefined") return null;
+
+  return (
+    Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '[data-badge-reveal-destination="true"]'
+      )
+    ).find(
+      (element) =>
+        element.isConnected &&
+        element.closest<HTMLElement>("[data-badge-slug]")?.dataset
+          .badgeSlug === slug
+    ) ?? null
+  );
+}
+
+function isOutsideViewport(
+  rect: DOMRect,
+  viewport: { width: number; height: number }
+) {
+  return (
+    rect.left < 0 ||
+    rect.top < 0 ||
+    rect.right > viewport.width ||
+    rect.bottom > viewport.height
+  );
+}
+
+function waitForAnimationFrames(count: number) {
+  return new Promise<void>((resolve) => {
+    const wait = (remaining: number) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+
+      window.requestAnimationFrame(() => wait(remaining - 1));
+    };
+
+    wait(count);
+  });
 }

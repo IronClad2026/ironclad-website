@@ -2,6 +2,7 @@
 
 import { Award, LockKeyhole, Sparkles } from "lucide-react";
 import Image from "next/image";
+import type { Ref } from "react";
 import { useState } from "react";
 
 import {
@@ -58,6 +59,8 @@ export type BadgeArtworkProps = {
   presentation?: "default" | "unrevealed" | "revealed";
   alt?: string;
   dictionary?: BadgesDictionary;
+  rootRef?: Ref<HTMLSpanElement>;
+  revealDestination?: boolean;
   statusLabels?: {
     earned: string;
     locked: string;
@@ -72,6 +75,8 @@ export default function BadgeArtwork({
   presentation = "default",
   alt,
   dictionary,
+  rootRef,
+  revealDestination = false,
   statusLabels,
 }: BadgeArtworkProps) {
   const copy = resolveBadgesDictionary(dictionary);
@@ -105,9 +110,11 @@ export default function BadgeArtwork({
 
   return (
     <span
+      ref={rootRef}
       data-badge-artwork={showArtwork ? "real" : "fallback"}
       data-badge-number={fallbackLabel}
       data-badge-artwork-surface={showArtwork ? "card" : "fallback"}
+      data-badge-reveal-destination={revealDestination ? "true" : undefined}
       data-badge-presentation={
         isUnrevealed ? "unrevealed" : isEarned ? "earned" : "locked"
       }
