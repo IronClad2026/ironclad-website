@@ -10,6 +10,7 @@ import {
   FIXED_UAT_ALIASES,
   FIXED_UAT_POOLS,
   MAX_CONCURRENT_UAT_PLAYERS,
+  PERMANENT_UAT_PLAYERS_PER_DIVISION,
   PRODUCTION_PROJECT_REF,
   SCENARIO_GROUPS,
   STAGING_PROJECT_REF,
@@ -130,11 +131,12 @@ describe("Badge Staging scenario plan", () => {
 
   it("reuses a bounded fixed UAT catalogue instead of allocating 256 players", () => {
     expect(MAX_CONCURRENT_UAT_PLAYERS).toBe(8);
-    expect(FIXED_UAT_ALIASES).toHaveLength(24);
-    expect(new Set(FIXED_UAT_ALIASES)).toHaveProperty("size", 24);
+    expect(PERMANENT_UAT_PLAYERS_PER_DIVISION).toBe(10);
+    expect(FIXED_UAT_ALIASES).toHaveLength(30);
+    expect(new Set(FIXED_UAT_ALIASES)).toHaveProperty("size", 30);
 
     for (const pool of Object.values(FIXED_UAT_POOLS)) {
-      expect(pool).toHaveLength(8);
+      expect(pool).toHaveLength(PERMANENT_UAT_PLAYERS_PER_DIVISION);
     }
     for (const group of SCENARIO_GROUPS) {
       if (group.targetAlias) {

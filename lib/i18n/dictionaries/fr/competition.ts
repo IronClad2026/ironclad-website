@@ -262,6 +262,15 @@ const dictionary = {
     winnerNeedsWins: "Le vainqueur doit terminer avec {count} victoires.",
     winner: "Vainqueur",
     selectWinner: "Sélectionnez le vainqueur",
+    gameWinnersTitle: "Vainqueur de chaque partie",
+    gameWinnersHelp:
+      "Sélectionnez dans l’ordre le vainqueur de chaque replay importé. La séquence doit correspondre au score final.",
+    gameWinnerLabel: "Vainqueur de la partie {game}",
+    selectGameWinner: "Sélectionnez le vainqueur de la partie {game}",
+    gameWinnersRequired:
+      "Sélectionnez un vainqueur pour chaque partie terminée.",
+    gameWinnersInvalid:
+      "Les vainqueurs des parties doivent correspondre au score final et la dernière partie doit être remportée par le vainqueur de la série.",
     replayProofs: "Preuves par replay (fichier .rec requis)",
     replayHelpLabel: "À propos de l'envoi des replays",
     replayHelp: "Envoyez un fichier CoH3 .rec unique pour chaque manche jouée. Chaque fichier peut atteindre 10 Mio. Les replays sont privés et les captures d'écran ne remplacent pas la preuve du résultat du match.",

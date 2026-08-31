@@ -11,6 +11,7 @@ export const PRODUCTION_PROJECT_REF = "nsyjtqpvyxlzyujlbzos";
 export const ACCEPTANCE_SCHEMA_VERSION = 1;
 export const ACCEPTANCE_PROVENANCE = "badge-acceptance-v1";
 export const MAX_CONCURRENT_UAT_PLAYERS = 8;
+export const PERMANENT_UAT_PLAYERS_PER_DIVISION = 10;
 
 export const ACCEPTANCE_STATUSES = Object.freeze([
   "PASS",
@@ -60,7 +61,7 @@ export const SCENARIO_GROUPS = Object.freeze([
   Object.freeze({
     key: "series-shape",
     execution: "existing-uat-authority",
-    targetAlias: "TestChallenge1",
+    targetAlias: "TestChallenge9",
     fixturePool: "challenge",
     badges: Object.freeze([16, 17]),
     purpose:
@@ -102,21 +103,21 @@ export const SCENARIO_GROUPS = Object.freeze([
   }),
   Object.freeze({
     key: "division-progression",
-    execution: "existing-authority-evidence",
-    targetAlias: null,
-    fixturePool: null,
+    execution: "fixed-staging-acceptance-helper",
+    targetAlias: "TestAcademy1",
+    fixturePool: "academy",
     badges: Object.freeze([5]),
     purpose:
-      "Requires one legitimate player whose first completed qualifying tournament was followed by a completed higher-division tournament.",
+      "Uses the exact Staging-only TestAcademy1 helper to arrange provider-null Challenge/Main registrations, then current tournament authority proves completion above the first completed division.",
   }),
   Object.freeze({
     key: "triple-crown",
-    execution: "existing-authority-evidence",
-    targetAlias: null,
-    fixturePool: null,
+    execution: "fixed-staging-acceptance-helper",
+    targetAlias: "TestAcademy1",
+    fixturePool: "academy",
     badges: Object.freeze([28]),
     purpose:
-      "Requires one legitimate player with Academy, Challenge, and Main/Elite championship authority; fixed-division synthetic aliases cannot fabricate this path.",
+      "Uses the exact Staging-only TestAcademy1 helper only for provider-null registration snapshots; current championship authority must still prove all three division wins.",
   }),
   Object.freeze({
     key: "flawless-played-champion",
@@ -391,7 +392,7 @@ export function getScenarioForBadge(number) {
 
 function fixturePool(prefix) {
   return Object.freeze(
-    Array.from({ length: MAX_CONCURRENT_UAT_PLAYERS }, (_, index) =>
+    Array.from({ length: PERMANENT_UAT_PLAYERS_PER_DIVISION }, (_, index) =>
       `${prefix}${index + 1}`
     )
   );

@@ -494,6 +494,14 @@ const dictionary = {
     winnerNeedsWins: "Winner must finish on {count} wins.",
     winner: "Winner",
     selectWinner: "Select winner",
+    gameWinnersTitle: "Winner by game",
+    gameWinnersHelp:
+      "Select the winner of each uploaded replay in game order. The sequence must match the final score.",
+    gameWinnerLabel: "Game {game} winner",
+    selectGameWinner: "Select Game {game} winner",
+    gameWinnersRequired: "Select one winner for every completed game.",
+    gameWinnersInvalid:
+      "The game winners must match the final score and end with the series winner.",
     replayProofs: "Replay proofs (.rec required)",
     replayHelpLabel: "About replay uploads",
     replayHelp:

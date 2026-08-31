@@ -76,6 +76,9 @@ export default function PlayerMatchResultForm({
   const [playerOneScore, setPlayerOneScore] = useState("");
   const [playerTwoScore, setPlayerTwoScore] = useState("");
   const [winnerRegistrationId, setWinnerRegistrationId] = useState("");
+  const [gameWinnerRegistrationIds, setGameWinnerRegistrationIds] = useState<
+    string[]
+  >([]);
   const [notes, setNotes] = useState("");
   const [selectedReplays, setSelectedReplays] = useState<File[]>([]);
   const [replaySelectionError, setReplaySelectionError] = useState("");
@@ -91,6 +94,23 @@ export default function PlayerMatchResultForm({
       ),
     [match.seriesBestOf, playerOneScore, playerTwoScore, t, winsRequired]
   );
+  const displayedGameWinnerRegistrationIds =
+    scoreInfo.requiredReplayCount === null
+      ? []
+      : Array.from(
+          { length: scoreInfo.requiredReplayCount },
+          (_, index) => gameWinnerRegistrationIds[index] ?? ""
+        );
+  const gameWinnerSelectionError = getGameWinnerSelectionError({
+    gameWinnerRegistrationIds: displayedGameWinnerRegistrationIds,
+    playerOneRegistrationId: match.playerOneRegistrationId,
+    playerTwoRegistrationId: match.playerTwoRegistrationId,
+    playerOneScore: parseScore(playerOneScore),
+    playerTwoScore: parseScore(playerTwoScore),
+    winnerRegistrationId,
+    requiredGameCount: scoreInfo.requiredReplayCount,
+    t,
+  });
   const selectedReplayCount = selectedReplays.length;
   const replayCountMatches =
     scoreInfo.requiredReplayCount !== null &&
@@ -101,7 +121,8 @@ export default function PlayerMatchResultForm({
     noShowPending ||
     finalizationUncertain ||
     scoreInfo.requiredReplayCount === null ||
-    !replayCountMatches;
+    !replayCountMatches ||
+    Boolean(gameWinnerSelectionError);
 
   useEffect(() => {
     if (noShowState.status === "success") {
@@ -149,6 +170,11 @@ export default function PlayerMatchResultForm({
       return;
     }
 
+    if (gameWinnerSelectionError) {
+      setState({ status: "error", message: gameWinnerSelectionError });
+      return;
+    }
+
     submissionInFlightRef.current = true;
     setPending(true);
     setState(initialState);
@@ -168,6 +194,7 @@ export default function PlayerMatchResultForm({
           name: file.name,
           size: file.size,
         })),
+        gameWinnerRegistrationIds: displayedGameWinnerRegistrationIds,
       });
 
       if (preparation.status === "error") {
@@ -222,6 +249,7 @@ export default function PlayerMatchResultForm({
         setPlayerOneScore("");
         setPlayerTwoScore("");
         setWinnerRegistrationId("");
+        setGameWinnerRegistrationIds([]);
         setNotes("");
         setSelectedReplays([]);
         setReplaySelectionError("");
@@ -278,14 +306,20 @@ export default function PlayerMatchResultForm({
             label={playerOneName}
             max={winsRequired}
             value={playerOneScore}
-            onChange={setPlayerOneScore}
+            onChange={(value) => {
+              setPlayerOneScore(value);
+              setGameWinnerRegistrationIds([]);
+            }}
           />
           <ScoreField
             name="playerTwoScore"
             label={playerTwoName}
             max={winsRequired}
             value={playerTwoScore}
-            onChange={setPlayerTwoScore}
+            onChange={(value) => {
+              setPlayerTwoScore(value);
+              setGameWinnerRegistrationIds([]);
+            }}
           />
           <div className="rounded-xl border border-orange-400/20 bg-orange-500/10 p-4 text-xs text-orange-100/80">
             {t("resultForm.winnerNeedsWins", { count: winsRequired })}
@@ -300,7 +334,10 @@ export default function PlayerMatchResultForm({
             name="winnerRegistrationId"
             required
             value={winnerRegistrationId}
-            onChange={(event) => setWinnerRegistrationId(event.target.value)}
+            onChange={(event) => {
+              setWinnerRegistrationId(event.target.value);
+              setGameWinnerRegistrationIds([]);
+            }}
             className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-orange-400"
           >
             <option value="">{t("resultForm.selectWinner")}</option>
@@ -334,6 +371,7 @@ export default function PlayerMatchResultForm({
             onChange={(event) => {
               const files = Array.from(event.currentTarget.files ?? []);
               setSelectedReplays(files);
+              setGameWinnerRegistrationIds([]);
               setReplaySelectionError(validateReplaySelection(files, t));
             }}
             className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
@@ -365,6 +403,55 @@ export default function PlayerMatchResultForm({
             </p>
           )}
         </div>
+        {scoreInfo.requiredReplayCount !== null && (
+          <fieldset className="rounded-xl border border-white/10 bg-slate-950/70 p-4">
+            <legend className="px-1 text-xs font-bold text-slate-300">
+              {t("resultForm.gameWinnersTitle")}
+            </legend>
+            <p className="mb-3 text-[11px] leading-5 text-slate-500">
+              {t("resultForm.gameWinnersHelp")}
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {displayedGameWinnerRegistrationIds.map((registrationId, index) => {
+                const gameNumber = index + 1;
+                return (
+                  <label key={gameNumber} className="block">
+                    <span className="text-xs font-bold text-slate-300">
+                      {t("resultForm.gameWinnerLabel", { game: gameNumber })}
+                    </span>
+                    <select
+                      required
+                      value={registrationId}
+                      onChange={(event) => {
+                        const next = [...displayedGameWinnerRegistrationIds];
+                        next[index] = event.target.value;
+                        setGameWinnerRegistrationIds(next);
+                      }}
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-orange-400"
+                    >
+                      <option value="">
+                        {t("resultForm.selectGameWinner", {
+                          game: gameNumber,
+                        })}
+                      </option>
+                      <option value={match.playerOneRegistrationId ?? ""}>
+                        {playerOneName}
+                      </option>
+                      <option value={match.playerTwoRegistrationId ?? ""}>
+                        {playerTwoName}
+                      </option>
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+            {gameWinnerSelectionError && (
+              <p className="mt-3 text-[11px] font-bold text-orange-200">
+                {gameWinnerSelectionError}
+              </p>
+            )}
+          </fieldset>
+        )}
         <label className="block">
           <span className="text-xs font-bold text-slate-300">
             {t("resultForm.notesOptional")}
@@ -613,6 +700,63 @@ function validateReplaySelection(files: File[], t: CompetitionTranslator) {
 
   if (files.some((file) => !file.name.toLowerCase().endsWith(".rec"))) {
     return t("resultForm.replayExtension");
+  }
+
+  return "";
+}
+
+function getGameWinnerSelectionError({
+  gameWinnerRegistrationIds,
+  playerOneRegistrationId,
+  playerTwoRegistrationId,
+  playerOneScore,
+  playerTwoScore,
+  winnerRegistrationId,
+  requiredGameCount,
+  t,
+}: {
+  gameWinnerRegistrationIds: string[];
+  playerOneRegistrationId: string | null;
+  playerTwoRegistrationId: string | null;
+  playerOneScore: number | null;
+  playerTwoScore: number | null;
+  winnerRegistrationId: string;
+  requiredGameCount: number | null;
+  t: CompetitionTranslator;
+}) {
+  if (requiredGameCount === null) return "";
+
+  if (
+    !playerOneRegistrationId ||
+    !playerTwoRegistrationId ||
+    gameWinnerRegistrationIds.length !== requiredGameCount ||
+    gameWinnerRegistrationIds.some((registrationId) => !registrationId)
+  ) {
+    return t("resultForm.gameWinnersRequired");
+  }
+
+  const participants = new Set([
+    playerOneRegistrationId,
+    playerTwoRegistrationId,
+  ]);
+  const playerOneGameWins = gameWinnerRegistrationIds.filter(
+    (registrationId) => registrationId === playerOneRegistrationId
+  ).length;
+  const playerTwoGameWins = gameWinnerRegistrationIds.filter(
+    (registrationId) => registrationId === playerTwoRegistrationId
+  ).length;
+
+  if (
+    playerOneScore === null ||
+    playerTwoScore === null ||
+    gameWinnerRegistrationIds.some(
+      (registrationId) => !participants.has(registrationId)
+    ) ||
+    playerOneGameWins !== playerOneScore ||
+    playerTwoGameWins !== playerTwoScore ||
+    gameWinnerRegistrationIds.at(-1) !== winnerRegistrationId
+  ) {
+    return t("resultForm.gameWinnersInvalid");
   }
 
   return "";

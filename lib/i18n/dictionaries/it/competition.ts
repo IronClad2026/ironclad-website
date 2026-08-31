@@ -536,6 +536,15 @@ const dictionary = {
     winnerNeedsWins: "Il vincitore deve concludere con {count} vittorie.",
     winner: "Vincitore",
     selectWinner: "Seleziona il vincitore",
+    gameWinnersTitle: "Vincitore di ogni Partita",
+    gameWinnersHelp:
+      "Seleziona in ordine il vincitore di ogni replay caricato. La sequenza deve corrispondere al punteggio finale.",
+    gameWinnerLabel: "Vincitore della Partita {game}",
+    selectGameWinner: "Seleziona il vincitore della Partita {game}",
+    gameWinnersRequired:
+      "Seleziona un vincitore per ogni Partita completata.",
+    gameWinnersInvalid:
+      "I vincitori delle Partite devono corrispondere al punteggio finale e terminare con il vincitore della serie.",
     replayProofs: "Prove replay (formato .rec obbligatorio)",
     replayHelpLabel: "Informazioni sul caricamento dei replay",
     replayHelp:

@@ -57,6 +57,7 @@ type MockReplayAttempt = {
   playerTwoScore: number;
   requiredReplayCount: number;
   declaredReplaySizes: number[];
+  gameWinnerRegistrationIds: string[];
   paths: string[];
   status: AttemptStatus;
   finalizationClaimId: string | null;
@@ -88,8 +89,10 @@ type MockOptions = {
   tournamentStatus?: string;
 };
 
-function validPreparationInput(overrides: Record<string, unknown> = {}) {
-  return {
+function validPreparationInput(
+  overrides: Record<string, unknown> = {}
+): Parameters<typeof prepareMatchReplayUploads>[0] {
+  const input = {
     matchId: MATCH_ID,
     playerOneScore: 2,
     playerTwoScore: 0,
@@ -100,6 +103,31 @@ function validPreparationInput(overrides: Record<string, unknown> = {}) {
     ],
     ...overrides,
   };
+
+  if (!("gameWinnerRegistrationIds" in overrides)) {
+    const winnerRegistrationId = String(input.winnerRegistrationId);
+    const loserRegistrationId =
+      winnerRegistrationId === PLAYER_ONE_REGISTRATION_ID
+        ? PLAYER_TWO_REGISTRATION_ID
+        : PLAYER_ONE_REGISTRATION_ID;
+    const winnerScore =
+      winnerRegistrationId === PLAYER_ONE_REGISTRATION_ID
+        ? Number(input.playerOneScore)
+        : Number(input.playerTwoScore);
+    const loserScore =
+      winnerRegistrationId === PLAYER_ONE_REGISTRATION_ID
+        ? Number(input.playerTwoScore)
+        : Number(input.playerOneScore);
+    return {
+      ...input,
+      gameWinnerRegistrationIds: [
+        ...Array.from({ length: loserScore }, () => loserRegistrationId),
+        ...Array.from({ length: winnerScore }, () => winnerRegistrationId),
+      ],
+    } as Parameters<typeof prepareMatchReplayUploads>[0];
+  }
+
+  return input as Parameters<typeof prepareMatchReplayUploads>[0];
 }
 
 function validFinalizationInput(attemptId: string) {
@@ -223,6 +251,9 @@ function createReplayClient(options: MockOptions = {}) {
         playerTwoScore: Number(args.p_player_two_score),
         requiredReplayCount,
         declaredReplaySizes: [...(args.p_declared_replay_sizes as number[])],
+        gameWinnerRegistrationIds: [
+          ...(args.p_game_winner_registration_ids as string[]),
+        ],
         paths,
         status: "prepared",
         finalizationClaimId: null,
@@ -774,6 +805,96 @@ describe("replay direct-upload actions and trusted finalization", () => {
       { upsert: false }
     );
     expect(recursivelyContainsTransportBody(input)).toBe(false);
+  });
+
+  it("passes an ordered per-game winner sequence as the final prepare RPC argument", async () => {
+    const replayClient = createReplayClient();
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+    const gameWinnerRegistrationIds = [
+      PLAYER_TWO_REGISTRATION_ID,
+      PLAYER_ONE_REGISTRATION_ID,
+      PLAYER_ONE_REGISTRATION_ID,
+    ];
+
+    const result = await prepareMatchReplayUploads(
+      validPreparationInput({
+        playerOneScore: 2,
+        playerTwoScore: 1,
+        replayFiles: [
+          { name: "one.rec", size: 10 },
+          { name: "two.rec", size: 10 },
+          { name: "three.rec", size: 10 },
+        ],
+        gameWinnerRegistrationIds,
+      })
+    );
+
+    expect(result.status).toBe("success");
+    expect(replayClient.rpc).toHaveBeenCalledWith(
+      "prepare_match_replay_upload_attempt",
+      expect.objectContaining({
+        p_game_winner_registration_ids: gameWinnerRegistrationIds,
+      })
+    );
+    expect([...replayClient.attempts.values()][0].gameWinnerRegistrationIds)
+      .toEqual(gameWinnerRegistrationIds);
+  });
+
+  it.each([
+    [[], "every completed game"],
+    [
+      [PLAYER_ONE_REGISTRATION_ID, OTHER_MATCH_ID],
+      "match participants",
+    ],
+    [
+      [PLAYER_ONE_REGISTRATION_ID, PLAYER_TWO_REGISTRATION_ID],
+      "match the final score",
+    ],
+  ])(
+    "rejects invalid per-game winner authority %#",
+    async (gameWinnerRegistrationIds, message) => {
+      const replayClient = createReplayClient();
+      createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+
+      await expect(
+        prepareMatchReplayUploads(
+          validPreparationInput({ gameWinnerRegistrationIds })
+        )
+      ).resolves.toMatchObject({
+        status: "error",
+        message: expect.stringContaining(message),
+      });
+      expect(replayClient.rpc).not.toHaveBeenCalled();
+      expect(replayClient.createSignedUploadUrl).not.toHaveBeenCalled();
+    }
+  );
+
+  it("rejects a game recorded after the declared series winner already clinched", async () => {
+    const replayClient = createReplayClient();
+    createSupabaseAdminClientMock.mockReturnValue(replayClient.client);
+
+    await expect(
+      prepareMatchReplayUploads(
+        validPreparationInput({
+          playerOneScore: 2,
+          playerTwoScore: 1,
+          replayFiles: [
+            { name: "one.rec", size: 10 },
+            { name: "two.rec", size: 10 },
+            { name: "three.rec", size: 10 },
+          ],
+          gameWinnerRegistrationIds: [
+            PLAYER_ONE_REGISTRATION_ID,
+            PLAYER_ONE_REGISTRATION_ID,
+            PLAYER_TWO_REGISTRATION_ID,
+          ],
+        })
+      )
+    ).resolves.toMatchObject({
+      status: "error",
+      message: expect.stringContaining("end with the series winner"),
+    });
+    expect(replayClient.rpc).not.toHaveBeenCalled();
   });
 
   it("rejects a replay File body at the preparation Server Action boundary", async () => {

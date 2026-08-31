@@ -317,6 +317,33 @@ values
     'ba200000-0000-4000-8000-000000000007'
   );
 
+insert into public.registrations (
+  id,
+  profile_id,
+  clerk_user_id,
+  player_name,
+  tournament_title,
+  bracket_name,
+  registration_status,
+  elo_status,
+  admin_notes,
+  tournament_id,
+  tournament_bracket_id
+)
+values (
+  'ba300000-0000-4000-8000-000000000012',
+  'ba000000-0000-4000-8000-000000000001',
+  'badge-forward-behavior-player-1',
+  'Played Champion Opponent',
+  'Badge Played Champion Behavior',
+  'Academy',
+  'approved',
+  'verified',
+  '',
+  'ba100000-0000-4000-8000-000000000007',
+  'ba200000-0000-4000-8000-000000000007'
+);
+
 insert into public.generated_brackets (
   id,
   tournament_bracket_id,
@@ -400,6 +427,110 @@ values
     2,
     'scheduled'
   );
+
+insert into public.generated_brackets (
+  id,
+  tournament_bracket_id,
+  format,
+  participant_count,
+  slot_count,
+  generated_by,
+  competition_locked_at
+)
+values (
+  'ba400000-0000-4000-8000-000000000007',
+  'ba200000-0000-4000-8000-000000000007',
+  'single_elimination',
+  2,
+  2,
+  'badge-forward-behavior',
+  '2199-01-07 00:00:00+00'
+);
+
+insert into public.bracket_rounds (
+  id,
+  generated_bracket_id,
+  round_number,
+  name
+)
+values (
+  'ba500000-0000-4000-8000-000000000007',
+  'ba400000-0000-4000-8000-000000000007',
+  1,
+  'Played Champion Final'
+);
+
+insert into public.tournament_matches (
+  id,
+  generated_bracket_id,
+  round_id,
+  match_number,
+  player_one_registration_id,
+  player_two_registration_id,
+  player_one_score,
+  player_two_score,
+  winner_registration_id,
+  player_one_slot,
+  player_two_slot,
+  series_best_of,
+  status
+)
+values (
+  'ba660000-0000-4000-8000-000000000002',
+  'ba400000-0000-4000-8000-000000000007',
+  'ba500000-0000-4000-8000-000000000007',
+  1,
+  'ba300000-0000-4000-8000-000000000011',
+  'ba300000-0000-4000-8000-000000000012',
+  2,
+  0,
+  'ba300000-0000-4000-8000-000000000011',
+  1,
+  2,
+  3,
+  'completed'
+);
+
+insert into public.match_replay_upload_attempts (
+  id,
+  match_id,
+  submitting_registration_id,
+  winner_registration_id,
+  player_one_score,
+  player_two_score,
+  required_replay_count,
+  replay_storage_paths,
+  declared_replay_sizes,
+  game_winner_registration_ids,
+  status,
+  capability_issued_at,
+  capability_not_before_reuse_at
+)
+values (
+  'ba900000-0000-4000-8000-000000000001',
+  'ba660000-0000-4000-8000-000000000002',
+  'ba300000-0000-4000-8000-000000000011',
+  'ba300000-0000-4000-8000-000000000011',
+  2,
+  1,
+  3,
+  array[
+    'ba660000-0000-4000-8000-000000000002/ba900000-0000-4000-8000-000000000001/game-1-ba910000-0000-4000-8000-000000000001.rec',
+    'ba660000-0000-4000-8000-000000000002/ba900000-0000-4000-8000-000000000001/game-2-ba910000-0000-4000-8000-000000000002.rec',
+    'ba660000-0000-4000-8000-000000000002/ba900000-0000-4000-8000-000000000001/game-3-ba910000-0000-4000-8000-000000000003.rec',
+    'ba660000-0000-4000-8000-000000000002/ba900000-0000-4000-8000-000000000001/game-4-ba910000-0000-4000-8000-000000000004.rec',
+    'ba660000-0000-4000-8000-000000000002/ba900000-0000-4000-8000-000000000001/game-5-ba910000-0000-4000-8000-000000000005.rec'
+  ],
+  array[1, 1, 1],
+  array[
+    'ba300000-0000-4000-8000-000000000012'::uuid,
+    'ba300000-0000-4000-8000-000000000011'::uuid,
+    'ba300000-0000-4000-8000-000000000011'::uuid
+  ],
+  'prepared',
+  '2199-01-07 00:00:00+00',
+  '2199-01-07 00:01:00+00'
+);
 
 -- Finalize -> reset fixture: revision 2 is already invalidated. A subsequent
 -- tournament void must inspect this true latest row and must not collide by
@@ -1016,6 +1147,58 @@ values
 
 select pg_catalog.set_config('session_replication_role', 'origin', true);
 
+update public.match_replay_upload_attempts
+set declared_replay_sizes = array[2, 2, 2]
+where id = 'ba900000-0000-4000-8000-000000000001';
+
+select pg_temp.badge_assert(
+  (
+    select cardinality(game_winner_registration_ids) = 0
+    from public.match_replay_upload_attempts
+    where id = 'ba900000-0000-4000-8000-000000000001'
+  ),
+  'changing prepared result facts must clear a stale game-winner sequence'
+);
+
+select pg_catalog.set_config('session_replication_role', 'replica', true);
+update public.match_replay_upload_attempts
+set
+  status = 'finalizing',
+  finalization_claim_id = 'ba920000-0000-4000-8000-000000000001',
+  finalization_lease_expires_at = '2199-01-07 01:00:00+00'
+where id = 'ba900000-0000-4000-8000-000000000001';
+update public.tournaments
+set status = 'in_progress'
+where id = 'ba100000-0000-4000-8000-000000000007';
+select pg_catalog.set_config('session_replication_role', 'origin', true);
+
+do $$
+begin
+  begin
+    perform public.commit_match_replay_attempt_result(
+      'ba900000-0000-4000-8000-000000000001',
+      'ba920000-0000-4000-8000-000000000001',
+      'ba660000-0000-4000-8000-000000000002',
+      'badge-forward-behavior-player-11',
+      array['hash-one', 'hash-two', 'hash-three'],
+      null
+    );
+    raise exception 'expected non-shutout legacy attempt rejection';
+  exception
+    when sqlstate '55000' then
+      if sqlerrm not like '%resubmit this non-shutout result%' then
+        raise;
+      end if;
+  end;
+end;
+$$;
+
+select pg_catalog.set_config('session_replication_role', 'replica', true);
+update public.tournaments
+set status = 'completed'
+where id = 'ba100000-0000-4000-8000-000000000007';
+select pg_catalog.set_config('session_replication_role', 'origin', true);
+
 -- Verify the replica-built fixture did not rely on broken references.
 select pg_temp.badge_assert(
   not exists (
@@ -1277,6 +1460,84 @@ select pg_temp.badge_assert(
   'Flawless Campaign must retain a champion with one genuinely played clean series'
 );
 
+select pg_temp.badge_assert(
+  ironclad_private.validate_match_game_winner_sequence(
+    'ba660000-0000-4000-8000-000000000002',
+    'ba300000-0000-4000-8000-000000000011',
+    2,
+    1,
+    array[
+      'ba300000-0000-4000-8000-000000000012'::uuid,
+      'ba300000-0000-4000-8000-000000000011'::uuid,
+      'ba300000-0000-4000-8000-000000000011'::uuid
+    ]
+  ) = array[
+    'ba300000-0000-4000-8000-000000000012'::uuid,
+    'ba300000-0000-4000-8000-000000000011'::uuid,
+    'ba300000-0000-4000-8000-000000000011'::uuid
+  ],
+  'per-game winner validation must accept an ordered BO3 comeback'
+);
+
+do $$
+begin
+  begin
+    perform ironclad_private.validate_match_game_winner_sequence(
+      'ba660000-0000-4000-8000-000000000002',
+      'ba300000-0000-4000-8000-000000000011',
+      2,
+      1,
+      array[
+        'ba300000-0000-4000-8000-000000000011'::uuid,
+        'ba300000-0000-4000-8000-000000000011'::uuid,
+        'ba300000-0000-4000-8000-000000000012'::uuid
+      ]
+    );
+    raise exception 'expected premature clinch rejection';
+  exception
+    when others then
+      if sqlerrm not like '%cannot follow the series-clinching game%' then
+        raise;
+      end if;
+  end;
+
+  begin
+    perform ironclad_private.validate_match_game_winner_sequence(
+      'ba660000-0000-4000-8000-000000000002',
+      'ba300000-0000-4000-8000-000000000011',
+      2,
+      1,
+      array[
+        'ba300000-0000-4000-8000-000000000011'::uuid,
+        'ba300000-0000-4000-8000-000000000012'::uuid
+      ]
+    );
+    raise exception 'expected winner-count mismatch rejection';
+  exception
+    when others then
+      if sqlerrm not like '%one winner for every played game%' then
+        raise;
+      end if;
+  end;
+end;
+$$;
+
+select pg_catalog.set_config('session_replication_role', 'replica', true);
+update public.tournament_matches
+set player_two_score = 1
+where id = 'ba660000-0000-4000-8000-000000000002';
+select pg_catalog.set_config('session_replication_role', 'origin', true);
+
+select pg_temp.badge_assert(
+  not exists (
+    select 1
+    from public.get_player_badge_flawless_campaign_summary(
+      'ba000000-0000-4000-8000-000000000011'
+    )
+  ),
+  'Flawless Campaign must reject aggregate evidence containing a game loss'
+);
+
 rollback;
 
 select pg_catalog.jsonb_build_object(
@@ -1287,6 +1548,11 @@ select pg_catalog.jsonb_build_object(
   'automatic_bye_right', 'pass',
   'reliable_competitor', 'pass',
   'flawless_played_requirement', 'pass',
+  'per_game_winner_sequence', 'pass',
+  'per_game_winner_rejections', 'pass',
+  'legacy_non_shutout_rejection', 'pass',
+  'stale_sequence_clear', 'pass',
+  'flawless_aggregate_score_guard', 'pass',
   'fixture_transaction', 'rolled_back',
   'database_rows_mutated', false
 )::text;
