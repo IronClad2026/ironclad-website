@@ -13,6 +13,8 @@ import type {
   ImgHTMLAttributes,
   ReactNode,
 } from "react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
@@ -185,6 +187,45 @@ describe("Badge reveal experience", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(destination).toHaveAttribute("data-badge-presentation", "earned");
     expect(destinationArtwork).not.toHaveClass("grayscale");
+  });
+
+  it("mounts the reveal portal after hydration without a server/client mismatch", async () => {
+    const fixture = buildRevealFixture("first-victory", "award-hydration");
+    const acknowledge = vi.fn(async () => ({
+      status: "success" as const,
+      code: "acknowledged" as const,
+    }));
+    const element = (
+      <DashboardBadgesSection
+        badgeData={fixture.badgeData}
+        pendingReveals={[fixture.queueItem]}
+        acknowledgeRevealAction={acknowledge}
+        reducedMotion
+      />
+    );
+    const serverMarkup = renderToString(element);
+    const container = document.createElement("div");
+    container.innerHTML = serverMarkup;
+    document.body.append(container);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const root = hydrateRoot(container, element);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(consoleError.mock.calls.flat().join(" ")).not.toContain(
+      "Hydration failed"
+    );
+    expect(
+      screen.getByRole("dialog", { name: "First Victory" })
+    ).toBeInTheDocument();
+
+    root.unmount();
+    container.remove();
   });
 
   it("keeps an accessible saving surface visible until acknowledgement resolves", async () => {

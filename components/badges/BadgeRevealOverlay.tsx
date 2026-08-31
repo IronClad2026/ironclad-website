@@ -2,7 +2,13 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 
 import BadgeArtwork from "@/components/badges/BadgeArtwork";
@@ -26,6 +32,10 @@ import type { BadgesDictionary } from "@/lib/i18n/badges";
 const defaultEntitlement: BadgePresentationEntitlement = {
   premiumEffectsEnabled: false,
 };
+
+const subscribeToHydration = () => () => undefined;
+const getHydratedSnapshot = () => true;
+const getServerHydratedSnapshot = () => false;
 
 type RevealPhase =
   | "intro"
@@ -87,6 +97,11 @@ export default function BadgeRevealOverlay({
   const [transferGeometry, setTransferGeometry] =
     useState<TransferGeometry | null>(null);
   const copy = resolveBadgesDictionary(dictionary);
+  const hydrationComplete = useSyncExternalStore(
+    subscribeToHydration,
+    getHydratedSnapshot,
+    getServerHydratedSnapshot
+  );
   const localizedItem = localizeBadgeItem(item, copy);
   const prefersReducedMotion = useReducedMotion();
   const shouldReduceMotion = reducedMotion ?? Boolean(prefersReducedMotion);
@@ -98,7 +113,9 @@ export default function BadgeRevealOverlay({
   );
   const resolvedContinueLabel = continueLabel ?? copy.reveal.continue;
   const portalTarget =
-    typeof document === "undefined" ? null : document.body;
+    hydrationComplete && typeof document !== "undefined"
+      ? document.body
+      : null;
   const transferOrSavePending = phase === "transferring" || pending;
   const { dialogRef, overlayRootRef } = useBadgeModalDialog({
     open,
