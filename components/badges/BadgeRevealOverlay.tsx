@@ -143,7 +143,7 @@ export default function BadgeRevealOverlay({
   useEffect(() => {
     completingTransferRef.current = false;
 
-    const revealDelay = shouldReduceMotion ? 180 : 520;
+    const revealDelay = shouldReduceMotion ? 180 : 600;
     const timer = window.setTimeout(() => setPhase("revealed"), revealDelay);
 
     return () => window.clearTimeout(timer);
@@ -407,7 +407,7 @@ export default function BadgeRevealOverlay({
                           : { opacity: 1, scale: 1, rotateY: 0, rotateZ: 0 }
                     }
                     transition={{
-                      duration: shouldReduceMotion ? 0.18 : 0.52,
+                      duration: shouldReduceMotion ? 0.18 : 0.6,
                       ease: [0.2, 0.75, 0.25, 1],
                     }}
                   >
@@ -417,19 +417,6 @@ export default function BadgeRevealOverlay({
                       presentation="unrevealed"
                       dictionary={copy}
                     />
-                    {!shouldReduceMotion && phase === "intro" ? (
-                      <motion.span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-y-[6%] -left-1/3 z-30 w-1/4 skew-x-[-16deg] bg-gradient-to-r from-transparent via-zinc-100/45 to-transparent mix-blend-screen blur-[1px]"
-                        initial={{ x: "0%", opacity: 0 }}
-                        animate={{ x: "560%", opacity: [0, 0.8, 0] }}
-                        transition={{
-                          delay: 0.28,
-                          duration: 0.48,
-                          ease: "easeInOut",
-                        }}
-                      />
-                    ) : null}
                   </motion.div>
                 </div>
 
@@ -545,7 +532,7 @@ export default function BadgeRevealOverlay({
                 transformPerspective: 1000,
               }}
               transition={{
-                duration: 1.9,
+                duration: 2.6,
                 times: [0, 0.22, 0.5, 0.74, 1],
                 ease: [0.2, 0.72, 0.2, 1],
                 opacity: { duration: 0.12, ease: "easeOut" },
@@ -557,7 +544,7 @@ export default function BadgeRevealOverlay({
                 initial={{ opacity: 1 }}
                 animate={{ opacity: [1, 0.96, 0.65, 0.12, 0] }}
                 transition={{
-                  duration: 1.9,
+                  duration: 2.6,
                   times: [0, 0.22, 0.5, 0.74, 1],
                   ease: "easeInOut",
                 }}
@@ -575,7 +562,7 @@ export default function BadgeRevealOverlay({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: [0, 0.04, 0.42, 0.94, 1] }}
                 transition={{
-                  duration: 1.9,
+                  duration: 2.6,
                   times: [0, 0.22, 0.5, 0.74, 1],
                   ease: "easeInOut",
                 }}
@@ -588,17 +575,6 @@ export default function BadgeRevealOverlay({
                   dictionary={copy}
                 />
               </motion.div>
-              <motion.span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-[5%] -left-1/3 z-30 w-1/4 skew-x-[-16deg] bg-gradient-to-r from-transparent via-zinc-100/48 to-transparent mix-blend-screen blur-[1px]"
-                initial={{ x: "0%", opacity: 0 }}
-                animate={{ x: "560%", opacity: [0, 0.78, 0] }}
-                transition={{
-                  delay: 0.38,
-                  duration: 1.1,
-                  ease: "easeInOut",
-                }}
-              />
             </motion.div>
           ) : null}
 
@@ -647,7 +623,7 @@ export default function BadgeRevealOverlay({
                 transformPerspective: 1000,
               }}
               transition={{
-                duration: shouldReduceMotion ? 0.2 : 0.72,
+                duration: shouldReduceMotion ? 0.2 : 0.8,
                 ease: [0.16, 0.8, 0.2, 1],
               }}
               onAnimationComplete={

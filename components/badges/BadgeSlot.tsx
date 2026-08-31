@@ -131,13 +131,6 @@ export default function BadgeSlot({
       <span
         className="relative z-10 isolate flex h-60 shrink-0 items-center justify-center"
       >
-        {!isVisuallyEarned ? (
-          <span
-            aria-hidden="true"
-            data-badge-card-divider="steel"
-            className="pointer-events-none absolute left-[-0.625rem] right-[-0.625rem] top-1/2 z-0 h-px -translate-y-1/2 bg-[linear-gradient(90deg,rgba(113,113,122,0.38)_0%,rgba(244,244,245,0.68)_18%,rgba(161,161,170,0.52)_50%,rgba(244,244,245,0.68)_82%,rgba(113,113,122,0.38)_100%)] opacity-80 shadow-[0_1px_0_rgba(0,0,0,0.72)] sm:left-[-0.75rem] sm:right-[-0.75rem]"
-          />
-        ) : null}
         <BadgeArtwork
           item={localizedItem}
           variant="slot"

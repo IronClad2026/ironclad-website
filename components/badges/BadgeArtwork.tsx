@@ -152,12 +152,6 @@ export default function BadgeArtwork({
               <LockKeyhole size={16} aria-hidden="true" />
             </span>
           ) : null}
-          {isUnrevealed ? (
-            <span
-              aria-hidden="true"
-              className="absolute inset-0 z-20 bg-[linear-gradient(112deg,transparent_30%,rgba(228,228,231,0.14)_48%,transparent_66%)] opacity-70 mix-blend-screen"
-            />
-          ) : null}
         </>
       ) : (
         <span

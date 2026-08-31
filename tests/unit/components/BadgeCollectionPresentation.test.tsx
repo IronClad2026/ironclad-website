@@ -122,7 +122,7 @@ describe("Badge collection presentation", () => {
     expect(screen.getByLabelText("0 Badge ottenuti su 30")).toBeInTheDocument();
   });
 
-  it("uses a full-card steel divider only behind locked and unrevealed artwork", () => {
+  it("keeps locked and unrevealed artwork matte without divider or sheen overlays", () => {
     const badgeData = buildDashboardBadgeData({
       awards: [
         {
@@ -153,20 +153,15 @@ describe("Badge collection presentation", () => {
     );
 
     expect(lockedCard).toBeInTheDocument();
-    const lockedDivider = lockedCard?.querySelector(
-      '[data-badge-card-divider="steel"]'
-    );
-    expect(lockedDivider).toBeInTheDocument();
-    expect(lockedDivider).toHaveAttribute("aria-hidden", "true");
-    expect(lockedDivider).toHaveClass(
-      "left-[-0.625rem]",
-      "right-[-0.625rem]",
-      "top-1/2",
-      "z-0"
-    );
+    expect(
+      lockedCard?.querySelector('[data-badge-card-divider="steel"]')
+    ).not.toBeInTheDocument();
     expect(
       unrevealedCard?.querySelector('[data-badge-card-divider="steel"]')
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
+    expect(
+      unrevealedCard?.querySelector(".mix-blend-screen")
+    ).not.toBeInTheDocument();
     expect(
       earnedCard?.querySelector('[data-badge-card-divider="steel"]')
     ).not.toBeInTheDocument();
@@ -181,7 +176,7 @@ describe("Badge collection presentation", () => {
     );
   });
 
-  it("keeps the dashboard showcase divider and artwork destination consistent", () => {
+  it("keeps the dashboard showcase matte and its artwork destination consistent", () => {
     const unrevealedData = buildDashboardBadgeData({
       awards: [
         {
@@ -198,15 +193,12 @@ describe("Badge collection presentation", () => {
     );
 
     expect(unrevealedCard).not.toHaveClass("overflow-hidden");
-    const showcaseDivider = unrevealedCard?.querySelector(
-      '[data-badge-card-divider="steel"]'
-    );
-    expect(showcaseDivider).toBeInTheDocument();
-    expect(showcaseDivider).toHaveClass(
-      "left-[-0.75rem]",
-      "right-[-0.75rem]",
-      "z-0"
-    );
+    expect(
+      unrevealedCard?.querySelector('[data-badge-card-divider="steel"]')
+    ).not.toBeInTheDocument();
+    expect(
+      unrevealedCard?.querySelector(".mix-blend-screen")
+    ).not.toBeInTheDocument();
     expect(
       unrevealedCard?.querySelector('[data-badge-reveal-destination="true"]')
     ).toHaveAttribute("data-badge-artwork", "real");

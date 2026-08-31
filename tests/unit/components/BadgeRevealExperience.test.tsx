@@ -221,7 +221,8 @@ describe("Badge reveal experience", () => {
       />
     );
 
-    act(() => vi.advanceTimersByTime(520));
+    expect(document.querySelector(".mix-blend-screen")).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(600));
     fireEvent.click(
       screen.getByRole("button", { name: "Complete reveal" })
     );
@@ -240,9 +241,10 @@ describe("Badge reveal experience", () => {
     expect(orbitAnimation.rotateZ).toEqual([0, -2.2, 2.7, -1.3, -0.4]);
     expect(orbitAnimation.scale).toEqual([1, 1.08, 1.12, 1.04, 0.98]);
     expect(orbitTransition).toMatchObject({
-      duration: 1.9,
+      duration: 2.6,
       times: [0, 0.22, 0.5, 0.74, 1],
     });
+    expect(orbit?.querySelector(".mix-blend-screen")).not.toBeInTheDocument();
     expect(orbit?.querySelectorAll("img")).toHaveLength(2);
     expect(destinationRectReads).toBe(1);
     expect(acknowledge).not.toHaveBeenCalled();
@@ -270,7 +272,7 @@ describe("Badge reveal experience", () => {
       height: 136,
       rotateY: [900, 990, 1050, 1080],
     });
-    expect(transferTransition).toMatchObject({ duration: 0.72 });
+    expect(transferTransition).toMatchObject({ duration: 0.8 });
     expect(acknowledge).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -307,7 +309,7 @@ describe("Badge reveal experience", () => {
       value: scrollIntoView,
     });
 
-    act(() => vi.advanceTimersByTime(520));
+    act(() => vi.advanceTimersByTime(600));
     fireEvent.click(
       screen.getByRole("button", { name: "Complete reveal" })
     );
@@ -353,7 +355,7 @@ describe("Badge reveal experience", () => {
       />
     );
 
-    act(() => vi.advanceTimersByTime(520));
+    act(() => vi.advanceTimersByTime(600));
     fireEvent.click(
       screen.getByRole("button", { name: "Complete reveal" })
     );
@@ -404,7 +406,7 @@ describe("Badge reveal experience", () => {
       />
     );
 
-    act(() => vi.advanceTimersByTime(520));
+    act(() => vi.advanceTimersByTime(600));
     fireEvent.click(
       screen.getByRole("button", { name: "Complete reveal" })
     );
@@ -441,7 +443,7 @@ describe("Badge reveal experience", () => {
       />
     );
 
-    act(() => vi.advanceTimersByTime(520));
+    act(() => vi.advanceTimersByTime(600));
     fireEvent.click(
       screen.getByRole("button", { name: "Complete reveal" })
     );
@@ -702,7 +704,7 @@ describe("Badge reveal experience", () => {
 });
 
 async function completeCurrentReveal() {
-  act(() => vi.advanceTimersByTime(520));
+  act(() => vi.advanceTimersByTime(600));
   fireEvent.click(screen.getByRole("button", { name: /reveal|acknowledgement/i }));
   const orbit = document.querySelector<HTMLElement>(
     "[data-badge-reveal-orbit]"
