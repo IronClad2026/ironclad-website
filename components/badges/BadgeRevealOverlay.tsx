@@ -38,16 +38,40 @@ const getHydratedSnapshot = () => true;
 const getServerHydratedSnapshot = () => false;
 
 const INTRO_DURATION_SECONDS = 0.6;
-const ROTATION_DURATION_SECONDS = 4.2;
-const COLORIZE_DURATION_SECONDS = 0.9;
+const ROTATION_DURATION_SECONDS = 4;
+const COLORIZE_DURATION_SECONDS = 0.8;
 const REDUCED_COLORIZE_DURATION_SECONDS = 0.8;
-const COLOR_HOLD_DURATION_SECONDS = 0.6;
+const COLOR_HOLD_DURATION_SECONDS = 0.7;
 const TRANSFER_DURATION_SECONDS = 0.8;
 const REDUCED_TRANSFER_DURATION_SECONDS = 0.2;
+const ANIMATION_COMPLETION_WATCHDOG_GRACE_MS = 100;
 const GREY_REVEAL_FILTER =
   "grayscale(1) saturate(0) brightness(0.68) contrast(1.14)";
 const FULL_COLOR_REVEAL_FILTER =
   "grayscale(0) saturate(1) brightness(1) contrast(1)";
+const EDGE_REVEAL_FILTERS = [
+  "grayscale(1) saturate(0) brightness(0.62) contrast(1.24)",
+  "grayscale(1) saturate(0) brightness(1.15) contrast(1.08)",
+] as const;
+const REAR_REVEAL_FILTER =
+  "grayscale(1) saturate(0) brightness(0.55) contrast(1.24)";
+const REVEAL_EDGE_LAYER_COUNT = 15;
+const REVEAL_EDGE_LAYERS = Array.from(
+  { length: REVEAL_EDGE_LAYER_COUNT },
+  (_, index) => index
+);
+const ROTATION_ANGLES = [0, 90, 180, 270, 360, 450, 540, 630, 720];
+const ROTATION_TIMES = [0, 0.22, 0.33, 0.42, 0.5, 0.58, 0.67, 0.78, 1];
+const ROTATION_EASES = [
+  [0.42, 0, 1, 1] as [number, number, number, number],
+  "linear" as const,
+  "linear" as const,
+  "linear" as const,
+  "linear" as const,
+  "linear" as const,
+  "linear" as const,
+  [0, 0, 0.58, 1] as [number, number, number, number],
+];
 
 type RevealPhase =
   | "intro"
@@ -73,11 +97,9 @@ type TransferGeometry = {
   hasDestination: boolean;
 };
 
-type OrbitGeometry = {
+type CinematicGeometry = {
   source: RectSnapshot;
   end: RectSnapshot;
-  left: number[];
-  top: number[];
   compact: boolean;
 };
 
@@ -119,9 +141,8 @@ export default function BadgeRevealOverlay({
   const completingTransferRef = useRef(false);
   const lockInAttemptRef = useRef(0);
   const [phase, setPhase] = useState<RevealPhase>("intro");
-  const [orbitGeometry, setOrbitGeometry] = useState<OrbitGeometry | null>(
-    null
-  );
+  const [cinematicGeometry, setCinematicGeometry] =
+    useState<CinematicGeometry | null>(null);
   const [transferGeometry, setTransferGeometry] =
     useState<TransferGeometry | null>(null);
   const copy = resolveBadgesDictionary(dictionary);
@@ -206,7 +227,7 @@ export default function BadgeRevealOverlay({
 
       if (completed === false) {
         completingTransferRef.current = false;
-        setOrbitGeometry(null);
+        setCinematicGeometry(null);
         setTransferGeometry(null);
         setPhase("saveFailed");
         return;
@@ -216,7 +237,7 @@ export default function BadgeRevealOverlay({
       setPhase("complete");
     } catch {
       completingTransferRef.current = false;
-      setOrbitGeometry(null);
+      setCinematicGeometry(null);
       setTransferGeometry(null);
       setPhase("saveFailed");
     }
@@ -234,8 +255,32 @@ export default function BadgeRevealOverlay({
     );
   }, []);
 
+  useEffect(() => {
+    if (phase !== "rotating") return;
+
+    const timer = window.setTimeout(
+      completeRotation,
+      ROTATION_DURATION_SECONDS * 1000 +
+        ANIMATION_COMPLETION_WATCHDOG_GRACE_MS
+    );
+    return () => window.clearTimeout(timer);
+  }, [completeRotation, phase]);
+
+  useEffect(() => {
+    if (phase !== "colorizing") return;
+
+    const duration = shouldReduceMotion
+      ? REDUCED_COLORIZE_DURATION_SECONDS
+      : COLORIZE_DURATION_SECONDS;
+    const timer = window.setTimeout(
+      completeColorization,
+      duration * 1000 + ANIMATION_COMPLETION_WATCHDOG_GRACE_MS
+    );
+    return () => window.clearTimeout(timer);
+  }, [completeColorization, phase, shouldReduceMotion]);
+
   const beginLockIn = useCallback(() => {
-    if (!orbitGeometry) return;
+    if (!cinematicGeometry) return;
 
     const attempt = lockInAttemptRef.current + 1;
     lockInAttemptRef.current = attempt;
@@ -251,7 +296,7 @@ export default function BadgeRevealOverlay({
       if (lockInAttemptRef.current !== attempt) return;
 
       setTransferGeometry(
-        buildTransferGeometry(orbitGeometry.end, destination)
+        buildTransferGeometry(cinematicGeometry.end, destination)
       );
       setPhase("transferring");
     };
@@ -282,7 +327,7 @@ export default function BadgeRevealOverlay({
   }, [
     getDestinationRect,
     localizedItem.definition.slug,
-    orbitGeometry,
+    cinematicGeometry,
   ]);
 
   useEffect(() => {
@@ -302,27 +347,13 @@ export default function BadgeRevealOverlay({
     if (!sourceRect) return;
 
     const source = snapshotRect(sourceRect);
-    const preliminaryDestination = getDestinationRect?.() ?? null;
+    getDestinationRect?.();
+    const geometry = buildCinematicGeometry(source, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
 
-    const geometry = buildOrbitGeometry(
-      source,
-      preliminaryDestination,
-      {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      }
-    );
-
-    setOrbitGeometry(
-      shouldReduceMotion
-        ? {
-            ...geometry,
-            end: geometry.source,
-            left: [geometry.source.left],
-            top: [geometry.source.top],
-          }
-        : geometry
-    );
+    setCinematicGeometry(geometry);
     setPhase(shouldReduceMotion ? "colorizing" : "rotating");
   };
 
@@ -458,7 +489,7 @@ export default function BadgeRevealOverlay({
                             opacity: 0,
                             scale: 0.94,
                             filter: dialogHeroIsFullColor
-                              ? FULL_COLOR_REVEAL_FILTER
+                              ? "none"
                               : GREY_REVEAL_FILTER,
                           }
                         : {
@@ -466,7 +497,7 @@ export default function BadgeRevealOverlay({
                             scale: 0.72,
                             rotateY: 0,
                             filter: dialogHeroIsFullColor
-                              ? FULL_COLOR_REVEAL_FILTER
+                              ? "none"
                               : GREY_REVEAL_FILTER,
                           }
                     }
@@ -476,7 +507,7 @@ export default function BadgeRevealOverlay({
                             opacity: 1,
                             scale: 1,
                             filter: dialogHeroIsFullColor
-                              ? FULL_COLOR_REVEAL_FILTER
+                              ? "none"
                               : GREY_REVEAL_FILTER,
                           }
                         : phase === "intro"
@@ -493,7 +524,7 @@ export default function BadgeRevealOverlay({
                               rotateY: 0,
                               rotateZ: 0,
                               filter: dialogHeroIsFullColor
-                                ? FULL_COLOR_REVEAL_FILTER
+                                ? "none"
                                 : GREY_REVEAL_FILTER,
                             }
                     }
@@ -599,63 +630,138 @@ export default function BadgeRevealOverlay({
             ) : null}
           </AnimatePresence>
 
-          {cinematicInProgress && orbitGeometry ? (
+          {(cinematicInProgress ||
+            ((phase === "transferring" || phase === "saving") &&
+              transferGeometry)) &&
+          cinematicGeometry ? (
             <motion.div
               aria-hidden="true"
-              className="pointer-events-none fixed z-[10020] isolate grid place-items-center [transform-style:preserve-3d]"
-              data-badge-reveal-cinematic={phase}
-              data-badge-reveal-orbit={
-                orbitGeometry.compact ? "compact" : "wide"
+              className="pointer-events-none fixed z-[10020] grid place-items-center overflow-visible [perspective:1000px] [perspective-origin:50%_50%]"
+              data-badge-reveal-cinematic={
+                cinematicInProgress ? phase : undefined
+              }
+              data-badge-reveal-path={
+                cinematicInProgress ? "centered" : undefined
+              }
+              data-badge-transfer={
+                (phase === "transferring" || phase === "saving") &&
+                transferGeometry
+                  ? transferGeometry.hasDestination
+                    ? "measured"
+                    : "fallback"
+                  : undefined
+              }
+              data-transfer-motion={
+                phase === "transferring" || phase === "saving"
+                  ? shouldReduceMotion
+                    ? "fade"
+                    : "flight"
+                  : undefined
+              }
+              data-transfer-state={
+                phase === "transferring" || phase === "saving"
+                  ? phase
+                  : undefined
               }
               initial={{
-                left: orbitGeometry.source.left,
-                top: orbitGeometry.source.top,
-                width: orbitGeometry.source.width,
-                height: orbitGeometry.source.height,
+                left: cinematicGeometry.source.left,
+                top: cinematicGeometry.source.top,
+                width: cinematicGeometry.source.width,
+                height: cinematicGeometry.source.height,
                 opacity: 0,
                 scale: 1,
-                rotateY: 0,
-                rotateZ: 0,
-                transformPerspective: 1000,
+                y: 0,
               }}
               animate={
                 phase === "rotating"
                   ? {
-                      left: orbitGeometry.left,
-                      top: orbitGeometry.top,
+                      left: cinematicGeometry.source.left,
+                      top: cinematicGeometry.source.top,
+                      width: cinematicGeometry.source.width,
+                      height: cinematicGeometry.source.height,
                       opacity: 1,
-                      scale: orbitGeometry.compact
-                        ? [1, 1.04, 1.06, 1.025, 1]
-                        : [1, 1.08, 1.12, 1.04, 1],
-                      rotateY: [0, 270, 540, 810, 1080],
-                      rotateZ: [0, -2.2, 2.7, -1.3, 0],
-                      transformPerspective: 1000,
+                      scale: cinematicGeometry.compact
+                        ? [1, 1.015, 1.025, 1.04, 1.05, 1.04, 1.025, 1.015, 1]
+                        : [1, 1.02, 1.035, 1.05, 1.06, 1.05, 1.035, 1.02, 1],
+                      y: [0, -1, -2, -4, -5, -4, -2, -1, 0],
                     }
-                  : {
-                      left: orbitGeometry.end.left,
-                      top: orbitGeometry.end.top,
-                      opacity: 1,
-                      scale: 1,
-                      rotateY: shouldReduceMotion ? 0 : 1080,
-                      rotateZ: 0,
-                      transformPerspective: 1000,
-                    }
+                  : phase === "transferring" && transferGeometry
+                    ? {
+                        left: shouldReduceMotion
+                          ? transferGeometry.source.left
+                          : transferGeometry.destination.left,
+                        top: shouldReduceMotion
+                          ? transferGeometry.source.top
+                          : transferGeometry.destination.top,
+                        width: shouldReduceMotion
+                          ? transferGeometry.source.width
+                          : transferGeometry.destination.width,
+                        height: shouldReduceMotion
+                          ? transferGeometry.source.height
+                          : transferGeometry.destination.height,
+                        opacity: shouldReduceMotion ? [1, 0.35, 0] : 1,
+                        scale: shouldReduceMotion
+                          ? [1, 0.96]
+                          : [1, 1.025, 0.995, 1],
+                        y: 0,
+                      }
+                    : phase === "saving" && transferGeometry
+                      ? {
+                          left: shouldReduceMotion
+                            ? transferGeometry.source.left
+                            : transferGeometry.destination.left,
+                          top: shouldReduceMotion
+                            ? transferGeometry.source.top
+                            : transferGeometry.destination.top,
+                          width: shouldReduceMotion
+                            ? transferGeometry.source.width
+                            : transferGeometry.destination.width,
+                          height: shouldReduceMotion
+                            ? transferGeometry.source.height
+                            : transferGeometry.destination.height,
+                          opacity: shouldReduceMotion ? 0 : 1,
+                          scale: shouldReduceMotion ? 0.96 : 1,
+                          y: 0,
+                        }
+                      : {
+                          left: cinematicGeometry.end.left,
+                          top: cinematicGeometry.end.top,
+                          width: cinematicGeometry.end.width,
+                          height: cinematicGeometry.end.height,
+                          opacity: 1,
+                          scale:
+                            phase === "colorizing" ? [1, 1.025, 1] : 1,
+                          y: 0,
+                        }
               }
               transition={
                 phase === "rotating"
                   ? {
                       duration: ROTATION_DURATION_SECONDS,
-                      times: [0, 0.25, 0.5, 0.75, 1],
-                      ease: "linear",
+                      times: ROTATION_TIMES,
+                      ease: ROTATION_EASES,
                       opacity: { duration: 0.12, ease: "easeOut" },
                     }
-                  : {
-                      duration: phase === "colorizing" ? 0.12 : 0,
-                      ease: "easeOut",
-                    }
+                  : phase === "transferring"
+                    ? {
+                        duration: shouldReduceMotion
+                          ? REDUCED_TRANSFER_DURATION_SECONDS
+                          : TRANSFER_DURATION_SECONDS,
+                        ease: [0.16, 0.8, 0.2, 1],
+                      }
+                    : phase === "colorizing"
+                      ? {
+                          duration: shouldReduceMotion
+                            ? REDUCED_COLORIZE_DURATION_SECONDS
+                            : COLORIZE_DURATION_SECONDS,
+                          ease: "easeInOut",
+                        }
+                      : { duration: 0 }
               }
               onAnimationComplete={
-                phase === "rotating" ? completeRotation : undefined
+                phase === "transferring"
+                  ? completeAcknowledgement
+                  : undefined
               }
             >
               {phase === "colorizing" || phase === "colorHold" ? (
@@ -681,115 +787,167 @@ export default function BadgeRevealOverlay({
                 />
               ) : null}
               <motion.div
-                className="absolute inset-0 z-10"
-                data-badge-reveal-artwork-state={phase}
-                data-badge-reveal-color={
+                className="absolute inset-0 z-10 [transform-style:preserve-3d] [will-change:transform]"
+                data-badge-reveal-rotor={phase}
+                initial={{ rotateY: 0, z: 0 }}
+                animate={
                   phase === "rotating"
-                    ? "grey"
-                    : phase === "colorizing"
-                      ? "transitioning"
-                      : "full"
+                    ? {
+                        rotateY: ROTATION_ANGLES,
+                        z: [0, 5, 12, 20, 26, 20, 12, 5, 0],
+                      }
+                    : {
+                        rotateY: shouldReduceMotion ? 0 : 720,
+                        z: 0,
+                      }
                 }
-                initial={{ filter: GREY_REVEAL_FILTER, scale: 1 }}
-                animate={{
-                  filter:
-                    phase === "rotating"
-                      ? GREY_REVEAL_FILTER
-                      : FULL_COLOR_REVEAL_FILTER,
-                  scale:
-                    phase === "colorizing" ? [1, 1.035, 1] : 1,
-                }}
-                transition={{
-                  duration:
-                    phase === "colorizing"
-                      ? shouldReduceMotion
-                        ? REDUCED_COLORIZE_DURATION_SECONDS
-                        : COLORIZE_DURATION_SECONDS
-                      : 0,
-                  ease: "easeInOut",
-                }}
+                transition={
+                  phase === "rotating"
+                    ? {
+                        duration: ROTATION_DURATION_SECONDS,
+                        times: ROTATION_TIMES,
+                        ease: ROTATION_EASES,
+                      }
+                    : { duration: 0.12, ease: "easeOut" }
+                }
                 onAnimationComplete={
-                  phase === "colorizing" ? completeColorization : undefined
+                  phase === "rotating" ? completeRotation : undefined
                 }
               >
-                <BadgeArtwork
+                <RevealBadgeExtrusion
                   item={localizedItem}
-                  variant="slot"
-                  presentation="revealed"
-                  className="h-full w-full"
                   dictionary={copy}
+                  phase={phase}
+                  compact={cinematicGeometry.compact}
+                  reducedMotion={shouldReduceMotion}
+                  onColorizationComplete={completeColorization}
                 />
               </motion.div>
-            </motion.div>
-          ) : null}
-
-          {(phase === "transferring" || phase === "saving") &&
-          transferGeometry ? (
-            <motion.div
-              aria-hidden="true"
-              className="pointer-events-none fixed z-[10020] grid place-items-center"
-              data-badge-transfer={
-                transferGeometry.hasDestination ? "measured" : "fallback"
-              }
-              data-transfer-motion={shouldReduceMotion ? "fade" : "flight"}
-              data-transfer-state={phase}
-              initial={{
-                left: transferGeometry.source.left,
-                top: transferGeometry.source.top,
-                width: transferGeometry.source.width,
-                height: transferGeometry.source.height,
-                opacity: 1,
-                scale: 1,
-                rotateY: shouldReduceMotion ? 0 : 1080,
-                rotateZ: 0,
-                transformPerspective: 1000,
-              }}
-              animate={{
-                left: shouldReduceMotion
-                  ? transferGeometry.source.left
-                  : transferGeometry.destination.left,
-                top: shouldReduceMotion
-                  ? transferGeometry.source.top
-                  : transferGeometry.destination.top,
-                width: shouldReduceMotion
-                  ? transferGeometry.source.width
-                  : transferGeometry.destination.width,
-                height: shouldReduceMotion
-                  ? transferGeometry.source.height
-                  : transferGeometry.destination.height,
-                opacity: shouldReduceMotion ? [1, 0.35, 0] : 1,
-                scale: shouldReduceMotion
-                  ? [1, 0.96]
-                  : [1, 1.035, 0.995, 1],
-                rotateY: shouldReduceMotion ? 0 : 1080,
-                rotateZ: 0,
-                transformPerspective: 1000,
-              }}
-              transition={{
-                duration: shouldReduceMotion
-                  ? REDUCED_TRANSFER_DURATION_SECONDS
-                  : TRANSFER_DURATION_SECONDS,
-                ease: [0.16, 0.8, 0.2, 1],
-              }}
-              onAnimationComplete={
-                phase === "transferring"
-                  ? completeAcknowledgement
-                  : undefined
-              }
-            >
-              <BadgeArtwork
-                item={localizedItem}
-                variant="slot"
-                presentation="revealed"
-                className="h-full w-full"
-                dictionary={copy}
-              />
             </motion.div>
           ) : null}
         </div>
       ) : null}
     </AnimatePresence>,
     portalTarget
+  );
+}
+
+function RevealBadgeExtrusion({
+  item,
+  dictionary,
+  phase,
+  compact,
+  reducedMotion,
+  onColorizationComplete,
+}: {
+  item: EarnedBadgeCollectionItem;
+  dictionary: BadgesDictionary;
+  phase: RevealPhase;
+  compact: boolean;
+  reducedMotion: boolean;
+  onColorizationComplete: () => void;
+}) {
+  const edgeSpacing = compact ? 1 : 1.1;
+  const halfDepth = ((REVEAL_EDGE_LAYER_COUNT - 1) * edgeSpacing) / 2;
+  const faceDepth = halfDepth + 0.6;
+  const artworkClassName = "h-full w-full [&>img]:drop-shadow-none";
+  const frontFilter =
+    phase === "rotating"
+      ? GREY_REVEAL_FILTER
+      : phase === "colorizing"
+        ? FULL_COLOR_REVEAL_FILTER
+        : "none";
+
+  return (
+    <div
+      className="absolute inset-0 [transform-style:preserve-3d]"
+      data-badge-reveal-extrusion={compact ? "compact" : "standard"}
+    >
+      {REVEAL_EDGE_LAYERS.map((layerIndex) => {
+        const z = -halfDepth + layerIndex * edgeSpacing;
+        const filter =
+          EDGE_REVEAL_FILTERS[
+            layerIndex === 0 || layerIndex === REVEAL_EDGE_LAYER_COUNT - 1
+              ? 1
+              : layerIndex % 4 === 0
+                ? 1
+                : 0
+          ];
+
+        return (
+          <span
+            key={layerIndex}
+            className="absolute inset-0 [backface-visibility:visible]"
+            data-badge-reveal-depth-layer="edge"
+            style={{
+              filter,
+              transform: `translateZ(${z}px)`,
+            }}
+          >
+            <BadgeArtwork
+              item={item}
+              variant="slot"
+              presentation="revealed"
+              className={artworkClassName}
+              dictionary={dictionary}
+            />
+          </span>
+        );
+      })}
+
+      <span
+        className="absolute inset-0 [backface-visibility:hidden]"
+        data-badge-reveal-face="rear"
+        style={{
+          filter: REAR_REVEAL_FILTER,
+          transform: `rotateY(180deg) translateZ(${faceDepth}px)`,
+        }}
+      >
+        <BadgeArtwork
+          item={item}
+          variant="slot"
+          presentation="revealed"
+          className={artworkClassName}
+          dictionary={dictionary}
+        />
+      </span>
+
+      <motion.div
+        className="absolute inset-0 [backface-visibility:hidden]"
+        data-badge-reveal-artwork-state={phase}
+        data-badge-reveal-color={
+          phase === "rotating"
+            ? "grey"
+            : phase === "colorizing"
+              ? "transitioning"
+              : "full"
+        }
+        data-badge-reveal-face="front"
+        initial={{ filter: GREY_REVEAL_FILTER }}
+        animate={{ filter: frontFilter }}
+        transition={{
+          duration:
+            phase === "colorizing"
+              ? reducedMotion
+                ? REDUCED_COLORIZE_DURATION_SECONDS
+                : COLORIZE_DURATION_SECONDS
+              : 0,
+          ease: "easeInOut",
+        }}
+        onAnimationComplete={
+          phase === "colorizing" ? onColorizationComplete : undefined
+        }
+        style={{ transform: `translateZ(${faceDepth}px)` }}
+      >
+        <BadgeArtwork
+          item={item}
+          variant="slot"
+          presentation="revealed"
+          className="h-full w-full"
+          dictionary={dictionary}
+        />
+      </motion.div>
+    </div>
   );
 }
 
@@ -822,83 +980,29 @@ function buildTransferGeometry(
   };
 }
 
-function buildOrbitGeometry(
+function buildCinematicGeometry(
   source: RectSnapshot,
-  preliminaryDestination: DOMRect | null,
   viewport: { width: number; height: number }
-): OrbitGeometry {
+): CinematicGeometry {
   const compact = viewport.width < 640 || viewport.height < 680;
-  const scalePeak = compact ? 1.06 : 1.12;
+  const scalePeak = compact ? 1.05 : 1.06;
   const scaledInset =
     (Math.max(source.width, source.height) * (scalePeak - 1)) / 2;
-  const margin = (compact ? 12 : 24) + scaledInset;
+  const extrusionInset = compact ? 8 : 10;
+  const margin = (compact ? 12 : 24) + scaledInset + extrusionInset;
   const minLeft = margin;
   const minTop = margin;
   const maxLeft = Math.max(minLeft, viewport.width - source.width - margin);
   const maxTop = Math.max(minTop, viewport.height - source.height - margin);
   const normalizedSource = {
     ...source,
-    left: clamp(source.left, minLeft, maxLeft),
-    top: clamp(source.top, minTop, maxTop),
+    left: clamp((viewport.width - source.width) / 2, minLeft, maxLeft),
+    top: clamp((viewport.height - source.height) / 2, minTop, maxTop),
   };
-  const xReach = compact
-    ? Math.min(viewport.width * 0.11, 44)
-    : Math.min(viewport.width * 0.16, 200);
-  const yReach = compact
-    ? Math.min(viewport.height * 0.08, 56)
-    : Math.min(viewport.height * 0.13, 120);
-  const endXOffset = preliminaryDestination
-    ? clamp(
-        (preliminaryDestination.left - normalizedSource.left) * 0.08,
-        -xReach * 0.24,
-        xReach * 0.24
-      )
-    : 0;
-  const endYOffset = preliminaryDestination
-    ? clamp(
-        (preliminaryDestination.top - normalizedSource.top) * 0.08,
-        -yReach * 0.2,
-        yReach * 0.2
-      )
-    : 0;
-  const point = (left: number, top: number) => ({
-    left: clamp(left, minLeft, maxLeft),
-    top: clamp(top, minTop, maxTop),
-  });
-  const upperRight = point(
-    normalizedSource.left + xReach,
-    normalizedSource.top - yReach * 0.78
-  );
-  const upperLeft = point(
-    normalizedSource.left - xReach * 0.92,
-    normalizedSource.top - yReach * 0.28
-  );
-  const lowerRight = point(
-    normalizedSource.left + xReach * 0.72,
-    normalizedSource.top + yReach * 0.72
-  );
-  const end = point(
-    normalizedSource.left + endXOffset,
-    normalizedSource.top + endYOffset
-  );
 
   return {
     source: normalizedSource,
-    end: { ...normalizedSource, ...end },
-    left: [
-      normalizedSource.left,
-      upperRight.left,
-      upperLeft.left,
-      lowerRight.left,
-      end.left,
-    ],
-    top: [
-      normalizedSource.top,
-      upperRight.top,
-      upperLeft.top,
-      lowerRight.top,
-      end.top,
-    ],
+    end: normalizedSource,
     compact,
   };
 }
