@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   getIronCladDivision,
   type IronCladDivision,
@@ -155,6 +156,8 @@ export async function submitTournamentRegistration(
   if (!userId) {
     return failure("Sign in before registering for a tournament.", "AUTH_REQUIRED");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   if (!isValidRegistrationInput(input)) {
     return failure(

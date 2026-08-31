@@ -48,6 +48,8 @@ const source = {
   list: read("app/admin/tournaments/page.tsx"),
   mapPool: read("components/AdminTournamentMapPools.tsx"),
   mapPoolActions: read("app/admin/tournaments/map-pool-actions.ts"),
+  media: read("components/admin/tournaments/AdminTournamentMedia.tsx"),
+  mediaActions: read("app/admin/tournaments/media-actions.ts"),
   matchActions: read("app/tournaments/match-actions.ts"),
   matchControls: read("components/MatchResultControls.tsx"),
   matches: read("components/admin/tournaments/AdminTournamentMatches.tsx"),
@@ -86,6 +88,7 @@ type WorkspaceSection =
   | "players-waitlist"
   | "bracket"
   | "matches"
+  | "media"
   | "map-pool"
   | "controls"
   | "outside-workspace";
@@ -745,12 +748,39 @@ const capabilities: Capability[] = [
       },
     ],
   },
+  {
+    id: 50,
+    label: "Tournament Media management",
+    section: "media",
+    evidence: [
+      {
+        file: "media",
+        includes: [
+          "Tournament Media",
+          "Associated Match (optional)",
+          "Publication state",
+          "Save Media",
+          "Confirm Remove",
+        ],
+      },
+      {
+        file: "mediaActions",
+        includes: [
+          "export async function createTournamentMedia",
+          "export async function updateTournamentMedia",
+          "export async function setTournamentMediaPublished",
+          "export async function removeTournamentMedia",
+          "verifyMatchScope",
+        ],
+      },
+    ],
+  },
 ];
 
 describe("PR 5 Admin Tournament workspace source contract", () => {
-  it("keeps the exact eight-section route taxonomy and all 49 capabilities reachable", () => {
+  it("keeps the exact nine-section route taxonomy and all 50 capabilities reachable", () => {
     expect(capabilities.map(({ id }) => id)).toEqual(
-      Array.from({ length: 49 }, (_, index) => index + 1)
+      Array.from({ length: 50 }, (_, index) => index + 1)
     );
     expect(
       new Set(
@@ -766,6 +796,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "players-waitlist",
         "bracket",
         "matches",
+        "media",
         "map-pool",
         "controls",
       ])
@@ -824,6 +855,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       source.editor,
       source.registrations,
       source.matches,
+      source.media,
     ].join("\n");
     expect(clientPresentation).not.toContain("@/lib/supabase-admin");
   });
@@ -841,6 +873,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "players-waitlist",
       "bracket",
       "matches",
+      "media",
       "map-pool",
     ]) {
       expect(workspace).toContain(`section === "${section}"`);
@@ -869,6 +902,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       source.bracket,
       source.bracketPopulation,
       source.matches,
+      source.media,
       source.mapPool,
       source.controls,
       source.recovery,
@@ -884,6 +918,18 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.actions.match(/rpc\("delete_tournament_data"/g)).toHaveLength(1);
     expect(source.mapPoolActions.match(/rpc\(/g)).toHaveLength(2);
     expect(source.registrationActions.match(/rpc\("review_tournament_registration"/g)).toHaveLength(2);
+    expect(source.mediaActions).not.toContain(".rpc(");
+    for (const action of [
+      "createTournamentMedia",
+      "updateTournamentMedia",
+      "setTournamentMediaPublished",
+      "removeTournamentMedia",
+    ]) {
+      expect(compact(source.mediaActions)).toContain(
+        `export async function ${action}`
+      );
+    }
+    expect(source.mediaActions.match(/await requireAdmin\(\)/g)).toHaveLength(5);
     expect(source.admin).not.toContain("async function updateRegistrationStatus(");
   });
 
@@ -934,14 +980,17 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       .filter((name) => name.endsWith(".sql"))
       .sort();
 
-    expect(migrationNames).toHaveLength(118);
-    expect(migrationNames.at(-2)).toBe(
+    expect(migrationNames).toHaveLength(119);
+    expect(migrationNames.at(-3)).toBe(
       "20260826100000_official_announcements.sql"
     );
-    expect(migrationNames.at(-1)).toBe(
+    expect(migrationNames.at(-2)).toBe(
       "20260827100000_announcement_tournament_link.sql"
     );
-    expect(migrationTreeSha256(migrationNames.slice(0, -1))).toBe(
+    expect(migrationNames.at(-1)).toBe(
+      "20260831123000_tournament_media_links.sql"
+    );
+    expect(migrationTreeSha256(migrationNames.slice(0, -2))).toBe(
       "8a66ada7bd7cae2874b3d4f6919462a1c2f74439850efac5d99aeddb0cf8b7cb"
     );
     expect(normalizedSha256(read("package.json"))).toBe(
@@ -981,5 +1030,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.bracketPopulation).toContain("h-dvh w-screen");
     expect(source.matches).toContain("min-w-0");
     expect(source.mapPool).toContain("min-w-0");
+    expect(source.media).toContain("min-w-0");
+    expect(source.media).toContain("min-h-11");
   });
 });

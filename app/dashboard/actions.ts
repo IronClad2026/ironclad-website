@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -65,6 +66,8 @@ export async function dismissDashboardNotifications(
       "Sign in before managing notifications."
     );
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const deleteAll = formData.get("deleteAll") === "true";
   const notificationIds = [
@@ -251,6 +254,8 @@ export async function confirmDashboardMatchResult(
     );
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const reportGroupId = getUuid(formData, "reportGroupId");
   if (!reportGroupId) {
     return actionErrorResult(
@@ -298,6 +303,8 @@ export async function disputeDashboardMatchResult(
       "Sign in before disputing a match result."
     );
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const reportGroupId = getUuid(formData, "reportGroupId");
   const disputeNotes = String(formData.get("disputeNotes") ?? "").trim();
@@ -366,6 +373,10 @@ export async function updateDiscordPublicEnabled(
       message: "Choose whether Discord contact should be public.",
       enabled: false,
     };
+  }
+
+  if (enabled) {
+    await requireCurrentAccountLegalAcceptance();
   }
 
   const nextEnabled = enabled;

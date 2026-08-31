@@ -1,12 +1,20 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   deleteLeaderboardRecalculationRuns,
   recalculateLeaderboardAllTime,
   recalculateLeaderboardForCurrentSeason,
   recalculateLeaderboardForTournament,
 } from "@/lib/leaderboard/admin";
+
+type CustomClaims = {
+  metadata?: {
+    role?: string;
+  };
+};
 
 export type LeaderboardRecalculationActionState = {
   status: "idle" | "success" | "error" | "pending";
@@ -33,6 +41,16 @@ export async function runLeaderboardRecalculation(
   const action = String(formData.get("leaderboardAction") ?? "");
 
   try {
+    if (!(await isCurrentUserAdmin())) {
+      return {
+        status: "error",
+        message: "Only administrators can recalculate leaderboards.",
+        runId: undefined,
+      };
+    }
+
+    await requireCurrentAccountLegalAcceptance();
+
     const result =
       action === "current_season"
         ? await recalculateLeaderboardForCurrentSeason()
@@ -82,6 +100,18 @@ export async function deleteLeaderboardRecalculationRunRecords(
   }
 
   try {
+    if (!(await isCurrentUserAdmin())) {
+      return {
+        status: "error",
+        message:
+          "Only administrators can delete leaderboard recalculation run records.",
+        runId: undefined,
+        deletedRunIds: undefined,
+      };
+    }
+
+    await requireCurrentAccountLegalAcceptance();
+
     const result = await deleteLeaderboardRecalculationRuns(runIds);
 
     console.info("Leaderboard recalculation run delete action result:", {
@@ -107,4 +137,10 @@ export async function deleteLeaderboardRecalculationRunRecords(
       message: "Recalculation run records could not be deleted.",
     };
   }
+}
+
+async function isCurrentUserAdmin() {
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+  return Boolean(userId && role === "admin");
 }

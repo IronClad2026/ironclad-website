@@ -23,9 +23,35 @@ const dictionary = {
       registeredTitle: "등록 완료 — {tournament}", registeredDescription: "{tournament}에 등록되었습니다.", spotAvailableTitle: "자리 이용 가능 — {tournament}", waitlistedTitle: "대기 명단 등록 — {tournament}", waitlistedDescription: "현재 {tournament} 대기 명단에 있습니다.", statusDetail: "등록 상태: {status}", bracketDetail: "대진표: {bracket}", dateDetail: "등록일: {date}", waitlistPosition: "대기 순번: #{position}", statuses: { approved: "승인됨", waitlisted: "대기 중", rejected: "승인되지 않음", withdrawn: "철회됨", manualReview: "수동 검토", pending: "검토 대기" },
     },
     overview: { title: "IronClad Company of Heroes 3 토너먼트", published: "공개된 토너먼트", archive: "토너먼트 보관함", archiveDescription: "Battlefy는 새 IronClad 플랫폼 출시 전에 진행된 이벤트의 과거 참고 자료로 유지됩니다.", tournamentRuleFormat: "토너먼트 규칙 형식", prizes: "상금", event: "이벤트", format: "형식", ruleFormat: "규칙 형식", registrationStatus: "등록 상태", registrationOpens: "등록 시작", registrationOpenStatus: "상태가 열림일 때", registrationCloses: "등록 종료", registrationCloseAdmin: "관리자가 종료할 때까지", grandFinal: "그랜드 파이널", grandFinalTba: "그랜드 파이널 미정", prizePool: "상금", approvedParticipants: "승인된 참가자", cohortSummary: "{requirement} — 활성 검토 그룹 {active}/{capacity} — 승인 {approved}명 — 대기 {waitlisted}명" },
+    rulesSummary: {
+      title: "토너먼트 필수 규칙",
+      description: "모든 플레이어가 대회 전과 진행 중에 알아야 할 핵심 규칙입니다.",
+      formatTitle: "형식",
+      formatBody: "CoH3 · 1v1 · 디비전당 플레이어 8명 · 독립 싱글 엘리미네이션 대진표.",
+      seriesTitle: "시리즈",
+      seriesBody: "8강: BO3 · 준결승: BO3 · 그랜드 파이널: BO5.",
+      matchTimingTitle: "경기 기한",
+      matchTimingBody: "각 경기는 활성화 시점부터 일반적으로 7일의 기한이 주어집니다. 이후 경기는 두 플레이어가 모두 확정되면 활성화됩니다. 경기와 함께 표시되는 정확한 기한이 우선하며 알림이 적용됩니다. 연장은 예외적이며 보장되지 않습니다.",
+      schedulingTitle: "일정 조율",
+      schedulingBody: "경기를 이용할 수 있게 된 뒤 일반적으로 24시간 이내에 합리적으로 첫 연락을 시도하세요. 상대가 48시간이 지나도 답하지 않거나 기한 준수가 위험하다면 더 일찍 관리자 지원을 요청하세요. 이 시간 기준은 자동 몰수패 타이머가 아닙니다.",
+      resultsTitle: "결과 및 리플레이",
+      resultsBody: "IronClad를 통해 시리즈 승자와 최종 점수를 보고하고, 실제 진행한 각 게임마다 고유한 .rec 리플레이 하나를 제출하세요.",
+      confirmationTitle: "확인 및 이의 제기",
+      confirmationBody: "상대는 표시된 기한까지 결과를 확인하거나 이의를 제기합니다. 이의 제기와 예외적인 경우는 관리자가 검토합니다. 공식적으로 확인되거나 승인된 결과만 대진표에 반영되어 다음 단계로 진행됩니다.",
+      noShowsTitle: "불참",
+      noShowsBody: "불참 승리를 직접 판정하지 마세요. 공식 불참 절차를 사용하면 상대가 확인하거나 이의를 제기하고, 예외 사항은 관리자가 검토합니다. 확인된 불참에는 참가 보상이 주어지지 않습니다. 두 플레이어 모두 합리적인 노력을 하지 않으면 IronClad가 양측 몰수패를 판정할 수 있습니다.",
+      mapsTitle: "맵, 진영 및 주사위",
+      mapsBody: "공개된 디비전 맵 풀을 사용하세요. 인증된 IronClad Dice는 실제로 진행되는 게임 1, 3, 5의 선택 순서를 정합니다. 플레이어는 맵과 진영 선택을 직접 조율합니다. 게임 2와 4에서는 진영을 바꾸고, 이전 게임의 패자가 새로운 적격 맵을 선택합니다.",
+      tournamentRulesTitle: "토너먼트 규칙",
+      authorityNote: "이 요약은 실용적인 안내입니다. 공식 토너먼트 규정집이 최종 기준입니다.",
+      openTournamentRules: "토너먼트 규칙 열기",
+      readFullRulebook: "공식 규정집 전체 읽기",
+      opensNewTab: "새 탭에서 열림",
+    },
     participants: { entries: "참가 명단", description: "ELO 자격 디비전별 승인된 참가자입니다.", search: "참가자 검색", player: "플레이어", country: "국가/지역", elo: "ELO", status: "상태", approved: "승인됨", title: "{tournament} 참가 명단", bracketTitle: "{bracket} 참가자", approvedCount: "승인 {count}명", empty: "이 디비전에는 승인된 참가자가 없습니다." },
     brackets: { title: "대진표", generated: "생성됨", awaitingGeneration: "생성 대기", empty: "이 디비전에 승인된 참가자가 두 명 이상이면 빈 대진 구조가 자동으로 생성됩니다.", standings: "순위표", participant: "참가자", win: "승", loss: "패", points: "점", standingsEmpty: "관리자가 플레이어를 배정하고 결과가 기록되면 순위표가 표시됩니다.", matchResults: "경기 결과", closeMatchWorkspace: "경기 결과 작업 공간 닫기", matchHistory: "토너먼트 경기 기록", matchWorkspace: "경기 작업 공간", matchWorkspaceDescription: "이 경기 기록에서 승인된 Dice Roll-Off, 점수 및 리플레이 기록을 확인하세요.", matchWorkspacePlayer: "비공개 Dice Roll-Off를 완료한 후 아래의 기존 시리즈 결과 및 리플레이 컨트롤을 사용하세요.", matchWorkspaceRoundRobin: "아래의 기존 시리즈 결과 및 리플레이 컨트롤을 사용하세요. 라운드 로빈 경기에서는 Dice Roll-Off를 사용할 수 없습니다.", signInWorkspace: "로그인하여 이 비공개 경기 작업 공간을 여세요.", active: "진행 중", openMatch: "경기 열기", matchLabel: "경기 {id}", singleElimination: "싱글 엘리미네이션", roundRobin: "라운드 로빈", deadlineDoubleForfeit: "기한 만료 — 양측 몰수패", automaticBye: "자동 부전승", emptyFeeder: "진출할 자격이 있는 플레이어 없음", deadlinePaused: "관리자가 기한을 일시 중지함", reviewPaused: "결과 또는 판정 검토 중 — 기한 적용이 일시 중지됨", deadlinePassed: "기한 만료 — 공식 판정 대기", waitingOpponent: "상대 대기 중 — 내 기한은 아직 시작되지 않음", deadlinePrefix: "기한: {date}", finalDoubleForfeit: "결승 양측 몰수패 — 이 디비전은 우승자 없이 종료됨", semifinalDoubleForfeit: "준결승 양측 몰수패 — 이 경기에서 진출자 없음", quarterfinalDoubleForfeit: "8강 양측 몰수패 — 이 대진에서 진출자 없음", finalWalkover: "결승 부전승 — 우승자가 경기 없이 진출함", semifinalBye: "준결승 자동 부전승 — 유일한 자격 플레이어가 결승 진출", automaticByeDetail: "자동 부전승 — 유일한 자격 플레이어가 경기 없이 진출", finalClosed: "결승 종료 — 이 디비전은 우승자 없이 종료됨", semifinalClosed: "준결승 종료 — 자격 있는 진출자 없음", matchClosed: "경기 종료 — 자격 있는 진출자 없음" },
     resources: { officialRules: "공식 규칙", title: "자료", open: "토너먼트 자료 열기", empty: "공개된 토너먼트 자료가 없습니다.", update: "IronClad 업데이트" },
+    media: { title: "토너먼트 미디어", empty: "게시된 토너먼트 미디어가 없습니다.", watch: "시청", opensNewTab: "새 탭에서 열림", types: { fullTournament: "전체 토너먼트", matchCast: "경기 중계", video: "동영상", other: "기타" } },
     workspace: { matchCount: "경기 {count}개", matchCountPlural: "경기 {count}개", pendingCount: "검토 대기 {count}건", pendingCountPlural: "검토 대기 {count}건", matchup: "{round} — 경기 {number}", versus: "대", tbd: "미정" },
     gatePrompt: {
       accountEyebrow: "IronClad 계정 필요", accountTitle: "이미 IronClad 계정이 있나요?", accountDescription: "로그인하여 계속하거나 계정을 만든 뒤 플레이어 프로필을 완성하고 등록하세요.",
@@ -103,6 +129,33 @@ const dictionary = {
     withdraw: "등록 철회",
     statedDeadline: "표시된 기한",
   },
+  registrationGuidance: {
+    controlLabel: "등록 절차 안내",
+    title: "등록 후에는 어떻게 진행되나요?",
+    adminReviewTitle: "관리자 검토",
+    adminReviewBody:
+      "IronClad가 등록 내용과 검증된 토너먼트 ELO를 검토합니다. 아직 참가 자리가 확정된 것은 아닙니다.",
+    approvalTitle: "승인",
+    approvalBody:
+      "승인되면 디비전 참가 자리가 확정됩니다. 디비전이 현재 정원에 도달했다면 선착순 대기 명단으로 등록됩니다.",
+    divisionReadyTitle: "디비전 준비",
+    divisionReadyBody:
+      "디비전 시작 준비를 진행하려면 정확히 8명의 승인을 받은 선수가 필요합니다.",
+    launchTitle: "토너먼트 시작",
+    launchBody:
+      "IronClad가 대진표, 시드 배정, 맵 풀을 준비한 뒤 관리자가 디비전을 시작합니다. 자동으로 시작되지 않습니다.",
+    matchTimingTitle: "매치 기한",
+    matchTimingBody:
+      "내 매치업이 활성화되면 일반적으로 완료까지 7일이 주어집니다.",
+    matchTimingDeadline:
+      "정확한 기한은 매치에 표시되며 IronClad가 기한 알림을 보냅니다.",
+    matchTimingExtension:
+      "기한 연장은 예외적인 경우에만 관리자가 승인할 수 있으며 보장되지 않습니다.",
+    dashboardGuidance:
+      "등록 상태와 대기 명단 제안은 대시보드에서 확인하세요.",
+    bracketGuidance:
+      "시작 후 토너먼트의 대진표 탭에서 대진표, 상대 선수, 매치 세부 정보를 확인하세요.",
+  },
   registrationModal: {
     eyebrow: "IronClad 등록",
     title: "e스포츠 선수 등록",
@@ -158,13 +211,25 @@ const dictionary = {
     ownershipConfirmation:
       "본인의 IronClad 계정을 사용 중이며 연결된 Steam 계정도 본인 소유임을 확인합니다.",
     submitRegistration: "등록 제출",
-    submittedTitle: "등록 제출 완료 — 관리자 검토 대기 중",
-    reviewTime:
-      "토너먼트 운영진이 등록을 검토합니다. Dashboard에서 상태 업데이트를 확인하세요.",
+    submittedTitle: "등록이 제출되었습니다",
+    pendingAdminReview: "관리자 검토 대기 중",
+    whatHappensNext: "다음 단계",
+    eightApprovedPlayers: "승인된 선수 8명",
+    divisionLaunch: "디비전 시작",
+    matchTimingTitle: "매치 일정",
+    reviewTime: "지금은 별도로 할 일이 없습니다.",
+    successGuidance:
+      "등록 상태는 대시보드에서 확인하세요. 주요 결정과 매치 업데이트를 알려드립니다. 시작 후 토너먼트의 대진표 탭에서 대진표, 상대 선수, 매치 세부 정보를 확인하세요.",
+    matchTimingDescription:
+      "내 매치업이 활성화되면 일반적으로 완료까지 7일이 주어집니다.",
+    matchTimingDeadline:
+      "정확한 기한과 알림은 매치에 표시됩니다.",
+    openDashboard: "대시보드 열기",
     waitlistJoinedTitle: "대기 명단 등록 완료",
     waitlistPositionPending: "대기 명단 순위를 확인하는 중…",
     waitlistResultDescription:
-      "참가 자리는 보장되지 않습니다. 대기열은 선착순으로 처리됩니다. 공석이 생기면 제안을 받을 수 있으며, 제안은 Dashboard에서 관리하세요.",
+      "참가 자리는 보장되지 않습니다. 대기열은 선착순으로 처리됩니다. 시작 전에 자리가 나면 대시보드에서 제안을 받을 수 있습니다. 표시된 기한 전에 응답하세요. 제안을 수락하면 등록이 관리자 검토로 돌아가며 승인이 보장되지는 않습니다.",
+    waitlistNoAction: "제안이 표시되지 않는 한 지금은 할 일이 없습니다.",
     back: "뒤로",
     cancel: "취소",
     continue: "계속",

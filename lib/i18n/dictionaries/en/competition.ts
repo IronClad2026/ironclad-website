@@ -137,6 +137,39 @@ const dictionary = {
       cohortSummary:
         "{requirement} — active review cohort {active}/{capacity} — {approved} approved — {waitlisted} waitlisted",
     },
+    rulesSummary: {
+      title: "Tournament Essentials",
+      description: "Key rules for every Player before and during competition.",
+      formatTitle: "Format",
+      formatBody:
+        "CoH3 · 1v1 · 8 Players per Division · Independent single-elimination brackets.",
+      seriesTitle: "Series",
+      seriesBody: "Quarterfinals: BO3 · Semifinals: BO3 · Grand Final: BO5.",
+      matchTimingTitle: "Match Timing",
+      matchTimingBody:
+        "Each individual Match normally has 7 days from activation. Later Matches activate when both Players are known. The exact deadline shown with the Match controls; reminders apply, and extensions are exceptional and not guaranteed.",
+      schedulingTitle: "Scheduling",
+      schedulingBody:
+        "Make reasonable first contact normally within 24 hours after the Match becomes available. If your opponent has not replied after 48 hours—or sooner if the deadline is at risk—request Admin Assistance. These timings are not automatic-forfeit timers.",
+      resultsTitle: "Results & Replays",
+      resultsBody:
+        "Report the Series winner and final score through IronClad, with one unique .rec replay for every Game played.",
+      confirmationTitle: "Confirmation & Disputes",
+      confirmationBody:
+        "Your opponent confirms or disputes by the displayed deadline. Disputes and exceptional cases go to Admin review. Only an official confirmed or approved result advances the Bracket.",
+      noShowsTitle: "No-Shows",
+      noShowsBody:
+        "Never self-award a no-show. Use the official no-show flow; your opponent confirms or disputes it, and an Admin reviews exceptions. A confirmed no-show receives no participation award. If neither Player makes a reasonable effort, IronClad may issue a double forfeit.",
+      mapsTitle: "Maps, Sides & Dice",
+      mapsBody:
+        "Use the published Division Map Pool. Authenticated IronClad Dice sets the choice order for Games 1, 3 and 5 when played. Players coordinate Map and Side choices manually; Games 2 and 4 swap Sides, and the previous Game's loser selects a new eligible Map.",
+      tournamentRulesTitle: "Tournament Rules",
+      authorityNote:
+        "This summary is a practical guide. The Official Tournament Rulebook remains authoritative.",
+      openTournamentRules: "Open Tournament Rules",
+      readFullRulebook: "Read Full Official Rulebook",
+      opensNewTab: "opens in a new tab",
+    },
     participants: {
       entries: "Entries",
       description: "Approved participants separated by their ELO-eligible bracket.",
@@ -204,6 +237,18 @@ const dictionary = {
       open: "Open tournament resource",
       empty: "No tournament resources have been published.",
       update: "IronClad Update",
+    },
+    media: {
+      title: "Tournament Media",
+      empty: "No Tournament media has been published.",
+      watch: "Watch",
+      opensNewTab: "Opens in a new tab",
+      types: {
+        fullTournament: "Full Tournament",
+        matchCast: "Match Cast",
+        video: "Video",
+        other: "Other",
+      },
     },
     workspace: {
       matchCount: "{count} Match",
@@ -314,6 +359,33 @@ const dictionary = {
     withdraw: "Withdraw Registration",
     statedDeadline: "the stated deadline",
   },
+  registrationGuidance: {
+    controlLabel: "How Registration Works",
+    title: "What Happens After You Register?",
+    adminReviewTitle: "Admin Review",
+    adminReviewBody:
+      "We review your Registration and verified Tournament ELO. Your place is not confirmed yet.",
+    approvalTitle: "Approval",
+    approvalBody:
+      "If approved, your place in the Division is confirmed. If your Division is currently full, registration uses the FIFO Waitlist.",
+    divisionReadyTitle: "Division Ready",
+    divisionReadyBody:
+      "Exactly 8 approved Players are required before the Division can be prepared for launch.",
+    launchTitle: "Tournament Launch",
+    launchBody:
+      "IronClad prepares the Bracket, seeding and Map Pool, then an Admin launches the Division. Launch is not automatic.",
+    matchTimingTitle: "Match Deadline",
+    matchTimingBody:
+      "Once your matchup becomes active, you normally have 7 days to complete it.",
+    matchTimingDeadline:
+      "Your exact deadline is shown with the Match, and IronClad sends deadline reminders.",
+    matchTimingExtension:
+      "Any extension is exceptional, must be granted by an Admin, and is not guaranteed.",
+    dashboardGuidance:
+      "Check your Dashboard for Registration status and Waitlist offers.",
+    bracketGuidance:
+      "After launch, open the Tournament's Brackets tab to see your Bracket, opponent and Match details.",
+  },
   registrationModal: {
     eyebrow: "IronClad Registration",
     title: "Esports Player Registration",
@@ -370,13 +442,25 @@ const dictionary = {
     ownershipConfirmation:
       "I confirm that I am using my own IronClad account and that the linked Steam account belongs to me.",
     submitRegistration: "Submit Registration",
-    submittedTitle: "Registration submitted — Pending Admin review",
-    reviewTime:
-      "Tournament administration will review your submission. Check your Dashboard for status updates.",
+    submittedTitle: "Registration submitted",
+    pendingAdminReview: "Pending Admin Review",
+    whatHappensNext: "What Happens Next?",
+    eightApprovedPlayers: "8 Approved Players",
+    divisionLaunch: "Division Launch",
+    matchTimingTitle: "Match Timing",
+    reviewTime: "You don't need to do anything right now.",
+    successGuidance:
+      "Check your Dashboard for Registration status. We'll notify you about key decisions and Match updates. After launch, open the Tournament's Brackets tab for your Bracket, opponent and Match details.",
+    matchTimingDescription:
+      "Once your matchup becomes active, you normally have 7 days to complete it.",
+    matchTimingDeadline:
+      "Your exact deadline and reminders will appear with your Match.",
+    openDashboard: "Open Dashboard",
     waitlistJoinedTitle: "Waitlist joined",
     waitlistPositionPending: "Confirming your waitlist position…",
     waitlistResultDescription:
-      "A place is not guaranteed. The queue is first-in, first-out. If a vacancy opens, you may receive an offer; manage offers from your Dashboard.",
+      "A place is not guaranteed. The queue is first-in, first-out. If a place opens before launch, you may receive an offer in your Dashboard. Respond before its displayed deadline. Accepting the offer returns your Registration to Admin Review and does not guarantee approval.",
+    waitlistNoAction: "You don't need to do anything unless an offer appears.",
     back: "Back",
     cancel: "Cancel",
     continue: "Continue",

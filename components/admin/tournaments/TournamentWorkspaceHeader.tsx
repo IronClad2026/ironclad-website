@@ -96,6 +96,7 @@ const TOURNAMENT_MANAGEMENT_LABELS: Record<
   "players-waitlist": "Players / Waitlist",
   bracket: "Bracket",
   matches: "Matches / Results",
+  media: "Media",
   "map-pool": "Map Pool",
   controls: "Tournament Controls",
 };

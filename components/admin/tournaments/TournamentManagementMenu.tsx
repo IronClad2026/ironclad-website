@@ -2,6 +2,7 @@
 
 import {
   ClipboardList,
+  Clapperboard,
   GitBranch,
   LayoutDashboard,
   Map,
@@ -30,6 +31,7 @@ export type TournamentManagementSection =
   | "players-waitlist"
   | "bracket"
   | "matches"
+  | "media"
   | "map-pool"
   | "controls";
 
@@ -56,6 +58,7 @@ export const TOURNAMENT_MANAGEMENT_SECTIONS: readonly TournamentManagementMenuIt
     },
     { icon: GitBranch, label: "Bracket", section: "bracket" },
     { icon: Swords, label: "Matches / Results", section: "matches" },
+    { icon: Clapperboard, label: "Media", section: "media" },
     { icon: Map, label: "Map Pool", section: "map-pool" },
     {
       icon: Settings,
@@ -311,7 +314,7 @@ export function TournamentDesktopSectionNavigation({
       aria-label="Tournament management sections"
       className="mt-4 hidden border-t border-white/10 pt-4 xl:block"
     >
-      <ul className="grid grid-cols-4 gap-1.5 2xl:grid-cols-8">
+      <ul className="grid grid-cols-3 gap-1.5 2xl:grid-cols-9">
         {TOURNAMENT_MANAGEMENT_SECTIONS.map((item) => {
           const Icon = item.icon;
           const active = activeSection === item.section;

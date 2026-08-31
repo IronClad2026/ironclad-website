@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import type {
   ProfileActionState,
   ProfileField,
@@ -41,6 +42,8 @@ export async function savePlayerProfile(
       errors: {},
     };
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const validation = validateProfile(formData);
 
