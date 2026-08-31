@@ -5,6 +5,7 @@ import { playerIdentity } from "@/tests/fixtures/auth";
 const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
+const evaluateProfileBadgesAfterCommitMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -16,6 +17,10 @@ vi.mock("next/cache", () => ({
 
 vi.mock("@/lib/supabase-server", () => ({
   createAuthenticatedSupabaseClient: createAuthenticatedSupabaseClientMock,
+}));
+
+vi.mock("@/lib/badges/integration", () => ({
+  evaluateProfileBadgesAfterCommit: evaluateProfileBadgesAfterCommitMock,
 }));
 
 import { savePlayerProfile } from "@/app/profile/actions";
@@ -116,6 +121,8 @@ function createPngAvatar(size: number, fileName = "avatar.png") {
 describe("profile save validation and Steam identity regression", () => {
   beforeEach(() => {
     authMock.mockResolvedValue(playerIdentity);
+    evaluateProfileBadgesAfterCommitMock.mockReset();
+    evaluateProfileBadgesAfterCommitMock.mockResolvedValue(undefined);
   });
 
   it("ignores a forged Steam display name and leaves completion to the protected database rule", async () => {
@@ -139,6 +146,10 @@ describe("profile save validation and Steam identity regression", () => {
     });
 
     expect(fixture.upsert).toHaveBeenCalledOnce();
+    expect(evaluateProfileBadgesAfterCommitMock).toHaveBeenCalledWith({
+      playerId: "player-existing",
+      reason: "profile_write",
+    });
     const [profileUpdate, options] = fixture.upsert.mock.calls[0];
 
     expect(profileUpdate).toMatchObject({

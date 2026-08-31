@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Locale } from "@/lib/i18n/config";
+import type { BadgesDictionary } from "@/lib/i18n/dictionaries/en/badges";
 import type { NotificationsDictionary } from "@/lib/i18n/dictionaries/en/notifications";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { localizePlayerNotificationCopy } from "@/lib/i18n/notification-copy";
@@ -157,7 +158,13 @@ export async function loadPlayerNotifications(
   locale: Locale = "en"
 ): Promise<NotificationLoadResult> {
   const supabase = createSupabaseAdminClient();
-  const [notificationResult, totalResult, unreadResult, dictionary] = await Promise.all([
+  const [
+    notificationResult,
+    totalResult,
+    unreadResult,
+    dictionary,
+    badgesDictionary,
+  ] = await Promise.all([
     supabase
       .from("notifications")
       .select(NOTIFICATION_SELECT)
@@ -177,6 +184,7 @@ export async function loadPlayerNotifications(
       .is("in_app_hidden_at", null)
       .is("read_at", null),
     loadDictionary(locale, "notifications"),
+    loadDictionary(locale, "badges"),
   ]);
 
   const loadError =
@@ -203,7 +211,13 @@ export async function loadPlayerNotifications(
 
   return {
     notifications: (notificationResult.data as NotificationRow[]).map(
-      (notification) => mapNotification(notification, "player", dictionary)
+      (notification) =>
+        mapNotification(
+          notification,
+          "player",
+          dictionary,
+          badgesDictionary
+        )
     ),
     totalCount: counts.totalCount,
     unreadCount: counts.unreadCount,
@@ -502,13 +516,19 @@ export async function deleteNotifications({
 function mapNotification(
   row: NotificationRow,
   scope: NotificationScope,
-  dictionary?: NotificationsDictionary
+  dictionary?: NotificationsDictionary,
+  badgesDictionary?: BadgesDictionary
 ): InAppNotification {
   const localizedCopy =
     scope === "player" && dictionary
       ? localizePlayerNotificationCopy(
-          { type: row.type, tournamentTitle: row.tournament_title },
-          dictionary
+          {
+            type: row.type,
+            tournamentTitle: row.tournament_title,
+            metadata: row.metadata,
+          },
+          dictionary,
+          badgesDictionary
         )
       : null;
 
@@ -616,6 +636,10 @@ function buildNotificationHref(
     }
 
     return "/admin";
+  }
+
+  if (row.type === "badge.unlocked") {
+    return "/dashboard/badges";
   }
 
   if (

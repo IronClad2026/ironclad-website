@@ -13,6 +13,7 @@ import {
 } from "@/lib/steam-openid";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { LOCALE_COOKIE_NAME, resolveLocale } from "@/lib/i18n/config";
+import { evaluateProfileBadgesAfterCommit } from "@/lib/badges/integration";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type ProfileResult =
@@ -116,6 +117,7 @@ export async function GET(request: NextRequest) {
       userId,
       steamId64
     );
+    await evaluateSteamBadgesAfterCommit(supabase, currentPlayer.id);
     return terminalResponse(
       redirectToProfile(
         origin,
@@ -164,6 +166,7 @@ export async function GET(request: NextRequest) {
       userId,
       steamId64
     );
+    await evaluateSteamBadgesAfterCommit(supabase, currentPlayer.id);
     return terminalResponse(
       redirectToProfile(
         origin,
@@ -181,6 +184,7 @@ export async function GET(request: NextRequest) {
       userId,
       steamId64
     );
+    await evaluateSteamBadgesAfterCommit(supabase, racedPlayer.id);
     return terminalResponse(
       redirectToProfile(
         origin,
@@ -201,6 +205,22 @@ type SteamIdentityLookup =
   | { status: "found"; id: string; steamId64: string | null };
 
 type SteamIdentityClient = ReturnType<typeof createSupabaseAdminClient>;
+
+async function evaluateSteamBadgesAfterCommit(
+  supabase: SteamIdentityClient,
+  playerId: string
+) {
+  try {
+    await evaluateProfileBadgesAfterCommit({
+      playerId,
+      reason: "steam_identity",
+      supabase,
+    });
+  } catch {
+    // Steam identity is already committed and remains authoritative.
+    console.error("Steam Badge follow-up failed unexpectedly.");
+  }
+}
 
 async function loadCurrentSteamIdentity(
   supabase: SteamIdentityClient,

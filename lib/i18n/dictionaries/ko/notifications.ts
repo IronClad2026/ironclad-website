@@ -185,6 +185,8 @@ const dictionary = {
   },
   server: {
     loadError: "알림을 불러올 수 없습니다.",
+    badgeUnlockedTitle: "배지 해제",
+    badgeUnlockedMessage: "{badgeName} 배지를 해제했습니다.",
     tournamentFallback: "이 IronClad 토너먼트",
     tournamentCancelledTitle: "토너먼트 취소됨",
     tournamentCancelledMessage:

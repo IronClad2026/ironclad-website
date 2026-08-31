@@ -73,7 +73,7 @@ const PR4_ANNOUNCEMENT_MESSAGE_KEYS = [
 ] as const;
 
 describe("server dictionary loader", () => {
-  it("loads all seven Italian Player namespaces", async () => {
+  it("loads all eight Italian Player namespaces", async () => {
     expect(DICTIONARY_NAMESPACES).toEqual([
       "common",
       "public",
@@ -82,6 +82,7 @@ describe("server dictionary loader", () => {
       "notifications",
       "email",
       "help-legal-ui",
+      "badges",
     ]);
 
     const dictionaries = await loadDictionaries(

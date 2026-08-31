@@ -8,6 +8,7 @@ const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const getRelic1v1EloMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
+const evaluateProfileBadgesAfterCommitMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -23,6 +24,10 @@ vi.mock("@/lib/elo-verification/relic", () => ({
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
+}));
+
+vi.mock("@/lib/badges/integration", () => ({
+  evaluateProfileBadgesAfterCommit: evaluateProfileBadgesAfterCommitMock,
 }));
 
 import { verifyRelicProfileElo } from "@/app/profile/relic-elo-action";
@@ -272,6 +277,8 @@ describe("profile Relic ELO verification action", () => {
     createSupabaseAdminClientMock.mockReset();
     getRelic1v1EloMock.mockReset();
     revalidatePathMock.mockReset();
+    evaluateProfileBadgesAfterCommitMock.mockReset();
+    evaluateProfileBadgesAfterCommitMock.mockResolvedValue(undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
@@ -370,6 +377,11 @@ describe("profile Relic ELO verification action", () => {
       refreshAvailableAt: REFRESH_AVAILABLE_AT,
     });
     expect(revalidatePathMock).toHaveBeenCalledExactlyOnceWith("/profile");
+    expect(evaluateProfileBadgesAfterCommitMock).toHaveBeenCalledWith({
+      playerId: PLAYER_ID,
+      reason: "relic_snapshot",
+      supabase: fixture.client,
+    });
 
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain(PLAYER_ID);

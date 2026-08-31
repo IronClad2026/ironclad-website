@@ -980,18 +980,48 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       .filter((name) => name.endsWith(".sql"))
       .sort();
 
-    expect(migrationNames).toHaveLength(119);
-    expect(migrationNames.at(-3)).toBe(
+    const badgeIntegrationMigrationNames = new Set([
+      "20260821000000_badge_award_foundation.sql",
+      "20260821001000_badge_batch_2_authority.sql",
+      "20260821002000_badge_progression_championship_authority.sql",
+      "20260821003000_badge_streak_clean_upset_authority.sql",
+      "20260821004000_badge_season_authority.sql",
+      "20260821005000_badge_bracket_progression_authority.sql",
+      "20260821006000_match_authority_foundation.sql",
+      "20260821007000_badge_reliable_competitor_authority.sql",
+      "20260821008000_badge_comeback_commander_authority.sql",
+      "20260821009000_tournament_championship_path_authority.sql",
+      "20260821010000_badge_flawless_campaign_authority.sql",
+      "20260830090000_player_badge_reveals.sql",
+      "20260831090000_service_role_badge_e2e_season_read.sql",
+      "20260831130000_badge_authority_forward_repairs.sql",
+      "20260831131000_badge_reconciliation_targets.sql",
+    ]);
+    const platformMigrationNames = migrationNames.filter(
+      (name) => !badgeIntegrationMigrationNames.has(name)
+    );
+
+    expect(platformMigrationNames).toHaveLength(119);
+    expect(platformMigrationNames.at(-3)).toBe(
       "20260826100000_official_announcements.sql"
     );
-    expect(migrationNames.at(-2)).toBe(
+    expect(platformMigrationNames.at(-2)).toBe(
       "20260827100000_announcement_tournament_link.sql"
     );
-    expect(migrationNames.at(-1)).toBe(
+    expect(platformMigrationNames.at(-1)).toBe(
       "20260831123000_tournament_media_links.sql"
     );
-    expect(migrationTreeSha256(migrationNames.slice(0, -2))).toBe(
+    expect(migrationTreeSha256(platformMigrationNames.slice(0, -2))).toBe(
       "8a66ada7bd7cae2874b3d4f6919462a1c2f74439850efac5d99aeddb0cf8b7cb"
+    );
+    expect(migrationNames).toHaveLength(
+      platformMigrationNames.length + badgeIntegrationMigrationNames.size
+    );
+    expect(migrationNames.at(-2)).toBe(
+      "20260831130000_badge_authority_forward_repairs.sql"
+    );
+    expect(migrationNames.at(-1)).toBe(
+      "20260831131000_badge_reconciliation_targets.sql"
     );
     expect(normalizedSha256(read("package.json"))).toBe(
       "0fa600694cee0d7bfbcb2ddd545ed8f46b0c33ea79d4e9953b39c0b3e7ae5db9"
