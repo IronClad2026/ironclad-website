@@ -49,10 +49,7 @@ describe("badge reveal acknowledgement action", () => {
       "clerk_user_id",
       "clerk-player-a"
     );
-    expect(fixture.playerQuery.is).toHaveBeenCalledWith(
-      "account_closed_at",
-      null
-    );
+    expect(fixture.playerQuery.is).not.toHaveBeenCalled();
     expect(fixture.awardQuery.eq.mock.calls).toEqual([
       ["id", OWNED_AWARD_ID],
       ["player_id", PLAYER_ID],
@@ -176,7 +173,7 @@ function createActionClient({
   existingReveal?: { player_badge_award_id: string } | null;
   insertError?: { code: string } | null;
 } = {}) {
-  const playerQuery = readQuery({ data: { id: PLAYER_ID }, error: null }, true);
+  const playerQuery = readQuery({ data: { id: PLAYER_ID }, error: null });
   const awardQuery = readQuery({ data: award, error: awardError });
   const revealLookupQuery = readQuery({
     data: existingReveal,

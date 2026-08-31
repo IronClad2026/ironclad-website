@@ -77,9 +77,8 @@ describe("dashboard Badge collection route", () => {
   });
 
   it("uses the request locale for metadata and collection copy", async () => {
-    createAuthenticatedSupabaseClientMock.mockResolvedValue(
-      createDashboardBadgePageClient()
-    );
+    const client = createDashboardBadgePageClient();
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(client);
 
     await expect(generateMetadata()).resolves.toEqual({
       title: "Collezione Badge | IronClad",
@@ -97,6 +96,11 @@ describe("dashboard Badge collection route", () => {
     expect(props.badgeData?.collection.earnedCount).toBe(1);
     expect(props.pendingReveals).toHaveLength(1);
     expect(props.pendingReveals?.[0].id).toBe(AWARD_ID);
+    expect(client.playerQuery.eq).toHaveBeenCalledWith(
+      "clerk_user_id",
+      "clerk-dashboard-badges"
+    );
+    expect(client.playerQuery.is).not.toHaveBeenCalled();
   });
 
   it("shows 0/30 only for a successful empty read", async () => {
@@ -204,6 +208,7 @@ function createDashboardBadgePageClient({
       if (table === "player_badge_reveals") return badgeRevealsQuery;
       throw new Error(`Unexpected Badge page table: ${table}`);
     }),
+    playerQuery: profileQuery,
   };
 }
 
@@ -217,7 +222,9 @@ function chainQuery() {
   };
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
-  query.is.mockReturnValue(query);
+  query.is.mockImplementation(() => {
+    throw new Error("Unexpected is() filter on this query.");
+  });
   return query;
 }
 

@@ -34,7 +34,6 @@ export default async function DashboardBadgeCollectionPage() {
     .from("players")
     .select("id")
     .eq("clerk_user_id", userId)
-    .is("account_closed_at", null)
     .maybeSingle();
 
   if (playerError) {
