@@ -24,6 +24,7 @@ import MatchDiceRollOff, {
   type MatchDiceLoadResult,
 } from "@/components/MatchDiceRollOff";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
+import RegistrationGuidanceDisclosure from "@/components/RegistrationGuidanceDisclosure";
 import RequestAdminAssistanceButton from "@/components/RequestAdminAssistanceButton";
 import MatchResultControls, {
   AdminResetMatchForm,
@@ -36,6 +37,8 @@ import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime"
 import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import ScrollReveal from "@/components/ScrollReveal";
 import TournamentMapPools from "@/components/TournamentMapPools";
+import TournamentMedia from "@/components/TournamentMedia";
+import TournamentRulesEssentials from "@/components/TournamentRulesEssentials";
 import {
   useOptionalLocale,
   useOptionalTranslations,
@@ -597,21 +600,24 @@ function Hero({
             ) : registrationState ? (
               <RegistrationStateCard state={registrationState} />
             ) : (
-              <ActionCard
-                label={actionLabel}
-                description={
-                  divisionLaunched
-                    ? t("tournaments.hero.divisionInProgress")
-                    : registrationOpen
-                    ? registrationIsWaitlistOnly
-                      ? t("tournaments.hero.waitlistOpen")
-                      : t("tournaments.hero.openEvents")
-                    : t("tournaments.hero.scheduleHint")
-                }
-                icon={registrationOpen ? CheckCircle2 : Clock3}
-                onClick={onRegisterClick}
-                disabled={divisionLaunched}
-              />
+              <>
+                <ActionCard
+                  label={actionLabel}
+                  description={
+                    divisionLaunched
+                      ? t("tournaments.hero.divisionInProgress")
+                      : registrationOpen
+                        ? registrationIsWaitlistOnly
+                          ? t("tournaments.hero.waitlistOpen")
+                          : t("tournaments.hero.openEvents")
+                        : t("tournaments.hero.scheduleHint")
+                  }
+                  icon={registrationOpen ? CheckCircle2 : Clock3}
+                  onClick={onRegisterClick}
+                  disabled={divisionLaunched}
+                />
+                {registrationOpen && <RegistrationGuidanceDisclosure />}
+              </>
             )}
           </div>
         </div>
@@ -1042,12 +1048,7 @@ function renderOverviewPanel(
 ) {
   const shared = "leading-7 text-zinc-300";
   if (panel === "rules") {
-    return (
-      <div className="space-y-4">
-        <Detail label={t("tournaments.overview.tournamentRuleFormat")} value={tournament.ruleFormatLabel} />
-        <p className={shared}>{tournament.rules}</p>
-      </div>
-    );
+    return <TournamentRulesEssentials tournament={tournament} />;
   }
   if (panel === "prizes") {
     return (
@@ -3181,14 +3182,11 @@ function TeamRow({ team }: { team: MatchTeam }) {
 }
 
 function Media({ tournament }: { tournament: TournamentCard }) {
-  const t = useOptionalTranslations("competition", competitionEnglish);
-  const links = [
-    tournament.rulesUrl
-      ? { label: t("tournaments.resources.officialRules"), url: tournament.rulesUrl }
-      : null,
-  ].filter((link) => link !== null);
-
-  return <Card><h2 className="text-xl font-black text-white">{tournament.title} — {t("tournaments.resources.title")}</h2>{links.length > 0 ? <div className="mt-5 grid gap-4 md:grid-cols-2">{links.map((link) => <a key={link.label} href={link.url} target="_blank" rel="noreferrer" className="group relative aspect-video overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100" style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${tournament.image})` }}><PlayCircle className="text-white opacity-90" /><p className="mt-20 text-sm font-bold text-white">{link.label}</p><p className="text-xs text-zinc-300">{t("tournaments.resources.open")}</p></a>)}</div> : <p className="mt-5 border border-white/12 p-8 text-center text-zinc-500">{t("tournaments.resources.empty")}</p>}</Card>;
+  return (
+    <Card>
+      <TournamentMedia tournament={tournament} presentation="desktop" />
+    </Card>
+  );
 }
 
 function Announcements({ tournament }: { tournament: TournamentCard }) {
@@ -3375,9 +3373,6 @@ export function RegisterModal({
   const [submissionError, setSubmissionError] = useState("");
   const [waitlistConfirmationRequired, setWaitlistConfirmationRequired] =
     useState(false);
-  const [successMessage, setSuccessMessage] = useState(
-    t("registrationServer.submitted")
-  );
   const [submissionOutcome, setSubmissionOutcome] =
     useState<RegistrationSubmissionOutcome | null>(null);
   const [showTournamentChoices, setShowTournamentChoices] = useState(false);
@@ -3742,7 +3737,6 @@ export function RegisterModal({
 
     router.refresh();
     setStep("submitted");
-    setSuccessMessage(getRegistrationResultMessage(result, t));
     setSubmissionOutcome(
       result.code === "WAITLIST_SUBMITTED"
         ? {
@@ -3783,6 +3777,13 @@ export function RegisterModal({
     submissionOutcome?.kind === "waitlist"
       ? submissionOutcome.position ?? refreshedWaitlistPosition
       : null;
+  const isWaitlistOutcome = submissionOutcome?.kind === "waitlist";
+  const registrationSuccessStages = [
+    t("registrationGuidance.adminReviewTitle"),
+    t("registrationGuidance.approvalTitle"),
+    t("registrationModal.eightApprovedPlayers"),
+    t("registrationModal.divisionLaunch"),
+  ];
   const profileReady = profile.profile_completed === true;
   // profile_completed is derived from the protected Steam identity link.
   const steamConnected = profileReady;
@@ -4070,7 +4071,7 @@ export function RegisterModal({
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                {tournaments.map((event) => {
+                {eligibleTournaments.map((event) => {
                   const selected = selectedTournament.title === event.title;
                   const registrationAvailable =
                     getRegistrationDivisionAvailability(
@@ -4502,7 +4503,7 @@ export function RegisterModal({
               role="status"
               aria-live="polite"
               className={classNames(
-                "grid place-items-center text-center",
+                "grid w-full place-items-center text-center",
                 isPhonePresentation ? "py-6" : "py-10"
               )}
             >
@@ -4514,25 +4515,72 @@ export function RegisterModal({
                 tabIndex={-1}
                 className="mt-5 text-2xl font-black text-white outline-none"
               >
-                {submissionOutcome?.kind === "waitlist"
+                {isWaitlistOutcome
                   ? t("registrationModal.waitlistJoinedTitle")
                   : t("registrationModal.submittedTitle")}
               </h3>
               <p className="mt-2 text-sm font-bold uppercase tracking-wider text-emerald-300">
-                {submissionOutcome?.kind === "waitlist" &&
-                displayedWaitlistPosition !== null
+                {isWaitlistOutcome && displayedWaitlistPosition !== null
                   ? t("registrationServer.waitlistSubmittedPosition", {
                       position: displayedWaitlistPosition,
                     })
-                  : submissionOutcome?.kind === "waitlist"
+                  : isWaitlistOutcome
                     ? t("registrationModal.waitlistPositionPending")
-                    : successMessage}
+                    : t("registrationModal.pendingAdminReview")}
               </p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-300">
-                {submissionOutcome?.kind === "waitlist"
-                  ? t("registrationModal.waitlistResultDescription")
-                  : t("registrationModal.reviewTime")}
-              </p>
+              {isWaitlistOutcome ? (
+                <div className="mt-4 max-w-xl space-y-3 text-sm leading-6 text-zinc-300">
+                  <p>{t("registrationModal.waitlistResultDescription")}</p>
+                  <p className="font-bold text-zinc-100">
+                    {t("registrationModal.waitlistNoAction")}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 w-full max-w-2xl">
+                  <h4 className="text-sm font-black uppercase tracking-[0.18em] text-orange-200">
+                    {t("registrationModal.whatHappensNext")}
+                  </h4>
+                  <ol
+                    data-registration-success-stages
+                    className="mt-3 grid gap-2 text-left sm:grid-cols-2"
+                  >
+                    {registrationSuccessStages.map((label, index) => (
+                      <li
+                        key={label}
+                        className="flex min-h-11 items-center gap-3 border border-white/10 bg-black/35 px-3 py-2.5 text-sm font-bold text-zinc-100"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-orange-400/45 bg-orange-500/10 text-xs font-black text-orange-200"
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 break-words">{label}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="mt-4 space-y-2 text-sm leading-6 text-zinc-300">
+                    <p className="font-bold text-white">
+                      {t("registrationModal.reviewTime")}
+                    </p>
+                    <p>{t("registrationModal.successGuidance")}</p>
+                  </div>
+                  <div
+                    data-registration-match-timing
+                    className="mt-4 border border-amber-300/25 bg-amber-500/10 p-4 text-left"
+                  >
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-200">
+                      {t("registrationModal.matchTimingTitle")}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-zinc-200">
+                      {t("registrationModal.matchTimingDescription")}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-zinc-300">
+                      {t("registrationModal.matchTimingDeadline")}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -4575,10 +4623,9 @@ export function RegisterModal({
           />
         )}
         {step === "submitted" && (
-          <ModalButtons
+          <SubmittedModalButtons
             persistent={isPhonePresentation}
-            onNext={requestClose}
-            nextLabel={t("tournaments.actions.close")}
+            onClose={requestClose}
           />
         )}
       </section>
@@ -4862,6 +4909,48 @@ function ModalButtons({
   );
 }
 
+function SubmittedModalButtons({
+  onClose,
+  persistent = false,
+}: {
+  onClose: () => void;
+  persistent?: boolean;
+}) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
+  return (
+    <footer
+      data-registration-action-footer={persistent ? "persistent" : "standard"}
+      className={classNames(
+        "flex shrink-0 gap-3 border-t border-slate-800",
+        persistent
+          ? "flex-row items-center bg-black/95 px-4 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]"
+          : "mx-5 mb-5 flex-col pt-5 sm:flex-row sm:justify-end"
+      )}
+    >
+      <Link
+        href="/dashboard"
+        className={classNames(
+          "inline-flex min-h-11 items-center justify-center rounded bg-orange-500 px-5 py-3 text-center text-xs font-black uppercase tracking-wide text-white transition hover:bg-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+          persistent ? "min-w-0 flex-1" : "w-full sm:w-auto"
+        )}
+      >
+        {t("registrationModal.openDashboard")}
+      </Link>
+      <button
+        type="button"
+        onClick={onClose}
+        className={classNames(
+          "min-h-11 rounded border border-slate-700 px-5 py-3 text-xs font-black uppercase tracking-wide text-zinc-300 transition hover:border-slate-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+          persistent ? "shrink-0" : "w-full sm:w-auto"
+        )}
+      >
+        {t("tournaments.actions.close")}
+      </button>
+    </footer>
+  );
+}
+
 function MobileCard({
   children,
   className,
@@ -5028,21 +5117,24 @@ function MobileHero({
           ) : registrationState ? (
             <RegistrationStateCard state={registrationState} />
           ) : (
-            <ActionCard
-              label={actionLabel}
-              description={
-                divisionLaunched
-                  ? t("tournaments.hero.divisionInProgress")
-                  : registrationOpen
-                  ? registrationIsWaitlistOnly
-                    ? t("tournaments.hero.waitlistOpen")
-                    : t("tournaments.hero.openEvents")
-                  : t("tournaments.hero.scheduleHint")
-              }
-              icon={registrationOpen ? CheckCircle2 : Clock3}
-              onClick={onRegisterClick}
-              disabled={divisionLaunched}
-            />
+            <>
+              <ActionCard
+                label={actionLabel}
+                description={
+                  divisionLaunched
+                    ? t("tournaments.hero.divisionInProgress")
+                    : registrationOpen
+                      ? registrationIsWaitlistOnly
+                        ? t("tournaments.hero.waitlistOpen")
+                        : t("tournaments.hero.openEvents")
+                      : t("tournaments.hero.scheduleHint")
+                }
+                icon={registrationOpen ? CheckCircle2 : Clock3}
+                onClick={onRegisterClick}
+                disabled={divisionLaunched}
+              />
+              {registrationOpen && <RegistrationGuidanceDisclosure />}
+            </>
           )}
         </div>
       </div>
@@ -5096,14 +5188,14 @@ function MobileTabs({
               onClick={() => setActiveTab(tab.key)}
               className={classNames(
                 spanClass,
-                "flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-center text-[10px] font-black uppercase leading-tight tracking-[0.04em] transition",
+                "flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-center text-[10px] font-black uppercase leading-tight tracking-normal transition",
                 selected
                   ? "border-orange-400/70 bg-orange-500/15 text-white"
                   : "border-white/12 bg-black/45 text-zinc-400 hover:border-orange-400/45 hover:text-white"
               )}
             >
               <Icon size={15} className="shrink-0 text-orange-300" />
-              <span className="min-w-0 max-w-full break-words">
+              <span className="min-w-0 max-w-full break-normal">
                 {t(`tournaments.tabs.${tab.key}`)}
               </span>
             </button>
@@ -5159,10 +5251,6 @@ function MobileOverview({
         </div>
       </MobileCard>
 
-      {tournament.mapPools.length > 0 ? (
-        <TournamentMapPools pools={tournament.mapPools} />
-      ) : null}
-
       <MobileCard>
         <div
           className={classNames(
@@ -5199,6 +5287,10 @@ function MobileOverview({
         </div>
         <div className="mt-5">{renderMobileOverviewPanel(visiblePanel, tournament, t, locale)}</div>
       </MobileCard>
+
+      {tournament.mapPools.length > 0 ? (
+        <TournamentMapPools pools={tournament.mapPools} />
+      ) : null}
 
       <MobileCard>
         <h3 className="text-sm font-black uppercase tracking-wider text-white">
@@ -5281,15 +5373,7 @@ function renderMobileOverviewPanel(
   const shared = "break-words leading-7 text-zinc-300";
 
   if (panel === "rules") {
-    return (
-      <div className="space-y-4">
-        <MobileDetail
-          label={t("tournaments.overview.tournamentRuleFormat")}
-          value={tournament.ruleFormatLabel}
-        />
-        <p className={shared}>{tournament.rules}</p>
-      </div>
-    );
+    return <TournamentRulesEssentials tournament={tournament} />;
   }
 
   if (panel === "prizes") {
@@ -5846,46 +5930,9 @@ function MobileRoundRobinBracket({
 }
 
 function MobileMedia({ tournament }: { tournament: TournamentCard }) {
-  const t = useOptionalTranslations("competition", competitionEnglish);
-  const links = [
-    tournament.rulesUrl
-      ? { label: t("tournaments.resources.officialRules"), url: tournament.rulesUrl }
-      : null,
-  ].filter((link) => link !== null);
-
   return (
     <MobileCard>
-      <h2 className="break-words text-xl font-black text-white">
-        {tournament.title} — {t("tournaments.resources.title")}
-      </h2>
-      {links.length > 0 ? (
-        <div className="mt-5 grid w-full max-w-full min-w-0 gap-4">
-          {links.map((link) => (
-            <a
-              key={link.label}
-              href={link.url}
-              target="_blank"
-              rel="noreferrer"
-              className="group relative aspect-video w-full max-w-full overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:border-orange-400/35"
-              style={{
-                backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${tournament.image})`,
-              }}
-            >
-              <PlayCircle className="text-white opacity-90" />
-              <p className="mt-20 break-words text-sm font-bold text-white">
-                {link.label}
-              </p>
-              <p className="break-words text-xs text-zinc-300">
-                {t("tournaments.resources.open")}
-              </p>
-            </a>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-5 border border-white/12 p-8 text-center text-zinc-500">
-          {t("tournaments.resources.empty")}
-        </p>
-      )}
+      <TournamentMedia tournament={tournament} presentation="mobile" />
     </MobileCard>
   );
 }

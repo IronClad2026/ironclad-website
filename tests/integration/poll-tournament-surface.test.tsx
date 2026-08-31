@@ -110,6 +110,11 @@ describe("Tournament Polls & Decisions surface", () => {
     expect(
       within(navigation).getByRole("button", { name: /Polls & Decisions/i })
     ).toHaveClass("min-h-11", "col-span-1");
+    const announcements = within(navigation).getByRole("button", {
+      name: /Announcements/i,
+    });
+    expect(announcements).toHaveClass("flex-col", "tracking-normal");
+    expect(announcements.querySelector("span")).toHaveClass("break-normal");
   });
 });
 

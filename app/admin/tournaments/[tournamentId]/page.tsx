@@ -1,10 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { loadAdminTournamentMediaWorkspace } from "@/app/admin/tournaments/media-actions";
 import AdminBracketManagement from "@/components/AdminBracketManagement";
 import AdminTournamentMapPools from "@/components/AdminTournamentMapPools";
 import TournamentFormDraft from "@/components/TournamentFormDraft";
 import AdminTournamentMatches from "@/components/admin/tournaments/AdminTournamentMatches";
+import AdminTournamentMedia from "@/components/admin/tournaments/AdminTournamentMedia";
 import AdminTournamentRegistrations from "@/components/admin/tournaments/AdminTournamentRegistrations";
 import TournamentBracketStructureControls from "@/components/admin/tournaments/TournamentBracketStructureControls";
 import TournamentControls from "@/components/admin/tournaments/TournamentControls";
@@ -57,6 +59,7 @@ const VALID_SECTIONS = new Set<TournamentManagementSection>([
   "players-waitlist",
   "bracket",
   "matches",
+  "media",
   "map-pool",
   "controls",
 ]);
@@ -274,6 +277,22 @@ async function renderWorkspaceSection({
         tournament={null}
         viewer={null}
         loadError={matchWorkspace.reason === "load-failed"}
+      />
+    );
+  }
+
+  if (section === "media") {
+    const mediaWorkspace = await loadAdminTournamentMediaWorkspace(
+      tournament.id
+    );
+    return (
+      <AdminTournamentMedia
+        key={tournament.id}
+        tournamentId={tournament.id}
+        tournamentTitle={tournament.title}
+        items={mediaWorkspace?.items ?? []}
+        matchOptions={mediaWorkspace?.matchOptions ?? []}
+        loadFailed={!mediaWorkspace}
       />
     );
   }

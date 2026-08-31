@@ -140,6 +140,31 @@ const dictionary = {
       cohortSummary:
         "{requirement} — gruppo in revisione attiva {active}/{capacity} — {approved} approvati — {waitlisted} in lista d'attesa",
     },
+    rulesSummary: {
+      title: "Regole essenziali del Torneo",
+      description: "Regole fondamentali per ogni giocatore prima e durante la competizione.",
+      formatTitle: "Formato",
+      formatBody: "CoH3 · 1v1 · 8 giocatori per Divisione · Tabelloni indipendenti a eliminazione diretta.",
+      seriesTitle: "Serie",
+      seriesBody: "Quarti di finale: BO3 · Semifinali: BO3 · Gran Finale: BO5.",
+      matchTimingTitle: "Tempistiche dei Match",
+      matchTimingBody: "Ogni singolo Match ha normalmente 7 giorni dalla sua attivazione. I Match successivi si attivano quando entrambi i giocatori sono noti. Fa fede la scadenza esatta mostrata con il Match; vengono inviati promemoria e le estensioni sono eccezionali e non garantite.",
+      schedulingTitle: "Programmazione",
+      schedulingBody: "Effettua un ragionevole primo contatto normalmente entro 24 ore da quando il Match diventa disponibile. Se l’avversario non risponde dopo 48 ore — o prima se la scadenza è a rischio — richiedi Assistenza Admin. Questi tempi non determinano automaticamente una sconfitta a tavolino.",
+      resultsTitle: "Risultati e replay",
+      resultsBody: "Comunica il vincitore della Serie e il punteggio finale tramite IronClad, allegando un replay .rec univoco per ogni Partita disputata.",
+      confirmationTitle: "Conferma e contestazioni",
+      confirmationBody: "L’avversario conferma o contesta entro la scadenza indicata. Le contestazioni e i casi eccezionali passano alla revisione Admin. Solo un risultato ufficiale confermato o approvato fa avanzare il Tabellone.",
+      noShowsTitle: "Mancate presenze",
+      noShowsBody: "Non assegnarti mai autonomamente una vittoria per mancata presenza. Usa il flusso ufficiale per la mancata presenza; l’avversario la conferma o la contesta e un Admin esamina le eccezioni. Una mancata presenza confermata non assegna il premio di partecipazione. Se nessuno dei due giocatori compie uno sforzo ragionevole, IronClad può assegnare una doppia sconfitta a tavolino.",
+      mapsTitle: "Mappe, schieramenti e dadi",
+      mapsBody: "Usa il pool di mappe pubblicato della Divisione. IronClad Dice autenticato stabilisce l’ordine di scelta per le Partite 1, 3 e 5 quando vengono disputate. I giocatori coordinano manualmente le scelte di Mappa e schieramento; nelle Partite 2 e 4 gli schieramenti vengono invertiti e chi ha perso la Partita precedente seleziona una nuova Mappa idonea.",
+      tournamentRulesTitle: "Regole del Torneo",
+      authorityNote: "Questo riepilogo è una guida pratica. Il Regolamento ufficiale del Torneo rimane la fonte autorevole.",
+      openTournamentRules: "Apri le regole del Torneo",
+      readFullRulebook: "Leggi il Regolamento ufficiale completo",
+      opensNewTab: "si apre in una nuova scheda",
+    },
     participants: {
       entries: "Iscritti",
       description:
@@ -217,6 +242,18 @@ const dictionary = {
       open: "Apri la risorsa del torneo",
       empty: "Non sono state pubblicate risorse per il torneo.",
       update: "Aggiornamento IronClad",
+    },
+    media: {
+      title: "Media del torneo",
+      empty: "Non sono stati pubblicati media per il torneo.",
+      watch: "Guarda",
+      opensNewTab: "Si apre in una nuova scheda",
+      types: {
+        fullTournament: "Torneo completo",
+        matchCast: "Trasmissione del match",
+        video: "Video",
+        other: "Altro",
+      },
     },
     workspace: {
       matchCount: "{count} Match",
@@ -359,6 +396,33 @@ const dictionary = {
     withdraw: "Ritira l'iscrizione",
     statedDeadline: "la scadenza indicata",
   },
+  registrationGuidance: {
+    controlLabel: "Come funziona l'iscrizione",
+    title: "Cosa succede dopo l'iscrizione?",
+    adminReviewTitle: "Revisione amministrativa",
+    adminReviewBody:
+      "Esaminiamo la tua iscrizione e il tuo ELO verificato per il Torneo. Il tuo posto non è ancora confermato.",
+    approvalTitle: "Approvazione",
+    approvalBody:
+      "Se approvata, il tuo posto nella Divisione è confermato. Se la Divisione è al completo, l'iscrizione passa alla lista d'attesa FIFO.",
+    divisionReadyTitle: "Divisione pronta",
+    divisionReadyBody:
+      "Servono esattamente 8 giocatori approvati prima che la Divisione possa essere preparata per l'avvio.",
+    launchTitle: "Avvio del Torneo",
+    launchBody:
+      "IronClad prepara il Tabellone, le teste di serie e il pool di mappe, poi un amministratore avvia la Divisione. L'avvio non è automatico.",
+    matchTimingTitle: "Scadenza del Match",
+    matchTimingBody:
+      "Quando il tuo abbinamento diventa attivo, normalmente hai 7 giorni per completarlo.",
+    matchTimingDeadline:
+      "La scadenza esatta è mostrata con il Match e IronClad invia promemoria sulla scadenza.",
+    matchTimingExtension:
+      "Qualsiasi proroga è eccezionale, deve essere concessa da un amministratore e non è garantita.",
+    dashboardGuidance:
+      "Controlla la Dashboard per lo stato dell'iscrizione e le offerte della lista d'attesa.",
+    bracketGuidance:
+      "Dopo l'avvio, apri la scheda Tabelloni del Torneo per vedere il tuo Tabellone, l'avversario e i dettagli del Match.",
+  },
   registrationModal: {
     eyebrow: "Iscrizione IronClad",
     title: "Iscrizione del giocatore esports",
@@ -416,14 +480,27 @@ const dictionary = {
     ownershipConfirmation:
       "Confermo di usare il mio account IronClad e che l'account Steam collegato mi appartiene.",
     submitRegistration: "Invia iscrizione",
-    submittedTitle: "Iscrizione inviata — in attesa di revisione dell'amministrazione",
-    reviewTime:
-      "L'amministrazione del Torneo esaminerà la tua iscrizione. Controlla la Dashboard per gli aggiornamenti sullo stato.",
+    submittedTitle: "Iscrizione inviata",
+    pendingAdminReview: "In attesa di revisione amministrativa",
+    whatHappensNext: "Cosa succede ora?",
+    eightApprovedPlayers: "8 giocatori approvati",
+    divisionLaunch: "Avvio della Divisione",
+    matchTimingTitle: "Tempistiche del Match",
+    reviewTime: "Non devi fare nulla per il momento.",
+    successGuidance:
+      "Controlla la Dashboard per lo stato dell'iscrizione. Ti avviseremo delle decisioni importanti e degli aggiornamenti sui Match. Dopo l'avvio, apri la scheda Tabelloni del Torneo per vedere il tuo Tabellone, l'avversario e i dettagli del Match.",
+    matchTimingDescription:
+      "Quando il tuo abbinamento diventa attivo, normalmente hai 7 giorni per completarlo.",
+    matchTimingDeadline:
+      "La scadenza esatta e i promemoria appariranno con il tuo Match.",
+    openDashboard: "Apri Dashboard",
     waitlistJoinedTitle: "Aggiunto alla lista d'attesa",
     waitlistPositionPending:
       "Conferma della tua posizione in lista d'attesa…",
     waitlistResultDescription:
-      "Il posto non è garantito. La coda segue l'ordine di arrivo. Se si libera un posto, potresti ricevere un'offerta; gestisci le offerte dalla Dashboard.",
+      "Il posto non è garantito. La coda segue l'ordine di arrivo. Se si libera un posto prima dell'avvio, potresti ricevere un'offerta nella Dashboard. Rispondi entro la scadenza indicata. Accettare l'offerta riporta la tua iscrizione alla revisione amministrativa e non ne garantisce l'approvazione.",
+    waitlistNoAction:
+      "Non devi fare nulla a meno che non compaia un'offerta.",
     back: "Indietro",
     cancel: "Annulla",
     continue: "Continua",

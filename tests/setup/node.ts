@@ -1,5 +1,9 @@
-import { afterAll, afterEach } from "vitest";
+import { afterAll, afterEach, vi } from "vitest";
 import { mockServer } from "@/tests/mocks/server";
+
+vi.mock("@/lib/account-legal-mutation-guard", () => ({
+  requireCurrentAccountLegalAcceptance: async () => undefined,
+}));
 
 const TEST_SUPABASE_URL = "http://127.0.0.1:54321";
 const TEST_CLERK_PUBLISHABLE_KEY = "pk_test_Y2xlcmsudGVzdCQ=";

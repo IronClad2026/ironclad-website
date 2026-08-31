@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   updateEloVerificationSetting,
   updateEloVerificationSupportLinkSetting,
@@ -27,6 +28,8 @@ export async function updateEloVerificationMode(formData: FormData) {
     throw new Error("Unauthorized");
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const mode = String(formData.get("mode") ?? "");
 
   if (mode !== "enabled" && mode !== "disabled") {
@@ -51,6 +54,8 @@ export async function updateEloVerificationSupportLink(
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const supportUrl = String(formData.get("supportUrl") ?? "");
   const result = await updateEloVerificationSupportLinkSetting({

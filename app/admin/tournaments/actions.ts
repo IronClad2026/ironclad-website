@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { notifyPlayersOfTournamentTerminalTransition } from "@/lib/notification-events";
 import {
@@ -86,6 +87,8 @@ export async function createTournamentBannerUpload(input: {
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const extension = getTournamentBannerExtension(input);
   if (!extension) {
@@ -199,6 +202,8 @@ export async function saveTournament(
       error: "Administrator permission is required to save tournaments.",
     };
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const tournamentId = getOptionalText(formData, "tournamentId");
   const title = getText(formData, "title");
@@ -453,6 +458,8 @@ export async function generateTournamentBracket(formData: FormData) {
     throw new Error("Unauthorized");
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const tournamentId = getText(formData, "tournamentId");
   const bracketId = getText(formData, "bracketId");
   const returnSection =
@@ -511,6 +518,8 @@ export async function saveBracketAssignments(formData: FormData) {
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const tournamentId = getText(formData, "tournamentId");
   const generatedBracketId = getText(formData, "generatedBracketId");
@@ -612,6 +621,8 @@ export async function launchTournamentDivision(formData: FormData) {
     throw new Error("Unauthorized");
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const tournamentBracketId = getText(formData, "tournamentBracketId");
 
   if (!isUuid(tournamentBracketId)) {
@@ -677,6 +688,8 @@ async function mutateTournamentTerminalState(
   if (!userId || role !== "admin") {
     return terminalErrorState("Administrator access is required.");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const tournamentId = getText(formData, "tournamentId");
   const reason = getText(formData, "reason");
@@ -757,6 +770,8 @@ export async function deleteTournament(formData: FormData) {
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const tournamentId = getText(formData, "tournamentId");
   const confirmation = getText(formData, "confirmation");

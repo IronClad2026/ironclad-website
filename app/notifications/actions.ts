@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   deleteNotifications,
   loadUnreadNotificationCount,
@@ -89,6 +90,8 @@ export async function saveWebPushSubscription(
   if (!identity) {
     return { ok: false, code: "authentication_required" };
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const subscription = parseWebPushSubscription(input);
   if (!subscription) {
@@ -229,6 +232,8 @@ export async function markInAppNotificationRead(
     return unavailableResult();
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const notificationId = String(formData.get("notificationId") ?? "");
 
   if (!notificationId) {
@@ -258,6 +263,8 @@ export async function markVisibleInAppNotificationsRead(
     return unavailableResult();
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const notificationIds = formData
     .getAll("notificationId")
     .map((value) => String(value))
@@ -286,6 +293,8 @@ export async function markAllInAppNotificationsRead(
     return unavailableResult();
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const updated = await markAllNotificationsRead({
     scope,
     clerkUserId: scope === "player" ? userId : null,
@@ -306,6 +315,10 @@ export async function deleteSelectedInAppNotifications(
 
   if (scope === "admin" && !isAdmin(sessionClaims as CustomClaims | null)) {
     return unavailableResult();
+  }
+
+  if (scope === "admin") {
+    await requireCurrentAccountLegalAcceptance();
   }
 
   const notificationIds = formData

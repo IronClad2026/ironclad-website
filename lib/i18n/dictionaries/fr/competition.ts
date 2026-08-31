@@ -23,9 +23,35 @@ const dictionary = {
       registeredTitle: "Inscription validée — {tournament}", registeredDescription: "Vous êtes inscrit à {tournament}.", spotAvailableTitle: "Place disponible — {tournament}", waitlistedTitle: "Sur liste d’attente — {tournament}", waitlistedDescription: "Vous êtes actuellement sur la liste d’attente de {tournament}.", statusDetail: "État de l’inscription : {status}", bracketDetail: "Tableau : {bracket}", dateDetail: "Date d’inscription : {date}", waitlistPosition: "Position sur la liste d’attente : #{position}", statuses: { approved: "Approuvée", waitlisted: "Sur liste d’attente", rejected: "Non approuvée", withdrawn: "Retirée", manualReview: "Examen manuel", pending: "En attente d’examen" },
     },
     overview: { title: "Tournois Company of Heroes 3 d'IronClad", published: "Tournois publiés", archive: "Archives des tournois", archiveDescription: "Battlefy reste la référence historique des événements organisés avant le lancement de la nouvelle plateforme IronClad.", tournamentRuleFormat: "Format des règles du tournoi", prizes: "Prix", event: "Événement", format: "Format", ruleFormat: "Format des règles", registrationStatus: "État des inscriptions", registrationOpens: "Ouverture des inscriptions", registrationOpenStatus: "Lorsque l’état est « Ouvert »", registrationCloses: "Clôture des inscriptions", registrationCloseAdmin: "Jusqu'à la clôture par un administrateur", grandFinal: "Grande finale", grandFinalTba: "Grande finale à confirmer", prizePool: "Dotation", approvedParticipants: "Participants approuvés", cohortSummary: "{requirement} — groupe d’examen actif {active}/{capacity} — {approved} approuvés — {waitlisted} en attente" },
+    rulesSummary: {
+      title: "L’essentiel du tournoi",
+      description: "Les règles essentielles que chaque joueur doit connaître avant et pendant la compétition.",
+      formatTitle: "Format",
+      formatBody: "CoH3 · 1v1 · 8 joueurs par division · Tableaux indépendants à élimination directe.",
+      seriesTitle: "Séries",
+      seriesBody: "Quarts de finale : BO3 · Demi-finales : BO3 · Grande finale : BO5.",
+      matchTimingTitle: "Délais des matchs",
+      matchTimingBody: "Chaque match dispose normalement de 7 jours à compter de son activation. Les matchs suivants s’activent lorsque les deux joueurs sont connus. L’échéance exacte affichée avec le match fait foi ; des rappels s’appliquent et les prolongations restent exceptionnelles et ne sont pas garanties.",
+      schedulingTitle: "Planification",
+      schedulingBody: "Prenez raisonnablement un premier contact dans les 24 heures suivant la mise à disposition du match. Si votre adversaire n’a pas répondu après 48 heures — ou plus tôt si l’échéance risque d’être dépassée — demandez l’Assistance de l’administration. Ces délais n’entraînent pas automatiquement un forfait.",
+      resultsTitle: "Résultats et replays",
+      resultsBody: "Signalez le vainqueur de la série et le score final via IronClad, avec un replay .rec unique pour chaque manche jouée.",
+      confirmationTitle: "Confirmation et contestations",
+      confirmationBody: "Votre adversaire confirme ou conteste le résultat avant l’échéance affichée. Les contestations et les cas exceptionnels sont examinés par l’administration. Seul un résultat officiel confirmé ou approuvé permet d’avancer dans le tableau.",
+      noShowsTitle: "Absences",
+      noShowsBody: "Ne vous attribuez jamais vous-même une victoire pour absence. Utilisez la procédure officielle d’absence ; votre adversaire la confirme ou la conteste, et un administrateur examine les exceptions. Une absence confirmée ne donne droit à aucune récompense de participation. Si aucun joueur ne fait d’effort raisonnable, IronClad peut prononcer un double forfait.",
+      mapsTitle: "Cartes, camps et dés",
+      mapsBody: "Utilisez le pool de cartes publié de la division. IronClad Dice authentifié détermine l’ordre des choix pour les manches 1, 3 et 5 lorsqu’elles sont jouées. Les joueurs coordonnent manuellement les choix de carte et de camp ; les camps sont inversés pour les manches 2 et 4, et le perdant de la manche précédente sélectionne une nouvelle carte éligible.",
+      tournamentRulesTitle: "Règles du tournoi",
+      authorityNote: "Ce résumé est un guide pratique. Le Règlement officiel du tournoi reste la référence faisant autorité.",
+      openTournamentRules: "Ouvrir les règles du tournoi",
+      readFullRulebook: "Lire le Règlement officiel complet",
+      opensNewTab: "s’ouvre dans un nouvel onglet",
+    },
     participants: { entries: "Inscrits", description: "Participants approuvés répartis selon le tableau auquel leur ELO donne accès.", search: "Rechercher des inscrits", player: "Joueur", country: "Pays", elo: "ELO", status: "État", approved: "Approuvé", title: "Inscrits à {tournament}", bracketTitle: "Participants — {bracket}", approvedCount: "{count} approuvés", empty: "Aucun participant approuvé dans ce tableau." },
     brackets: { title: "Tableaux", generated: "Généré", awaitingGeneration: "En attente de génération", empty: "La structure du tableau sera générée automatiquement lorsque ce tableau comptera au moins deux participants approuvés.", standings: "Classement", participant: "Participant", win: "V", loss: "D", points: "pts", standingsEmpty: "Le classement apparaîtra après l'assignation des joueurs par les administrateurs et l'enregistrement des résultats.", matchResults: "Résultats du match", closeMatchWorkspace: "Fermer l'espace de résultats du match", matchHistory: "Historique des matchs du tournoi", matchWorkspace: "Espace du match", matchWorkspaceDescription: "Consultez le Dice Roll-Off autorisé, le score et l'historique des replays de ce match.", matchWorkspacePlayer: "Terminez le Dice Roll-Off privé, puis utilisez les contrôles de résultat de série et de replay ci-dessous.", matchWorkspaceRoundRobin: "Utilisez les contrôles de résultat de série et de replay ci-dessous. Dice Roll-Off est indisponible pour les matchs au format toutes rondes.", signInWorkspace: "Connectez-vous pour ouvrir cet espace privé du match.", active: "Actif", openMatch: "Ouvrir le match", matchLabel: "Match {id}", singleElimination: "Élimination directe", roundRobin: "Toutes rondes", deadlineDoubleForfeit: "Échéance dépassée — double forfait", automaticBye: "Qualification automatique", emptyFeeder: "Aucun joueur éligible n’avance", deadlinePaused: "Échéance suspendue par un administrateur", reviewPaused: "Résultat ou décision en cours d’examen — l’application du délai est suspendue", deadlinePassed: "Échéance dépassée — décision officielle en attente", waitingOpponent: "En attente de l’adversaire — votre échéance n’a pas commencé", deadlinePrefix: "Échéance : {date}", finalDoubleForfeit: "Double forfait en finale — la division se termine sans champion", semifinalDoubleForfeit: "Double forfait en demi-finale — aucun joueur n’avance à l’issue de ce match", quarterfinalDoubleForfeit: "Double forfait en quart de finale — aucun joueur n’avance à l’issue de ce match qualificatif", finalWalkover: "Forfait en finale — le champion avance sans match joué", semifinalBye: "Qualification automatique en demi-finale — le seul joueur éligible avance en finale", automaticByeDetail: "Qualification automatique — le seul joueur éligible avance sans match joué", finalClosed: "Finale close — la division se termine sans champion", semifinalClosed: "Demi-finale close — aucun joueur éligible n’avance", matchClosed: "Match clos — aucun joueur éligible n’avance" },
     resources: { officialRules: "Règles officielles", title: "Ressources", open: "Ouvrir la ressource du tournoi", empty: "Aucune ressource de tournoi n'a été publiée.", update: "Actualité IronClad" },
+    media: { title: "Médias du tournoi", empty: "Aucun média de tournoi n’a été publié.", watch: "Regarder", opensNewTab: "S’ouvre dans un nouvel onglet", types: { fullTournament: "Tournoi complet", matchCast: "Diffusion du match", video: "Vidéo", other: "Autre" } },
     workspace: { matchCount: "{count} match", matchCountPlural: "{count} matchs", pendingCount: "{count} examen en attente", pendingCountPlural: "{count} examens en attente", matchup: "{round} — match {number}", versus: "contre", tbd: "À déterminer" },
     gatePrompt: {
       accountEyebrow: "Compte IronClad requis", accountTitle: "Avez-vous déjà un compte IronClad ?", accountDescription: "Connectez-vous pour continuer, ou créez un compte et complétez votre profil avant de vous inscrire.",
@@ -103,6 +129,33 @@ const dictionary = {
     withdraw: "Retirer l'inscription",
     statedDeadline: "la date limite indiquée",
   },
+  registrationGuidance: {
+    controlLabel: "Comment fonctionne l’inscription",
+    title: "Que se passe-t-il après votre inscription ?",
+    adminReviewTitle: "Examen administratif",
+    adminReviewBody:
+      "Nous examinons votre inscription et votre ELO de tournoi vérifié. Votre place n’est pas encore confirmée.",
+    approvalTitle: "Validation",
+    approvalBody:
+      "Si votre inscription est validée, votre place dans la Division est confirmée. Si votre Division est complète, l’inscription passe par la liste d’attente selon l’ordre d’arrivée.",
+    divisionReadyTitle: "Division prête",
+    divisionReadyBody:
+      "Il faut exactement 8 joueurs approuvés avant de pouvoir préparer la Division pour son lancement.",
+    launchTitle: "Lancement du tournoi",
+    launchBody:
+      "IronClad prépare le tableau, le placement des têtes de série et la sélection de cartes, puis un administrateur lance la Division. Le lancement n’est pas automatique.",
+    matchTimingTitle: "Délai du match",
+    matchTimingBody:
+      "Une fois votre confrontation active, vous disposez normalement de 7 jours pour la terminer.",
+    matchTimingDeadline:
+      "La date limite exacte est affichée avec le Match et IronClad envoie des rappels.",
+    matchTimingExtension:
+      "Toute prolongation est exceptionnelle, doit être accordée par un administrateur et n’est pas garantie.",
+    dashboardGuidance:
+      "Consultez votre tableau de bord pour suivre le statut de votre inscription et les offres de la liste d’attente.",
+    bracketGuidance:
+      "Après le lancement, ouvrez l’onglet Tableaux du tournoi pour voir votre tableau, votre adversaire et les détails du Match.",
+  },
   registrationModal: {
     eyebrow: "Inscription IronClad",
     title: "Inscription du joueur esport",
@@ -159,14 +212,27 @@ const dictionary = {
     ownershipConfirmation:
       "Je confirme utiliser mon propre compte IronClad et être propriétaire du compte Steam associé.",
     submitRegistration: "Envoyer l’inscription",
-    submittedTitle: "Inscription envoyée — en attente de validation administrative",
-    reviewTime:
-      "L’administration du tournoi examinera votre inscription. Consultez votre tableau de bord pour suivre son statut.",
+    submittedTitle: "Inscription envoyée",
+    pendingAdminReview: "En attente d’examen administratif",
+    whatHappensNext: "Que se passe-t-il ensuite ?",
+    eightApprovedPlayers: "8 joueurs approuvés",
+    divisionLaunch: "Lancement de la Division",
+    matchTimingTitle: "Délai du Match",
+    reviewTime: "Vous n’avez rien à faire pour le moment.",
+    successGuidance:
+      "Consultez votre tableau de bord pour suivre le statut de votre inscription. Nous vous informerons des décisions importantes et des actualités de vos Matchs. Après le lancement, ouvrez l’onglet Tableaux du tournoi pour voir votre tableau, votre adversaire et les détails du Match.",
+    matchTimingDescription:
+      "Une fois votre confrontation active, vous disposez normalement de 7 jours pour la terminer.",
+    matchTimingDeadline:
+      "La date limite exacte et les rappels apparaîtront avec votre Match.",
+    openDashboard: "Ouvrir le tableau de bord",
     waitlistJoinedTitle: "Ajout à la liste d’attente confirmé",
     waitlistPositionPending:
       "Confirmation de votre position sur la liste d’attente…",
     waitlistResultDescription:
-      "Une place n’est pas garantie. La file suit l’ordre d’arrivée. Si une place se libère, vous pourrez recevoir une offre ; gérez les offres depuis votre tableau de bord.",
+      "Une place n’est pas garantie. La file suit l’ordre d’arrivée. Si une place se libère avant le lancement, vous pourrez recevoir une offre dans votre tableau de bord. Répondez avant la date limite affichée. Accepter l’offre renvoie votre inscription à l’examen administratif et ne garantit pas sa validation.",
+    waitlistNoAction:
+      "Vous n’avez rien à faire, sauf si une offre apparaît.",
     back: "Retour",
     cancel: "Annuler",
     continue: "Continuer",

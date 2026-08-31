@@ -15,6 +15,7 @@ import {
   parseAnnouncementMediaPath,
   type AnnouncementMediaMimeType,
 } from "@/lib/announcement-contract";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type CustomClaims = {
@@ -57,6 +58,7 @@ export async function createAnnouncementMediaUpload(input: {
   size: number;
 }): Promise<AnnouncementMediaUploadAuthorization> {
   await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
 
   const extension = getAnnouncementMediaExtension(input);
   if (!extension) throw new Error(invalidMediaMessage);
@@ -118,6 +120,7 @@ export async function publishAnnouncement(
   input: AnnouncementPublishInput
 ): Promise<AnnouncementPublishResult> {
   const { userId } = await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const parsed = parsePublishInput(input);
   if (!parsed.ok) return { ok: false, message: parsed.message };
 
@@ -201,6 +204,7 @@ export async function withdrawAnnouncement(
   announcementId: string
 ): Promise<AnnouncementWithdrawResult> {
   const { userId } = await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   if (!isUuid(announcementId)) {
     return { ok: false, message: "The announcement could not be withdrawn." };
   }

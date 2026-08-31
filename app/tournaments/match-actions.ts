@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   createInAppNotification,
   createInAppNotifications,
@@ -95,6 +96,8 @@ export async function prepareMatchReplayUploads(
     };
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const supabase = createSupabaseAdminClient();
 
   try {
@@ -130,6 +133,8 @@ export async function finalizeMatchResult(
   if (!userId) {
     return errorState("Sign in before submitting a match result.", "auth_required");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const supabase = createSupabaseAdminClient();
   let committed: Awaited<
@@ -270,6 +275,8 @@ export async function submitNoShowReport(
     return errorState("Sign in before reporting a no-show.", "auth_required");
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const matchId = getText(formData, "matchId");
   const noShowRegistrationId = getText(formData, "noShowRegistrationId");
   const notes = getText(formData, "noShowNotes");
@@ -388,6 +395,8 @@ export async function confirmMatchResultReportGroup(
     return errorState("Sign in before confirming a match result.", "auth_required");
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const reportGroupId = getText(formData, "reportGroupId");
   if (!reportGroupId) {
     return errorState("The match result confirmation could not be found.", "report_unavailable");
@@ -423,6 +432,8 @@ export async function disputeMatchResultReportGroup(
   if (!userId) {
     return errorState("Sign in before disputing a match result.", "auth_required");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const reportGroupId = getText(formData, "reportGroupId");
   const disputeNotes = getText(formData, "disputeNotes");
@@ -466,6 +477,8 @@ export async function reviewMatchResultReportGroup(
   if (!admin) {
     return errorState("Administrator access is required.");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const reportGroupId = getText(formData, "reportGroupId");
   const decision = getText(formData, "decision");
@@ -526,6 +539,8 @@ export async function saveAdminMatchResult(
   if (!admin) {
     return errorState("Administrator access is required.");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const matchId = getText(formData, "matchId");
   const winnerRegistrationId = getText(formData, "winnerRegistrationId");
@@ -639,6 +654,8 @@ export async function resetAdminMatch(
     return errorState("Administrator access is required.");
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const matchId = getText(formData, "matchId");
   const confirmation = getText(formData, "confirmation");
 
@@ -679,6 +696,8 @@ export async function reviewMatchResult(
   if (!admin) {
     return errorState("Administrator access is required.");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const submissionId = getText(formData, "submissionId");
   const decision = getText(formData, "decision");

@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export type PlayerRegistrationActionState = {
@@ -102,6 +103,10 @@ export async function respondToWaitlistOfferAction(
 
   if (response !== "accept" && response !== "decline") {
     return errorState("Choose Accept or Decline for this waitlist offer.", "invalid_registration");
+  }
+
+  if (response === "accept") {
+    await requireCurrentAccountLegalAcceptance();
   }
 
   const supabase = await createAuthenticatedSupabaseClient();

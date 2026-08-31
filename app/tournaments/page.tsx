@@ -7,6 +7,12 @@ import { loadMatchResultData } from "@/lib/match-result-data";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
 import {
+  mapTournamentMediaAdminItem,
+  parseTournamentMediaDatabaseRow,
+  sortTournamentMediaNewestFirst,
+  type TournamentMediaItem,
+} from "@/lib/tournament-media";
+import {
   groupPublicTournamentMapPoolEntries,
   projectPublishedTournamentMapPools,
   type PublicTournamentMapPoolEntryDatabaseRow,
@@ -178,9 +184,9 @@ export default async function TournamentsPage({
       .filter((bracket) => bracket.map_pool_published_at !== null)
       .map((bracket) => bracket.id)
   );
-  const mapPoolEntryResult =
+  const [mapPoolEntryResult, tournamentMediaResult] = await Promise.all([
     publishedMapPoolBracketIds.length > 0
-      ? await supabase
+      ? supabase
           .from("tournament_bracket_map_pool_entries")
           .select(
             "tournament_bracket_id, added_at, removed_at, coh3_maps(id, slug, display_name, source_type, creator_name, game_mode, status, thumbnail_path, source_reference, created_at, updated_at)"
@@ -188,7 +194,22 @@ export default async function TournamentsPage({
           .in("tournament_bracket_id", publishedMapPoolBracketIds)
           .is("removed_at", null)
           .order("added_at", { ascending: true })
-      : { data: [], error: null };
+      : Promise.resolve({ data: [], error: null }),
+    tournamentRows.length > 0
+      ? supabase
+          .from("tournament_media")
+          .select(
+            "id, tournament_id, title, url, media_type, description, match_id, published, created_at, updated_at"
+          )
+          .in(
+            "tournament_id",
+            tournamentRows.map((tournament) => tournament.id)
+          )
+          .eq("published", true)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
   if (mapPoolEntryResult.error) {
     console.error("Published tournament map pools failed to load.");
@@ -198,6 +219,49 @@ export default async function TournamentsPage({
   if (!Array.isArray(mapPoolEntryResult.data)) {
     console.error("Published tournament map pools returned an invalid response.");
     throw new Error("Tournament data could not be loaded.");
+  }
+
+  if (tournamentMediaResult.error) {
+    console.error("Published tournament media failed to load.");
+    throw new Error("Tournament data could not be loaded.");
+  }
+
+  if (!Array.isArray(tournamentMediaResult.data)) {
+    console.error("Published tournament media returned an invalid response.");
+    throw new Error("Tournament data could not be loaded.");
+  }
+
+  const parsedTournamentMedia = [];
+
+  for (const row of tournamentMediaResult.data) {
+    const parsed = parseTournamentMediaDatabaseRow(row);
+
+    if (!parsed) {
+      console.error("Published tournament media contained an invalid row.");
+      throw new Error("Tournament data could not be loaded.");
+    }
+
+    parsedTournamentMedia.push(parsed);
+  }
+
+  const mediaByTournament = new Map<string, TournamentMediaItem[]>();
+
+  for (const media of sortTournamentMediaNewestFirst(
+    parsedTournamentMedia.map(mapTournamentMediaAdminItem)
+  )) {
+    if (!media.published || !includedTournamentIds.has(media.tournamentId)) {
+      continue;
+    }
+
+    const items = mediaByTournament.get(media.tournamentId) ?? [];
+    items.push({
+      id: media.id,
+      title: media.title,
+      url: media.url,
+      mediaType: media.mediaType,
+      description: media.description,
+    });
+    mediaByTournament.set(media.tournamentId, items);
   }
 
   const mapPoolEntriesByBracket = groupPublicTournamentMapPoolEntries(
@@ -422,6 +486,7 @@ export default async function TournamentsPage({
     tournament.bracketParticipants =
       bracketParticipantsByTournament.get(row.id) ?? [];
     tournament.generatedBrackets = generatedByTournament.get(row.id) ?? [];
+    tournament.media = mediaByTournament.get(row.id) ?? [];
     tournament.mapPools = projectPublishedTournamentMapPools(
       (row.tournament_brackets ?? []).map((bracket) => ({
         id: bracket.id,

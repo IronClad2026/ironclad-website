@@ -372,6 +372,76 @@ describe("Relic verified-division registration UI", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders only eligible Tournaments in desktop selection and preserves mobile filtering", () => {
+    const completedTournament: TournamentCard = {
+      ...alternateTournament,
+      id: "11111111-1111-4111-8111-111111111113",
+      slug: "completed-tournament",
+      title: "Completed Historical Tournament",
+      status: "Completed",
+      statusValue: "completed",
+      registrationEnabled: false,
+    };
+    const closedTournament: TournamentCard = {
+      ...alternateTournament,
+      id: "11111111-1111-4111-8111-111111111114",
+      slug: "closed-tournament",
+      title: "Closed Registration Tournament",
+      registrationEnabled: false,
+    };
+    const voidedTournament: TournamentCard = {
+      ...alternateTournament,
+      id: "11111111-1111-4111-8111-111111111115",
+      slug: "voided-tournament",
+      title: "Voided Tournament",
+      status: "Voided",
+      statusValue: "voided",
+      registrationEnabled: false,
+    };
+    const availableTournaments = [
+      tournament,
+      alternateTournament,
+      completedTournament,
+      closedTournament,
+      voidedTournament,
+    ];
+
+    const desktopView = renderModal("Challenge", tournament, {
+      availableTournaments,
+    });
+
+    expect(screen.getAllByText("Safe Tournament").length).toBeGreaterThan(0);
+    expect(screen.getByText("Alternate Safe Tournament")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Completed Historical Tournament")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Closed Registration Tournament")
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Voided Tournament")).not.toBeInTheDocument();
+
+    desktopView.unmount();
+
+    renderModal("Challenge", tournament, {
+      availableTournaments,
+      presentation: "phone",
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: competitionEnglish.registrationModal.changeTournament,
+      })
+    );
+
+    expect(screen.getByText("Alternate Safe Tournament")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Completed Historical Tournament")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Closed Registration Tournament")
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Voided Tournament")).not.toBeInTheDocument();
+  });
+
   it("shows open registration for an unlaunched division in a partially launched Tournament", () => {
     const partiallyLaunched: TournamentCard = {
       ...tournament,
@@ -843,8 +913,73 @@ describe("Relic verified-division registration UI", () => {
       })
     ).toBeInTheDocument();
     expect(
+      within(outcome).getByText(
+        competitionEnglish.registrationModal.pendingAdminReview
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(outcome).getByRole("heading", {
+        name: competitionEnglish.registrationModal.whatHappensNext,
+      })
+    ).toBeInTheDocument();
+    const stages = outcome.querySelector(
+      "[data-registration-success-stages]"
+    );
+    expect(stages).not.toBeNull();
+    for (const label of [
+      competitionEnglish.registrationGuidance.adminReviewTitle,
+      competitionEnglish.registrationGuidance.approvalTitle,
+      competitionEnglish.registrationModal.eightApprovedPlayers,
+      competitionEnglish.registrationModal.divisionLaunch,
+    ]) {
+      expect(within(stages as HTMLElement).getByText(label)).toBeInTheDocument();
+    }
+    expect(
       within(outcome).getByText(competitionEnglish.registrationModal.reviewTime)
     ).toBeInTheDocument();
+    expect(
+      within(outcome).getByText(
+        competitionEnglish.registrationModal.successGuidance
+      )
+    ).toBeInTheDocument();
+    const matchTiming = outcome.querySelector(
+      "[data-registration-match-timing]"
+    );
+    expect(matchTiming).not.toBeNull();
+    expect(matchTiming).toHaveTextContent(
+      competitionEnglish.registrationModal.matchTimingTitle
+    );
+    expect(matchTiming).toHaveTextContent(/matchup becomes active/i);
+    expect(matchTiming).toHaveTextContent(/7 days/i);
+    expect(matchTiming).not.toHaveTextContent(/9 days/i);
+    expect(matchTiming).not.toHaveTextContent(/extension/i);
+    expect(
+      screen.getByRole("link", {
+        name: competitionEnglish.registrationModal.openDashboard,
+      })
+    ).toHaveAttribute("href", "/dashboard");
+    expect(
+      screen.getByRole("button", {
+        name: competitionEnglish.tournaments.actions.close,
+      })
+    ).toBeInTheDocument();
+    const submittedFooter = document.querySelector(
+      '[data-registration-action-footer="persistent"]'
+    );
+    expect(submittedFooter).toHaveClass(
+      "shrink-0",
+      "[padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]"
+    );
+    expect(
+      within(submittedFooter as HTMLElement).getByRole("link", {
+        name: competitionEnglish.registrationModal.openDashboard,
+      })
+    ).toHaveClass("min-h-11");
+    expect(
+      within(submittedFooter as HTMLElement).getByRole("button", {
+        name: competitionEnglish.tournaments.actions.close,
+      })
+    ).toHaveClass("min-h-11");
     expect(within(outcome).queryByText(/24\s*hours/i)).not.toBeInTheDocument();
     expect(
       within(outcome).queryByText(
@@ -935,12 +1070,39 @@ describe("Relic verified-division registration UI", () => {
     expect(outcome).toHaveTextContent(/not guaranteed/i);
     expect(outcome).toHaveTextContent(/first-in, first-out/i);
     expect(outcome).toHaveTextContent(/Dashboard/i);
+    expect(outcome).toHaveTextContent(/returns your Registration to Admin Review/i);
+    expect(outcome).toHaveTextContent(/does not guarantee approval/i);
+    expect(outcome).not.toHaveTextContent(/7 days/i);
+    expect(outcome).not.toHaveTextContent(/matchup becomes active/i);
     expect(
       within(outcome).queryByText(competitionEnglish.registrationModal.reviewTime)
     ).not.toBeInTheDocument();
     expect(
       within(outcome).queryByText(competitionEnglish.registrationModal.submittedTitle)
     ).not.toBeInTheDocument();
+    expect(
+      within(outcome).queryByText(
+        competitionEnglish.registrationModal.whatHappensNext
+      )
+    ).not.toBeInTheDocument();
+    expect(
+      outcome.querySelector("[data-registration-match-timing]")
+    ).toBeNull();
+    expect(
+      within(outcome).getByText(
+        competitionEnglish.registrationModal.waitlistNoAction
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: competitionEnglish.registrationModal.openDashboard,
+      })
+    ).toHaveAttribute("href", "/dashboard");
+    expect(
+      screen.getByRole("button", {
+        name: competitionEnglish.tournaments.actions.close,
+      })
+    ).toBeInTheDocument();
   });
 
   it("uses the refreshed authoritative waitlist position when the action omits it", async () => {
@@ -1040,5 +1202,20 @@ describe("Relic verified-division registration UI", () => {
     expect(source).not.toContain("current_elo");
     expect(source.toLowerCase()).not.toContain("coh3stats");
     expect(source).not.toContain("coh3_player_card_url");
+  });
+
+  it("keeps Registration guidance beside both actionable Hero cards", () => {
+    const source = readFileSync(
+      path.join(process.cwd(), "components/TournamentsExperience.tsx"),
+      "utf8"
+    );
+    const siblingPlacements = source.match(
+      /<ActionCard[\s\S]*?\/>\s*\{registrationOpen && <RegistrationGuidanceDisclosure \/>\}/g
+    );
+
+    expect(siblingPlacements).toHaveLength(2);
+    expect(source).toContain(
+      'import RegistrationGuidanceDisclosure from "@/components/RegistrationGuidanceDisclosure";'
+    );
   });
 });

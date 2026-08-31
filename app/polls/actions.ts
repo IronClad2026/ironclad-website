@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   isSubmitPollVoteInput,
   parsePollVoteResult,
@@ -39,6 +40,8 @@ export async function castPollBallot(
   if (!userId) {
     return { ok: false, error: "Sign in before voting in this Poll.", code: "auth_required" };
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   if (!isSubmitPollVoteInput(input)) {
     return { ok: false, error: "The Poll ballot request is invalid.", code: "invalid_request" };
