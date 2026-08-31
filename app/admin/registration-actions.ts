@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   createInAppNotification,
   type NotificationCreateInput,
@@ -269,6 +270,8 @@ export async function updateRegistrationStatus(formData: FormData) {
     throw new Error("Unauthorized");
   }
 
+  await requireCurrentAccountLegalAcceptance();
+
   const workspaceContext = getWorkspaceRedirectContext(formData);
   const registrationId = String(formData.get("registrationId") || "");
   const nextStatus = String(
@@ -464,6 +467,8 @@ export async function deleteSelectedRegistrations(formData: FormData) {
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const workspaceContext = getWorkspaceRedirectContext(formData);
   const activeFilter = getSafeFilter(
@@ -669,6 +674,8 @@ export async function approveSelectedRegistrations(formData: FormData) {
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const workspaceContext = getWorkspaceRedirectContext(formData);
   const activeFilter = getSafeFilter(

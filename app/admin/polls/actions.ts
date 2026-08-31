@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   isUuid,
   POLL_LIMITS,
@@ -46,6 +47,7 @@ export async function loadAdminPollSnapshot(
 
 export async function savePollDraft(formData: FormData) {
   const { userId } = await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const candidate = pollDraftFromFormData(formData);
   const parsed = parsePollDraftInput(candidate);
 
@@ -96,6 +98,7 @@ export async function savePollDraft(formData: FormData) {
 
 export async function deletePollDraft(formData: FormData) {
   const { userId } = await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const pollId = readText(formData, "pollId");
 
   if (!isUuid(pollId)) {
@@ -146,6 +149,7 @@ export async function previewPollEligibility(formData: FormData) {
 
 export async function publishPoll(formData: FormData) {
   const { userId } = await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const pollId = readText(formData, "pollId");
 
   if (!isUuid(pollId)) {
@@ -177,6 +181,7 @@ export async function publishPoll(formData: FormData) {
 
 export async function cancelPoll(formData: FormData) {
   const { userId } = await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const pollId = readText(formData, "pollId");
   const reason = readText(formData, "reason");
 
@@ -206,6 +211,7 @@ export async function cancelPoll(formData: FormData) {
 
 export async function publishPollFinalDecision(formData: FormData) {
   const { userId } = await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const pollId = readText(formData, "pollId");
   const optionIds = readDistinctUuids(formData, "optionIds");
   const rationale = readOptionalText(formData, "rationale");

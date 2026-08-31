@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export type PublicProfileVisibilityActionResult = {
@@ -39,6 +40,10 @@ export async function updatePublicProfileEnabled(
       message: "Public profile visibility must be enabled or disabled.",
       enabled: false,
     };
+  }
+
+  if (enabled) {
+    await requireCurrentAccountLegalAcceptance();
   }
 
   const supabase = await createAuthenticatedSupabaseClient();
