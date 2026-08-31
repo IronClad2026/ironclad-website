@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import type { IronCladDivision } from "@/lib/elo-verification/divisions";
 import {
   getRelic1v1Elo,
@@ -102,6 +103,8 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
   if (!userId) {
     return errorResult("Sign in before verifying your ELO.", "auth-required");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   let supabase: ReturnType<typeof createSupabaseAdminClient>;
 

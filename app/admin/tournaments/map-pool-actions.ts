@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type CustomClaims = {
@@ -25,6 +26,8 @@ export async function publishTournamentMapPools(formData: FormData) {
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const tournamentId = readText(formData, "tournamentId");
   const bracketIds = readDistinctUuids(formData, "bracketIds");
@@ -66,6 +69,8 @@ export async function correctTournamentMapPool(formData: FormData) {
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const tournamentId = readText(formData, "tournamentId");
   const bracketId = readText(formData, "bracketId");

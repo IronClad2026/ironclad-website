@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { parseCoh3MapInput } from "@/lib/coh3-maps";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -17,6 +18,8 @@ export async function saveCoh3Map(formData: FormData) {
   if (!userId || role !== "admin") {
     throw new Error("Unauthorized");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   const mapId = optionalText(formData, "mapId");
   if (mapId && !isUuid(mapId)) {

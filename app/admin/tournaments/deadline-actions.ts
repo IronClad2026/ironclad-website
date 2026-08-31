@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type CustomClaims = {
@@ -21,6 +22,7 @@ export async function extendTournamentMatchDeadline(
 ): Promise<MatchDeadlineActionState> {
   const actor = await requireAdmin();
   if (!actor) return errorState("Administrator access is required.");
+  await requireCurrentAccountLegalAcceptance();
 
   const matchId = getText(formData, "matchId");
   const extensionMinutes = Number(getText(formData, "extensionMinutes"));
@@ -65,6 +67,7 @@ export async function holdTournamentMatchDeadline(
 ): Promise<MatchDeadlineActionState> {
   const actor = await requireAdmin();
   if (!actor) return errorState("Administrator access is required.");
+  await requireCurrentAccountLegalAcceptance();
 
   const matchId = getText(formData, "matchId");
   const reason = getText(formData, "reason");
@@ -97,6 +100,7 @@ export async function releaseTournamentMatchDeadline(
 ): Promise<MatchDeadlineActionState> {
   const actor = await requireAdmin();
   if (!actor) return errorState("Administrator access is required.");
+  await requireCurrentAccountLegalAcceptance();
 
   const matchId = getText(formData, "matchId");
 

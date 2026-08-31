@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createInAppNotification } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -38,6 +39,8 @@ export async function requestMatchAdminAssistance(input: {
   if (!userId) {
     return failure("Sign in before requesting admin assistance.", "auth_required");
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   if (!isRecord(input) || !isUuid(input.matchId)) {
     return failure(REQUEST_FAILED_MESSAGE, "invalid_request");

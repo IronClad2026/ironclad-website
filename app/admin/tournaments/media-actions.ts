@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   isUuid,
@@ -104,6 +105,7 @@ export async function createTournamentMedia(
   input: unknown
 ): Promise<TournamentMediaActionResult> {
   await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const parsed = parseTournamentMediaDraftInput(input);
   if (!parsed.ok || parsed.value.mediaId !== null) {
     return { ok: false, message: parsed.ok ? invalidEntryMessage : parsed.message };
@@ -160,6 +162,7 @@ export async function updateTournamentMedia(
   input: unknown
 ): Promise<TournamentMediaActionResult> {
   await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const parsed = parseTournamentMediaDraftInput(input);
   if (!parsed.ok || !parsed.value.mediaId) {
     return { ok: false, message: parsed.ok ? invalidEntryMessage : parsed.message };
@@ -228,6 +231,7 @@ export async function setTournamentMediaPublished(
   input: unknown
 ): Promise<TournamentMediaActionResult> {
   await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const parsed = parsePublicationInput(input);
   if (!parsed) return { ok: false, message: "Select a valid media entry." };
 
@@ -275,6 +279,7 @@ export async function removeTournamentMedia(
   input: unknown
 ): Promise<TournamentMediaActionResult> {
   await requireAdmin();
+  await requireCurrentAccountLegalAcceptance();
   const parsed = parseScopedEntryInput(input);
   if (!parsed) return { ok: false, message: "Select a valid media entry." };
 

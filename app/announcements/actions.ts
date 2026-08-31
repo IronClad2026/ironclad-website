@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { isUuid, type AnnouncementMarker } from "@/lib/announcement-contract";
 import {
   loadAuthenticatedAnnouncementNavigationState,
@@ -64,6 +65,8 @@ export async function markAnnouncementSeen(
     return { ok: false };
   }
   if (!userId) return { ok: false };
+
+  await requireCurrentAccountLegalAcceptance();
 
   const marked = await markAuthenticatedAnnouncementSeen(
     userId,

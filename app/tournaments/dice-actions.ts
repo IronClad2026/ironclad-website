@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
   isRollMatchDiceInput,
   parseMatchDiceRollRpcResult,
@@ -27,6 +28,8 @@ export async function rollMatchDice(
   if (!userId) {
     return { ok: false, error: "Sign in before using the Dice Roll-Off.", code: "auth_required" };
   }
+
+  await requireCurrentAccountLegalAcceptance();
 
   if (!isRollMatchDiceInput(input)) {
     return { ok: false, error: "The Dice Roll-Off request is invalid.", code: "invalid_request" };
