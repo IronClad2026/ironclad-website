@@ -1,5 +1,6 @@
 import { PHASE_FOUR_ACTIVE_COHORT_SIZE } from "@/lib/tournament-registration-cohort";
 import type { PublishedTournamentMapPool } from "@/lib/tournament-map-pools";
+import type { TournamentMediaItem } from "@/lib/tournament-media";
 
 export type TournamentStatus =
   | "upcoming"
@@ -107,6 +108,7 @@ export type TournamentCard = {
   resultConfirmationWindowMinutes: number;
   rulesUrl: string | null;
   battlefyUrl: string | null;
+  media?: TournamentMediaItem[];
   participants: TournamentParticipant[];
   bracketParticipants: TournamentParticipant[];
   generatedBrackets: GeneratedTournamentBracket[];
@@ -528,6 +530,7 @@ export function mapTournamentRow(
       row.result_confirmation_window_minutes ?? 30,
     rulesUrl: row.rules_url,
     battlefyUrl: row.battlefy_url,
+    media: [],
     participants: [],
     bracketParticipants: [],
     generatedBrackets: [],

@@ -23,6 +23,9 @@ const tournamentEditor = readSource(
 const tournamentManagementMenu = readSource(
   "components/admin/tournaments/TournamentManagementMenu.tsx"
 );
+const tournamentMedia = readSource(
+  "components/admin/tournaments/AdminTournamentMedia.tsx"
+);
 const registrationDetailDialog = readSource(
   "components/admin/tournaments/AdminRegistrationDetailDialog.tsx"
 );
@@ -146,6 +149,31 @@ describe("admin responsive component and CSS contracts", () => {
       "[padding-top:max(1rem,env(safe-area-inset-top))]"
     );
     expect(tournamentManagementMenu).toContain("flex min-h-11 items-center");
+    expect(tournamentManagementMenu).toContain(
+      "grid grid-cols-3 gap-1.5 2xl:grid-cols-9"
+    );
+  });
+
+  it("keeps Tournament media controls usable on phone, tablet, and desktop", () => {
+    expect(tournamentMedia).toContain(
+      'className="min-w-0"'
+    );
+    expect(tournamentMedia).toContain(
+      "flex min-w-0 flex-col gap-4"
+    );
+    expect(tournamentMedia).toContain(
+      "mt-5 grid min-w-0 gap-4 lg:grid-cols-2"
+    );
+    expect(tournamentMedia).toContain(
+      "mt-5 grid min-w-0 gap-4 md:grid-cols-2"
+    );
+    expect(tournamentMedia).toContain(
+      "mt-6 flex flex-col-reverse gap-3 sm:flex-row"
+    );
+    expect(tournamentMedia).toContain("text-base");
+    expect(tournamentMedia).toContain("sm:text-sm");
+    expect(count(tournamentMedia, "min-h-11")).toBeGreaterThanOrEqual(10);
+    expect(tournamentMedia).toContain("break-words");
   });
 
   it("makes bracket administration usable without desktop-only drag interactions", () => {

@@ -497,6 +497,7 @@ function createPageClient(
     registrations: { data: registrations, error: null },
     players: { data: players, error: null },
     tournament_bracket_map_pool_entries: { data: [], error: null },
+    tournament_media: { data: [], error: null },
     legal_documents: {
       data: [
         ["rulebook", "11111111-1111-4111-8111-111111111111"],
