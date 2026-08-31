@@ -137,6 +137,39 @@ const dictionary = {
       cohortSummary:
         "{requirement} — active review cohort {active}/{capacity} — {approved} approved — {waitlisted} waitlisted",
     },
+    rulesSummary: {
+      title: "Tournament Essentials",
+      description: "Key rules for every Player before and during competition.",
+      formatTitle: "Format",
+      formatBody:
+        "CoH3 · 1v1 · 8 Players per Division · Independent single-elimination brackets.",
+      seriesTitle: "Series",
+      seriesBody: "Quarterfinals: BO3 · Semifinals: BO3 · Grand Final: BO5.",
+      matchTimingTitle: "Match Timing",
+      matchTimingBody:
+        "Each individual Match normally has 7 days from activation. Later Matches activate when both Players are known. The exact deadline shown with the Match controls; reminders apply, and extensions are exceptional and not guaranteed.",
+      schedulingTitle: "Scheduling",
+      schedulingBody:
+        "Make reasonable first contact normally within 24 hours after the Match becomes available. If your opponent has not replied after 48 hours—or sooner if the deadline is at risk—request Admin Assistance. These timings are not automatic-forfeit timers.",
+      resultsTitle: "Results & Replays",
+      resultsBody:
+        "Report the Series winner and final score through IronClad, with one unique .rec replay for every Game played.",
+      confirmationTitle: "Confirmation & Disputes",
+      confirmationBody:
+        "Your opponent confirms or disputes by the displayed deadline. Disputes and exceptional cases go to Admin review. Only an official confirmed or approved result advances the Bracket.",
+      noShowsTitle: "No-Shows",
+      noShowsBody:
+        "Never self-award a no-show. Use the official no-show flow; your opponent confirms or disputes it, and an Admin reviews exceptions. A confirmed no-show receives no participation award. If neither Player makes a reasonable effort, IronClad may issue a double forfeit.",
+      mapsTitle: "Maps, Sides & Dice",
+      mapsBody:
+        "Use the published Division Map Pool. Authenticated IronClad Dice sets the choice order for Games 1, 3 and 5 when played. Players coordinate Map and Side choices manually; Games 2 and 4 swap Sides, and the previous Game's loser selects a new eligible Map.",
+      tournamentRulesTitle: "Tournament Rules",
+      authorityNote:
+        "This summary is a practical guide. The Official Tournament Rulebook remains authoritative.",
+      openTournamentRules: "Open Tournament Rules",
+      readFullRulebook: "Read Full Official Rulebook",
+      opensNewTab: "opens in a new tab",
+    },
     participants: {
       entries: "Entries",
       description: "Approved participants separated by their ELO-eligible bracket.",
