@@ -37,12 +37,27 @@ const subscribeToHydration = () => () => undefined;
 const getHydratedSnapshot = () => true;
 const getServerHydratedSnapshot = () => false;
 
+const INTRO_DURATION_SECONDS = 0.6;
+const ROTATION_DURATION_SECONDS = 4.2;
+const COLORIZE_DURATION_SECONDS = 0.9;
+const REDUCED_COLORIZE_DURATION_SECONDS = 0.8;
+const COLOR_HOLD_DURATION_SECONDS = 0.6;
+const TRANSFER_DURATION_SECONDS = 0.8;
+const REDUCED_TRANSFER_DURATION_SECONDS = 0.2;
+const GREY_REVEAL_FILTER =
+  "grayscale(1) saturate(0) brightness(0.68) contrast(1.14)";
+const FULL_COLOR_REVEAL_FILTER =
+  "grayscale(0) saturate(1) brightness(1) contrast(1)";
+
 type RevealPhase =
   | "intro"
-  | "revealed"
-  | "orbiting"
+  | "ready"
+  | "rotating"
+  | "colorizing"
+  | "colorHold"
   | "transferring"
   | "saving"
+  | "saveFailed"
   | "complete";
 
 type RectSnapshot = {
@@ -129,10 +144,15 @@ export default function BadgeRevealOverlay({
     hydrationComplete && typeof document !== "undefined"
       ? document.body
       : null;
-  const motionInProgress = phase === "orbiting" || phase === "transferring";
+  const cinematicInProgress =
+    phase === "rotating" ||
+    phase === "colorizing" ||
+    phase === "colorHold";
+  const motionInProgress = cinematicInProgress || phase === "transferring";
   const accessibleBusy = motionInProgress || phase === "saving";
-  const transferOrSavePending =
-    accessibleBusy || pending;
+  const transferOrSavePending = accessibleBusy || pending;
+  const actionReady = phase === "ready" || phase === "saveFailed";
+  const dialogHeroIsFullColor = phase === "saveFailed";
   const { dialogRef, overlayRootRef } = useBadgeModalDialog({
     open,
     onDismiss: onClose,
@@ -143,14 +163,16 @@ export default function BadgeRevealOverlay({
   useEffect(() => {
     completingTransferRef.current = false;
 
-    const revealDelay = shouldReduceMotion ? 180 : 600;
-    const timer = window.setTimeout(() => setPhase("revealed"), revealDelay);
+    const revealDelay = shouldReduceMotion
+      ? 180
+      : INTRO_DURATION_SECONDS * 1000;
+    const timer = window.setTimeout(() => setPhase("ready"), revealDelay);
 
     return () => window.clearTimeout(timer);
   }, [localizedItem.award.awardId, localizedItem.definition.slug, shouldReduceMotion]);
 
   useEffect(() => {
-    if (phase !== "revealed" || !errorMessage) return;
+    if (phase !== "saveFailed" || !errorMessage) return;
 
     const focusTimer = window.setTimeout(
       () => continueButtonRef.current?.focus(),
@@ -173,7 +195,7 @@ export default function BadgeRevealOverlay({
     []
   );
 
-  const completeTransfer = useCallback(async () => {
+  const completeAcknowledgement = useCallback(async () => {
     if (completingTransferRef.current) return;
 
     completingTransferRef.current = true;
@@ -186,7 +208,7 @@ export default function BadgeRevealOverlay({
         completingTransferRef.current = false;
         setOrbitGeometry(null);
         setTransferGeometry(null);
-        setPhase("revealed");
+        setPhase("saveFailed");
         return;
       }
 
@@ -196,9 +218,21 @@ export default function BadgeRevealOverlay({
       completingTransferRef.current = false;
       setOrbitGeometry(null);
       setTransferGeometry(null);
-      setPhase("revealed");
+      setPhase("saveFailed");
     }
   }, [onContinue, onDestinationSettle]);
+
+  const completeRotation = useCallback(() => {
+    setPhase((current) =>
+      current === "rotating" ? "colorizing" : current
+    );
+  }, []);
+
+  const completeColorization = useCallback(() => {
+    setPhase((current) =>
+      current === "colorizing" ? "colorHold" : current
+    );
+  }, []);
 
   const beginLockIn = useCallback(() => {
     if (!orbitGeometry) return;
@@ -251,8 +285,18 @@ export default function BadgeRevealOverlay({
     orbitGeometry,
   ]);
 
-  const beginTransfer = () => {
-    if (phase !== "revealed" || pending) return;
+  useEffect(() => {
+    if (phase !== "colorHold") return;
+
+    const timer = window.setTimeout(
+      beginLockIn,
+      COLOR_HOLD_DURATION_SECONDS * 1000
+    );
+    return () => window.clearTimeout(timer);
+  }, [beginLockIn, phase]);
+
+  const beginCinematic = () => {
+    if (phase !== "ready" || pending) return;
 
     const sourceRect = artworkAnchorRef.current?.getBoundingClientRect();
     if (!sourceRect) return;
@@ -260,21 +304,35 @@ export default function BadgeRevealOverlay({
     const source = snapshotRect(sourceRect);
     const preliminaryDestination = getDestinationRect?.() ?? null;
 
-    if (shouldReduceMotion) {
-      setTransferGeometry(
-        buildTransferGeometry(source, preliminaryDestination)
-      );
-      setPhase("transferring");
+    const geometry = buildOrbitGeometry(
+      source,
+      preliminaryDestination,
+      {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }
+    );
+
+    setOrbitGeometry(
+      shouldReduceMotion
+        ? {
+            ...geometry,
+            end: geometry.source,
+            left: [geometry.source.left],
+            top: [geometry.source.top],
+          }
+        : geometry
+    );
+    setPhase(shouldReduceMotion ? "colorizing" : "rotating");
+  };
+
+  const handleContinue = () => {
+    if (phase === "saveFailed") {
+      void completeAcknowledgement();
       return;
     }
 
-    setOrbitGeometry(
-      buildOrbitGeometry(source, preliminaryDestination, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      })
-    );
-    setPhase("orbiting");
+    beginCinematic();
   };
 
   if (!portalTarget) return null;
@@ -379,7 +437,9 @@ export default function BadgeRevealOverlay({
                 ) : (
                   <>
                 <PremiumBadgeEffects
-                  active={premium && phase === "revealed"}
+                  active={
+                    premium && (phase === "ready" || phase === "saveFailed")
+                  }
                   rarity={localizedItem.definition.rarity}
                   reducedMotion={shouldReduceMotion}
                 />
@@ -388,33 +448,70 @@ export default function BadgeRevealOverlay({
                   <motion.div
                     ref={artworkAnchorRef}
                     data-testid="badge-reveal-artwork-anchor"
+                    data-badge-reveal-color={
+                      dialogHeroIsFullColor ? "full" : "grey"
+                    }
                     className="relative [transform-style:preserve-3d]"
                     initial={
                       shouldReduceMotion
-                        ? { opacity: 0, scale: 0.94 }
-                        : { opacity: 0, scale: 0.72, rotateY: 0 }
+                        ? {
+                            opacity: 0,
+                            scale: 0.94,
+                            filter: dialogHeroIsFullColor
+                              ? FULL_COLOR_REVEAL_FILTER
+                              : GREY_REVEAL_FILTER,
+                          }
+                        : {
+                            opacity: 0,
+                            scale: 0.72,
+                            rotateY: 0,
+                            filter: dialogHeroIsFullColor
+                              ? FULL_COLOR_REVEAL_FILTER
+                              : GREY_REVEAL_FILTER,
+                          }
                     }
                     animate={
                       shouldReduceMotion
-                        ? { opacity: 1, scale: 1 }
+                        ? {
+                            opacity: 1,
+                            scale: 1,
+                            filter: dialogHeroIsFullColor
+                              ? FULL_COLOR_REVEAL_FILTER
+                              : GREY_REVEAL_FILTER,
+                          }
                         : phase === "intro"
                           ? {
                               opacity: [0, 1, 1],
                               scale: [0.82, 1.025, 1],
                               rotateY: [0, -18, 0],
                               rotateZ: [0, -0.8, 0],
+                              filter: GREY_REVEAL_FILTER,
                             }
-                          : { opacity: 1, scale: 1, rotateY: 0, rotateZ: 0 }
+                          : {
+                              opacity: 1,
+                              scale: 1,
+                              rotateY: 0,
+                              rotateZ: 0,
+                              filter: dialogHeroIsFullColor
+                                ? FULL_COLOR_REVEAL_FILTER
+                                : GREY_REVEAL_FILTER,
+                            }
                     }
                     transition={{
-                      duration: shouldReduceMotion ? 0.18 : 0.6,
+                      duration: shouldReduceMotion
+                        ? dialogHeroIsFullColor
+                          ? 0
+                          : 0.18
+                        : dialogHeroIsFullColor
+                          ? 0
+                          : INTRO_DURATION_SECONDS,
                       ease: [0.2, 0.75, 0.25, 1],
                     }}
                   >
                     <BadgeArtwork
                       item={localizedItem}
                       variant="reveal"
-                      presentation="unrevealed"
+                      presentation="revealed"
                       dictionary={copy}
                     />
                   </motion.div>
@@ -424,11 +521,11 @@ export default function BadgeRevealOverlay({
                   className="relative z-10"
                   initial={false}
                   animate={{
-                    opacity: phase === "revealed" ? 1 : 0,
-                    y: phase === "revealed" ? 0 : 10,
+                    opacity: actionReady ? 1 : 0,
+                    y: actionReady ? 0 : 10,
                   }}
                   transition={{ duration: shouldReduceMotion ? 0.16 : 0.3 }}
-                  aria-hidden={phase !== "revealed"}
+                  aria-hidden={!actionReady}
                 >
                   <p className="mt-5 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.24em] text-orange-300">
                     <Sparkles size={15} aria-hidden="true" />
@@ -473,8 +570,8 @@ export default function BadgeRevealOverlay({
                   <button
                     ref={continueButtonRef}
                     type="button"
-                    disabled={phase !== "revealed" || pending}
-                    onClick={beginTransfer}
+                    disabled={!actionReady || pending}
+                    onClick={handleContinue}
                     className="relative z-10 mt-6 min-h-12 w-full border border-orange-300 bg-orange-500 px-6 py-3 text-sm font-black uppercase tracking-[0.16em] text-black transition hover:bg-orange-300 disabled:cursor-wait disabled:border-zinc-600 disabled:bg-zinc-700 disabled:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
                   >
                     {pending
@@ -502,10 +599,11 @@ export default function BadgeRevealOverlay({
             ) : null}
           </AnimatePresence>
 
-          {phase === "orbiting" && orbitGeometry ? (
+          {cinematicInProgress && orbitGeometry ? (
             <motion.div
               aria-hidden="true"
-              className="pointer-events-none fixed z-[10020] grid place-items-center [transform-style:preserve-3d]"
+              className="pointer-events-none fixed z-[10020] isolate grid place-items-center [transform-style:preserve-3d]"
+              data-badge-reveal-cinematic={phase}
               data-badge-reveal-orbit={
                 orbitGeometry.compact ? "compact" : "wide"
               }
@@ -520,52 +618,99 @@ export default function BadgeRevealOverlay({
                 rotateZ: 0,
                 transformPerspective: 1000,
               }}
-              animate={{
-                left: orbitGeometry.left,
-                top: orbitGeometry.top,
-                opacity: 1,
-                scale: orbitGeometry.compact
-                  ? [1, 1.04, 1.06, 1.025, 0.98]
-                  : [1, 1.08, 1.12, 1.04, 0.98],
-                rotateY: [0, 260, 520, 760, 900],
-                rotateZ: [0, -2.2, 2.7, -1.3, -0.4],
-                transformPerspective: 1000,
-              }}
-              transition={{
-                duration: 2.6,
-                times: [0, 0.22, 0.5, 0.74, 1],
-                ease: [0.2, 0.72, 0.2, 1],
-                opacity: { duration: 0.12, ease: "easeOut" },
-              }}
-              onAnimationComplete={beginLockIn}
+              animate={
+                phase === "rotating"
+                  ? {
+                      left: orbitGeometry.left,
+                      top: orbitGeometry.top,
+                      opacity: 1,
+                      scale: orbitGeometry.compact
+                        ? [1, 1.04, 1.06, 1.025, 1]
+                        : [1, 1.08, 1.12, 1.04, 1],
+                      rotateY: [0, 270, 540, 810, 1080],
+                      rotateZ: [0, -2.2, 2.7, -1.3, 0],
+                      transformPerspective: 1000,
+                    }
+                  : {
+                      left: orbitGeometry.end.left,
+                      top: orbitGeometry.end.top,
+                      opacity: 1,
+                      scale: 1,
+                      rotateY: shouldReduceMotion ? 0 : 1080,
+                      rotateZ: 0,
+                      transformPerspective: 1000,
+                    }
+              }
+              transition={
+                phase === "rotating"
+                  ? {
+                      duration: ROTATION_DURATION_SECONDS,
+                      times: [0, 0.25, 0.5, 0.75, 1],
+                      ease: "linear",
+                      opacity: { duration: 0.12, ease: "easeOut" },
+                    }
+                  : {
+                      duration: phase === "colorizing" ? 0.12 : 0,
+                      ease: "easeOut",
+                    }
+              }
+              onAnimationComplete={
+                phase === "rotating" ? completeRotation : undefined
+              }
             >
-              <motion.div
-                className="absolute inset-0"
-                initial={{ opacity: 1 }}
-                animate={{ opacity: [1, 0.96, 0.65, 0.12, 0] }}
-                transition={{
-                  duration: 2.6,
-                  times: [0, 0.22, 0.5, 0.74, 1],
-                  ease: "easeInOut",
-                }}
-              >
-                <BadgeArtwork
-                  item={localizedItem}
-                  variant="slot"
-                  presentation="unrevealed"
-                  className="h-full w-full"
-                  dictionary={copy}
+              {phase === "colorizing" || phase === "colorHold" ? (
+                <motion.span
+                  aria-hidden="true"
+                  data-badge-reveal-accent={phase}
+                  className="absolute inset-[7%] z-0 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.32)_0%,rgba(249,115,22,0.24)_38%,transparent_72%)] blur-xl"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={
+                    phase === "colorizing"
+                      ? { opacity: [0, 0.62, 0.24], scale: [0.9, 1.08, 1] }
+                      : { opacity: 0.16, scale: 1 }
+                  }
+                  transition={{
+                    duration:
+                      phase === "colorizing"
+                        ? shouldReduceMotion
+                          ? REDUCED_COLORIZE_DURATION_SECONDS
+                          : COLORIZE_DURATION_SECONDS
+                        : 0.18,
+                    ease: "easeOut",
+                  }}
                 />
-              </motion.div>
+              ) : null}
               <motion.div
-                className="absolute inset-0"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 0.04, 0.42, 0.94, 1] }}
+                className="absolute inset-0 z-10"
+                data-badge-reveal-artwork-state={phase}
+                data-badge-reveal-color={
+                  phase === "rotating"
+                    ? "grey"
+                    : phase === "colorizing"
+                      ? "transitioning"
+                      : "full"
+                }
+                initial={{ filter: GREY_REVEAL_FILTER, scale: 1 }}
+                animate={{
+                  filter:
+                    phase === "rotating"
+                      ? GREY_REVEAL_FILTER
+                      : FULL_COLOR_REVEAL_FILTER,
+                  scale:
+                    phase === "colorizing" ? [1, 1.035, 1] : 1,
+                }}
                 transition={{
-                  duration: 2.6,
-                  times: [0, 0.22, 0.5, 0.74, 1],
+                  duration:
+                    phase === "colorizing"
+                      ? shouldReduceMotion
+                        ? REDUCED_COLORIZE_DURATION_SECONDS
+                        : COLORIZE_DURATION_SECONDS
+                      : 0,
                   ease: "easeInOut",
                 }}
+                onAnimationComplete={
+                  phase === "colorizing" ? completeColorization : undefined
+                }
               >
                 <BadgeArtwork
                   item={localizedItem}
@@ -594,9 +739,9 @@ export default function BadgeRevealOverlay({
                 width: transferGeometry.source.width,
                 height: transferGeometry.source.height,
                 opacity: 1,
-                scale: shouldReduceMotion ? 1 : 0.98,
-                rotateY: shouldReduceMotion ? 0 : 900,
-                rotateZ: shouldReduceMotion ? 0 : -0.4,
+                scale: 1,
+                rotateY: shouldReduceMotion ? 0 : 1080,
+                rotateZ: 0,
                 transformPerspective: 1000,
               }}
               animate={{
@@ -615,19 +760,21 @@ export default function BadgeRevealOverlay({
                 opacity: shouldReduceMotion ? [1, 0.35, 0] : 1,
                 scale: shouldReduceMotion
                   ? [1, 0.96]
-                  : [0.98, 1.035, 0.995, 1],
-                rotateY: shouldReduceMotion
-                  ? 0
-                  : [900, 990, 1050, 1080],
-                rotateZ: shouldReduceMotion ? 0 : [-0.4, 0.7, -0.2, 0],
+                  : [1, 1.035, 0.995, 1],
+                rotateY: shouldReduceMotion ? 0 : 1080,
+                rotateZ: 0,
                 transformPerspective: 1000,
               }}
               transition={{
-                duration: shouldReduceMotion ? 0.2 : 0.8,
+                duration: shouldReduceMotion
+                  ? REDUCED_TRANSFER_DURATION_SECONDS
+                  : TRANSFER_DURATION_SECONDS,
                 ease: [0.16, 0.8, 0.2, 1],
               }}
               onAnimationComplete={
-                phase === "transferring" ? completeTransfer : undefined
+                phase === "transferring"
+                  ? completeAcknowledgement
+                  : undefined
               }
             >
               <BadgeArtwork

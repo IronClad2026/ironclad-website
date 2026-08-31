@@ -17,6 +17,7 @@ import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import BadgeRevealOverlay from "@/components/badges/BadgeRevealOverlay";
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import { buildDashboardBadgeData } from "@/lib/badges/dashboard";
 import type {
@@ -110,6 +111,11 @@ vi.mock("framer-motion", async () => {
   };
 });
 
+const GREY_REVEAL_FILTER =
+  "grayscale(1) saturate(0) brightness(0.68) contrast(1.14)";
+const FULL_COLOR_REVEAL_FILTER =
+  "grayscale(0) saturate(1) brightness(1) contrast(1)";
+
 describe("Badge reveal experience", () => {
   let destinationRect: DOMRect;
   let destinationRectReads: number;
@@ -144,7 +150,7 @@ describe("Badge reveal experience", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps an owned pending Badge grey until measured transfer and acknowledgement complete", async () => {
+  it("uses a reduced-motion colour transformation before transfer and acknowledgement", async () => {
     const fixture = buildRevealFixture("first-victory", "award-first-victory");
     const acknowledge = vi.fn(async () => ({
       status: "success" as const,
@@ -173,11 +179,52 @@ describe("Badge reveal experience", () => {
     expect(
       screen.getByRole("dialog").closest("[data-motion]")
     ).toHaveAttribute("data-motion", "reduced");
+    const introHero = screen.getByTestId("badge-reveal-artwork-anchor");
+    expect(introHero).toHaveAttribute("data-badge-reveal-color", "grey");
+    expect(readMotionValue(introHero, "data-motion-initial").filter).toBe(
+      GREY_REVEAL_FILTER
+    );
 
     act(() => vi.advanceTimersByTime(200));
+    expect(screen.getByRole("dialog").closest("[data-reveal-phase]")).toHaveAttribute(
+      "data-reveal-phase",
+      "ready"
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Complete reveal" })
     );
+
+    expect(
+      document.querySelector('[data-badge-reveal-cinematic="rotating"]')
+    ).not.toBeInTheDocument();
+    const colorizing = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-cinematic="colorizing"]'
+    );
+    const colorizingArtwork = colorizing?.querySelector<HTMLElement>(
+      '[data-badge-reveal-artwork-state="colorizing"]'
+    );
+    expect(colorizing).toBeInTheDocument();
+    expect(colorizing?.querySelectorAll("img")).toHaveLength(1);
+    expect(readMotionValue(colorizing, "data-motion-animate").rotateY).toBe(0);
+    expect(readMotionValue(colorizingArtwork, "data-motion-initial").filter).toBe(
+      GREY_REVEAL_FILTER
+    );
+    expect(readMotionValue(colorizingArtwork, "data-motion-animate").filter).toBe(
+      FULL_COLOR_REVEAL_FILTER
+    );
+    expect(readMotionValue(colorizingArtwork, "data-motion-transition")).toMatchObject({
+      duration: 0.8,
+      ease: "easeInOut",
+    });
+    expect(acknowledge).not.toHaveBeenCalled();
+
+    fireEvent.click(colorizingArtwork as HTMLElement);
+    expect(
+      document.querySelector('[data-badge-reveal-cinematic="colorHold"]')
+    ).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(599));
+    expect(document.querySelector("[data-badge-transfer]")).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
 
     const transfer = document.querySelector<HTMLElement>(
       '[data-badge-transfer="measured"]'
@@ -191,6 +238,9 @@ describe("Badge reveal experience", () => {
         width: 224,
         height: 224,
       });
+    expect(readMotionValue(transfer, "data-motion-transition")).toMatchObject({
+      duration: 0.2,
+    });
     expect(acknowledge).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -206,7 +256,7 @@ describe("Badge reveal experience", () => {
     expect(destinationArtwork).not.toHaveClass("grayscale");
   });
 
-  it("runs a deliberate orbit, remeasures the live slot, and acknowledges only after lock-in", async () => {
+  it("runs grey rotation, separate colourization, hero hold, and measured lock-in in order", async () => {
     const fixture = buildRevealFixture("first-victory", "award-cinematic");
     const acknowledge = vi.fn(async () => ({
       status: "success" as const,
@@ -221,39 +271,110 @@ describe("Badge reveal experience", () => {
       />
     );
 
-    expect(document.querySelector(".mix-blend-screen")).not.toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(600));
+    const overlay = screen.getByRole("dialog").closest("[data-reveal-phase]");
+    const introHero = screen.getByTestId("badge-reveal-artwork-anchor");
+    const continueButton = screen.getByRole("button", {
+      name: "Complete reveal",
+    });
+
+    expect(overlay).toHaveAttribute("data-reveal-phase", "intro");
+    expect(introHero).toHaveAttribute("data-badge-reveal-color", "grey");
+    expect(continueButton).toBeDisabled();
+    expect(document.querySelector("[data-badge-reveal-cinematic]")).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(599));
+    expect(overlay).toHaveAttribute("data-reveal-phase", "intro");
+    act(() => vi.advanceTimersByTime(1));
+    expect(overlay).toHaveAttribute("data-reveal-phase", "ready");
+    expect(screen.getByTestId("badge-reveal-artwork-anchor")).toHaveAttribute(
+      "data-badge-reveal-color",
+      "grey"
+    );
+    expect(continueButton).toBeEnabled();
+
     fireEvent.click(
-      screen.getByRole("button", { name: "Complete reveal" })
+      continueButton
     );
 
-    const orbit = document.querySelector<HTMLElement>(
-      '[data-badge-reveal-orbit="wide"]'
+    const rotation = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-cinematic="rotating"]'
     );
-    const orbitAnimation = readMotionValue(orbit, "data-motion-animate");
-    const orbitTransition = readMotionValue(
-      orbit,
+    const rotationArtwork = rotation?.querySelector<HTMLElement>(
+      '[data-badge-reveal-artwork-state="rotating"]'
+    );
+    const rotationAnimation = readMotionValue(rotation, "data-motion-animate");
+    const rotationTransition = readMotionValue(
+      rotation,
       "data-motion-transition"
     );
 
-    expect(orbit).toBeInTheDocument();
-    expect(orbitAnimation.rotateY).toEqual([0, 260, 520, 760, 900]);
-    expect(orbitAnimation.rotateZ).toEqual([0, -2.2, 2.7, -1.3, -0.4]);
-    expect(orbitAnimation.scale).toEqual([1, 1.08, 1.12, 1.04, 0.98]);
-    expect(orbitTransition).toMatchObject({
-      duration: 2.6,
-      times: [0, 0.22, 0.5, 0.74, 1],
+    expect(overlay).toHaveAttribute("data-reveal-phase", "rotating");
+    expect(rotation).toBeInTheDocument();
+    expect(rotationAnimation.rotateY).toEqual([0, 270, 540, 810, 1080]);
+    expect(rotationAnimation.rotateZ).toEqual([0, -2.2, 2.7, -1.3, 0]);
+    expect(rotationAnimation.scale).toEqual([1, 1.08, 1.12, 1.04, 1]);
+    expect(rotationTransition).toMatchObject({
+      duration: 4.2,
+      times: [0, 0.25, 0.5, 0.75, 1],
+      ease: "linear",
     });
-    expect(orbit?.querySelector(".mix-blend-screen")).not.toBeInTheDocument();
-    expect(orbit?.querySelectorAll("img")).toHaveLength(2);
+    expect(rotation?.querySelectorAll("img")).toHaveLength(1);
+    expect(rotationArtwork).toHaveAttribute("data-badge-reveal-color", "grey");
+    expect(readMotionValue(rotationArtwork, "data-motion-animate").filter).toBe(
+      GREY_REVEAL_FILTER
+    );
     expect(destinationRectReads).toBe(1);
     expect(acknowledge).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-badge-transfer]")).not.toBeInTheDocument();
+
+    fireEvent.click(rotation as HTMLElement);
+    const colorizing = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-cinematic="colorizing"]'
+    );
+    const colorizingArtwork = colorizing?.querySelector<HTMLElement>(
+      '[data-badge-reveal-artwork-state="colorizing"]'
+    );
+    expect(overlay).toHaveAttribute("data-reveal-phase", "colorizing");
+    expect(readMotionValue(colorizing, "data-motion-animate")).toMatchObject({
+      rotateY: 1080,
+      rotateZ: 0,
+    });
+    expect(colorizingArtwork).toHaveAttribute(
+      "data-badge-reveal-color",
+      "transitioning"
+    );
+    expect(readMotionValue(colorizingArtwork, "data-motion-initial").filter).toBe(
+      GREY_REVEAL_FILTER
+    );
+    expect(readMotionValue(colorizingArtwork, "data-motion-animate").filter).toBe(
+      FULL_COLOR_REVEAL_FILTER
+    );
+    expect(readMotionValue(colorizingArtwork, "data-motion-transition")).toMatchObject({
+      duration: 0.9,
+      ease: "easeInOut",
+    });
+    expect(document.querySelector("[data-badge-transfer]")).not.toBeInTheDocument();
+
+    fireEvent.click(colorizingArtwork as HTMLElement);
+    const colorHold = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-cinematic="colorHold"]'
+    );
+    expect(overlay).toHaveAttribute("data-reveal-phase", "colorHold");
+    expect(colorHold).toBeInTheDocument();
+    expect(
+      colorHold?.querySelector('[data-badge-reveal-color="full"]')
+    ).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(599));
+    expect(document.querySelector("[data-badge-transfer]")).not.toBeInTheDocument();
 
     destinationRect = createRect(44, 148, 136, 136);
-    fireEvent.click(orbit as HTMLElement);
+    act(() => vi.advanceTimersByTime(1));
 
     const transfer = document.querySelector<HTMLElement>(
       '[data-badge-transfer="measured"]'
+    );
+    const transferInitial = readMotionValue(
+      transfer,
+      "data-motion-initial"
     );
     const transferAnimation = readMotionValue(
       transfer,
@@ -265,12 +386,15 @@ describe("Badge reveal experience", () => {
     );
 
     expect(destinationRectReads).toBe(2);
+    expect(transferInitial).toMatchObject({ scale: 1 });
     expect(transferAnimation).toMatchObject({
       left: 44,
       top: 148,
       width: 136,
       height: 136,
-      rotateY: [900, 990, 1050, 1080],
+      scale: [1, 1.035, 0.995, 1],
+      rotateY: 1080,
+      rotateZ: 0,
     });
     expect(transferTransition).toMatchObject({ duration: 0.8 });
     expect(acknowledge).not.toHaveBeenCalled();
@@ -313,13 +437,18 @@ describe("Badge reveal experience", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Complete reveal" })
     );
-    const orbit = document.querySelector<HTMLElement>(
-      "[data-badge-reveal-orbit]"
+    const rotation = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-cinematic="rotating"]'
     );
 
+    fireEvent.click(rotation as HTMLElement);
+    const colorizingArtwork = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-artwork-state="colorizing"]'
+    );
+    fireEvent.click(colorizingArtwork as HTMLElement);
+
     await act(async () => {
-      fireEvent.click(orbit as HTMLElement);
-      vi.advanceTimersByTime(40);
+      vi.advanceTimersByTime(640);
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -344,7 +473,43 @@ describe("Badge reveal experience", () => {
     expect(acknowledge).not.toHaveBeenCalled();
   });
 
-  it("keeps a focusable busy dialog mounted during orbit and transfer", () => {
+  it("retains bounded fallback transfer geometry when no destination is mounted", () => {
+    const fixture = buildRevealFixture("first-victory", "award-fallback-slot");
+    const acknowledge = vi.fn();
+
+    render(
+      <BadgeRevealOverlay
+        item={fixture.queueItem.item}
+        onContinue={acknowledge}
+        getDestinationRect={() => null}
+        reducedMotion
+      />
+    );
+
+    act(() => vi.advanceTimersByTime(200));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Complete reveal" })
+    );
+    const colorizingArtwork = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-artwork-state="colorizing"]'
+    );
+    fireEvent.click(colorizingArtwork as HTMLElement);
+    act(() => vi.advanceTimersByTime(600));
+
+    const transfer = document.querySelector<HTMLElement>(
+      '[data-badge-transfer="fallback"]'
+    );
+    expect(transfer).toBeInTheDocument();
+    expect(readMotionValue(transfer, "data-motion-animate")).toMatchObject({
+      left: sourceRect.left,
+      top: sourceRect.top,
+      width: sourceRect.width,
+      height: sourceRect.height,
+    });
+    expect(acknowledge).not.toHaveBeenCalled();
+  });
+
+  it("keeps a focusable busy dialog mounted throughout the cinematic and transfer", () => {
     const fixture = buildRevealFixture("first-victory", "award-focus-shell");
     const acknowledge = vi.fn();
     const view = render(
@@ -367,17 +532,22 @@ describe("Badge reveal experience", () => {
     expect(orbitDialog).toHaveAttribute("aria-busy", "true");
     expect(orbitDialog).toHaveAttribute(
       "data-badge-reveal-progress",
-      "orbiting"
+      "rotating"
     );
     expect(orbitDialog).toHaveFocus();
     expect(screen.getByRole("status")).toHaveTextContent("Badge unlocked");
     expect(view.container).toHaveAttribute("aria-hidden", "true");
     expect(view.container.inert).toBe(true);
 
-    const orbit = document.querySelector<HTMLElement>(
-      "[data-badge-reveal-orbit]"
+    const rotation = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-cinematic="rotating"]'
     );
-    fireEvent.click(orbit as HTMLElement);
+    fireEvent.click(rotation as HTMLElement);
+    const colorizingArtwork = document.querySelector<HTMLElement>(
+      '[data-badge-reveal-artwork-state="colorizing"]'
+    );
+    fireEvent.click(colorizingArtwork as HTMLElement);
+    act(() => vi.advanceTimersByTime(600));
     act(() => vi.advanceTimersByTime(1));
 
     const transferDialog = screen.getByRole("dialog", {
@@ -419,7 +589,7 @@ describe("Badge reveal experience", () => {
     const top = animation.top as number[];
 
     expect(orbit).toBeInTheDocument();
-    expect(animation.scale).toEqual([1, 1.04, 1.06, 1.025, 0.98]);
+    expect(animation.scale).toEqual([1, 1.04, 1.06, 1.025, 1]);
     expect(left.every((value) => Math.abs(value - sourceRect.left) <= 44))
       .toBe(true);
     expect(top.every((value) => Math.abs(value - sourceRect.top) <= 56))
@@ -531,13 +701,7 @@ describe("Badge reveal experience", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Not now" })).toHaveFocus();
 
-    act(() => vi.advanceTimersByTime(200));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Complete reveal" })
-    );
-    const transfer = document.querySelector<HTMLElement>(
-      '[data-badge-transfer="measured"]'
-    );
+    const transfer = advanceCurrentRevealToTransfer();
 
     await act(async () => {
       fireEvent.click(transfer as HTMLElement);
@@ -600,24 +764,36 @@ describe("Badge reveal experience", () => {
     expect(
       screen.getByRole("button", { name: "Retry acknowledgement" })
     ).toBeEnabled();
+    const failedHero = screen.getByTestId("badge-reveal-artwork-anchor");
+    expect(failedHero).toHaveAttribute("data-badge-reveal-color", "full");
+    expect(readMotionValue(failedHero, "data-motion-animate").filter).toBe(
+      FULL_COLOR_REVEAL_FILTER
+    );
+    expect(readMotionValue(failedHero, "data-motion-initial").filter).toBe(
+      FULL_COLOR_REVEAL_FILTER
+    );
+    expect(readMotionValue(failedHero, "data-motion-transition")).toMatchObject({
+      duration: 0,
+    });
+    expect(failedHero.querySelector("img")).not.toHaveClass("grayscale");
     expect(
       document.querySelector('button[data-badge-slug="first-victory"]')
     ).toHaveAttribute("data-badge-presentation", "unrevealed");
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Retry acknowledgement" })
-    );
-    const retryTransfer = document.querySelector<HTMLElement>(
-      '[data-badge-transfer="measured"]'
-    );
+    expect(
+      document.querySelector("[data-badge-reveal-cinematic]")
+    ).not.toBeInTheDocument();
+    expect(document.querySelector("[data-badge-transfer]")).not.toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(retryTransfer as HTMLElement);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Retry acknowledgement" })
+      );
       await Promise.resolve();
       await Promise.resolve();
     });
 
     expect(acknowledge).toHaveBeenCalledTimes(2);
+    expect(document.querySelector("[data-badge-transfer]")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -704,19 +880,7 @@ describe("Badge reveal experience", () => {
 });
 
 async function completeCurrentReveal() {
-  act(() => vi.advanceTimersByTime(600));
-  fireEvent.click(screen.getByRole("button", { name: /reveal|acknowledgement/i }));
-  const orbit = document.querySelector<HTMLElement>(
-    "[data-badge-reveal-orbit]"
-  );
-
-  if (orbit) {
-    fireEvent.click(orbit);
-  }
-
-  const transfer = document.querySelector<HTMLElement>(
-    '[data-badge-transfer="measured"]'
-  );
+  const transfer = advanceCurrentRevealToTransfer();
 
   await act(async () => {
     fireEvent.click(transfer as HTMLElement);
@@ -725,7 +889,34 @@ async function completeCurrentReveal() {
   });
 }
 
-function readMotionValue(element: HTMLElement | null, attribute: string) {
+function advanceCurrentRevealToTransfer() {
+  act(() => vi.advanceTimersByTime(600));
+  fireEvent.click(
+    screen.getByRole("button", { name: /reveal|acknowledgement/i })
+  );
+
+  const rotation = document.querySelector<HTMLElement>(
+    '[data-badge-reveal-cinematic="rotating"]'
+  );
+  if (rotation) {
+    fireEvent.click(rotation);
+  }
+
+  const colorizingArtwork = document.querySelector<HTMLElement>(
+    '[data-badge-reveal-artwork-state="colorizing"]'
+  );
+  fireEvent.click(colorizingArtwork as HTMLElement);
+  act(() => vi.advanceTimersByTime(600));
+
+  return document.querySelector<HTMLElement>(
+    '[data-badge-transfer="measured"]'
+  );
+}
+
+function readMotionValue(
+  element: HTMLElement | null | undefined,
+  attribute: string
+) {
   return JSON.parse(element?.getAttribute(attribute) ?? "{}") as Record<
     string,
     unknown
