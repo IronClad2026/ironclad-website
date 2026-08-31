@@ -4,9 +4,18 @@ import { describe, expect, it } from "vitest";
 
 const migrationName =
   "20260831133000_staging_badge_cross_division_acceptance.sql";
+const compatibilityMigrationName =
+  "20260831134000_staging_badge_fixture_eligibility_compatibility.sql";
 const previousMigrationName = "20260831132000_match_game_winner_authority.sql";
 const sql = readFileSync(
   resolve(process.cwd(), "supabase/migrations", migrationName),
+  "utf8"
+)
+  .toLowerCase()
+  .replace(/\s+/g, " ")
+  .trim();
+const compatibilitySql = readFileSync(
+  resolve(process.cwd(), "supabase/migrations", compatibilityMigrationName),
   "utf8"
 )
   .toLowerCase()
@@ -39,6 +48,29 @@ describe("Staging Badge cross-division acceptance fixture", () => {
     );
     expect(sql.startsWith("begin;")).toBe(true);
     expect(sql.endsWith("commit;")).toBe(true);
+  });
+
+  it("keeps normal synthetic fixture eligibility in a forward repair", () => {
+    const names = readdirSync(
+      resolve(process.cwd(), "supabase/migrations")
+    ).sort();
+    expect(names.indexOf(compatibilityMigrationName)).toBeGreaterThan(
+      names.indexOf(migrationName)
+    );
+    expect(compatibilitySql.startsWith("begin;")).toBe(true);
+    expect(compatibilitySql.endsWith("commit;")).toBe(true);
+    expect(compatibilitySql).toContain(
+      "v_progression_synthetic_elo integer"
+    );
+    expect(compatibilitySql).toContain(
+      "v_fixture_synthetic_elo := v_progression_synthetic_elo"
+    );
+    expect(compatibilitySql).toContain(
+      "elsif coalesce( current_setting( 'ironclad.staging_badge_cross_division_enrolling', true )"
+    );
+    expect(compatibilitySql).not.toContain(
+      "into v_fixture_synthetic_elo, v_fixture_synthetic_division from ironclad_private.staging_badge_cross_division_enrolments"
+    );
   });
 
   it("keeps exact provenance private behind forced RLS", () => {

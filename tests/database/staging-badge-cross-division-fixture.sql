@@ -35,6 +35,8 @@ do $$
 declare
   v_secret text;
   v_player_id uuid;
+  v_generic_player_id uuid;
+  v_generic_registration uuid;
   v_challenge_registration uuid;
   v_main_registration uuid;
   v_result record;
@@ -124,6 +126,54 @@ begin
     'user_BadgeCrossDivisionAcademy1'
   );
   v_player_id := v_result.player_id;
+
+  select * into strict v_result
+  from public.provision_staging_synthetic_uat_player(
+    v_secret,
+    'TestChallenge1',
+    'user_BadgeCrossDivisionChallenge1'
+  );
+  v_generic_player_id := v_result.player_id;
+
+  select * into strict v_result
+  from public.enrol_staging_synthetic_uat_player(
+    v_secret,
+    'TestChallenge1',
+    '5b700000-0000-4000-8000-000000000001',
+    '5b700000-0000-4000-8000-000000000101',
+    false
+  );
+  v_generic_registration := v_result.registration_id;
+  perform pg_temp.badge_cross_division_assert(
+    v_result.player_id = v_generic_player_id
+      and v_result.synthetic_elo = 1100
+      and v_result.synthetic_division = 'Challenge'
+      and v_result.registration_status = 'pending'
+      and v_result.created,
+    'normal synthetic enrollment must retain its base fixture eligibility'
+  );
+
+  perform pg_temp.badge_cross_division_assert(
+    exists (
+      select 1
+      from public.registrations as registration
+      join ironclad_private.staging_synthetic_uat_enrolments as fixture
+        on fixture.registration_id = registration.id
+      where registration.id = v_generic_registration
+        and registration.profile_id = v_generic_player_id
+        and registration.submitted_elo = 1100
+        and registration.registration_provenance =
+          'staging_synthetic_uat'
+        and registration.fixture_contract_version =
+          'staging-synthetic-v1'
+    )
+      and not exists (
+        select 1
+        from ironclad_private.staging_badge_cross_division_enrolments
+        where registration_id = v_generic_registration
+      ),
+    'normal fixture evidence must not be replaced by cross-division evidence'
+  );
 
   select * into strict v_result
   from public.enrol_staging_badge_cross_division_acceptance(
@@ -218,7 +268,11 @@ begin
 
   update public.registrations
   set registration_status = 'approved'
-  where id in (v_challenge_registration, v_main_registration);
+  where id in (
+    v_generic_registration,
+    v_challenge_registration,
+    v_main_registration
+  );
 
   perform pg_temp.badge_cross_division_assert(
     (
