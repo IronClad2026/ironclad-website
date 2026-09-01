@@ -2,21 +2,18 @@
 
 ## HOLD and authorization boundaries
 
-**Production remains on HOLD.** This runbook is a proposal and evidence
-contract. It does not authorize merging PR #88, applying a Production
-migration, deploying Production, running the historical backfill, or otherwise
-mutating Production.
+**Production historical backfill remains on HOLD.** The approved Badge
+application release is complete at Production head
+`c6109d85de98f73545209a016c3114d953b8ebba` and application tree
+`6ba0e3b2308bd22c3c9dea62efb235f1bb48326c`; it must remain untouched. This
+runbook authorizes neither a deployment nor a Production mutation.
 
-Two later Owner authorizations are required and must not be combined:
-
-1. a release-cutover authorization for the exact 18 migrations and the frozen
-   PR #88 release source/content artifact; and
-2. after deployment, smoke testing, candidate derivation, and a successful
-   read-only backfill preflight, a separate authorization for the exact frozen
-   Production candidate file and the `--apply` command.
-
-Neither a green automated test nor a green read-only preflight authorizes an
-apply. Stop and return to the Owner at both gates.
+The collision-aware tooling revision and its read-only Production preflight
+are a review gate only. A green automated test, GitHub/Vercel check, or
+`BADGE_BACKFILL_PREFLIGHT_READY` result does **not** authorize `--apply`. After
+that evidence is reviewed, the Owner must separately authorize the exact
+Production head, tooling head, full two-player population file, pinned live
+trio, derived historical execution set, and command before any backfill write.
 
 The one-time operation must call the already approved
 `backfillInitialBadgeAwards()` authority with `evaluationMode: "backfill"`.
@@ -24,7 +21,7 @@ It must not manually insert or delete Badge awards, change qualification
 rules, use reconciliation mode as a historical substitute, create historical
 `badge.unlocked` notifications, or pre-create Reveal acknowledgements.
 
-## Frozen release source, future Production head, and operator tooling
+## Frozen release source, current Production head, and operator tooling
 
 PR #88 remains feature-frozen at this exact source/content artifact:
 
@@ -33,7 +30,7 @@ PR #88 remains feature-frozen at this exact source/content artifact:
 | PR | `#88` |
 | Release source head | `ac612018f6c27963a59df84815d0a76ebbcbd27e` |
 | Approved application tree | `6ba0e3b2308bd22c3c9dea62efb235f1bb48326c` |
-| Production head | Unknown until PR #88 is merged into `master` |
+| Production head | `c6109d85de98f73545209a016c3114d953b8ebba` |
 
 The operator runner and this runbook are a **separate reviewed local tooling
 history** descended from the release source head. The tooling commits are not
@@ -43,11 +40,15 @@ approved PR #88 content tree through the normal merge into `master`, while the
 operator executes the runner from a clean local checkout of the separately
 authorized tooling head.
 
+This tooling history is Draft PR #89 on
+`ops/badge-initial-backfill-cutover`. Keep it OPEN, Draft, and unmerged. Revise
+it only with normal follow-up commits; never rewrite or force-push its reviewed
+history.
+
 `ac612018f6c27963a59df84815d0a76ebbcbd27e` is the PR #88 release source
-head. It is **not** the future deployed Production SHA. After merge,
-`productionHead` is the then-current `origin/master` SHA. It may have a
-different commit identity, but its tree must equal both the release source tree
-and the approved application tree.
+head. It is **not** the deployed Production SHA. The current `productionHead`
+is `c6109d85de98f73545209a016c3114d953b8ebba`; its tree must continue to equal
+both the release-source tree and approved application tree.
 
 Before either runner mode, record and verify:
 
@@ -74,8 +75,8 @@ The runner also explicitly verifies that the pinned Badge authority,
 notification, reconciliation, Reveal, and Supabase-admin runtime modules have
 no diff from the release source.
 
-The CLI arguments bind the future Production and tooling heads; the runner
-separately pins the release source head and approved application tree:
+The CLI arguments bind the current Production and reviewed tooling heads; the
+runner separately pins the release source head and approved application tree:
 
 ```text
 --target production
@@ -85,86 +86,72 @@ separately pins the release source head and approved application tree:
 --expected-tooling-head <40-character reviewed local tooling SHA>
 --allowlist-file <absolute path to private JSON>
 --allowlist-sha256 <lowercase SHA-256 of the exact file bytes>
+--expected-live-award-id <canonical UUID>
+--expected-live-notification-id <canonical UUID>
+--expected-live-reveal-id <canonical UUID>
+--expected-execution-count <positive integer>
+--expected-execution-set-sha256 <lowercase SHA-256>
 [--apply]
 ```
+
+The five `--expected-live-*` / `--expected-execution-*` arguments form one
+all-or-none collision-aware baseline contract. Omitting any one while
+supplying another, duplicating an argument, or supplying a malformed value
+must fail before database evaluation. Production's current state requires all
+five; an unpinned "one award exists" assertion is never sufficient.
 
 Omitting `--apply` is read-only preflight. Supplying `--apply` is the only
 runner mode permitted to create awards. The runner must fail closed if the
 post-merge Production identity/tree, Vercel deployment identity, release
 source/tree, or local tooling identity/base/diff differs from this contract.
 
-## Authorized future cutover order
+## Collision-aware backfill cutover order
 
-Do not start this sequence under the current HOLD. After the first separate
-Owner authorization, perform the release in this order:
+The 18 approved migrations through `20260831134000`, PR #88 merge, and
+Production deployment are already complete. Do not rerun, alter, or roll back
+them under this tooling authorization. Continue in this order:
 
-1. Reconfirm PR #88 still has release source head `ac612018...` and approved
-   tree `6ba0e3b...`; reconfirm the separately reviewed tooling head, ancestry,
-   clean checkout, and exact four-path diff.
-2. Apply exactly the following 18 already reviewed migrations to Production,
-   in ledger order, using the separately approved migration procedure:
-
-   1. `20260821000000_badge_award_foundation.sql`
-   2. `20260821001000_badge_batch_2_authority.sql`
-   3. `20260821002000_badge_progression_championship_authority.sql`
-   4. `20260821003000_badge_streak_clean_upset_authority.sql`
-   5. `20260821004000_badge_season_authority.sql`
-   6. `20260821005000_badge_bracket_progression_authority.sql`
-   7. `20260821006000_match_authority_foundation.sql`
-   8. `20260821007000_badge_reliable_competitor_authority.sql`
-   9. `20260821008000_badge_comeback_commander_authority.sql`
-   10. `20260821009000_tournament_championship_path_authority.sql`
-   11. `20260821010000_badge_flawless_campaign_authority.sql`
-   12. `20260830090000_player_badge_reveals.sql`
-   13. `20260831090000_service_role_badge_e2e_season_read.sql`
-   14. `20260831130000_badge_authority_forward_repairs.sql`
-   15. `20260831131000_badge_reconciliation_targets.sql`
-   16. `20260831132000_match_game_winner_authority.sql`
-   17. `20260831133000_staging_badge_cross_division_acceptance.sql`
-   18. `20260831134000_staging_badge_fixture_eligibility_compatibility.sql`
-
-   Stop if the dry run or ledger contains any additional migration, if any
-   expected migration is missing, or if the post-apply ledger is not exact.
-3. Merge PR #88 without adding either tooling commit. Fetch `origin/master`
-   after the merge and freeze its exact SHA as `productionHead`. Verify
-   `origin/master == productionHead` and
-   `tree(productionHead) == tree(releaseSourceHead) == applicationTree`. Stop
-   if the merged Production tree differs from the approved content tree.
-4. Deploy that exact `productionHead`. The READY canonical Vercel deployment
-   must report `gitSource.sha == productionHead`; do not compare the deployed
-   SHA to the pre-merge release source SHA.
-5. Smoke test sign-in, Dashboard, Badge Collection, Profile/Steam/Relic, and
-   tournament pages. Confirm no award, notification, Reveal, synthetic player,
-   or fixture was manufactured by migration or deployment.
-6. Enter a stable cutover window, derive and freeze the complete Production
-   candidate list below, and run the exact read-only CLI command from the
-   clean authorized tooling checkout.
-7. Review the release-source/Production/tree and tooling/base/diff evidence,
-   plus candidate, count, hash, database, baseline-award, notification, and
-   Reveal evidence. Do not apply yet.
-8. Return to the Owner for the second, explicit backfill authorization naming
-   `releaseSourceHead`, `productionHead`, `applicationTree`, `toolingHead`,
-   candidate count, both candidate hashes, and the exact apply command.
-9. Only after that authorization, run the apply. The runner performs the first
-   historical pass and the immediate idempotency pass over the same frozen
-   candidate IDs.
-10. Validate the complete retained backfill cohort before any candidate visits
-   Dashboard. Only then allow a qualifying player to exercise the natural
-   pending-Reveal journey.
+1. Reconfirm the exact Production head/tree, READY Vercel deployment SHA,
+   migration ceiling, reviewed tooling head/base/four-path diff, and clean
+   relevant worktrees.
+2. Reconfirm the existing private allowlist is byte-identical and still
+   attests the complete two-player legitimate-open population.
+3. Read and attest the exact live award, notification, and completed Reveal;
+   reject every other non-backfill award.
+4. Derive and verify the one-player historical execution set by subtracting
+   the attested live player from the full cohort. Never create a separate
+   one-player allowlist.
+5. Run the exact read-only preflight below using memory-only credentials and
+   without `--apply`.
+6. Wait for all local, GitHub, and Vercel tooling checks, archive only
+   sanitized evidence, and stop.
+7. Return to the Owner for separate APPLY authorization naming the exact
+   Production/tooling SHAs, full allowlist hashes, live trio, execution count
+   and hash, and exact future command.
+8. Only after that new authorization, repeat every gate, re-attest the live
+   trio immediately before mutation, and call the approved authority with only
+   the derived execution set.
+9. Re-attest the live trio and cohort after pass one, then run the same
+   execution set immediately for the required zero-award second pass.
+10. Re-attest the live trio and cohort after pass two and validate the complete
+    historical delta before any Dashboard acceptance.
 
 Do not allow profile verification, official-result finalization, tournament or
 season finalization, account closure, candidate cleanup, or reconciliation to
-race candidate derivation and the two-pass apply. If the attested population
-changes, fail closed and repeat read-only review with a newly frozen file.
+race candidate/trio attestation and a future two-pass apply. If the population,
+trio, execution hash, or deployment changes, fail closed and return for review.
 
 ## Complete Production candidate population
 
-The candidate list is an evaluation population, not a list of presumed Badge
-winners. It must contain **every legitimate open Production player**, including
+The full candidate list is population attestation, not a hand-selected write
+list. It must contain **every legitimate open Production player**, including
 players with incomplete profiles and players expected to qualify for no Badge.
-Do not filter by Steam/Relic verification, profile completeness, ELO,
-tournament history, match history, award expectation, or any Badge rule.
-`backfillInitialBadgeAwards()` alone decides qualification.
+Do not filter it by Steam/Relic verification, profile completeness, ELO,
+tournament history, match history, award expectation, or any Badge rule. The
+only subtraction is the owner of the exact independently attested live trio;
+that subtraction occurs inside the runner after population attestation. For
+the remaining historical execution set, `backfillInitialBadgeAwards()` alone
+decides qualification.
 
 Exclude only a row that is provably outside the required population:
 
@@ -388,6 +375,86 @@ Recompute only the raw-file hash without exposing content:
 $productionAllowlistSha256 = (Get-FileHash -LiteralPath $productionAllowlist -Algorithm SHA256).Hash.ToLowerInvariant()
 ```
 
+## Collision-aware current Production baseline
+
+The full allowlist remains population attestation, not a write list. The
+current authoritative Production values are:
+
+```text
+populationAttestation.count = 2
+populationAttestation.playerIdsSha256 = 5d9ba68c581d92994fc25394303395f5d261a8d402e9fa7dc97baf683c00d0d3
+allowlist.fileSha256 = ed6fcde74fef31e71549954b9c50ab9d6697b0989fb0fe807021e3f27f73cd6d
+
+liveBaseline.awardId = 7aafe28e-0a3e-4b05-96ea-c1ece084d97b
+liveBaseline.notificationId = b25dd0e9-b27d-48a4-942c-8e8e232f276d
+liveBaseline.revealId = 6f5b2632-c91b-4971-b4db-19240ed7f729
+liveBaseline.playerFingerprint = b71196840fa09572
+
+historicalExecutionSet.count = 1
+historicalExecutionSet.playerIdsSha256 = acdccbcee9e2a5c869c8bb7279eae49f43c2b09ade999ab21a1eef3eb06c0bc1
+historicalExecutionSet.playerFingerprint = 41efa45d817786c1
+```
+
+Do not replace the private two-player allowlist with a one-player file and do
+not manually select the historical player. After the complete legitimate-open
+cohort and exact live trio are independently attested, derive:
+
+```text
+historicalExecutionSet
+= completeLegitimateOpenCandidateIds
+- liveBaseline.playerId
+```
+
+Canonicalize and hash that derived set with the existing player-ID hashing
+rules. Require count `1` and the exact execution-set hash above. Only this
+derived set may be passed as `playerIds` to `backfillInitialBadgeAwards()`.
+The live-baseline player must never be included in that authority call.
+
+The award UUID above must identify exactly one award belonging to a player in
+the full two-player cohort. Require Badge slug `ironclad-recruit`, source type
+`profile`, `source_metadata.evaluationMode = "live"`, and the expected player
+linkage. The notification UUID must identify exactly one notification for the
+same player's Clerk identity, recipient role `player`, type `badge.unlocked`,
+event key `badge-award:7aafe28e-0a3e-4b05-96ea-c1ece084d97b:unlocked`, and
+metadata linking the exact award with Badge slug `ironclad-recruit` and Badge
+number `1`. The Reveal UUID must identify exactly one already
+acknowledged/completed Reveal linking the same player and award.
+
+Normalize the live-trio snapshot to immutable ownership, authority, and
+linkage properties. Mutable notification presentation fields such as read or
+hidden timestamps are not ownership linkage and must not cause a false
+cutover failure; they also must never be modified by the runner.
+
+The reviewed no-write authority evaluation established that this live player
+has no missing awards across the current 30 Badge rules. That evidence does
+not authorize duplicating rule logic in the runner: exclusion is based only on
+the exact live-baseline attestation, and the unchanged authority evaluates the
+remaining historical player.
+
+Accept no other non-backfill Badge ownership. A missing or changed trio row,
+wrong linkage/property, extra non-backfill award, population mismatch, or
+execution-set mismatch is a stop condition; it is not permission to broaden
+the baseline automatically.
+
+The expected counts describe two separate scopes:
+
+| Scope | Awards | `badge.unlocked` notifications | Reveal acknowledgements |
+| --- | ---: | ---: | ---: |
+| Global current Production | 1 | 1 | 1 |
+| Historical-backfill state | 0 | 0 | 0 |
+
+The global `1/1/1` is the exact pinned legitimate live lifecycle, not a
+backfill failure. Historical checks must be scoped to awards whose
+`source_metadata.evaluationMode` is `backfill`, plus notifications and Reveals
+associated with those awards. Arbitrary live state remains forbidden.
+
+Snapshot and re-attest the exact live award, notification, and Reveal at four
+gates: (1) initial read-only preflight, (2) immediately before a separately
+authorized mutation, (3) after historical pass one, and (4) after historical
+pass two. Compare all relevant authority and linkage fields. If the trio
+changes during the window, stop before the next operation and retain it
+untouched.
+
 ## Staging validation disposition
 
 No genuine, non-synthetic, provider-verified Staging candidate is currently
@@ -409,27 +476,47 @@ npx vitest run tests/unit/badge-initial-backfill-cli.test.ts tests/integration/b
 
 The automated evidence must cover target/ref and split-head rejection, dirty
 tooling rejection, canonical file/hash rejection, complete-candidate
-attestation, `evaluationMode: "backfill"`, notification suppression, absence
-of pre-created Reveal rows, first-pass failure handling, partial-write retry,
-and immediate second-pass zero. It must not load Production credentials or
-contact either live environment. A read-only Production preflight after the
-approved application deployment remains mandatory.
+attestation, all-or-none collision arguments, exact live-trio identity and
+linkage, unexpected-live-state rejection, derived execution-set hashing and
+live-player exclusion, `evaluationMode: "backfill"`, historical notification
+suppression, absence of historical Reveal rows, live-trio immutability at all
+four gates, first-pass failure handling, partial-write retry, and immediate
+second-pass zero. It must not load Production credentials or contact either
+live environment. A read-only Production preflight remains mandatory.
 
 ## Production preflight — read only
 
-Run this only after the first Owner authorization, the exact 18 migrations,
-the PR #88 merge/deployment, smoke tests, and candidate derivation. Run it from
-the root of the clean local tooling checkout. Fill in the exact post-merge
-Production SHA, reviewed tooling SHA, and private file path.
+Run this from the root of the clean reviewed tooling checkout after reconfirming
+the deployed application and migration ledger. Fill in only the new reviewed
+tooling SHA and the existing private two-player allowlist path. The command
+uses the pinned Supabase CLI to read the two existing legacy project keys into
+process memory, runs the local runner directly, and removes the three temporary
+runner variables in `finally`. Do not use `vercel env run` for credentials.
+
+Use only existing keys returned by the authenticated pinned CLI for exact
+project `nsyjtqpvyxlzyujlbzos`. Do not create, rotate, disable, print, decode,
+persist, copy, or commit a key; do not alter Supabase or Vercel configuration.
+Capture the JSON response only in process memory—never use `tee`, a temporary
+credential file, `.env`, shell tracing, or verbose output. If the exact legacy
+`service_role` JWT and legacy public `anon` key cannot be selected uniquely,
+stop without another workaround. The fixed URL and two key values may exist
+only in the current PowerShell process for the direct runner invocation and
+must be absent after `finally` cleanup.
 
 ```powershell
 $releaseSourceHead = "ac612018f6c27963a59df84815d0a76ebbcbd27e"
 $applicationTree = "6ba0e3b2308bd22c3c9dea62efb235f1bb48326c"
-$productionHead = "REPLACE_WITH_40_CHARACTER_POST_MERGE_MASTER_SHA"
+$productionHead = "c6109d85de98f73545209a016c3114d953b8ebba"
 $toolingHead = "REPLACE_WITH_40_CHARACTER_REVIEWED_TOOLING_SHA"
 $productionAllowlist = "C:\ABSOLUTE\PRIVATE\PATH\badge-backfill-production.json"
 $productionAllowlistSha256 = (Get-FileHash -LiteralPath $productionAllowlist -Algorithm SHA256).Hash.ToLowerInvariant()
 $productionBaseUrl = "https://www.ironcladtournaments.com"
+$expectedAllowlistSha256 = "ed6fcde74fef31e71549954b9c50ab9d6697b0989fb0fe807021e3f27f73cd6d"
+$expectedLiveAwardId = "7aafe28e-0a3e-4b05-96ea-c1ece084d97b"
+$expectedLiveNotificationId = "b25dd0e9-b27d-48a4-942c-8e8e232f276d"
+$expectedLiveRevealId = "6f5b2632-c91b-4971-b4db-19240ed7f729"
+$expectedExecutionCount = 1
+$expectedExecutionSetSha256 = "acdccbcee9e2a5c869c8bb7279eae49f43c2b09ade999ab21a1eef3eb06c0bc1"
 $expectedToolingPaths = @(
   "docs/achievement-badge-production-cutover-runbook.md"
   "scripts/badges/initial-awards-backfill.mjs"
@@ -450,18 +537,102 @@ if ((git --no-replace-objects merge-base $toolingHead $releaseSourceHead).Trim()
 $actualToolingPaths = @(git --no-replace-objects diff --name-only --no-renames ($releaseSourceHead + ".." + $toolingHead) --)
 $toolingPathDifference = @(Compare-Object ($expectedToolingPaths | Sort-Object) ($actualToolingPaths | Sort-Object))
 if ($toolingPathDifference.Count -ne 0) { throw "Tooling diff is not the exact reviewed four-path set." }
+if ($productionAllowlistSha256 -cne $expectedAllowlistSha256) { throw "Private allowlist file hash mismatch." }
 
-npx.cmd --yes vercel@59.1.4 env run `
-  --environment=production `
-  --scope=ironclad-tournaments `
-  -- node scripts/badges/initial-awards-backfill.mjs `
-  --target production `
-  --confirm-project-ref nsyjtqpvyxlzyujlbzos `
-  --base-url $productionBaseUrl `
-  --expected-production-head $productionHead `
-  --expected-tooling-head $toolingHead `
-  --allowlist-file $productionAllowlist `
-  --allowlist-sha256 $productionAllowlistSha256
+$temporaryRunnerVariables = @(
+  "NEXT_PUBLIC_SUPABASE_URL"
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  "SUPABASE_SERVICE_ROLE_KEY"
+)
+foreach ($variableName in $temporaryRunnerVariables) {
+  if (Test-Path -LiteralPath ("Env:" + $variableName)) {
+    throw "A temporary runner variable is already present; use a clean PowerShell process."
+  }
+}
+if (Test-Path -LiteralPath "Env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") {
+  throw "An ambient public-key override is present; use a clean PowerShell process."
+}
+
+$rawKeyResponse = $null
+$keyRows = $null
+$legacyAnonRows = $null
+$legacyServiceRoleRows = $null
+$legacyAnonKey = $null
+$legacyServiceRoleKey = $null
+$preflightFailed = $false
+
+try {
+  $rawKeyResponse = (& npx.cmd --yes supabase@2.114.0 projects api-keys `
+    --project-ref nsyjtqpvyxlzyujlbzos `
+    --output json 2>$null | Out-String)
+  if ($LASTEXITCODE -ne 0) { throw "Read-only Production API-key listing failed." }
+
+  try {
+    $keyRows = @($rawKeyResponse | ConvertFrom-Json)
+  } catch {
+    throw "Production API-key listing did not return valid JSON."
+  }
+
+  $legacyAnonRows = @($keyRows | Where-Object {
+    $_.name -ceq "anon" -and $_.type -ceq "legacy"
+  })
+  $legacyServiceRoleRows = @($keyRows | Where-Object {
+    $_.name -ceq "service_role" -and $_.type -ceq "legacy"
+  })
+  if ($legacyAnonRows.Count -ne 1 -or $legacyServiceRoleRows.Count -ne 1) {
+    throw "Exact existing legacy anon/service_role keys were not uniquely available."
+  }
+
+  $legacyAnonKey = [string]$legacyAnonRows[0].api_key
+  $legacyServiceRoleKey = [string]$legacyServiceRoleRows[0].api_key
+  if ([string]::IsNullOrWhiteSpace($legacyAnonKey) -or
+      [string]::IsNullOrWhiteSpace($legacyServiceRoleKey) -or
+      $legacyServiceRoleKey.Split(".").Count -ne 3) {
+    throw "Existing legacy Production key validation failed."
+  }
+
+  $env:NEXT_PUBLIC_SUPABASE_URL = "https://nsyjtqpvyxlzyujlbzos.supabase.co"
+  $env:NEXT_PUBLIC_SUPABASE_ANON_KEY = $legacyAnonKey
+  $env:SUPABASE_SERVICE_ROLE_KEY = $legacyServiceRoleKey
+
+  & node scripts/badges/initial-awards-backfill.mjs `
+    --target production `
+    --confirm-project-ref nsyjtqpvyxlzyujlbzos `
+    --base-url $productionBaseUrl `
+    --expected-production-head $productionHead `
+    --expected-tooling-head $toolingHead `
+    --allowlist-file $productionAllowlist `
+    --allowlist-sha256 $productionAllowlistSha256 `
+    --expected-live-award-id $expectedLiveAwardId `
+    --expected-live-notification-id $expectedLiveNotificationId `
+    --expected-live-reveal-id $expectedLiveRevealId `
+    --expected-execution-count $expectedExecutionCount `
+    --expected-execution-set-sha256 $expectedExecutionSetSha256
+  if ($LASTEXITCODE -ne 0) { throw "Read-only Production Badge preflight failed." }
+} catch {
+  # Preserve no ErrorRecord or credential-bearing output. Cleanup and its
+  # verification must complete before a sanitized failure is raised.
+  $preflightFailed = $true
+} finally {
+  foreach ($variableName in $temporaryRunnerVariables) {
+    Remove-Item -LiteralPath ("Env:" + $variableName) -ErrorAction SilentlyContinue
+  }
+  $legacyAnonKey = $null
+  $legacyServiceRoleKey = $null
+  $legacyAnonRows = $null
+  $legacyServiceRoleRows = $null
+  $keyRows = $null
+  $rawKeyResponse = $null
+}
+
+foreach ($variableName in $temporaryRunnerVariables) {
+  if (Test-Path -LiteralPath ("Env:" + $variableName)) {
+    throw "Temporary runner variable cleanup failed."
+  }
+}
+if ($preflightFailed) {
+  throw "Read-only Production Badge preflight failed; temporary runner variables were removed."
+}
 ```
 
 There is no `--apply` flag in this command. It must perform no database write.
@@ -482,10 +653,18 @@ Preflight must fail closed for a target/ref/URL mismatch; stale or mismatched
 `origin/master`; release-source or Production tree mismatch; READY Vercel
 `gitSource.sha` mismatch; local tooling SHA/base/diff/cleanliness mismatch;
 candidate count/hash mismatch; closed, missing, synthetic, or unavailable
-allowlisted player; changed file bytes; non-backfill Production baseline award;
-or any retained backfill award with a matching historical notification or
-Reveal. The exact 18-migration ledger is a separate mandatory prerequisite gate
-and must already be green before this runner is invoked.
+allowlisted player; changed file bytes; a partial collision-aware argument set;
+a missing, mismatched, or noncanonical pinned live trio; any unexpected
+non-backfill award; execution count/hash mismatch; or any retained backfill
+award with a matching historical notification or Reveal. The exact
+18-migration ledger with ceiling `20260831134000` is a separate mandatory
+prerequisite gate and must already be green before this runner is invoked.
+
+The exact successful read-only result is `BADGE_BACKFILL_PREFLIGHT_READY` with
+population count/hash `2` / `5d9ba68c...`, derived execution count/hash `1` /
+`acdccbce...`, an unchanged exact live trio, global `1/1/1`, historical
+backfill `0/0/0`, and `productionMutationMayHaveOccurred = false`. Stop after
+recording sanitized evidence; `--apply` remains unauthorized.
 
 Review and archive only sanitized evidence. Then stop and request the second
 Owner authorization. That authorization must identify:
@@ -497,73 +676,53 @@ Owner authorization. That authorization must identify:
 - canonical Production URL and project ref;
 - global-open, candidate, and each exclusion count;
 - `allowlist.fileSha256` and `allowlist.playerIdsSha256`;
+- all three pinned live row IDs and sanitized property/linkage attestations;
+- the derived historical execution count and player-set SHA-256;
+- global award/notification/Reveal counts separately from backfill-specific
+  counts;
 - preflight timestamp/result and migration ledger evidence; and
 - the exact apply command below.
 
 ## Production apply — separate Owner authorization required
 
-Immediately before apply, reconfirm the stable window, local clean checkout,
-release source, post-merge Production head, both content trees, tooling
-head/base/diff, READY deployment SHA, candidate counts, and both hashes. The
-private file must be byte-identical to preflight. Add only `--apply`:
+`--apply` is **not authorized by this runbook revision or its preflight**.
+After a new, separate Owner authorization, repeat the exact Git, deployment,
+allowlist-hash, API-key retrieval, in-memory injection, and `finally` cleanup
+procedure from the read-only command. Inside that same protected process,
+re-attest the live trio immediately before mutation and invoke the identical
+local command with only one additional flag:
 
 ```powershell
-$releaseSourceHead = "ac612018f6c27963a59df84815d0a76ebbcbd27e"
-$applicationTree = "6ba0e3b2308bd22c3c9dea62efb235f1bb48326c"
-$productionHead = "REPLACE_WITH_40_CHARACTER_POST_MERGE_MASTER_SHA"
-$toolingHead = "REPLACE_WITH_40_CHARACTER_REVIEWED_TOOLING_SHA"
-$productionAllowlist = "C:\ABSOLUTE\PRIVATE\PATH\badge-backfill-production.json"
-$productionAllowlistSha256 = (Get-FileHash -LiteralPath $productionAllowlist -Algorithm SHA256).Hash.ToLowerInvariant()
-$productionBaseUrl = "https://www.ironcladtournaments.com"
-$expectedToolingPaths = @(
-  "docs/achievement-badge-production-cutover-runbook.md"
-  "scripts/badges/initial-awards-backfill.mjs"
-  "tests/integration/badge-initial-backfill-contract.test.ts"
-  "tests/unit/badge-initial-backfill-cli.test.ts"
-)
-$ambientGitControls = @(Get-ChildItem Env: | Where-Object { $_.Name -like "GIT_*" })
-if ($ambientGitControls.Count -ne 0) { throw "Ambient Git control variables must be removed before cutover." }
-
-git --no-replace-objects fetch --no-tags origin refs/heads/master:refs/remotes/origin/master
-if ($LASTEXITCODE -ne 0) { throw "Unable to refresh origin/master." }
-if ((git --no-replace-objects rev-parse HEAD).Trim() -cne $toolingHead) { throw "Wrong local tooling head." }
-if ((git --no-replace-objects status --porcelain | Out-String).Trim().Length -ne 0) { throw "Local tooling checkout is not clean." }
-if ((git --no-replace-objects rev-parse refs/remotes/origin/master).Trim() -cne $productionHead) { throw "origin/master does not equal the authorized Production head." }
-if ((git --no-replace-objects rev-parse ($releaseSourceHead + "^{tree}")).Trim() -cne $applicationTree) { throw "Release source tree mismatch." }
-if ((git --no-replace-objects rev-parse ($productionHead + "^{tree}")).Trim() -cne $applicationTree) { throw "Production head tree mismatch." }
-if ((git --no-replace-objects merge-base $toolingHead $releaseSourceHead).Trim() -cne $releaseSourceHead) { throw "Tooling head is not descended from the release source head." }
-$actualToolingPaths = @(git --no-replace-objects diff --name-only --no-renames ($releaseSourceHead + ".." + $toolingHead) --)
-$toolingPathDifference = @(Compare-Object ($expectedToolingPaths | Sort-Object) ($actualToolingPaths | Sort-Object))
-if ($toolingPathDifference.Count -ne 0) { throw "Tooling diff is not the exact reviewed four-path set." }
-
-npx.cmd --yes vercel@59.1.4 env run `
-  --environment=production `
-  --scope=ironclad-tournaments `
-  -- node scripts/badges/initial-awards-backfill.mjs `
+& node scripts/badges/initial-awards-backfill.mjs `
   --target production `
   --confirm-project-ref nsyjtqpvyxlzyujlbzos `
-  --base-url $productionBaseUrl `
-  --expected-production-head $productionHead `
-  --expected-tooling-head $toolingHead `
+  --base-url https://www.ironcladtournaments.com `
+  --expected-production-head c6109d85de98f73545209a016c3114d953b8ebba `
+  --expected-tooling-head REPLACE_WITH_40_CHARACTER_OWNER_AUTHORIZED_TOOLING_SHA `
   --allowlist-file $productionAllowlist `
-  --allowlist-sha256 $productionAllowlistSha256 `
+  --allowlist-sha256 ed6fcde74fef31e71549954b9c50ab9d6697b0989fb0fe807021e3f27f73cd6d `
+  --expected-live-award-id 7aafe28e-0a3e-4b05-96ea-c1ece084d97b `
+  --expected-live-notification-id b25dd0e9-b27d-48a4-942c-8e8e232f276d `
+  --expected-live-reveal-id 6f5b2632-c91b-4971-b4db-19240ed7f729 `
+  --expected-execution-count 1 `
+  --expected-execution-set-sha256 acdccbcee9e2a5c869c8bb7279eae49f43c2b09ade999ab21a1eef3eb06c0bc1 `
   --apply
 ```
 
-The apply invokes `backfillInitialBadgeAwards()` over fixed batches of the
-frozen candidates. If a batch returns an error, the runner stops scheduling
-later batches and preserves already committed awards for authoritative
-inspection; it does not claim the full cohort was evaluated. A complete,
-error-free first pass must evaluate every frozen candidate and its observed
-database delta must equal the reported award count. Immediately before loading
-the authority, the runner re-attests Git/tooling identity and rechecks the
-deployment and Production candidate snapshot; mutation begins only if all
-three remain unchanged. After pass one it re-attests the candidate snapshot
-and begins the immediate second pass over the same frozen IDs only if that
-snapshot is unchanged. Before reporting success it re-fetches/revalidates Git
-identity and rechecks the deployment again. Incomplete and nonqualifying
-players are expected to create zero awards; that is not an error. Acceptance
-requires a complete second pass with no errors and zero additional awards.
+The apply must call `backfillInitialBadgeAwards()` only with the derived
+one-player historical execution set, never the full allowlist and never the
+live-baseline player. If the authority returns an error, stop and preserve any
+committed historical award for inspection. Pass one must evaluate exactly one
+player and create exactly one `ironclad-recruit` award with source `profile`
+and `source_metadata.evaluationMode = "backfill"`. It must create zero
+notifications and zero Reveal acknowledgements associated with that award.
+
+After re-attesting the exact unchanged live trio and unchanged full cohort,
+run pass two immediately over the same derived one-player execution set. It
+must create zero awards, notifications, or Reveals. Re-attest the trio again
+after pass two. Any trio change, unexpected DML target, extra award, historical
+notification/Reveal, cohort/hash drift, evaluator error, or nonzero second pass
+fails the cutover; it never authorizes cleanup or continuation.
 
 ## Required sanitized evidence and values
 
@@ -580,7 +739,8 @@ Require these artifact and candidate groups:
 - `expectedToolingHead`, `toolingHead`, `toolingTree`, `toolingBaseHead`,
   `toolingMergeBase`, and `toolingDiffPaths`, plus separately recorded
   clean-status evidence;
-- migration expected/applied count (`18`) and ledger match;
+- migration expected/applied count (`18`), ceiling `20260831134000`, and
+  ledger match;
 - derivation output `globalOpenCount`, `candidateCount`, each disjoint
   exclusion count, and `populationEquationMatches`;
 - `allowlist.count`, `allowlist.fileSha256`, and
@@ -591,14 +751,19 @@ Require these artifact and candidate groups:
   `allAllowlistedPlayersLegitimateOpen`, plus `candidatePlayerCount`,
   `candidatePlayerSha256`, and `candidateHashMatches`;
 - `serviceRoleAttestation.allowlistCount` and `allowlistHashMatches`;
+- `collisionAwareBaseline.liveAwardId`, `liveNotificationId`, `liveRevealId`,
+  and `liveTrioValidated`;
+- `historicalExecutionSet.count`, `playerIdsSha256`,
+  `livePlayerExcluded`, and the sanitized member fingerprint;
 - `authority.loader`, `authority.exportVerified`, and `authority.envFile`;
-- `before.awardCount`, `nonBackfillAwardCount`,
-  `retainedBackfillAwardCount`, `retainedBackfillNotifications`, and
-  `retainedBackfillReveals`;
+- `before.awardCount`, `globalBadgeState.awardCount`, `notificationCount`, and
+  `revealCount`, separately from `retainedBackfillAwardCount`,
+  `retainedBackfillNotifications`, and `retainedBackfillReveals`;
 - `firstPass.playersEvaluated`, `awardsCreated`, `badgeCounts`, `errorCount`,
   and `errorsByCode`, and the same fields for `secondPass`; and
 - `postconditions.databaseAttestationUnchanged`,
-  `databaseAttestationUnchangedAfterFirstPass`, `gitAttestationUnchanged`,
+  `databaseAttestationUnchangedAfterFirstPass`, `gitAttestationUnchanged`, and
+  `liveBaselineUnchanged` (which certifies all four required checkpoints),
   `evaluationModeBackfill`, `firstPassNewAwards`, `matchingNotifications`,
   `matchingReveals`, `secondPassNewAwards`, `secondPassZero`, and
   `validatedBackfillCohortAwards`.
@@ -613,7 +778,7 @@ Required values are:
 releaseSourceHead = ac612018f6c27963a59df84815d0a76ebbcbd27e
 releaseSourceTree = 6ba0e3b2308bd22c3c9dea62efb235f1bb48326c
 approvedApplicationTree = 6ba0e3b2308bd22c3c9dea62efb235f1bb48326c
-productionHead = expectedProductionHead = freshly fetched origin/master
+productionHead = expectedProductionHead = freshly fetched origin/master = c6109d85de98f73545209a016c3114d953b8ebba
 productionApplicationTree = approvedApplicationTree
 deployment.gitSha = productionHead
 deployment.target = "production"
@@ -624,10 +789,12 @@ toolingMergeBase = releaseSourceHead
 toolingDiffPaths = exact four authorized paths
 migrations.expectedCount = 18
 migrations.appliedCount = 18
+migrations.ceiling = 20260831134000
 migrations.ledgerMatches = true
 populationEquationMatches = true
-candidateCount = allowlist.count
-playerIdsSha256 = allowlist.playerIdsSha256
+candidateCount = allowlist.count = 2
+playerIdsSha256 = allowlist.playerIdsSha256 = 5d9ba68c581d92994fc25394303395f5d261a8d402e9fa7dc97baf683c00d0d3
+allowlist.fileSha256 = ed6fcde74fef31e71549954b9c50ab9d6697b0989fb0fe807021e3f27f73cd6d
 databaseAttestation.allowlistHashMatches = true
 databaseAttestation.candidatePlayerCount = allowlist.count
 databaseAttestation.candidatePlayerSha256 = allowlist.playerIdsSha256
@@ -640,16 +807,30 @@ serviceRoleAttestation.allowlistHashMatches = true
 authority.loader = "vite-ssr"
 authority.exportVerified = true
 authority.envFile = false
-before.nonBackfillAwardCount = 0
+collisionAwareBaseline.liveAwardId = 7aafe28e-0a3e-4b05-96ea-c1ece084d97b
+collisionAwareBaseline.liveNotificationId = b25dd0e9-b27d-48a4-942c-8e8e232f276d
+collisionAwareBaseline.liveRevealId = 6f5b2632-c91b-4971-b4db-19240ed7f729
+collisionAwareBaseline.liveTrioValidated = true
+historicalExecutionSet.count = 1
+historicalExecutionSet.playerIdsSha256 = acdccbcee9e2a5c869c8bb7279eae49f43c2b09ade999ab21a1eef3eb06c0bc1
+historicalExecutionSet.livePlayerExcluded = true
+before.awardCount = 1
+before.nonBackfillAwardCount = 1
+before.globalBadgeState.awardCount = 1
+before.globalBadgeState.notificationCount = 1
+before.globalBadgeState.revealCount = 1
+before.retainedBackfillAwardCount = 0
 before.retainedBackfillNotifications = 0
 before.retainedBackfillReveals = 0
-firstPass.playersEvaluated = allowlist.count
+firstPass.playersEvaluated = historicalExecutionSet.count
+firstPass.awardsCreated = 1
+firstPass.badgeCounts.ironclad-recruit = 1
 firstPass.errorCount = 0
 postconditions.firstPassNewAwards = firstPass.awardsCreated
 postconditions.evaluationModeBackfill = true
 postconditions.matchingNotifications = 0
 postconditions.matchingReveals = 0
-secondPass.playersEvaluated = allowlist.count
+secondPass.playersEvaluated = historicalExecutionSet.count
 secondPass.awardsCreated = 0
 secondPass.errorCount = 0
 postconditions.secondPassNewAwards = 0
@@ -657,13 +838,14 @@ postconditions.secondPassZero = true
 postconditions.databaseAttestationUnchangedAfterFirstPass = true
 postconditions.databaseAttestationUnchanged = true
 postconditions.gitAttestationUnchanged = true
+postconditions.liveBaselineUnchanged = true
 ```
 
-Production's initial execution expects no baseline Badge awards. A retry after
-a partial attempt may retain valid awards, but every retained award for the
-frozen cohort must have `source_metadata.evaluationMode = "backfill"`. Any
-non-backfill baseline count fails with
-`PRODUCTION_BASELINE_AWARD_MODE_MISMATCH`.
+Production's collision-aware execution expects exactly the pinned live award
+as its only non-backfill baseline award. Every retained historical award must
+have `source_metadata.evaluationMode = "backfill"`. Any other non-backfill
+award, including another otherwise valid live award, fails closed and requires
+a fresh forensic review; it is never silently accepted.
 
 The apply must re-run the read-only database attestation after pass one and
 must not begin pass two if count/hash or candidate status changed. It re-runs
@@ -672,17 +854,21 @@ the same attestation after pass two. A change fails with
 `DATABASE_ATTESTATION_CHANGED_DURING_BACKFILL`, respectively. Valid awards
 already committed remain valid, but the cutover is not accepted.
 
-The notification/Reveal checks cover the **entire retained backfill cohort**,
-not only current-run deltas. `postconditions.validatedBackfillCohortAwards`
-must equal the retained cohort count that was actually inspected. This permits
-a clean retry after partial writes while preventing a historical notification
-or acknowledgement from being hidden by delta-only evidence.
+The notification/Reveal checks cover the **entire retained historical
+backfill cohort**, not the pinned live trio and not only current-run deltas.
+`postconditions.validatedBackfillCohortAwards` must equal the retained
+historical cohort count actually inspected. Separately, each live-trio gate
+must prove exact immutability. This permits a clean retry after partial writes
+without misclassifying the legitimate live `1/1/1` or hiding a historical
+notification or acknowledgement.
 
 ## Required natural Recruit outcome
 
-Complete all retry/idempotency and cohort checks before any allowlisted player
-visits Dashboard. For an existing legitimate Production player whose already
-verified data satisfies the complete IronClad Recruit rule, require:
+Complete all retry/idempotency, live-trio, and cohort checks before the
+historical execution candidate visits Dashboard after a future apply. The
+already-live player has completed a legitimate Reveal and is outside this
+acceptance flow. For the historical candidate whose already verified data
+satisfies the complete IronClad Recruit rule, require:
 
 ```text
 existing verified Production data
@@ -709,9 +895,11 @@ exactly one owned `player_badge_reveals` row must persist; refreshes of
 acknowledgement must be idempotent. Recheck that no historical
 `badge.unlocked` notification, Badge email, or Web Push was created.
 
-Once a retained award has been naturally acknowledged, the runner's preflight
-cohort gate will intentionally reject it. Therefore never begin Dashboard
-acceptance while an apply retry or postcondition investigation remains open.
+Once the new historical award has been naturally acknowledged, a fresh
+cutover preflight will intentionally reject its changed baseline. Therefore
+never begin the historical candidate's Dashboard acceptance while an apply
+retry or postcondition investigation remains open. This does not alter or
+invalidate the already-completed live Reveal.
 
 ## Failure, retry, and rollback behavior
 
@@ -736,17 +924,20 @@ On any preflight or apply failure:
    database delta, not merely a returned counter, determines what committed.
 4. Treat release-source/Production/tree mismatch, Vercel head mismatch,
    tooling base/diff mismatch, dirty tooling, population/hash drift,
-   non-backfill metadata, any matching historical notification or Reveal,
-   first-pass errors, or a nonzero second pass as a blocker.
+   unattested or changed non-backfill metadata, any matching historical
+   notification or Reveal, first-pass errors, or a nonzero second pass as a
+   blocker.
 5. Fix the underlying tooling, application, credential, identity, availability,
    or stable-window issue under review. Renew authorization if
    `releaseSourceHead`, `productionHead`, `applicationTree`, `toolingHead`, the
    tooling base/diff, deployment, candidate bytes, target state, or scope
    changes.
-6. Retry only the existing `backfill` path over the same still-valid frozen
-   IDs. Uniqueness on `(player_id, badge_slug)` preserves valid awards and
-   prevents duplicates. Acceptance still requires a clean pass followed by an
-   immediate zero-award pass and full retained-cohort validation.
+6. Retry only the existing `backfill` path over the same still-valid derived
+   historical execution set. Never substitute the full allowlist or include
+   the live-baseline player. Uniqueness on `(player_id, badge_slug)` preserves
+   valid awards and prevents duplicates. Acceptance still requires a clean
+   pass followed by an immediate zero-award pass, four live-trio attestations,
+   and full retained-historical-cohort validation.
 
 There is no automatic award rollback. Correct historical awards are immutable
 entitlements; deleting them can cascade presentation state and destroy audit
@@ -756,20 +947,24 @@ proven incorrect, stop and obtain a separately reviewed corrective procedure.
 
 ## Completion record
 
-- Current Production mutation total: **zero required while HOLD remains**
-- Release-cutover Owner authorization: pending
-- Exact 18-migration Production ledger/apply evidence: pending
+- Production mutations under this tooling revision: **zero required**
+- Badge application release: **complete and frozen**
+- Migration ledger ceiling: `20260831134000`
 - Frozen PR #88 release source head: `ac612018...`
-- Approved application tree: `6ba0e3b...`
-- Post-merge `productionHead` / `origin/master`: pending
-- READY canonical Vercel `gitSource.sha` and smoke evidence: pending
-- Reviewed tooling head/tree/base/diff scope: pending
-- Automated runner/dry-run test evidence: pending
+- Approved/Production application tree: `6ba0e3b...`
+- `productionHead` / `origin/master`: `c6109d85...`
+- READY canonical Vercel `gitSource.sha`: `c6109d85...`
+- Reviewed collision-aware tooling head/tree/base/diff scope: pending new SHA
+- Automated runner/collision test evidence: pending
 - Staging live candidate/apply: **not performed; no genuine candidate attested**
-- Production global-open/candidate/exclusion counts: pending
-- Production fileSha256/playerIdsSha256: pending
-- Production read-only preflight and retained-cohort baseline: pending
-- Separate backfill Owner authorization: pending
-- Production first pass / immediate zero pass: pending
-- Production post-apply database/notification/Reveal evidence: pending
-- Natural Production Recruit Dashboard journey: pending
+- Production population count/hash: `2` / `5d9ba68c...`
+- Production allowlist file SHA-256: `ed6fcde74...`
+- Exact pinned live award/notification/Reveal: attested `1/1/1`
+- Historical execution count/hash: `1` / `acdccbce...`
+- Historical-backfill award/notification/Reveal baseline: `0/0/0`
+- Fresh collision-aware read-only Production preflight: pending
+- Separate Production backfill APPLY authorization: **not granted**
+- Draft PR #89: must remain OPEN, Draft, and unmerged
+- Production first pass / immediate zero pass: not run
+- Production post-apply evidence: not applicable until separately authorized
+- Natural Production Recruit Dashboard journey: pending after accepted apply

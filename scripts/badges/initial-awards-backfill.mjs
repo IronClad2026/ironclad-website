@@ -80,6 +80,11 @@ export function parseArguments(argv) {
     apply: false,
     baseUrl: null,
     confirmProjectRef: null,
+    expectedExecutionCount: null,
+    expectedExecutionSetSha256: null,
+    expectedLiveAwardId: null,
+    expectedLiveNotificationId: null,
+    expectedLiveRevealId: null,
     expectedProductionHead: null,
     expectedStagingHead: null,
     expectedToolingHead: null,
@@ -92,6 +97,11 @@ export function parseArguments(argv) {
     ["--allowlist-sha256", "allowlistSha256"],
     ["--base-url", "baseUrl"],
     ["--confirm-project-ref", "confirmProjectRef"],
+    ["--expected-execution-count", "expectedExecutionCount"],
+    ["--expected-execution-set-sha256", "expectedExecutionSetSha256"],
+    ["--expected-live-award-id", "expectedLiveAwardId"],
+    ["--expected-live-notification-id", "expectedLiveNotificationId"],
+    ["--expected-live-reveal-id", "expectedLiveRevealId"],
     ["--expected-production-head", "expectedProductionHead"],
     ["--expected-staging-head", "expectedStagingHead"],
     ["--expected-tooling-head", "expectedToolingHead"],
@@ -160,10 +170,67 @@ export function validateOptions(options) {
   }
   if (!options.allowlistFile) fail("ALLOWLIST_FILE_REQUIRED");
 
+  const liveBaselineOptionValues = [
+    options.expectedLiveAwardId,
+    options.expectedLiveNotificationId,
+    options.expectedLiveRevealId,
+    options.expectedExecutionCount,
+    options.expectedExecutionSetSha256,
+  ];
+  const suppliedLiveBaselineOptionCount = liveBaselineOptionValues.filter(
+    (value) => value !== null && value !== undefined
+  ).length;
+  if (
+    suppliedLiveBaselineOptionCount !== 0 &&
+    suppliedLiveBaselineOptionCount !== liveBaselineOptionValues.length
+  ) {
+    fail("LIVE_BASELINE_ARGUMENTS_PARTIAL");
+  }
+  if (options.target === "production" && suppliedLiveBaselineOptionCount === 0) {
+    fail("PRODUCTION_LIVE_BASELINE_REQUIRED");
+  }
+  if (options.target === "staging" && suppliedLiveBaselineOptionCount !== 0) {
+    fail("STAGING_LIVE_BASELINE_UNEXPECTED");
+  }
+
+  let collisionBaseline = null;
+  if (suppliedLiveBaselineOptionCount === liveBaselineOptionValues.length) {
+    if (!UUID_PATTERN.test(options.expectedLiveAwardId ?? "")) {
+      fail("EXPECTED_LIVE_AWARD_ID_INVALID");
+    }
+    if (!UUID_PATTERN.test(options.expectedLiveNotificationId ?? "")) {
+      fail("EXPECTED_LIVE_NOTIFICATION_ID_INVALID");
+    }
+    if (!UUID_PATTERN.test(options.expectedLiveRevealId ?? "")) {
+      fail("EXPECTED_LIVE_REVEAL_ID_INVALID");
+    }
+    if (!/^[1-9][0-9]*$/.test(options.expectedExecutionCount ?? "")) {
+      fail("EXPECTED_EXECUTION_COUNT_INVALID");
+    }
+    const expectedExecutionCount = Number(options.expectedExecutionCount);
+    if (
+      !Number.isSafeInteger(expectedExecutionCount) ||
+      expectedExecutionCount !== 1
+    ) {
+      fail("EXPECTED_EXECUTION_COUNT_INVALID");
+    }
+    if (!SHA256_PATTERN.test(options.expectedExecutionSetSha256 ?? "")) {
+      fail("EXPECTED_EXECUTION_SET_SHA256_INVALID");
+    }
+    collisionBaseline = {
+      awardId: options.expectedLiveAwardId,
+      executionCount: expectedExecutionCount,
+      executionSetSha256: options.expectedExecutionSetSha256,
+      notificationId: options.expectedLiveNotificationId,
+      revealId: options.expectedLiveRevealId,
+    };
+  }
+
   const baseUrl = validateBaseUrl(options.baseUrl, options.target);
   return {
     ...options,
     baseUrl,
+    collisionBaseline,
     targetConfig: target,
   };
 }
@@ -231,6 +298,44 @@ export function hashPlayerIds(playerIds) {
   return createHash("sha256")
     .update(serializePlayerIds(playerIds), "utf8")
     .digest("hex");
+}
+
+export function deriveHistoricalExecutionSet(
+  fullPlayerIds,
+  livePlayerId,
+  { expectedCount, expectedSha256 }
+) {
+  const canonicalFullPlayerIds = canonicalizePlayerIds(fullPlayerIds);
+  if (
+    typeof livePlayerId !== "string" ||
+    !UUID_PATTERN.test(livePlayerId) ||
+    !canonicalFullPlayerIds.includes(livePlayerId)
+  ) {
+    fail("LIVE_BASELINE_AWARD_MISMATCH");
+  }
+
+  const playerIds = canonicalFullPlayerIds.filter(
+    (playerId) => playerId !== livePlayerId
+  );
+  if (playerIds.includes(livePlayerId)) {
+    fail("LIVE_BASELINE_PLAYER_IN_EXECUTION_SET");
+  }
+  if (playerIds.length !== expectedCount) {
+    fail("HISTORICAL_EXECUTION_COUNT_MISMATCH", {
+      actualCount: playerIds.length,
+      expectedCount,
+    });
+  }
+
+  const playerIdsSha256 = hashPlayerIds(playerIds);
+  if (playerIdsSha256 !== expectedSha256) {
+    fail("HISTORICAL_EXECUTION_SET_SHA256_MISMATCH", {
+      actualCount: playerIds.length,
+      expectedCount,
+    });
+  }
+
+  return { playerIds, playerIdsSha256 };
 }
 
 export function parseAllowlistDocument(text, { target, projectRef }) {
@@ -717,6 +822,33 @@ export function validateNewAwardMetadata(rows) {
   return true;
 }
 
+export function validateHistoricalAwardDelta(rows, executionPlayerIds) {
+  const canonicalExecutionPlayerIds = canonicalizePlayerIds(
+    executionPlayerIds
+  );
+  if (canonicalExecutionPlayerIds.length !== 1 || rows.length !== 1) {
+    fail("HISTORICAL_AWARD_DELTA_MISMATCH", {
+      executionCount: canonicalExecutionPlayerIds.length,
+      newAwardCount: rows.length,
+    });
+  }
+
+  const row = parseAwardRow(rows[0]);
+  if (
+    row.player_id !== canonicalExecutionPlayerIds[0] ||
+    row.badge_slug !== "ironclad-recruit" ||
+    row.source_type !== "profile" ||
+    row.source_id !== row.player_id ||
+    row.source_metadata.evaluationMode !== "backfill"
+  ) {
+    fail("HISTORICAL_AWARD_DELTA_MISMATCH", {
+      executionCount: canonicalExecutionPlayerIds.length,
+      newAwardCount: rows.length,
+    });
+  }
+  return true;
+}
+
 export function validateLoadedAuthority(value) {
   if (
     !isRecord(value) ||
@@ -787,25 +919,48 @@ export async function runInitialAwardsBackfill(
     supabase,
     allowlist.playerIds
   );
+  const serviceRolePlayerIds = serviceRolePlayers.map((player) => player.id);
   if (
     serviceRolePlayers.length !== allowlist.playerIds.length ||
-    hashPlayerIds(serviceRolePlayers) !== allowlist.playerIdsSha256
+    hashPlayerIds(serviceRolePlayerIds) !== allowlist.playerIdsSha256
   ) {
     fail("SERVICE_ROLE_ALLOWLIST_ATTESTATION_MISMATCH");
   }
 
   const beforeAwards = await loadAwardRows(supabase, allowlist.playerIds);
-  const baselineNonBackfillAwards = beforeAwards.filter(
+  let initialLiveBaseline = null;
+  let initialGlobalBadgeState = null;
+  let executionSet = {
+    playerIds: allowlist.playerIds,
+    playerIdsSha256: allowlist.playerIdsSha256,
+  };
+  let baselineNonBackfillAwards = beforeAwards.filter(
     (award) => !isBackfillAward(award)
   );
-  if (
-    options.target === "production" &&
-    baselineNonBackfillAwards.length !== 0
-  ) {
-    fail("PRODUCTION_BASELINE_AWARD_MODE_MISMATCH", {
-      baselineAwardCount: beforeAwards.length,
-      nonBackfillAwardCount: baselineNonBackfillAwards.length,
-    });
+  if (options.target === "production") {
+    initialLiveBaseline = await loadLiveBaseline(
+      supabase,
+      options.collisionBaseline,
+      serviceRolePlayers
+    );
+    baselineNonBackfillAwards = validateSoleLiveBaselineAward(
+      beforeAwards,
+      initialLiveBaseline
+    );
+    executionSet = deriveHistoricalExecutionSet(
+      allowlist.playerIds,
+      initialLiveBaseline.award.player_id,
+      {
+        expectedCount: options.collisionBaseline.executionCount,
+        expectedSha256: options.collisionBaseline.executionSetSha256,
+      }
+    );
+    initialGlobalBadgeState = await loadGlobalBadgeState(supabase);
+    assertGlobalBadgeState(
+      initialGlobalBadgeState,
+      { awardCount: 1, notificationCount: 1, revealCount: 1 },
+      "PRODUCTION_GLOBAL_BADGE_BASELINE_MISMATCH"
+    );
   }
   const existingBackfillAwards = beforeAwards.filter(isBackfillAward);
   const existingBackfillNotificationCount = await countMatchingNotifications(
@@ -836,6 +991,7 @@ export async function runInitialAwardsBackfill(
     authority: null,
     before: {
       awardCount: beforeAwards.length,
+      globalBadgeState: initialGlobalBadgeState,
       nonBackfillAwardCount: baselineNonBackfillAwards.length,
       retainedBackfillAwardCount: existingBackfillAwards.length,
       retainedBackfillNotifications: existingBackfillNotificationCount,
@@ -863,6 +1019,25 @@ export async function runInitialAwardsBackfill(
       allowlistCount: serviceRolePlayers.length,
       allowlistHashMatches: true,
     },
+    collisionAwareBaseline:
+      options.target === "production"
+        ? {
+            liveAwardId: options.collisionBaseline.awardId,
+            liveNotificationId: options.collisionBaseline.notificationId,
+            liveRevealId: options.collisionBaseline.revealId,
+            liveTrioValidated: true,
+          }
+        : null,
+    historicalExecutionSet: {
+      count: executionSet.playerIds.length,
+      livePlayerExcluded:
+        options.target === "production"
+          ? !executionSet.playerIds.includes(
+              initialLiveBaseline.award.player_id
+            )
+          : null,
+      playerIdsSha256: executionSet.playerIdsSha256,
+    },
     target: options.target,
     toolingBaseHead: APPROVED_TOOLING_BASE_HEAD,
     toolingDiffPaths: gitAttestation.toolingDiffPaths,
@@ -882,7 +1057,11 @@ export async function runInitialAwardsBackfill(
         exportVerified: true,
         loader: "vite-ssr",
       };
-      return { ...report, code: "BADGE_BACKFILL_PREFLIGHT_READY" };
+      return {
+        ...report,
+        code: "BADGE_BACKFILL_PREFLIGHT_READY",
+        productionMutationMayHaveOccurred: false,
+      };
     } finally {
       if (typeof preflightAuthorityServer?.close === "function") {
         await preflightAuthorityServer.close();
@@ -923,6 +1102,54 @@ export async function runInitialAwardsBackfill(
     fail("DATABASE_ATTESTATION_CHANGED_BEFORE_APPLY");
   }
 
+  if (options.target === "production") {
+    const immediatePlayers = await loadAllowlistedPlayers(
+      supabase,
+      allowlist.playerIds
+    );
+    if (stableJson(immediatePlayers) !== stableJson(serviceRolePlayers)) {
+      fail("SERVICE_ROLE_ALLOWLIST_CHANGED_BEFORE_APPLY");
+    }
+    const immediateAwards = await loadAwardRows(
+      supabase,
+      allowlist.playerIds
+    );
+    if (stableJson(immediateAwards) !== stableJson(beforeAwards)) {
+      fail("AWARD_BASELINE_CHANGED_BEFORE_APPLY");
+    }
+    const immediateLiveBaseline = await loadLiveBaseline(
+      supabase,
+      options.collisionBaseline,
+      immediatePlayers
+    );
+    validateSoleLiveBaselineAward(
+      immediateAwards,
+      immediateLiveBaseline
+    );
+    assertLiveBaselineUnchanged(
+      initialLiveBaseline,
+      immediateLiveBaseline,
+      "before-first-pass"
+    );
+    const immediateExecutionSet = deriveHistoricalExecutionSet(
+      allowlist.playerIds,
+      immediateLiveBaseline.award.player_id,
+      {
+        expectedCount: options.collisionBaseline.executionCount,
+        expectedSha256: options.collisionBaseline.executionSetSha256,
+      }
+    );
+    if (stableJson(immediateExecutionSet) !== stableJson(executionSet)) {
+      fail("HISTORICAL_EXECUTION_SET_CHANGED_BEFORE_APPLY");
+    }
+    const immediateGlobalBadgeState = await loadGlobalBadgeState(supabase);
+    assertGlobalBadgeState(
+      immediateGlobalBadgeState,
+      initialGlobalBadgeState,
+      "PRODUCTION_GLOBAL_BADGE_BASELINE_CHANGED_BEFORE_APPLY"
+    );
+  }
+
   let authorityServer;
   try {
     const loaded = await authorityLoader(repositoryRoot);
@@ -936,7 +1163,7 @@ export async function runInitialAwardsBackfill(
 
     const firstResults = await runBatchedBackfill({
       backfillInitialBadgeAwards,
-      playerIds: allowlist.playerIds,
+      playerIds: executionSet.playerIds,
       supabase,
     });
     const firstPass = aggregateBackfillResults(firstResults);
@@ -948,6 +1175,12 @@ export async function runInitialAwardsBackfill(
     const firstBackfillCohort = afterFirstAwards.filter(isBackfillAward);
     report.firstPass = firstPass;
     validateNewAwardMetadata(firstNewAwards);
+    if (options.target === "production") {
+      validateHistoricalAwardDelta(
+        firstNewAwards,
+        executionSet.playerIds
+      );
+    }
 
     const firstNotificationCount = await countMatchingNotifications(
       supabase,
@@ -978,9 +1211,54 @@ export async function runInitialAwardsBackfill(
 
     validateBackfillPass(firstPass, {
       expectedNewAwards: firstNewAwards.length,
-      expectedPlayers: allowlist.playerIds.length,
+      expectedPlayers: executionSet.playerIds.length,
       requireZero: false,
     });
+
+    if (options.target === "production") {
+      const afterFirstPlayers = await loadAllowlistedPlayers(
+        supabase,
+        allowlist.playerIds
+      );
+      if (stableJson(afterFirstPlayers) !== stableJson(serviceRolePlayers)) {
+        fail("SERVICE_ROLE_ALLOWLIST_CHANGED_AFTER_FIRST_PASS");
+      }
+      const afterFirstLiveBaseline = await loadLiveBaseline(
+        supabase,
+        options.collisionBaseline,
+        afterFirstPlayers
+      );
+      validateSoleLiveBaselineAward(
+        afterFirstAwards,
+        afterFirstLiveBaseline
+      );
+      assertLiveBaselineUnchanged(
+        initialLiveBaseline,
+        afterFirstLiveBaseline,
+        "after-first-pass"
+      );
+      const afterFirstExecutionSet = deriveHistoricalExecutionSet(
+        allowlist.playerIds,
+        afterFirstLiveBaseline.award.player_id,
+        {
+          expectedCount: options.collisionBaseline.executionCount,
+          expectedSha256: options.collisionBaseline.executionSetSha256,
+        }
+      );
+      if (stableJson(afterFirstExecutionSet) !== stableJson(executionSet)) {
+        fail("HISTORICAL_EXECUTION_SET_CHANGED_AFTER_FIRST_PASS");
+      }
+      const afterFirstGlobalBadgeState = await loadGlobalBadgeState(supabase);
+      assertGlobalBadgeState(
+        afterFirstGlobalBadgeState,
+        {
+          awardCount: initialGlobalBadgeState.awardCount + 1,
+          notificationCount: initialGlobalBadgeState.notificationCount,
+          revealCount: initialGlobalBadgeState.revealCount,
+        },
+        "PRODUCTION_GLOBAL_BADGE_STATE_CHANGED_AFTER_FIRST_PASS"
+      );
+    }
 
     const afterFirstPassDatabaseAttestation = validateDatabaseAttestation(
       queryDatabaseAttestation(
@@ -1004,9 +1282,61 @@ export async function runInitialAwardsBackfill(
       });
     }
 
+    if (options.target === "production") {
+      const beforeSecondPlayers = await loadAllowlistedPlayers(
+        supabase,
+        allowlist.playerIds
+      );
+      if (stableJson(beforeSecondPlayers) !== stableJson(serviceRolePlayers)) {
+        fail("SERVICE_ROLE_ALLOWLIST_CHANGED_BEFORE_SECOND_PASS");
+      }
+      const beforeSecondAwards = await loadAwardRows(
+        supabase,
+        allowlist.playerIds
+      );
+      if (stableJson(beforeSecondAwards) !== stableJson(afterFirstAwards)) {
+        fail("AWARD_BASELINE_CHANGED_BEFORE_SECOND_PASS");
+      }
+      const beforeSecondLiveBaseline = await loadLiveBaseline(
+        supabase,
+        options.collisionBaseline,
+        beforeSecondPlayers
+      );
+      validateSoleLiveBaselineAward(
+        beforeSecondAwards,
+        beforeSecondLiveBaseline
+      );
+      assertLiveBaselineUnchanged(
+        initialLiveBaseline,
+        beforeSecondLiveBaseline,
+        "before-second-pass"
+      );
+      const beforeSecondExecutionSet = deriveHistoricalExecutionSet(
+        allowlist.playerIds,
+        beforeSecondLiveBaseline.award.player_id,
+        {
+          expectedCount: options.collisionBaseline.executionCount,
+          expectedSha256: options.collisionBaseline.executionSetSha256,
+        }
+      );
+      if (stableJson(beforeSecondExecutionSet) !== stableJson(executionSet)) {
+        fail("HISTORICAL_EXECUTION_SET_CHANGED_BEFORE_SECOND_PASS");
+      }
+      const beforeSecondGlobalBadgeState = await loadGlobalBadgeState(supabase);
+      assertGlobalBadgeState(
+        beforeSecondGlobalBadgeState,
+        {
+          awardCount: initialGlobalBadgeState.awardCount + 1,
+          notificationCount: initialGlobalBadgeState.notificationCount,
+          revealCount: initialGlobalBadgeState.revealCount,
+        },
+        "PRODUCTION_GLOBAL_BADGE_STATE_CHANGED_BEFORE_SECOND_PASS"
+      );
+    }
+
     const secondResults = await runBatchedBackfill({
       backfillInitialBadgeAwards,
-      playerIds: allowlist.playerIds,
+      playerIds: executionSet.playerIds,
       supabase,
     });
     const secondPass = aggregateBackfillResults(secondResults);
@@ -1052,9 +1382,54 @@ export async function runInitialAwardsBackfill(
 
     validateBackfillPass(secondPass, {
       expectedNewAwards: secondNewAwards.length,
-      expectedPlayers: allowlist.playerIds.length,
+      expectedPlayers: executionSet.playerIds.length,
       requireZero: true,
     });
+
+    if (options.target === "production") {
+      const afterSecondPlayers = await loadAllowlistedPlayers(
+        supabase,
+        allowlist.playerIds
+      );
+      if (stableJson(afterSecondPlayers) !== stableJson(serviceRolePlayers)) {
+        fail("SERVICE_ROLE_ALLOWLIST_CHANGED_AFTER_SECOND_PASS");
+      }
+      const afterSecondLiveBaseline = await loadLiveBaseline(
+        supabase,
+        options.collisionBaseline,
+        afterSecondPlayers
+      );
+      validateSoleLiveBaselineAward(
+        afterSecondAwards,
+        afterSecondLiveBaseline
+      );
+      assertLiveBaselineUnchanged(
+        initialLiveBaseline,
+        afterSecondLiveBaseline,
+        "after-second-pass"
+      );
+      const afterSecondExecutionSet = deriveHistoricalExecutionSet(
+        allowlist.playerIds,
+        afterSecondLiveBaseline.award.player_id,
+        {
+          expectedCount: options.collisionBaseline.executionCount,
+          expectedSha256: options.collisionBaseline.executionSetSha256,
+        }
+      );
+      if (stableJson(afterSecondExecutionSet) !== stableJson(executionSet)) {
+        fail("HISTORICAL_EXECUTION_SET_CHANGED_AFTER_SECOND_PASS");
+      }
+      const afterSecondGlobalBadgeState = await loadGlobalBadgeState(supabase);
+      assertGlobalBadgeState(
+        afterSecondGlobalBadgeState,
+        {
+          awardCount: initialGlobalBadgeState.awardCount + 1,
+          notificationCount: initialGlobalBadgeState.notificationCount,
+          revealCount: initialGlobalBadgeState.revealCount,
+        },
+        "PRODUCTION_GLOBAL_BADGE_STATE_CHANGED_AFTER_SECOND_PASS"
+      );
+    }
 
     const finalDatabaseAttestation = validateDatabaseAttestation(
       queryDatabaseAttestation(
@@ -1081,7 +1456,11 @@ export async function runInitialAwardsBackfill(
       databaseAttestationUnchanged: true,
       databaseAttestationUnchangedAfterFirstPass: true,
       evaluationModeBackfill: true,
+      historicalExecutionCount: executionSet.playerIds.length,
+      historicalExecutionSetSha256: executionSet.playerIdsSha256,
       firstPassNewAwards: firstNewAwards.length,
+      liveBaselineUnchanged:
+        options.target === "production" ? true : null,
       matchingNotifications: finalNotificationCount,
       matchingReveals: finalRevealCount,
       secondPassNewAwards: secondNewAwards.length,
@@ -1171,7 +1550,7 @@ export async function runBatchedBackfill({
 }
 
 async function loadAllowlistedPlayers(supabase, playerIds) {
-  const returnedIds = [];
+  const returnedPlayers = [];
   for (const batch of chunks(playerIds, BACKFILL_BATCH_SIZE)) {
     const { data, error } = await supabase
       .from("players")
@@ -1191,10 +1570,19 @@ async function loadAllowlistedPlayers(supabase, playerIds) {
       ) {
         fail("PLAYER_ALLOWLIST_ROW_INVALID");
       }
-      returnedIds.push(row.id);
+      returnedPlayers.push({
+        clerk_user_id: row.clerk_user_id,
+        id: row.id,
+      });
     }
   }
-  return canonicalizePlayerIds(returnedIds);
+  const returnedIds = canonicalizePlayerIds(
+    returnedPlayers.map((player) => player.id)
+  );
+  const playersById = new Map(
+    returnedPlayers.map((player) => [player.id, player])
+  );
+  return returnedIds.map((playerId) => playersById.get(playerId));
 }
 
 async function loadAwardRows(supabase, playerIds) {
@@ -1203,7 +1591,9 @@ async function loadAwardRows(supabase, playerIds) {
     for (let offset = 0; ; offset += REST_PAGE_SIZE) {
       const { data, error } = await supabase
         .from("player_badge_awards")
-        .select("id, player_id, badge_slug, source_metadata")
+        .select(
+          "id, player_id, badge_slug, source_type, source_id, source_metadata"
+        )
         .in("player_id", playerBatch)
         .order("id", { ascending: true })
         .range(offset, offset + REST_PAGE_SIZE - 1);
@@ -1215,6 +1605,202 @@ async function loadAwardRows(supabase, playerIds) {
   return [...indexAwardRows(rows).values()].sort((left, right) =>
     left.id.localeCompare(right.id)
   );
+}
+
+async function loadLiveBaseline(supabase, expected, cohortPlayers) {
+  const [awardResult, notificationResult, revealResult] = await Promise.all([
+    supabase
+      .from("player_badge_awards")
+      .select(
+        "id, player_id, badge_slug, source_type, source_id, source_metadata"
+      )
+      .eq("id", expected.awardId)
+      .maybeSingle(),
+    supabase
+      .from("notifications")
+      .select(
+        "id, recipient_clerk_user_id, recipient_role, type, event_key, metadata"
+      )
+      .eq("id", expected.notificationId)
+      .maybeSingle(),
+    supabase
+      .from("player_badge_reveals")
+      .select(
+        "id, player_badge_award_id, player_id, revealed_at, created_at"
+      )
+      .eq("id", expected.revealId)
+      .maybeSingle(),
+  ]);
+
+  if (awardResult.error) fail("LIVE_BASELINE_AWARD_MISMATCH");
+  if (notificationResult.error) {
+    fail("LIVE_BASELINE_NOTIFICATION_MISMATCH");
+  }
+  if (revealResult.error) fail("LIVE_BASELINE_REVEAL_MISMATCH");
+
+  let award;
+  try {
+    award = parseAwardRow(awardResult.data);
+  } catch {
+    fail("LIVE_BASELINE_AWARD_MISMATCH");
+  }
+  const player = cohortPlayers.find(
+    (candidate) => candidate?.id === award.player_id
+  );
+  if (
+    award.id !== expected.awardId ||
+    !player ||
+    award.badge_slug !== "ironclad-recruit" ||
+    award.source_type !== "profile" ||
+    award.source_id !== award.player_id ||
+    award.source_metadata.evaluationMode !== "live" ||
+    award.source_metadata.evaluator !== "profile-status"
+  ) {
+    fail("LIVE_BASELINE_AWARD_MISMATCH");
+  }
+
+  const notification = parseLiveNotification(
+    notificationResult.data,
+    expected.notificationId
+  );
+  if (
+    notification.recipient_clerk_user_id !== player.clerk_user_id ||
+    notification.recipient_role !== "player" ||
+    notification.type !== "badge.unlocked" ||
+    notification.event_key !== `badge-award:${award.id}:unlocked` ||
+    notification.metadata.awardId !== award.id ||
+    notification.metadata.badgeSlug !== award.badge_slug ||
+    notification.metadata.badgeNumber !== 1
+  ) {
+    fail("LIVE_BASELINE_NOTIFICATION_MISMATCH");
+  }
+
+  const reveal = parseLiveReveal(revealResult.data, expected.revealId);
+  if (
+    reveal.player_badge_award_id !== award.id ||
+    reveal.player_id !== award.player_id
+  ) {
+    fail("LIVE_BASELINE_REVEAL_MISMATCH");
+  }
+
+  return { award, notification, reveal };
+}
+
+function parseLiveNotification(value, expectedId) {
+  if (
+    !isRecord(value) ||
+    value.id !== expectedId ||
+    !UUID_PATTERN.test(value.id) ||
+    typeof value.recipient_clerk_user_id !== "string" ||
+    !CLERK_USER_ID_PATTERN.test(value.recipient_clerk_user_id) ||
+    typeof value.recipient_role !== "string" ||
+    typeof value.type !== "string" ||
+    typeof value.event_key !== "string" ||
+    !isRecord(value.metadata)
+  ) {
+    fail("LIVE_BASELINE_NOTIFICATION_MISMATCH");
+  }
+  return {
+    event_key: value.event_key,
+    id: value.id,
+    metadata: value.metadata,
+    recipient_clerk_user_id: value.recipient_clerk_user_id,
+    recipient_role: value.recipient_role,
+    type: value.type,
+  };
+}
+
+function parseLiveReveal(value, expectedId) {
+  if (
+    !isRecord(value) ||
+    value.id !== expectedId ||
+    !UUID_PATTERN.test(value.id) ||
+    typeof value.player_badge_award_id !== "string" ||
+    !UUID_PATTERN.test(value.player_badge_award_id) ||
+    typeof value.player_id !== "string" ||
+    !UUID_PATTERN.test(value.player_id) ||
+    typeof value.revealed_at !== "string" ||
+    value.revealed_at.length === 0 ||
+    typeof value.created_at !== "string" ||
+    value.created_at.length === 0
+  ) {
+    fail("LIVE_BASELINE_REVEAL_MISMATCH");
+  }
+  return {
+    created_at: value.created_at,
+    id: value.id,
+    player_badge_award_id: value.player_badge_award_id,
+    player_id: value.player_id,
+    revealed_at: value.revealed_at,
+  };
+}
+
+function validateSoleLiveBaselineAward(awardRows, liveBaseline) {
+  const nonBackfillAwards = awardRows.filter(
+    (award) => !isBackfillAward(award)
+  );
+  if (
+    nonBackfillAwards.length !== 1 ||
+    stableJson(nonBackfillAwards[0]) !== stableJson(liveBaseline.award)
+  ) {
+    fail("PRODUCTION_BASELINE_AWARD_MODE_MISMATCH", {
+      baselineAwardCount: awardRows.length,
+      nonBackfillAwardCount: nonBackfillAwards.length,
+    });
+  }
+  return nonBackfillAwards;
+}
+
+function assertLiveBaselineUnchanged(expected, actual, checkpoint) {
+  if (stableJson(actual) !== stableJson(expected)) {
+    fail("LIVE_BASELINE_CHANGED_DURING_BACKFILL", { checkpoint });
+  }
+}
+
+async function loadGlobalBadgeState(supabase) {
+  const [awardResult, notificationResult, revealResult] = await Promise.all([
+    supabase
+      .from("player_badge_awards")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "badge.unlocked"),
+    supabase
+      .from("player_badge_reveals")
+      .select("id", { count: "exact", head: true }),
+  ]);
+  const awardCount = exactCountOrFail(
+    awardResult,
+    "GLOBAL_BADGE_STATE_LOAD_FAILED"
+  );
+  const notificationCount = exactCountOrFail(
+    notificationResult,
+    "GLOBAL_BADGE_STATE_LOAD_FAILED"
+  );
+  const revealCount = exactCountOrFail(
+    revealResult,
+    "GLOBAL_BADGE_STATE_LOAD_FAILED"
+  );
+  return { awardCount, notificationCount, revealCount };
+}
+
+function exactCountOrFail(result, code) {
+  if (
+    !isRecord(result) ||
+    result.error ||
+    !Number.isInteger(result.count) ||
+    result.count < 0
+  ) {
+    fail(code);
+  }
+  return result.count;
+}
+
+function assertGlobalBadgeState(actual, expected, code) {
+  if (stableJson(actual) !== stableJson(expected)) {
+    fail(code, actual);
+  }
 }
 
 async function countMatchingNotifications(supabase, awardIds) {
@@ -1260,6 +1846,11 @@ function parseAwardRow(value) {
     !UUID_PATTERN.test(value.player_id) ||
     typeof value.badge_slug !== "string" ||
     !BADGE_SLUG_PATTERN.test(value.badge_slug) ||
+    typeof value.source_type !== "string" ||
+    !BADGE_SLUG_PATTERN.test(value.source_type) ||
+    (value.source_id !== null &&
+      (typeof value.source_id !== "string" ||
+        !UUID_PATTERN.test(value.source_id))) ||
     !isRecord(value.source_metadata)
   ) {
     fail("AWARD_SNAPSHOT_ROW_INVALID");
@@ -1269,7 +1860,9 @@ function parseAwardRow(value) {
     badge_slug: value.badge_slug,
     id: value.id,
     player_id: value.player_id,
+    source_id: value.source_id,
     source_metadata: value.source_metadata,
+    source_type: value.source_type,
   };
 }
 
@@ -1804,6 +2397,11 @@ function printHelp() {
     --expected-tooling-head <40-character-local-git-sha> \\
     --allowlist-file <private-json-path-outside-repository> \\
     --allowlist-sha256 <sha256-of-exact-file-bytes> \\
+    [--expected-live-award-id <production-live-award-uuid> \\
+     --expected-live-notification-id <production-live-notification-uuid> \\
+     --expected-live-reveal-id <production-live-reveal-uuid> \\
+     --expected-execution-count <positive-integer> \\
+     --expected-execution-set-sha256 <sha256-of-derived-player-ids>] \\
     [--apply]
 
 Production requires its exact deployed head; fetched origin/master and the
@@ -1812,9 +2410,12 @@ source tree. Staging uses --expected-staging-head instead. The local tooling
 head is always explicit and must be a clean descendant containing exactly the
 approved operator-only files. Without
 --apply, the command performs read-only identity, deployment, database,
-allowlist, and award-baseline checks. --apply runs the existing controlled
-backfill twice over one frozen allowlist and requires the second pass to create
-zero awards. Player identifiers and credentials are never printed.`);
+allowlist, and award-baseline checks. Production requires all five collision-
+aware baseline arguments together. It attests the full allowlist, pins the
+exact live award lifecycle, derives the historical execution set, and excludes
+the live player from authority calls. --apply runs the controlled backfill
+twice over only that execution set and requires the second pass to create zero
+awards. Player identifiers and credentials are never printed.`);
 }
 
 async function main() {

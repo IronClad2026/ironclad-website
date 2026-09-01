@@ -22,6 +22,7 @@ import {
   buildCommandEnvironment,
   buildDatabaseAttestationSql,
   canonicalizePlayerIds,
+  deriveHistoricalExecutionSet,
   diffAwardRows,
   hashPlayerIds,
   parseAllowlistDocument,
@@ -31,6 +32,7 @@ import {
   sanitizeFailure,
   validateBackfillPass,
   validateBaseUrl,
+  validateHistoricalAwardDelta,
   validateLoadedAuthority,
   validateNewAwardMetadata,
   validateOptions,
@@ -49,7 +51,12 @@ const PLAYER_IDS = Array.from(
     `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`
 );
 const PLAYER_ID = PLAYER_IDS[0];
+const LIVE_PLAYER_ID = PLAYER_IDS[1];
 const AWARD_ID = "10000000-0000-4000-8000-000000000001";
+const LIVE_AWARD_ID = "20000000-0000-4000-8000-000000000001";
+const LIVE_NOTIFICATION_ID = "30000000-0000-4000-8000-000000000001";
+const LIVE_REVEAL_ID = "40000000-0000-4000-8000-000000000001";
+const EXECUTION_SET_SHA256 = hashPlayerIds([PLAYER_ID]);
 
 const temporaryDirectories: string[] = [];
 
@@ -78,12 +85,27 @@ describe("initial Badge backfill CLI guards", () => {
         "C:\\private\\badge-backfill.json",
         "--allowlist-sha256",
         FILE_SHA256,
+        "--expected-live-award-id",
+        LIVE_AWARD_ID,
+        "--expected-live-notification-id",
+        LIVE_NOTIFICATION_ID,
+        "--expected-live-reveal-id",
+        LIVE_REVEAL_ID,
+        "--expected-execution-count",
+        "1",
+        "--expected-execution-set-sha256",
+        EXECUTION_SET_SHA256,
       ])
     ).toMatchObject({
       apply: false,
       expectedProductionHead: EXPECTED_PRODUCTION_HEAD,
       expectedStagingHead: null,
       expectedToolingHead: EXPECTED_TOOLING_HEAD,
+      expectedLiveAwardId: LIVE_AWARD_ID,
+      expectedLiveNotificationId: LIVE_NOTIFICATION_ID,
+      expectedLiveRevealId: LIVE_REVEAL_ID,
+      expectedExecutionCount: "1",
+      expectedExecutionSetSha256: EXECUTION_SET_SHA256,
       target: "production",
     });
 
@@ -113,6 +135,80 @@ describe("initial Badge backfill CLI guards", () => {
     expectCutoverError(
       () => parseArguments(["--mutate"]),
       "ARGUMENT_UNKNOWN"
+    );
+  });
+
+  it("requires the collision-aware Production arguments all-or-none", () => {
+    const production = validOptions("production");
+
+    expect(validateOptions(production)).toMatchObject({
+      collisionBaseline: {
+        awardId: LIVE_AWARD_ID,
+        executionCount: 1,
+        executionSetSha256: EXECUTION_SET_SHA256,
+        notificationId: LIVE_NOTIFICATION_ID,
+        revealId: LIVE_REVEAL_ID,
+      },
+    });
+
+    for (const key of [
+      "expectedLiveAwardId",
+      "expectedLiveNotificationId",
+      "expectedLiveRevealId",
+      "expectedExecutionCount",
+      "expectedExecutionSetSha256",
+    ] as const) {
+      expectCutoverError(
+        () => validateOptions({ ...production, [key]: null }),
+        "LIVE_BASELINE_ARGUMENTS_PARTIAL"
+      );
+    }
+
+    expectCutoverError(
+      () =>
+        validateOptions({
+          ...production,
+          expectedExecutionCount: null,
+          expectedExecutionSetSha256: null,
+          expectedLiveAwardId: null,
+          expectedLiveNotificationId: null,
+          expectedLiveRevealId: null,
+        }),
+      "PRODUCTION_LIVE_BASELINE_REQUIRED"
+    );
+    expectCutoverError(
+      () =>
+        validateOptions({
+          ...validOptions("staging"),
+          expectedExecutionCount: "1",
+          expectedExecutionSetSha256: EXECUTION_SET_SHA256,
+          expectedLiveAwardId: LIVE_AWARD_ID,
+          expectedLiveNotificationId: LIVE_NOTIFICATION_ID,
+          expectedLiveRevealId: LIVE_REVEAL_ID,
+        }),
+      "STAGING_LIVE_BASELINE_UNEXPECTED"
+    );
+  });
+
+  it.each([
+    ["expectedLiveAwardId", "not-a-uuid", "EXPECTED_LIVE_AWARD_ID_INVALID"],
+    [
+      "expectedLiveNotificationId",
+      "not-a-uuid",
+      "EXPECTED_LIVE_NOTIFICATION_ID_INVALID",
+    ],
+    ["expectedLiveRevealId", "not-a-uuid", "EXPECTED_LIVE_REVEAL_ID_INVALID"],
+    ["expectedExecutionCount", 0, "EXPECTED_EXECUTION_COUNT_INVALID"],
+    ["expectedExecutionCount", "2", "EXPECTED_EXECUTION_COUNT_INVALID"],
+    [
+      "expectedExecutionSetSha256",
+      "not-a-hash",
+      "EXPECTED_EXECUTION_SET_SHA256_INVALID",
+    ],
+  ] as const)("rejects invalid collision option %s", (key, value, code) => {
+    expectCutoverError(
+      () => validateOptions({ ...validOptions("production"), [key]: value }),
+      code
     );
   });
 
@@ -297,6 +393,37 @@ describe("initial Badge backfill CLI guards", () => {
     expectCutoverError(
       () => canonicalizePlayerIds([PLAYER_ID, PLAYER_ID]),
       "ALLOWLIST_PLAYER_ID_DUPLICATE"
+    );
+  });
+
+  it("derives and pins the historical execution set from the full cohort", () => {
+    const fullCohort = [PLAYER_ID, LIVE_PLAYER_ID];
+
+    expect(
+      deriveHistoricalExecutionSet(fullCohort, LIVE_PLAYER_ID, {
+        expectedCount: 1,
+        expectedSha256: EXECUTION_SET_SHA256,
+      })
+    ).toEqual({
+      playerIds: [PLAYER_ID],
+      playerIdsSha256: EXECUTION_SET_SHA256,
+    });
+
+    expectCutoverError(
+      () =>
+        deriveHistoricalExecutionSet(fullCohort, LIVE_PLAYER_ID, {
+          expectedCount: 2,
+          expectedSha256: EXECUTION_SET_SHA256,
+        }),
+      "HISTORICAL_EXECUTION_COUNT_MISMATCH"
+    );
+    expectCutoverError(
+      () =>
+        deriveHistoricalExecutionSet(fullCohort, LIVE_PLAYER_ID, {
+          expectedCount: 1,
+          expectedSha256: "f".repeat(64),
+        }),
+      "HISTORICAL_EXECUTION_SET_SHA256_MISMATCH"
     );
   });
 
@@ -627,6 +754,25 @@ describe("initial Badge backfill result contracts", () => {
       "EXISTING_AWARD_CHANGED_DURING_BACKFILL"
     );
   });
+
+  it("pins the sole historical delta to Recruit/profile/backfill for the execution player", () => {
+    const expected = awardRow(AWARD_ID, "backfill");
+
+    expect(validateHistoricalAwardDelta([expected], [PLAYER_ID])).toBe(true);
+
+    for (const row of [
+      { ...expected, player_id: LIVE_PLAYER_ID },
+      { ...expected, badge_slug: "first-victory" },
+      { ...expected, source_type: "match" },
+      { ...expected, source_id: LIVE_PLAYER_ID },
+      { ...expected, source_metadata: { evaluationMode: "live" } },
+    ]) {
+      expectCutoverError(
+        () => validateHistoricalAwardDelta([row], [PLAYER_ID]),
+        "HISTORICAL_AWARD_DELTA_MISMATCH"
+      );
+    }
+  });
 });
 
 function validOptions(target: "staging" | "production") {
@@ -645,6 +791,13 @@ function validOptions(target: "staging" | "production") {
     expectedStagingHead:
       target === "staging" ? EXPECTED_STAGING_HEAD : null,
     expectedToolingHead: EXPECTED_TOOLING_HEAD,
+    expectedLiveAwardId: target === "production" ? LIVE_AWARD_ID : null,
+    expectedLiveNotificationId:
+      target === "production" ? LIVE_NOTIFICATION_ID : null,
+    expectedLiveRevealId: target === "production" ? LIVE_REVEAL_ID : null,
+    expectedExecutionCount: target === "production" ? "1" : null,
+    expectedExecutionSetSha256:
+      target === "production" ? EXECUTION_SET_SHA256 : null,
     help: false,
     target,
   };
@@ -677,7 +830,9 @@ function awardRow(id: string, evaluationMode: string) {
     badge_slug: "ironclad-recruit",
     id,
     player_id: PLAYER_ID,
+    source_id: PLAYER_ID,
     source_metadata: { evaluationMode },
+    source_type: "profile",
   };
 }
 
