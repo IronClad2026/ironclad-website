@@ -30,6 +30,7 @@ export type PrepareMatchReplayUploadsInput = {
   playerTwoScore: number;
   winnerRegistrationId: string;
   replayFiles: MatchReplayFileMetadata[];
+  gameWinnerRegistrationIds: string[];
 };
 
 export type PreparedMatchReplayUpload = {
@@ -171,6 +172,11 @@ export async function prepareMatchReplayUploadsForPlayer(
     input?.playerTwoScore,
     input?.winnerRegistrationId
   );
+  const gameWinnerRegistrationIds = validateGameWinnerRegistrationIds(
+    authorized.match,
+    result,
+    input?.gameWinnerRegistrationIds
+  );
 
   if (replayFiles.length !== result.requiredReplayCount) {
     throw replayCountError(result.requiredReplayCount);
@@ -188,6 +194,7 @@ export async function prepareMatchReplayUploadsForPlayer(
         p_player_one_score: result.playerOneScore,
         p_player_two_score: result.playerTwoScore,
         p_declared_replay_sizes: replayFiles.map((file) => file.size),
+        p_game_winner_registration_ids: gameWinnerRegistrationIds,
       }
     );
 
@@ -827,6 +834,63 @@ function validateResult(
     winnerRegistrationId,
     requiredReplayCount: playerOneScore + playerTwoScore,
   };
+}
+
+function validateGameWinnerRegistrationIds(
+  match: ReplayMatchContext,
+  result: ValidatedResult,
+  value: unknown
+) {
+  if (
+    !match.playerOneRegistrationId ||
+    !match.playerTwoRegistrationId ||
+    !Array.isArray(value) ||
+    value.length !== result.requiredReplayCount
+  ) {
+    throw new MatchReplayUploadError(
+      "BAD_GAME_WINNERS",
+      "Select one game winner for every completed game."
+    );
+  }
+
+  const gameWinnerRegistrationIds = value.map((candidate) =>
+    typeof candidate === "string" ? candidate.trim() : ""
+  );
+  const participants = new Set([
+    match.playerOneRegistrationId,
+    match.playerTwoRegistrationId,
+  ]);
+
+  if (
+    gameWinnerRegistrationIds.some(
+      (registrationId) => !participants.has(registrationId)
+    )
+  ) {
+    throw new MatchReplayUploadError(
+      "BAD_GAME_WINNERS",
+      "Select one of the match participants as each game winner."
+    );
+  }
+
+  const playerOneGameWins = gameWinnerRegistrationIds.filter(
+    (registrationId) => registrationId === match.playerOneRegistrationId
+  ).length;
+  const playerTwoGameWins = gameWinnerRegistrationIds.filter(
+    (registrationId) => registrationId === match.playerTwoRegistrationId
+  ).length;
+
+  if (
+    playerOneGameWins !== result.playerOneScore ||
+    playerTwoGameWins !== result.playerTwoScore ||
+    gameWinnerRegistrationIds.at(-1) !== result.winnerRegistrationId
+  ) {
+    throw new MatchReplayUploadError(
+      "BAD_GAME_WINNERS",
+      "The game winners must match the final score and end with the series winner."
+    );
+  }
+
+  return gameWinnerRegistrationIds;
 }
 
 function validateNotes(value: unknown) {

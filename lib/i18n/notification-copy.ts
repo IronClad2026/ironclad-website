@@ -1,3 +1,8 @@
+import {
+  DEFAULT_BADGES_DICTIONARY,
+  getLocalizedBadgeDefinition,
+  type BadgesDictionary,
+} from "@/lib/i18n/badges";
 import type { NotificationsDictionary } from "@/lib/i18n/dictionaries/en/notifications";
 import { interpolateMessage } from "@/lib/i18n/translate";
 
@@ -9,6 +14,7 @@ type LocalizedNotificationCopy = {
 type NotificationCopyInput = {
   type: string;
   tournamentTitle: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 function template(
@@ -27,12 +33,29 @@ function template(
 
 export function localizePlayerNotificationCopy(
   input: NotificationCopyInput,
-  dictionary: NotificationsDictionary
+  dictionary: NotificationsDictionary,
+  badgesDictionary: BadgesDictionary = DEFAULT_BADGES_DICTIONARY
 ): LocalizedNotificationCopy | null {
   const tournamentName =
     input.tournamentTitle?.trim() || dictionary.server.tournamentFallback;
 
   switch (input.type) {
+    case "badge.unlocked": {
+      const badge = getLocalizedBadgeDefinition(
+        badgesDictionary,
+        input.metadata?.badgeSlug
+      );
+
+      return badge
+        ? {
+            title: dictionary.server.badgeUnlockedTitle,
+            message: interpolateMessage(
+              dictionary.server.badgeUnlockedMessage,
+              { badgeName: badge.name }
+            ),
+          }
+        : null;
+    }
     case "tournament.cancelled":
       return template(
         dictionary,

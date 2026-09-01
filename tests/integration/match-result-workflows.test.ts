@@ -15,6 +15,11 @@ const notifyNoShowReporterOfResponseMock = vi.hoisted(() => vi.fn());
 const notifyPlayersOfLegacyMatchResultReviewMock = vi.hoisted(() => vi.fn());
 const notifyPlayersOfReportGroupReviewMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
+const evaluateLegacySubmissionBadgesAfterCommitMock = vi.hoisted(() =>
+  vi.fn()
+);
+const evaluateMatchBadgesAfterCommitMock = vi.hoisted(() => vi.fn());
+const evaluateReportGroupBadgesAfterCommitMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -35,6 +40,14 @@ vi.mock("@/lib/notification-events", () => ({
   notifyPlayersOfLegacyMatchResultReview:
     notifyPlayersOfLegacyMatchResultReviewMock,
   notifyPlayersOfReportGroupReview: notifyPlayersOfReportGroupReviewMock,
+}));
+
+vi.mock("@/lib/badges/integration", () => ({
+  evaluateLegacySubmissionBadgesAfterCommit:
+    evaluateLegacySubmissionBadgesAfterCommitMock,
+  evaluateMatchBadgesAfterCommit: evaluateMatchBadgesAfterCommitMock,
+  evaluateReportGroupBadgesAfterCommit:
+    evaluateReportGroupBadgesAfterCommitMock,
 }));
 
 vi.mock("next/cache", () => ({
@@ -130,6 +143,12 @@ describe("match-result workflow contracts", () => {
     notifyPlayersOfLegacyMatchResultReviewMock.mockReset();
     notifyPlayersOfReportGroupReviewMock.mockReset();
     revalidatePathMock.mockReset();
+    evaluateLegacySubmissionBadgesAfterCommitMock.mockReset();
+    evaluateMatchBadgesAfterCommitMock.mockReset();
+    evaluateReportGroupBadgesAfterCommitMock.mockReset();
+    evaluateLegacySubmissionBadgesAfterCommitMock.mockResolvedValue(undefined);
+    evaluateMatchBadgesAfterCommitMock.mockResolvedValue(undefined);
+    evaluateReportGroupBadgesAfterCommitMock.mockResolvedValue(undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
@@ -157,6 +176,10 @@ describe("match-result workflow contracts", () => {
         p_confirmed_by_clerk_user_id: playerIdentity.userId,
       }
     );
+    expect(evaluateReportGroupBadgesAfterCommitMock).toHaveBeenCalledWith({
+      reportGroupId: "report-group-1",
+      supabase: service.client,
+    });
     expect(notifyNoShowReporterOfResponseMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
@@ -359,6 +382,10 @@ describe("match-result workflow contracts", () => {
         decision: "approved",
       }
     );
+    expect(evaluateReportGroupBadgesAfterCommitMock).toHaveBeenCalledWith({
+      reportGroupId: "report-group-1",
+      supabase: service.client,
+    });
     expect(revalidatePathMock).toHaveBeenCalledWith(
       "/admin/tournaments/[tournamentId]",
       "page"
@@ -536,6 +563,9 @@ describe("match-result workflow contracts", () => {
         decision: "resubmission_requested",
       }
     );
+    expect(
+      evaluateLegacySubmissionBadgesAfterCommitMock
+    ).not.toHaveBeenCalled();
   });
 
   it("maps the legacy wrapper's narrow PT409 without a success notification", async () => {
@@ -625,6 +655,27 @@ describe("match-result workflow contracts", () => {
     });
     expect(visibleOutput).not.toContain(secretPath);
     expect(visibleOutput).not.toContain("user_secret_dashboard");
+  });
+
+  it("evaluates Badges only after a committed dashboard confirmation", async () => {
+    const service = createRpcClient();
+    authMock.mockResolvedValue(playerIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(service.client);
+
+    await expect(
+      confirmDashboardMatchResult(
+        createFormData({ reportGroupId: REPORT_GROUP_UUID })
+      )
+    ).resolves.toEqual({
+      status: "success",
+      code: "confirmed",
+      message: "Result confirmed. The bracket has been updated.",
+    });
+
+    expect(evaluateReportGroupBadgesAfterCommitMock).toHaveBeenCalledWith({
+      reportGroupId: REPORT_GROUP_UUID,
+      supabase: service.client,
+    });
   });
 
   it("returns a stable dashboard conflict when confirmation loses the race", async () => {

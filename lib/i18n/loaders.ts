@@ -17,6 +17,7 @@ import type { CompetitionDictionary } from "@/lib/i18n/dictionaries/en/competiti
 import type { NotificationsDictionary } from "@/lib/i18n/dictionaries/en/notifications";
 import type { EmailDictionary } from "@/lib/i18n/dictionaries/en/email";
 import type { HelpLegalUiDictionary } from "@/lib/i18n/dictionaries/en/help-legal-ui";
+import type { BadgesDictionary } from "@/lib/i18n/dictionaries/en/badges";
 
 export type DictionaryByNamespace = {
   common: CommonDictionary;
@@ -26,6 +27,7 @@ export type DictionaryByNamespace = {
   notifications: NotificationsDictionary;
   email: EmailDictionary;
   "help-legal-ui": HelpLegalUiDictionary;
+  badges: BadgesDictionary;
 };
 
 export type DictionaryNamespace = keyof DictionaryByNamespace;
@@ -38,6 +40,7 @@ export const DICTIONARY_NAMESPACES = [
   "notifications",
   "email",
   "help-legal-ui",
+  "badges",
 ] as const satisfies readonly DictionaryNamespace[];
 
 type DictionaryModule<Namespace extends DictionaryNamespace> = {
@@ -61,6 +64,7 @@ const DICTIONARY_LOADERS = {
     email: () => import("@/lib/i18n/dictionaries/en/email"),
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/en/help-legal-ui"),
+    badges: () => import("@/lib/i18n/dictionaries/en/badges"),
   },
   it: {
     common: () => import("@/lib/i18n/dictionaries/it/common"),
@@ -73,6 +77,7 @@ const DICTIONARY_LOADERS = {
     email: () => import("@/lib/i18n/dictionaries/it/email"),
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/it/help-legal-ui"),
+    badges: () => import("@/lib/i18n/dictionaries/it/badges"),
   },
   "zh-CN": {
     common: () => import("@/lib/i18n/dictionaries/zh-CN/common"),
@@ -85,6 +90,7 @@ const DICTIONARY_LOADERS = {
     email: () => import("@/lib/i18n/dictionaries/zh-CN/email"),
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/zh-CN/help-legal-ui"),
+    badges: () => import("@/lib/i18n/dictionaries/zh-CN/badges"),
   },
   ru: {
     common: () => import("@/lib/i18n/dictionaries/ru/common"),
@@ -96,6 +102,7 @@ const DICTIONARY_LOADERS = {
     email: () => import("@/lib/i18n/dictionaries/ru/email"),
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/ru/help-legal-ui"),
+    badges: () => import("@/lib/i18n/dictionaries/ru/badges"),
   },
   es: {
     common: () => import("@/lib/i18n/dictionaries/es/common"),
@@ -107,6 +114,7 @@ const DICTIONARY_LOADERS = {
     email: () => import("@/lib/i18n/dictionaries/es/email"),
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/es/help-legal-ui"),
+    badges: () => import("@/lib/i18n/dictionaries/es/badges"),
   },
   "pt-BR": {
     common: () => import("@/lib/i18n/dictionaries/pt-BR/common"),
@@ -119,6 +127,7 @@ const DICTIONARY_LOADERS = {
     email: () => import("@/lib/i18n/dictionaries/pt-BR/email"),
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/pt-BR/help-legal-ui"),
+    badges: () => import("@/lib/i18n/dictionaries/pt-BR/badges"),
   },
   ko: {
     common: () => import("@/lib/i18n/dictionaries/ko/common"),
@@ -130,6 +139,7 @@ const DICTIONARY_LOADERS = {
     email: () => import("@/lib/i18n/dictionaries/ko/email"),
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/ko/help-legal-ui"),
+    badges: () => import("@/lib/i18n/dictionaries/ko/badges"),
   },
   fr: {
     common: () => import("@/lib/i18n/dictionaries/fr/common"),
@@ -141,6 +151,7 @@ const DICTIONARY_LOADERS = {
     email: () => import("@/lib/i18n/dictionaries/fr/email"),
     "help-legal-ui": () =>
       import("@/lib/i18n/dictionaries/fr/help-legal-ui"),
+    badges: () => import("@/lib/i18n/dictionaries/fr/badges"),
   },
 } satisfies Record<Locale, NamespaceLoaders>;
 

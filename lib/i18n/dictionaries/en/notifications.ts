@@ -192,6 +192,8 @@ const dictionary = {
   },
   server: {
     loadError: "Notifications could not be loaded.",
+    badgeUnlockedTitle: "Badge unlocked",
+    badgeUnlockedMessage: "You unlocked the {badgeName} Badge.",
     tournamentFallback: "this IronClad tournament",
     tournamentCancelledTitle: "Tournament cancelled",
     tournamentCancelledMessage:

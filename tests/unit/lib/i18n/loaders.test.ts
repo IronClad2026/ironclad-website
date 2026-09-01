@@ -72,8 +72,17 @@ const PR4_ANNOUNCEMENT_MESSAGE_KEYS = [
   "retry",
 ] as const;
 
+const GAME_WINNER_MESSAGE_KEYS = [
+  "gameWinnersTitle",
+  "gameWinnersHelp",
+  "gameWinnerLabel",
+  "selectGameWinner",
+  "gameWinnersRequired",
+  "gameWinnersInvalid",
+] as const;
+
 describe("server dictionary loader", () => {
-  it("loads all seven Italian Player namespaces", async () => {
+  it("loads all eight Italian Player namespaces", async () => {
     expect(DICTIONARY_NAMESPACES).toEqual([
       "common",
       "public",
@@ -82,6 +91,7 @@ describe("server dictionary loader", () => {
       "notifications",
       "email",
       "help-legal-ui",
+      "badges",
     ]);
 
     const dictionaries = await loadDictionaries(
@@ -122,6 +132,27 @@ describe("server dictionary loader", () => {
     expect(SUPPORTED_LOCALES).toHaveLength(8);
     expect(messages.every((message) => message.trim().length > 0)).toBe(true);
     expect(new Set(messages).size).toBe(8);
+  });
+
+  it("loads complete per-game winner copy in all eight Player locales", async () => {
+    const messagesByLocale = await Promise.all(
+      SUPPORTED_LOCALES.map(async (locale) => {
+        const competition = await loadDictionary(locale, "competition");
+        return GAME_WINNER_MESSAGE_KEYS.map(
+          (key) => competition.resultForm[key]
+        );
+      })
+    );
+
+    expect(SUPPORTED_LOCALES).toHaveLength(8);
+    for (const messages of messagesByLocale) {
+      expect(messages.every((message) => message.trim().length > 0)).toBe(true);
+    }
+    for (let index = 0; index < GAME_WINNER_MESSAGE_KEYS.length; index += 1) {
+      expect(
+        new Set(messagesByLocale.map((messages) => messages[index])).size
+      ).toBe(SUPPORTED_LOCALES.length);
+    }
   });
 
   it("loads distinct PR3 mobile registration copy in all eight Player locales", async () => {
