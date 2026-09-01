@@ -12,6 +12,7 @@ const normalizeSteamOpenIdOriginMock = vi.hoisted(() => vi.fn());
 const validateSteamOpenIdCallbackMock = vi.hoisted(() => vi.fn());
 const validateSteamOpenIdFlowCookieMock = vi.hoisted(() => vi.fn());
 const verifySteamOpenIdAssertionMock = vi.hoisted(() => vi.fn());
+const evaluateProfileBadgesAfterCommitMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -32,6 +33,10 @@ vi.mock("@/lib/steam-openid", () => ({
   validateSteamOpenIdCallback: validateSteamOpenIdCallbackMock,
   validateSteamOpenIdFlowCookie: validateSteamOpenIdFlowCookieMock,
   verifySteamOpenIdAssertion: verifySteamOpenIdAssertionMock,
+}));
+
+vi.mock("@/lib/badges/integration", () => ({
+  evaluateProfileBadgesAfterCommit: evaluateProfileBadgesAfterCommitMock,
 }));
 
 import { GET as callbackGET } from "@/app/api/steam/callback/route";
@@ -277,6 +282,8 @@ function expectFlowCookieConsumed(response: Response) {
 
 describe("Steam connection start route", () => {
   beforeEach(() => {
+    evaluateProfileBadgesAfterCommitMock.mockReset();
+    evaluateProfileBadgesAfterCommitMock.mockResolvedValue(undefined);
     authMock.mockResolvedValue(authenticatedIdentity());
     normalizeSteamOpenIdOriginMock.mockReturnValue(ORIGIN);
     buildSteamOpenIdAuthenticationUrlMock.mockReturnValue(
@@ -400,6 +407,8 @@ describe("Steam connection start route", () => {
 
 describe("Steam connection callback route", () => {
   beforeEach(() => {
+    evaluateProfileBadgesAfterCommitMock.mockReset();
+    evaluateProfileBadgesAfterCommitMock.mockResolvedValue(undefined);
     authMock.mockResolvedValue(authenticatedIdentity());
     normalizeSteamOpenIdOriginMock.mockReturnValue(ORIGIN);
     getSteamOpenIdCallbackStateMock.mockImplementation(
@@ -555,6 +564,11 @@ describe("Steam connection callback route", () => {
       steam_username: STEAM_DISPLAY_NAME,
     });
     expect(fixture.update).toHaveBeenCalledTimes(2);
+    expect(evaluateProfileBadgesAfterCommitMock).toHaveBeenCalledWith({
+      playerId: "player-1",
+      reason: "steam_identity",
+      supabase: fixture.client,
+    });
     expect(fixture.linkEq).toHaveBeenCalledWith("id", "player-1");
     expect(fixture.linkEq).toHaveBeenCalledWith("clerk_user_id", USER_ID);
     expect(fixture.linkIs).toHaveBeenCalledWith("steam_id64", null);

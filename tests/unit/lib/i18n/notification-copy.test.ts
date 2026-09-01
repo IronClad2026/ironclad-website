@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import notificationsEnglish from "@/lib/i18n/dictionaries/en/notifications";
 import notificationsItalian from "@/lib/i18n/dictionaries/it/notifications";
+import badgesItalian from "@/lib/i18n/dictionaries/it/badges";
 import { localizePlayerNotificationCopy } from "@/lib/i18n/notification-copy";
 
 const KNOWN_TYPES = [
@@ -67,5 +68,34 @@ describe("localized notification copy", () => {
       message:
         "La tua Iscrizione a Coppa degli Alleati è stata approvata.",
     });
+  });
+
+  it("renders Badge unlock copy from safe localized slug metadata", () => {
+    expect(
+      localizePlayerNotificationCopy(
+        {
+          type: "badge.unlocked",
+          tournamentTitle: null,
+          metadata: { badgeSlug: "first-victory" },
+        },
+        notificationsItalian,
+        badgesItalian
+      )
+    ).toEqual({
+      title: "Badge sbloccato",
+      message: "Hai sbloccato il Badge Prima vittoria.",
+    });
+
+    expect(
+      localizePlayerNotificationCopy(
+        {
+          type: "badge.unlocked",
+          tournamentTitle: null,
+          metadata: { badgeSlug: "not-a-canonical-badge" },
+        },
+        notificationsItalian,
+        badgesItalian
+      )
+    ).toBeNull();
   });
 });

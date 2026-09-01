@@ -16,12 +16,15 @@ import type { ReactNode } from "react";
 import DashboardChampionHistory from "@/components/DashboardChampionHistory";
 import DashboardMatchHistory from "@/components/DashboardMatchHistory";
 import DashboardNotifications from "@/components/DashboardNotifications";
+import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
 import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
 import PlayerRegistrationActions from "@/components/PlayerRegistrationActions";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
+import { acknowledgeBadgeReveal } from "@/app/dashboard/badge-reveal-actions";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
+import { loadPlayerBadgeRevealDashboardState } from "@/lib/badges/reveals";
 import {
   getLocalizedCountryName,
   getLocalizedPlayerRegion,
@@ -112,7 +115,7 @@ export default async function PlayerDashboardPage() {
   const locale = await getRequestLocale();
   const dictionaries = await loadDictionaries(
     locale,
-    ["account-dashboard"] as const
+    ["account-dashboard", "badges"] as const
   );
   const t: DashboardTranslator = (path, values) =>
     translate(dictionaries["account-dashboard"], path, values);
@@ -165,6 +168,22 @@ export default async function PlayerDashboardPage() {
       first(registration.tournaments)?.status ?? "upcoming",
   }));
   const profileComplete = profile?.profile_completed === true;
+  const badgeRevealState = profileResult.error
+    ? { status: "error" as const, code: "award-load-failed" as const }
+    : await loadPlayerBadgeRevealDashboardState(
+        supabase,
+        profile?.id ?? null
+      );
+  const badgeLoadError =
+    badgeRevealState.status === "error" &&
+    badgeRevealState.code === "award-load-failed"
+      ? dictionaries.badges.dashboard.loadErrorDescription
+      : null;
+  const badgeRevealLoadError =
+    badgeRevealState.status === "error" &&
+    badgeRevealState.code === "reveal-load-failed"
+      ? dictionaries.badges.dashboard.loadErrorDescription
+      : null;
 
   return (
     <main
@@ -372,6 +391,24 @@ export default async function PlayerDashboardPage() {
             <DashboardMatchHistory matches={career.matchHistory} />
           </>
         )}
+
+        <DashboardBadgesSection
+          badgeData={
+            badgeRevealState.status === "success"
+              ? badgeRevealState.badgeData
+              : null
+          }
+          pendingReveals={
+            badgeRevealState.status === "success"
+              ? badgeRevealState.pendingReveals
+              : []
+          }
+          acknowledgeRevealAction={acknowledgeBadgeReveal}
+          loadError={badgeLoadError}
+          revealLoadError={badgeRevealLoadError}
+          dictionary={dictionaries.badges}
+          locale={locale}
+        />
 
         <section className="mt-8">
           <div className="flex items-end justify-between gap-4">

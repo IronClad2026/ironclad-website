@@ -259,6 +259,14 @@ const dictionary = {
     winnerNeedsWins: "승자는 {count}승으로 마쳐야 합니다.",
     winner: "승자",
     selectWinner: "승자 선택",
+    gameWinnersTitle: "게임별 승자",
+    gameWinnersHelp:
+      "업로드한 리플레이의 게임 순서대로 각 승자를 선택하세요. 순서는 최종 스코어와 일치해야 합니다.",
+    gameWinnerLabel: "게임 {game} 승자",
+    selectGameWinner: "게임 {game} 승자 선택",
+    gameWinnersRequired: "완료된 모든 게임의 승자를 선택하세요.",
+    gameWinnersInvalid:
+      "게임별 승자는 최종 스코어와 일치해야 하며 마지막 게임은 시리즈 승자가 이겨야 합니다.",
     replayProofs: "리플레이 증거(.rec 필수)",
     replayHelpLabel: "리플레이 업로드 안내",
     replayHelp: "실제로 진행한 각 게임마다 고유한 CoH3 .rec 파일 하나를 업로드하세요. 각 파일은 최대 10 MiB이며 비공개로 보관됩니다. 스크린샷은 경기 결과 증거를 대신할 수 없습니다.",

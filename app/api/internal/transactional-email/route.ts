@@ -47,17 +47,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    const [emailModule, pushModule] = await Promise.allSettled([
+    const [emailModule, pushModule, badgeModule] = await Promise.allSettled([
       import("@/lib/transactional-email/worker"),
       import("@/lib/web-push/worker"),
+      import("@/lib/badges/reconciliation"),
     ]);
-    const [emailResult, pushResult] = await Promise.allSettled([
+    const [emailResult, pushResult, badgeResult] = await Promise.allSettled([
       emailModule.status === "fulfilled"
         ? emailModule.value.runTransactionalEmailWorker()
         : Promise.reject(emailModule.reason),
       pushModule.status === "fulfilled"
         ? pushModule.value.runWebPushWorker()
         : Promise.reject(pushModule.reason),
+      badgeModule.status === "fulfilled"
+        ? badgeModule.value.runBadgeReconciliationWorker()
+        : Promise.reject(badgeModule.reason),
     ]);
 
     if (
@@ -65,6 +69,13 @@ export async function POST(request: Request) {
       pushResult.status === "rejected"
     ) {
       return jsonResponse({ ok: false, code: "WORKER_FAILED" }, 500);
+    }
+
+    if (badgeResult.status === "rejected") {
+      console.error("Badge reconciliation worker failed.", {
+        operation: "run-badge-reconciliation-worker",
+        code: "BADGE_RECONCILIATION_FAILED",
+      });
     }
 
     return jsonResponse({
@@ -82,6 +93,19 @@ export async function POST(request: Request) {
         retryableFailures: pushResult.value.retryableFailures,
         permanentFailures: pushResult.value.permanentFailures,
       },
+      badge:
+        badgeResult.status === "fulfilled"
+          ? {
+              ok: true,
+              claimed: badgeResult.value.claimed,
+              completed: badgeResult.value.completed,
+              retryableFailures: badgeResult.value.retryableFailures,
+              completionFailures: badgeResult.value.completionFailures,
+            }
+          : {
+              ok: false,
+              code: "BADGE_RECONCILIATION_FAILED",
+            },
     });
   } catch {
     return jsonResponse({ ok: false, code: "WORKER_FAILED" }, 500);

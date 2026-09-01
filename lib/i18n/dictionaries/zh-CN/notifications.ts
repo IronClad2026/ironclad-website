@@ -178,6 +178,8 @@ const dictionary = {
   },
   server: {
     loadError: "无法加载通知。",
+    badgeUnlockedTitle: "徽章已解锁",
+    badgeUnlockedMessage: "你已解锁“{badgeName}”徽章。",
     tournamentFallback: "这项 IronClad 锦标赛",
     tournamentCancelledTitle: "锦标赛已取消",
     tournamentCancelledMessage:

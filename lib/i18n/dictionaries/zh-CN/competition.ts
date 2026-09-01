@@ -264,6 +264,14 @@ const dictionary = {
     winnerNeedsWins: "获胜者必须取得 {count} 胜。",
     winner: "获胜者",
     selectWinner: "选择获胜者",
+    gameWinnersTitle: "每局胜者",
+    gameWinnersHelp:
+      "请按已上传录像的对局顺序选择每局胜者。该顺序必须与最终比分一致。",
+    gameWinnerLabel: "第 {game} 局胜者",
+    selectGameWinner: "选择第 {game} 局胜者",
+    gameWinnersRequired: "请为每场已完成的对局选择一名胜者。",
+    gameWinnersInvalid:
+      "每局胜者必须与最终比分一致，且最后一局必须由系列赛胜者获胜。",
     replayProofs: "回放证明（必须为 .rec）",
     replayHelpLabel: "关于回放上传",
     replayHelp: "每个实际进行的小局都需上传一个唯一的 CoH3 .rec 文件。每个文件最大 10 MiB。回放为私密文件，截图不能替代比赛结果证明。",

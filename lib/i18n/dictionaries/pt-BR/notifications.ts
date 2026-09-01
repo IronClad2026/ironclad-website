@@ -190,6 +190,8 @@ const dictionary = {
   },
   server: {
     loadError: "Não foi possível carregar as notificações.",
+    badgeUnlockedTitle: "Medalha desbloqueada",
+    badgeUnlockedMessage: "Você desbloqueou a medalha {badgeName}.",
     tournamentFallback: "este torneio IronClad",
     tournamentCancelledTitle: "Torneio cancelado",
     tournamentCancelledMessage:
