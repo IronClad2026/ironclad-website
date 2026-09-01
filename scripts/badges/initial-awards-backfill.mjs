@@ -20,9 +20,11 @@ export const VERCEL_CLI_VERSION = "59.1.4";
 export const VERCEL_SCOPE = "ironclad-tournaments";
 export const BACKFILL_BATCH_SIZE = 25;
 export const REST_PAGE_SIZE = 500;
-export const APPROVED_APPLICATION_HEAD =
+export const APPROVED_RELEASE_SOURCE_HEAD =
   "ac612018f6c27963a59df84815d0a76ebbcbd27e";
-export const APPROVED_TOOLING_BASE_HEAD = APPROVED_APPLICATION_HEAD;
+export const APPROVED_APPLICATION_TREE =
+  "6ba0e3b2308bd22c3c9dea62efb235f1bb48326c";
+export const APPROVED_TOOLING_BASE_HEAD = APPROVED_RELEASE_SOURCE_HEAD;
 export const AUTHORIZED_TOOLING_PATHS = Object.freeze([
   "docs/achievement-badge-production-cutover-runbook.md",
   "scripts/badges/initial-awards-backfill.mjs",
@@ -78,7 +80,8 @@ export function parseArguments(argv) {
     apply: false,
     baseUrl: null,
     confirmProjectRef: null,
-    expectedApplicationHead: null,
+    expectedProductionHead: null,
+    expectedStagingHead: null,
     expectedToolingHead: null,
     help: false,
     target: null,
@@ -89,7 +92,8 @@ export function parseArguments(argv) {
     ["--allowlist-sha256", "allowlistSha256"],
     ["--base-url", "baseUrl"],
     ["--confirm-project-ref", "confirmProjectRef"],
-    ["--expected-application-head", "expectedApplicationHead"],
+    ["--expected-production-head", "expectedProductionHead"],
+    ["--expected-staging-head", "expectedStagingHead"],
     ["--expected-tooling-head", "expectedToolingHead"],
     ["--target", "target"],
   ]);
@@ -127,16 +131,26 @@ export function validateOptions(options) {
   if (options.confirmProjectRef !== target.ref) {
     fail("PROJECT_CONFIRMATION_MISMATCH");
   }
-  const expectedApplicationHead =
-    options.expectedApplicationHead ?? APPROVED_APPLICATION_HEAD;
-  if (!GIT_SHA_PATTERN.test(expectedApplicationHead)) {
-    fail("EXPECTED_APPLICATION_HEAD_INVALID");
-  }
-  if (
-    options.target === "production" &&
-    expectedApplicationHead !== APPROVED_APPLICATION_HEAD
-  ) {
-    fail("PRODUCTION_APPLICATION_HEAD_MISMATCH");
+  if (options.target === "production") {
+    if (!GIT_SHA_PATTERN.test(options.expectedProductionHead ?? "")) {
+      fail("EXPECTED_PRODUCTION_HEAD_INVALID");
+    }
+    if (
+      options.expectedStagingHead !== null &&
+      options.expectedStagingHead !== undefined
+    ) {
+      fail("EXPECTED_STAGING_HEAD_UNEXPECTED");
+    }
+  } else {
+    if (!GIT_SHA_PATTERN.test(options.expectedStagingHead ?? "")) {
+      fail("EXPECTED_STAGING_HEAD_INVALID");
+    }
+    if (
+      options.expectedProductionHead !== null &&
+      options.expectedProductionHead !== undefined
+    ) {
+      fail("EXPECTED_PRODUCTION_HEAD_UNEXPECTED");
+    }
   }
   if (!GIT_SHA_PATTERN.test(options.expectedToolingHead ?? "")) {
     fail("EXPECTED_TOOLING_HEAD_INVALID");
@@ -150,7 +164,6 @@ export function validateOptions(options) {
   return {
     ...options,
     baseUrl,
-    expectedApplicationHead,
     targetConfig: target,
   };
 }
@@ -743,7 +756,11 @@ export async function runInitialAwardsBackfill(
   );
   const runtime = validateRuntimeEnvironment(environment, target);
 
-  verifyGitState(options, commandRunner, repositoryRoot);
+  const gitAttestation = verifyGitState(
+    options,
+    commandRunner,
+    repositoryRoot
+  );
   verifySupabaseProject(target, commandRunner, repositoryRoot);
   const deployment = verifyVercelDeployment(
     options,
@@ -824,15 +841,23 @@ export async function runInitialAwardsBackfill(
       retainedBackfillNotifications: existingBackfillNotificationCount,
       retainedBackfillReveals: existingBackfillRevealCount,
     },
+    approvedApplicationTree: APPROVED_APPLICATION_TREE,
     databaseAttestation,
     deployment,
-    expectedApplicationHead: options.expectedApplicationHead,
+    expectedProductionHead:
+      options.target === "production" ? options.expectedProductionHead : null,
+    expectedStagingHead:
+      options.target === "staging" ? options.expectedStagingHead : null,
     expectedToolingHead: options.expectedToolingHead,
     firstPass: null,
     mode: options.apply ? "apply" : "preflight",
     ok: true,
     postconditions: null,
     projectRef: target.ref,
+    productionApplicationTree: gitAttestation.productionApplicationTree,
+    productionHead: gitAttestation.productionHead,
+    releaseSourceHead: APPROVED_RELEASE_SOURCE_HEAD,
+    releaseSourceTree: gitAttestation.releaseSourceTree,
     secondPass: null,
     serviceRoleAttestation: {
       allowlistCount: serviceRolePlayers.length,
@@ -840,6 +865,10 @@ export async function runInitialAwardsBackfill(
     },
     target: options.target,
     toolingBaseHead: APPROVED_TOOLING_BASE_HEAD,
+    toolingDiffPaths: gitAttestation.toolingDiffPaths,
+    toolingHead: gitAttestation.toolingHead,
+    toolingMergeBase: gitAttestation.toolingMergeBase,
+    toolingTree: gitAttestation.toolingTree,
   };
 
   if (!options.apply) {
@@ -861,6 +890,16 @@ export async function runInitialAwardsBackfill(
     }
   }
 
+  const immediateGitAttestation = verifyGitState(
+    options,
+    commandRunner,
+    repositoryRoot
+  );
+  assertSameGitAttestation(
+    gitAttestation,
+    immediateGitAttestation,
+    "GIT_ATTESTATION_CHANGED_BEFORE_APPLY"
+  );
   const immediateDeployment = verifyVercelDeployment(
     options,
     commandRunner,
@@ -1055,12 +1094,23 @@ export async function runInitialAwardsBackfill(
     }
   }
 
+  const finalGitAttestation = verifyGitState(
+    options,
+    commandRunner,
+    repositoryRoot
+  );
+  assertSameGitAttestation(
+    gitAttestation,
+    finalGitAttestation,
+    "GIT_ATTESTATION_CHANGED_DURING_BACKFILL"
+  );
   const finalDeployment = verifyVercelDeployment(
     options,
     commandRunner,
     repositoryRoot
   );
   assertSameDeployment(deployment, finalDeployment);
+  report.postconditions.gitAttestationUnchanged = true;
 
   return { ...report, code: "BADGE_BACKFILL_COMPLETE" };
 }
@@ -1281,8 +1331,8 @@ function queryDatabaseAttestation(
 }
 
 function verifyGitState(options, commandRunner, repositoryRoot) {
-  const head = commandRunner(
-    "git",
+  const head = runGit(
+    commandRunner,
     ["rev-parse", "HEAD"],
     repositoryRoot,
     "GIT_HEAD_LOAD_FAILED"
@@ -1291,16 +1341,16 @@ function verifyGitState(options, commandRunner, repositoryRoot) {
     fail("GIT_TOOLING_HEAD_MISMATCH");
   }
 
-  const status = commandRunner(
-    "git",
+  const status = runGit(
+    commandRunner,
     ["status", "--porcelain=v1", "--untracked-files=all"],
     repositoryRoot,
     "GIT_STATUS_LOAD_FAILED"
   );
   if (status.trim().length > 0) fail("GIT_WORKTREE_DIRTY");
 
-  const mergeBase = commandRunner(
-    "git",
+  const mergeBase = runGit(
+    commandRunner,
     [
       "merge-base",
       APPROVED_TOOLING_BASE_HEAD,
@@ -1318,8 +1368,8 @@ function verifyGitState(options, commandRunner, repositoryRoot) {
     options.expectedToolingHead,
   ].join("..");
   const toolingDiffPaths = parseGitPathList(
-    commandRunner(
-      "git",
+    runGit(
+      commandRunner,
       [
         "diff",
         "--name-only",
@@ -1340,8 +1390,8 @@ function verifyGitState(options, commandRunner, repositoryRoot) {
   }
 
   const runtimeModuleDiffPaths = parseGitPathList(
-    commandRunner(
-      "git",
+    runGit(
+      commandRunner,
       [
         "diff",
         "--name-only",
@@ -1358,6 +1408,85 @@ function verifyGitState(options, commandRunner, repositoryRoot) {
   if (runtimeModuleDiffPaths.length !== 0) {
     fail("GIT_RUNTIME_MODULE_MISMATCH");
   }
+
+  const toolingTree = runGit(
+    commandRunner,
+    ["rev-parse", options.expectedToolingHead + "^{tree}"],
+    repositoryRoot,
+    "GIT_TOOLING_TREE_LOAD_FAILED"
+  ).trim();
+  if (!GIT_SHA_PATTERN.test(toolingTree)) {
+    fail("GIT_TOOLING_TREE_INVALID");
+  }
+
+  const releaseSourceTree = runGit(
+    commandRunner,
+    ["rev-parse", APPROVED_RELEASE_SOURCE_HEAD + "^{tree}"],
+    repositoryRoot,
+    "GIT_RELEASE_SOURCE_TREE_LOAD_FAILED"
+  ).trim();
+  if (releaseSourceTree !== APPROVED_APPLICATION_TREE) {
+    fail("GIT_RELEASE_SOURCE_TREE_MISMATCH");
+  }
+
+  let productionApplicationTree = null;
+  let productionHead = null;
+  if (options.target === "production") {
+    runGit(
+      commandRunner,
+      [
+        "fetch",
+        "--quiet",
+        "origin",
+        "refs/heads/master:refs/remotes/origin/master",
+      ],
+      repositoryRoot,
+      "GIT_PRODUCTION_MASTER_FETCH_FAILED"
+    );
+    const originMaster = runGit(
+      commandRunner,
+      ["rev-parse", "refs/remotes/origin/master"],
+      repositoryRoot,
+      "GIT_PRODUCTION_MASTER_LOAD_FAILED"
+    ).trim();
+    if (originMaster !== options.expectedProductionHead) {
+      fail("GIT_PRODUCTION_MASTER_MISMATCH");
+    }
+    productionHead = originMaster;
+
+    productionApplicationTree = runGit(
+      commandRunner,
+      ["rev-parse", options.expectedProductionHead + "^{tree}"],
+      repositoryRoot,
+      "GIT_PRODUCTION_TREE_LOAD_FAILED"
+    ).trim();
+    if (productionApplicationTree !== APPROVED_APPLICATION_TREE) {
+      fail("GIT_PRODUCTION_TREE_MISMATCH");
+    }
+  }
+
+  return {
+    productionApplicationTree,
+    productionHead,
+    releaseSourceTree,
+    toolingDiffPaths,
+    toolingHead: head,
+    toolingMergeBase: mergeBase,
+    toolingTree,
+  };
+}
+
+function runGit(commandRunner, arguments_, repositoryRoot, failureCode) {
+  return commandRunner(
+    "git",
+    ["--no-replace-objects", ...arguments_],
+    repositoryRoot,
+    failureCode
+  );
+}
+
+function assertSameGitAttestation(expected, actual, code) {
+  if (stableJson(expected) !== stableJson(actual)) fail(code);
 }
 
 function parseGitPathList(value, code) {
@@ -1437,10 +1566,20 @@ function verifyVercelDeployment(options, commandRunner, repositoryRoot) {
   );
   if (
     metadata.id !== inspected.id ||
-    metadata.readyState !== "READY" ||
-    metadata.gitSource?.sha !== options.expectedApplicationHead
+    metadata.readyState !== "READY"
   ) {
-    fail("VERCEL_DEPLOYMENT_HEAD_MISMATCH");
+    fail("VERCEL_DEPLOYMENT_METADATA_MISMATCH");
+  }
+  const expectedDeploymentHead =
+    options.target === "production"
+      ? options.expectedProductionHead
+      : options.expectedStagingHead;
+  if (metadata.gitSource?.sha !== expectedDeploymentHead) {
+    fail(
+      options.target === "production"
+        ? "VERCEL_PRODUCTION_HEAD_MISMATCH"
+        : "VERCEL_STAGING_HEAD_MISMATCH"
+    );
   }
   if (
     options.target === "staging" &&
@@ -1549,6 +1688,7 @@ export function buildCommandEnvironment(environment) {
 
   for (const [name, value] of Object.entries(environment)) {
     if (typeof value !== "string") continue;
+    if (/^GIT_/iu.test(name)) continue;
     if (retainedAuthenticationVariables.has(name)) {
       sanitized[name] = value;
       continue;
@@ -1562,6 +1702,8 @@ export function buildCommandEnvironment(environment) {
     }
     sanitized[name] = value;
   }
+
+  sanitized.GIT_NO_REPLACE_OBJECTS = "1";
 
   return sanitized;
 }
@@ -1657,15 +1799,18 @@ function printHelp() {
     --target <staging|production> \\
     --confirm-project-ref <exact-project-ref> \\
     --base-url <exact-immutable-deployment-origin> \\
-    [--expected-application-head <40-character-deployed-git-sha>] \\
+    (--expected-production-head <40-character-production-git-sha> | \\
+     --expected-staging-head <40-character-staging-git-sha>) \\
     --expected-tooling-head <40-character-local-git-sha> \\
     --allowlist-file <private-json-path-outside-repository> \\
     --allowlist-sha256 <sha256-of-exact-file-bytes> \\
     [--apply]
 
-The application head defaults to the approved application release; Production
-cannot override it. The local tooling head is always explicit and must be a
-clean descendant containing exactly the approved operator-only files. Without
+Production requires its exact deployed head; fetched origin/master and the
+READY deployment must match it, and its tree must equal the approved release
+source tree. Staging uses --expected-staging-head instead. The local tooling
+head is always explicit and must be a clean descendant containing exactly the
+approved operator-only files. Without
 --apply, the command performs read-only identity, deployment, database,
 allowlist, and award-baseline checks. --apply runs the existing controlled
 backfill twice over one frozen allowlist and requires the second pass to create

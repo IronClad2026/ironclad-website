@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  APPROVED_APPLICATION_HEAD,
+  APPROVED_APPLICATION_TREE,
+  APPROVED_RELEASE_SOURCE_HEAD,
   APPROVED_TOOLING_BASE_HEAD,
   AUTHORIZED_TOOLING_PATHS,
   BACKFILL_TARGETS,
@@ -18,8 +19,10 @@ import {
 
 const STAGING_REF = BACKFILL_TARGETS.staging.ref;
 const PRODUCTION_REF = BACKFILL_TARGETS.production.ref;
-const EXPECTED_APPLICATION_HEAD = APPROVED_APPLICATION_HEAD;
+const EXPECTED_STAGING_HEAD = "c".repeat(40);
+const EXPECTED_PRODUCTION_HEAD = "d".repeat(40);
 const EXPECTED_TOOLING_HEAD = "a".repeat(40);
+const EXPECTED_TOOLING_TREE = "9".repeat(40);
 const BASE_URL = "https://ironclad-backfill-preview.vercel.app";
 const PLAYER_ID = "00000000-0000-4000-8000-000000000001";
 const FIRST_AWARD_ID = "10000000-0000-4000-8000-000000000001";
@@ -45,9 +48,19 @@ describe("initial Badge backfill orchestration contract", () => {
       mode: "preflight",
       ok: true,
       target: "staging",
-      expectedApplicationHead: EXPECTED_APPLICATION_HEAD,
+      approvedApplicationTree: APPROVED_APPLICATION_TREE,
+      expectedProductionHead: null,
+      expectedStagingHead: EXPECTED_STAGING_HEAD,
       expectedToolingHead: EXPECTED_TOOLING_HEAD,
+      productionApplicationTree: null,
+      productionHead: null,
+      releaseSourceHead: APPROVED_RELEASE_SOURCE_HEAD,
+      releaseSourceTree: APPROVED_APPLICATION_TREE,
       toolingBaseHead: APPROVED_TOOLING_BASE_HEAD,
+      toolingDiffPaths: AUTHORIZED_TOOLING_PATHS,
+      toolingHead: EXPECTED_TOOLING_HEAD,
+      toolingMergeBase: APPROVED_TOOLING_BASE_HEAD,
+      toolingTree: EXPECTED_TOOLING_TREE,
       allowlist: {
         count: 1,
         fileSha256: harness.fileSha256,
@@ -66,6 +79,11 @@ describe("initial Badge backfill orchestration contract", () => {
     expect(harness.authorityLoader).toHaveBeenCalledOnce();
     expect(harness.backfillInitialBadgeAwards).not.toHaveBeenCalled();
     expect(harness.server.close).toHaveBeenCalledOnce();
+    expect(
+      harness.commandRunner.mock.calls
+        .filter(([command]) => command === "git")
+        .every(([, arguments_]) => arguments_[0] === "--no-replace-objects")
+    ).toBe(true);
     expect(harness.client.from.mock.calls.map(([table]) => table)).toEqual([
       "players",
       "player_badge_awards",
@@ -74,7 +92,126 @@ describe("initial Badge backfill orchestration contract", () => {
     expect(JSON.stringify(result)).not.toContain(harness.allowlistPath);
   });
 
-  it("rejects a deployed application SHA that differs from the reviewed application", async () => {
+  it("accepts a distinct Production SHA only when it resolves to the approved release-source tree", async () => {
+    const harness = createHarness({ apply: false, target: "production" });
+
+    const result = await runInitialAwardsBackfill(
+      harness.options,
+      harness.deps
+    );
+
+    expect(EXPECTED_PRODUCTION_HEAD).not.toBe(APPROVED_RELEASE_SOURCE_HEAD);
+    expect(result).toMatchObject({
+      approvedApplicationTree: APPROVED_APPLICATION_TREE,
+      expectedProductionHead: EXPECTED_PRODUCTION_HEAD,
+      expectedStagingHead: null,
+      productionApplicationTree: APPROVED_APPLICATION_TREE,
+      productionHead: EXPECTED_PRODUCTION_HEAD,
+      releaseSourceHead: APPROVED_RELEASE_SOURCE_HEAD,
+      releaseSourceTree: APPROVED_APPLICATION_TREE,
+    });
+    expect(
+      harness.commandRunner.mock.calls.find(
+        ([, , , failureCode]) =>
+          failureCode === "GIT_RELEASE_SOURCE_TREE_LOAD_FAILED"
+      )?.[1]
+    ).toEqual([
+      "--no-replace-objects",
+      "rev-parse",
+      `${APPROVED_RELEASE_SOURCE_HEAD}^{tree}`,
+    ]);
+    expect(
+      harness.commandRunner.mock.calls.find(
+        ([, , , failureCode]) =>
+          failureCode === "GIT_PRODUCTION_MASTER_FETCH_FAILED"
+      )?.[1]
+    ).toEqual([
+      "--no-replace-objects",
+      "fetch",
+      "--quiet",
+      "origin",
+      "refs/heads/master:refs/remotes/origin/master",
+    ]);
+    expect(
+      harness.commandRunner.mock.calls.find(
+        ([, , , failureCode]) =>
+          failureCode === "GIT_PRODUCTION_TREE_LOAD_FAILED"
+      )?.[1]
+    ).toEqual([
+      "--no-replace-objects",
+      "rev-parse",
+      `${EXPECTED_PRODUCTION_HEAD}^{tree}`,
+    ]);
+    const mergeBaseCall = harness.commandRunner.mock.calls.find(
+      ([, , , failureCode]) => failureCode === "GIT_TOOLING_BASE_LOAD_FAILED"
+    );
+    expect(mergeBaseCall?.[1]).toEqual([
+      "--no-replace-objects",
+      "merge-base",
+      APPROVED_TOOLING_BASE_HEAD,
+      EXPECTED_TOOLING_HEAD,
+    ]);
+    const toolingDiffCall = harness.commandRunner.mock.calls.find(
+      ([, , , failureCode]) => failureCode === "GIT_TOOLING_DIFF_LOAD_FAILED"
+    );
+    expect(toolingDiffCall?.[1]).toEqual([
+      "--no-replace-objects",
+      "diff",
+      "--name-only",
+      "--no-renames",
+      `${APPROVED_TOOLING_BASE_HEAD}..${EXPECTED_TOOLING_HEAD}`,
+      "--",
+    ]);
+  });
+
+  it("rejects a release-source SHA whose tree differs from the approved application tree", async () => {
+    const harness = createHarness({
+      apply: false,
+      commandOutputs: {
+        GIT_RELEASE_SOURCE_TREE_LOAD_FAILED: `${"e".repeat(40)}\n`,
+      },
+    });
+
+    await expect(
+      runInitialAwardsBackfill(harness.options, harness.deps)
+    ).rejects.toMatchObject({ code: "GIT_RELEASE_SOURCE_TREE_MISMATCH" });
+    expect(harness.authorityLoader).not.toHaveBeenCalled();
+    expect(harness.backfillInitialBadgeAwards).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Production head whose tree differs from the approved application tree", async () => {
+    const harness = createHarness({
+      apply: false,
+      commandOutputs: {
+        GIT_PRODUCTION_TREE_LOAD_FAILED: `${"e".repeat(40)}\n`,
+      },
+      target: "production",
+    });
+
+    await expect(
+      runInitialAwardsBackfill(harness.options, harness.deps)
+    ).rejects.toMatchObject({ code: "GIT_PRODUCTION_TREE_MISMATCH" });
+    expect(harness.authorityLoader).not.toHaveBeenCalled();
+    expect(harness.backfillInitialBadgeAwards).not.toHaveBeenCalled();
+  });
+
+  it("rejects origin/master when it differs from the expected Production head", async () => {
+    const harness = createHarness({
+      apply: false,
+      commandOutputs: {
+        GIT_PRODUCTION_MASTER_LOAD_FAILED: `${"f".repeat(40)}\n`,
+      },
+      target: "production",
+    });
+
+    await expect(
+      runInitialAwardsBackfill(harness.options, harness.deps)
+    ).rejects.toMatchObject({ code: "GIT_PRODUCTION_MASTER_MISMATCH" });
+    expect(harness.authorityLoader).not.toHaveBeenCalled();
+    expect(harness.backfillInitialBadgeAwards).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Vercel Production deployment SHA that differs from the expected Production head", async () => {
     const harness = createHarness({
       apply: false,
       commandOutputs: {
@@ -82,14 +219,52 @@ describe("initial Badge backfill orchestration contract", () => {
           gitSource: { sha: "f".repeat(40) },
           id: "dpl_BadgeBackfillTest",
           readyState: "READY",
-          target: null,
+          target: "production",
         }),
       },
+      target: "production",
     });
 
     await expect(
       runInitialAwardsBackfill(harness.options, harness.deps)
-    ).rejects.toMatchObject({ code: "VERCEL_DEPLOYMENT_HEAD_MISMATCH" });
+    ).rejects.toMatchObject({ code: "VERCEL_PRODUCTION_HEAD_MISMATCH" });
+    expect(harness.authorityLoader).not.toHaveBeenCalled();
+    expect(harness.backfillInitialBadgeAwards).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      code: "VERCEL_DEPLOYMENT_NOT_READY",
+      failureCode: "VERCEL_DEPLOYMENT_INSPECTION_FAILED",
+      name: "a non-READY Production deployment",
+      output: JSON.stringify({
+        id: "dpl_BadgeBackfillTest",
+        readyState: "BUILDING",
+        target: "production",
+        url: "www.ironcladtournaments.com",
+      }),
+    },
+    {
+      code: "PRODUCTION_DEPLOYMENT_TARGET_MISMATCH",
+      failureCode: "VERCEL_DEPLOYMENT_INSPECTION_FAILED",
+      name: "a READY deployment outside the Production target",
+      output: JSON.stringify({
+        id: "dpl_BadgeBackfillTest",
+        readyState: "READY",
+        target: null,
+        url: "www.ironcladtournaments.com",
+      }),
+    },
+  ])("rejects $name", async (scenario) => {
+    const harness = createHarness({
+      apply: false,
+      commandOutputs: { [scenario.failureCode]: scenario.output },
+      target: "production",
+    });
+
+    await expect(
+      runInitialAwardsBackfill(harness.options, harness.deps)
+    ).rejects.toMatchObject({ code: scenario.code });
     expect(harness.authorityLoader).not.toHaveBeenCalled();
     expect(harness.backfillInitialBadgeAwards).not.toHaveBeenCalled();
   });
@@ -121,6 +296,12 @@ describe("initial Badge backfill orchestration contract", () => {
         ...AUTHORIZED_TOOLING_PATHS,
         "lib/notifications.ts",
       ].join("\n")}\n`,
+    },
+    {
+      code: "GIT_TOOLING_DIFF_MISMATCH",
+      failureCode: "GIT_TOOLING_DIFF_LOAD_FAILED",
+      name: "a tooling diff missing an authorized path",
+      output: `${AUTHORIZED_TOOLING_PATHS.slice(1).join("\n")}\n`,
     },
   ])("fails closed before remote checks for $name", async (scenario) => {
     const harness = createHarness({
@@ -160,6 +341,7 @@ describe("initial Badge backfill orchestration contract", () => {
           failureCode === "GIT_RUNTIME_MODULE_DIFF_LOAD_FAILED"
       );
       expect(runtimeDiffCall?.[1]).toEqual([
+        "--no-replace-objects",
         "diff",
         "--name-only",
         "--no-renames",
@@ -341,6 +523,11 @@ describe("initial Badge backfill orchestration contract", () => {
           failureCode === "DATABASE_ATTESTATION_QUERY_FAILED"
       )
     ).toHaveLength(4);
+    expect(
+      harness.commandRunner.mock.calls.filter(
+        ([, , , failureCode]) => failureCode === "GIT_HEAD_LOAD_FAILED"
+      )
+    ).toHaveLength(3);
     expect(result).toMatchObject({
       code: "BADGE_BACKFILL_COMPLETE",
       mode: "apply",
@@ -354,10 +541,11 @@ describe("initial Badge backfill orchestration contract", () => {
         errorCount: 0,
         playersEvaluated: 1,
       },
-      postconditions: {
-        databaseAttestationUnchangedAfterFirstPass: true,
-        evaluationModeBackfill: true,
-        firstPassNewAwards: 1,
+        postconditions: {
+          databaseAttestationUnchangedAfterFirstPass: true,
+          evaluationModeBackfill: true,
+          firstPassNewAwards: 1,
+          gitAttestationUnchanged: true,
         matchingNotifications: 0,
         matchingReveals: 0,
         secondPassNewAwards: 0,
@@ -366,6 +554,31 @@ describe("initial Badge backfill orchestration contract", () => {
       },
     });
     expect(JSON.stringify(result)).not.toContain(PLAYER_ID);
+  });
+
+  it("re-fetches and rejects a moved Production head immediately before mutation", async () => {
+    const harness = createHarness({
+      apply: true,
+      commandOutputs: {
+        GIT_PRODUCTION_MASTER_LOAD_FAILED: [
+          `${EXPECTED_PRODUCTION_HEAD}\n`,
+          `${"f".repeat(40)}\n`,
+        ],
+      },
+      target: "production",
+    });
+
+    await expect(
+      runInitialAwardsBackfill(harness.options, harness.deps)
+    ).rejects.toMatchObject({ code: "GIT_PRODUCTION_MASTER_MISMATCH" });
+    expect(harness.authorityLoader).not.toHaveBeenCalled();
+    expect(harness.backfillInitialBadgeAwards).not.toHaveBeenCalled();
+    expect(
+      harness.commandRunner.mock.calls.filter(
+        ([, , , failureCode]) =>
+          failureCode === "GIT_PRODUCTION_MASTER_FETCH_FAILED"
+      )
+    ).toHaveLength(2);
   });
 
   it("stops before the second pass when the attested Production snapshot changes after pass one", async () => {
@@ -555,7 +768,7 @@ function createHarness({
   target = "staging",
 }: {
   apply: boolean;
-  commandOutputs?: Record<string, string>;
+  commandOutputs?: Record<string, string | string[]>;
   databaseAttestationOverrides?: Array<Record<string, unknown>>;
   notificationCount?: number;
   revealCount?: number;
@@ -603,7 +816,10 @@ function createHarness({
         : BASE_URL,
     confirmProjectRef:
       target === "production" ? PRODUCTION_REF : STAGING_REF,
-    expectedApplicationHead: EXPECTED_APPLICATION_HEAD,
+    expectedProductionHead:
+      target === "production" ? EXPECTED_PRODUCTION_HEAD : null,
+    expectedStagingHead:
+      target === "staging" ? EXPECTED_STAGING_HEAD : null,
     expectedToolingHead: EXPECTED_TOOLING_HEAD,
     help: false,
     target,
@@ -645,12 +861,13 @@ function createCommandRunner(
     commandOutputs,
     databaseAttestationOverrides,
   }: {
-    commandOutputs: Record<string, string>;
+    commandOutputs: Record<string, string | string[]>;
     databaseAttestationOverrides: Array<Record<string, unknown>>;
   }
 ) {
   const project = BACKFILL_TARGETS[target];
   let databaseAttestationCall = 0;
+  const commandOutputCalls = new Map<string, number>();
   return vi.fn(
     (
       _command: string,
@@ -659,7 +876,11 @@ function createCommandRunner(
       failureCode: string
     ) => {
       if (Object.hasOwn(commandOutputs, failureCode)) {
-        return commandOutputs[failureCode];
+        const configured = commandOutputs[failureCode];
+        if (!Array.isArray(configured)) return configured;
+        const callIndex = commandOutputCalls.get(failureCode) ?? 0;
+        commandOutputCalls.set(failureCode, callIndex + 1);
+        return configured[Math.min(callIndex, configured.length - 1)];
       }
 
       switch (failureCode) {
@@ -673,6 +894,16 @@ function createCommandRunner(
           return `${AUTHORIZED_TOOLING_PATHS.join("\n")}\n`;
         case "GIT_RUNTIME_MODULE_DIFF_LOAD_FAILED":
           return "";
+        case "GIT_TOOLING_TREE_LOAD_FAILED":
+          return `${EXPECTED_TOOLING_TREE}\n`;
+        case "GIT_RELEASE_SOURCE_TREE_LOAD_FAILED":
+          return `${APPROVED_APPLICATION_TREE}\n`;
+        case "GIT_PRODUCTION_MASTER_FETCH_FAILED":
+          return "";
+        case "GIT_PRODUCTION_MASTER_LOAD_FAILED":
+          return `${EXPECTED_PRODUCTION_HEAD}\n`;
+        case "GIT_PRODUCTION_TREE_LOAD_FAILED":
+          return `${APPROVED_APPLICATION_TREE}\n`;
         case "SUPABASE_PROJECT_LIST_FAILED":
           return JSON.stringify([
             {
@@ -693,7 +924,12 @@ function createCommandRunner(
           });
         case "VERCEL_DEPLOYMENT_METADATA_FAILED":
           return JSON.stringify({
-            gitSource: { sha: EXPECTED_APPLICATION_HEAD },
+            gitSource: {
+              sha:
+                target === "production"
+                  ? EXPECTED_PRODUCTION_HEAD
+                  : EXPECTED_STAGING_HEAD,
+            },
             id: "dpl_BadgeBackfillTest",
             readyState: "READY",
             target: target === "production" ? "production" : null,

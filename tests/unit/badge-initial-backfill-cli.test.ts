@@ -10,7 +10,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  APPROVED_APPLICATION_HEAD,
+  APPROVED_APPLICATION_TREE,
+  APPROVED_RELEASE_SOURCE_HEAD,
   APPROVED_TOOLING_BASE_HEAD,
   AUTHORIZED_TOOLING_PATHS,
   BACKFILL_BATCH_SIZE,
@@ -39,7 +40,8 @@ import {
 const STAGING_REF = BACKFILL_TARGETS.staging.ref;
 const PRODUCTION_REF = BACKFILL_TARGETS.production.ref;
 const EXPECTED_TOOLING_HEAD = "a".repeat(40);
-const STAGING_APPLICATION_HEAD = "c".repeat(40);
+const EXPECTED_STAGING_HEAD = "c".repeat(40);
+const EXPECTED_PRODUCTION_HEAD = "d".repeat(40);
 const FILE_SHA256 = "b".repeat(64);
 const PLAYER_IDS = Array.from(
   { length: BACKFILL_BATCH_SIZE + 1 },
@@ -68,8 +70,8 @@ describe("initial Badge backfill CLI guards", () => {
         PRODUCTION_REF,
         "--base-url",
         "https://www.ironcladtournaments.com",
-        "--expected-application-head",
-        APPROVED_APPLICATION_HEAD,
+        "--expected-production-head",
+        EXPECTED_PRODUCTION_HEAD,
         "--expected-tooling-head",
         EXPECTED_TOOLING_HEAD,
         "--allowlist-file",
@@ -79,7 +81,8 @@ describe("initial Badge backfill CLI guards", () => {
       ])
     ).toMatchObject({
       apply: false,
-      expectedApplicationHead: APPROVED_APPLICATION_HEAD,
+      expectedProductionHead: EXPECTED_PRODUCTION_HEAD,
+      expectedStagingHead: null,
       expectedToolingHead: EXPECTED_TOOLING_HEAD,
       target: "production",
     });
@@ -88,9 +91,16 @@ describe("initial Badge backfill CLI guards", () => {
       parseArguments([
         "--target",
         "staging",
+        "--expected-staging-head",
+        EXPECTED_STAGING_HEAD,
         "--apply",
       ])
-    ).toMatchObject({ apply: true, target: "staging" });
+    ).toMatchObject({
+      apply: true,
+      expectedProductionHead: null,
+      expectedStagingHead: EXPECTED_STAGING_HEAD,
+      target: "staging",
+    });
 
     expectCutoverError(
       () => parseArguments(["--target", "staging", "--apply", "--apply"]),
@@ -106,11 +116,12 @@ describe("initial Badge backfill CLI guards", () => {
     );
   });
 
-  it("hard-binds the target, project ref, deployment origin, application/tooling heads, and hash", () => {
+  it("hard-binds the target, project ref, deployment origin, target/tooling heads, and hash", () => {
     const production = validOptions("production");
     expect(validateOptions(production)).toMatchObject({
       baseUrl: "https://www.ironcladtournaments.com",
-      expectedApplicationHead: APPROVED_APPLICATION_HEAD,
+      expectedProductionHead: EXPECTED_PRODUCTION_HEAD,
+      expectedStagingHead: null,
       expectedToolingHead: EXPECTED_TOOLING_HEAD,
       targetConfig: BACKFILL_TARGETS.production,
     });
@@ -125,8 +136,12 @@ describe("initial Badge backfill CLI guards", () => {
     );
     expectCutoverError(
       () =>
-        validateOptions({ ...production, expectedApplicationHead: "main" }),
-      "EXPECTED_APPLICATION_HEAD_INVALID"
+        validateOptions({ ...production, expectedProductionHead: "main" }),
+      "EXPECTED_PRODUCTION_HEAD_INVALID"
+    );
+    expectCutoverError(
+      () => validateOptions({ ...production, expectedProductionHead: null }),
+      "EXPECTED_PRODUCTION_HEAD_INVALID"
     );
     expectCutoverError(
       () => validateOptions({ ...production, expectedToolingHead: "main" }),
@@ -136,9 +151,9 @@ describe("initial Badge backfill CLI guards", () => {
       () =>
         validateOptions({
           ...production,
-          expectedApplicationHead: STAGING_APPLICATION_HEAD,
+          expectedStagingHead: EXPECTED_STAGING_HEAD,
         }),
-      "PRODUCTION_APPLICATION_HEAD_MISMATCH"
+      "EXPECTED_STAGING_HEAD_UNEXPECTED"
     );
     expectCutoverError(
       () => validateOptions({ ...production, allowlistSha256: "ABC" }),
@@ -167,21 +182,35 @@ describe("initial Badge backfill CLI guards", () => {
 
     const staging = validOptions("staging");
     expect(
-      validateOptions({
-        ...staging,
-        expectedApplicationHead: STAGING_APPLICATION_HEAD,
-      })
+      validateOptions(staging)
     ).toMatchObject({
-      expectedApplicationHead: STAGING_APPLICATION_HEAD,
+      expectedProductionHead: null,
+      expectedStagingHead: EXPECTED_STAGING_HEAD,
       expectedToolingHead: EXPECTED_TOOLING_HEAD,
     });
-    expect(
-      validateOptions({ ...staging, expectedApplicationHead: null })
-    ).toMatchObject({ expectedApplicationHead: APPROVED_APPLICATION_HEAD });
+    expectCutoverError(
+      () => validateOptions({ ...staging, expectedStagingHead: null }),
+      "EXPECTED_STAGING_HEAD_INVALID"
+    );
+    expectCutoverError(
+      () =>
+        validateOptions({
+          ...staging,
+          expectedProductionHead: EXPECTED_PRODUCTION_HEAD,
+        }),
+      "EXPECTED_PRODUCTION_HEAD_UNEXPECTED"
+    );
   });
 
-  it("pins the tooling base, exact four-file diff, and critical runtime modules", () => {
-    expect(APPROVED_TOOLING_BASE_HEAD).toBe(APPROVED_APPLICATION_HEAD);
+  it("pins the release source/tree, tooling base, exact four-file diff, and critical runtime modules", () => {
+    expect(APPROVED_RELEASE_SOURCE_HEAD).toBe(
+      "ac612018f6c27963a59df84815d0a76ebbcbd27e"
+    );
+    expect(APPROVED_APPLICATION_TREE).toBe(
+      "6ba0e3b2308bd22c3c9dea62efb235f1bb48326c"
+    );
+    expect(APPROVED_TOOLING_BASE_HEAD).toBe(APPROVED_RELEASE_SOURCE_HEAD);
+    expect(EXPECTED_PRODUCTION_HEAD).not.toBe(APPROVED_RELEASE_SOURCE_HEAD);
     expect(AUTHORIZED_TOOLING_PATHS).toEqual([
       "docs/achievement-badge-production-cutover-runbook.md",
       "scripts/badges/initial-awards-backfill.mjs",
@@ -387,11 +416,16 @@ describe("initial Badge backfill CLI guards", () => {
     expect(sql).not.toMatch(/\b(?:insert|update|delete|truncate|alter|drop)\b/iu);
   });
 
-  it("strips application credentials from spawned CLI environments", () => {
+  it("strips application credentials and ambient Git controls from spawned CLI environments", () => {
     expect(
       buildCommandEnvironment({
         CLERK_SECRET_KEY: "clerk-secret",
         DATABASE_URL: "postgres://private",
+        GIT_CONFIG_COUNT: "1",
+        GIT_DIR: "C:\\spoofed-git-dir",
+        GIT_NO_REPLACE_OBJECTS: "0",
+        GIT_REPLACE_REF_BASE: "refs/spoofed/",
+        GIT_WORK_TREE: "C:\\spoofed-work-tree",
         NORMAL_SETTING: "retained",
         OPENAI_API_KEY: "api-secret",
         PATH: "C:\\tools",
@@ -401,6 +435,7 @@ describe("initial Badge backfill CLI guards", () => {
         VERCEL_TOKEN: "vercel-cli-auth",
       })
     ).toEqual({
+      GIT_NO_REPLACE_OBJECTS: "1",
       NORMAL_SETTING: "retained",
       PATH: "C:\\tools",
       SUPABASE_ACCESS_TOKEN: "supabase-cli-auth",
@@ -605,10 +640,10 @@ function validOptions(target: "staging" | "production") {
         : "https://ironclad-preview.vercel.app",
     confirmProjectRef:
       target === "production" ? PRODUCTION_REF : STAGING_REF,
-    expectedApplicationHead:
-      target === "production"
-        ? APPROVED_APPLICATION_HEAD
-        : STAGING_APPLICATION_HEAD,
+    expectedProductionHead:
+      target === "production" ? EXPECTED_PRODUCTION_HEAD : null,
+    expectedStagingHead:
+      target === "staging" ? EXPECTED_STAGING_HEAD : null,
     expectedToolingHead: EXPECTED_TOOLING_HEAD,
     help: false,
     target,

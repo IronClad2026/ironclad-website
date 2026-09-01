@@ -10,7 +10,7 @@ mutating Production.
 Two later Owner authorizations are required and must not be combined:
 
 1. a release-cutover authorization for the exact 18 migrations and the frozen
-   PR #88 application artifact; and
+   PR #88 release source/content artifact; and
 2. after deployment, smoke testing, candidate derivation, and a successful
    read-only backfill preflight, a separate authorization for the exact frozen
    Production candidate file and the `--apply` command.
@@ -24,45 +24,64 @@ It must not manually insert or delete Badge awards, change qualification
 rules, use reconciliation mode as a historical substitute, create historical
 `badge.unlocked` notifications, or pre-create Reveal acknowledgements.
 
-## Frozen application artifact and separate operator tooling
+## Frozen release source, future Production head, and operator tooling
 
-PR #88 remains feature-frozen at this exact application artifact:
+PR #88 remains feature-frozen at this exact source/content artifact:
 
 | Artifact field | Required value |
 | --- | --- |
 | PR | `#88` |
-| Application head | `ac612018f6c27963a59df84815d0a76ebbcbd27e` |
-| Application tree | `6ba0e3b2308bd22c3c9dea62efb235f1bb48326c` |
+| Release source head | `ac612018f6c27963a59df84815d0a76ebbcbd27e` |
+| Approved application tree | `6ba0e3b2308bd22c3c9dea62efb235f1bb48326c` |
+| Production head | Unknown until PR #88 is merged into `master` |
 
 The operator runner and this runbook are a **separate reviewed local tooling
-commit** based on the frozen application head. The tooling commit is not part
-of PR #88, is not merged into the frozen application artifact, and is not
-deployed to Vercel. This separation is intentional: the deployed application
-must remain the approved PR #88 code, while the operator executes the runner
-from a clean local checkout of the separately authorized tooling commit.
+history** descended from the release source head. The tooling commits are not
+part of PR #88, are not merged into the application artifact, and are not
+deployed to Vercel. This separation is intentional: Production receives the
+approved PR #88 content tree through the normal merge into `master`, while the
+operator executes the runner from a clean local checkout of the separately
+authorized tooling head.
+
+`ac612018f6c27963a59df84815d0a76ebbcbd27e` is the PR #88 release source
+head. It is **not** the future deployed Production SHA. After merge,
+`productionHead` is the then-current `origin/master` SHA. It may have a
+different commit identity, but its tree must equal both the release source tree
+and the approved application tree.
 
 Before either runner mode, record and verify:
 
-- `application.head` is the fixed PR #88 head above;
-- `application.tree` is the fixed PR #88 tree above;
-- `application.deploymentSha` is exactly the application head;
+- `releaseSourceHead` is the fixed PR #88 source head above;
+- `applicationTree` is the fixed approved tree above;
+- `productionHead` is the exact post-merge `origin/master` SHA;
+- a fresh fetch proves `origin/master == productionHead`;
+- `tree(productionHead) == tree(releaseSourceHead) == applicationTree`;
+- the READY canonical Vercel deployment reports
+  `gitSource.sha == productionHead`;
 - `tooling.head` is the separate 40-character Owner-authorized tooling SHA;
-- `tooling.baseHead` is the frozen application head;
-- the tooling commit's first parent is the frozen application head;
+- `toolingBaseHead` is the release source head;
+- `merge-base(tooling.head, releaseSourceHead) == releaseSourceHead`;
 - the local tooling checkout is at `tooling.head` and has no tracked or
   untracked changes; and
-- the reviewed `application.head..tooling.head` file list contains only the
-  approved operator runner, its tests, and this runbook. It must contain no
-  Badge rule, application runtime, migration, dependency, or environment-file
-  change.
+- the reviewed `releaseSourceHead..tooling.head` diff contains exactly these
+  four paths and no others:
+  `docs/achievement-badge-production-cutover-runbook.md`,
+  `scripts/badges/initial-awards-backfill.mjs`,
+  `tests/integration/badge-initial-backfill-contract.test.ts`, and
+  `tests/unit/badge-initial-backfill-cli.test.ts`.
 
-The CLI arguments deliberately bind both artifacts:
+The runner also explicitly verifies that the pinned Badge authority,
+notification, reconciliation, Reveal, and Supabase-admin runtime modules have
+no diff from the release source.
+
+The CLI arguments bind the future Production and tooling heads; the runner
+separately pins the release source head and approved application tree:
 
 ```text
 --target production
 --confirm-project-ref nsyjtqpvyxlzyujlbzos
 --base-url https://www.ironcladtournaments.com
---expected-application-head ac612018f6c27963a59df84815d0a76ebbcbd27e
+--expected-production-head <40-character post-merge origin/master SHA>
 --expected-tooling-head <40-character reviewed local tooling SHA>
 --allowlist-file <absolute path to private JSON>
 --allowlist-sha256 <lowercase SHA-256 of the exact file bytes>
@@ -70,17 +89,18 @@ The CLI arguments deliberately bind both artifacts:
 ```
 
 Omitting `--apply` is read-only preflight. Supplying `--apply` is the only
-runner mode permitted to create awards. The runner must fail closed if either
-the remote application identity or local tooling identity differs from these
-arguments.
+runner mode permitted to create awards. The runner must fail closed if the
+post-merge Production identity/tree, Vercel deployment identity, release
+source/tree, or local tooling identity/base/diff differs from this contract.
 
 ## Authorized future cutover order
 
 Do not start this sequence under the current HOLD. After the first separate
 Owner authorization, perform the release in this order:
 
-1. Reconfirm PR #88 still has application head `ac612018...` and tree
-   `6ba0e3b...`; reconfirm the separately reviewed tooling commit and its base.
+1. Reconfirm PR #88 still has release source head `ac612018...` and approved
+   tree `6ba0e3b...`; reconfirm the separately reviewed tooling head, ancestry,
+   clean checkout, and exact four-path diff.
 2. Apply exactly the following 18 already reviewed migrations to Production,
    in ledger order, using the separately approved migration procedure:
 
@@ -105,25 +125,30 @@ Owner authorization, perform the release in this order:
 
    Stop if the dry run or ledger contains any additional migration, if any
    expected migration is missing, or if the post-apply ledger is not exact.
-3. Merge and deploy PR #88 without adding the tooling commit. The READY
-   canonical Vercel deployment must identify application Git SHA
-   `ac612018f6c27963a59df84815d0a76ebbcbd27e`; a same-tree but different SHA
-   is not accepted without renewed exact-artifact review and authorization.
-4. Smoke test sign-in, Dashboard, Badge Collection, Profile/Steam/Relic, and
+3. Merge PR #88 without adding either tooling commit. Fetch `origin/master`
+   after the merge and freeze its exact SHA as `productionHead`. Verify
+   `origin/master == productionHead` and
+   `tree(productionHead) == tree(releaseSourceHead) == applicationTree`. Stop
+   if the merged Production tree differs from the approved content tree.
+4. Deploy that exact `productionHead`. The READY canonical Vercel deployment
+   must report `gitSource.sha == productionHead`; do not compare the deployed
+   SHA to the pre-merge release source SHA.
+5. Smoke test sign-in, Dashboard, Badge Collection, Profile/Steam/Relic, and
    tournament pages. Confirm no award, notification, Reveal, synthetic player,
    or fixture was manufactured by migration or deployment.
-5. Enter a stable cutover window, derive and freeze the complete Production
+6. Enter a stable cutover window, derive and freeze the complete Production
    candidate list below, and run the exact read-only CLI command from the
    clean authorized tooling checkout.
-6. Review the application/tooling/base, candidate, count, hash, database,
-   baseline-award, notification, and Reveal evidence. Do not apply yet.
-7. Return to the Owner for the second, explicit backfill authorization naming
-   both heads, the application tree, candidate count, both candidate hashes,
-   and the exact apply command.
-8. Only after that authorization, run the apply. The runner performs the first
+7. Review the release-source/Production/tree and tooling/base/diff evidence,
+   plus candidate, count, hash, database, baseline-award, notification, and
+   Reveal evidence. Do not apply yet.
+8. Return to the Owner for the second, explicit backfill authorization naming
+   `releaseSourceHead`, `productionHead`, `applicationTree`, `toolingHead`,
+   candidate count, both candidate hashes, and the exact apply command.
+9. Only after that authorization, run the apply. The runner performs the first
    historical pass and the immediate idempotency pass over the same frozen
    candidate IDs.
-9. Validate the complete retained backfill cohort before any candidate visits
+10. Validate the complete retained backfill cohort before any candidate visits
    Dashboard. Only then allow a qualifying player to exercise the natural
    pending-Reveal journey.
 
@@ -307,6 +332,7 @@ try {
     excludedSyntheticOrUatCount = $excludedSyntheticCount
     excludedUnavailableIdentityCount = $excludedUnavailableCount
     excludedOtherProvenFixtureCount = $excludedOtherFixtureCount
+    populationEquationMatches = $true
     fileSha256 = $fileSha256
     playerIdsSha256 = $playerIdsSha256
   } | ConvertTo-Json
@@ -392,22 +418,38 @@ approved application deployment remains mandatory.
 ## Production preflight — read only
 
 Run this only after the first Owner authorization, the exact 18 migrations,
-the frozen PR #88 deployment, smoke tests, and candidate derivation. Run it
-from the root of the clean local tooling checkout. Replace only the tooling
-SHA and private file path.
+the PR #88 merge/deployment, smoke tests, and candidate derivation. Run it from
+the root of the clean local tooling checkout. Fill in the exact post-merge
+Production SHA, reviewed tooling SHA, and private file path.
 
 ```powershell
-$applicationHead = "ac612018f6c27963a59df84815d0a76ebbcbd27e"
+$releaseSourceHead = "ac612018f6c27963a59df84815d0a76ebbcbd27e"
 $applicationTree = "6ba0e3b2308bd22c3c9dea62efb235f1bb48326c"
+$productionHead = "REPLACE_WITH_40_CHARACTER_POST_MERGE_MASTER_SHA"
 $toolingHead = "REPLACE_WITH_40_CHARACTER_REVIEWED_TOOLING_SHA"
 $productionAllowlist = "C:\ABSOLUTE\PRIVATE\PATH\badge-backfill-production.json"
 $productionAllowlistSha256 = (Get-FileHash -LiteralPath $productionAllowlist -Algorithm SHA256).Hash.ToLowerInvariant()
 $productionBaseUrl = "https://www.ironcladtournaments.com"
+$expectedToolingPaths = @(
+  "docs/achievement-badge-production-cutover-runbook.md"
+  "scripts/badges/initial-awards-backfill.mjs"
+  "tests/integration/badge-initial-backfill-contract.test.ts"
+  "tests/unit/badge-initial-backfill-cli.test.ts"
+)
+$ambientGitControls = @(Get-ChildItem Env: | Where-Object { $_.Name -like "GIT_*" })
+if ($ambientGitControls.Count -ne 0) { throw "Ambient Git control variables must be removed before cutover." }
 
-if ((git rev-parse HEAD).Trim() -cne $toolingHead) { throw "Wrong local tooling head." }
-if ((git status --porcelain | Out-String).Trim().Length -ne 0) { throw "Local tooling checkout is not clean." }
-if ((git rev-parse ($applicationHead + "^{tree}")).Trim() -cne $applicationTree) { throw "Frozen application tree mismatch." }
-if ((git rev-parse ($toolingHead + "^")).Trim() -cne $applicationHead) { throw "Tooling commit is not based directly on the frozen application head." }
+git --no-replace-objects fetch --no-tags origin refs/heads/master:refs/remotes/origin/master
+if ($LASTEXITCODE -ne 0) { throw "Unable to refresh origin/master." }
+if ((git --no-replace-objects rev-parse HEAD).Trim() -cne $toolingHead) { throw "Wrong local tooling head." }
+if ((git --no-replace-objects status --porcelain | Out-String).Trim().Length -ne 0) { throw "Local tooling checkout is not clean." }
+if ((git --no-replace-objects rev-parse refs/remotes/origin/master).Trim() -cne $productionHead) { throw "origin/master does not equal the authorized Production head." }
+if ((git --no-replace-objects rev-parse ($releaseSourceHead + "^{tree}")).Trim() -cne $applicationTree) { throw "Release source tree mismatch." }
+if ((git --no-replace-objects rev-parse ($productionHead + "^{tree}")).Trim() -cne $applicationTree) { throw "Production head tree mismatch." }
+if ((git --no-replace-objects merge-base $toolingHead $releaseSourceHead).Trim() -cne $releaseSourceHead) { throw "Tooling head is not descended from the release source head." }
+$actualToolingPaths = @(git --no-replace-objects diff --name-only --no-renames ($releaseSourceHead + ".." + $toolingHead) --)
+$toolingPathDifference = @(Compare-Object ($expectedToolingPaths | Sort-Object) ($actualToolingPaths | Sort-Object))
+if ($toolingPathDifference.Count -ne 0) { throw "Tooling diff is not the exact reviewed four-path set." }
 
 npx.cmd --yes vercel@59.1.4 env run `
   --environment=production `
@@ -416,7 +458,7 @@ npx.cmd --yes vercel@59.1.4 env run `
   --target production `
   --confirm-project-ref nsyjtqpvyxlzyujlbzos `
   --base-url $productionBaseUrl `
-  --expected-application-head $applicationHead `
+  --expected-production-head $productionHead `
   --expected-tooling-head $toolingHead `
   --allowlist-file $productionAllowlist `
   --allowlist-sha256 $productionAllowlistSha256
@@ -426,8 +468,19 @@ There is no `--apply` flag in this command. It must perform no database write.
 The runner must Vite-load and verify the authority export without invoking it,
 must not load an environment file, and must always close its local server.
 
-Preflight must fail closed for a target/ref/URL mismatch; deployed application
-SHA mismatch; local tooling SHA/base/cleanliness mismatch;
+The runner independently performs a fresh fetch/read of `origin/master` and
+requires `origin/master == --expected-production-head`. It resolves both Git
+trees and requires
+`tree(productionHead) == tree(releaseSourceHead) == applicationTree`. It then
+reads the canonical READY Vercel deployment and requires
+`deployment.gitSource.sha == productionHead`. Operator-side checks above do
+not replace these runner gates. The runner strips ambient `GIT_*` controls,
+disables Git replacement objects, and emits its tooling head, tree, merge base,
+and exact diff paths as sanitized evidence.
+
+Preflight must fail closed for a target/ref/URL mismatch; stale or mismatched
+`origin/master`; release-source or Production tree mismatch; READY Vercel
+`gitSource.sha` mismatch; local tooling SHA/base/diff/cleanliness mismatch;
 candidate count/hash mismatch; closed, missing, synthetic, or unavailable
 allowlisted player; changed file bytes; non-backfill Production baseline award;
 or any retained backfill award with a matching historical notification or
@@ -437,8 +490,10 @@ and must already be green before this runner is invoked.
 Review and archive only sanitized evidence. Then stop and request the second
 Owner authorization. That authorization must identify:
 
-- application head and tree;
-- tooling head, tooling tree, and tooling base head;
+- `releaseSourceHead`, `applicationTree`, and post-merge `productionHead`;
+- proof of fresh `origin/master`, both equal trees, and the READY Vercel
+  `gitSource.sha`;
+- tooling head, tooling tree, merge base, and exact four-path diff;
 - canonical Production URL and project ref;
 - global-open, candidate, and each exclusion count;
 - `allowlist.fileSha256` and `allowlist.playerIdsSha256`;
@@ -448,16 +503,38 @@ Owner authorization. That authorization must identify:
 ## Production apply — separate Owner authorization required
 
 Immediately before apply, reconfirm the stable window, local clean checkout,
-both heads/base, deployment SHA, candidate counts, and both hashes. The private
-file must be byte-identical to preflight. Add only `--apply`:
+release source, post-merge Production head, both content trees, tooling
+head/base/diff, READY deployment SHA, candidate counts, and both hashes. The
+private file must be byte-identical to preflight. Add only `--apply`:
 
 ```powershell
+$releaseSourceHead = "ac612018f6c27963a59df84815d0a76ebbcbd27e"
+$applicationTree = "6ba0e3b2308bd22c3c9dea62efb235f1bb48326c"
+$productionHead = "REPLACE_WITH_40_CHARACTER_POST_MERGE_MASTER_SHA"
+$toolingHead = "REPLACE_WITH_40_CHARACTER_REVIEWED_TOOLING_SHA"
+$productionAllowlist = "C:\ABSOLUTE\PRIVATE\PATH\badge-backfill-production.json"
 $productionAllowlistSha256 = (Get-FileHash -LiteralPath $productionAllowlist -Algorithm SHA256).Hash.ToLowerInvariant()
+$productionBaseUrl = "https://www.ironcladtournaments.com"
+$expectedToolingPaths = @(
+  "docs/achievement-badge-production-cutover-runbook.md"
+  "scripts/badges/initial-awards-backfill.mjs"
+  "tests/integration/badge-initial-backfill-contract.test.ts"
+  "tests/unit/badge-initial-backfill-cli.test.ts"
+)
+$ambientGitControls = @(Get-ChildItem Env: | Where-Object { $_.Name -like "GIT_*" })
+if ($ambientGitControls.Count -ne 0) { throw "Ambient Git control variables must be removed before cutover." }
 
-if ((git rev-parse HEAD).Trim() -cne $toolingHead) { throw "Wrong local tooling head." }
-if ((git status --porcelain | Out-String).Trim().Length -ne 0) { throw "Local tooling checkout is not clean." }
-if ((git rev-parse ($applicationHead + "^{tree}")).Trim() -cne $applicationTree) { throw "Frozen application tree mismatch." }
-if ((git rev-parse ($toolingHead + "^")).Trim() -cne $applicationHead) { throw "Tooling commit is not based directly on the frozen application head." }
+git --no-replace-objects fetch --no-tags origin refs/heads/master:refs/remotes/origin/master
+if ($LASTEXITCODE -ne 0) { throw "Unable to refresh origin/master." }
+if ((git --no-replace-objects rev-parse HEAD).Trim() -cne $toolingHead) { throw "Wrong local tooling head." }
+if ((git --no-replace-objects status --porcelain | Out-String).Trim().Length -ne 0) { throw "Local tooling checkout is not clean." }
+if ((git --no-replace-objects rev-parse refs/remotes/origin/master).Trim() -cne $productionHead) { throw "origin/master does not equal the authorized Production head." }
+if ((git --no-replace-objects rev-parse ($releaseSourceHead + "^{tree}")).Trim() -cne $applicationTree) { throw "Release source tree mismatch." }
+if ((git --no-replace-objects rev-parse ($productionHead + "^{tree}")).Trim() -cne $applicationTree) { throw "Production head tree mismatch." }
+if ((git --no-replace-objects merge-base $toolingHead $releaseSourceHead).Trim() -cne $releaseSourceHead) { throw "Tooling head is not descended from the release source head." }
+$actualToolingPaths = @(git --no-replace-objects diff --name-only --no-renames ($releaseSourceHead + ".." + $toolingHead) --)
+$toolingPathDifference = @(Compare-Object ($expectedToolingPaths | Sort-Object) ($actualToolingPaths | Sort-Object))
+if ($toolingPathDifference.Count -ne 0) { throw "Tooling diff is not the exact reviewed four-path set." }
 
 npx.cmd --yes vercel@59.1.4 env run `
   --environment=production `
@@ -466,19 +543,27 @@ npx.cmd --yes vercel@59.1.4 env run `
   --target production `
   --confirm-project-ref nsyjtqpvyxlzyujlbzos `
   --base-url $productionBaseUrl `
-  --expected-application-head $applicationHead `
+  --expected-production-head $productionHead `
   --expected-tooling-head $toolingHead `
   --allowlist-file $productionAllowlist `
   --allowlist-sha256 $productionAllowlistSha256 `
   --apply
 ```
 
-The apply invokes `backfillInitialBadgeAwards()` once for every frozen
-candidate, then immediately repeats the same call over the same frozen IDs.
-Incomplete and nonqualifying players are expected to create zero awards; that
-is not an error. Acceptance requires no first-pass errors, observed database
-delta equal to the reported first-pass awards, and an immediate second pass
-with no errors and zero additional awards.
+The apply invokes `backfillInitialBadgeAwards()` over fixed batches of the
+frozen candidates. If a batch returns an error, the runner stops scheduling
+later batches and preserves already committed awards for authoritative
+inspection; it does not claim the full cohort was evaluated. A complete,
+error-free first pass must evaluate every frozen candidate and its observed
+database delta must equal the reported award count. Immediately before loading
+the authority, the runner re-attests Git/tooling identity and rechecks the
+deployment and Production candidate snapshot; mutation begins only if all
+three remain unchanged. After pass one it re-attests the candidate snapshot
+and begins the immediate second pass over the same frozen IDs only if that
+snapshot is unchanged. Before reporting success it re-fetches/revalidates Git
+identity and rechecks the deployment again. Incomplete and nonqualifying
+players are expected to create zero awards; that is not an error. Acceptance
+requires a complete second pass with no errors and zero additional awards.
 
 ## Required sanitized evidence and values
 
@@ -488,19 +573,23 @@ path redacted, UTC timestamp, authorization reference, and sanitized JSON.
 
 Require these artifact and candidate groups:
 
-- `application.head`, `application.tree`, `application.deploymentSha`, and
-  deployment target/URL;
-- `tooling.head`, `tooling.tree`, `tooling.baseHead`, `tooling.clean`, and the
-  reviewed tooling-diff scope;
+- `releaseSourceHead`, `releaseSourceTree`, `approvedApplicationTree`,
+  `expectedProductionHead`, `productionHead`, and
+  `productionApplicationTree`;
+- `deployment.target`, `deployment.gitSha`, and the canonical Production URL;
+- `expectedToolingHead`, `toolingHead`, `toolingTree`, `toolingBaseHead`,
+  `toolingMergeBase`, and `toolingDiffPaths`, plus separately recorded
+  clean-status evidence;
 - migration expected/applied count (`18`) and ledger match;
-- `candidate.globalOpenCount`, `candidate.count`, each disjoint exclusion
-  count, and `candidate.populationEquationMatches`;
+- derivation output `globalOpenCount`, `candidateCount`, each disjoint
+  exclusion count, and `populationEquationMatches`;
 - `allowlist.count`, `allowlist.fileSha256`, and
   `allowlist.playerIdsSha256`;
 - `databaseAttestation.allowlistCount`, `allowlistHashMatches`,
   `allowlistClosedOrMissingCount`, `allowlistSyntheticOverlapCount`,
   `allowlistUnavailableIdentityCount`, and
-  `allAllowlistedPlayersLegitimateOpen`;
+  `allAllowlistedPlayersLegitimateOpen`, plus `candidatePlayerCount`,
+  `candidatePlayerSha256`, and `candidateHashMatches`;
 - `serviceRoleAttestation.allowlistCount` and `allowlistHashMatches`;
 - `authority.loader`, `authority.exportVerified`, and `authority.envFile`;
 - `before.awardCount`, `nonBackfillAwardCount`,
@@ -509,6 +598,7 @@ Require these artifact and candidate groups:
 - `firstPass.playersEvaluated`, `awardsCreated`, `badgeCounts`, `errorCount`,
   and `errorsByCode`, and the same fields for `secondPass`; and
 - `postconditions.databaseAttestationUnchanged`,
+  `databaseAttestationUnchangedAfterFirstPass`, `gitAttestationUnchanged`,
   `evaluationModeBackfill`, `firstPassNewAwards`, `matchingNotifications`,
   `matchingReveals`, `secondPassNewAwards`, `secondPassZero`, and
   `validatedBackfillCohortAwards`.
@@ -520,18 +610,28 @@ the player qualifies for a Badge.
 Required values are:
 
 ```text
-application.head = ac612018f6c27963a59df84815d0a76ebbcbd27e
-application.tree = 6ba0e3b2308bd22c3c9dea62efb235f1bb48326c
-application.deploymentSha = application.head
-tooling.baseHead = application.head
-tooling.clean = true
+releaseSourceHead = ac612018f6c27963a59df84815d0a76ebbcbd27e
+releaseSourceTree = 6ba0e3b2308bd22c3c9dea62efb235f1bb48326c
+approvedApplicationTree = 6ba0e3b2308bd22c3c9dea62efb235f1bb48326c
+productionHead = expectedProductionHead = freshly fetched origin/master
+productionApplicationTree = approvedApplicationTree
+deployment.gitSha = productionHead
+deployment.target = "production"
+toolingBaseHead = releaseSourceHead
+expectedToolingHead = local clean HEAD
+toolingHead = expectedToolingHead
+toolingMergeBase = releaseSourceHead
+toolingDiffPaths = exact four authorized paths
 migrations.expectedCount = 18
 migrations.appliedCount = 18
 migrations.ledgerMatches = true
-candidate.populationEquationMatches = true
-candidate.count = allowlist.count
-candidate.playerIdsSha256 = allowlist.playerIdsSha256
+populationEquationMatches = true
+candidateCount = allowlist.count
+playerIdsSha256 = allowlist.playerIdsSha256
 databaseAttestation.allowlistHashMatches = true
+databaseAttestation.candidatePlayerCount = allowlist.count
+databaseAttestation.candidatePlayerSha256 = allowlist.playerIdsSha256
+databaseAttestation.candidateHashMatches = true
 databaseAttestation.allowlistClosedOrMissingCount = 0
 databaseAttestation.allowlistSyntheticOverlapCount = 0
 databaseAttestation.allowlistUnavailableIdentityCount = 0
@@ -556,6 +656,7 @@ postconditions.secondPassNewAwards = 0
 postconditions.secondPassZero = true
 postconditions.databaseAttestationUnchangedAfterFirstPass = true
 postconditions.databaseAttestationUnchanged = true
+postconditions.gitAttestationUnchanged = true
 ```
 
 Production's initial execution expects no baseline Badge awards. A retry after
@@ -564,10 +665,12 @@ frozen cohort must have `source_metadata.evaluationMode = "backfill"`. Any
 non-backfill baseline count fails with
 `PRODUCTION_BASELINE_AWARD_MODE_MISMATCH`.
 
-The apply must re-run the read-only database attestation after pass two. If
-count/hash or candidate status changed during the operation, fail with
-`DATABASE_ATTESTATION_CHANGED_DURING_BACKFILL`. Valid awards already committed
-remain valid, but the cutover is not accepted.
+The apply must re-run the read-only database attestation after pass one and
+must not begin pass two if count/hash or candidate status changed. It re-runs
+the same attestation after pass two. A change fails with
+`DATABASE_ATTESTATION_CHANGED_AFTER_FIRST_PASS` or
+`DATABASE_ATTESTATION_CHANGED_DURING_BACKFILL`, respectively. Valid awards
+already committed remain valid, but the cutover is not accepted.
 
 The notification/Reveal checks cover the **entire retained backfill cohort**,
 not only current-run deltas. `postconditions.validatedBackfillCohortAwards`
@@ -617,6 +720,12 @@ transaction. A player can receive valid awards before a later evaluator,
 network call, or process fails. A client-side failure can leave the commit
 result uncertain.
 
+On any migration, deployment, or smoke-test failure during the separately
+authorized release stage, stop before candidate derivation, preflight, or
+apply. Do not improvise a migration rollback, redeploy, or partial continuation.
+Record sanitized evidence, establish the exact applied migration ledger and
+deployed Git identity, and return for an Owner-reviewed recovery decision.
+
 On any preflight or apply failure:
 
 1. Stop. Preserve the frozen file bytes privately and retain only sanitized
@@ -625,13 +734,15 @@ On any preflight or apply failure:
    manually insert a replacement award and do not switch to reconciliation.
 3. Read authoritative before/after state by the exact frozen IDs. The observed
    database delta, not merely a returned counter, determines what committed.
-4. Treat split-head/base mismatch, dirty tooling, population/hash drift,
+4. Treat release-source/Production/tree mismatch, Vercel head mismatch,
+   tooling base/diff mismatch, dirty tooling, population/hash drift,
    non-backfill metadata, any matching historical notification or Reveal,
    first-pass errors, or a nonzero second pass as a blocker.
 5. Fix the underlying tooling, application, credential, identity, availability,
-   or stable-window issue under review. Renew authorization if either head,
-   application tree, tooling base/diff, deployment, candidate bytes, target
-   state, or scope changes.
+   or stable-window issue under review. Renew authorization if
+   `releaseSourceHead`, `productionHead`, `applicationTree`, `toolingHead`, the
+   tooling base/diff, deployment, candidate bytes, target state, or scope
+   changes.
 6. Retry only the existing `backfill` path over the same still-valid frozen
    IDs. Uniqueness on `(player_id, badge_slug)` preserves valid awards and
    prevents duplicates. Acceptance still requires a clean pass followed by an
@@ -648,8 +759,10 @@ proven incorrect, stop and obtain a separately reviewed corrective procedure.
 - Current Production mutation total: **zero required while HOLD remains**
 - Release-cutover Owner authorization: pending
 - Exact 18-migration Production ledger/apply evidence: pending
-- Frozen application head/tree: `ac612018...` / `6ba0e3b...`
-- Canonical deployment SHA and smoke evidence: pending
+- Frozen PR #88 release source head: `ac612018...`
+- Approved application tree: `6ba0e3b...`
+- Post-merge `productionHead` / `origin/master`: pending
+- READY canonical Vercel `gitSource.sha` and smoke evidence: pending
 - Reviewed tooling head/tree/base/diff scope: pending
 - Automated runner/dry-run test evidence: pending
 - Staging live candidate/apply: **not performed; no genuine candidate attested**
