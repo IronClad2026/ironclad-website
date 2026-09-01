@@ -260,6 +260,15 @@ const dictionary = {
     winnerNeedsWins: "El ganador debe terminar con {count} victorias.",
     winner: "Ganador",
     selectWinner: "Selecciona al ganador",
+    gameWinnersTitle: "Ganador de cada partida",
+    gameWinnersHelp:
+      "Selecciona en orden al ganador de cada repetición subida. La secuencia debe coincidir con el marcador final.",
+    gameWinnerLabel: "Ganador de la partida {game}",
+    selectGameWinner: "Selecciona al ganador de la partida {game}",
+    gameWinnersRequired:
+      "Selecciona un ganador para cada partida completada.",
+    gameWinnersInvalid:
+      "Los ganadores de las partidas deben coincidir con el marcador final y terminar con el ganador de la serie.",
     replayProofs: "Repeticiones como prueba (archivo .rec obligatorio)",
     replayHelpLabel: "Acerca de la subida de repeticiones",
     replayHelp: "Sube un archivo CoH3 .rec único por cada juego jugado. Cada archivo puede ocupar hasta 10 MiB. Las repeticiones son privadas y las capturas no sustituyen la prueba del resultado de la partida.",

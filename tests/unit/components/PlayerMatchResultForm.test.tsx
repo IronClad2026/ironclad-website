@@ -110,6 +110,12 @@ function selectValidResult(container: HTMLElement) {
     'input[type="file"]'
   ) as HTMLInputElement;
   fireEvent.change(fileInput, { target: { files } });
+  fireEvent.change(screen.getByLabelText("Game 1 winner"), {
+    target: { value: PLAYER_ONE_REGISTRATION_ID },
+  });
+  fireEvent.change(screen.getByLabelText("Game 2 winner"), {
+    target: { value: PLAYER_ONE_REGISTRATION_ID },
+  });
   return { fileInput, files };
 }
 
@@ -184,6 +190,10 @@ describe("PlayerMatchResultForm direct replay transport", () => {
         { name: "private-original-one.REC", size: 8 },
         { name: "private-original-two.rec", size: 8 },
       ],
+      gameWinnerRegistrationIds: [
+        PLAYER_ONE_REGISTRATION_ID,
+        PLAYER_ONE_REGISTRATION_ID,
+      ],
     });
     expect(recursivelyContainsFileBody(prepareInput)).toBe(false);
 
@@ -227,6 +237,120 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     expect(sessionStorage.length).toBe(0);
     expect(cleanupPreparedReplayUploadsMock).not.toHaveBeenCalled();
     expect(refreshMock).toHaveBeenCalled();
+  });
+
+  it("passes an ordered comeback sequence with one winner per uploaded game", async () => {
+    prepareMatchReplayUploadsMock.mockResolvedValueOnce({
+      status: "error",
+      message: "Preparation stopped after validating the request.",
+    });
+    const { container } = renderResultForm();
+    fireEvent.change(screen.getByLabelText("Player One"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText("Player Two"), {
+      target: { value: "1" },
+    });
+    fireEvent.change(screen.getByLabelText("Winner"), {
+      target: { value: PLAYER_ONE_REGISTRATION_ID },
+    });
+    const files = [
+      new File(["game-one"], "game-one.rec"),
+      new File(["game-two"], "game-two.rec"),
+      new File(["game-three"], "game-three.rec"),
+    ];
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files },
+    });
+    fireEvent.change(screen.getByLabelText("Game 1 winner"), {
+      target: { value: PLAYER_TWO_REGISTRATION_ID },
+    });
+    fireEvent.change(screen.getByLabelText("Game 2 winner"), {
+      target: { value: PLAYER_ONE_REGISTRATION_ID },
+    });
+    fireEvent.change(screen.getByLabelText("Game 3 winner"), {
+      target: { value: PLAYER_ONE_REGISTRATION_ID },
+    });
+
+    fireEvent.submit(
+      screen.getByRole("button", {
+        name: "Submit for Opponent Confirmation",
+      }).closest("form") as HTMLFormElement
+    );
+
+    await waitFor(() => expect(prepareMatchReplayUploadsMock).toHaveBeenCalledOnce());
+    expect(prepareMatchReplayUploadsMock.mock.calls[0][0]).toMatchObject({
+      playerOneScore: 2,
+      playerTwoScore: 1,
+      winnerRegistrationId: PLAYER_ONE_REGISTRATION_ID,
+      gameWinnerRegistrationIds: [
+        PLAYER_TWO_REGISTRATION_ID,
+        PLAYER_ONE_REGISTRATION_ID,
+        PLAYER_ONE_REGISTRATION_ID,
+      ],
+    });
+  });
+
+  it("rejects a sequence that reaches the declared series winner before the final game", () => {
+    const { container } = renderResultForm();
+    fireEvent.change(screen.getByLabelText("Player One"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText("Player Two"), {
+      target: { value: "1" },
+    });
+    fireEvent.change(screen.getByLabelText("Winner"), {
+      target: { value: PLAYER_ONE_REGISTRATION_ID },
+    });
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: {
+        files: [
+          new File(["one"], "one.rec"),
+          new File(["two"], "two.rec"),
+          new File(["three"], "three.rec"),
+        ],
+      },
+    });
+    fireEvent.change(screen.getByLabelText("Game 1 winner"), {
+      target: { value: PLAYER_ONE_REGISTRATION_ID },
+    });
+    fireEvent.change(screen.getByLabelText("Game 2 winner"), {
+      target: { value: PLAYER_ONE_REGISTRATION_ID },
+    });
+    fireEvent.change(screen.getByLabelText("Game 3 winner"), {
+      target: { value: PLAYER_TWO_REGISTRATION_ID },
+    });
+
+    expect(
+      screen.getByText(
+        "The game winners must match the final score and end with the series winner."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Submit for Opponent Confirmation",
+      })
+    ).toBeDisabled();
+    expect(prepareMatchReplayUploadsMock).not.toHaveBeenCalled();
+  });
+
+  it("clears stale per-game winners when the final score changes", () => {
+    const { container } = renderResultForm();
+    selectValidResult(container);
+    expect(screen.getByLabelText("Game 1 winner")).toHaveValue(
+      PLAYER_ONE_REGISTRATION_ID
+    );
+
+    fireEvent.change(screen.getByLabelText("Player Two"), {
+      target: { value: "1" },
+    });
+
+    expect(screen.getByLabelText("Game 1 winner")).toHaveValue("");
+    expect(screen.getByLabelText("Game 2 winner")).toHaveValue("");
+    expect(screen.getByLabelText("Game 3 winner")).toHaveValue("");
+    expect(
+      screen.getByText("Select one winner for every completed game.")
+    ).toBeInTheDocument();
   });
 
   it("shows localized duplicate replay feedback and keeps selected files available", async () => {

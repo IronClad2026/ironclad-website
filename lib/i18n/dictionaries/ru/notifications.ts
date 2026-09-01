@@ -187,6 +187,8 @@ const dictionary = {
   },
   server: {
     loadError: "Не удалось загрузить уведомления.",
+    badgeUnlockedTitle: "Значок открыт",
+    badgeUnlockedMessage: "Вы открыли значок «{badgeName}».",
     tournamentFallback: "этот турнир IronClad",
     tournamentCancelledTitle: "Турнир отменён",
     tournamentCancelledMessage:

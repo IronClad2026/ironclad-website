@@ -18,6 +18,7 @@ const RPC_NAMES = Object.freeze({
   provision: "provision_staging_synthetic_uat_player",
   inspect: "inspect_staging_synthetic_uat_player",
   enrol: "enrol_staging_synthetic_uat_player",
+  badgeProgression: "enrol_staging_badge_cross_division_acceptance",
   cleanup: "cleanup_staging_synthetic_uat_enrolment",
 });
 
@@ -52,6 +53,10 @@ const COMMAND_OPTIONS = Object.freeze({
   enrol: Object.freeze({
     required: ["alias", "tournament-id", "bracket-id"],
     optional: ["confirm-waitlist"],
+  }),
+  "enrol-badge-progression": Object.freeze({
+    required: ["tournament-id", "bracket-id"],
+    optional: [],
   }),
   "cleanup-enrolment": Object.freeze({
     required: ["alias", "tournament-id"],
@@ -573,7 +578,9 @@ export function parseArgs(argv) {
     }
   }
 
-  const fixture = getFixtureDefinition(options.alias);
+  const fixture = getFixtureDefinition(
+    command === "enrol-badge-progression" ? "TestAcademy1" : options.alias
+  );
 
   for (const identifierName of ["tournament-id", "bracket-id"]) {
     if (
@@ -810,6 +817,42 @@ export function buildRedactedResult(operation, fixture, rawResult, extras = {}) 
       waitlistConfirmationRequired: confirmationRequired,
       fixtureEnrolmentCreated: result.created,
       provenanceVerified: true,
+    };
+  }
+
+  if (operation === "enrol-badge-progression") {
+    const validSnapshot =
+      (result.synthetic_elo === 1100 &&
+        result.synthetic_division === "Challenge") ||
+      (result.synthetic_elo === 1400 &&
+        result.synthetic_division === "Main / Pro");
+
+    if (
+      !SAFE_UUID_PATTERN.test(String(result.player_id ?? "")) ||
+      !SAFE_UUID_PATTERN.test(String(result.registration_id ?? "")) ||
+      !["pending", "manual_review", "approved"].includes(
+        result.registration_status
+      ) ||
+      !validSnapshot ||
+      result.scenario_key !== "badge-05-28-cross-division" ||
+      typeof result.created !== "boolean"
+    ) {
+      throw fixtureError("rpc_response_rejected");
+    }
+
+    return {
+      alias: "TestAcademy1",
+      operation,
+      status: "ok",
+      syntheticElo: result.synthetic_elo,
+      syntheticDivision: result.synthetic_division,
+      contractVersion: "staging-badge-cross-division-v1",
+      fixtureEnrolmentCreated: result.created,
+      pending: result.registration_status === "pending",
+      manualReview: result.registration_status === "manual_review",
+      approved: result.registration_status === "approved",
+      provenanceVerified: true,
+      providerFactsClaimed: false,
     };
   }
 
@@ -1181,6 +1224,20 @@ function createFixtureService({ config, fetchImpl, readFileImpl, rootDir }) {
       return buildRedactedResult("enrol", config.fixture, result);
     },
 
+    async enrolBadgeProgression(tournamentId, bracketId) {
+      const result = await supabaseRpc(RPC_NAMES.badgeProgression, {
+        p_fixture_secret: config.fixtureSecret,
+        p_tournament_id: tournamentId,
+        p_tournament_bracket_id: bracketId,
+      });
+
+      return buildRedactedResult(
+        "enrol-badge-progression",
+        config.fixture,
+        result
+      );
+    },
+
     async cleanupEnrolment(tournamentId) {
       const result = await supabaseRpc(RPC_NAMES.cleanup, {
         p_fixture_secret: config.fixtureSecret,
@@ -1237,6 +1294,11 @@ export async function executeFixtureCommand(
         parsedCommand.tournamentId,
         parsedCommand.bracketId,
         parsedCommand.confirmWaitlist
+      );
+    case "enrol-badge-progression":
+      return service.enrolBadgeProgression(
+        parsedCommand.tournamentId,
+        parsedCommand.bracketId
       );
     case "cleanup-enrolment":
       return service.cleanupEnrolment(parsedCommand.tournamentId);

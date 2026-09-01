@@ -4,6 +4,11 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import {
+  evaluateLegacySubmissionBadgesAfterCommit,
+  evaluateMatchBadgesAfterCommit,
+  evaluateReportGroupBadgesAfterCommit,
+} from "@/lib/badges/integration";
+import {
   createInAppNotification,
   createInAppNotifications,
 } from "@/lib/notifications";
@@ -419,6 +424,8 @@ export async function confirmMatchResultReportGroup(
     );
   }
 
+  await evaluateReportGroupBadgesAfterCommit({ reportGroupId, supabase });
+
   revalidateTournamentPaths();
   return successState("Result confirmed. The winner has been advanced.", "confirmed");
 }
@@ -520,6 +527,10 @@ export async function reviewMatchResultReportGroup(
     decision,
   });
 
+  if (decision === "approved") {
+    await evaluateReportGroupBadgesAfterCommit({ reportGroupId, supabase });
+  }
+
   revalidateTournamentPaths();
   return successState(
     decision === "approved"
@@ -615,6 +626,11 @@ export async function saveAdminMatchResult(
       decision: "approved",
     });
 
+    await evaluateReportGroupBadgesAfterCommit({
+      reportGroupId: activeReportGroup.id,
+      supabase,
+    });
+
     revalidateTournamentPaths();
     return successState("Report group overridden and winner advanced.");
   }
@@ -639,6 +655,7 @@ export async function saveAdminMatchResult(
   }
 
   await notifyPlayersOfAdminOfficialMatchResult(supabase, match);
+  await evaluateMatchBadgesAfterCommit({ matchId, supabase });
 
   revalidateTournamentPaths();
   return successState("Official result saved and winner advanced.");
@@ -746,6 +763,13 @@ export async function reviewMatchResult(
     submissionId,
     decision,
   });
+
+  if (decision === "approved") {
+    await evaluateLegacySubmissionBadgesAfterCommit({
+      submissionId,
+      supabase,
+    });
+  }
 
   revalidateTournamentPaths();
   return successState(

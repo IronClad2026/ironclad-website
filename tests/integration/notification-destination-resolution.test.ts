@@ -97,6 +97,30 @@ describe("notification destination ownership resolution", () => {
     );
   });
 
+  it("routes a Badge unlock notification to the authenticated collection", async () => {
+    const supabase = createSupabaseQueryMock({
+      data: destinationRow({
+        type: "badge.unlocked",
+        tournament_id: null,
+        match_id: null,
+        metadata: {
+          awardId: "22222222-2222-4222-8222-222222222222",
+          badgeSlug: "first-victory",
+          badgeNumber: 3,
+        },
+      }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    await expect(
+      resolveNotificationDestination(
+        NOTIFICATION_ID,
+        "player",
+        "user_player_a"
+      )
+    ).resolves.toBe("/dashboard/badges");
+  });
+
   it("rejects invalid identity before service-role access", async () => {
     await expect(
       resolveNotificationDestination("not-a-uuid", "player", "user_player_a")

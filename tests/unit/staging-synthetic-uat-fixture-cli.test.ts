@@ -12,6 +12,7 @@ import {
   buildRedactedResult,
   getFixtureDefinition,
   isOfficialClerkTestEmail,
+  parseArgs,
   validateClerkFixtureUser,
   validateRuntimeGuards,
 } from "../../scripts/lib/staging-synthetic-uat.mjs";
@@ -132,6 +133,36 @@ describe("Staging synthetic UAT fixture catalogue", () => {
     );
     expect(Object.isFrozen(APPROVED_FIXTURES)).toBe(true);
     expect(new Set(Object.keys(APPROVED_FIXTURES)).size).toBe(30);
+  });
+
+  it("parses only the fixed TestAcademy1 Badge progression command", () => {
+    expect(
+      parseArgs([
+        "enrol-badge-progression",
+        "--tournament-id",
+        "11111111-1111-4111-8111-111111111111",
+        "--bracket-id",
+        "22222222-2222-4222-8222-222222222222",
+      ])
+    ).toEqual({
+      command: "enrol-badge-progression",
+      alias: "TestAcademy1",
+      tournamentId: "11111111-1111-4111-8111-111111111111",
+      bracketId: "22222222-2222-4222-8222-222222222222",
+      confirmWaitlist: false,
+    });
+
+    expect(() =>
+      parseArgs([
+        "enrol-badge-progression",
+        "--alias",
+        "TestAcademy2",
+        "--tournament-id",
+        "11111111-1111-4111-8111-111111111111",
+        "--bracket-id",
+        "22222222-2222-4222-8222-222222222222",
+      ])
+    ).toThrowError("arguments_rejected");
   });
 
   it("rejects aliases outside the exact reserved, case-sensitive set", () => {
@@ -408,5 +439,54 @@ describe("Staging synthetic UAT Clerk identity and redaction", () => {
     ]) {
       expect(serialized).not.toContain(sensitiveValue);
     }
+  });
+
+  it("redacts the fixed cross-division acceptance RPC result", () => {
+    const result = buildRedactedResult(
+      "enrol-badge-progression",
+      getFixtureDefinition("TestAcademy1"),
+      {
+        player_id: "11111111-1111-4111-8111-111111111111",
+        registration_id: "22222222-2222-4222-8222-222222222222",
+        registration_status: "pending",
+        synthetic_elo: 1100,
+        synthetic_division: "Challenge",
+        scenario_key: "badge-05-28-cross-division",
+        created: true,
+        fixture_secret: VALID_FIXTURE_SECRET,
+      }
+    );
+
+    expect(result).toEqual({
+      alias: "TestAcademy1",
+      operation: "enrol-badge-progression",
+      status: "ok",
+      syntheticElo: 1100,
+      syntheticDivision: "Challenge",
+      contractVersion: "staging-badge-cross-division-v1",
+      fixtureEnrolmentCreated: true,
+      pending: true,
+      manualReview: false,
+      approved: false,
+      provenanceVerified: true,
+      providerFactsClaimed: false,
+    });
+    expect(JSON.stringify(result)).not.toContain(VALID_FIXTURE_SECRET);
+  });
+
+  it("rejects a mismatched cross-division ELO and division pair", () => {
+    const fixture = getFixtureDefinition("TestAcademy1");
+
+    expect(() =>
+      buildRedactedResult("enrol-badge-progression", fixture, {
+        player_id: "11111111-1111-4111-8111-111111111111",
+        registration_id: "22222222-2222-4222-8222-222222222222",
+        registration_status: "pending",
+        synthetic_elo: 1100,
+        synthetic_division: "Main / Pro",
+        scenario_key: "badge-05-28-cross-division",
+        created: true,
+      })
+    ).toThrow("rpc_response_rejected");
   });
 });

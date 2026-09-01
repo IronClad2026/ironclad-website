@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runTransactionalEmailWorkerMock = vi.hoisted(() => vi.fn());
 const runWebPushWorkerMock = vi.hoisted(() => vi.fn());
+const runBadgeReconciliationWorkerMock = vi.hoisted(() => vi.fn());
 const workerModuleLoadedMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/transactional-email/worker", () => {
@@ -15,6 +16,10 @@ vi.mock("@/lib/transactional-email/worker", () => {
 
 vi.mock("@/lib/web-push/worker", () => ({
   runWebPushWorker: runWebPushWorkerMock,
+}));
+
+vi.mock("@/lib/badges/reconciliation", () => ({
+  runBadgeReconciliationWorker: runBadgeReconciliationWorkerMock,
 }));
 
 import {
@@ -56,6 +61,13 @@ describe("transactional email worker route", () => {
       retryableFailures: 0,
       permanentFailures: 0,
       privateEndpoint: "must-not-leak",
+    });
+    runBadgeReconciliationWorkerMock.mockResolvedValue({
+      claimed: 4,
+      completed: 3,
+      retryableFailures: 1,
+      completionFailures: 0,
+      privateTarget: "must-not-leak",
     });
   });
 
@@ -119,9 +131,35 @@ describe("transactional email worker route", () => {
         retryableFailures: 0,
         permanentFailures: 0,
       },
+      badge: {
+        ok: true,
+        claimed: 4,
+        completed: 3,
+        retryableFailures: 1,
+        completionFailures: 0,
+      },
     });
     expect(runTransactionalEmailWorkerMock).toHaveBeenCalledOnce();
     expect(runWebPushWorkerMock).toHaveBeenCalledOnce();
+    expect(runBadgeReconciliationWorkerMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Badge reconciliation failure independent from email and Push", async () => {
+    runBadgeReconciliationWorkerMock.mockRejectedValueOnce(
+      new Error("private Badge target detail")
+    );
+
+    const response = await POST(createRequest(`Bearer ${WORKER_SECRET}`));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      badge: {
+        ok: false,
+        code: "BADGE_RECONCILIATION_FAILED",
+      },
+    });
+    expectNoStore(response);
   });
 
   it("keeps Push failure independent from email state and returns a sanitized retryable route failure", async () => {

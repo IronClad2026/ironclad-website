@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import { evaluateProfileBadgesAfterCommit } from "@/lib/badges/integration";
 import type { IronCladDivision } from "@/lib/elo-verification/divisions";
 import {
   getRelic1v1Elo,
@@ -261,6 +262,17 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
       "confirmation-failed",
       refreshAvailableAt
     );
+  }
+
+  try {
+    await evaluateProfileBadgesAfterCommit({
+      playerId: player.id,
+      reason: "relic_snapshot",
+      supabase,
+    });
+  } catch {
+    // The verified provider snapshot is already committed and authoritative.
+    console.error("Relic ELO Badge follow-up failed unexpectedly.");
   }
 
   try {

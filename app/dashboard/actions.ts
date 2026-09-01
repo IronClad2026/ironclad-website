@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import { evaluateReportGroupBadgesAfterCommit } from "@/lib/badges/integration";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -283,6 +284,8 @@ export async function confirmDashboardMatchResult(
       "The match result could not be confirmed. Please try again."
     );
   }
+
+  await evaluateReportGroupBadgesAfterCommit({ reportGroupId, supabase });
 
   revalidateDashboardPaths();
   return {

@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import { evaluateProfileBadgesAfterCommit } from "@/lib/badges/integration";
 import type {
   ProfileActionState,
   ProfileField,
@@ -172,6 +173,17 @@ export async function savePlayerProfile(
       message: "Your profile could not be saved. Please try again.",
       errors: {},
     };
+  }
+
+  try {
+    await evaluateProfileBadgesAfterCommit({
+      playerId,
+      reason: "profile_write",
+    });
+  } catch {
+    // The profile write is already committed. Badge recovery must not convert
+    // a valid profile save into an application-level failure.
+    console.error("Profile Badge follow-up failed unexpectedly.");
   }
 
   revalidatePath("/profile");

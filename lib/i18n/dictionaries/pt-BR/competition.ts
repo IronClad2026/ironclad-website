@@ -262,6 +262,15 @@ const dictionary = {
     winnerNeedsWins: "O vencedor precisa terminar com {count} vitórias.",
     winner: "Vencedor",
     selectWinner: "Selecione o vencedor",
+    gameWinnersTitle: "Vencedor de cada partida",
+    gameWinnersHelp:
+      "Selecione, na ordem, o vencedor de cada replay enviado. A sequência deve corresponder ao placar final.",
+    gameWinnerLabel: "Vencedor da partida {game}",
+    selectGameWinner: "Selecione o vencedor da partida {game}",
+    gameWinnersRequired:
+      "Selecione um vencedor para cada partida concluída.",
+    gameWinnersInvalid:
+      "Os vencedores das partidas devem corresponder ao placar final, e a última partida deve ser vencida pelo vencedor da série.",
     replayProofs: "Provas de replay (.rec obrigatório)",
     replayHelpLabel: "Sobre o envio de replays",
     replayHelp: "Envie um arquivo CoH3 .rec exclusivo para cada jogo disputado. Cada arquivo pode ter até 10 MiB. Os replays são privados, e capturas de tela não substituem a prova do resultado da partida.",

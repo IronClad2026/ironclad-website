@@ -45,6 +45,7 @@ describe("Web Push eligibility and payload privacy", () => {
   it("requires a stable Player event key and excludes ordinary Polls", () => {
     expect(PLAYER_WEB_PUSH_TYPES).not.toContain("registration.waitlisted");
     expect(PLAYER_WEB_PUSH_TYPES).not.toContain("registration.manual_review");
+    expect(PLAYER_WEB_PUSH_TYPES).not.toContain("badge.unlocked");
 
     const base = {
       recipientRole: "player",
@@ -54,6 +55,9 @@ describe("Web Push eligibility and payload privacy", () => {
       metadata: {},
     };
     expect(isWebPushEligible(base)).toBe(true);
+    expect(
+      isWebPushEligible({ ...base, type: "badge.unlocked" })
+    ).toBe(false);
     expect(isWebPushEligible({ ...base, eventKey: "" })).toBe(false);
     expect(
       isWebPushEligible({
