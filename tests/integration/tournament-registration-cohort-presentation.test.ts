@@ -184,7 +184,9 @@ describe("registration cohort presentation", () => {
     expect(adminRegistrationsSource).toContain(
       "Vacancy offers remain transactional and follow Division FIFO."
     );
-    expect(tournamentFormSource).toContain('label="Registration Closes"');
+    expect(tournamentFormSource).toContain(
+      'label="Registration Closes (optional)"'
+    );
     expect(tournamentFormSource).toContain('name="registrationCloseAt"');
     expect(tournamentActionSource).toContain(
       'parseOptionalDateTime(\n    formData,\n    "registrationCloseAt"\n  )'

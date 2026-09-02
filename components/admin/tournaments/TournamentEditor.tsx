@@ -42,7 +42,6 @@ export type TournamentFormValues = {
   bannerImageUrl: string;
   registrationOpenAt: string;
   registrationCloseAt: string;
-  grandFinalAt: string;
   status: string;
   format: string;
   ruleFormat: string;
@@ -114,7 +113,6 @@ export const EMPTY_TOURNAMENT_VALUES: TournamentFormValues = {
   bannerImageUrl: "",
   registrationOpenAt: "",
   registrationCloseAt: "",
-  grandFinalAt: "",
   status: "upcoming",
   format: "1v1",
   ruleFormat: "format_a",
@@ -311,24 +309,49 @@ export function TournamentEditor({
               ["1440", "24 hours"],
             ]}
           />
-          <DateField
-            label="Registration Opens"
-            name="registrationOpenAt"
-            defaultValue={values.registrationOpenAt}
-            readOnly={!isEditing}
-          />
-          <DateField
-            label="Registration Closes"
-            name="registrationCloseAt"
-            defaultValue={values.registrationCloseAt}
-            readOnly={!isEditing}
-          />
-          <DateField
-            label="Grand Final Date/Time"
-            name="grandFinalAt"
-            defaultValue={values.grandFinalAt}
-            readOnly={!isEditing}
-          />
+          <div
+            data-event-scheduling-policy
+            className="md:col-span-2 rounded-2xl border border-orange-400/25 bg-orange-500/10 p-4 text-sm leading-6 text-orange-100"
+          >
+            <p className="font-black text-white">Rolling Division schedule</p>
+            <p className="mt-1">
+              Each Division launches independently when eight approved Players
+              are ready. Each Matchup, including the Grand Final, normally
+              receives seven days after activation.
+            </p>
+          </div>
+          <details
+            data-registration-window-controls
+            className="md:col-span-2 rounded-2xl border border-white/10 bg-black/25 p-4"
+            open={Boolean(
+              values.registrationOpenAt || values.registrationCloseAt
+            )}
+          >
+            <summary className="cursor-pointer text-sm font-black text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
+              Advanced Event-Wide Registration Window
+            </summary>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">
+              These optional times affect every unlaunched Division in this
+              Event. Leave both blank to keep eligible Divisions open until
+              they launch or an administrator deliberately closes Event
+              registration. These controls do not schedule Match deadlines or
+              the Grand Final.
+            </p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <DateField
+                label="Registration Opens (optional)"
+                name="registrationOpenAt"
+                defaultValue={values.registrationOpenAt}
+                readOnly={!isEditing}
+              />
+              <DateField
+                label="Registration Closes (optional)"
+                name="registrationCloseAt"
+                defaultValue={values.registrationCloseAt}
+                readOnly={!isEditing}
+              />
+            </div>
+          </details>
           <TextAreaField
             label="Prize Pool (optional)"
             name="prizePool"
@@ -647,9 +670,6 @@ export function toTournamentFormValues(
       : "",
     registrationCloseAt: tournament.registration_close_at
       ? toDateTimeLocal(tournament.registration_close_at)
-      : "",
-    grandFinalAt: tournament.grand_final_at
-      ? toDateTimeLocal(tournament.grand_final_at)
       : "",
     status: tournament.status,
     format: tournament.format,

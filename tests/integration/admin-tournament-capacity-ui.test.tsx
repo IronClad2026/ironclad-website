@@ -82,7 +82,6 @@ const existingTournamentValues: TournamentFormValues = {
   bannerImageUrl: "",
   registrationOpenAt: "",
   registrationCloseAt: "",
-  grandFinalAt: "",
   status: "upcoming",
   format: "1v1",
   ruleFormat: "format_a",

@@ -393,7 +393,6 @@ function makeTournament({
     id,
     slug,
     title: DUPLICATE_TITLE,
-    month: "August 2026",
     format: "1v1",
     ruleFormat: "format_a",
     ruleFormatLabel: "Format A",
@@ -404,7 +403,6 @@ function makeTournament({
     organizer: "IronClad Tournaments",
     game: "Company of Heroes 3",
     region: "Global",
-    time: "August 2026",
     prizePool: "",
     players: brackets.reduce(
       (total, bracket) => total + bracket.registeredPlayers,
@@ -423,7 +421,6 @@ function makeTournament({
     registrationEnabled: true,
     registrationOpenAt: "2026-01-01T00:00:00.000Z",
     registrationCloseAt: "2099-12-31T23:59:59.000Z",
-    grandFinalAt: null,
     createdAt: "2026-08-01T00:00:00.000Z",
     resultConfirmationWindowMinutes: 30,
     rulesUrl: null,

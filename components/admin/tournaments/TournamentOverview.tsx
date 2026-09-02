@@ -80,12 +80,14 @@ export default function TournamentOverview({
           />
           <div className="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4">
             <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">
-              Grand Final
+              Schedule model
             </dt>
-            <dd className="mt-3 break-words text-xl font-black text-white">
-              {tournament.grand_final_at
-                ? formatDateTime(tournament.grand_final_at)
-                : "To be announced"}
+            <dd className="mt-3 break-words text-lg font-black text-white">
+              Independent Division launches
+            </dd>
+            <dd className="mt-1 text-sm leading-6 text-zinc-400">
+              Each active Matchup normally receives seven days after
+              activation.
             </dd>
           </div>
         </dl>
@@ -195,15 +197,4 @@ function BracketFact({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 break-words font-bold text-zinc-200">{value}</dd>
     </div>
   );
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  return Number.isFinite(date.getTime())
-    ? new Intl.DateTimeFormat("en", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "UTC",
-      }).format(date)
-    : "Unavailable";
 }

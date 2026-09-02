@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import type { PollViewerProjection } from "@/lib/polls";
 import type { TournamentCard } from "@/lib/tournaments";
+import { createDisabledTournamentDivisionStates } from "@/tests/fixtures/tournament-division-states";
 
 const pollsAndDecisionsMock = vi.hoisted(() =>
   vi.fn(({ surface }: { surface: string }) => (
@@ -171,7 +172,6 @@ function makeTournament(): TournamentCard {
     id: TOURNAMENT_ID,
     slug: "feature-c-tournament",
     title: "Feature C Tournament",
-    month: "August 2026",
     format: "1v1",
     ruleFormat: "format_a",
     ruleFormatLabel: "Format A",
@@ -182,12 +182,14 @@ function makeTournament(): TournamentCard {
     organizer: "IronClad Tournaments",
     game: "Company of Heroes 3",
     region: "Global",
-    time: "August 2026",
     prizePool: "",
     players: 0,
     maxPlayers: 8,
     brackets: [],
-    divisionStates: [],
+    divisionStates: createDisabledTournamentDivisionStates(
+      TOURNAMENT_ID,
+      "registration_open"
+    ),
     details: "Feature C surface fixture.",
     rules: "Format A rules.",
     schedule: [],
@@ -195,7 +197,6 @@ function makeTournament(): TournamentCard {
     registrationEnabled: true,
     registrationOpenAt: "2026-08-01T00:00:00.000Z",
     registrationCloseAt: "2026-08-31T00:00:00.000Z",
-    grandFinalAt: "2026-08-31T00:00:00.000Z",
     createdAt: "2026-08-01T00:00:00.000Z",
     resultConfirmationWindowMinutes: 30,
     rulesUrl: null,

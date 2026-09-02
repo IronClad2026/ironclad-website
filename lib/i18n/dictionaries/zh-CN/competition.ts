@@ -14,6 +14,7 @@ const dictionary = {
     panels: { details: "详情", rules: "规则", prizes: "奖励", schedule: "赛程", contact: "联系" },
     status: { open: "开放", inProgress: "进行中", completed: "已完成", cancelled: "已取消", closed: "已关闭", generated: "已生成", awaitingGeneration: "等待生成", pendingReview: "等待审核", upcoming: "即将开始" },
     divisionState: { disabled: "已禁用", filling: "招募中 — {approved}/{required}", ready: "准备开赛 — {approved}/{required}", inProgress: "进行中", completed: "已完成", cancelled: "已取消", voided: "已作废" },
+    eventSections: { in_competition: "比赛进行中", open: "开放赛事", resolved: "已结束赛事" },
     hero: { tournament: "锦标赛", approvedSlots: "个已批准名额", divisionInProgress: "组别进行中", waitlistOpen: "候补名单开放", openEvents: "开放赛事", scheduleHint: "查看锦标赛赛程" },
     actions: { register: "报名", joinWaitlist: "加入候补名单", registrationClosed: "报名已关闭 — 此组别已开始。", viewBattlefy: "在 Battlefy 查看", openProfile: "打开个人资料", signIn: "登录", createAccount: "创建账户", completeProfile: "完善个人资料", close: "关闭" },
     terminal: { cancelled: "已取消的锦标赛", voided: "已作废的锦标赛", historical: "只读历史记录", historicalTitle: "历史记录", unavailable: "终止状态的锦标赛不可进行报名或赛果相关操作。", cancelledMessage: "此锦标赛在产生正式竞技结果前已取消。", voidedMessage: "此锦标赛已作废。其比赛事实记录会保留，但不再计入官方排名。" },
@@ -71,7 +72,7 @@ const dictionary = {
       errorEyebrow: "无法检查个人资料", errorTitle: "IronClad 无法验证你的玩家资料。", errorDescription: "关闭此消息后重试。如果问题持续，请打开个人资料确认账户信息。",
       closeAria: "关闭报名提示", checkingProfile: "正在检查玩家资料",
     },
-    projection: { dateTba: "日期待定", format_a: "赛制 A", format_b: "赛制 B", voided: "已作废", organizer: "IronClad 锦标赛", global: "全球", grandFinal: "总决赛：{date} UTC", grandFinalTba: "总决赛日期待公布", maxPlayers: "最多 {count} 名玩家", prizeListed: "奖金详情列于本锦标赛页面", noPrize: "本赛事未公布奖金", rulesLinked: "规则赛制：{format}。请通过本赛事的“规则”链接阅读官方锦标赛规则。", rulesManaged: "规则赛制：{format}。锦标赛专属规则和最终对阵表位置由 IronClad 管理员管理。", scheduleRegistration: "赛事开放期间可报名。已满的对阵表或已有候补队列的对阵表仍可接受候补报名。", contact: "请通过 IronClad 网站和官方社区频道了解报名、比赛详情和锦标赛更新。" },
+    projection: { rollingSchedule: "每个组别在八名获批准的玩家准备就绪后独立开赛。包括总决赛在内的每场对阵通常在激活后有七天时间完成。", dateTba: "日期待定", format_a: "赛制 A", format_b: "赛制 B", voided: "已作废", organizer: "IronClad 锦标赛", global: "全球", grandFinal: "总决赛：{date} UTC", grandFinalTba: "总决赛日期待公布", maxPlayers: "最多 {count} 名玩家", prizeListed: "奖金详情列于本锦标赛页面", noPrize: "本赛事未公布奖金", rulesLinked: "规则赛制：{format}。请通过本赛事的“规则”链接阅读官方锦标赛规则。", rulesManaged: "规则赛制：{format}。锦标赛专属规则和最终对阵表位置由 IronClad 管理员管理。", scheduleRegistration: "赛事开放期间可报名。已满的对阵表或已有候补队列的对阵表仍可接受候补报名。", contact: "请通过 IronClad 网站和官方社区频道了解报名、比赛详情和锦标赛更新。" },
     archive: { betaBlitz: "Battlefy 时期早期的 IronClad 1v1 锦标赛。", councilOfWar: "保存在 Battlefy 上的一场已完赛 IronClad 1v1 赛事。", shadowWar: "一场已完赛的 IronClad 月度 1v1 锦标赛。", artOfWar: "一场已完赛的 IronClad 1v1 赛事，原始详情保存在 Battlefy。", operationSkyfall: "上线前 Battlefy 档案中最后一场精选 1v1 赛事。", teamBeta: "IronClad 最初的团队赛制测试锦标赛。" },
   },
   bracketPresentation: {

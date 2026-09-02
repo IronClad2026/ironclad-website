@@ -53,7 +53,12 @@ import type { Locale } from "@/lib/i18n/config";
 import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
-import { getEffectiveTournamentDivisionState } from "@/lib/tournament-division-state";
+import {
+  getEffectiveTournamentDivisionState,
+  getTournamentEventSection,
+  TOURNAMENT_EVENT_SECTIONS,
+  type TournamentEventSection,
+} from "@/lib/tournament-division-state";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { RegistrationDocumentSet } from "@/lib/legal-document-types";
 import { parseMatchDiceSnapshot } from "@/lib/match-dice";
@@ -325,6 +330,27 @@ function localizeTournamentDivisionState(
   }
 }
 
+function localizeTournamentEventSection(
+  section: TournamentEventSection,
+  t: CompetitionTranslator
+) {
+  return t(`tournaments.eventSections.${section}`);
+}
+
+function groupTournamentsByLifecycle(
+  tournaments: readonly TournamentCard[],
+  t: CompetitionTranslator
+) {
+  return TOURNAMENT_EVENT_SECTIONS.map((section) => ({
+    section,
+    label: localizeTournamentEventSection(section, t),
+    events: tournaments.filter(
+      (tournament) =>
+        getTournamentEventSection(tournament.divisionStates) === section
+    ),
+  })).filter((group) => group.events.length > 0);
+}
+
 function TournamentDivisionStatePill({
   resolution,
 }: {
@@ -400,14 +426,7 @@ function Sidebar({
 }) {
   const [eventsOpen, setEventsOpen] = useState(true);
   const t = useOptionalTranslations("competition", competitionEnglish);
-  const eventsByMonth = Array.from(
-    tournaments.reduce((groups, tournament) => {
-      const group = groups.get(tournament.month) ?? [];
-      group.push(tournament);
-      groups.set(tournament.month, group);
-      return groups;
-    }, new Map<string, TournamentCard[]>())
-  ).map(([month, events]) => ({ month, events }));
+  const eventGroups = groupTournamentsByLifecycle(tournaments, t);
 
   return (
     <aside className="hidden w-72 shrink-0 border-r border-orange-500/20 bg-black/70 shadow-2xl shadow-black/30 backdrop-blur-xl lg:block">
@@ -435,9 +454,9 @@ function Sidebar({
 
           {eventsOpen && (
             <div className="mt-2 space-y-4 border border-white/12 bg-black/45 p-3 shadow-inner shadow-black/20">
-              {eventsByMonth.map((group) => (
-                <div key={group.month}>
-                  <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">{group.month}</p>
+              {eventGroups.map((group) => (
+                <div key={group.section}>
+                  <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">{group.label}</p>
                   <div className="space-y-2">
                     {group.events.map((event) => {
                       const selected = selectedTournament.id === event.id;
@@ -484,14 +503,7 @@ function MobileTournamentDrawer({
   onSelectTournament: (tournament: TournamentCard) => void;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
-  const eventsByMonth = Array.from(
-    tournaments.reduce((groups, tournament) => {
-      const group = groups.get(tournament.month) ?? [];
-      group.push(tournament);
-      groups.set(tournament.month, group);
-      return groups;
-    }, new Map<string, TournamentCard[]>())
-  ).map(([month, events]) => ({ month, events }));
+  const eventGroups = groupTournamentsByLifecycle(tournaments, t);
 
   useEffect(() => {
     if (!open) return;
@@ -565,10 +577,10 @@ function MobileTournamentDrawer({
                   {t("tournaments.tournaments")}
                 </p>
                 <div className="mt-3 space-y-5">
-                  {eventsByMonth.map((group) => (
-                    <div key={group.month}>
+                  {eventGroups.map((group) => (
+                    <div key={group.section}>
                       <p className="mb-2 text-[11px] font-black uppercase tracking-[0.22em] text-orange-300">
-                        {group.month}
+                        {group.label}
                       </p>
                       <div className="space-y-2">
                         {group.events.map((event) => {
@@ -724,8 +736,8 @@ function Hero({
                 </svg>
                 {tournament.game}
               </span>
-              <span className="flex items-center gap-2"><CalendarDays size={16} className="text-orange-300" /> {t("heroMetadata.date", { date: tournament.month })}</span>
-              <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.time}</span>
+              <span className="flex items-center gap-2"><CalendarDays size={16} className="text-orange-300" /> {localizeTournamentEventSection(getTournamentEventSection(tournament.divisionStates), t)}</span>
+              <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.schedule[0]}</span>
               <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {t("heroMetadata.approvedSlots", { players: formatNumber(tournament.players, locale), maximum: formatNumber(tournament.maxPlayers, locale) })}</span>
             </div>
             <TournamentDivisionStateSummary
@@ -1165,13 +1177,17 @@ function Overview({
 }
 
 function TournamentLinkCard({ item }: { item: TournamentCard }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className={classNames("block p-3", tournamentCardClass)}>
       <div className="flex items-center gap-3">
         <div className="h-12 w-16 shrink-0 bg-cover bg-center" style={{ backgroundImage: `url(${item.image})` }} />
         <div className="min-w-0 flex-1">
           <p className="font-bold text-white">{item.title}</p>
-                  <p className="text-xs text-zinc-500">{item.month} - {item.format} - {item.status}</p>
+          <p className="text-xs text-zinc-500">
+            {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {item.status}
+          </p>
         </div>
       </div>
       <TournamentDivisionStateSummary tournament={item} className="mt-3" />
@@ -1217,7 +1233,7 @@ function renderOverviewPanel(
       <Detail label={t("tournaments.overview.registrationStatus")} value={localizeTournamentStatus(getPublicTournamentStatus(tournament), t)} />
       <Detail label={t("tournaments.overview.registrationOpens")} value={formatOptionalDateTime(tournament.registrationOpenAt, t("tournaments.overview.registrationOpenStatus"), locale)} />
       <Detail label={t("tournaments.overview.registrationCloses")} value={formatOptionalDateTime(tournament.registrationCloseAt, t("tournaments.overview.registrationCloseAdmin"), locale)} />
-      <Detail label={t("tournaments.overview.grandFinal")} value={formatOptionalDateTime(tournament.grandFinalAt, t("tournaments.overview.grandFinalTba"), locale)} />
+      <Detail label={t("tournaments.panels.schedule")} value={tournament.schedule[0]} />
       {hasPrize(tournament) && <Detail label={t("tournaments.overview.prizePool")} value={tournament.prizePool} />}
       <Detail label={t("tournaments.overview.approvedParticipants")} value={`${tournament.players} / ${tournament.maxPlayers}`} />
       {tournament.divisionStates.map((resolution) => (
@@ -4249,7 +4265,7 @@ export function RegisterModal({
                       style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
                     >
                       <p className="break-words text-lg font-black text-white">{event.title}</p>
-                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{event.month} - {event.format} - {localizeTournamentStatus(event.status, t)}</p>
+                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{localizeTournamentEventSection(getTournamentEventSection(event.divisionStates), t)} - {event.format} - {localizeTournamentStatus(event.status, t)}</p>
                       <TournamentDivisionStateSummary
                         tournament={event}
                         className="mt-3"
@@ -4282,7 +4298,7 @@ export function RegisterModal({
                       {hasPrize(selectedTournament) && (
                         <p><span className="font-bold text-zinc-500">{t("tournaments.overview.prizePool")}:</span> {selectedTournament.prizePool}</p>
                       )}
-                      <p><span className="font-bold text-zinc-500">{t("tournaments.overview.grandFinal")}:</span> {formatOptionalDateTime(selectedTournament.grandFinalAt, t("tournaments.projection.dateTba"), locale)}</p>
+                      <p className="sm:col-span-2"><span className="font-bold text-zinc-500">{t("tournaments.panels.schedule")}:</span> {selectedTournament.schedule[0]}</p>
                     </div>
                   </div>
                 </div>
@@ -5180,11 +5196,14 @@ function MobileHero({
     },
     {
       icon: CalendarDays,
-      label: t("heroMetadata.date", { date: tournament.month }),
+      label: localizeTournamentEventSection(
+        getTournamentEventSection(tournament.divisionStates),
+        t
+      ),
     },
     {
       icon: Clock3,
-      label: tournament.time,
+      label: tournament.schedule[0],
     },
     {
       icon: Users,
@@ -5513,6 +5532,8 @@ function MobileOverview({
 }
 
 function MobileTournamentLinkCard({ item }: { item: TournamentCard }) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
   return (
     <div className={classNames("w-full max-w-full min-w-0 p-3", tournamentInsetCardClass)}>
       <div className="flex min-w-0 items-center gap-3">
@@ -5523,7 +5544,7 @@ function MobileTournamentLinkCard({ item }: { item: TournamentCard }) {
         <div className="min-w-0 flex-1">
           <p className="break-words font-bold text-white">{item.title}</p>
           <p className="break-words text-xs text-zinc-500">
-            {item.month} - {item.format} - {item.status}
+            {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {item.status}
           </p>
         </div>
       </div>
@@ -5611,12 +5632,8 @@ function renderMobileOverviewPanel(
         )}
       />
       <MobileDetail
-        label={t("tournaments.overview.grandFinal")}
-        value={formatOptionalDateTime(
-          tournament.grandFinalAt,
-          t("tournaments.overview.grandFinalTba"),
-          locale
-        )}
+        label={t("tournaments.panels.schedule")}
+        value={tournament.schedule[0]}
       />
       {hasPrize(tournament) && (
         <MobileDetail label={t("tournaments.overview.prizePool")} value={tournament.prizePool} />
@@ -6156,13 +6173,7 @@ function getAnnouncementMessages(
       title: tournament.title,
       status: tournament.status,
     }),
-    t("announcements.grandFinal", {
-      date: formatOptionalDateTime(
-        tournament.grandFinalAt,
-        t("tournaments.overview.grandFinalTba"),
-        locale
-      ),
-    }),
+    tournament.schedule[0],
     t("announcements.participants", {
       players: formatNumber(tournament.players, locale),
       brackets: formatNumber(tournament.brackets.length, locale),
