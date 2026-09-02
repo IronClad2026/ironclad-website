@@ -50,7 +50,7 @@ const rankingOptions: Array<{
 }> = [
   {
     value: "main",
-    labelKey: "rankings.mainSeason",
+    labelKey: "rankings.mainDivision",
   },
   {
     value: "challenge",
@@ -62,17 +62,33 @@ const rankingOptions: Array<{
   },
 ];
 
+const mainScopeOptions: Array<{
+  value: LeaderboardScope;
+  labelKey: string;
+}> = [
+  {
+    value: "season",
+    labelKey: "rankings.currentSeasonScope",
+  },
+  {
+    value: "all_time",
+    labelKey: "rankings.allTimeScope",
+  },
+];
+
 export default function LeaderboardExperience({
   data,
 }: LeaderboardExperienceProps) {
   const t = usePublicTranslations();
   const locale = useOptionalLocale();
   const [rankingView, setRankingView] = useState<PublicRankingView>("main");
-  const isMainSeason = rankingView === "main";
-  const scope: LeaderboardScope = isMainSeason ? "season" : "all_time";
+  const [mainScope, setMainScope] = useState<LeaderboardScope>("season");
+  const isMainView = rankingView === "main";
+  const isMainSeason = isMainView && mainScope === "season";
+  const scope: LeaderboardScope = isMainView ? mainScope : "all_time";
 
   const activeRows = useMemo(() => {
-    const source = isMainSeason
+    const source = scope === "season"
       ? data.seasonStandings
       : data.allTimeStandings;
 
@@ -80,7 +96,7 @@ export default function LeaderboardExperience({
       .filter((row) => row.bracketType === rankingView)
       .slice()
       .sort(compareRows);
-  }, [data.allTimeStandings, data.seasonStandings, isMainSeason, rankingView]);
+  }, [data.allTimeStandings, data.seasonStandings, rankingView, scope]);
 
   const podiumRows = useMemo(
     () =>
@@ -107,12 +123,17 @@ export default function LeaderboardExperience({
     value: option.value,
     label: t(option.labelKey),
   }));
+  const translatedMainScopeOptions = mainScopeOptions.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
 
   return (
     <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#030303,#080808_42%,#030303)] text-white">
       <LeaderboardHero
         currentSeason={data.currentSeason}
         rankingView={rankingView}
+        scope={scope}
         playerCount={activeRows.length}
       />
 
@@ -131,6 +152,17 @@ export default function LeaderboardExperience({
               value={rankingView}
               onChange={setRankingView}
             />
+
+            {isMainView && (
+              <div className="mt-4 border-t border-white/10 pt-4">
+                <SegmentedControl
+                  label={t("rankings.mainScope")}
+                  options={translatedMainScopeOptions}
+                  value={mainScope}
+                  onChange={setMainScope}
+                />
+              </div>
+            )}
           </section>
         </ScrollReveal>
 
@@ -159,17 +191,22 @@ export default function LeaderboardExperience({
                 </p>
 
                 <h2 className="mt-3 text-3xl font-black text-white">
-                  {getRankingViewLabel(rankingView, t)}
+                  {getActiveRankingLabel(rankingView, scope, t)}
                 </h2>
 
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300">
-                  {getRankingViewDescription(rankingView, t)}{" "}
+                  {getRankingViewDescription(rankingView, scope, t)}{" "}
                   {t("rankings.safeData")}
                 </p>
               </div>
             </div>
 
-            {!isMainSeason && <CareerExplanation division={rankingView} />}
+            {scope === "all_time" &&
+              (isMainView ? (
+                <MainAllTimeExplanation />
+              ) : (
+                <CareerExplanation division={rankingView} />
+              ))}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <MetricCard
@@ -182,7 +219,9 @@ export default function LeaderboardExperience({
                 value={
                   isMainSeason
                     ? t("rankings.sixEventSeason")
-                    : t("rankings.permanentCareer")
+                    : isMainView
+                      ? t("rankings.permanentMainPro")
+                      : t("rankings.permanentCareer")
                 }
               />
 
@@ -190,12 +229,16 @@ export default function LeaderboardExperience({
                 label={
                   isMainSeason
                     ? t("rankings.seasonState")
-                    : t("rankings.division")
+                    : isMainView
+                      ? t("rankings.scope")
+                      : t("rankings.division")
                 }
                 value={
                   isMainSeason
                     ? getMainSeasonState(data.currentSeason, t).shortLabel
-                    : getRankingViewLabel(rankingView, t)
+                    : isMainView
+                      ? t("rankings.allTimeScope")
+                      : getRankingViewLabel(rankingView, t)
                 }
               />
             </div>
@@ -204,9 +247,17 @@ export default function LeaderboardExperience({
           </section>
         </ScrollReveal>
 
-        {isMainSeason && (
-          <ScrollReveal className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
-            <TournamentHistoryLeaderboard items={historyItems} />
+        {isMainView && (
+          <ScrollReveal
+            className={
+              isMainSeason
+                ? "grid gap-8 xl:grid-cols-[1.15fr_0.85fr]"
+                : undefined
+            }
+          >
+            {isMainSeason && (
+              <TournamentHistoryLeaderboard items={historyItems} />
+            )}
             <SeasonChampionsArchive champions={data.seasonChampions} />
           </ScrollReveal>
         )}
@@ -218,15 +269,18 @@ export default function LeaderboardExperience({
 function LeaderboardHero({
   currentSeason,
   rankingView,
+  scope,
   playerCount,
 }: {
   currentSeason: PublicLeaderboardSeason | null;
   rankingView: PublicRankingView;
+  scope: LeaderboardScope;
   playerCount: number;
 }) {
   const t = usePublicTranslations();
   const locale = useOptionalLocale();
-  const isMainSeason = rankingView === "main";
+  const isMainView = rankingView === "main";
+  const isMainSeason = isMainView && scope === "season";
   const seasonState = getMainSeasonState(currentSeason, t);
   const validEventCount = Math.min(
     Math.max(currentSeason?.validMainEventCount ?? 0, 0),
@@ -272,13 +326,15 @@ function LeaderboardHero({
               <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
                 {isMainSeason
                   ? t("rankings.featuredSeason")
-                  : t("rankings.careerStandings")}
+                  : isMainView
+                    ? t("rankings.mainAllTime")
+                    : t("rankings.careerStandings")}
               </p>
 
               <h2 className="mt-2 text-2xl font-black text-white">
                 {isMainSeason
                   ? currentSeason?.name ?? t("rankings.seasonNotStarted")
-                  : getRankingViewLabel(rankingView, t)}
+                  : getActiveRankingLabel(rankingView, scope, t)}
               </h2>
 
               <p className="mt-2 text-sm text-zinc-400">
@@ -290,7 +346,9 @@ function LeaderboardHero({
                     )}`
                   : isMainSeason
                     ? t("rankings.noSeason")
-                    : t("rankings.careerRecord")}
+                    : isMainView
+                      ? t("rankings.mainAllTimeRecord")
+                      : t("rankings.careerRecord")}
               </p>
             </div>
 
@@ -333,7 +391,9 @@ function LeaderboardHero({
             </>
           ) : (
             <p className="mt-6 border border-orange-300/20 bg-orange-500/[0.06] p-4 text-sm leading-6 text-zinc-300">
-              {t("rankings.careerNoReset")}
+              {isMainView
+                ? t("rankings.mainAllTimeNoReset")
+                : t("rankings.careerNoReset")}
             </p>
           )}
 
@@ -411,14 +471,54 @@ function CareerExplanation({ division }: { division: PublicRankingView }) {
   );
 }
 
-function getRankingViewLabel(view: PublicRankingView, t: Translator) {
-  const key = rankingOptions.find((option) => option.value === view)?.labelKey;
-  return t(key ?? "rankings.mainSeason");
+function MainAllTimeExplanation() {
+  const t = usePublicTranslations();
+
+  return (
+    <div
+      role="note"
+      className="mt-6 border border-orange-300/20 bg-orange-500/[0.055] p-4 text-sm leading-6 text-zinc-300 sm:p-5"
+    >
+      <p className="font-black text-white">
+        {t("rankings.mainAllTimeRecord")}
+      </p>
+      <p className="mt-2 text-zinc-400">
+        {t("rankings.mainAllTimeNoReset")}
+      </p>
+    </div>
+  );
 }
 
-function getRankingViewDescription(view: PublicRankingView, t: Translator) {
+function getRankingViewLabel(view: PublicRankingView, t: Translator) {
+  const key = rankingOptions.find((option) => option.value === view)?.labelKey;
+  return t(key ?? "rankings.mainDivision");
+}
+
+function getActiveRankingLabel(
+  view: PublicRankingView,
+  scope: LeaderboardScope,
+  t: Translator
+) {
   if (view === "main") {
-    return t("rankings.mainDescription");
+    return t(
+      scope === "season" ? "rankings.mainSeason" : "rankings.mainAllTime"
+    );
+  }
+
+  return getRankingViewLabel(view, t);
+}
+
+function getRankingViewDescription(
+  view: PublicRankingView,
+  scope: LeaderboardScope,
+  t: Translator
+) {
+  if (view === "main") {
+    return t(
+      scope === "season"
+        ? "rankings.mainDescription"
+        : "rankings.mainAllTimeDescription"
+    );
   }
 
   return t(
@@ -623,7 +723,11 @@ function LeaderboardTable({
   return (
     <div className="mt-6 overflow-hidden border border-orange-500/20 shadow-2xl shadow-black/25">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1040px] text-left text-sm">
+        <table
+          className={`w-full text-left text-sm ${
+            scope === "season" ? "min-w-[1040px]" : "min-w-[850px]"
+          }`}
+        >
           <thead className="bg-black/72 text-xs uppercase tracking-wider text-orange-200/70">
             <tr>
               <th className="px-4 py-4">{t("rankings.rank")}</th>
@@ -635,8 +739,12 @@ function LeaderboardTable({
               <th className="px-4 py-4">{t("rankings.rounds")}</th>
               <th className="px-4 py-4">{t("rankings.wins")}</th>
               <th className="px-4 py-4">{t("rankings.winRate")}</th>
-              <th className="px-4 py-4">{t("rankings.lastPoints")}</th>
-              <th className="px-4 py-4">{t("rankings.movement")}</th>
+              {scope === "season" && (
+                <>
+                  <th className="px-4 py-4">{t("rankings.lastPoints")}</th>
+                  <th className="px-4 py-4">{t("rankings.movement")}</th>
+                </>
+              )}
             </tr>
           </thead>
 
@@ -707,15 +815,17 @@ function LeaderboardTable({
                   })}
                 </td>
 
-                <td className="px-4 py-4 text-zinc-300">
-                  {scope === "season"
-                    ? formatLocalizedNumber(row.lastTournamentPoints, locale)
-                    : "-"}
-                </td>
+                {scope === "season" && (
+                  <>
+                    <td className="px-4 py-4 text-zinc-300">
+                      {formatLocalizedNumber(row.lastTournamentPoints, locale)}
+                    </td>
 
-                <td className="px-4 py-4">
-                  {scope === "season" ? <RankMovement row={row} /> : "-"}
-                </td>
+                    <td className="px-4 py-4">
+                      <RankMovement row={row} />
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
