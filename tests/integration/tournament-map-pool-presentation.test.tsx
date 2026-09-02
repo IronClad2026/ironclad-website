@@ -105,7 +105,7 @@ const tournament: TournamentCard = {
   mapPools: [
     {
       bracketId: "22222222-2222-4222-8222-222222222222",
-      divisionName: "Academy",
+      divisionName: "Academy Bracket",
       publishedAt: "2026-08-15T00:00:00.000Z",
       launchedAt: null,
       maps: [
@@ -150,13 +150,35 @@ describe("public tournament map-pool presentation", () => {
 
     expect(desktopAndMobilePools).toHaveLength(2);
     for (const pool of desktopAndMobilePools) {
-      expect(within(pool).getByRole("heading", { name: "Academy" }))
+      expect(within(pool).getByRole("heading", { name: "Academy Bracket" }))
         .toBeInTheDocument();
       expect(within(pool).getByText("Community Crossing"))
         .toBeInTheDocument();
       expect(within(pool).getByText("Community")).toBeInTheDocument();
+      expect(within(pool).getByText("Active")).toBeInTheDocument();
       expect(within(pool).getByText("Created by Community Cartographer"))
         .toBeInTheDocument();
     }
+  });
+
+  it("omits the public map-pool presentation when no pool is published", () => {
+    render(
+      <TournamentsExperience
+        tournaments={[{ ...tournament, mapPools: [] }]}
+        viewer={{
+          isAdmin: false,
+          relicVerifiedDivision: null,
+          registrationIds: [],
+          registrations: [],
+        }}
+        matchResultSubmissions={[]}
+        matchResultReportGroups={[]}
+        eloVerificationEnabled
+      />
+    );
+
+    expect(
+      screen.queryByRole("region", { name: "Published division map pools" })
+    ).not.toBeInTheDocument();
   });
 });
