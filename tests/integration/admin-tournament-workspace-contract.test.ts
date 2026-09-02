@@ -1030,8 +1030,13 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260831133000_staging_badge_cross_division_acceptance.sql",
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql",
     ]);
+    const postPr5MigrationNames = new Set([
+      "20260902100000_unlaunched_event_void_authority.sql",
+    ]);
     const platformMigrationNames = migrationNames.filter(
-      (name) => !badgeIntegrationMigrationNames.has(name)
+      (name) =>
+        !badgeIntegrationMigrationNames.has(name) &&
+        !postPr5MigrationNames.has(name)
     );
 
     expect(platformMigrationNames).toHaveLength(119);
@@ -1048,13 +1053,27 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "8a66ada7bd7cae2874b3d4f6919462a1c2f74439850efac5d99aeddb0cf8b7cb"
     );
     expect(migrationNames).toHaveLength(
-      platformMigrationNames.length + badgeIntegrationMigrationNames.size
+      platformMigrationNames.length +
+        badgeIntegrationMigrationNames.size +
+        postPr5MigrationNames.size
     );
-    expect(migrationNames.at(-2)).toBe(
+    expect(migrationNames.at(-3)).toBe(
       "20260831133000_staging_badge_cross_division_acceptance.sql"
     );
-    expect(migrationNames.at(-1)).toBe(
+    expect(migrationNames.at(-2)).toBe(
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql"
+    );
+    expect(migrationNames.at(-1)).toBe(
+      "20260902100000_unlaunched_event_void_authority.sql"
+    );
+    expect(
+      normalizedSha256(
+        read(
+          "supabase/migrations/20260902100000_unlaunched_event_void_authority.sql"
+        )
+      )
+    ).toBe(
+      "8e97337efc36276797b3e98ff45bbdbd893533b0ffa13486e0f4bac83e911fd6"
     );
     expect(normalizedSha256(read("package.json"))).toBe(
       "0fa600694cee0d7bfbcb2ddd545ed8f46b0c33ea79d4e9953b39c0b3e7ae5db9"
