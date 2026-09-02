@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   formatTournamentDivisionState,
   formatTournamentEventDivisionState,
+  getTournamentEventSection,
   projectPublicTournamentDivisionStates,
   resolveTournamentDivisionStates,
   type TournamentDivisionStateEvidence,
@@ -72,6 +73,64 @@ describe("tournament division state resolver", () => {
       Challenge: "in_progress",
       Main: "filling",
     });
+  });
+
+  it("resolves Not Held independently without fabricating competition completion", () => {
+    const resolutions = resolveTournamentDivisionStates({
+      tournamentId: "mixed-not-held-event",
+      eventStatus: "in_progress",
+      divisions: [
+        evidence("Academy", {
+          launchedAt: launchTime,
+          generatedBracketId: "generated-academy",
+          isCompetitionComplete: true,
+        }),
+        evidence("Challenge", {
+          notHeldAt: "2026-09-03T01:00:00.000Z",
+          notHeldReasonCode: "minimum_roster_not_reached",
+        }),
+        evidence("Main", { approvedCount: 4 }),
+      ],
+    });
+
+    expect(resolutions.map((resolution) => resolution.state)).toEqual([
+      "completed",
+      "not_held",
+      "filling",
+    ]);
+    expect(resolutions[1]).toMatchObject({
+      launchedAt: null,
+      generatedBracketId: null,
+      isCompetitionComplete: false,
+    });
+    expect(formatTournamentDivisionState(resolutions[1])).toBe(
+      "Not Held — Minimum roster requirement not reached"
+    );
+    expect(getTournamentEventSection(resolutions)).toBe("open");
+  });
+
+  it("reports an all-Not-Held event as resolved without calling it completed", () => {
+    const resolutions = resolveTournamentDivisionStates({
+      tournamentId: "all-not-held-event",
+      eventStatus: "registration_open",
+      divisions: [
+        evidence("Academy", {
+          notHeldAt: "2026-09-03T01:00:00.000Z",
+          notHeldReasonCode: "minimum_roster_not_reached",
+        }),
+        evidence("Challenge", {
+          notHeldAt: "2026-09-03T02:00:00.000Z",
+          notHeldReasonCode: "minimum_roster_not_reached",
+        }),
+      ],
+    });
+
+    expect(getTournamentEventSection(resolutions)).toBe("resolved");
+    expect(formatTournamentEventDivisionState(resolutions)).toBe(
+      "Not Held — Minimum roster requirement not reached"
+    );
+    expect(resolutions.every((resolution) => resolution.state !== "completed"))
+      .toBe(true);
   });
 
   it("keeps a generated private draft in Ready until authoritative launch", () => {
@@ -290,6 +349,33 @@ describe("tournament division state resolver", () => {
         divisions: [evidence("Academy"), evidence("Academy")],
       })
     ).toThrow("duplicate canonical divisions");
+
+    expect(() =>
+      resolveTournamentDivisionStates({
+        tournamentId: "incomplete-not-held",
+        eventStatus: "registration_open",
+        divisions: [
+          evidence("Academy", {
+            notHeldAt: "2026-09-03T01:00:00.000Z",
+          }),
+        ],
+      })
+    ).toThrow("Not Held evidence was incomplete");
+
+    expect(() =>
+      resolveTournamentDivisionStates({
+        tournamentId: "not-held-with-competition",
+        eventStatus: "in_progress",
+        divisions: [
+          evidence("Academy", {
+            launchedAt: launchTime,
+            generatedBracketId: "generated-academy",
+            notHeldAt: "2026-09-03T01:00:00.000Z",
+            notHeldReasonCode: "minimum_roster_not_reached",
+          }),
+        ],
+      })
+    ).toThrow("contains competition evidence");
   });
 });
 

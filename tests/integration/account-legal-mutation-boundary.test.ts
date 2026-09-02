@@ -39,6 +39,7 @@ const ALWAYS_GUARDED_ACTIONS = {
     "generateTournamentBracket",
     "saveBracketAssignments",
     "launchTournamentDivision",
+    "closeTournamentDivisionWithoutLaunch",
     "deleteTournament",
   ],
   "app/admin/tournaments/deadline-actions.ts": [
@@ -323,15 +324,15 @@ describe("account legal mutation boundary architecture", () => {
       )
     );
 
-    expect(new Set(expected).size).toBe(77);
-    expect(expected).toHaveLength(77);
+    expect(new Set(expected).size).toBe(78);
+    expect(expected).toHaveLength(78);
     expect(actual.sort()).toEqual(expected.sort());
   });
 
-  it("guards all 56 ordinary authenticated mutations", () => {
+  it("guards all 57 ordinary authenticated mutations", () => {
     const directlyGuarded = flattenedInventory(ALWAYS_GUARDED_ACTIONS);
 
-    expect(directlyGuarded).toHaveLength(54);
+    expect(directlyGuarded).toHaveLength(55);
     expect(DELEGATED_GUARDED_ACTIONS).toHaveLength(2);
 
     for (const [path, actions] of Object.entries(ALWAYS_GUARDED_ACTIONS)) {

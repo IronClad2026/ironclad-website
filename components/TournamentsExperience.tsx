@@ -235,6 +235,7 @@ function localizeTournamentStatus(
     completed: "tournaments.status.completed",
     cancelled: "tournaments.status.cancelled",
     closed: "tournaments.status.closed",
+    "not held": "tournaments.status.notHeld",
     generated: "tournaments.status.generated",
     "awaiting generation": "tournaments.status.awaitingGeneration",
     "pending review": "tournaments.status.pendingReview",
@@ -284,6 +285,7 @@ function getTournamentDivisionStateTone(
       return "neutral";
     case "filling":
       return "amber";
+    case "not_held":
     case "disabled":
       return "gray";
     case "cancelled":
@@ -323,6 +325,8 @@ function localizeTournamentDivisionState(
       return t("tournaments.divisionState.inProgress");
     case "completed":
       return t("tournaments.divisionState.completed");
+    case "not_held":
+      return t("tournaments.divisionState.notHeld");
     case "cancelled":
       return t("tournaments.divisionState.cancelled");
     case "voided":
@@ -415,6 +419,16 @@ function getTournamentDivisionStateForBracket(
   return resolution;
 }
 
+function isTournamentBracketNotHeld(
+  tournament: TournamentCard,
+  bracketId: string
+) {
+  return tournament.divisionStates.some(
+    (resolution) =>
+      resolution.bracketId === bracketId && resolution.state === "not_held"
+  );
+}
+
 function Sidebar({
   selectedTournament,
   tournaments,
@@ -470,7 +484,7 @@ function Sidebar({
                           style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
                         >
                           <p className="break-words text-sm font-black text-white">{event.title}</p>
-                          <p className="mt-1 text-xs text-zinc-300">{event.format} - {localizeTournamentStatus(event.status, t)}</p>
+                          <p className="mt-1 text-xs text-zinc-300">{event.format} - {localizeTournamentStatus(getPublicTournamentStatus(event), t)}</p>
                           <TournamentDivisionStateSummary
                             tournament={event}
                             className="mt-2"
@@ -610,7 +624,7 @@ function MobileTournamentDrawer({
                                   {event.title}
                                 </span>
                                 <span className="mt-1 block break-words text-xs text-zinc-500">
-                                  {event.format} - {localizeTournamentStatus(event.status, t)}
+                                  {event.format} - {localizeTournamentStatus(getPublicTournamentStatus(event), t)}
                                 </span>
                               </span>
                               <TournamentDivisionStateSummary
@@ -654,15 +668,18 @@ function Hero({
     registrationAvailability === "open" ||
     registrationAvailability === "waitlist";
   const divisionLaunched = registrationAvailability === "launched";
+  const divisionNotHeld = registrationAvailability === "not_held";
   const publicStatus = getPublicTournamentStatus(tournament);
   const registrationIsWaitlistOnly = registrationAvailability === "waitlist";
-  const actionLabel = divisionLaunched
-    ? t("tournaments.actions.registrationClosed")
-    : registrationOpen
-      ? registrationIsWaitlistOnly
-      ? t("tournaments.actions.joinWaitlist")
-      : t("tournaments.actions.register")
-    : localizeTournamentStatus(publicStatus, t);
+  const actionLabel = divisionNotHeld
+    ? t("tournaments.divisionState.notHeld")
+    : divisionLaunched
+      ? t("tournaments.actions.registrationClosed")
+      : registrationOpen
+        ? registrationIsWaitlistOnly
+          ? t("tournaments.actions.joinWaitlist")
+          : t("tournaments.actions.register")
+        : localizeTournamentStatus(publicStatus, t);
   const registrationState = viewerRegistration
     ? getViewerRegistrationDisplay(tournament, viewerRegistration, t, locale)
     : null;
@@ -691,8 +708,9 @@ function Hero({
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
                 tone={
-                  tournament.statusValue === "registration_open" ||
-                  tournament.statusValue === "in_progress"
+                  !divisionNotHeld &&
+                  (tournament.statusValue === "registration_open" ||
+                    tournament.statusValue === "in_progress")
                     ? "green"
                     : "gray"
                 }
@@ -755,8 +773,10 @@ function Hero({
                 <ActionCard
                   label={actionLabel}
                   description={
-                    divisionLaunched
-                      ? t("tournaments.hero.divisionInProgress")
+                    divisionNotHeld
+                      ? t("tournaments.hero.divisionNotHeld")
+                      : divisionLaunched
+                        ? t("tournaments.hero.divisionInProgress")
                       : registrationOpen
                         ? registrationIsWaitlistOnly
                           ? t("tournaments.hero.waitlistOpen")
@@ -765,7 +785,7 @@ function Hero({
                   }
                   icon={registrationOpen ? CheckCircle2 : Clock3}
                   onClick={onRegisterClick}
-                  disabled={divisionLaunched}
+                  disabled={divisionLaunched || divisionNotHeld}
                 />
                 {registrationOpen && <RegistrationGuidanceDisclosure />}
               </>
@@ -911,6 +931,23 @@ export function getViewerRegistrationDisplay(
         />
       : null,
   ].filter((detail) => detail !== null);
+
+  if (
+    isTournamentBracketNotHeld(
+      tournament,
+      registration.tournamentBracketId
+    )
+  ) {
+    return {
+      title: t("tournaments.registrationState.notHeldTitle"),
+      description: t(
+        "tournaments.registrationState.notHeldDescription"
+      ),
+      tone: "neutral",
+      icon: X,
+      details,
+    };
+  }
 
   if (registration.status === "approved") {
     return {
@@ -1186,7 +1223,7 @@ function TournamentLinkCard({ item }: { item: TournamentCard }) {
         <div className="min-w-0 flex-1">
           <p className="font-bold text-white">{item.title}</p>
           <p className="text-xs text-zinc-500">
-            {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {item.status}
+            {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {localizeTournamentStatus(getPublicTournamentStatus(item), t)}
           </p>
         </div>
       </div>
@@ -3425,6 +3462,7 @@ export type RegistrationDivisionAvailability =
   | "open"
   | "waitlist"
   | "launched"
+  | "not_held"
   | "closed";
 
 export function getRegistrationDivisionAvailability(
@@ -3436,15 +3474,43 @@ export function getRegistrationDivisionAvailability(
   const verifiedBracket = tournament.brackets.find(
     (bracket) => bracket.name === verifiedBracketName
   );
+  const verifiedDivisionState = verifiedBracket
+    ? tournament.divisionStates.find(
+        (resolution) => resolution.bracketId === verifiedBracket.id
+      )
+    : null;
+
+  if (verifiedDivisionState?.state === "not_held") {
+    return "not_held";
+  }
 
   if (verifiedBracket?.launchedAt) {
     return "launched";
   }
 
+  const enabledDivisionStates = tournament.divisionStates.filter(
+    (resolution) => resolution.bracketId !== null
+  );
+
   if (
     !verifiedDivision &&
-    tournament.brackets.length > 0 &&
-    tournament.brackets.every((bracket) => bracket.launchedAt !== null)
+    enabledDivisionStates.length > 0 &&
+    enabledDivisionStates.every(
+      (resolution) => resolution.state === "not_held"
+    )
+  ) {
+    return "not_held";
+  }
+
+  if (
+    !verifiedDivision &&
+    enabledDivisionStates.length > 0 &&
+    enabledDivisionStates.every(
+      (resolution) =>
+        resolution.state === "not_held" ||
+        resolution.state === "in_progress" ||
+        resolution.state === "completed"
+    )
   ) {
     return "launched";
   }
@@ -3529,9 +3595,12 @@ export function RegisterModal({
   const getVerifiedBracket = (tournament: TournamentCard) => {
     const verifiedBracketName =
       getVerifiedDivisionBracketName(verifiedDivision);
-    return tournament.brackets.some(
+    const verifiedBracket = tournament.brackets.find(
       (bracket) => bracket.name === verifiedBracketName
-    )
+    );
+    return verifiedBracket &&
+      verifiedBracket.launchedAt === null &&
+      !isTournamentBracketNotHeld(tournament, verifiedBracket.id)
       ? verifiedBracketName
       : "";
   };
@@ -3666,7 +3735,8 @@ export function RegisterModal({
     if (
       !isVerifiedDivisionBracket(bracketName, verifiedDivision) ||
       !bracket ||
-      bracket.launchedAt !== null
+      bracket.launchedAt !== null ||
+      isTournamentBracketNotHeld(selectedTournament, bracket.id)
     ) {
       return;
     }
@@ -3696,7 +3766,9 @@ export function RegisterModal({
         verifiedDivision
       );
 
-      if (availability === "launched") {
+      if (availability === "not_held") {
+        nextErrors.tournamentTitle = t("tournaments.divisionState.notHeld");
+      } else if (availability === "launched") {
         nextErrors.tournamentTitle = t("tournaments.actions.registrationClosed");
       } else if (availability === "closed") {
         nextErrors.tournamentTitle = t(
@@ -3823,10 +3895,13 @@ export function RegisterModal({
 
     if (
       registrationAvailability === "closed" ||
-      registrationAvailability === "launched"
+      registrationAvailability === "launched" ||
+      registrationAvailability === "not_held"
     ) {
       setSubmissionError(
-        registrationAvailability === "launched"
+        registrationAvailability === "not_held"
+          ? t("tournaments.divisionState.notHeld")
+          : registrationAvailability === "launched"
           ? t("tournaments.actions.registrationClosed")
           : t("registrationModal.errors.registrationUnavailable")
       );
@@ -4108,7 +4183,9 @@ export function RegisterModal({
                       ? t("registrationModal.waitlistOnly")
                       : registrationAvailability === "open"
                         ? t("tournaments.status.open")
-                        : t("tournaments.actions.registrationClosed")}
+                        : registrationAvailability === "not_held"
+                          ? t("tournaments.divisionState.notHeld")
+                          : t("tournaments.actions.registrationClosed")}
                   </span>
                 </div>
 
@@ -4186,7 +4263,10 @@ export function RegisterModal({
                               {getVerifiedBracket(event)} ·{" "}
                               {availability === "waitlist"
                                 ? t("registrationModal.waitlistOnly")
-                                : localizeTournamentStatus(event.status, t)}
+                                : localizeTournamentStatus(
+                                    getPublicTournamentStatus(event),
+                                    t
+                                  )}
                             </span>
                             <TournamentDivisionStateSummary
                               tournament={event}
@@ -4265,7 +4345,7 @@ export function RegisterModal({
                       style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
                     >
                       <p className="break-words text-lg font-black text-white">{event.title}</p>
-                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{localizeTournamentEventSection(getTournamentEventSection(event.divisionStates), t)} - {event.format} - {localizeTournamentStatus(event.status, t)}</p>
+                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{localizeTournamentEventSection(getTournamentEventSection(event.divisionStates), t)} - {event.format} - {localizeTournamentStatus(getPublicTournamentStatus(event), t)}</p>
                       <TournamentDivisionStateSummary
                         tournament={event}
                         className="mt-3"
@@ -4294,7 +4374,7 @@ export function RegisterModal({
                     <div className="mt-3 grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
                       <p><span className="font-bold text-zinc-500">{t("tournaments.overview.format")}:</span> {selectedTournament.format}</p>
                       <p><span className="font-bold text-zinc-500">{t("tournaments.overview.ruleFormat")}:</span> {selectedTournament.ruleFormatLabel}</p>
-                      <p><span className="font-bold text-zinc-500">{t("tournaments.participants.status")}:</span> {localizeTournamentStatus(selectedTournament.status, t)}</p>
+                      <p><span className="font-bold text-zinc-500">{t("tournaments.participants.status")}:</span> {localizeTournamentStatus(getPublicTournamentStatus(selectedTournament), t)}</p>
                       {hasPrize(selectedTournament) && (
                         <p><span className="font-bold text-zinc-500">{t("tournaments.overview.prizePool")}:</span> {selectedTournament.prizePool}</p>
                       )}
@@ -4305,10 +4385,16 @@ export function RegisterModal({
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {selectedTournament.brackets.map((bracket) => {
-                    const selectable = isVerifiedDivisionBracket(
-                      bracket.name,
-                      verifiedDivision
-                    ) && bracket.launchedAt === null;
+                    const selectable =
+                      isVerifiedDivisionBracket(
+                        bracket.name,
+                        verifiedDivision
+                      ) &&
+                      bracket.launchedAt === null &&
+                      !isTournamentBracketNotHeld(
+                        selectedTournament,
+                        bracket.id
+                      );
                     const selected = form.bracketName === bracket.name;
                     return (
                       <button
@@ -4372,6 +4458,14 @@ export function RegisterModal({
                         {bracket.launchedAt && (
                           <p className="mt-2 text-xs font-black uppercase tracking-wider text-zinc-400">
                             {t("tournaments.actions.registrationClosed")}
+                          </p>
+                        )}
+                        {isTournamentBracketNotHeld(
+                          selectedTournament,
+                          bracket.id
+                        ) && (
+                          <p className="mt-2 text-xs font-black uppercase tracking-wider text-zinc-400">
+                            {t("tournaments.divisionState.notHeld")}
                           </p>
                         )}
                         <p
@@ -4776,7 +4870,8 @@ export function RegisterModal({
             isDisabled={
               !verifiedBracketAvailable ||
               registrationAvailability === "closed" ||
-              registrationAvailability === "launched"
+              registrationAvailability === "launched" ||
+              registrationAvailability === "not_held"
             }
           />
         )}
@@ -5174,15 +5269,18 @@ function MobileHero({
     registrationAvailability === "open" ||
     registrationAvailability === "waitlist";
   const divisionLaunched = registrationAvailability === "launched";
+  const divisionNotHeld = registrationAvailability === "not_held";
   const publicStatus = getPublicTournamentStatus(tournament);
   const registrationIsWaitlistOnly = registrationAvailability === "waitlist";
-  const actionLabel = divisionLaunched
-    ? t("tournaments.actions.registrationClosed")
-    : registrationOpen
-      ? registrationIsWaitlistOnly
-      ? t("tournaments.actions.joinWaitlist")
-      : t("tournaments.actions.register")
-    : localizeTournamentStatus(publicStatus, t);
+  const actionLabel = divisionNotHeld
+    ? t("tournaments.divisionState.notHeld")
+    : divisionLaunched
+      ? t("tournaments.actions.registrationClosed")
+      : registrationOpen
+        ? registrationIsWaitlistOnly
+          ? t("tournaments.actions.joinWaitlist")
+          : t("tournaments.actions.register")
+        : localizeTournamentStatus(publicStatus, t);
   const registrationState = viewerRegistration
     ? getViewerRegistrationDisplay(tournament, viewerRegistration, t, locale)
     : null;
@@ -5232,8 +5330,9 @@ function MobileHero({
         <div className="flex max-w-full flex-wrap items-center gap-2">
           <StatusPill
             tone={
-              tournament.statusValue === "registration_open" ||
-              tournament.statusValue === "in_progress"
+              !divisionNotHeld &&
+              (tournament.statusValue === "registration_open" ||
+                tournament.statusValue === "in_progress")
                 ? "green"
                 : "gray"
             }
@@ -5310,8 +5409,10 @@ function MobileHero({
               <ActionCard
                 label={actionLabel}
                 description={
-                  divisionLaunched
-                    ? t("tournaments.hero.divisionInProgress")
+                  divisionNotHeld
+                    ? t("tournaments.hero.divisionNotHeld")
+                    : divisionLaunched
+                      ? t("tournaments.hero.divisionInProgress")
                     : registrationOpen
                       ? registrationIsWaitlistOnly
                         ? t("tournaments.hero.waitlistOpen")
@@ -5320,7 +5421,7 @@ function MobileHero({
                 }
                 icon={registrationOpen ? CheckCircle2 : Clock3}
                 onClick={onRegisterClick}
-                disabled={divisionLaunched}
+                disabled={divisionLaunched || divisionNotHeld}
               />
               {registrationOpen && <RegistrationGuidanceDisclosure />}
             </>
@@ -5544,7 +5645,7 @@ function MobileTournamentLinkCard({ item }: { item: TournamentCard }) {
         <div className="min-w-0 flex-1">
           <p className="break-words font-bold text-white">{item.title}</p>
           <p className="break-words text-xs text-zinc-500">
-            {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {item.status}
+            {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {localizeTournamentStatus(getPublicTournamentStatus(item), t)}
           </p>
         </div>
       </div>
@@ -6784,7 +6885,8 @@ export default function TournamentsExperience({
 
     if (
       registrationAvailability === "closed" ||
-      registrationAvailability === "launched"
+      registrationAvailability === "launched" ||
+      registrationAvailability === "not_held"
     ) {
       setRegistrationGate("closed");
       return;
@@ -6996,6 +7098,19 @@ export default function TournamentsExperience({
 }
 
 function getPublicTournamentStatus(tournament: TournamentCard) {
+  const enabledDivisionStates = tournament.divisionStates.filter(
+    (resolution) => resolution.bracketId !== null
+  );
+
+  if (
+    enabledDivisionStates.length > 0 &&
+    enabledDivisionStates.every(
+      (resolution) => resolution.state === "not_held"
+    )
+  ) {
+    return "Not Held";
+  }
+
   if (
     tournament.statusValue === "registration_open" &&
     !isTournamentRegistrationOpen(tournament)

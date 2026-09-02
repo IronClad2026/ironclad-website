@@ -333,6 +333,13 @@ async function renderWorkspaceSection({
   if (section === "map-pool") {
     const mapPool = await loadAdminTournamentMapPoolWorkspaceData(tournament);
     const brackets = tournament.tournament_brackets ?? [];
+    const divisionStateByBracket = new Map(
+      summary.divisionStates.flatMap((division) =>
+        division.bracketId
+          ? [[division.bracketId, division] as const]
+          : []
+      )
+    );
     return brackets.length > 0 ? (
       <AdminTournamentMapPools
         key={tournament.id}
@@ -346,6 +353,8 @@ async function renderWorkspaceSection({
           id: bracket.id,
           name: bracket.name,
           launchedAt: bracket.launched_at,
+          notHeldAt:
+            divisionStateByBracket.get(bracket.id)?.notHeldAt ?? null,
           mapPoolPublishedAt: bracket.map_pool_published_at,
           currentMapIds:
             mapPool.currentMapIdsByBracket.get(bracket.id) ?? [],
@@ -440,6 +449,10 @@ function getBracketNotice(value?: string) {
     "division-launched",
     "division-already-launched",
     "division-launch-failed",
+    "division-not-held",
+    "division-already-not-held",
+    "division-not-held-invalid",
+    "division-not-held-failed",
   ] as const;
   return valid.find((notice) => notice === value);
 }

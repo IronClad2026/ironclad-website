@@ -7,7 +7,10 @@ import { GitBranch, RefreshCw } from "lucide-react";
 import AdminBracketPopulation, {
   type BracketPopulationData,
 } from "@/components/AdminBracketPopulation";
-import { launchTournamentDivision } from "@/app/admin/tournaments/actions";
+import {
+  closeTournamentDivisionWithoutLaunch,
+  launchTournamentDivision,
+} from "@/app/admin/tournaments/actions";
 import {
   formatTournamentDivisionState,
   type TournamentDivisionStateResolution,
@@ -28,12 +31,22 @@ export type AdminBracketTournamentOption = {
       actualMatchCount: number;
       expectedMatchCount: number;
       approvedCount: number;
+      activeRegistrationCount: number;
+      waitlistRegistrationCount: number;
       requiredCount: number;
       isReady: boolean;
       launchedAt: string | null;
       divisionState: TournamentDivisionStateResolution;
       mapPoolPublishedAt: string | null;
       currentMapCount: number;
+      notHeldAudit: {
+        reasonCode: "minimum_roster_not_reached";
+        detail: string | null;
+        closedAt: string;
+        closedByClerkUserId: string;
+        activeRegistrationCount: number;
+        waitlistRegistrationCount: number;
+      } | null;
     }
   >;
 };
@@ -52,7 +65,11 @@ export default function AdminBracketManagement({
     | "population-failed"
     | "division-launched"
     | "division-already-launched"
-    | "division-launch-failed";
+    | "division-launch-failed"
+    | "division-not-held"
+    | "division-already-not-held"
+    | "division-not-held-invalid"
+    | "division-not-held-failed";
 }) {
   const router = useRouter();
   const [tournamentId, setTournamentId] = useState(
@@ -172,7 +189,9 @@ export default function AdminBracketManagement({
           className={`mt-4 rounded-xl border p-3 text-sm font-bold ${
               notice === "population-saved" ||
               notice === "division-launched" ||
-              notice === "division-already-launched"
+              notice === "division-already-launched" ||
+              notice === "division-not-held" ||
+              notice === "division-already-not-held"
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
               : "border-red-500/30 bg-red-500/10 text-red-300"
           }`}
@@ -183,9 +202,17 @@ export default function AdminBracketManagement({
               ? "Division launched. Its bracket is now public and its roster is locked."
               : notice === "division-already-launched"
                 ? "This division was already launched; its original launch time and notifications were preserved."
+                : notice === "division-not-held"
+                  ? "Division closed as Not Held. Registrations were preserved and no competition points were created."
+                  : notice === "division-already-not-held"
+                    ? "This division was already Not Held; its immutable closure and notifications were preserved."
+                    : notice === "division-not-held-invalid"
+                      ? "Not Held closure was not confirmed. Type NOT HELD exactly and keep optional detail within 500 characters."
                 : notice === "division-launch-failed"
                   ? "Division launch failed. Confirm readiness, all eight unique assignments, and private-draft integrity."
-                  : "Bracket assignments could not be saved. Confirm every selected player is approved and unique."}
+                  : notice === "division-not-held-failed"
+                    ? "Not Held closure failed. Confirm the Division is unlaunched, below readiness, and free of competitive evidence."
+                    : "Bracket assignments could not be saved. Confirm every selected player is approved and unique."}
         </div>
       )}
 
@@ -309,7 +336,9 @@ export default function AdminBracketManagement({
                   </Link>
                 )}
               </div>
-              {!terminalTournament && !selectedBracket.launchedAt && (
+              {!terminalTournament &&
+                !selectedBracket.launchedAt &&
+                !selectedBracket.notHeldAudit && (
                 <AdminBracketPopulation
                   tournamentId={selectedTournament.id}
                   tournamentTitle={selectedTournament.title}
@@ -323,7 +352,9 @@ export default function AdminBracketManagement({
                 />
               )}
 
-              {!terminalTournament && !selectedBracket.launchedAt && (
+              {!terminalTournament &&
+                !selectedBracket.launchedAt &&
+                !selectedBracket.notHeldAudit && (
                 <form
                   action={launchTournamentDivision}
                   className="mt-4 rounded-2xl border border-orange-500/25 bg-orange-500/10 p-4"
@@ -370,6 +401,111 @@ export default function AdminBracketManagement({
               The selected bracket has no generated structure yet.
             </p>
           )}
+
+          {selectedBracket?.notHeldAudit ? (
+            <section className="mt-4 rounded-2xl border border-slate-500/40 bg-slate-900/55 p-4 text-sm text-zinc-200">
+              <p className="font-black uppercase tracking-wider text-zinc-100">
+                Not Held — Minimum roster requirement not reached
+              </p>
+              <p className="mt-2 leading-6">
+                Closed {new Date(selectedBracket.notHeldAudit.closedAt).toLocaleString()}
+                {" "}by {selectedBracket.notHeldAudit.closedByClerkUserId}.
+              </p>
+              <p className="mt-1 leading-6 text-zinc-400">
+                Snapshot: {selectedBracket.notHeldAudit.activeRegistrationCount}{" "}
+                active registration{selectedBracket.notHeldAudit.activeRegistrationCount === 1 ? "" : "s"}
+                {" · "}{selectedBracket.notHeldAudit.waitlistRegistrationCount}{" "}
+                waitlisted.
+              </p>
+              {selectedBracket.notHeldAudit.detail && (
+                <p className="mt-2 break-words leading-6 text-zinc-300">
+                  {selectedBracket.notHeldAudit.detail}
+                </p>
+              )}
+              <p className="mt-3 text-xs font-bold uppercase tracking-wider text-zinc-500">
+                Immutable audit · registrations preserved · zero competition accounting
+              </p>
+            </section>
+          ) : !terminalTournament &&
+            selectedBracket &&
+            selectedBracket.divisionState.state === "filling" &&
+            selectedBracket.activeRegistrationCount <
+              selectedBracket.requiredCount ? (
+            <form
+              action={closeTournamentDivisionWithoutLaunch}
+              className="mt-4 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4"
+            >
+              <input
+                type="hidden"
+                name="tournamentBracketId"
+                value={selectedBracket.bracketId}
+              />
+              {fixedTournamentId && (
+                <input
+                  type="hidden"
+                  name="workspaceTournamentId"
+                  value={fixedTournamentId}
+                />
+              )}
+              <p className="text-xs font-black uppercase tracking-wider text-amber-200">
+                Close Division Without Launch
+              </p>
+              <p className="mt-2 font-black text-white">
+                {selectedTournament.title} — {selectedBracket.bracketName}
+              </p>
+              <dl className="mt-3 grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                    Active registrations
+                  </dt>
+                  <dd className="mt-1 font-bold">
+                    {selectedBracket.activeRegistrationCount}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                    Waitlist
+                  </dt>
+                  <dd className="mt-1 font-bold">
+                    {selectedBracket.waitlistRegistrationCount}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-4 rounded-xl border border-amber-300/25 bg-black/25 p-3 text-sm leading-6 text-amber-100">
+                This irreversible action records “Minimum roster requirement not reached,”
+                preserves every registration and its Division relationship, cancels active
+                waitlist offers, and awards no competition points.
+              </div>
+              <label className="mt-4 block">
+                <span className="text-sm font-bold text-white">
+                  Optional audit detail
+                </span>
+                <textarea
+                  name="detail"
+                  maxLength={500}
+                  rows={3}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none focus:border-amber-400"
+                />
+              </label>
+              <label className="mt-4 block">
+                <span className="text-sm font-bold text-white">
+                  Type NOT HELD to confirm
+                </span>
+                <input
+                  name="confirmation"
+                  required
+                  autoComplete="off"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none focus:border-amber-400 sm:max-w-sm"
+                />
+              </label>
+              <button
+                type="submit"
+                className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-amber-500 px-5 py-3 text-sm font-black uppercase tracking-wider text-black transition hover:bg-amber-400 sm:w-auto"
+              >
+                Confirm Not Held Closure
+              </button>
+            </form>
+          ) : null}
         </>
       ))}
     </section>

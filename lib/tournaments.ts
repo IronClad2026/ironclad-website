@@ -557,6 +557,7 @@ export function isTournamentBracketRegistrationOpen(
     | "registrationOpenAt"
     | "registrationCloseAt"
     | "brackets"
+    | "divisionStates"
   >,
   bracketId: string,
   now = Date.now()
@@ -564,7 +565,13 @@ export function isTournamentBracketRegistrationOpen(
   return (
     isTournamentRegistrationOpen(tournament, now) &&
     tournament.brackets.some(
-      (bracket) => bracket.id === bracketId && bracket.launchedAt === null
+      (bracket) =>
+        bracket.id === bracketId &&
+        bracket.launchedAt === null &&
+        !tournament.divisionStates.some(
+          (division) =>
+            division.bracketId === bracketId && division.state === "not_held"
+        )
     )
   );
 }

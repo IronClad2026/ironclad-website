@@ -64,6 +64,7 @@ export default function TournamentBracketStructureControls({
           const requiredCount = divisionState?.requiredCount;
           const launchedAt = divisionState?.launchedAt ?? bracket.launchedAt;
           const isReady = divisionState?.state === "ready";
+          const isNotHeld = divisionState?.state === "not_held";
           const effectiveState = divisionState
             ? getEffectiveTournamentDivisionState(divisionState)
             : null;
@@ -88,8 +89,11 @@ export default function TournamentBracketStructureControls({
               </p>
               <p
                 className={`mt-2 text-xs font-black uppercase tracking-wider ${
-                  effectiveState === "cancelled" || effectiveState === "voided"
+                  effectiveState === "cancelled" ||
+                  effectiveState === "voided"
                     ? "text-red-300"
+                    : effectiveState === "not_held"
+                      ? "text-zinc-300"
                     : effectiveState === "completed"
                     ? "text-emerald-300"
                     : effectiveState === "in_progress"
@@ -109,11 +113,15 @@ export default function TournamentBracketStructureControls({
                 <input type="hidden" name="workspaceSection" value="bracket" />
                 <button
                   type="submit"
-                  disabled={readOnly || Boolean(launchedAt) || !isReady}
+                  disabled={
+                    readOnly || isNotHeld || Boolean(launchedAt) || !isReady
+                  }
                   className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-center text-sm font-black text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:border-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-500"
                 >
                   {readOnly
                     ? "Terminal Tournament — View Only"
+                    : isNotHeld
+                      ? "Division Not Held — View Only"
                     : launchedAt
                     ? "Division Launched"
                     : !divisionState

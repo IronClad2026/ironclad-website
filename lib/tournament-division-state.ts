@@ -10,6 +10,7 @@ export const TOURNAMENT_DIVISION_STATES = [
   "ready",
   "in_progress",
   "completed",
+  "not_held",
 ] as const;
 
 export type TournamentDivisionState =
@@ -39,6 +40,8 @@ export type TournamentDivisionStateEvidence = {
   launchedAt: string | null;
   generatedBracketId: string | null;
   isCompetitionComplete: boolean;
+  notHeldAt?: string | null;
+  notHeldReasonCode?: "minimum_roster_not_reached" | null;
 };
 
 type TournamentDivisionStateResolutionBase = {
@@ -58,6 +61,8 @@ export type TournamentDivisionStateResolution =
       launchedAt: null;
       generatedBracketId: null;
       isCompetitionComplete: false;
+      notHeldAt: null;
+      notHeldReasonCode: null;
     })
   | (TournamentDivisionStateResolutionBase & {
       bracketId: string;
@@ -68,6 +73,8 @@ export type TournamentDivisionStateResolution =
       launchedAt: string | null;
       generatedBracketId: string | null;
       isCompetitionComplete: boolean;
+      notHeldAt: string | null;
+      notHeldReasonCode: "minimum_roster_not_reached" | null;
     });
 
 export type PublicTournamentDivisionStateResolution = Omit<
@@ -136,6 +143,16 @@ export function resolveTournamentDivisionStates({
       evidence.generatedBracketId,
       "Generated tournament bracket ID"
     );
+    const notHeldAt = evidence.notHeldAt ?? null;
+    const notHeldReasonCode = evidence.notHeldReasonCode ?? null;
+    assertNullableTimestamp(notHeldAt, "Not Held timestamp");
+
+    if (
+      notHeldReasonCode !== null &&
+      notHeldReasonCode !== "minimum_roster_not_reached"
+    ) {
+      throw new Error("Tournament division received an invalid Not Held reason.");
+    }
 
     if (typeof evidence.isReady !== "boolean") {
       throw new Error("Tournament division readiness evidence was invalid.");
@@ -157,6 +174,24 @@ export function resolveTournamentDivisionStates({
     ) {
       throw new Error(
         "Tournament division completion evidence is missing its generated bracket."
+      );
+    }
+
+    if (
+      (notHeldAt === null) !==
+      (notHeldReasonCode === null)
+    ) {
+      throw new Error("Tournament division Not Held evidence was incomplete.");
+    }
+
+    if (
+      notHeldAt !== null &&
+      (evidence.launchedAt !== null ||
+        evidence.generatedBracketId !== null ||
+        evidence.isCompetitionComplete)
+    ) {
+      throw new Error(
+        "A Not Held tournament division contains competition evidence."
       );
     }
 
@@ -183,6 +218,8 @@ export function resolveTournamentDivisionStates({
         launchedAt: null,
         generatedBracketId: null,
         isCompetitionComplete: false,
+        notHeldAt: null,
+        notHeldReasonCode: null,
       } satisfies TournamentDivisionStateResolution;
     }
 
@@ -202,6 +239,8 @@ export function resolveTournamentDivisionStates({
       generatedBracketId: evidence.generatedBracketId,
       isCompetitionComplete:
         evidence.launchedAt !== null && evidence.isCompetitionComplete,
+      notHeldAt: evidence.notHeldAt ?? null,
+      notHeldReasonCode: evidence.notHeldReasonCode ?? null,
     } satisfies TournamentDivisionStateResolution;
   });
 }
@@ -231,6 +270,8 @@ export function formatTournamentDivisionState(
       return "In Progress";
     case "completed":
       return "Completed";
+    case "not_held":
+      return "Not Held — Minimum roster requirement not reached";
     case "cancelled":
       return "Cancelled";
     case "voided":
@@ -288,6 +329,16 @@ export function formatTournamentEventDivisionState(
     return "Voided";
   }
 
+  const enabled = ordered.filter(
+    (resolution) => resolution.state !== "disabled"
+  );
+  if (
+    enabled.length > 0 &&
+    enabled.every((resolution) => resolution.state === "not_held")
+  ) {
+    return "Not Held — Minimum roster requirement not reached";
+  }
+
   return ordered
     .map(
       (resolution) =>
@@ -299,6 +350,10 @@ export function formatTournamentEventDivisionState(
 function resolveEnabledTournamentDivisionState(
   evidence: TournamentDivisionStateEvidence
 ): Exclude<TournamentDivisionState, "disabled"> {
+  if (evidence.notHeldAt != null) {
+    return "not_held";
+  }
+
   if (evidence.launchedAt !== null) {
     return evidence.isCompetitionComplete ? "completed" : "in_progress";
   }

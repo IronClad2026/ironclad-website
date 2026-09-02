@@ -61,6 +61,8 @@ const EVENT_A_CHALLENGE_ID = "22222222-2222-4222-8222-222222222222";
 const EVENT_A_MAIN_ID = "22222222-2222-4222-8222-222222222223";
 const EVENT_B_ACADEMY_ID = "22222222-2222-4222-8222-222222222224";
 const CANCELLED_EVENT_ID = "11111111-1111-4111-8111-111111111113";
+const NOT_HELD_EVENT_ID = "11111111-1111-4111-8111-111111111114";
+const NOT_HELD_ACADEMY_ID = "22222222-2222-4222-8222-222222222225";
 const DUPLICATE_TITLE = "Shared Event Title";
 
 const eventA = makeTournament({
@@ -173,6 +175,37 @@ const cancelledEvent = makeTournament({
     ],
   }),
 });
+
+const notHeldEvent: TournamentCard = {
+  ...makeTournament({
+    id: NOT_HELD_EVENT_ID,
+    slug: "not-held-event",
+    status: "Open",
+    statusValue: "registration_open",
+    brackets: [
+      makeBracket(NOT_HELD_ACADEMY_ID, "Academy Bracket", 3, false),
+    ],
+    divisionStates: resolveTournamentDivisionStates({
+      tournamentId: NOT_HELD_EVENT_ID,
+      eventStatus: "registration_open",
+      divisions: [
+        {
+          canonicalName: "Academy",
+          bracketId: NOT_HELD_ACADEMY_ID,
+          approvedCount: 3,
+          requiredCount: 8,
+          isReady: false,
+          launchedAt: null,
+          generatedBracketId: null,
+          isCompetitionComplete: false,
+          notHeldAt: "2026-08-05T00:00:00.000Z",
+          notHeldReasonCode: "minimum_roster_not_reached",
+        },
+      ],
+    }),
+  }),
+  registrationEnabled: false,
+};
 
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(
   Element.prototype,
@@ -355,6 +388,33 @@ describe("public Tournament division-state surface", () => {
     expect(main).toHaveTextContent("Main / Pro Bracket: Disabled");
     expect(main.firstElementChild).toHaveClass("text-zinc-300");
   });
+
+  it("shows an all-Not-Held Event distinctly and disables registration", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/tournaments?tournament=not-held-event&tab=overview&panel=details"
+    );
+    const { container } = render(experience([notHeldEvent]));
+    const summary = getEventSummary(container, NOT_HELD_EVENT_ID);
+    const academy = getDivisionState(summary, "Academy");
+
+    expect(academy).toHaveAttribute("data-division-state", "not_held");
+    expect(academy).toHaveTextContent(
+      `Academy Bracket: ${competitionEnglish.tournaments.divisionState.notHeld}`
+    );
+    expect(getEventButton(summary)).toHaveTextContent("Not Held");
+    expect(
+      screen
+        .getAllByRole("button")
+        .filter(
+          (button) =>
+            button.textContent?.includes(
+              competitionEnglish.tournaments.divisionState.notHeld
+            ) && button.hasAttribute("disabled")
+        )
+    ).not.toHaveLength(0);
+  });
 });
 
 function renderExperience() {
@@ -489,7 +549,7 @@ function getEventButton(summary: HTMLElement) {
 function expectDivisionState(
   summary: HTMLElement,
   divisionName: "Academy" | "Challenge" | "Main",
-  state: "disabled" | "filling" | "in_progress" | "completed",
+  state: "disabled" | "filling" | "in_progress" | "completed" | "not_held",
   expectedText: string
 ) {
   const stateElement = getDivisionState(summary, divisionName);
