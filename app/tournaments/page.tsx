@@ -490,7 +490,7 @@ export default async function TournamentsPage({
     tournament.mapPools = projectPublishedTournamentMapPools(
       (row.tournament_brackets ?? []).map((bracket) => ({
         id: bracket.id,
-        name: getTournamentBracketDisplayName(bracket.name),
+        name: bracket.name,
         mapPoolPublishedAt: bracket.map_pool_published_at,
         launchedAt: bracket.launched_at,
         entries: mapPoolEntriesByBracket.get(bracket.id) ?? [],
