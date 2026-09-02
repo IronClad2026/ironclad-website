@@ -904,6 +904,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "players-waitlist",
       "bracket",
       "matches",
+      "replays",
       "media",
       "map-pool",
     ]) {

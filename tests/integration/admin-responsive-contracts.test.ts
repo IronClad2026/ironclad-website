@@ -150,7 +150,7 @@ describe("admin responsive component and CSS contracts", () => {
     );
     expect(tournamentManagementMenu).toContain("flex min-h-11 items-center");
     expect(tournamentManagementMenu).toContain(
-      "grid grid-cols-3 gap-1.5 2xl:grid-cols-9"
+      "grid grid-cols-3 gap-1.5 2xl:grid-cols-10"
     );
   });
 
