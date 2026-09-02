@@ -263,6 +263,107 @@ describe("LeaderboardExperience", () => {
     expect(within(topStandings).queryByText("Rank Four")).not.toBeInTheDocument();
   });
 
+  it("switches Main / Pro between current-season and permanent all-time projections", () => {
+    const currentSeasonRow = standing({
+      playerName: "Commander With An Intentionally Long Public Name",
+      displayName: "Commander With An Intentionally Long Public Name",
+      totalPoints: 45,
+      lastTournamentPoints: 15,
+    });
+    const allTimeRow = standing({
+      scope: "all_time",
+      seasonId: null,
+      playerName: "Commander With An Intentionally Long Public Name",
+      displayName: "Commander With An Intentionally Long Public Name",
+      totalPoints: 145,
+      tournamentsPlayed: 8,
+      lastTournamentPoints: 0,
+      previousRank: null,
+      rankMovement: null,
+    });
+    const historicalRow = standing({
+      scope: "all_time",
+      seasonId: null,
+      playerId: "99999999-9999-4999-8999-999999999999",
+      playerName: "Historical Main Veteran",
+      displayName: "Historical Main Veteran",
+      totalPoints: 120,
+      tournamentsPlayed: 6,
+      rank: 2,
+      displayOrder: 2,
+      previousRank: null,
+      rankMovement: null,
+    });
+
+    render(
+      <LeaderboardExperience
+        data={leaderboardData({
+          seasonStandings: [currentSeasonRow],
+          allTimeStandings: [allTimeRow, historicalRow],
+          seasonChampions: [
+            {
+              id: "champion-history",
+              seasonName: "2025 Main / Pro Season 2",
+              bracketType: "main",
+              playerId: null,
+              playerName: "Former Main Champion",
+              country: null,
+              hasAvatar: false,
+              avatarUrl: null,
+              finalRank: 1,
+              finalPoints: 180,
+            },
+          ],
+        })}
+      />
+    );
+
+    const currentSeasonButton = screen.getByRole("button", {
+      name: "Current Season",
+    });
+    const allTimeButton = screen.getByRole("button", { name: "All-Time" });
+
+    expect(currentSeasonButton).toHaveAttribute("aria-pressed", "true");
+    expect(allTimeButton).toHaveAttribute("aria-pressed", "false");
+    let table = screen.getByRole("table");
+    expect(
+      within(table).getByRole("row", {
+        name: /Commander With An Intentionally Long Public Name/,
+      })
+    ).toHaveTextContent("45");
+    expect(within(table).queryByText("Historical Main Veteran")).not.toBeInTheDocument();
+    expect(within(table).getByText("Last Pts")).toBeInTheDocument();
+    expect(within(table).getByText("Movement")).toBeInTheDocument();
+
+    fireEvent.click(allTimeButton);
+
+    expect(allTimeButton).toHaveAttribute("aria-pressed", "true");
+    expect(currentSeasonButton).toHaveAttribute("aria-pressed", "false");
+    table = screen.getByRole("table");
+    expect(
+      within(table).getByRole("row", {
+        name: /Commander With An Intentionally Long Public Name/,
+      })
+    ).toHaveTextContent("145");
+    expect(within(table).getByText("Historical Main Veteran")).toBeInTheDocument();
+    expect(within(table).queryByText("Last Pts")).not.toBeInTheDocument();
+    expect(within(table).queryByText("Movement")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Main / Pro top standings" })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Published Tournament Impact")).not.toBeInTheDocument();
+    expect(screen.getByText("Latest Finalized Results")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/does not reset when a season closes/).length
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(currentSeasonButton);
+
+    table = screen.getByRole("table");
+    expect(within(table).queryByText("Historical Main Veteran")).not.toBeInTheDocument();
+    expect(within(table).getByText("Last Pts")).toBeInTheDocument();
+  });
+
   it("keeps Career divisions separate and renders opted-out and closed identities safely", () => {
     const academyRows = [
       standing({

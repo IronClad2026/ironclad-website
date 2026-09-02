@@ -200,8 +200,12 @@ const dictionary = {
   rankings: {
     metadataTitle: "Leaderboard & Rankings | IronClad",
     metadataDescription:
-      "Track the six-event Main / Pro season and permanent Academy and Challenge Career standings.",
+      "Track the six-event Main / Pro season and its all-time standings alongside permanent Academy and Challenge Career standings.",
+    mainDivision: "Main / Pro",
     mainSeason: "Main / Pro Season",
+    currentSeasonScope: "Current Season",
+    allTimeScope: "All-Time",
+    mainScope: "Main / Pro Ranking",
     academyCareer: "Academy Career",
     challengeCareer: "Challenge Career",
     loadWarning:
@@ -210,6 +214,8 @@ const dictionary = {
     dynamicStandings: "Dynamic Standings",
     mainDescription:
       "Official Main / Pro standings for the featured six-valid-Event season.",
+    mainAllTimeDescription:
+      "Permanent Main / Pro standings across every valid ranked Event, including the active season.",
     academyDescription:
       "Academy points and Results remain in this permanent Career view.",
     challengeDescription:
@@ -218,14 +224,20 @@ const dictionary = {
     visibleCompetitors: "Visible Competitors",
     rankingModel: "Ranking Model",
     sixEventSeason: "Six-Event season",
+    permanentMainPro: "Permanent Main / Pro",
     permanentCareer: "Permanent Career",
     seasonState: "Season State",
     division: "Division",
     heroEyebrow: "IronClad Competitive Command",
     heroTitle: "Leaderboard & Rankings",
     heroDescription:
-      "Main / Pro is the authoritative six-valid-event season. Academy and Challenge track separate permanent Career standings.",
+      "Main / Pro shows the authoritative six-valid-event season and its permanent all-time record. Academy and Challenge track separate permanent Career standings.",
     featuredSeason: "Featured Main / Pro Season",
+    mainAllTime: "Main / Pro All-Time",
+    mainAllTimeRecord:
+      "Every valid Main / Pro point event contributes to this permanent record.",
+    mainAllTimeNoReset:
+      "Current-season points are included. The record does not reset when a season closes, and it does not determine current-season prize positions.",
     careerStandings: "Career Standings",
     seasonNotStarted: "Season not started",
     noSeason:
