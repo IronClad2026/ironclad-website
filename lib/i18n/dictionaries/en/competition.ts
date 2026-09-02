@@ -31,6 +31,7 @@ const dictionary = {
       completed: "Completed",
       cancelled: "Cancelled",
       closed: "Closed",
+      notHeld: "Not Held",
       generated: "Generated",
       awaitingGeneration: "Awaiting Generation",
       pendingReview: "Pending review",
@@ -42,6 +43,7 @@ const dictionary = {
       ready: "Ready to Launch — {approved}/{required}",
       inProgress: "In Progress",
       completed: "Completed",
+      notHeld: "Not Held — Minimum roster requirement not reached",
       cancelled: "Cancelled",
       voided: "Voided",
     },
@@ -54,6 +56,7 @@ const dictionary = {
       tournament: "Tournament",
       approvedSlots: "approved slots",
       divisionInProgress: "Division in progress",
+      divisionNotHeld: "Minimum roster requirement not reached",
       waitlistOpen: "Waitlist open",
       openEvents: "Open events",
       scheduleHint: "Check the tournament schedule",
@@ -80,6 +83,9 @@ const dictionary = {
       voidedMessage: "This Tournament was voided. Its factual Match history is retained, but it no longer contributes to official standings.",
     },
     registrationState: {
+      notHeldTitle: "Division Not Held",
+      notHeldDescription:
+        "The minimum roster requirement was not reached. Your registration remains in the event history, and no competition points were awarded.",
       waitlistClosed: "Waitlist Closed",
       waitlistClosedDescription:
         "This Division launched before a place became available. Your waitlist registration is now closed.",

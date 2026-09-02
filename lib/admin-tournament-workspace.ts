@@ -69,6 +69,7 @@ export type AdminTournamentEditorWorkspaceData = {
       requiredCount: number;
       isReady: boolean;
       launchedAt: string | null;
+      notHeldAt: string | null;
     }
   >;
   underReview: {
@@ -255,6 +256,7 @@ export async function loadAdminTournamentEditorWorkspaceData(
           requiredCount: division.requiredCount,
           isReady: division.isReady,
           launchedAt: division.launchedAt,
+          notHeldAt: division.notHeldAt,
         },
       ] as const;
     })
@@ -335,12 +337,12 @@ export async function loadAdminTournamentBracketWorkspaceData(
   const supabase = createSupabaseAdminClient();
   const brackets = tournament.tournament_brackets ?? [];
   const bracketIds = brackets.map((bracket) => bracket.id);
-  const [registrationResult, generatedResult, mapPoolResult] =
+  const [registrationResult, generatedResult, mapPoolResult, closureResult] =
     await Promise.all([
       supabase
         .from("registrations")
         .select(
-          "id, player_name, country, submitted_elo, registration_status, tournament_bracket_id"
+          "id, player_name, country, submitted_elo, registration_status, tournament_bracket_id, waitlist_offer_status"
         )
         .eq("tournament_id", tournament.id),
       bracketIds.length > 0
@@ -358,12 +360,21 @@ export async function loadAdminTournamentBracketWorkspaceData(
             .in("tournament_bracket_id", bracketIds)
             .is("removed_at", null)
         : Promise.resolve({ data: [], error: null }),
+      bracketIds.length > 0
+        ? supabase
+            .from("tournament_division_not_held_closures")
+            .select(
+              "tournament_bracket_id, reason_code, detail, closed_at, closed_by_clerk_user_id, active_registration_count, waitlist_registration_count"
+            )
+            .in("tournament_bracket_id", bracketIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
   if (
     registrationResult.error ||
     generatedResult.error ||
-    mapPoolResult.error
+    mapPoolResult.error ||
+    closureResult.error
   ) {
     console.error("Admin Tournament bracket workspace load failed.", {
       operation: "load-tournament-bracket",
@@ -401,6 +412,17 @@ export async function loadAdminTournamentBracketWorkspaceData(
       (currentMapCountByBracket.get(entry.tournament_bracket_id) ?? 0) + 1
     );
   }
+  const closureByBracket = new Map(
+    ((closureResult.data ?? []) as Array<{
+      tournament_bracket_id: string;
+      reason_code: "minimum_roster_not_reached";
+      detail: string | null;
+      closed_at: string;
+      closed_by_clerk_user_id: string;
+      active_registration_count: number;
+      waitlist_registration_count: number;
+    }>).map((closure) => [closure.tournament_bracket_id, closure])
+  );
 
   const divisionStateByBracket = new Map(
     divisionStates.flatMap((division) =>
@@ -452,6 +474,21 @@ export async function loadAdminTournamentBracketWorkspaceData(
             registration.registration_status === "approved" &&
             registration.tournament_bracket_id === bracket.id
         );
+        const activeRegistrationCount = registrations.filter(
+          (registration) =>
+            registration.tournament_bracket_id === bracket.id &&
+            (["pending", "manual_review", "approved"].includes(
+              registration.registration_status
+            ) ||
+              (registration.registration_status === "waitlisted" &&
+                registration.waitlist_offer_status === "offered"))
+        ).length;
+        const waitlistRegistrationCount = registrations.filter(
+          (registration) =>
+            registration.tournament_bracket_id === bracket.id &&
+            registration.registration_status === "waitlisted"
+        ).length;
+        const closure = closureByBracket.get(bracket.id) ?? null;
 
         return {
           generatedBracketId: generated?.id ?? null,
@@ -468,6 +505,8 @@ export async function loadAdminTournamentBracketWorkspaceData(
           assignments,
           approvedCount:
             divisionState.approvedCount ?? approvedParticipants.length,
+          activeRegistrationCount,
+          waitlistRegistrationCount,
           requiredCount: divisionState.requiredCount ?? bracket.max_players,
           isReady: divisionState.isReady,
           launchedAt: divisionState.launchedAt,
@@ -475,6 +514,18 @@ export async function loadAdminTournamentBracketWorkspaceData(
           mapPoolPublishedAt: bracket.map_pool_published_at,
           currentMapCount:
             currentMapCountByBracket.get(bracket.id) ?? 0,
+          notHeldAudit: closure
+            ? {
+                reasonCode: closure.reason_code,
+                detail: closure.detail,
+                closedAt: closure.closed_at,
+                closedByClerkUserId: closure.closed_by_clerk_user_id,
+                activeRegistrationCount:
+                  closure.active_registration_count,
+                waitlistRegistrationCount:
+                  closure.waitlist_registration_count,
+              }
+            : null,
           participants: approvedParticipants.map((registration) => ({
             id: registration.id,
             name: registration.player_name,

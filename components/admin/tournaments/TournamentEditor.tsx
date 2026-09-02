@@ -76,6 +76,7 @@ export type TournamentBracketReadinessSummary = {
   requiredCount: number;
   isReady: boolean;
   launchedAt: string | null;
+  notHeldAt: string | null;
 };
 
 export type TournamentTerminalPresentation = {
@@ -382,7 +383,14 @@ export function TournamentEditor({
               prefix={config.fieldPrefix}
               label={config.label}
               values={values[config.fieldPrefix]}
-              readOnly={!isEditing}
+              readOnly={
+                !isEditing ||
+                Boolean(
+                  readinessByBracket.get(
+                    values[config.fieldPrefix].id ?? ""
+                  )?.notHeldAt
+                )
+              }
             />
           ))}
         </div>
@@ -410,6 +418,7 @@ export function TournamentEditor({
                 const approvedCount = readiness?.approvedCount ?? approved;
                 const requiredCount = readiness?.requiredCount ?? 8;
                 const launchedAt = readiness?.launchedAt ?? bracket.launchedAt;
+                const notHeldAt = readiness?.notHeldAt ?? null;
                 const isReady = readiness?.isReady ?? false;
 
                 return (
@@ -426,14 +435,18 @@ export function TournamentEditor({
                     </p>
                     <p
                       className={`mt-2 text-xs font-black uppercase tracking-wider ${
-                        launchedAt
+                        notHeldAt
+                          ? "text-zinc-300"
+                          : launchedAt
                           ? "text-sky-300"
                           : isReady
                             ? "text-emerald-300"
                             : "text-amber-300"
                       }`}
                     >
-                      {launchedAt
+                      {notHeldAt
+                        ? "Not Held — Minimum roster requirement not reached"
+                        : launchedAt
                         ? `Launched ${new Date(launchedAt).toLocaleString()}`
                         : isReady
                           ? `${approvedCount}/${requiredCount} approved — ready for private bracket preparation`
@@ -442,10 +455,14 @@ export function TournamentEditor({
                     <button
                       type="submit"
                       form={`generate-bracket-${bracket.id}`}
-                      disabled={Boolean(launchedAt) || !isReady}
+                      disabled={
+                        Boolean(notHeldAt) || Boolean(launchedAt) || !isReady
+                      }
                       className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-center text-sm font-black text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:border-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-500"
                     >
-                      {launchedAt
+                      {notHeldAt
+                        ? "Division Not Held — View Only"
+                        : launchedAt
                         ? "Division Launched"
                         : !isReady
                           ? `Requires ${requiredCount}/${requiredCount} Approved`

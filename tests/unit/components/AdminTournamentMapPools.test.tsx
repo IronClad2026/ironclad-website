@@ -32,6 +32,7 @@ const brackets = [
     id: "bracket-academy",
     name: "Academy",
     launchedAt: null,
+    notHeldAt: null,
     mapPoolPublishedAt: "2026-08-15T00:00:00.000Z",
     currentMapIds: catalogue.slice(0, 5).map((map) => map.id),
   },
@@ -39,6 +40,7 @@ const brackets = [
     id: "bracket-challenge",
     name: "Challenge",
     launchedAt: null,
+    notHeldAt: null,
     mapPoolPublishedAt: null,
     currentMapIds: [],
   },
@@ -46,6 +48,7 @@ const brackets = [
     id: "bracket-main",
     name: "Main",
     launchedAt: null,
+    notHeldAt: null,
     mapPoolPublishedAt: null,
     currentMapIds: [],
   },
@@ -151,6 +154,31 @@ describe("AdminTournamentMapPools", () => {
       screen.queryByRole("button", {
         name: "Apply Audited Post-Launch Correction",
       })
+    ).not.toBeInTheDocument();
+  });
+
+  it("retains a Not Held Division Map Pool as read-only history", () => {
+    render(
+      <AdminTournamentMapPools
+        tournamentId="tournament-not-held"
+        tournamentTitle="IronClad Not Held"
+        terminal={false}
+        brackets={[
+          {
+            ...brackets[0],
+            notHeldAt: "2026-09-03T01:00:00.000Z",
+          },
+        ]}
+        catalogue={catalogue}
+      />
+    );
+
+    expect(screen.getByText("Not Held / Frozen")).toBeVisible();
+    expect(screen.getByText(/retained as read-only history/i)).toBeVisible();
+    expect(screen.getAllByRole("checkbox").every((input) => input.hasAttribute("disabled")))
+      .toBe(true);
+    expect(
+      screen.queryByRole("button", { name: /Publish This Division/ })
     ).not.toBeInTheDocument();
   });
 });

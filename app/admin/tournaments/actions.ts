@@ -667,6 +667,81 @@ export async function launchTournamentDivision(formData: FormData) {
   redirectToBracketManagement(formData, notice);
 }
 
+export async function closeTournamentDivisionWithoutLaunch(
+  formData: FormData
+) {
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+
+  if (!userId || role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  await requireCurrentAccountLegalAcceptance();
+
+  const tournamentId = getWorkspaceTournamentId(formData);
+  const tournamentBracketId = getText(formData, "tournamentBracketId");
+  const detail = getOptionalText(formData, "detail");
+  const confirmation = getText(formData, "confirmation");
+
+  if (
+    !tournamentId ||
+    !isUuid(tournamentBracketId) ||
+    (detail?.length ?? 0) > 500 ||
+    confirmation !== "NOT HELD"
+  ) {
+    redirectToBracketManagement(formData, "division-not-held-invalid");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc(
+    "close_tournament_division_without_launch",
+    {
+      p_tournament_bracket_id: tournamentBracketId,
+      p_reason_code: "minimum_roster_not_reached",
+      p_detail: detail,
+      p_actor_clerk_user_id: userId,
+    }
+  );
+
+  const result = readNotHeldClosureResult(
+    data,
+    tournamentId,
+    tournamentBracketId
+  );
+
+  if (error || !result) {
+    const candidateCode =
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code.toUpperCase()
+        : "";
+    console.error("Tournament Division Not Held closure failed.", {
+      code: /^[A-Z0-9]{3,10}$/.test(candidateCode)
+        ? candidateCode
+        : "NOT_HELD_FAILED",
+    });
+    redirectToBracketManagement(formData, "division-not-held-failed");
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/registrations");
+  revalidatePath("/admin/tournaments", "page");
+  revalidatePath(`/admin/tournaments/${tournamentId}`, "page");
+  revalidatePath("/dashboard");
+  revalidatePath("/tournaments");
+
+  redirectToBracketManagement(
+    formData,
+    result.alreadyNotHeld
+      ? "division-already-not-held"
+      : "division-not-held"
+  );
+}
+
 export async function cancelTournamentAction(
   _previousState: TournamentTerminalActionState,
   formData: FormData
@@ -1203,6 +1278,42 @@ function readBracket(
 
 function getText(formData: FormData, field: string) {
   return String(formData.get(field) ?? "").trim();
+}
+
+function readNotHeldClosureResult(
+  value: unknown,
+  tournamentId: string,
+  tournamentBracketId: string
+) {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value) ||
+    !("tournamentId" in value) ||
+    value.tournamentId !== tournamentId ||
+    !("tournamentBracketId" in value) ||
+    value.tournamentBracketId !== tournamentBracketId ||
+    !("notHeldAt" in value) ||
+    typeof value.notHeldAt !== "string" ||
+    !Number.isFinite(Date.parse(value.notHeldAt)) ||
+    !("reasonCode" in value) ||
+    value.reasonCode !== "minimum_roster_not_reached" ||
+    !("activeRegistrationCount" in value) ||
+    !Number.isInteger(value.activeRegistrationCount) ||
+    Number(value.activeRegistrationCount) < 0 ||
+    Number(value.activeRegistrationCount) > 7 ||
+    !("waitlistRegistrationCount" in value) ||
+    !Number.isInteger(value.waitlistRegistrationCount) ||
+    Number(value.waitlistRegistrationCount) < 0 ||
+    !("alreadyNotHeld" in value) ||
+    typeof value.alreadyNotHeld !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    alreadyNotHeld: value.alreadyNotHeld,
+  };
 }
 
 function isUuid(value: string) {

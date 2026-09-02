@@ -31,6 +31,7 @@ const dictionary = {
       completed: "Completato",
       cancelled: "Annullato",
       closed: "Chiuso",
+      notHeld: "Non disputato",
       generated: "Generato",
       awaitingGeneration: "In attesa di generazione",
       pendingReview: "In attesa di revisione",
@@ -42,6 +43,7 @@ const dictionary = {
       ready: "Pronta al lancio — {approved}/{required}",
       inProgress: "In corso",
       completed: "Completata",
+      notHeld: "Non disputata — requisito minimo di giocatori non raggiunto",
       cancelled: "Annullata",
       voided: "Invalidata",
     },
@@ -54,6 +56,7 @@ const dictionary = {
       tournament: "Torneo",
       approvedSlots: "posti approvati",
       divisionInProgress: "Divisione in corso",
+      divisionNotHeld: "Requisito minimo di giocatori non raggiunto",
       waitlistOpen: "Lista d'attesa aperta",
       openEvents: "Eventi aperti",
       scheduleHint: "Controlla il programma del torneo",
@@ -82,6 +85,9 @@ const dictionary = {
         "Questo Torneo è stato invalidato. La cronologia effettiva dei Match è conservata, ma non contribuisce più alle classifiche ufficiali.",
     },
     registrationState: {
+      notHeldTitle: "Divisione non disputata",
+      notHeldDescription:
+        "Il requisito minimo di giocatori non è stato raggiunto. La tua iscrizione resta nello storico dell’evento e non sono stati assegnati punti competitivi.",
       waitlistClosed: "Lista d'attesa chiusa",
       waitlistClosedDescription:
         "Questa Divisione è iniziata prima che si liberasse un posto. La tua iscrizione in lista d'attesa è ora chiusa.",

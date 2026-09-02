@@ -13,7 +13,7 @@ describe("tournament division state authority loader", () => {
     vi.restoreAllMocks();
   });
 
-  it("loads multiple events with two bounded batch authority reads", async () => {
+  it("loads multiple events with three bounded batch authority reads", async () => {
     const database = createDatabase({
       capacityRows: [
         capacity("bracket-academy-a", "event-a", 8, 8, launchTime),
@@ -49,9 +49,13 @@ describe("tournament division state authority loader", () => {
     expect(
       result.get("event-b")?.map((resolution) => resolution.state)
     ).toEqual(["filling", "disabled", "disabled"]);
-    expect(database.rpc).toHaveBeenCalledExactlyOnceWith(
+    expect(database.rpc).toHaveBeenCalledWith(
       "get_tournament_bracket_capacity"
     );
+    expect(database.rpc).toHaveBeenCalledWith(
+      "get_tournament_division_not_held_states"
+    );
+    expect(database.rpc).toHaveBeenCalledTimes(2);
     expect(database.from).toHaveBeenCalledExactlyOnceWith(
       "generated_brackets"
     );
@@ -158,6 +162,88 @@ describe("tournament division state authority loader", () => {
       generatedBracketId: "private-academy-draft",
       isCompetitionComplete: false,
     });
+  });
+
+  it("projects a protected Not Held authority row into terminal Division state", async () => {
+    const database = createDatabase({
+      capacityRows: [
+        capacity("bracket-academy", "not-held-event", 1, 1, null),
+      ],
+      notHeldRows: [
+        {
+          tournament_bracket_id: "bracket-academy",
+          tournament_id: "not-held-event",
+          not_held_at: "2026-09-03T01:00:00.000Z",
+          reason_code: "minimum_roster_not_reached",
+        },
+      ],
+    });
+
+    const result = await loadTournamentDivisionStates(database.client, [
+      tournament("not-held-event", "registration_open", [
+        bracket("bracket-academy", "Academy", null),
+      ]),
+    ]);
+
+    expect(result.get("not-held-event")?.[0]).toMatchObject({
+      state: "not_held",
+      notHeldAt: "2026-09-03T01:00:00.000Z",
+      notHeldReasonCode: "minimum_roster_not_reached",
+      launchedAt: null,
+      generatedBracketId: null,
+      isCompetitionComplete: false,
+    });
+  });
+
+  it.each([
+    {
+      name: "Not Held authority query error",
+      fixture: {
+        capacityRows: [capacity("bracket-academy", "event", 1, 1, null)],
+        notHeldError: { message: "unavailable" },
+      },
+      message: "Not Held authority could not be loaded",
+    },
+    {
+      name: "malformed Not Held authority row",
+      fixture: {
+        capacityRows: [capacity("bracket-academy", "event", 1, 1, null)],
+        notHeldRows: [
+          {
+            tournament_bracket_id: "bracket-academy",
+            tournament_id: "event",
+            not_held_at: null,
+            reason_code: "minimum_roster_not_reached",
+          },
+        ],
+      },
+      message: "Not Held authority returned malformed data",
+    },
+    {
+      name: "wrong Not Held Tournament relationship",
+      fixture: {
+        capacityRows: [capacity("bracket-academy", "event", 1, 1, null)],
+        notHeldRows: [
+          {
+            tournament_bracket_id: "bracket-academy",
+            tournament_id: "different-event",
+            not_held_at: "2026-09-03T01:00:00.000Z",
+            reason_code: "minimum_roster_not_reached",
+          },
+        ],
+      },
+      message: "Not Held authority returned malformed data",
+    },
+  ])("fails explicitly on $name", async ({ fixture, message }) => {
+    const database = createDatabase(fixture);
+
+    await expect(
+      loadTournamentDivisionStates(database.client, [
+        tournament("event", "registration_open", [
+          bracket("bracket-academy", "Academy", null),
+        ]),
+      ])
+    ).rejects.toThrow(message);
   });
 
   it("does not query database authorities when every division is Disabled", async () => {
@@ -478,11 +564,15 @@ function createDatabase({
   capacityRows = [],
   generatedError = null,
   generatedRows = [],
+  notHeldError = null,
+  notHeldRows = [],
 }: {
   capacityError?: unknown;
   capacityRows?: unknown;
   generatedError?: unknown;
   generatedRows?: unknown;
+  notHeldError?: unknown;
+  notHeldRows?: unknown;
 }) {
   const inFilter = vi.fn().mockResolvedValue({
     data: generatedRows,
@@ -493,6 +583,10 @@ function createDatabase({
   const rpc = vi.fn(async (name: string) => {
     if (name === "get_tournament_bracket_capacity") {
       return { data: capacityRows, error: capacityError };
+    }
+
+    if (name === "get_tournament_division_not_held_states") {
+      return { data: notHeldRows, error: notHeldError };
     }
 
     return { data: null, error: { message: "unexpected authority" } };

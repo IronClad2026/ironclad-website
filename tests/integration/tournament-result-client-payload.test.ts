@@ -584,6 +584,10 @@ function createPageClient(
         };
       }
 
+      if (name === "get_tournament_division_not_held_states") {
+        return { data: [], error: null };
+      }
+
       return {
         data: null,
         error: { message: `Unexpected mocked page RPC: ${name}` },
@@ -813,9 +817,15 @@ describe("tournament Client Component result payload", () => {
       expect(loadGeneratedBracketPageRowsMock).toHaveBeenCalledWith({
         includeAdminAudit: admin,
       });
-      expect(client.rpc).toHaveBeenCalledExactlyOnceWith(
+      expect(client.rpc).toHaveBeenNthCalledWith(
+        1,
         "get_tournament_bracket_capacity"
       );
+      expect(client.rpc).toHaveBeenNthCalledWith(
+        2,
+        "get_tournament_division_not_held_states"
+      );
+      expect(client.rpc).toHaveBeenCalledTimes(2);
       expect(loadMatchResultDataMock).toHaveBeenCalledOnce();
     }
   );

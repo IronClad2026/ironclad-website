@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/app/admin/tournaments/actions", () => ({
+  closeTournamentDivisionWithoutLaunch: vi.fn(),
   launchTournamentDivision: vi.fn(),
   saveBracketAssignments: vi.fn(),
 }));
@@ -48,6 +49,8 @@ function tournamentOption(
     launchedAt,
     generatedBracketId,
     isCompetitionComplete: false,
+    notHeldAt: null,
+    notHeldReasonCode: null,
   };
 
   return {
@@ -68,12 +71,17 @@ function tournamentOption(
         ),
         participants,
         approvedCount,
+        activeRegistrationCount:
+          overrides.activeRegistrationCount ?? approvedCount,
+        waitlistRegistrationCount:
+          overrides.waitlistRegistrationCount ?? 0,
         requiredCount,
         isReady,
         launchedAt,
         divisionState,
         mapPoolPublishedAt: "2026-08-15T00:00:00.000Z",
         currentMapCount: 5,
+        notHeldAudit: null,
         ...overrides,
       },
     ],
@@ -170,6 +178,65 @@ describe("administrator private bracket launch controls", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Launch Division" }))
       .toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Confirm Not Held Closure" })
+    ).toBeEnabled();
+    expect(screen.getByText(/irreversible action/i)).toHaveTextContent(
+      "preserves every registration"
+    );
+  });
+
+  it("renders immutable Not Held audit history without launch or closure controls", () => {
+    const bracketId = "323e4567-e89b-42d3-a456-426614174000";
+    render(
+      <AdminBracketManagement
+        fixedTournamentId="123e4567-e89b-42d3-a456-426614174000"
+        tournaments={[
+          tournamentOption({
+            approvedCount: 0,
+            activeRegistrationCount: 1,
+            waitlistRegistrationCount: 0,
+            isReady: false,
+            generatedBracketId: null,
+            format: null,
+            divisionState: {
+              tournamentId: "123e4567-e89b-42d3-a456-426614174000",
+              canonicalName: "Academy",
+              displayName: "Academy Bracket",
+              bracketId,
+              state: "not_held",
+              terminalOverlay: null,
+              approvedCount: 0,
+              requiredCount: 8,
+              isReady: false,
+              launchedAt: null,
+              generatedBracketId: null,
+              isCompetitionComplete: false,
+              notHeldAt: "2026-09-03T01:00:00.000Z",
+              notHeldReasonCode: "minimum_roster_not_reached",
+            },
+            notHeldAudit: {
+              reasonCode: "minimum_roster_not_reached",
+              detail: "Roster window exhausted.",
+              closedAt: "2026-09-03T01:00:00.000Z",
+              closedByClerkUserId: "admin_test",
+              activeRegistrationCount: 1,
+              waitlistRegistrationCount: 0,
+            },
+          }),
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByText("Not Held — Minimum roster requirement not reached")
+    ).toBeVisible();
+    expect(screen.getByText(/Immutable audit/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Launch Division" }))
+      .not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Confirm Not Held Closure" })
+    ).not.toBeInTheDocument();
   });
 
   it("keeps launch disabled until a five-map pool is published", () => {

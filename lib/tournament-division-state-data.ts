@@ -35,6 +35,7 @@ export type TournamentDivisionStateTournamentRow = {
 export type TournamentDivisionStateAuthoritySnapshot = {
   readinessRows: unknown;
   generatedBracketRows: unknown;
+  notHeldRows?: unknown;
 };
 
 export class TournamentDivisionStateDataError extends Error {
@@ -62,6 +63,11 @@ type ReadinessEvidence = {
   requiredCount: number;
   isReady: boolean;
   launchedAt: string | null;
+};
+
+type NotHeldEvidence = {
+  notHeldAt: string;
+  reasonCode: "minimum_roster_not_reached";
 };
 
 type GeneratedBracketEvidence = {
@@ -129,11 +135,16 @@ export async function loadTournamentDivisionStates(
     return resolveFromAuthorityEvidence(tournaments, new Map(), new Map());
   }
 
-  const [readinessRows, generatedBracketRows] = snapshot
-    ? [snapshot.readinessRows, snapshot.generatedBracketRows]
+  const [readinessRows, generatedBracketRows, notHeldRows] = snapshot
+    ? [
+        snapshot.readinessRows,
+        snapshot.generatedBracketRows,
+        snapshot.notHeldRows ?? [],
+      ]
     : await Promise.all([
         loadReadinessRows(supabase),
         loadGeneratedBracketRows(supabase, bracketIds),
+        loadNotHeldRows(supabase),
       ]);
   const readinessByBracketId = normalizeReadinessRows(
     readinessRows,
@@ -143,18 +154,21 @@ export async function loadTournamentDivisionStates(
     generatedBracketRows,
     bracketIds
   );
+  const notHeldByBracketId = normalizeNotHeldRows(notHeldRows, brackets);
 
   return resolveFromAuthorityEvidence(
     tournaments,
     readinessByBracketId,
-    generatedByBracketId
+    generatedByBracketId,
+    notHeldByBracketId
   );
 }
 
 function resolveFromAuthorityEvidence(
   tournaments: readonly NormalizedTournament[],
   readinessByBracketId: ReadonlyMap<string, ReadinessEvidence>,
-  generatedByBracketId: ReadonlyMap<string, GeneratedBracketEvidence>
+  generatedByBracketId: ReadonlyMap<string, GeneratedBracketEvidence>,
+  notHeldByBracketId: ReadonlyMap<string, NotHeldEvidence> = new Map()
 ) {
   const resolutionsByTournamentId = new Map<
     string,
@@ -173,6 +187,7 @@ function resolveFromAuthorityEvidence(
         }
 
         const generated = generatedByBracketId.get(bracket.id) ?? null;
+        const notHeld = notHeldByBracketId.get(bracket.id) ?? null;
         if (readiness.launchedAt !== null && generated === null) {
           throw new TournamentDivisionStateDataError(
             "A launched tournament division is missing its generated bracket."
@@ -194,6 +209,8 @@ function resolveFromAuthorityEvidence(
           launchedAt: readiness.launchedAt,
           generatedBracketId: generated?.id ?? null,
           isCompetitionComplete,
+          notHeldAt: notHeld?.notHeldAt ?? null,
+          notHeldReasonCode: notHeld?.reasonCode ?? null,
         };
       }
     );
@@ -240,6 +257,79 @@ async function loadReadinessRows(
     result,
     "Tournament division readiness authority returned an invalid response."
   );
+}
+
+async function loadNotHeldRows(
+  supabase: TournamentDivisionStateDataClient
+) {
+  const result = await runAuthorityRequest(
+    () => supabase.rpc("get_tournament_division_not_held_states"),
+    "Tournament division Not Held authority could not be loaded."
+  );
+  return getAuthorityData(
+    result,
+    "Tournament division Not Held authority returned an invalid response."
+  );
+}
+
+function normalizeNotHeldRows(
+  data: unknown,
+  brackets: readonly NormalizedBracket[]
+) {
+  if (!Array.isArray(data)) {
+    throw new TournamentDivisionStateDataError(
+      "Tournament division Not Held authority returned an invalid response."
+    );
+  }
+
+  const bracketById = new Map(brackets.map((bracket) => [bracket.id, bracket]));
+  const notHeldByBracketId = new Map<string, NotHeldEvidence>();
+
+  for (const value of data) {
+    if (!isRecord(value)) {
+      throw new TournamentDivisionStateDataError(
+        "Tournament division Not Held authority returned malformed data."
+      );
+    }
+
+    const bracketId = readNonEmptyString(value.tournament_bracket_id);
+    const tournamentId = readNonEmptyString(value.tournament_id);
+    const notHeldAt = readNullableTimestamp(value.not_held_at);
+    const reasonCode = value.reason_code;
+
+    if (
+      bracketId === null ||
+      tournamentId === null ||
+      notHeldAt === null ||
+      notHeldAt === undefined ||
+      reasonCode !== "minimum_roster_not_reached"
+    ) {
+      throw new TournamentDivisionStateDataError(
+        "Tournament division Not Held authority returned malformed data."
+      );
+    }
+
+    const bracket = bracketById.get(bracketId);
+    if (!bracket) {
+      continue;
+    }
+
+    if (
+      bracket.tournamentId !== tournamentId ||
+      notHeldByBracketId.has(bracketId)
+    ) {
+      throw new TournamentDivisionStateDataError(
+        "Tournament division Not Held authority returned malformed data."
+      );
+    }
+
+    notHeldByBracketId.set(bracketId, {
+      notHeldAt,
+      reasonCode,
+    });
+  }
+
+  return notHeldByBracketId;
 }
 
 function normalizeReadinessRows(

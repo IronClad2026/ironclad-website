@@ -26,6 +26,7 @@ const divisionStateKeys = [
   "disabled",
   "filling",
   "inProgress",
+  "notHeld",
   "ready",
   "voided",
 ] as const;

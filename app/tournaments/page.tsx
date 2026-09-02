@@ -73,7 +73,7 @@ function normalizeRelicVerifiedDivision(
 
 export default async function TournamentsPage({
   searchParams,
-}: TournamentsPageProps = {}) {
+}: TournamentsPageProps) {
   const [{ userId, sessionClaims }, locale] = await Promise.all([
     auth(),
     getRequestLocale(),
@@ -101,6 +101,7 @@ export default async function TournamentsPage({
     capacityResult,
     registrationResult,
     generatedBracketResult,
+    notHeldResult,
     viewerDivisionResult,
     registrationDocuments,
   ] = await Promise.all([
@@ -121,6 +122,7 @@ export default async function TournamentsPage({
     loadGeneratedBracketPageRows({
       includeAdminAudit: isAdmin,
     }),
+    supabase.rpc("get_tournament_division_not_held_states"),
     viewerDivisionRequest,
     loadEffectiveRegistrationDocumentSet(supabase),
   ]);
@@ -155,11 +157,16 @@ export default async function TournamentsPage({
     console.error("Generated tournament brackets load failed.");
   }
 
+  if (notHeldResult.error) {
+    console.error("Tournament Division Not Held state load failed.");
+  }
+
   if (
     tournamentResult.error ||
     capacityResult.error ||
     registrationResult.error ||
     generatedBracketResult.error ||
+    notHeldResult.error ||
     viewerDivisionResult.error
   ) {
     throw new Error("Tournament data could not be loaded.");
@@ -169,7 +176,8 @@ export default async function TournamentsPage({
     !Array.isArray(tournamentResult.data) ||
     !Array.isArray(capacityResult.data) ||
     !Array.isArray(registrationResult.data) ||
-    !Array.isArray(generatedBracketResult.data)
+    !Array.isArray(generatedBracketResult.data) ||
+    !Array.isArray(notHeldResult.data)
   ) {
     console.error("Tournament data load returned an invalid response.");
     throw new Error("Tournament data could not be loaded.");
@@ -190,6 +198,7 @@ export default async function TournamentsPage({
     {
       readinessRows: capacityResult.data,
       generatedBracketRows: generatedBracketResult.data,
+      notHeldRows: notHeldResult.data,
     }
   );
   const publishedMapPoolBracketIds = tournamentRows.flatMap((tournament) =>
@@ -504,14 +513,25 @@ export default async function TournamentsPage({
     const publicDivisionStates = projectPublicTournamentDivisionStates(
       divisionStates
     );
+    const notHeldBracketIds = new Set(
+      divisionStates.flatMap((division) =>
+        division.state === "not_held" && division.bracketId
+          ? [division.bracketId]
+          : []
+      )
+    );
     const tournament = mapTournamentRow(
       row,
       { locale, t },
       publicDivisionStates
     );
-    tournament.participants = participantsByTournament.get(row.id) ?? [];
+    tournament.participants = (
+      participantsByTournament.get(row.id) ?? []
+    ).filter((participant) => !notHeldBracketIds.has(participant.bracketId));
     tournament.bracketParticipants =
-      bracketParticipantsByTournament.get(row.id) ?? [];
+      (bracketParticipantsByTournament.get(row.id) ?? []).filter(
+        (participant) => !notHeldBracketIds.has(participant.bracketId)
+      );
     tournament.generatedBrackets = generatedByTournament.get(row.id) ?? [];
     tournament.media = mediaByTournament.get(row.id) ?? [];
     tournament.mapPools = projectPublishedTournamentMapPools(

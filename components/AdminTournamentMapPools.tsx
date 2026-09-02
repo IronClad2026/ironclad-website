@@ -15,6 +15,7 @@ export type AdminTournamentMapPoolBracket = {
   id: string;
   name: string;
   launchedAt: string | null;
+  notHeldAt: string | null;
   mapPoolPublishedAt: string | null;
   currentMapIds: string[];
 };
@@ -66,8 +67,8 @@ export default function AdminTournamentMapPools({
       }),
     [catalogue, normalizedSearch]
   );
-  const allDivisionsUnlaunched = brackets.every(
-    (bracket) => bracket.launchedAt === null
+  const allDivisionsEditable = brackets.every(
+    (bracket) => bracket.launchedAt === null && bracket.notHeldAt === null
   );
   const activeSelectionIsPublishable =
     activeSelection.length >= 5 &&
@@ -81,6 +82,10 @@ export default function AdminTournamentMapPools({
   }
 
   function toggleMap(mapId: string) {
+    if (terminal || activeBracket.notHeldAt) {
+      return;
+    }
+
     setSelectionByBracket((current) => {
       const currentSelection = current[activeBracket.id] ?? [];
       return {
@@ -141,10 +146,18 @@ export default function AdminTournamentMapPools({
               </span>
               <span
                 className={`mt-2 block text-xs font-black uppercase tracking-wider ${
-                  bracket.launchedAt ? "text-sky-300" : "text-emerald-300"
+                  bracket.notHeldAt
+                    ? "text-zinc-300"
+                    : bracket.launchedAt
+                      ? "text-sky-300"
+                      : "text-emerald-300"
                 }`}
               >
-                {bracket.launchedAt ? "Launched / Frozen" : "Pre-launch / Editable"}
+                {bracket.notHeldAt
+                  ? "Not Held / Frozen"
+                  : bracket.launchedAt
+                    ? "Launched / Frozen"
+                    : "Pre-launch / Editable"}
               </span>
             </button>
           );
@@ -186,12 +199,16 @@ export default function AdminTournamentMapPools({
                   checked
                     ? "border-orange-400/70 bg-orange-500/10"
                     : "border-white/10 bg-zinc-950/70"
-                } ${terminal ? "cursor-default" : "cursor-pointer"}`}
+                } ${terminal || activeBracket.notHeldAt ? "cursor-default" : "cursor-pointer"}`}
               >
                 <input
                   type="checkbox"
                   checked={checked}
-                  disabled={terminal || (!eligible && !checked)}
+                  disabled={
+                    terminal ||
+                    Boolean(activeBracket.notHeldAt) ||
+                    (!eligible && !checked)
+                  }
                   onChange={() => toggleMap(map.id)}
                   className="mt-1 h-5 w-5 shrink-0 accent-orange-500"
                 />
@@ -237,7 +254,7 @@ export default function AdminTournamentMapPools({
           )}
         </div>
 
-        {!terminal && !activeBracket.launchedAt && (
+        {!terminal && !activeBracket.launchedAt && !activeBracket.notHeldAt && (
           <div className="mt-6 grid gap-3 lg:grid-cols-2">
             <MapPoolPublicationForm
               tournamentId={tournamentId}
@@ -250,7 +267,7 @@ export default function AdminTournamentMapPools({
                   : "Publish This Division"
               }
             />
-            {brackets.length > 1 && allDivisionsUnlaunched && (
+            {brackets.length > 1 && allDivisionsEditable && (
               <MapPoolPublicationForm
                 tournamentId={tournamentId}
                 bracketIds={brackets.map((bracket) => bracket.id)}
@@ -261,6 +278,13 @@ export default function AdminTournamentMapPools({
               />
             )}
           </div>
+        )}
+
+        {!terminal && activeBracket.notHeldAt && (
+          <p className="mt-6 rounded-xl border border-zinc-500/30 bg-zinc-900/70 p-4 text-sm leading-6 text-zinc-300">
+            This Division is Not Held because the minimum roster requirement was
+            not reached. Its Map Pool is retained as read-only history.
+          </p>
         )}
 
         {!terminal &&
