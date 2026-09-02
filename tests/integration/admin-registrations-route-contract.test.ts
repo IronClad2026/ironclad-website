@@ -34,7 +34,10 @@ describe("global Admin Registrations workspace route contract", () => {
       "AdminRegistrationReviewRows",
       "approveSelectedRegistrations",
       'id="registration-review"',
-      "get_tournament_bracket_readiness",
+      "loadTournamentDivisionStates",
+      "formatTournamentDivisionState",
+      "formatTournamentEventDivisionState",
+      "divisionStatesByTournament",
       "buildWaitlistPositionMap",
       "FIFO Waitlist",
       "Tournament metadata unavailable",
@@ -47,6 +50,9 @@ describe("global Admin Registrations workspace route contract", () => {
     ]) {
       expect(registrationsPage).toContain(value);
     }
+    expect(registrationsPage).not.toContain(
+      "get_tournament_bracket_readiness"
+    );
     expect(registrationsPage).not.toContain("InAppNotificationCenter");
   });
 

@@ -5,7 +5,13 @@ import { redirect } from "next/navigation";
 import { retryTournamentStorageCleanup } from "@/app/admin/tournaments/actions";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
+  formatTournamentDivisionState,
+  formatTournamentEventDivisionState,
+} from "@/lib/tournament-division-state";
+import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
+import {
   getTournamentBracketDisplayName,
+  type TournamentBracketName,
   type TournamentStatus,
 } from "@/lib/tournaments";
 
@@ -32,7 +38,7 @@ type AdminTournamentListRow = {
   created_at: string;
   tournament_brackets?: Array<{
     id: string;
-    name: string;
+    name: TournamentBracketName;
     max_players: number;
     launched_at: string | null;
   }>;
@@ -85,6 +91,10 @@ export default async function AdminTournamentsPage({
   const tournaments = [
     ...((tournamentResult.data ?? []) as AdminTournamentListRow[]),
   ].sort(compareTournamentRows);
+  const divisionStatesByTournament = await loadTournamentDivisionStates(
+    supabase,
+    tournaments
+  );
   const pendingCleanupJobs = pendingCleanupResult.data ?? [];
 
   return (
@@ -165,12 +175,18 @@ export default async function AdminTournamentsPage({
         <div className="mt-8 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {tournaments.map((tournament) => {
             const brackets = tournament.tournament_brackets ?? [];
+            const divisionStates = divisionStatesByTournament.get(tournament.id);
+
+            if (!divisionStates) {
+              throw new Error("Tournament Administration could not be loaded.");
+            }
+
             const capacity = brackets.reduce(
               (total, bracket) => total + bracket.max_players,
               0
             );
-            const launched = brackets.filter(
-              (bracket) => bracket.launched_at !== null
+            const launched = divisionStates.filter(
+              (division) => division.launchedAt !== null
             ).length;
 
             return (
@@ -214,6 +230,19 @@ export default async function AdminTournamentsPage({
                       .join(" · ")}
                   </p>
                 )}
+                <div
+                  aria-label={formatTournamentEventDivisionState(divisionStates)}
+                  className="mt-4 flex flex-wrap gap-2"
+                >
+                  {divisionStates.map((division) => (
+                    <span
+                      key={division.canonicalName}
+                      className="rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-300"
+                    >
+                      {division.displayName}: {formatTournamentDivisionState(division)}
+                    </span>
+                  ))}
+                </div>
               </Link>
             );
           })}

@@ -1,24 +1,26 @@
 import { generateTournamentBracket } from "@/app/admin/tournaments/actions";
 import type {
-  TournamentBracketReadinessSummary,
   TournamentFormValues,
   TournamentGeneratedBracketSummary,
 } from "@/components/admin/tournaments/TournamentEditor";
+import {
+  formatTournamentDivisionState,
+  getEffectiveTournamentDivisionState,
+  type TournamentDivisionStateResolution,
+} from "@/lib/tournament-division-state";
 import { TOURNAMENT_BRACKET_CONFIGS } from "@/lib/tournaments";
 
 export default function TournamentBracketStructureControls({
-  approvedByBracket,
+  divisionStates,
   generatedByBracket,
   notice,
   readOnly = false,
-  readinessByBracket,
   values,
 }: {
-  approvedByBracket: Map<string, number>;
+  divisionStates: readonly TournamentDivisionStateResolution[];
   generatedByBracket: Map<string, TournamentGeneratedBracketSummary>;
   notice?: string;
   readOnly?: boolean;
-  readinessByBracket: Map<string, TournamentBracketReadinessSummary>;
   values: TournamentFormValues;
 }) {
   if (!values.id) return null;
@@ -55,12 +57,16 @@ export default function TournamentBracketStructureControls({
           if (!bracket.id) return null;
 
           const generated = generatedByBracket.get(bracket.id);
-          const readiness = readinessByBracket.get(bracket.id);
-          const approvedCount =
-            readiness?.approvedCount ?? approvedByBracket.get(bracket.id) ?? 0;
-          const requiredCount = readiness?.requiredCount ?? 8;
-          const launchedAt = readiness?.launchedAt ?? bracket.launchedAt;
-          const isReady = readiness?.isReady ?? false;
+          const divisionState = divisionStates.find(
+            (division) => division.bracketId === bracket.id
+          );
+          const approvedCount = divisionState?.approvedCount;
+          const requiredCount = divisionState?.requiredCount;
+          const launchedAt = divisionState?.launchedAt ?? bracket.launchedAt;
+          const isReady = divisionState?.state === "ready";
+          const effectiveState = divisionState
+            ? getEffectiveTournamentDivisionState(divisionState)
+            : null;
           const formId = `workspace-generate-bracket-${bracket.id}`;
 
           return (
@@ -72,25 +78,30 @@ export default function TournamentBracketStructureControls({
                 {config.label}
               </h3>
               <p className="mt-2 break-words text-sm text-zinc-400">
-                {approvedCount}/{requiredCount} approved
+                {approvedCount !== null && approvedCount !== undefined &&
+                requiredCount !== null && requiredCount !== undefined
+                  ? `${approvedCount}/${requiredCount} approved`
+                  : "Authoritative readiness unavailable"}
                 {generated
                   ? ` — ${formatLabel(generated.format)} private structure ready`
                   : " — not generated"}
               </p>
               <p
                 className={`mt-2 text-xs font-black uppercase tracking-wider ${
-                  launchedAt
-                    ? "text-sky-300"
-                    : isReady
+                  effectiveState === "cancelled" || effectiveState === "voided"
+                    ? "text-red-300"
+                    : effectiveState === "completed"
+                    ? "text-emerald-300"
+                    : effectiveState === "in_progress"
+                      ? "text-sky-300"
+                      : effectiveState === "ready"
                       ? "text-emerald-300"
                       : "text-amber-300"
                 }`}
               >
-                {launchedAt
-                  ? "Division launched"
-                  : isReady
-                    ? "Ready for private bracket preparation"
-                    : "Review incomplete"}
+                {divisionState
+                  ? formatTournamentDivisionState(divisionState)
+                  : "Division state unavailable"}
               </p>
               <form id={formId} action={generateTournamentBracket}>
                 <input type="hidden" name="tournamentId" value={tournamentId} />
@@ -105,8 +116,10 @@ export default function TournamentBracketStructureControls({
                     ? "Terminal Tournament — View Only"
                     : launchedAt
                     ? "Division Launched"
+                    : !divisionState
+                      ? "Division State Unavailable"
                     : !isReady
-                      ? `Requires ${requiredCount}/${requiredCount} Approved`
+                      ? `Requires ${requiredCount ?? 8}/${requiredCount ?? 8} Approved`
                       : generated
                         ? "Regenerate Private Structure"
                         : "Generate Private Structure"}

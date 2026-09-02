@@ -22,6 +22,8 @@ import {
   loadGeneratedBracketPageRows,
   mapGeneratedBrackets,
 } from "@/lib/tournament-bracket-data";
+import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
+import { projectPublicTournamentDivisionStates } from "@/lib/tournament-division-state";
 import {
   getTournamentBracketDisplayName,
   getPublicTournamentRowsForRequest,
@@ -178,6 +180,14 @@ export default async function TournamentsPage({
   );
   const includedTournamentIds = new Set(
     tournamentRows.map((tournament) => tournament.id)
+  );
+  const divisionStatesByTournament = await loadTournamentDivisionStates(
+    supabase,
+    tournamentRows,
+    {
+      readinessRows: capacityResult.data,
+      generatedBracketRows: generatedBracketResult.data,
+    }
   );
   const publishedMapPoolBracketIds = tournamentRows.flatMap((tournament) =>
     (tournament.tournament_brackets ?? [])
@@ -481,7 +491,21 @@ export default async function TournamentsPage({
     tournamentRows
   );
   const tournaments = tournamentRows.map((row) => {
-    const tournament = mapTournamentRow(row, { locale, t });
+    const divisionStates = divisionStatesByTournament.get(row.id);
+
+    if (!divisionStates) {
+      console.error("Tournament division-state projection was missing.");
+      throw new Error("Tournament data could not be loaded.");
+    }
+
+    const publicDivisionStates = projectPublicTournamentDivisionStates(
+      divisionStates
+    );
+    const tournament = mapTournamentRow(
+      row,
+      { locale, t },
+      publicDivisionStates
+    );
     tournament.participants = participantsByTournament.get(row.id) ?? [];
     tournament.bracketParticipants =
       bracketParticipantsByTournament.get(row.id) ?? [];

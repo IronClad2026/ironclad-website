@@ -354,11 +354,19 @@ const capabilities: Capability[] = [
     evidence: [
       {
         file: "registrations",
-        includes: ["data.cohortSummaries.map", "Active cohort:", "Ready for private bracket preparation"],
+        includes: [
+          "data.cohortSummaries.map",
+          "Active cohort:",
+          "formatTournamentDivisionState(summary.divisionState)",
+        ],
       },
       {
         file: "registrationWorkspace",
-        includes: ["get_tournament_bracket_readiness"],
+        includes: ["divisionStates", "divisionStateByBracket"],
+      },
+      {
+        file: "workspaceData",
+        includes: ["loadTournamentDivisionStates", "divisionStates"],
       },
     ],
   },
@@ -858,6 +866,28 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       source.media,
     ].join("\n");
     expect(clientPresentation).not.toContain("@/lib/supabase-admin");
+  });
+
+  it("projects the central division state across Admin surfaces without direct readiness RPCs", () => {
+    expect(source.workspaceData).toContain("loadTournamentDivisionStates");
+    expect(source.workspace).toContain("summary.divisionStates");
+    expect(source.workspaceHeader).toContain("formatTournamentDivisionState");
+    expect(source.overview).toContain("formatTournamentEventDivisionState");
+    expect(source.bracketStructure).toContain(
+      "formatTournamentDivisionState"
+    );
+    expect(source.bracket).toContain("selectedBracket.divisionState.state");
+
+    for (const key of [
+      "list",
+      "workspace",
+      "workspaceData",
+      "registrationWorkspace",
+    ] as const) {
+      expect(source[key], key).not.toContain(
+        "get_tournament_bracket_readiness"
+      );
+    }
   });
 
   it("renders one selected section at a time and preserves section-aware actions", () => {

@@ -36,6 +36,15 @@ const dictionary = {
       pendingReview: "In attesa di revisione",
       upcoming: "In arrivo",
     },
+    divisionState: {
+      disabled: "Disabilitata",
+      filling: "Iscrizioni in corso — {approved}/{required}",
+      ready: "Pronta al lancio — {approved}/{required}",
+      inProgress: "In corso",
+      completed: "Completata",
+      cancelled: "Annullata",
+      voided: "Invalidata",
+    },
     hero: {
       tournament: "Torneo",
       approvedSlots: "posti approvati",

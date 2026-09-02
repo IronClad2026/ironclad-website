@@ -1,6 +1,7 @@
 import { PHASE_FOUR_ACTIVE_COHORT_SIZE } from "@/lib/tournament-registration-cohort";
 import type { PublishedTournamentMapPool } from "@/lib/tournament-map-pools";
 import type { TournamentMediaItem } from "@/lib/tournament-media";
+import type { PublicTournamentDivisionStateResolution } from "@/lib/tournament-division-state";
 
 export type TournamentStatus =
   | "upcoming"
@@ -96,6 +97,7 @@ export type TournamentCard = {
     launchedAt: string | null;
     prize: string;
   }[];
+  divisionStates: readonly PublicTournamentDivisionStateResolution[];
   details: string;
   rules: string;
   schedule: string[];
@@ -415,7 +417,8 @@ type TournamentProjectionTranslator = (
 
 export function mapTournamentRow(
   row: TournamentRow,
-  localization?: { locale: string; t: TournamentProjectionTranslator }
+  localization?: { locale: string; t: TournamentProjectionTranslator },
+  divisionStates: readonly PublicTournamentDivisionStateResolution[] = []
 ): TournamentCard {
   const brackets = [...(row.tournament_brackets ?? [])].sort(
     (left, right) =>
@@ -503,6 +506,7 @@ export function mapTournamentRow(
         : localization?.t("tournaments.projection.noPrize") ??
           "No prize is published for this Event",
     })),
+    divisionStates,
     details: row.description,
     rules: row.rules_url
       ? localization?.t("tournaments.projection.rulesLinked", {

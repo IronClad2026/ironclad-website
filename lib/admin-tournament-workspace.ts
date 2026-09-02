@@ -7,8 +7,9 @@ import {
   type Coh3MapDatabaseRow,
   type Coh3MapRow,
 } from "@/lib/coh3-maps";
-import { PHASE_FOUR_ACTIVE_COHORT_SIZE } from "@/lib/tournament-registration-cohort";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import type { TournamentDivisionStateResolution } from "@/lib/tournament-division-state";
+import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
 import {
   getTournamentBracketDisplayName,
   getTournamentBracketSortOrder,
@@ -45,6 +46,7 @@ export type AdminTournamentWorkspaceSummary = {
   totalCapacity: number;
   generatedDivisions: number;
   launchedDivisions: number;
+  divisionStates: readonly TournamentDivisionStateResolution[];
 };
 
 export type AdminTournamentEditorWorkspaceData = {
@@ -120,21 +122,15 @@ export async function loadAdminTournamentWorkspace(tournamentId: string) {
   tournament.tournament_brackets = sortBrackets(
     tournament.tournament_brackets ?? []
   );
-  const bracketIds = tournament.tournament_brackets.map((bracket) => bracket.id);
-  const [registrationResult, generatedResult] = await Promise.all([
+  const [registrationResult, divisionStatesByTournament] = await Promise.all([
     supabase
       .from("registrations")
       .select("registration_status, tournament_bracket_id")
       .eq("tournament_id", tournamentId),
-    bracketIds.length > 0
-      ? supabase
-          .from("generated_brackets")
-          .select("tournament_bracket_id")
-          .in("tournament_bracket_id", bracketIds)
-      : Promise.resolve({ data: [], error: null }),
+    loadTournamentDivisionStates(supabase, [tournament]),
   ]);
 
-  if (registrationResult.error || generatedResult.error) {
+  if (registrationResult.error) {
     console.error("Admin Tournament workspace summary load failed.", {
       operation: "load-tournament-workspace-summary",
     });
@@ -142,6 +138,15 @@ export async function loadAdminTournamentWorkspace(tournamentId: string) {
   }
 
   const registrations = registrationResult.data ?? [];
+  const divisionStates = divisionStatesByTournament.get(tournament.id);
+
+  if (!divisionStates) {
+    console.error("Admin Tournament division-state projection was missing.", {
+      operation: "load-tournament-workspace-division-states",
+    });
+    throw new Error("Tournament management data could not be loaded.");
+  }
+
   const summary: AdminTournamentWorkspaceSummary = {
     totalRegistrations: registrations.length,
     pendingReviews: registrations.filter(
@@ -159,37 +164,33 @@ export async function loadAdminTournamentWorkspace(tournamentId: string) {
       (total, bracket) => total + bracket.max_players,
       0
     ),
-    generatedDivisions: (generatedResult.data ?? []).length,
-    launchedDivisions: tournament.tournament_brackets.filter(
-      (bracket) => bracket.launched_at !== null
+    generatedDivisions: divisionStates.filter(
+      (division) => division.generatedBracketId !== null
     ).length,
+    launchedDivisions: divisionStates.filter(
+      (division) => division.launchedAt !== null
+    ).length,
+    divisionStates,
   };
 
   return { tournament, summary };
 }
 
 export async function loadAdminTournamentEditorWorkspaceData(
-  tournament: AdminTournamentWorkspaceRow
+  tournament: AdminTournamentWorkspaceRow,
+  divisionStates: readonly TournamentDivisionStateResolution[]
 ): Promise<AdminTournamentEditorWorkspaceData> {
   await requireAdmin();
   const supabase = createSupabaseAdminClient();
   const brackets = tournament.tournament_brackets ?? [];
   const bracketIds = brackets.map((bracket) => bracket.id);
-  const [generatedResult, approvedResult, underReviewResult] =
-    await Promise.all([
+  const [generatedResult, underReviewResult] = await Promise.all([
       bracketIds.length > 0
         ? supabase
             .from("generated_brackets")
             .select(
               "id, tournament_bracket_id, format, slot_count, generated_at"
             )
-            .in("tournament_bracket_id", bracketIds)
-        : Promise.resolve({ data: [], error: null }),
-      bracketIds.length > 0
-        ? supabase
-            .from("registrations")
-            .select("tournament_bracket_id")
-            .eq("registration_status", "approved")
             .in("tournament_bracket_id", bracketIds)
         : Promise.resolve({ data: [], error: null }),
       supabase
@@ -204,9 +205,7 @@ export async function loadAdminTournamentEditorWorkspaceData(
     ]);
 
   if (
-    generatedResult.error ||
-    approvedResult.error ||
-    underReviewResult.error
+    generatedResult.error || underReviewResult.error
   ) {
     console.error("Admin Tournament editor support data load failed.", {
       operation: "load-tournament-editor-data",
@@ -223,53 +222,42 @@ export async function loadAdminTournamentEditorWorkspaceData(
       generated_at: string;
     }>).map((generated) => [generated.tournament_bracket_id, generated])
   );
-  const approvedByBracket = new Map<string, number>();
+  const resolutionByBracket = new Map(
+    divisionStates.flatMap((division) =>
+      division.bracketId ? [[division.bracketId, division] as const] : []
+    )
+  );
+  const missingBracketState = brackets.find(
+    (bracket) => !resolutionByBracket.has(bracket.id)
+  );
 
-  for (const registration of approvedResult.data ?? []) {
-    if (!registration.tournament_bracket_id) continue;
-    approvedByBracket.set(
-      registration.tournament_bracket_id,
-      (approvedByBracket.get(registration.tournament_bracket_id) ?? 0) + 1
-    );
+  if (missingBracketState) {
+    console.error("Admin Tournament editor division-state projection was incomplete.", {
+      operation: "load-tournament-editor-division-states",
+    });
+    throw new Error("Tournament editor data could not be loaded.");
   }
 
-  const readinessResults = await Promise.all(
-    brackets.map(async (bracket) => {
-      const { data, error } = await supabase.rpc(
-        "get_tournament_bracket_readiness",
-        { p_tournament_bracket_id: bracket.id }
-      );
-
-      if (error) {
-        console.error("Tournament bracket readiness load failed.", {
-          operation: "load-tournament-editor-readiness",
-        });
-        throw new Error("Tournament editor data could not be loaded.");
-      }
-
-      const readiness = Array.isArray(data) ? data[0] : data;
-      return readiness
-        ? {
-            bracketId: bracket.id,
-            approvedCount: Number(readiness.approved_count),
-            requiredCount: Number(readiness.required_count),
-            isReady: readiness.is_ready === true,
-            launchedAt:
-              typeof readiness.launched_at === "string"
-                ? readiness.launched_at
-                : bracket.launched_at,
-          }
-        : {
-            bracketId: bracket.id,
-            approvedCount: approvedByBracket.get(bracket.id) ?? 0,
-            requiredCount: PHASE_FOUR_ACTIVE_COHORT_SIZE,
-            isReady: false,
-            launchedAt: bracket.launched_at,
-          };
-    })
+  const approvedByBracket = new Map(
+    brackets.map((bracket) => [
+      bracket.id,
+      resolutionByBracket.get(bracket.id)?.approvedCount ?? 0,
+    ])
   );
   const readinessByBracket = new Map(
-    readinessResults.map((readiness) => [readiness.bracketId, readiness])
+    brackets.map((bracket) => {
+      const division = resolutionByBracket.get(bracket.id)!;
+      return [
+        bracket.id,
+        {
+          bracketId: bracket.id,
+          approvedCount: division.approvedCount,
+          requiredCount: division.requiredCount,
+          isReady: division.isReady,
+          launchedAt: division.launchedAt,
+        },
+      ] as const;
+    })
   );
   const underReview = underReviewResult.data as {
     name: string;
@@ -340,7 +328,8 @@ export async function loadAdminTournamentMapPoolWorkspaceData(
 }
 
 export async function loadAdminTournamentBracketWorkspaceData(
-  tournament: AdminTournamentWorkspaceRow
+  tournament: AdminTournamentWorkspaceRow,
+  divisionStates: readonly TournamentDivisionStateResolution[]
 ): Promise<{ tournament: AdminBracketTournamentOption; loadError: boolean }> {
   await requireAdmin();
   const supabase = createSupabaseAdminClient();
@@ -413,40 +402,30 @@ export async function loadAdminTournamentBracketWorkspaceData(
     );
   }
 
-  let loadError = false;
-  const readinessResults = await Promise.all(
-    brackets.map(async (bracket) => {
-      const { data, error } = await supabase.rpc(
-        "get_tournament_bracket_readiness",
-        { p_tournament_bracket_id: bracket.id }
-      );
-      if (error) {
-        loadError = true;
-        console.error("Admin Tournament bracket readiness load failed.", {
-          operation: "load-tournament-bracket-readiness",
-        });
-        return null;
-      }
-      const readiness = Array.isArray(data) ? data[0] : data;
-      return readiness
-        ? {
-            bracketId: bracket.id,
-            approvedCount: Number(readiness.approved_count),
-            requiredCount: Number(readiness.required_count),
-            isReady: readiness.is_ready === true,
-            launchedAt:
-              typeof readiness.launched_at === "string"
-                ? readiness.launched_at
-                : bracket.launched_at,
-          }
-        : null;
-    })
+  const divisionStateByBracket = new Map(
+    divisionStates.flatMap((division) =>
+      division.bracketId ? [[division.bracketId, division] as const] : []
+    )
   );
-  const readinessByBracket = new Map(
-    readinessResults
-      .filter((readiness) => readiness !== null)
-      .map((readiness) => [readiness.bracketId, readiness])
+  const loadError = brackets.some(
+    (bracket) => !divisionStateByBracket.has(bracket.id)
   );
+
+  if (loadError) {
+    console.error(
+      "Admin Tournament bracket division-state projection was incomplete.",
+      { operation: "load-tournament-bracket-division-states" }
+    );
+    return {
+      tournament: {
+        id: tournament.id,
+        title: tournament.title,
+        status: tournament.status,
+        brackets: [],
+      },
+      loadError: true,
+    };
+  }
 
   return {
     tournament: {
@@ -455,7 +434,7 @@ export async function loadAdminTournamentBracketWorkspaceData(
       status: tournament.status,
       brackets: brackets.map((bracket) => {
         const generated = generatedByBracket.get(bracket.id);
-        const readiness = readinessByBracket.get(bracket.id);
+        const divisionState = divisionStateByBracket.get(bracket.id)!;
         const assignments: Record<number, string | null> = {};
         for (const match of generated?.tournament_matches ?? []) {
           if (match.player_one_slot) {
@@ -488,11 +467,11 @@ export async function loadAdminTournamentBracketWorkspaceData(
             : 0,
           assignments,
           approvedCount:
-            readiness?.approvedCount ?? approvedParticipants.length,
-          requiredCount:
-            readiness?.requiredCount ?? PHASE_FOUR_ACTIVE_COHORT_SIZE,
-          isReady: readiness?.isReady ?? false,
-          launchedAt: readiness?.launchedAt ?? bracket.launched_at,
+            divisionState.approvedCount ?? approvedParticipants.length,
+          requiredCount: divisionState.requiredCount ?? bracket.max_players,
+          isReady: divisionState.isReady,
+          launchedAt: divisionState.launchedAt,
+          divisionState,
           mapPoolPublishedAt: bracket.map_pool_published_at,
           currentMapCount:
             currentMapCountByBracket.get(bracket.id) ?? 0,

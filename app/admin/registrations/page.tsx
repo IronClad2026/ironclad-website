@@ -10,14 +10,19 @@ import {
 import AdminRegistrationReviewRows from "@/components/AdminRegistrationReviewRows";
 import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
 import {
+  formatTournamentDivisionState,
+  formatTournamentEventDivisionState,
+  getEffectiveTournamentDivisionState,
+  type TournamentDivisionStateResolution,
+} from "@/lib/tournament-division-state";
+import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
+import {
   getTournamentBracketDisplayName,
   isTournamentTerminalStatus,
+  type TournamentBracketName,
   type TournamentStatus,
 } from "@/lib/tournaments";
-import {
-  PHASE_FOUR_ACTIVE_COHORT_SIZE,
-  isActiveReviewCohortStatus,
-} from "@/lib/tournament-registration-cohort";
+import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
 import {
   buildAdminRegistrationEvidence,
   buildRegistrationOrderMap,
@@ -100,22 +105,22 @@ type AdminTournamentOption = {
   created_at: string;
   tournament_brackets?: {
     id: string;
-    name: string;
+    name: TournamentBracketName;
     launched_at: string | null;
   }[];
 };
 
 type RegistrationCohortSummary = {
-  bracketId: string;
+  bracketId: string | null;
+  canonicalName: string;
   tournamentId: string;
   tournamentTitle: string;
   bracketName: string;
   activeCohortCount: number;
-  approvedCount: number;
-  requiredCount: number;
+  approvedCount: number | null;
+  requiredCount: number | null;
   waitlistCount: number;
-  isReady: boolean;
-  launchedAt: string | null;
+  divisionState: TournamentDivisionStateResolution;
 };
 
 type RegistrationReviewGroupStatus =
@@ -384,32 +389,45 @@ function RegistrationWorkbenchGroup({
           {group.readiness.length > 0 && (
             <span
               data-registration-readiness-summary={group.key}
+              aria-label={formatTournamentEventDivisionState(
+                group.readiness.map((readiness) => readiness.divisionState)
+              )}
               className="flex min-w-0 flex-wrap gap-2 xl:max-w-[58%] xl:justify-end"
             >
-              {group.readiness.map((readiness) => (
-                <span
-                  key={readiness.bracketId}
-                  className={`rounded-xl border px-3 py-2 text-xs leading-5 ${
-                    readiness.launchedAt
-                      ? "border-sky-400/30 bg-sky-500/10 text-sky-100"
-                      : readiness.isReady
-                        ? "border-orange-400/35 bg-orange-500/10 text-orange-100"
-                        : "border-white/10 bg-black/30 text-zinc-300"
-                  }`}
-                >
-                  <span className="font-black text-white">
-                    {readiness.bracketName}
-                  </span>{" "}
-                  {readiness.approvedCount}/{readiness.requiredCount} approved ·{" "}
-                  {readiness.activeCohortCount} active · {readiness.waitlistCount}{" "}
-                  waiting
-                  {readiness.launchedAt
-                    ? " · LAUNCHED / LOCKED"
-                    : readiness.isReady
-                      ? " · READY"
-                      : ""}
-                </span>
-              ))}
+              {group.readiness.map((readiness) => {
+                const effectiveState = getEffectiveTournamentDivisionState(
+                  readiness.divisionState
+                );
+
+                return (
+                  <span
+                    key={readiness.canonicalName}
+                    className={`rounded-xl border px-3 py-2 text-xs leading-5 ${
+                      effectiveState === "cancelled" ||
+                      effectiveState === "voided"
+                        ? "border-red-400/30 bg-red-500/10 text-red-100"
+                        : effectiveState === "completed"
+                        ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-100"
+                        : effectiveState === "in_progress"
+                          ? "border-sky-400/30 bg-sky-500/10 text-sky-100"
+                          : effectiveState === "ready"
+                            ? "border-orange-400/35 bg-orange-500/10 text-orange-100"
+                            : "border-white/10 bg-black/30 text-zinc-300"
+                    }`}
+                  >
+                    <span className="font-black text-white">
+                      {readiness.bracketName}
+                    </span>{" — "}
+                    {formatTournamentDivisionState(readiness.divisionState)}
+                    {readiness.bracketId && (
+                      <>
+                        {" · "}{readiness.activeCohortCount} active ·{" "}
+                        {readiness.waitlistCount} waiting
+                      </>
+                    )}
+                  </span>
+                );
+              })}
             </span>
           )}
         </span>
@@ -547,45 +565,16 @@ export default async function AdminRegistrationsPage({
       ? tournamentResult.data
       : []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
-  const readinessResults = await Promise.all(
-    tournaments.flatMap((tournament) =>
-      (tournament.tournament_brackets ?? []).map(async (bracket) => {
-        const { data, error: readinessError } = await supabase.rpc(
-          "get_tournament_bracket_readiness",
-          { p_tournament_bracket_id: bracket.id }
-        );
-
-        if (readinessError) {
-          console.error(
-            "Admin division readiness load failed:",
-            readinessError.message
-          );
-          return null;
-        }
-
-        const result = Array.isArray(data) ? data[0] : data;
-        if (!result) {
-          console.error("Admin division readiness returned an invalid response.");
-        }
-        return result
-          ? {
-              bracketId: bracket.id,
-              approvedCount: Number(result.approved_count),
-              requiredCount: Number(result.required_count),
-              isReady: result.is_ready === true,
-              launchedAt:
-                typeof result.launched_at === "string"
-                  ? result.launched_at
-                  : bracket.launched_at,
-            }
-          : null;
-      })
+  const divisionStatesByTournament =
+    tournamentResult.error || invalidTournamentResponse
+      ? new Map<string, readonly TournamentDivisionStateResolution[]>()
+      : await loadTournamentDivisionStates(supabase, tournaments);
+  const divisionStateByBracket = new Map(
+    Array.from(divisionStatesByTournament.values()).flatMap((divisions) =>
+      divisions.flatMap((division) =>
+        division.bracketId ? [[division.bracketId, division] as const] : []
+      )
     )
-  );
-  const readinessByBracket = new Map(
-    readinessResults
-      .filter((result) => result !== null)
-      .map((result) => [result.bracketId, result])
   );
   const tournamentsById = new Map(
     tournaments.map((tournament) => [tournament.id, tournament.title])
@@ -603,7 +592,9 @@ export default async function AdminRegistrationsPage({
           tournamentId: tournament.id,
           tournamentTitle: tournament.title,
           bracketName: getTournamentBracketDisplayName(bracket.name),
-          launchedAt: bracket.launched_at,
+          launchedAt:
+            divisionStateByBracket.get(bracket.id)?.launchedAt ??
+            bracket.launched_at,
           isTournamentTerminal: isTournamentTerminalStatus(tournament.status),
         },
       ])
@@ -614,7 +605,6 @@ export default async function AdminRegistrationsPage({
     bracketMetaById.get(bracketId)?.launchedAt === null &&
     bracketMetaById.get(bracketId)?.isTournamentTerminal === false;
   const activeCohortCountByBracket = new Map<string, number>();
-  const approvedCountByBracket = new Map<string, number>();
   const waitlistCountByBracket = new Map<string, number>();
   for (const registration of baseRegistrations) {
     if (!registration.tournament_bracket_id) {
@@ -628,13 +618,6 @@ export default async function AdminRegistrationsPage({
           registration.tournament_bracket_id
         ) ?? 0) + 1
       );
-      if (registration.registration_status === "approved") {
-        approvedCountByBracket.set(
-          registration.tournament_bracket_id,
-          (approvedCountByBracket.get(registration.tournament_bracket_id) ??
-            0) + 1
-        );
-      }
     } else if (
       registration.registration_status === "waitlisted" &&
       registration.waitlist_offer_status === null &&
@@ -647,30 +630,28 @@ export default async function AdminRegistrationsPage({
       );
     }
   }
-  const registrationCohortSummaries: RegistrationCohortSummary[] = Array.from(
-    bracketMetaById,
-    ([bracketId, meta]) => {
-      const activeCohortCount =
-        activeCohortCountByBracket.get(bracketId) ?? 0;
-
-      return {
-        bracketId,
-        ...meta,
-        activeCohortCount,
-        approvedCount:
-          readinessByBracket.get(bracketId)?.approvedCount ??
-          approvedCountByBracket.get(bracketId) ??
-          0,
-        requiredCount:
-          readinessByBracket.get(bracketId)?.requiredCount ??
-          PHASE_FOUR_ACTIVE_COHORT_SIZE,
-        waitlistCount: waitlistCountByBracket.get(bracketId) ?? 0,
-        isReady: readinessByBracket.get(bracketId)?.isReady ?? false,
-        launchedAt:
-          readinessByBracket.get(bracketId)?.launchedAt ?? meta.launchedAt,
-      };
-    }
-  );
+  const registrationCohortSummaries: RegistrationCohortSummary[] =
+    tournaments.flatMap((tournament) =>
+      (divisionStatesByTournament.get(tournament.id) ?? []).map((division) => {
+        const bracketId = division.bracketId;
+        return {
+          bracketId,
+          canonicalName: division.canonicalName,
+          tournamentId: tournament.id,
+          tournamentTitle: tournament.title,
+          bracketName: division.displayName,
+          activeCohortCount: bracketId
+            ? activeCohortCountByBracket.get(bracketId) ?? 0
+            : 0,
+          approvedCount: division.approvedCount,
+          requiredCount: division.requiredCount,
+          waitlistCount: bracketId
+            ? waitlistCountByBracket.get(bracketId) ?? 0
+            : 0,
+          divisionState: division,
+        };
+      })
+    );
   const waitlistPositionByRegistration = buildWaitlistPositionMap(
     registrationOrderInputs.filter(({ tournamentBracketId }) =>
       isBracketWaitlistOpen(tournamentBracketId)

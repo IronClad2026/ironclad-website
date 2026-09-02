@@ -97,6 +97,7 @@ import TournamentsPage from "@/app/tournaments/page";
 
 const TOURNAMENT_ID = "11111111-1111-4111-8111-111111111111";
 const BRACKET_ID = "22222222-2222-4222-8222-222222222222";
+const GENERATED_BRACKET_ID = "99999999-9999-4999-8999-999999999999";
 const MATCH_ID = "33333333-3333-4333-8333-333333333333";
 const SUBMISSION_ID = "44444444-4444-4444-8444-444444444444";
 const REPORT_GROUP_ID = "55555555-5555-4555-8555-555555555555";
@@ -179,7 +180,7 @@ const safeReportGroup = {
 };
 
 const safeGeneratedBracket = {
-  id: BRACKET_ID,
+  id: GENERATED_BRACKET_ID,
   tournamentBracketId: BRACKET_ID,
   format: "single_elimination" as const,
   slotCount: 2,
@@ -498,6 +499,15 @@ function createPageClient(
     players: { data: players, error: null },
     tournament_bracket_map_pool_entries: { data: [], error: null },
     tournament_media: { data: [], error: null },
+    generated_brackets: {
+      data: [
+        {
+          id: GENERATED_BRACKET_ID,
+          tournament_bracket_id: BRACKET_ID,
+        },
+      ],
+      error: null,
+    },
     legal_documents: {
       data: [
         ["rulebook", "11111111-1111-4111-8111-111111111111"],
@@ -544,21 +554,48 @@ function createPageClient(
     return createQuery(result);
   });
 
+  const rpc = vi.fn(
+    async (name: string) => {
+      if (name === "get_tournament_bracket_capacity") {
+        const approvedCount = registrations.filter(
+          (registration) => registration.registration_status === "approved"
+        ).length;
+        const activeCohortCount = registrations.filter(
+          (registration) =>
+            registration.registration_status === "pending" ||
+            registration.registration_status === "manual_review" ||
+            registration.registration_status === "approved" ||
+            (registration.registration_status === "waitlisted" &&
+              registration.waitlist_offer_status === "offered")
+        ).length;
+
+        return {
+          data: [
+            {
+              bracket_id: BRACKET_ID,
+              tournament_id: TOURNAMENT_ID,
+              registered_players: approvedCount,
+              active_cohort_players: activeCohortCount,
+              max_players: 8,
+              launched_at: rawTournament.tournament_brackets[0].launched_at,
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return {
+        data: null,
+        error: { message: `Unexpected mocked page RPC: ${name}` },
+      };
+    }
+  );
+
   return {
     from,
     participantPlayersQuery,
     registrationQuery,
-    rpc: vi.fn(async () => ({
-      data: [
-        {
-          bracket_id: BRACKET_ID,
-          tournament_id: TOURNAMENT_ID,
-          registered_players: 2,
-          max_players: 8,
-        },
-      ],
-      error: null,
-    })),
+    rpc,
     viewerDivisionQuery,
   };
 }
@@ -668,11 +705,28 @@ describe("tournament Client Component result payload", () => {
     loadGeneratedBracketPageRowsMock.mockResolvedValue({
       data: [
         {
-          id: BRACKET_ID,
+          id: GENERATED_BRACKET_ID,
           tournament_bracket_id: BRACKET_ID,
           format: "single_elimination",
           slot_count: 2,
           generated_at: "2026-07-25T00:00:00.000Z",
+          bracket_rounds: [
+            {
+              round_number: 1,
+              name: "Final",
+              tournament_matches: [
+                {
+                  id: MATCH_ID,
+                  generated_bracket_id: GENERATED_BRACKET_ID,
+                  match_number: 1,
+                  status: "completed",
+                  outcome_type: null,
+                  winner_registration_id: VIEWER_REGISTRATION_ID,
+                },
+              ],
+            },
+          ],
+          tournament_standings: [],
           synthetic_server_only_audit: SECRET_ADMIN_ID,
         },
       ],
@@ -694,17 +748,22 @@ describe("tournament Client Component result payload", () => {
         : new Map()
     );
     mapTournamentRowMock.mockImplementation(
-      (row: {
-        created_at: string;
-        id: string;
-        status: string;
-        title: string;
-      }) => ({
+      (
+        row: {
+          created_at: string;
+          id: string;
+          status: string;
+          title: string;
+        },
+        _localization: unknown,
+        divisionStates: unknown[]
+      ) => ({
         id: row.id,
         title: row.title,
         statusValue: row.status,
         grandFinalAt: null,
         createdAt: row.created_at,
+        divisionStates,
         participants: [],
         bracketParticipants: [],
         generatedBrackets: [],
@@ -719,7 +778,7 @@ describe("tournament Client Component result payload", () => {
   ])(
     "serializes only allowlisted same-origin result props for an %s",
     async (_name, admin) => {
-      const { props } = await loadClientProps({ admin });
+      const { client, props } = await loadClientProps({ admin });
 
       expectExactShape(props, clientPropsShape);
       expectNoSensitiveBrowserData(props, [
@@ -730,6 +789,19 @@ describe("tournament Client Component result payload", () => {
         SECRET_SUPABASE_URL,
       ]);
       expect(serializePrivacyValue(props)).not.toContain("supabase.co");
+      const [tournament] = props.tournaments as Array<{
+        divisionStates: Array<Record<string, unknown>>;
+      }>;
+      expect(tournament.divisionStates).toHaveLength(3);
+      expect(serializePrivacyValue(tournament.divisionStates)).not.toContain(
+        "generatedBracketId"
+      );
+      expect(serializePrivacyValue(tournament.divisionStates)).not.toContain(
+        GENERATED_BRACKET_ID
+      );
+      for (const divisionState of tournament.divisionStates) {
+        expect(divisionState).not.toHaveProperty("generatedBracketId");
+      }
       expect(
         (props.matchResultSubmissions as typeof safeSubmission[])[0]
           .replayAccessHref
@@ -741,6 +813,9 @@ describe("tournament Client Component result payload", () => {
       expect(loadGeneratedBracketPageRowsMock).toHaveBeenCalledWith({
         includeAdminAudit: admin,
       });
+      expect(client.rpc).toHaveBeenCalledExactlyOnceWith(
+        "get_tournament_bracket_capacity"
+      );
       expect(loadMatchResultDataMock).toHaveBeenCalledOnce();
     }
   );
@@ -921,11 +996,12 @@ describe("tournament Client Component result payload", () => {
   });
 
   it("excludes generated brackets from the prelaunch public payload", async () => {
-    const { props } = await loadClientProps({
+    const { client, props } = await loadClientProps({
       admin: false,
       tournamentStatus: "registration_open",
     });
     const [tournament] = props.tournaments as Array<{
+      divisionStates: Array<Record<string, unknown>>;
       generatedBrackets: unknown[];
     }>;
 
@@ -935,6 +1011,17 @@ describe("tournament Client Component result payload", () => {
       expect.any(Array)
     );
     expect(tournament.generatedBrackets).toEqual([]);
+    expect(serializePrivacyValue(tournament)).not.toContain(
+      GENERATED_BRACKET_ID
+    );
+    expect(tournament.divisionStates).toHaveLength(3);
+    for (const divisionState of tournament.divisionStates) {
+      expect(divisionState).not.toHaveProperty("generatedBracketId");
+    }
+    expect(client.rpc).not.toHaveBeenCalledWith(
+      "is_generated_bracket_complete",
+      expect.anything()
+    );
   });
 
   it("loads an explicitly deep-linked terminal tournament with its factual history", async () => {
@@ -974,7 +1061,8 @@ describe("tournament Client Component result payload", () => {
       expect.objectContaining({
         locale: "en",
         t: expect.any(Function),
-      })
+      }),
+      expect.any(Array)
     );
   });
 
@@ -998,7 +1086,8 @@ describe("tournament Client Component result payload", () => {
       expect.objectContaining({
         locale: "en",
         t: expect.any(Function),
-      })
+      }),
+      expect.any(Array)
     );
   });
 

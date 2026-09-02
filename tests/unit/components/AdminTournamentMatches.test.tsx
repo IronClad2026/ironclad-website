@@ -183,6 +183,7 @@ function makeTournament(): TournamentCard {
       makeBracket("bracket-academy", "Academy Bracket"),
       makeBracket("bracket-main", "Main / Pro Bracket"),
     ],
+    divisionStates: [],
     details: "Tournament workspace fixture.",
     rules: "Managed rules.",
     schedule: [],

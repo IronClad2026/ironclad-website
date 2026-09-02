@@ -14,6 +14,7 @@ const PUBLIC_GENERATED_BRACKET_SELECT =
   "tournament_matches(" +
   "id, match_number, series_best_of, status, activation_version, activated_at, deadline_at, " +
   "outcome_type, deadline_ruled_at, extension_minutes, extended_at, hold_started_at, hold_released_at, " +
+  "generated_bracket_id, " +
   "player_one_slot, player_two_slot, " +
   "player_one_registration_id, player_two_registration_id, " +
   "player_one_score, player_two_score, winner_registration_id" +
@@ -32,6 +33,7 @@ type CustomClaims = {
 
 type PublicTournamentMatchRow = {
   id: string;
+  generated_bracket_id: string;
   match_number: number;
   series_best_of: number;
   status: "scheduled" | "in_progress" | "pending_review" | "completed";
@@ -400,6 +402,7 @@ function sanitizeGeneratedBracketRows(
       name: round.name,
       tournament_matches: round.tournament_matches?.map((match) => ({
         id: match.id,
+        generated_bracket_id: match.generated_bracket_id,
         match_number: match.match_number,
         series_best_of: match.series_best_of,
         status: match.status,

@@ -170,6 +170,7 @@ const tournament: TournamentCard = {
       prize: "Challenge division",
     },
   ],
+  divisionStates: [],
   details: "Registration gate fixture.",
   rules: "Format A rules.",
   schedule: [],

@@ -26,6 +26,29 @@ function tournamentOption(
     country: "AU",
     elo: 1_000 + index,
   }));
+  const bracketId = "323e4567-e89b-42d3-a456-426614174000";
+  const generatedBracketId =
+    overrides.generatedBracketId === undefined
+      ? "223e4567-e89b-42d3-a456-426614174000"
+      : overrides.generatedBracketId;
+  const launchedAt = overrides.launchedAt ?? null;
+  const isReady = overrides.isReady ?? true;
+  const approvedCount = overrides.approvedCount ?? 8;
+  const requiredCount = overrides.requiredCount ?? 8;
+  const divisionState = overrides.divisionState ?? {
+    tournamentId: "123e4567-e89b-42d3-a456-426614174000",
+    canonicalName: "Academy" as const,
+    displayName: "Academy Bracket",
+    bracketId,
+    state: launchedAt ? ("in_progress" as const) : isReady ? ("ready" as const) : ("filling" as const),
+    terminalOverlay: null,
+    approvedCount,
+    requiredCount,
+    isReady,
+    launchedAt,
+    generatedBracketId,
+    isCompetitionComplete: false,
+  };
 
   return {
     id: "123e4567-e89b-42d3-a456-426614174000",
@@ -33,8 +56,8 @@ function tournamentOption(
     status: "registration_open",
     brackets: [
       {
-        generatedBracketId: "223e4567-e89b-42d3-a456-426614174000",
-        bracketId: "323e4567-e89b-42d3-a456-426614174000",
+        generatedBracketId,
+        bracketId,
         bracketName: "Academy",
         format: "single_elimination",
         slotCount: 8,
@@ -44,10 +67,11 @@ function tournamentOption(
           participants.map((participant, index) => [index + 1, participant.id])
         ),
         participants,
-        approvedCount: 8,
-        requiredCount: 8,
-        isReady: true,
-        launchedAt: null,
+        approvedCount,
+        requiredCount,
+        isReady,
+        launchedAt,
+        divisionState,
         mapPoolPublishedAt: "2026-08-15T00:00:00.000Z",
         currentMapCount: 5,
         ...overrides,
@@ -116,7 +140,7 @@ describe("administrator private bracket launch controls", () => {
     render(<AdminBracketManagement tournaments={[tournamentOption()]} />);
 
     expect(
-      screen.getByText("8/8 approved — ready for private bracket preparation")
+      screen.getByText("Ready to Launch — 8/8")
     ).toBeInTheDocument();
     expect(screen.getByText("Private draft — not published"))
       .toBeInTheDocument();
@@ -142,7 +166,7 @@ describe("administrator private bracket launch controls", () => {
       />
     );
 
-    expect(screen.getByText("7/8 approved — administrator review incomplete"))
+    expect(screen.getByText("Filling — 7/8"))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Launch Division" }))
       .toBeDisabled();

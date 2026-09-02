@@ -8,6 +8,10 @@ import type {
   AdminTournamentWorkspaceRow,
   AdminTournamentWorkspaceSummary,
 } from "@/lib/admin-tournament-workspace";
+import {
+  formatTournamentDivisionState,
+  formatTournamentEventDivisionState,
+} from "@/lib/tournament-division-state";
 import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 
 export default function TournamentWorkspaceHeader({
@@ -49,6 +53,21 @@ export default function TournamentWorkspaceHeader({
               <Users aria-hidden="true" size={13} />
               {summary.approvedPlayers}/{summary.totalCapacity} approved
             </span>
+          </div>
+          <div
+            aria-label={formatTournamentEventDivisionState(
+              summary.divisionStates
+            )}
+            className="mt-3 flex min-w-0 flex-wrap gap-2"
+          >
+            {summary.divisionStates.map((division) => (
+              <span
+                key={division.canonicalName}
+                className="rounded-lg border border-white/10 bg-black/35 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-300"
+              >
+                {division.displayName}: {formatTournamentDivisionState(division)}
+              </span>
+            ))}
           </div>
         </div>
         <TournamentManagementMenu

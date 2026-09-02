@@ -12,10 +12,8 @@ import {
 } from "@/lib/admin-registration-review";
 import type { AdminTournamentWorkspaceRow } from "@/lib/admin-tournament-workspace";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import {
-  PHASE_FOUR_ACTIVE_COHORT_SIZE,
-  isActiveReviewCohortStatus,
-} from "@/lib/tournament-registration-cohort";
+import type { TournamentDivisionStateResolution } from "@/lib/tournament-division-state";
+import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
 import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 
 type CustomClaims = {
@@ -62,6 +60,7 @@ export type AdminTournamentRegistrationCohortSummary = {
   waitlistCount: number;
   isReady: boolean;
   launchedAt: string | null;
+  divisionState: TournamentDivisionStateResolution;
 };
 
 export type AdminTournamentRegistrationWorkspaceData = {
@@ -127,6 +126,7 @@ export function getSafeAdminTournamentRegistrationFilter(
 
 export async function loadAdminTournamentRegistrationWorkspace(
   tournament: AdminTournamentWorkspaceRow,
+  divisionStates: readonly TournamentDivisionStateResolution[],
   {
     filter,
     section,
@@ -160,12 +160,31 @@ export async function loadAdminTournamentRegistrationWorkspace(
 
   const registrations = registrationResult.data as SupabaseRegistration[];
   const brackets = tournament.tournament_brackets ?? [];
+  const divisionStateByBracket = new Map(
+    divisionStates.flatMap((division) =>
+      division.bracketId ? [[division.bracketId, division] as const] : []
+    )
+  );
+  const missingBracketState = brackets.find(
+    (bracket) => !divisionStateByBracket.has(bracket.id)
+  );
+
+  if (missingBracketState) {
+    console.error(
+      "Admin Tournament registration division-state projection was incomplete.",
+      { operation: "load-tournament-registration-division-states" }
+    );
+    throw new Error("Tournament registrations could not be loaded.");
+  }
+
   const bracketMetaById = new Map(
     brackets.map((bracket) => [
       bracket.id,
       {
         name: getTournamentBracketDisplayName(bracket.name),
-        launchedAt: bracket.launched_at,
+        launchedAt:
+          divisionStateByBracket.get(bracket.id)?.launchedAt ??
+          bracket.launched_at,
       },
     ])
   );
@@ -191,7 +210,6 @@ export async function loadAdminTournamentRegistrationWorkspace(
     )
   );
   const activeCohortCountByBracket = new Map<string, number>();
-  const approvedCountByBracket = new Map<string, number>();
   const waitlistCountByBracket = new Map<string, number>();
 
   for (const registration of registrations) {
@@ -203,12 +221,6 @@ export async function loadAdminTournamentRegistrationWorkspace(
         bracketId,
         (activeCohortCountByBracket.get(bracketId) ?? 0) + 1
       );
-      if (registration.registration_status === "approved") {
-        approvedCountByBracket.set(
-          bracketId,
-          (approvedCountByBracket.get(bracketId) ?? 0) + 1
-        );
-      }
     } else if (
       registration.registration_status === "waitlisted" &&
       registration.waitlist_offer_status === null &&
@@ -221,53 +233,18 @@ export async function loadAdminTournamentRegistrationWorkspace(
     }
   }
 
-  const readinessResults = await Promise.all(
-    brackets.map(async (bracket) => {
-      const { data, error } = await supabase.rpc(
-        "get_tournament_bracket_readiness",
-        { p_tournament_bracket_id: bracket.id }
-      );
-
-      if (error) {
-        console.error("Admin registration readiness load failed.", {
-          operation: "load-tournament-registration-readiness",
-        });
-        return null;
-      }
-
-      const readiness = Array.isArray(data) ? data[0] : data;
-      return readiness
-        ? {
-            bracketId: bracket.id,
-            approvedCount: Number(readiness.approved_count),
-            requiredCount: Number(readiness.required_count),
-            isReady: readiness.is_ready === true,
-            launchedAt:
-              typeof readiness.launched_at === "string"
-                ? readiness.launched_at
-                : bracket.launched_at,
-          }
-        : null;
-    })
-  );
-  const readinessByBracket = new Map(
-    readinessResults
-      .filter((readiness) => readiness !== null)
-      .map((readiness) => [readiness.bracketId, readiness])
-  );
   const cohortSummaries = brackets.map((bracket) => {
-    const readiness = readinessByBracket.get(bracket.id);
+    const divisionState = divisionStateByBracket.get(bracket.id)!;
     return {
       bracketId: bracket.id,
-      bracketName: getTournamentBracketDisplayName(bracket.name),
+      bracketName: divisionState.displayName,
       activeCohortCount: activeCohortCountByBracket.get(bracket.id) ?? 0,
-      approvedCount:
-        readiness?.approvedCount ?? approvedCountByBracket.get(bracket.id) ?? 0,
-      requiredCount:
-        readiness?.requiredCount ?? PHASE_FOUR_ACTIVE_COHORT_SIZE,
+      approvedCount: divisionState.approvedCount ?? 0,
+      requiredCount: divisionState.requiredCount ?? bracket.max_players,
       waitlistCount: waitlistCountByBracket.get(bracket.id) ?? 0,
-      isReady: readiness?.isReady ?? false,
-      launchedAt: readiness?.launchedAt ?? bracket.launched_at,
+      isReady: divisionState.isReady,
+      launchedAt: divisionState.launchedAt,
+      divisionState,
     };
   });
   const allRows = registrations
