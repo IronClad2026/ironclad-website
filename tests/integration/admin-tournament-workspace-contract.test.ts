@@ -1035,6 +1035,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     const postPr5MigrationNames = new Set([
       "20260902100000_unlaunched_event_void_authority.sql",
       "20260902130000_event_based_tournament_scheduling.sql",
+      "20260903100000_division_settlement_shadow_foundation.sql",
     ]);
     const platformMigrationNames = migrationNames.filter(
       (name) =>
@@ -1060,17 +1061,20 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.at(-4)).toBe(
+    expect(migrationNames.at(-5)).toBe(
       "20260831133000_staging_badge_cross_division_acceptance.sql"
     );
-    expect(migrationNames.at(-3)).toBe(
+    expect(migrationNames.at(-4)).toBe(
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql"
     );
-    expect(migrationNames.at(-2)).toBe(
+    expect(migrationNames.at(-3)).toBe(
       "20260902100000_unlaunched_event_void_authority.sql"
     );
-    expect(migrationNames.at(-1)).toBe(
+    expect(migrationNames.at(-2)).toBe(
       "20260902130000_event_based_tournament_scheduling.sql"
+    );
+    expect(migrationNames.at(-1)).toBe(
+      "20260903100000_division_settlement_shadow_foundation.sql"
     );
     expect(
       normalizedSha256(
