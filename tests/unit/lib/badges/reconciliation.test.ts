@@ -123,6 +123,88 @@ describe("Badge reconciliation runtime", () => {
     });
   });
 
+  it("keeps an incomplete canonical Badge notification retryable", async () => {
+    const playerId = "11111111-1111-4111-8111-111111111111";
+    evaluateAllBadgeAwardsForPlayerMock.mockRejectedValueOnce(
+      Object.assign(new Error("sanitized"), {
+        code: "BADGE_NOTIFICATION_CREATE_FAILED",
+      })
+    );
+
+    let claimAttempt = 0;
+    const rpc = vi.fn(async (name: string) => {
+      if (name === "claim_badge_reconciliation_targets") {
+        claimAttempt += 1;
+        return {
+          data:
+            claimAttempt <= 2
+              ? [
+                  claimedTarget(
+                    "target-1",
+                    playerId,
+                    `token-${claimAttempt}`,
+                    claimAttempt
+                  ),
+                ]
+              : [],
+          error: null,
+        };
+      }
+      if (name === "complete_badge_reconciliation_target") {
+        return { data: true, error: null };
+      }
+      throw new Error(`Unexpected RPC ${name}`);
+    });
+
+    const firstAttempt = runBadgeReconciliationWorker({
+      supabase: { rpc } as unknown as ReconciliationClient,
+    });
+    await expect(firstAttempt).resolves.toEqual({
+      claimed: 1,
+      completed: 0,
+      retryableFailures: 1,
+      completionFailures: 0,
+    });
+    const secondAttempt = runBadgeReconciliationWorker({
+      supabase: { rpc } as unknown as ReconciliationClient,
+    });
+    await expect(secondAttempt).resolves.toEqual({
+      claimed: 1,
+      completed: 1,
+      retryableFailures: 0,
+      completionFailures: 0,
+    });
+    await expect(
+      runBadgeReconciliationWorker({
+        supabase: { rpc } as unknown as ReconciliationClient,
+      })
+    ).resolves.toEqual({
+      claimed: 0,
+      completed: 0,
+      retryableFailures: 0,
+      completionFailures: 0,
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      "complete_badge_reconciliation_target",
+      expect.objectContaining({
+        p_target_id: "target-1",
+        p_claim_token: "token-1",
+        p_succeeded: false,
+        p_error_code: "BADGE_NOTIFICATION_CREATE_FAILED",
+      })
+    );
+    expect(rpc).toHaveBeenCalledWith(
+      "complete_badge_reconciliation_target",
+      expect.objectContaining({
+        p_target_id: "target-1",
+        p_claim_token: "token-2",
+        p_succeeded: true,
+        p_error_code: null,
+      })
+    );
+    expect(evaluateAllBadgeAwardsForPlayerMock).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects malformed claim rows instead of evaluating an untrusted target", async () => {
     const rpc = vi.fn(async () => ({
       data: [{ target_id: "target-without-a-player" }],
@@ -141,7 +223,8 @@ describe("Badge reconciliation runtime", () => {
 function claimedTarget(
   targetId: string,
   playerId: string,
-  claimToken: string
+  claimToken: string,
+  attemptCount = 1
 ) {
   return {
     target_id: targetId,
@@ -150,6 +233,6 @@ function claimedTarget(
     reason: "match_authority",
     source_type: "match",
     source_id: "33333333-3333-4333-8333-333333333333",
-    attempt_count: 1,
+    attempt_count: attemptCount,
   };
 }
