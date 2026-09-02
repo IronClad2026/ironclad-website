@@ -7,6 +7,7 @@ import AdminTournamentMapPools from "@/components/AdminTournamentMapPools";
 import TournamentFormDraft from "@/components/TournamentFormDraft";
 import AdminTournamentMatches from "@/components/admin/tournaments/AdminTournamentMatches";
 import AdminTournamentMedia from "@/components/admin/tournaments/AdminTournamentMedia";
+import AdminTournamentReplayArchive from "@/components/admin/tournaments/AdminTournamentReplayArchive";
 import AdminTournamentRegistrations from "@/components/admin/tournaments/AdminTournamentRegistrations";
 import TournamentBracketStructureControls from "@/components/admin/tournaments/TournamentBracketStructureControls";
 import TournamentControls from "@/components/admin/tournaments/TournamentControls";
@@ -18,6 +19,7 @@ import type { TournamentManagementSection } from "@/components/admin/tournaments
 import TournamentOverview from "@/components/admin/tournaments/TournamentOverview";
 import TournamentWorkspaceHeader from "@/components/admin/tournaments/TournamentWorkspaceHeader";
 import { loadAdminTournamentMatchWorkspace } from "@/lib/admin-tournament-match-workspace";
+import { loadAdminTournamentReplayArchive } from "@/lib/admin-replay-archive";
 import { loadAdminTournamentRegistrationWorkspace } from "@/lib/admin-tournament-registration-workspace";
 import {
   isAdminTournamentWorkspaceTerminal,
@@ -59,6 +61,7 @@ const VALID_SECTIONS = new Set<TournamentManagementSection>([
   "players-waitlist",
   "bracket",
   "matches",
+  "replays",
   "media",
   "map-pool",
   "controls",
@@ -289,6 +292,24 @@ async function renderWorkspaceSection({
         tournament={null}
         viewer={null}
         loadError={matchWorkspace.reason === "load-failed"}
+      />
+    );
+  }
+
+  if (section === "replays") {
+    const replayWorkspace = await loadAdminTournamentReplayArchive(
+      tournament.id
+    );
+    return replayWorkspace.ok ? (
+      <AdminTournamentReplayArchive
+        key={tournament.id}
+        archive={replayWorkspace.archive}
+      />
+    ) : (
+      <AdminTournamentReplayArchive
+        key={tournament.id}
+        archive={null}
+        loadError={replayWorkspace.reason === "load-failed"}
       />
     );
   }

@@ -126,6 +126,10 @@ export type MatchResultData = {
   error: "load-failed" | null;
 };
 
+export type MatchResultDataLoadOptions = {
+  adminMatchIds?: readonly string[];
+};
+
 const emptyAnonymousResult: MatchResultData = {
   submissions: [],
   reportGroups: [],
@@ -133,7 +137,9 @@ const emptyAnonymousResult: MatchResultData = {
   error: null,
 };
 
-export async function loadMatchResultData(): Promise<MatchResultData> {
+export async function loadMatchResultData(
+  options: MatchResultDataLoadOptions = {}
+): Promise<MatchResultData> {
   const { userId, sessionClaims } = await auth();
 
   if (!userId) {
@@ -146,6 +152,20 @@ export async function loadMatchResultData(): Promise<MatchResultData> {
 
   try {
     const supabase = createSupabaseAdminClient();
+    const adminMatchIds =
+      isAdmin && options.adminMatchIds !== undefined
+        ? uniqueIds(options.adminMatchIds)
+        : null;
+
+    if (isAdmin && adminMatchIds?.length === 0) {
+      return {
+        submissions: [],
+        reportGroups: [],
+        viewerRole,
+        error: null,
+      };
+    }
+
     const viewerRegistrationIds = isAdmin
       ? []
       : await loadViewerRegistrationIds(supabase, userId);
@@ -165,12 +185,14 @@ export async function loadMatchResultData(): Promise<MatchResultData> {
     const reportGroupRows = await loadVisibleReportGroupRows(
       supabase,
       isAdmin,
-      viewerRegistrationIds
+      viewerRegistrationIds,
+      adminMatchIds
     );
     const submissionRows = await loadVisibleSubmissionRows(
       supabase,
       isAdmin,
-      participantMatchIds
+      participantMatchIds,
+      adminMatchIds
     );
     const replayProofRows = await loadReplayProofRows(
       supabase,
@@ -475,7 +497,8 @@ async function loadParticipantMatchIds(
 async function loadVisibleSubmissionRows(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   isAdmin: boolean,
-  participantMatchIds: string[]
+  participantMatchIds: string[],
+  adminMatchIds: string[] | null
 ) {
   if (!isAdmin && participantMatchIds.length === 0) {
     return [];
@@ -489,6 +512,8 @@ async function loadVisibleSubmissionRows(
 
   if (!isAdmin) {
     query = query.in("match_id", participantMatchIds);
+  } else if (adminMatchIds) {
+    query = query.in("match_id", adminMatchIds);
   }
 
   const { data, error } = await query;
@@ -508,13 +533,20 @@ async function loadVisibleSubmissionRows(
 async function loadVisibleReportGroupRows(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   isAdmin: boolean,
-  viewerRegistrationIds: string[]
+  viewerRegistrationIds: string[],
+  adminMatchIds: string[] | null
 ) {
   if (isAdmin) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("match_result_report_groups")
       .select(MATCH_RESULT_REPORT_GROUP_SELECT)
       .order("created_at", { ascending: false });
+
+    if (adminMatchIds) {
+      query = query.in("match_id", adminMatchIds);
+    }
+
+    const { data, error } = await query;
 
     if (error || !Array.isArray(data)) {
       throw new Error("Match-result report groups unavailable.");

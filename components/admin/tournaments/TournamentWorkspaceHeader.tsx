@@ -115,6 +115,7 @@ const TOURNAMENT_MANAGEMENT_LABELS: Record<
   "players-waitlist": "Players / Waitlist",
   bracket: "Bracket",
   matches: "Matches / Results",
+  replays: "Replay Archive",
   media: "Media",
   "map-pool": "Map Pool",
   controls: "Tournament Controls",

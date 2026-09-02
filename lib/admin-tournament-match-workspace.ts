@@ -247,7 +247,14 @@ export async function loadAdminTournamentMatchWorkspace(
       ) ?? [];
     tournament.players = participants.length;
 
-    const matchResultData = await loadMatchResultData();
+    const matchIds = new Set(
+      tournament.generatedBrackets.flatMap((bracket) =>
+        bracket.matches.map((match) => match.id)
+      )
+    );
+    const matchResultData = await loadMatchResultData({
+      adminMatchIds: [...matchIds],
+    });
     if (
       matchResultData.error ||
       matchResultData.viewerRole !== "admin" ||
@@ -256,12 +263,6 @@ export async function loadAdminTournamentMatchWorkspace(
     ) {
       return loadFailure("result-data");
     }
-
-    const matchIds = new Set(
-      tournament.generatedBrackets.flatMap((bracket) =>
-        bracket.matches.map((match) => match.id)
-      )
-    );
 
     return {
       ok: true,
