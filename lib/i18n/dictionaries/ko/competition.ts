@@ -7,6 +7,7 @@ const dictionary = {
     panels: { details: "상세 정보", rules: "규칙", prizes: "상금", schedule: "일정", contact: "연락처" },
     status: { open: "열림", inProgress: "진행 중", completed: "완료", cancelled: "취소됨", closed: "닫힘", generated: "생성됨", awaitingGeneration: "생성 대기", pendingReview: "검토 대기", upcoming: "예정" },
     divisionState: { disabled: "비활성화됨", filling: "참가자 모집 중 — {approved}/{required}", ready: "시작 준비 완료 — {approved}/{required}", inProgress: "진행 중", completed: "완료", cancelled: "취소됨", voided: "무효 처리됨" },
+    eventSections: { in_competition: "경기 진행 중", open: "접수 중인 이벤트", resolved: "종료된 이벤트" },
     hero: { tournament: "토너먼트", approvedSlots: "승인된 자리", divisionInProgress: "디비전 진행 중", waitlistOpen: "대기 명단 열림", openEvents: "열린 이벤트", scheduleHint: "토너먼트 일정 확인" },
     actions: { register: "등록", joinWaitlist: "대기 명단 참여", registrationClosed: "등록 종료 — 이 디비전은 이미 시작되었습니다.", viewBattlefy: "Battlefy에서 보기", openProfile: "프로필 열기", signIn: "로그인", createAccount: "계정 만들기", completeProfile: "프로필 완성", close: "닫기" },
     terminal: { cancelled: "취소된 토너먼트", voided: "무효 처리된 토너먼트", historical: "읽기 전용 과거 기록", historicalTitle: "과거 기록", unavailable: "종료 상태의 토너먼트에서는 등록 및 결과 작업을 사용할 수 없습니다.", cancelledMessage: "이 토너먼트는 공식 경기 결과가 나오기 전에 취소되었습니다.", voidedMessage: "이 토너먼트는 무효 처리되었습니다. 실제 경기 기록은 보존되지만 공식 순위에는 더 이상 반영되지 않습니다." },
@@ -62,7 +63,7 @@ const dictionary = {
       errorEyebrow: "프로필 확인 불가", errorTitle: "IronClad에서 플레이어 프로필을 확인하지 못했습니다.", errorDescription: "이 메시지를 닫고 다시 시도하세요. 문제가 계속되면 프로필에서 계정 정보를 확인하세요.",
       closeAria: "등록 안내 닫기", checkingProfile: "플레이어 프로필 확인 중",
     },
-    projection: { dateTba: "날짜 추후 공개", format_a: "형식 A", format_b: "형식 B", voided: "무효", organizer: "IronClad 토너먼트", global: "전 세계", grandFinal: "그랜드 파이널: {date} UTC", grandFinalTba: "그랜드 파이널 날짜 추후 공개", maxPlayers: "최대 {count}명", prizeListed: "상금 세부 정보는 토너먼트 페이지에 표시됩니다", noPrize: "이 이벤트에는 공개된 상금이 없습니다", rulesLinked: "규칙 형식: {format}. 이 이벤트의 규칙 링크에서 공식 토너먼트 규칙을 확인하세요.", rulesManaged: "규칙 형식: {format}. 토너먼트별 규칙과 최종 대진 배치는 IronClad 관리자가 관리합니다.", scheduleRegistration: "이벤트가 열려 있는 동안 등록할 수 있습니다. 정원이 찼거나 기존 대기열이 있는 대진표는 대기 명단 등록을 받습니다.", contact: "등록, 경기 세부 정보, 토너먼트 업데이트는 IronClad 웹사이트와 공식 커뮤니티 채널을 이용하세요." },
+    projection: { rollingSchedule: "각 디비전은 승인된 선수 8명이 준비되면 독립적으로 시작됩니다. 그랜드 파이널을 포함한 각 매치업에는 활성화 후 일반적으로 7일이 주어집니다.", dateTba: "날짜 추후 공개", format_a: "형식 A", format_b: "형식 B", voided: "무효", organizer: "IronClad 토너먼트", global: "전 세계", grandFinal: "그랜드 파이널: {date} UTC", grandFinalTba: "그랜드 파이널 날짜 추후 공개", maxPlayers: "최대 {count}명", prizeListed: "상금 세부 정보는 토너먼트 페이지에 표시됩니다", noPrize: "이 이벤트에는 공개된 상금이 없습니다", rulesLinked: "규칙 형식: {format}. 이 이벤트의 규칙 링크에서 공식 토너먼트 규칙을 확인하세요.", rulesManaged: "규칙 형식: {format}. 토너먼트별 규칙과 최종 대진 배치는 IronClad 관리자가 관리합니다.", scheduleRegistration: "이벤트가 열려 있는 동안 등록할 수 있습니다. 정원이 찼거나 기존 대기열이 있는 대진표는 대기 명단 등록을 받습니다.", contact: "등록, 경기 세부 정보, 토너먼트 업데이트는 IronClad 웹사이트와 공식 커뮤니티 채널을 이용하세요." },
     archive: { betaBlitz: "Battlefy 시절 초기에 열린 IronClad 1대1 토너먼트입니다.", councilOfWar: "Battlefy에 보존된 완료된 IronClad 1대1 이벤트입니다.", shadowWar: "완료된 IronClad 월간 1대1 토너먼트입니다.", artOfWar: "원래 세부 정보가 Battlefy에 남아 있는 완료된 IronClad 1대1 이벤트입니다.", operationSkyfall: "플랫폼 출시 전 Battlefy 기록의 마지막 주요 1대1 이벤트입니다.", teamBeta: "IronClad 최초의 팀 형식 베타 토너먼트입니다." },
   },
   bracketPresentation: {

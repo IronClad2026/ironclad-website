@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import { translate } from "@/lib/i18n/translate";
 import type { TournamentCard } from "@/lib/tournaments";
+import { createDisabledTournamentDivisionStates } from "@/tests/fixtures/tournament-division-states";
 
 const refreshMock = vi.hoisted(() => vi.fn());
 const submitTournamentRegistrationMock = vi.hoisted(() => vi.fn());
@@ -157,7 +158,6 @@ const tournament: TournamentCard = {
   id: TOURNAMENT_ID,
   slug: "safe-tournament",
   title: "Safe Tournament",
-  month: "August 2026",
   format: "1v1",
   ruleFormat: "format_a",
   ruleFormatLabel: "Format A",
@@ -168,12 +168,14 @@ const tournament: TournamentCard = {
   organizer: "IronClad Tournaments",
   game: "Company of Heroes 3",
   region: "Global",
-  time: "August 2026",
   prizePool: "",
   players: 0,
   maxPlayers: 24,
   brackets,
-  divisionStates: [],
+  divisionStates: createDisabledTournamentDivisionStates(
+    TOURNAMENT_ID,
+    "registration_open"
+  ),
   details: "Safe details",
   rules: "Safe rules",
   schedule: [],
@@ -181,7 +183,6 @@ const tournament: TournamentCard = {
   registrationEnabled: true,
   registrationOpenAt: "2026-01-01T00:00:00.000Z",
   registrationCloseAt: "2026-12-31T23:59:59.000Z",
-  grandFinalAt: "2026-08-21T00:00:00.000Z",
   createdAt: "2026-08-05T00:00:00.000Z",
   resultConfirmationWindowMinutes: 30,
   rulesUrl: null,

@@ -200,7 +200,7 @@ describe("generic tournament editor lifecycle boundary", () => {
 
   it("validates lifecycle transitions against authoritative stored state", () => {
     expect(actionsSource).toContain(
-      '.select("slug, banner_image_url, status, registration_enabled")'
+      '"slug, banner_image_url, status, registration_enabled, grand_final_at"'
     );
     expect(actionsSource).toContain(
       "Tournament lifecycle status is managed by Launch Division and match completion"

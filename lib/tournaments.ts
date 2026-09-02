@@ -68,7 +68,6 @@ export type TournamentCard = {
   id: string;
   slug: string;
   title: string;
-  month: string;
   format: TournamentFormat;
   ruleFormat: TournamentRuleFormat;
   ruleFormatLabel: string;
@@ -79,7 +78,6 @@ export type TournamentCard = {
   organizer: string;
   game: string;
   region: string;
-  time: string;
   prizePool: string;
   players: number;
   maxPlayers: number;
@@ -105,8 +103,9 @@ export type TournamentCard = {
   registrationEnabled: boolean;
   registrationOpenAt: string;
   registrationCloseAt: string;
-  grandFinalAt: string | null;
   createdAt: string;
+  terminalAt?: string | null;
+  firstCompletedAt?: string | null;
   resultConfirmationWindowMinutes: number;
   rulesUrl: string | null;
   battlefyUrl: string | null;
@@ -366,7 +365,9 @@ export type TournamentRow = {
   rules_url: string | null;
   battlefy_url: string | null;
   registration_enabled: boolean;
-  grand_final_at: string | null;
+  grand_final_at?: string | null;
+  terminal_at?: string | null;
+  first_completed_at?: string | null;
   created_at: string;
   updated_at: string;
   tournament_brackets?: TournamentBracketRow[];
@@ -426,29 +427,12 @@ export function mapTournamentRow(
         getTournamentBracketSortOrder(right.name) ||
       left.name.localeCompare(right.name)
   );
-  const grandFinalDate = row.grand_final_at
-    ? new Date(row.grand_final_at)
-    : null;
-  const dateFormatter = new Intl.DateTimeFormat(localization?.locale ?? "en", {
-    month: "long",
-    timeZone: "UTC",
-    year: "numeric",
-  });
-  const dateTimeFormatter = new Intl.DateTimeFormat(localization?.locale ?? "en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  });
-
   const ruleFormat = row.rule_format ?? "format_a";
 
   return {
     id: row.id,
     slug: row.slug,
     title: row.title,
-    month: grandFinalDate
-      ? dateFormatter.format(grandFinalDate)
-      : localization?.t("tournaments.projection.dateTba") ?? "Date TBA",
     format: row.format,
     ruleFormat,
     ruleFormatLabel:
@@ -465,12 +449,6 @@ export function mapTournamentRow(
       "IronClad Tournaments",
     game: "Company of Heroes 3",
     region: localization?.t("tournaments.projection.global") ?? "Global",
-    time: grandFinalDate
-      ? localization?.t("tournaments.projection.grandFinal", {
-          date: dateTimeFormatter.format(grandFinalDate),
-        }) ?? `Grand Final: ${dateTimeFormatter.format(grandFinalDate)} UTC`
-      : localization?.t("tournaments.projection.grandFinalTba") ??
-        "Grand Final date to be announced",
     prizePool: row.prize_pool,
     players: brackets.reduce(
       (total, bracket) => total + (bracket.registered_players ?? 0),
@@ -521,15 +499,16 @@ export function mapTournamentRow(
             ruleFormatLabels[ruleFormat],
         }) ??
         `Rule format: ${ruleFormatLabels[ruleFormat]}. Tournament-specific rules and final bracket placement are managed by IronClad administrators.`,
-    schedule: buildTournamentSchedule(row, dateTimeFormatter, localization),
+    schedule: buildTournamentSchedule(localization),
     contact:
       localization?.t("tournaments.projection.contact") ??
       "Use the IronClad website and official community channels for registration, match details, and tournament updates.",
     registrationEnabled: row.registration_enabled,
     registrationOpenAt: row.registration_open_at ?? "",
     registrationCloseAt: row.registration_close_at ?? "",
-    grandFinalAt: row.grand_final_at,
     createdAt: row.created_at,
+    terminalAt: row.terminal_at ?? null,
+    firstCompletedAt: row.first_completed_at ?? null,
     resultConfirmationWindowMinutes:
       row.result_confirmation_window_minutes ?? 30,
     rulesUrl: row.rules_url,
@@ -771,21 +750,14 @@ export function getEligibleBracketNames(
     .map((bracket) => bracket.name);
 }
 
-function buildTournamentSchedule(
-  row: TournamentRow,
-  formatter: Intl.DateTimeFormat,
-  localization?: { locale: string; t: TournamentProjectionTranslator }
-) {
-  const schedule = [
-    row.grand_final_at
-      ? localization?.t("tournaments.projection.grandFinal", {
-          date: formatter.format(new Date(row.grand_final_at)),
-        }) ?? `Grand Final: ${formatter.format(new Date(row.grand_final_at))} UTC`
-      : localization?.t("tournaments.projection.grandFinalTba") ??
-        "Grand Final date to be announced",
+function buildTournamentSchedule(localization?: {
+  locale: string;
+  t: TournamentProjectionTranslator;
+}) {
+  return [
+    localization?.t("tournaments.projection.rollingSchedule") ??
+      "Each Division launches independently when eight approved Players are ready. Each Matchup, including the Grand Final, normally receives seven days after activation.",
     localization?.t("tournaments.projection.scheduleRegistration") ??
-      "Registration remains open while the event is open. Full brackets or brackets with an existing queue accept waitlist registrations.",
+      "Registration remains available for each unlaunched Division while Event registration is open. Full cohorts continue through the waitlist.",
   ];
-
-  return schedule;
 }

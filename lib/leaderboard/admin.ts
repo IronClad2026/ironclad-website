@@ -26,9 +26,9 @@ type RecalculationRunRow = {
 type CompletedTournamentRow = {
   id: string;
   title: string;
-  grand_final_at: string | null;
+  terminal_at: string | null;
+  first_completed_at: string | null;
   created_at: string | null;
-  updated_at: string | null;
 };
 
 type LeaderboardSeasonRow = {
@@ -210,7 +210,7 @@ export async function getCompletedLeaderboardTournaments(): Promise<
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id, title, grand_final_at, created_at, updated_at")
+    .select("id, title, terminal_at, first_completed_at, created_at")
     .eq("status", "completed");
 
   if (error) {
@@ -498,7 +498,7 @@ function uniquePresent(values: Array<string | null>) {
 }
 
 function getStableTournamentDate(tournament: CompletedTournamentRow) {
-  return tournament.grand_final_at ?? tournament.created_at ?? tournament.updated_at;
+  return tournament.terminal_at ?? tournament.first_completed_at ?? tournament.created_at;
 }
 
 function getSortTime(date: string | null) {

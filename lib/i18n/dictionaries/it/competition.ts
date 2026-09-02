@@ -45,6 +45,11 @@ const dictionary = {
       cancelled: "Annullata",
       voided: "Invalidata",
     },
+    eventSections: {
+      in_competition: "In competizione",
+      open: "Eventi aperti",
+      resolved: "Eventi conclusi",
+    },
     hero: {
       tournament: "Torneo",
       approvedSlots: "posti approvati",
@@ -297,6 +302,8 @@ const dictionary = {
       checkingProfile: "Verifica del profilo giocatore",
     },
     projection: {
+      rollingSchedule:
+        "Ogni Divisione inizia in modo indipendente quando sono pronti otto Giocatori approvati. Ogni abbinamento, compresa la Finalissima, dispone normalmente di sette giorni dall'attivazione.",
       dateTba: "Data da definire",
       format_a: "Formato A",
       format_b: "Formato B",

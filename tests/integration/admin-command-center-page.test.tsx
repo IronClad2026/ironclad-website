@@ -165,7 +165,7 @@ describe("Admin Command Center and global Registrations authorization", () => {
       "registration_status"
     );
     expect(tournamentSelect).toHaveBeenCalledExactlyOnceWith(
-      "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, launched_at)"
+      "id, title, status, created_at, tournament_brackets(id, name, launched_at)"
     );
     expect(loadTournamentDivisionStatesMock).toHaveBeenCalledExactlyOnceWith(
       supabase,

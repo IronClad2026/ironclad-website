@@ -161,9 +161,10 @@ const capabilities: Capability[] = [
           'label="Format"',
           'label="Rule Format"',
           'label="Result Confirmation Window"',
-          'label="Registration Opens"',
-          'label="Registration Closes"',
-          'label="Grand Final Date/Time"',
+          'label="Registration Opens (optional)"',
+          'label="Registration Closes (optional)"',
+          "data-event-scheduling-policy",
+          "data-registration-window-controls",
           'label="Prize Pool (optional)"',
           'label="Rules URL (optional)"',
           'label="Battlefy URL (optional)"',
@@ -1032,6 +1033,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     ]);
     const postPr5MigrationNames = new Set([
       "20260902100000_unlaunched_event_void_authority.sql",
+      "20260902130000_event_based_tournament_scheduling.sql",
     ]);
     const platformMigrationNames = migrationNames.filter(
       (name) =>
@@ -1057,14 +1059,17 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.at(-3)).toBe(
+    expect(migrationNames.at(-4)).toBe(
       "20260831133000_staging_badge_cross_division_acceptance.sql"
     );
-    expect(migrationNames.at(-2)).toBe(
+    expect(migrationNames.at(-3)).toBe(
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql"
     );
-    expect(migrationNames.at(-1)).toBe(
+    expect(migrationNames.at(-2)).toBe(
       "20260902100000_unlaunched_event_void_authority.sql"
+    );
+    expect(migrationNames.at(-1)).toBe(
+      "20260902130000_event_based_tournament_scheduling.sql"
     );
     expect(
       normalizedSha256(

@@ -218,7 +218,6 @@ export async function saveTournament(
     formData,
     "registrationCloseAt"
   );
-  const grandFinalAt = parseOptionalDateTime(formData, "grandFinalAt");
   const status = getText(formData, "status") as TournamentStatus;
   const format = getText(formData, "format") as TournamentFormat;
   const ruleFormat = getText(formData, "ruleFormat") as TournamentRuleFormat;
@@ -253,7 +252,6 @@ export async function saveTournament(
     battlefyUrl,
     registrationOpenAt,
     registrationCloseAt,
-    grandFinalAt,
     brackets: bracketInputs,
     bracketCount: brackets.length,
   });
@@ -280,6 +278,7 @@ export async function saveTournament(
 
   const supabase = createSupabaseAdminClient();
   let previousBannerUrl: string | null = null;
+  let preservedGrandFinalAt: number | null = null;
   try {
     if (tournamentId) {
       const existingTournament = await getExistingTournamentDetails(
@@ -288,6 +287,7 @@ export async function saveTournament(
       );
       slug = existingTournament.slug;
       previousBannerUrl = existingTournament.bannerImageUrl;
+      preservedGrandFinalAt = toTimestamp(existingTournament.grandFinalAt);
       const lifecycleManagedStatus =
         status === "in_progress" || status === "completed";
       const existingLifecycleManagedStatus =
@@ -363,7 +363,10 @@ export async function saveTournament(
     p_rules_url: rulesUrl,
     p_battlefy_url: battlefyUrl,
     p_registration_enabled: registrationEnabled,
-    p_grand_final_at: toIsoDateTime(grandFinalAt),
+    // Keep the legacy argument populated during the migration rollout so the
+    // prior RPC cannot erase historical metadata. The new authority preserves
+    // existing values itself and always writes null for a new event.
+    p_grand_final_at: toIsoDateTime(preservedGrandFinalAt),
     p_rule_format: ruleFormat,
     p_result_confirmation_window_minutes:
       resultConfirmationWindowMinutes,
@@ -395,7 +398,7 @@ export async function saveTournament(
     toTimestamp(savedTournament.registration_open_at) !== registrationOpenAt ||
     toTimestamp(savedTournament.registration_close_at) !==
       registrationCloseAt ||
-    toTimestamp(savedTournament.grand_final_at) !== grandFinalAt ||
+    toTimestamp(savedTournament.grand_final_at) !== preservedGrandFinalAt ||
     savedTournament.format !== format ||
     savedTournament.rule_format !== ruleFormat ||
     savedTournament.result_confirmation_window_minutes !==
@@ -1295,7 +1298,9 @@ async function getExistingTournamentDetails(
 ) {
   const { data, error } = await supabase
     .from("tournaments")
-    .select("slug, banner_image_url, status, registration_enabled")
+    .select(
+      "slug, banner_image_url, status, registration_enabled, grand_final_at"
+    )
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -1307,13 +1312,16 @@ async function getExistingTournamentDetails(
     !data?.slug ||
     !data.banner_image_url ||
     !validStatuses.includes(data.status as TournamentStatus) ||
-    typeof data.registration_enabled !== "boolean"
+    typeof data.registration_enabled !== "boolean" ||
+    (data.grand_final_at !== null &&
+      typeof data.grand_final_at !== "string")
   ) {
     throw new Error("Tournament not found.");
   }
 
   return {
     bannerImageUrl: data.banner_image_url,
+    grandFinalAt: data.grand_final_at,
     registrationEnabled: data.registration_enabled,
     slug: data.slug,
     status: data.status as TournamentStatus,
@@ -1379,7 +1387,6 @@ function getTournamentValidationError(input: {
   battlefyUrl: string | null;
   registrationOpenAt: number | null;
   registrationCloseAt: number | null;
-  grandFinalAt: number | null;
   brackets: {
     config: (typeof TOURNAMENT_BRACKET_CONFIGS)[number];
     enabled: boolean;
@@ -1457,6 +1464,11 @@ function getDatabaseSaveError(message?: string) {
   }
 
   const normalized = message.toLowerCase();
+  if (
+    normalized.includes("division already has an unresolved ranked cycle")
+  ) {
+    return "That Division already has an unresolved ranked cycle in another Event. Resolve it before enabling a new cycle.";
+  }
   if (normalized.includes("duplicate") || normalized.includes("unique")) {
     return "A tournament with this generated URL already exists. Rename the tournament or try again.";
   }

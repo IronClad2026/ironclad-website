@@ -45,6 +45,11 @@ const dictionary = {
       cancelled: "Cancelled",
       voided: "Voided",
     },
+    eventSections: {
+      in_competition: "In Competition",
+      open: "Open Events",
+      resolved: "Resolved Events",
+    },
     hero: {
       tournament: "Tournament",
       approvedSlots: "approved slots",
@@ -292,6 +297,7 @@ const dictionary = {
       checkingProfile: "Checking Player Profile",
     },
     projection: {
+      rollingSchedule: "Each Division launches independently when eight approved Players are ready. Each Matchup, including the Grand Final, normally receives seven days after activation.",
       dateTba: "Date TBA", format_a: "Format A", format_b: "Format B", voided: "Voided", organizer: "IronClad Tournaments", global: "Global", grandFinal: "Grand Final: {date} UTC", grandFinalTba: "Grand Final date to be announced", maxPlayers: "Maximum {count} players", prizeListed: "Prize details are listed on this Tournament page", noPrize: "No prize is published for this Event", rulesLinked: "Rule format: {format}. Read the official Tournament rules using this Event’s Rules link.", rulesManaged: "Rule format: {format}. Tournament-specific rules and final Bracket placement are managed by IronClad administrators.", scheduleRegistration: "Registration remains open while the Event is open. Full Brackets or Brackets with an existing queue accept waitlist Registrations.", contact: "Use the IronClad website and official community channels for Registration, Match details, and Tournament updates."
     },
     archive: { betaBlitz: "An early IronClad 1v1 Tournament from the Battlefy era.", councilOfWar: "A completed IronClad 1v1 Event preserved on Battlefy.", shadowWar: "A completed monthly IronClad 1v1 Tournament.", artOfWar: "A completed IronClad 1v1 Event with its original details on Battlefy.", operationSkyfall: "The final featured 1v1 Event from the pre-launch Battlefy archive.", teamBeta: "IronClad’s original team-format beta Tournament." },

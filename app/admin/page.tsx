@@ -77,7 +77,6 @@ type TournamentSummaryRow = {
   id: string;
   title: string;
   status: TournamentStatus;
-  grand_final_at: string | null;
   created_at: string;
   tournament_brackets?: Array<{
     id: string;
@@ -180,9 +179,7 @@ function getLegacyRegistrationRedirect(params?: AdminPageSearchParams) {
 }
 
 function getTournamentSortTime(tournament: TournamentSummaryRow) {
-  const timestamp = new Date(
-    tournament.grand_final_at ?? tournament.created_at
-  ).getTime();
+  const timestamp = new Date(tournament.created_at).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
@@ -213,9 +210,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, launched_at)"
+          "id, title, status, created_at, tournament_brackets(id, name, launched_at)"
         )
-        .order("grand_final_at", { ascending: false, nullsFirst: false }),
+        .order("created_at", { ascending: false }),
       loadAdminNotifications(50),
     ]);
 

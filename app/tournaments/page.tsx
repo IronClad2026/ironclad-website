@@ -23,7 +23,10 @@ import {
   mapGeneratedBrackets,
 } from "@/lib/tournament-bracket-data";
 import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
-import { projectPublicTournamentDivisionStates } from "@/lib/tournament-division-state";
+import {
+  getTournamentEventSection,
+  projectPublicTournamentDivisionStates,
+} from "@/lib/tournament-division-state";
 import {
   getTournamentBracketDisplayName,
   getPublicTournamentRowsForRequest,
@@ -104,9 +107,9 @@ export default async function TournamentsPage({
     supabase
       .from("tournaments")
       .select(
-        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
+        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, rule_format, result_confirmation_window_minutes, terminal_at, first_completed_at, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
       )
-      .order("grand_final_at", { ascending: false, nullsFirst: false }),
+      .order("created_at", { ascending: false }),
     supabase.rpc("get_tournament_bracket_capacity"),
     supabase
       .from("registrations")
@@ -652,18 +655,37 @@ function compareTournamentCards(
   left: ReturnType<typeof mapTournamentRow>,
   right: ReturnType<typeof mapTournamentRow>
 ) {
-  const leftHistorical = left.statusValue === "completed" ? 1 : 0;
-  const rightHistorical = right.statusValue === "completed" ? 1 : 0;
+  const sectionOrder = {
+    in_competition: 0,
+    open: 1,
+    resolved: 2,
+  } as const;
+  const leftSection = getTournamentEventSection(left.divisionStates);
+  const rightSection = getTournamentEventSection(right.divisionStates);
+  const sectionDifference =
+    sectionOrder[leftSection] - sectionOrder[rightSection];
 
-  if (leftHistorical !== rightHistorical) {
-    return leftHistorical - rightHistorical;
+  if (sectionDifference !== 0) {
+    return sectionDifference;
   }
 
-  return getTournamentSortTime(right) - getTournamentSortTime(left);
+  const timeDifference =
+    getTournamentSortTime(right, rightSection) -
+    getTournamentSortTime(left, leftSection);
+
+  return timeDifference || left.id.localeCompare(right.id);
 }
 
-function getTournamentSortTime(tournament: ReturnType<typeof mapTournamentRow>) {
-  const dateValue = tournament.grandFinalAt ?? tournament.createdAt;
+function getTournamentSortTime(
+  tournament: ReturnType<typeof mapTournamentRow>,
+  section: ReturnType<typeof getTournamentEventSection>
+) {
+  const dateValue =
+    section === "resolved"
+      ? tournament.terminalAt ??
+        tournament.firstCompletedAt ??
+        tournament.createdAt
+      : tournament.createdAt;
   const timestamp = new Date(dateValue).getTime();
 
   return Number.isFinite(timestamp) ? timestamp : 0;

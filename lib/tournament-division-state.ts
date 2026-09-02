@@ -21,6 +21,15 @@ export type EffectiveTournamentDivisionState =
   | TournamentDivisionState
   | TournamentDivisionTerminalOverlay;
 
+export const TOURNAMENT_EVENT_SECTIONS = [
+  "in_competition",
+  "open",
+  "resolved",
+] as const;
+
+export type TournamentEventSection =
+  (typeof TOURNAMENT_EVENT_SECTIONS)[number];
+
 export type TournamentDivisionStateEvidence = {
   canonicalName: TournamentBracketName;
   bracketId: string;
@@ -235,6 +244,34 @@ export function getEffectiveTournamentDivisionState(
   return resolution.state === "disabled"
     ? "disabled"
     : resolution.terminalOverlay ?? resolution.state;
+}
+
+export function getTournamentEventSection(
+  resolutions: readonly PublicTournamentDivisionStateResolution[]
+): TournamentEventSection {
+  const ordered = orderAndValidateResolutions(resolutions);
+
+  if (ordered.some((resolution) => resolution.terminalOverlay !== null)) {
+    return "resolved";
+  }
+
+  const enabledStates = ordered
+    .map(getEffectiveTournamentDivisionState)
+    .filter((state) => state !== "disabled");
+
+  if (enabledStates.some((state) => state === "in_progress")) {
+    return "in_competition";
+  }
+
+  if (
+    enabledStates.some(
+      (state) => state === "filling" || state === "ready"
+    )
+  ) {
+    return "open";
+  }
+
+  return "resolved";
 }
 
 export function formatTournamentEventDivisionState(
