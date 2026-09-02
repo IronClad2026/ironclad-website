@@ -182,7 +182,10 @@ async function renderWorkspaceSection({
   }
 
   if (section === "edit") {
-    const editor = await loadAdminTournamentEditorWorkspaceData(tournament);
+    const editor = await loadAdminTournamentEditorWorkspaceData(
+      tournament,
+      summary.divisionStates
+    );
     const terminal = isAdminTournamentWorkspaceTerminal(tournament);
     return (
       <TournamentEditor
@@ -212,11 +215,15 @@ async function renderWorkspaceSection({
   }
 
   if (section === "registrations" || section === "players-waitlist") {
-    const data = await loadAdminTournamentRegistrationWorkspace(tournament, {
-      filter: query?.filter,
-      section,
-      selectedRegistrationId: query?.selected,
-    });
+    const data = await loadAdminTournamentRegistrationWorkspace(
+      tournament,
+      summary.divisionStates,
+      {
+        filter: query?.filter,
+        section,
+        selectedRegistrationId: query?.selected,
+      }
+    );
     return (
       <AdminTournamentRegistrations
         key={`${tournament.id}:${section}`}
@@ -232,18 +239,23 @@ async function renderWorkspaceSection({
 
   if (section === "bracket") {
     const [bracket, editor] = await Promise.all([
-      loadAdminTournamentBracketWorkspaceData(tournament),
-      loadAdminTournamentEditorWorkspaceData(tournament),
+      loadAdminTournamentBracketWorkspaceData(
+        tournament,
+        summary.divisionStates
+      ),
+      loadAdminTournamentEditorWorkspaceData(
+        tournament,
+        summary.divisionStates
+      ),
     ]);
     const values = toTournamentFormValues(tournament);
     return (
       <div className="grid min-w-0 gap-5">
         <TournamentBracketStructureControls
-          approvedByBracket={editor.approvedByBracket}
+          divisionStates={summary.divisionStates}
           generatedByBracket={editor.generatedByBracket}
           notice={query?.notice}
           readOnly={isAdminTournamentWorkspaceTerminal(tournament)}
-          readinessByBracket={editor.readinessByBracket}
           values={values}
         />
         <AdminBracketManagement
@@ -325,7 +337,7 @@ async function renderWorkspaceSection({
   }
 
   const [editor, deletionPreview] = await Promise.all([
-    loadAdminTournamentEditorWorkspaceData(tournament),
+    loadAdminTournamentEditorWorkspaceData(tournament, summary.divisionStates),
     loadAdminTournamentDeletionPreview(tournament.id),
   ]);
   return (

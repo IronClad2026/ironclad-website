@@ -87,6 +87,7 @@ const tournament: TournamentCard = {
       prize: "Included in tournament prize pool",
     },
   ],
+  divisionStates: [],
   details: "Public map-pool presentation fixture.",
   rules: "Format A rules.",
   schedule: [],

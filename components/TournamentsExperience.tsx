@@ -53,6 +53,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
+import { getEffectiveTournamentDivisionState } from "@/lib/tournament-division-state";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { RegistrationDocumentSet } from "@/lib/legal-document-types";
 import { parseMatchDiceSnapshot } from "@/lib/match-dice";
@@ -265,6 +266,129 @@ function StatusPill({ children, tone = "neutral" }: { children: ReactNode; tone?
   return <span className={classNames("inline-flex items-center rounded border px-2 py-1 text-xs font-semibold uppercase tracking-wide", tones[tone])}>{children}</span>;
 }
 
+type TournamentDivisionResolution = TournamentCard["divisionStates"][number];
+
+function getTournamentDivisionStateTone(
+  resolution: TournamentDivisionResolution
+): "neutral" | "green" | "red" | "amber" | "gray" {
+  switch (getEffectiveTournamentDivisionState(resolution)) {
+    case "completed":
+    case "ready":
+      return "green";
+    case "in_progress":
+      return "neutral";
+    case "filling":
+      return "amber";
+    case "disabled":
+      return "gray";
+    case "cancelled":
+    case "voided":
+      return "red";
+  }
+}
+
+function localizeTournamentDivisionState(
+  resolution: TournamentDivisionResolution,
+  t: CompetitionTranslator
+) {
+  const readinessValues = () => {
+    if (
+      resolution.approvedCount === null ||
+      resolution.requiredCount === null
+    ) {
+      throw new Error(
+        "An enabled tournament division is missing readiness counts."
+      );
+    }
+
+    return {
+      approved: resolution.approvedCount,
+      required: resolution.requiredCount,
+    };
+  };
+
+  switch (getEffectiveTournamentDivisionState(resolution)) {
+    case "disabled":
+      return t("tournaments.divisionState.disabled");
+    case "filling":
+      return t("tournaments.divisionState.filling", readinessValues());
+    case "ready":
+      return t("tournaments.divisionState.ready", readinessValues());
+    case "in_progress":
+      return t("tournaments.divisionState.inProgress");
+    case "completed":
+      return t("tournaments.divisionState.completed");
+    case "cancelled":
+      return t("tournaments.divisionState.cancelled");
+    case "voided":
+      return t("tournaments.divisionState.voided");
+  }
+}
+
+function TournamentDivisionStatePill({
+  resolution,
+}: {
+  resolution: TournamentDivisionResolution;
+}) {
+  const t = useOptionalTranslations("competition", competitionEnglish);
+
+  return (
+    <span
+      data-division-name={resolution.canonicalName}
+      data-division-state={resolution.state}
+      data-division-effective-state={getEffectiveTournamentDivisionState(
+        resolution
+      )}
+      data-division-terminal-overlay={resolution.terminalOverlay ?? undefined}
+    >
+      <StatusPill tone={getTournamentDivisionStateTone(resolution)}>
+        {resolution.displayName}: {localizeTournamentDivisionState(resolution, t)}
+      </StatusPill>
+    </span>
+  );
+}
+
+function TournamentDivisionStateSummary({
+  tournament,
+  className,
+}: {
+  tournament: TournamentCard;
+  className?: string;
+}) {
+  if (tournament.divisionStates.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className={classNames("flex flex-wrap gap-2", className)}
+      data-tournament-division-state-summary={tournament.id}
+    >
+      {tournament.divisionStates.map((resolution) => (
+        <TournamentDivisionStatePill
+          key={resolution.canonicalName}
+          resolution={resolution}
+        />
+      ))}
+    </div>
+  );
+}
+
+function getTournamentDivisionStateForBracket(
+  tournament: TournamentCard,
+  bracketId: string
+) {
+  const resolution = tournament.divisionStates.find(
+    (candidate) => candidate.bracketId === bracketId
+  );
+
+  if (!resolution) {
+    throw new Error("Tournament division state was missing for an enabled bracket.");
+  }
+
+  return resolution;
+}
+
 function Sidebar({
   selectedTournament,
   tournaments,
@@ -316,16 +440,22 @@ function Sidebar({
                   <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">{group.month}</p>
                   <div className="space-y-2">
                     {group.events.map((event) => {
-                      const selected = selectedTournament.title === event.title;
+                      const selected = selectedTournament.id === event.id;
                       return (
                         <button
-                          key={event.title}
+                          key={event.id}
+                          type="button"
+                          aria-pressed={selected}
                           onClick={() => onSelectTournament(event)}
                           className={classNames("relative block w-full overflow-hidden border border-white/12 bg-cover bg-center p-3 text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100", selected && "ring-2 ring-orange-500")}
                           style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
                         >
                           <p className="break-words text-sm font-black text-white">{event.title}</p>
                           <p className="mt-1 text-xs text-zinc-300">{event.format} - {localizeTournamentStatus(event.status, t)}</p>
+                          <TournamentDivisionStateSummary
+                            tournament={event}
+                            className="mt-2"
+                          />
                         </button>
                       );
                     })}
@@ -447,12 +577,13 @@ function MobileTournamentDrawer({
                             <button
                               key={event.id}
                               type="button"
+                              aria-pressed={selected}
                               onClick={() => {
                                 onSelectTournament(event);
                                 onClose();
                               }}
                               className={classNames(
-                                "flex min-h-11 w-full min-w-0 items-center gap-3 rounded-lg border px-3 py-3 text-left shadow-lg shadow-black/15 transition",
+                                "flex min-h-11 w-full min-w-0 flex-wrap items-center gap-3 rounded-lg border px-3 py-3 text-left shadow-lg shadow-black/15 transition",
                                 selected
                                   ? "border-orange-400/70 bg-orange-500/15 text-white"
                                   : "border-white/12 bg-white/[0.06] text-zinc-300 hover:border-orange-400/45 hover:bg-orange-500/10 hover:text-white"
@@ -470,6 +601,10 @@ function MobileTournamentDrawer({
                                   {event.format} - {localizeTournamentStatus(event.status, t)}
                                 </span>
                               </span>
+                              <TournamentDivisionStateSummary
+                                tournament={event}
+                                className="basis-full pl-7"
+                              />
                             </button>
                           );
                         })}
@@ -593,6 +728,10 @@ function Hero({
               <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.time}</span>
               <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {t("heroMetadata.approvedSlots", { players: formatNumber(tournament.players, locale), maximum: formatNumber(tournament.maxPlayers, locale) })}</span>
             </div>
+            <TournamentDivisionStateSummary
+              tournament={tournament}
+              className="mt-5"
+            />
           </ScrollReveal>
           <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
             {terminalTournament ? (
@@ -994,7 +1133,7 @@ function Overview({
           <h3 className="text-sm font-black uppercase tracking-wider text-white">{t("tournaments.overview.published")}</h3>
           <div className="mt-4 space-y-3">
             {tournaments.map((item) => (
-              <TournamentLinkCard key={item.title} item={item} />
+              <TournamentLinkCard key={item.id} item={item} />
             ))}
           </div>
         </Card>
@@ -1035,6 +1174,7 @@ function TournamentLinkCard({ item }: { item: TournamentCard }) {
                   <p className="text-xs text-zinc-500">{item.month} - {item.format} - {item.status}</p>
         </div>
       </div>
+      <TournamentDivisionStateSummary tournament={item} className="mt-3" />
       <p className="mt-3 text-xs leading-5 text-zinc-400">{item.description}</p>
     </div>
   );
@@ -1080,6 +1220,13 @@ function renderOverviewPanel(
       <Detail label={t("tournaments.overview.grandFinal")} value={formatOptionalDateTime(tournament.grandFinalAt, t("tournaments.overview.grandFinalTba"), locale)} />
       {hasPrize(tournament) && <Detail label={t("tournaments.overview.prizePool")} value={tournament.prizePool} />}
       <Detail label={t("tournaments.overview.approvedParticipants")} value={`${tournament.players} / ${tournament.maxPlayers}`} />
+      {tournament.divisionStates.map((resolution) => (
+        <Detail
+          key={resolution.canonicalName}
+          label={resolution.displayName}
+          value={localizeTournamentDivisionState(resolution, t)}
+        />
+      ))}
       {tournament.brackets.map((bracket) => (
         <Detail key={bracket.name} label={bracket.name} value={t("tournaments.overview.cohortSummary", { requirement: bracket.requirement, active: bracket.activeCohortPlayers, capacity: bracket.activeCohortSize, approved: bracket.registeredPlayers, waitlisted: bracket.waitlistedPlayers })} />
       ))}
@@ -1349,6 +1496,10 @@ function Brackets({
         </StatusPill>
       </div>
       {tournament.brackets.map((bracket) => {
+        const divisionState = getTournamentDivisionStateForBracket(
+          tournament,
+          bracket.id
+        );
         const generated = tournament.generatedBrackets.find(
           (item) => item.tournamentBracketId === bracket.id
         );
@@ -1397,6 +1548,7 @@ function Brackets({
                   <h3 className="text-lg font-black text-white">
                     {bracket.name}
                   </h3>
+                  <TournamentDivisionStatePill resolution={divisionState} />
                   {generated && canOpenResults && (
                     <BracketMatchResultsWorkspace
                       bracketName={bracket.name}
@@ -4020,6 +4172,10 @@ export function RegisterModal({
                                 ? t("registrationModal.waitlistOnly")
                                 : localizeTournamentStatus(event.status, t)}
                             </span>
+                            <TournamentDivisionStateSummary
+                              tournament={event}
+                              className="mt-2"
+                            />
                           </button>
                         );
                       })}
@@ -4072,7 +4228,7 @@ export function RegisterModal({
 
               <div className="grid gap-3 md:grid-cols-2">
                 {eligibleTournaments.map((event) => {
-                  const selected = selectedTournament.title === event.title;
+                  const selected = selectedTournament.id === event.id;
                   const registrationAvailable =
                     getRegistrationDivisionAvailability(
                       event,
@@ -4084,7 +4240,9 @@ export function RegisterModal({
                     ) === "waitlist";
                   return (
                     <button
-                      key={event.title}
+                      key={event.id}
+                      type="button"
+                      aria-pressed={selected}
                       disabled={!registrationAvailable}
                       onClick={() => selectTournament(event)}
                       className={classNames("relative overflow-hidden border bg-cover bg-center p-4 text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100", selected ? "border-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.24)]" : "border-white/12 hover:border-orange-400/35")}
@@ -4092,6 +4250,10 @@ export function RegisterModal({
                     >
                       <p className="break-words text-lg font-black text-white">{event.title}</p>
                       <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">{event.month} - {event.format} - {localizeTournamentStatus(event.status, t)}</p>
+                      <TournamentDivisionStateSummary
+                        tournament={event}
+                        className="mt-3"
+                      />
                       <p className="mt-3 break-words text-sm leading-6 text-zinc-300">{event.description}</p>
                       {!registrationAvailable && (
                         <p className="mt-3 text-xs font-black uppercase tracking-wider text-red-300">
@@ -4109,6 +4271,10 @@ export function RegisterModal({
                   <div className="h-32 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(135deg,rgba(0,0,0,0.25),rgba(0,0,0,0.55)),url(${selectedTournament.image})` }} />
                   <div className="min-w-0">
                     <h5 className="break-words text-lg font-black text-white">{selectedTournament.title}</h5>
+                    <TournamentDivisionStateSummary
+                      tournament={selectedTournament}
+                      className="mt-3"
+                    />
                     <div className="mt-3 grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
                       <p><span className="font-bold text-zinc-500">{t("tournaments.overview.format")}:</span> {selectedTournament.format}</p>
                       <p><span className="font-bold text-zinc-500">{t("tournaments.overview.ruleFormat")}:</span> {selectedTournament.ruleFormatLabel}</p>
@@ -5109,6 +5275,10 @@ function MobileHero({
               );
             })}
           </div>
+          <TournamentDivisionStateSummary
+            tournament={tournament}
+            className="mt-5"
+          />
         </div>
 
         <div className="w-full max-w-full min-w-0">
@@ -5298,7 +5468,7 @@ function MobileOverview({
         </h3>
         <div className="mt-4 space-y-3">
           {tournaments.map((item) => (
-            <MobileTournamentLinkCard key={item.title} item={item} />
+            <MobileTournamentLinkCard key={item.id} item={item} />
           ))}
         </div>
       </MobileCard>
@@ -5357,6 +5527,7 @@ function MobileTournamentLinkCard({ item }: { item: TournamentCard }) {
           </p>
         </div>
       </div>
+      <TournamentDivisionStateSummary tournament={item} className="mt-3" />
       <p className="mt-3 break-words text-xs leading-5 text-zinc-400">
         {item.description}
       </p>
@@ -5454,6 +5625,13 @@ function renderMobileOverviewPanel(
         label={t("tournaments.overview.approvedParticipants")}
         value={`${tournament.players} / ${tournament.maxPlayers}`}
       />
+      {tournament.divisionStates.map((resolution) => (
+        <MobileDetail
+          key={resolution.canonicalName}
+          label={resolution.displayName}
+          value={localizeTournamentDivisionState(resolution, t)}
+        />
+      ))}
       {tournament.brackets.map((bracket) => (
         <MobileDetail
           key={bracket.name}
@@ -5701,6 +5879,10 @@ function MobileBrackets({
       </div>
 
       {tournament.brackets.map((bracket) => {
+        const divisionState = getTournamentDivisionStateForBracket(
+          tournament,
+          bracket.id
+        );
         const generated = tournament.generatedBrackets.find(
           (item) => item.tournamentBracketId === bracket.id
         );
@@ -5750,6 +5932,7 @@ function MobileBrackets({
                   <h3 className="break-words text-lg font-black text-white">
                     {bracket.name}
                   </h3>
+                  <TournamentDivisionStatePill resolution={divisionState} />
                   {generated && canOpenResults && (
                     <BracketMatchResultsWorkspace
                       bracketName={bracket.name}

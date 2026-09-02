@@ -21,11 +21,15 @@ const redirectMock = vi.hoisted(() =>
   })
 );
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
+const loadTournamentDivisionStatesMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
+}));
+vi.mock("@/lib/tournament-division-state-data", () => ({
+  loadTournamentDivisionStates: loadTournamentDivisionStatesMock,
 }));
 
 import AdminRegistrationsPage from "@/app/admin/registrations/page";
@@ -247,6 +251,7 @@ describe("Admin Registration Workbench presentation", () => {
     authMock.mockReset();
     redirectMock.mockClear();
     createSupabaseAdminClientMock.mockReset();
+    loadTournamentDivisionStatesMock.mockReset();
   });
 
   it.each([
@@ -389,11 +394,13 @@ describe("Admin Registration Workbench presentation", () => {
     );
 
     expect(textContent(openReadiness)).toContain(
-      "Challenge Bracket 1/8 approved · 1 active · 2 waiting"
+      "Challenge Bracket — Filling — 1/8 · 1 active · 2 waiting"
     );
-    expect(textContent(openReadiness)).not.toContain("LAUNCHED / LOCKED");
+    expect(textContent(openReadiness)).toContain(
+      "Academy Bracket — Disabled"
+    );
     expect(textContent(progressReadiness)).toContain(
-      "Main / Pro Bracket 8/8 approved · 1 active · 0 waiting · LAUNCHED / LOCKED"
+      "Main / Pro Bracket — In Progress · 1 active · 0 waiting"
     );
     expect(textContent(openFifo)).toContain("FIFO Waitlist · 2 waiting");
     expect(textContent(openFifo)).toMatch(
@@ -466,44 +473,79 @@ async function loadPage(searchParams: {
     }
     throw new Error(`Unexpected table: ${table}`);
   });
-  const rpc = vi.fn(
-    (
-      name: string,
-      { p_tournament_bracket_id: bracketId }: { p_tournament_bracket_id: string }
-    ) => {
-      expect(name).toBe("get_tournament_bracket_readiness");
-      const launchedAt =
-        bracketId === bracketIds.progress
-          ? "2026-08-28T01:00:00.000Z"
-          : null;
-      const approvedCount =
-        bracketId === bracketIds.progress
-          ? 8
-          : bracketId === bracketIds.open
-            ? 1
-            : bracketId === bracketIds.completed
-              ? 1
-              : 0;
-
-      return Promise.resolve({
-        data: [
-          {
-            approved_count: approvedCount,
-            required_count: 8,
-            is_ready: approvedCount === 8,
-            launched_at: launchedAt,
-          },
-        ],
-        error: null,
-      });
-    }
+  loadTournamentDivisionStatesMock.mockResolvedValue(
+    buildDivisionStateMap(tournaments)
   );
-
-  createSupabaseAdminClientMock.mockReturnValue({ from, rpc });
+  createSupabaseAdminClientMock.mockReturnValue({ from });
 
   return AdminRegistrationsPage({
     searchParams: Promise.resolve(searchParams),
   });
+}
+
+function buildDivisionStateMap(rows: typeof tournaments) {
+  const canonicalDivisions = [
+    ["Academy", "Academy Bracket"],
+    ["Challenge", "Challenge Bracket"],
+    ["Main", "Main / Pro Bracket"],
+  ] as const;
+
+  return new Map(
+    rows.map((row) => {
+      const bracket = row.tournament_brackets[0];
+      const approvedCount =
+        bracket.id === bracketIds.progress
+          ? 8
+          : bracket.id === bracketIds.open || bracket.id === bracketIds.completed
+            ? 1
+            : 0;
+      const terminalOverlay =
+        row.status === "cancelled" || row.status === "voided"
+          ? row.status
+          : null;
+
+      return [
+        row.id,
+        canonicalDivisions.map(([canonicalName, displayName]) => {
+          if (canonicalName !== bracket.name) {
+            return {
+              tournamentId: row.id,
+              canonicalName,
+              displayName,
+              bracketId: null,
+              state: "disabled" as const,
+              terminalOverlay,
+              approvedCount: null,
+              requiredCount: null,
+              isReady: false,
+              launchedAt: null,
+              generatedBracketId: null,
+              isCompetitionComplete: false,
+            };
+          }
+
+          return {
+            tournamentId: row.id,
+            canonicalName,
+            displayName,
+            bracketId: bracket.id,
+            state:
+              bracket.id === bracketIds.progress
+                ? ("in_progress" as const)
+                : ("filling" as const),
+            terminalOverlay,
+            approvedCount,
+            requiredCount: 8,
+            isReady: approvedCount === 8,
+            launchedAt: bracket.launched_at,
+            generatedBracketId:
+              bracket.id === bracketIds.progress ? "generated-progress" : null,
+            isCompetitionComplete: false,
+          };
+        }),
+      ] as const;
+    })
+  );
 }
 
 type ElementProps = Record<string, unknown> & { children?: ReactNode };

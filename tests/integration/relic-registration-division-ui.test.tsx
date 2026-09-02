@@ -173,6 +173,7 @@ const tournament: TournamentCard = {
   players: 0,
   maxPlayers: 24,
   brackets,
+  divisionStates: [],
   details: "Safe details",
   rules: "Safe rules",
   schedule: [],

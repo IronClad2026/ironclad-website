@@ -13,6 +13,10 @@ import type {
   AdminTournamentRegistrationWorkspaceData,
 } from "@/lib/admin-tournament-registration-workspace";
 import type { AdminTournamentWorkspaceRow } from "@/lib/admin-tournament-workspace";
+import {
+  formatTournamentDivisionState,
+  getEffectiveTournamentDivisionState,
+} from "@/lib/tournament-division-state";
 
 export default function AdminTournamentRegistrations({
   data,
@@ -112,39 +116,46 @@ export default function AdminTournamentRegistrations({
         <RegistrationNotice notice={notice} detail={detail} />
 
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {data.cohortSummaries.map((summary) => (
-            <div
-              key={summary.bracketId}
-              className={`min-w-0 rounded-2xl border p-4 ${
-                summary.isReady
-                  ? "border-orange-400/35 bg-orange-500/10"
-                  : summary.launchedAt
-                    ? "border-sky-400/35 bg-sky-500/10"
-                    : "border-white/10 bg-black/30"
-              }`}
-            >
-              <p className="break-words text-sm font-black text-white">
-                {summary.bracketName}
-              </p>
-              <p className="mt-3 text-2xl font-black text-orange-300">
-                {summary.approvedCount} / {summary.requiredCount}
-              </p>
-              <p className="mt-1 text-xs uppercase tracking-wider text-zinc-400">
-                Approved Players
-              </p>
-              <p className="mt-3 break-words text-xs leading-5 text-zinc-400">
-                Active cohort: {summary.activeCohortCount} · Waiting:{" "}
-                {summary.waitlistCount}
-              </p>
-              <p className="mt-2 text-xs font-black text-zinc-200">
-                {summary.launchedAt
-                  ? "Division launched — roster locked"
-                  : summary.isReady
-                    ? "Ready for private bracket preparation"
-                    : "Review incomplete"}
-              </p>
-            </div>
-          ))}
+          {data.cohortSummaries.map((summary) => {
+            const effectiveState = getEffectiveTournamentDivisionState(
+              summary.divisionState
+            );
+
+            return (
+              <div
+                key={summary.bracketId}
+                className={`min-w-0 rounded-2xl border p-4 ${
+                  effectiveState === "cancelled" ||
+                  effectiveState === "voided"
+                    ? "border-red-400/35 bg-red-500/10"
+                    : effectiveState === "completed"
+                    ? "border-emerald-400/35 bg-emerald-500/10"
+                    : effectiveState === "in_progress"
+                      ? "border-sky-400/35 bg-sky-500/10"
+                      : effectiveState === "ready"
+                        ? "border-orange-400/35 bg-orange-500/10"
+                        : "border-white/10 bg-black/30"
+                }`}
+              >
+                <p className="break-words text-sm font-black text-white">
+                  {summary.bracketName}
+                </p>
+                <p className="mt-3 text-2xl font-black text-orange-300">
+                  {summary.approvedCount} / {summary.requiredCount}
+                </p>
+                <p className="mt-1 text-xs uppercase tracking-wider text-zinc-400">
+                  Approved Players
+                </p>
+                <p className="mt-3 break-words text-xs leading-5 text-zinc-400">
+                  Active cohort: {summary.activeCohortCount} · Waiting:{" "}
+                  {summary.waitlistCount}
+                </p>
+                <p className="mt-2 text-xs font-black text-zinc-200">
+                  {formatTournamentDivisionState(summary.divisionState)}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 

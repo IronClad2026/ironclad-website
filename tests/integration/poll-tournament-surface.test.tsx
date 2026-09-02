@@ -187,6 +187,7 @@ function makeTournament(): TournamentCard {
     players: 0,
     maxPlayers: 8,
     brackets: [],
+    divisionStates: [],
     details: "Feature C surface fixture.",
     rules: "Format A rules.",
     schedule: [],

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SUPPORTED_LOCALES, type Locale } from "@/lib/i18n/config";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { interpolateMessage } from "@/lib/i18n/translate";
+import { resolveTournamentDivisionStates } from "@/lib/tournament-division-state";
 import type {
   GeneratedTournamentMatch,
   TournamentCard,
@@ -174,6 +175,22 @@ function makeTournament(): TournamentCard {
         prize: "Main / Pro division",
       },
     ],
+    divisionStates: resolveTournamentDivisionStates({
+      tournamentId: TOURNAMENT_ID,
+      eventStatus: "completed",
+      divisions: [
+        {
+          canonicalName: "Main",
+          bracketId: BRACKET_ID,
+          approvedCount: 8,
+          requiredCount: 8,
+          isReady: true,
+          launchedAt: "2026-08-25T00:00:00.000Z",
+          generatedBracketId: "33333333-3333-4333-8333-333333333333",
+          isCompetitionComplete: true,
+        },
+      ],
+    }),
     details: "Completed bracket regression fixture.",
     rules: "Format A rules.",
     schedule: [],

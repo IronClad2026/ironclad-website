@@ -17,7 +17,16 @@ import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import type { AdminRegistrationStatus } from "@/lib/admin-registration-review";
 import { loadAdminNotifications } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import type { TournamentStatus } from "@/lib/tournaments";
+import {
+  formatTournamentDivisionState,
+  formatTournamentEventDivisionState,
+  type TournamentDivisionStateResolution,
+} from "@/lib/tournament-division-state";
+import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
+import type {
+  TournamentBracketName,
+  TournamentStatus,
+} from "@/lib/tournaments";
 
 type CustomClaims = {
   metadata?: {
@@ -70,6 +79,11 @@ type TournamentSummaryRow = {
   status: TournamentStatus;
   grand_final_at: string | null;
   created_at: string;
+  tournament_brackets?: Array<{
+    id: string;
+    name: TournamentBracketName;
+    launched_at: string | null;
+  }>;
 };
 
 const registrationFilters: LegacyRegistrationFilter[] = [
@@ -198,7 +212,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase.from("registrations").select("registration_status"),
       supabase
         .from("tournaments")
-        .select("id, title, status, grand_final_at, created_at")
+        .select(
+          "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, launched_at)"
+        )
         .order("grand_final_at", { ascending: false, nullsFirst: false }),
       loadAdminNotifications(50),
     ]);
@@ -233,6 +249,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     );
   const registrationSummaryAvailable = !registrationResult.error;
   const tournamentSummaryAvailable = !tournamentResult.error;
+  const divisionStatesByTournament = tournamentSummaryAvailable
+    ? await loadTournamentDivisionStates(supabase, activeTournaments)
+    : new Map<string, readonly TournamentDivisionStateResolution[]>();
   const summaryCards = [
     {
       label: "Pending Registrations",
@@ -464,20 +483,43 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </p>
           ) : (
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {activeTournaments.slice(0, 6).map((tournament) => (
-                <Link
-                  key={tournament.id}
-                  href={`/admin/tournaments/${tournament.id}?section=overview`}
-                  className="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:border-orange-400/45 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
-                >
-                  <p className="break-words font-black text-white">
-                    {tournament.title}
-                  </p>
-                  <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">
-                    {formatStatus(tournament.status)}
-                  </p>
-                </Link>
-              ))}
+              {activeTournaments.slice(0, 6).map((tournament) => {
+                const divisionStates = divisionStatesByTournament.get(
+                  tournament.id
+                );
+
+                if (!divisionStates) {
+                  throw new Error(
+                    "Admin Command Center Tournament state could not be loaded."
+                  );
+                }
+
+                return (
+                  <Link
+                    key={tournament.id}
+                    href={`/admin/tournaments/${tournament.id}?section=overview`}
+                    aria-label={`${tournament.title} — ${formatTournamentEventDivisionState(divisionStates)}`}
+                    className="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:border-orange-400/45 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+                  >
+                    <p className="break-words font-black text-white">
+                      {tournament.title}
+                    </p>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-300">
+                      {formatStatus(tournament.status)}
+                    </p>
+                    <span className="mt-3 flex flex-wrap gap-2">
+                      {divisionStates.map((division) => (
+                        <span
+                          key={division.canonicalName}
+                          className="rounded-lg border border-white/10 bg-black/35 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-300"
+                        >
+                          {division.displayName}: {formatTournamentDivisionState(division)}
+                        </span>
+                      ))}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>

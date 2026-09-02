@@ -167,8 +167,17 @@ describe("registration cohort presentation", () => {
     expect(adminRegistrationsSource).toContain(
       "data-registration-readiness-summary={group.key}"
     );
-    expect(adminRegistrationsSource).toContain('" · READY"');
-    expect(adminRegistrationsSource).toContain('" · LAUNCHED / LOCKED"');
+    expect(adminRegistrationsSource).toContain(
+      "loadTournamentDivisionStates("
+    );
+    expect(adminRegistrationsSource).toContain(
+      "formatTournamentDivisionState(readiness.divisionState)"
+    );
+    expect(adminRegistrationsSource).toContain(
+      "getEffectiveTournamentDivisionState("
+    );
+    expect(adminRegistrationsSource).not.toContain('" · READY"');
+    expect(adminRegistrationsSource).not.toContain('" · LAUNCHED / LOCKED"');
     expect(adminRegistrationsSource).toContain(
       "data-registration-fifo-summary={group.key}"
     );

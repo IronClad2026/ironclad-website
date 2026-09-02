@@ -10,7 +10,10 @@ import type {
   AdminTournamentWorkspaceRow,
   AdminTournamentWorkspaceSummary,
 } from "@/lib/admin-tournament-workspace";
-import { getTournamentBracketDisplayName } from "@/lib/tournaments";
+import {
+  formatTournamentDivisionState,
+  formatTournamentEventDivisionState,
+} from "@/lib/tournament-division-state";
 
 export default function TournamentOverview({
   summary,
@@ -20,6 +23,7 @@ export default function TournamentOverview({
   tournament: AdminTournamentWorkspaceRow;
 }) {
   const brackets = tournament.tournament_brackets ?? [];
+  const bracketById = new Map(brackets.map((bracket) => [bracket.id, bracket]));
 
   return (
     <section aria-labelledby="workspace-overview-title" className="min-w-0">
@@ -37,6 +41,9 @@ export default function TournamentOverview({
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
             Existing Tournament facts only. Choose a management area from the
             right-side menu to work on one function at a time.
+          </p>
+          <p className="mt-3 break-words text-sm font-bold leading-6 text-orange-100">
+            {formatTournamentEventDivisionState(summary.divisionStates)}
           </p>
         </div>
 
@@ -85,31 +92,49 @@ export default function TournamentOverview({
       </div>
 
       <div className="mt-5 grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {brackets.map((bracket) => (
-          <article
-            key={bracket.id}
-            className="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4"
-          >
-            <p className="text-xs font-black uppercase tracking-wider text-orange-300">
-              Division
-            </p>
-            <h3 className="mt-2 break-words text-lg font-black text-white">
-              {getTournamentBracketDisplayName(bracket.name)}
-            </h3>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <BracketFact label="Capacity" value={String(bracket.max_players)} />
-              <BracketFact
-                label="Status"
-                value={bracket.launched_at ? "Launched" : "Private"}
-              />
-              <BracketFact
-                label="Map Pool"
-                value={bracket.map_pool_published_at ? "Published" : "Draft"}
-              />
-              <BracketFact label="ELO" value={bracket.elo_rules} />
-            </dl>
-          </article>
-        ))}
+        {summary.divisionStates.map((division) => {
+          const bracket = division.bracketId
+            ? bracketById.get(division.bracketId)
+            : undefined;
+
+          return (
+            <article
+              key={division.canonicalName}
+              className="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4"
+            >
+              <p className="text-xs font-black uppercase tracking-wider text-orange-300">
+                Division
+              </p>
+              <h3 className="mt-2 break-words text-lg font-black text-white">
+                {division.displayName}
+              </h3>
+              <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <BracketFact
+                  label="Capacity"
+                  value={bracket ? String(bracket.max_players) : "Not enabled"}
+                />
+                <BracketFact
+                  label="Status"
+                  value={formatTournamentDivisionState(division)}
+                />
+                <BracketFact
+                  label="Map Pool"
+                  value={
+                    bracket
+                      ? bracket.map_pool_published_at
+                        ? "Published"
+                        : "Draft"
+                      : "Not enabled"
+                  }
+                />
+                <BracketFact
+                  label="ELO"
+                  value={bracket?.elo_rules ?? "Not enabled"}
+                />
+              </dl>
+            </article>
+          );
+        })}
       </div>
 
       <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/[0.06] p-4 sm:flex-row sm:flex-wrap">

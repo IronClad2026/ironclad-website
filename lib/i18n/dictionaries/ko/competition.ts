@@ -6,6 +6,7 @@ const dictionary = {
     tabs: { overview: "개요", participants: "참가자", brackets: "대진표", decisions: "투표 및 결정", media: "미디어", announcements: "공지" },
     panels: { details: "상세 정보", rules: "규칙", prizes: "상금", schedule: "일정", contact: "연락처" },
     status: { open: "열림", inProgress: "진행 중", completed: "완료", cancelled: "취소됨", closed: "닫힘", generated: "생성됨", awaitingGeneration: "생성 대기", pendingReview: "검토 대기", upcoming: "예정" },
+    divisionState: { disabled: "비활성화됨", filling: "참가자 모집 중 — {approved}/{required}", ready: "시작 준비 완료 — {approved}/{required}", inProgress: "진행 중", completed: "완료", cancelled: "취소됨", voided: "무효 처리됨" },
     hero: { tournament: "토너먼트", approvedSlots: "승인된 자리", divisionInProgress: "디비전 진행 중", waitlistOpen: "대기 명단 열림", openEvents: "열린 이벤트", scheduleHint: "토너먼트 일정 확인" },
     actions: { register: "등록", joinWaitlist: "대기 명단 참여", registrationClosed: "등록 종료 — 이 디비전은 이미 시작되었습니다.", viewBattlefy: "Battlefy에서 보기", openProfile: "프로필 열기", signIn: "로그인", createAccount: "계정 만들기", completeProfile: "프로필 완성", close: "닫기" },
     terminal: { cancelled: "취소된 토너먼트", voided: "무효 처리된 토너먼트", historical: "읽기 전용 과거 기록", historicalTitle: "과거 기록", unavailable: "종료 상태의 토너먼트에서는 등록 및 결과 작업을 사용할 수 없습니다.", cancelledMessage: "이 토너먼트는 공식 경기 결과가 나오기 전에 취소되었습니다.", voidedMessage: "이 토너먼트는 무효 처리되었습니다. 실제 경기 기록은 보존되지만 공식 순위에는 더 이상 반영되지 않습니다." },

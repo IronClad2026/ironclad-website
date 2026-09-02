@@ -102,6 +102,7 @@ const tournament: TournamentCard = {
       prize: "Included in tournament prize pool",
     },
   ],
+  divisionStates: [],
   details: "Rules summary fixture.",
   rules: "Tournament-specific Format A rules remain in effect.",
   schedule: [],

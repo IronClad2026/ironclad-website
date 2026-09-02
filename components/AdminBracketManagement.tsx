@@ -9,6 +9,10 @@ import AdminBracketPopulation, {
 } from "@/components/AdminBracketPopulation";
 import { launchTournamentDivision } from "@/app/admin/tournaments/actions";
 import {
+  formatTournamentDivisionState,
+  type TournamentDivisionStateResolution,
+} from "@/lib/tournament-division-state";
+import {
   isTournamentTerminalStatus,
   type TournamentStatus,
 } from "@/lib/tournaments";
@@ -27,6 +31,7 @@ export type AdminBracketTournamentOption = {
       requiredCount: number;
       isReady: boolean;
       launchedAt: string | null;
+      divisionState: TournamentDivisionStateResolution;
       mapPoolPublishedAt: string | null;
       currentMapCount: number;
     }
@@ -95,6 +100,7 @@ export default function AdminBracketManagement({
   const canLaunch = Boolean(
     selectedBracket?.generatedBracketId &&
       selectedBracket.isReady &&
+      selectedBracket.divisionState.state === "ready" &&
       assignmentsComplete &&
       structureComplete &&
       mapPoolReady &&
@@ -275,12 +281,10 @@ export default function AdminBracketManagement({
                   <p className="break-words font-black text-white">
                     {selectedTournament.title} - {selectedBracket.bracketName}
                   </p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    {selectedBracket.approvedCount}/{selectedBracket.requiredCount}
-                    {" "}approved
-                    {selectedBracket.isReady
-                      ? " — ready for private bracket preparation"
-                      : " — administrator review incomplete"}
+                  <p className="mt-1 text-xs font-bold text-zinc-400">
+                    {formatTournamentDivisionState(
+                      selectedBracket.divisionState
+                    )}
                   </p>
                   <p
                     className={`mt-2 text-xs font-black uppercase tracking-wider ${

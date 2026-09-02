@@ -13,6 +13,7 @@ const dictionary = {
     tabs: { overview: "概览", participants: "参赛者", brackets: "对阵表", decisions: "投票与决定", media: "媒体", announcements: "公告" },
     panels: { details: "详情", rules: "规则", prizes: "奖励", schedule: "赛程", contact: "联系" },
     status: { open: "开放", inProgress: "进行中", completed: "已完成", cancelled: "已取消", closed: "已关闭", generated: "已生成", awaitingGeneration: "等待生成", pendingReview: "等待审核", upcoming: "即将开始" },
+    divisionState: { disabled: "已禁用", filling: "招募中 — {approved}/{required}", ready: "准备开赛 — {approved}/{required}", inProgress: "进行中", completed: "已完成", cancelled: "已取消", voided: "已作废" },
     hero: { tournament: "锦标赛", approvedSlots: "个已批准名额", divisionInProgress: "组别进行中", waitlistOpen: "候补名单开放", openEvents: "开放赛事", scheduleHint: "查看锦标赛赛程" },
     actions: { register: "报名", joinWaitlist: "加入候补名单", registrationClosed: "报名已关闭 — 此组别已开始。", viewBattlefy: "在 Battlefy 查看", openProfile: "打开个人资料", signIn: "登录", createAccount: "创建账户", completeProfile: "完善个人资料", close: "关闭" },
     terminal: { cancelled: "已取消的锦标赛", voided: "已作废的锦标赛", historical: "只读历史记录", historicalTitle: "历史记录", unavailable: "终止状态的锦标赛不可进行报名或赛果相关操作。", cancelledMessage: "此锦标赛在产生正式竞技结果前已取消。", voidedMessage: "此锦标赛已作废。其比赛事实记录会保留，但不再计入官方排名。" },
