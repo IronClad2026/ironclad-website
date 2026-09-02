@@ -742,6 +742,82 @@ export async function closeTournamentDivisionWithoutLaunch(
   );
 }
 
+export async function createTournamentDivisionInvitationAction(
+  formData: FormData
+) {
+  const { userId, sessionClaims } = await auth();
+  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
+
+  if (!userId || role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  await requireCurrentAccountLegalAcceptance();
+
+  const sourceRegistrationId = getText(formData, "sourceRegistrationId");
+  const targetTournamentBracketId = getText(
+    formData,
+    "targetTournamentBracketId"
+  );
+
+  if (
+    !isUuid(sourceRegistrationId) ||
+    !isUuid(targetTournamentBracketId)
+  ) {
+    redirectToBracketManagement(formData, "division-invitation-invalid");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc(
+    "create_tournament_division_invitation",
+    {
+      p_source_registration_id: sourceRegistrationId,
+      p_target_tournament_bracket_id: targetTournamentBracketId,
+      p_actor_clerk_user_id: userId,
+    }
+  );
+  const result = readDivisionInvitationResult(
+    data,
+    sourceRegistrationId,
+    targetTournamentBracketId
+  );
+
+  if (error || !result) {
+    const candidateCode =
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code.toUpperCase()
+        : "";
+    console.error("Tournament Division invitation creation failed.", {
+      code: /^[A-Z0-9]{3,10}$/.test(candidateCode)
+        ? candidateCode
+        : "INVITE_FAILED",
+    });
+    redirectToBracketManagement(formData, "division-invitation-failed");
+  }
+
+  for (const path of [
+    "/admin",
+    "/admin/tournaments",
+    "/dashboard",
+  ]) {
+    revalidatePath(path);
+  }
+  const workspaceTournamentId = getWorkspaceTournamentId(formData);
+  if (workspaceTournamentId) {
+    revalidatePath(`/admin/tournaments/${workspaceTournamentId}`, "page");
+  }
+
+  redirectToBracketManagement(
+    formData,
+    result.alreadyPending
+      ? "division-invitation-already-pending"
+      : "division-invitation-sent"
+  );
+}
+
 export async function cancelTournamentAction(
   _previousState: TournamentTerminalActionState,
   formData: FormData
@@ -1314,6 +1390,33 @@ function readNotHeldClosureResult(
   return {
     alreadyNotHeld: value.alreadyNotHeld,
   };
+}
+
+function readDivisionInvitationResult(
+  value: unknown,
+  sourceRegistrationId: string,
+  targetTournamentBracketId: string
+) {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value) ||
+    !("invitationId" in value) ||
+    typeof value.invitationId !== "string" ||
+    !isUuid(value.invitationId) ||
+    !("sourceRegistrationId" in value) ||
+    value.sourceRegistrationId !== sourceRegistrationId ||
+    !("targetTournamentBracketId" in value) ||
+    value.targetTournamentBracketId !== targetTournamentBracketId ||
+    !("status" in value) ||
+    value.status !== "pending" ||
+    !("alreadyPending" in value) ||
+    typeof value.alreadyPending !== "boolean"
+  ) {
+    return null;
+  }
+
+  return { alreadyPending: value.alreadyPending };
 }
 
 function isUuid(value: string) {

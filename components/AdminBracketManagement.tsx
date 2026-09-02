@@ -7,6 +7,10 @@ import { GitBranch, RefreshCw } from "lucide-react";
 import AdminBracketPopulation, {
   type BracketPopulationData,
 } from "@/components/AdminBracketPopulation";
+import AdminDivisionInvitationPanel, {
+  type AdminDivisionInvitationRegistration,
+  type AdminDivisionInvitationTarget,
+} from "@/components/AdminDivisionInvitationPanel";
 import {
   closeTournamentDivisionWithoutLaunch,
   launchTournamentDivision,
@@ -47,6 +51,8 @@ export type AdminBracketTournamentOption = {
         activeRegistrationCount: number;
         waitlistRegistrationCount: number;
       } | null;
+      invitationRegistrations: AdminDivisionInvitationRegistration[];
+      invitationTargets: AdminDivisionInvitationTarget[];
     }
   >;
 };
@@ -69,7 +75,11 @@ export default function AdminBracketManagement({
     | "division-not-held"
     | "division-already-not-held"
     | "division-not-held-invalid"
-    | "division-not-held-failed";
+    | "division-not-held-failed"
+    | "division-invitation-sent"
+    | "division-invitation-already-pending"
+    | "division-invitation-invalid"
+    | "division-invitation-failed";
 }) {
   const router = useRouter();
   const [tournamentId, setTournamentId] = useState(
@@ -191,7 +201,9 @@ export default function AdminBracketManagement({
               notice === "division-launched" ||
               notice === "division-already-launched" ||
               notice === "division-not-held" ||
-              notice === "division-already-not-held"
+              notice === "division-already-not-held" ||
+              notice === "division-invitation-sent" ||
+              notice === "division-invitation-already-pending"
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
               : "border-red-500/30 bg-red-500/10 text-red-300"
           }`}
@@ -212,6 +224,14 @@ export default function AdminBracketManagement({
                   ? "Division launch failed. Confirm readiness, all eight unique assignments, and private-draft integrity."
                   : notice === "division-not-held-failed"
                     ? "Not Held closure failed. Confirm the Division is unlaunched, below readiness, and free of competitive evidence."
+                    : notice === "division-invitation-sent"
+                      ? "Invitation sent. The player must still accept and complete the normal registration flow."
+                      : notice === "division-invitation-already-pending"
+                        ? "The canonical pending invitation already exists; no duplicate was created."
+                        : notice === "division-invitation-invalid"
+                          ? "Choose one explicit matching open Division before sending the invitation."
+                          : notice === "division-invitation-failed"
+                            ? "Invitation failed. Confirm the source registration remains eligible and the explicit target still accepts registration."
                     : "Bracket assignments could not be saved. Confirm every selected player is approved and unique."}
         </div>
       )}
@@ -425,6 +445,11 @@ export default function AdminBracketManagement({
               <p className="mt-3 text-xs font-bold uppercase tracking-wider text-zinc-500">
                 Immutable audit · registrations preserved · zero competition accounting
               </p>
+              <AdminDivisionInvitationPanel
+                registrations={selectedBracket.invitationRegistrations}
+                targets={selectedBracket.invitationTargets}
+                workspaceTournamentId={fixedTournamentId}
+              />
             </section>
           ) : !terminalTournament &&
             selectedBracket &&

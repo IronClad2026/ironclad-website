@@ -21,6 +21,7 @@ vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
 import {
   closeTournamentDivisionWithoutLaunch,
+  createTournamentDivisionInvitationAction,
   generateTournamentBracket,
   launchTournamentDivision,
 } from "@/app/admin/tournaments/actions";
@@ -73,6 +74,17 @@ function notHeldFormData({
   formData.set("workspaceTournamentId", tournamentId);
   formData.set("confirmation", confirmation);
   formData.set("detail", detail);
+  return formData;
+}
+
+function invitationFormData({
+  sourceRegistrationId = "44444444-4444-4444-8444-444444444444",
+  targetTournamentBracketId = "55555555-5555-4555-8555-555555555555",
+} = {}) {
+  const formData = new FormData();
+  formData.set("sourceRegistrationId", sourceRegistrationId);
+  formData.set("targetTournamentBracketId", targetTournamentBracketId);
+  formData.set("workspaceTournamentId", tournamentId);
   return formData;
 }
 
@@ -292,6 +304,75 @@ describe("administrator Not Held Division action", () => {
     expect(console.error).toHaveBeenCalledWith(
       "Tournament Division Not Held closure failed.",
       { code: "NOT_HELD_FAILED" }
+    );
+  });
+});
+
+describe("administrator optional Division invitation action", () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    createSupabaseAdminClientMock.mockReset();
+    redirectMock.mockClear();
+    revalidatePathMock.mockReset();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("rejects a non-administrator before privileged access", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+
+    await expect(
+      createTournamentDivisionInvitationAction(invitationFormData())
+    ).rejects.toThrow("Unauthorized");
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("delegates one explicit source and target to the invitation authority", async () => {
+    const sourceRegistrationId = "44444444-4444-4444-8444-444444444444";
+    const targetTournamentBracketId = "55555555-5555-4555-8555-555555555555";
+    const rpc = vi.fn(async () => ({
+      data: {
+        invitationId: "66666666-6666-4666-8666-666666666666",
+        sourceRegistrationId,
+        sourceTournamentBracketId: bracketId,
+        targetTournamentId: "77777777-7777-4777-8777-777777777777",
+        targetTournamentBracketId,
+        status: "pending",
+        createdAt: "2026-09-03T08:00:00.000Z",
+        alreadyPending: false,
+      },
+      error: null,
+    }));
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ rpc });
+
+    await expect(
+      createTournamentDivisionInvitationAction(invitationFormData())
+    ).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&bracketNotice=division-invitation-sent`
+    );
+    expect(rpc).toHaveBeenCalledExactlyOnceWith(
+      "create_tournament_division_invitation",
+      {
+        p_source_registration_id: sourceRegistrationId,
+        p_target_tournament_bracket_id: targetTournamentBracketId,
+        p_actor_clerk_user_id: adminIdentity.userId,
+      }
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("does not claim success for malformed authority output", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { status: "pending", alreadyPending: false },
+      error: null,
+    }));
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ rpc });
+
+    await expect(
+      createTournamentDivisionInvitationAction(invitationFormData())
+    ).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&bracketNotice=division-invitation-failed`
     );
   });
 });

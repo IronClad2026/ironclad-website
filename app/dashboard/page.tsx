@@ -20,6 +20,7 @@ import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
 import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
+import PlayerDivisionInvitations from "@/components/PlayerDivisionInvitations";
 import PlayerRegistrationActions from "@/components/PlayerRegistrationActions";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import { acknowledgeBadgeReveal } from "@/app/dashboard/badge-reveal-actions";
@@ -43,6 +44,7 @@ import {
   loadPlayerCareerDashboard,
   type PlayerStatistics,
 } from "@/lib/player-dashboard";
+import { loadPlayerTournamentDivisionInvitations } from "@/lib/tournament-division-invitations";
 import {
   type PlayerProfile,
 } from "@/lib/player-profile";
@@ -168,6 +170,12 @@ export default async function PlayerDashboardPage() {
       first(registration.tournaments)?.status ?? "upcoming",
   }));
   const profileComplete = profile?.profile_completed === true;
+  const divisionInvitationState =
+    profileResult.error
+      ? { status: "error" as const, invitations: [] }
+      : !profile
+        ? { status: "success" as const, invitations: [] }
+        : await loadPlayerTournamentDivisionInvitations(userId, profile.id);
   const badgeRevealState = profileResult.error
     ? { status: "error" as const, code: "award-load-failed" as const }
     : await loadPlayerBadgeRevealDashboardState(
@@ -408,6 +416,11 @@ export default async function PlayerDashboardPage() {
           revealLoadError={badgeRevealLoadError}
           dictionary={dictionaries.badges}
           locale={locale}
+        />
+
+        <PlayerDivisionInvitations
+          invitations={divisionInvitationState.invitations}
+          loadError={divisionInvitationState.status === "error"}
         />
 
         <section className="mt-8">

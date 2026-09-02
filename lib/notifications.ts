@@ -642,6 +642,10 @@ function buildNotificationHref(
     return "/dashboard/badges";
   }
 
+  if (row.type === "tournament.division_invitation") {
+    return "/dashboard#division-invitations";
+  }
+
   if (
     row.registration_id &&
     (row.type === "registration.approved" ||

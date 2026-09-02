@@ -453,6 +453,10 @@ function getBracketNotice(value?: string) {
     "division-already-not-held",
     "division-not-held-invalid",
     "division-not-held-failed",
+    "division-invitation-sent",
+    "division-invitation-already-pending",
+    "division-invitation-invalid",
+    "division-invitation-failed",
   ] as const;
   return valid.find((notice) => notice === value);
 }
