@@ -1,4 +1,4 @@
-import { CheckCircle, Clock3 } from "lucide-react";
+import { Clock3 } from "lucide-react";
 import Link from "next/link";
 import {
   approveSelectedRegistrations,
@@ -6,6 +6,7 @@ import {
 } from "@/app/admin/registration-actions";
 import AdminRegistrationReviewRows from "@/components/AdminRegistrationReviewRows";
 import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
+import AdminRegistrationApproveSelected from "@/components/AdminRegistrationApproveSelected";
 import AdminRegistrationDetailDialog from "@/components/admin/tournaments/AdminRegistrationDetailDialog";
 import type {
   AdminTournamentRegistrationFilter,
@@ -83,15 +84,12 @@ export default function AdminTournamentRegistrations({
                   value={section}
                 />
               </form>
-              <button
-                type="submit"
-                form={formId}
-                disabled={!data.hasBulkApprovableRegistration}
-                className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-zinc-600 sm:w-auto"
-              >
-                <CheckCircle aria-hidden="true" className="h-4 w-4" />
-                Approve Selected
-              </button>
+              <AdminRegistrationApproveSelected
+                formId={formId}
+                name="registrationId"
+                scope={tournament.id}
+                className="shrink-0"
+              />
             </>
           )}
         </div>
@@ -182,7 +180,7 @@ export default function AdminTournamentRegistrations({
       )}
 
       <div className="mt-5 min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 sm:p-5">
-        <div className="mb-4 flex min-w-0 items-center justify-between gap-3">
+        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-300">
               {playersView ? "Roster records" : "Registration records"}
@@ -192,12 +190,18 @@ export default function AdminTournamentRegistrations({
             </p>
           </div>
           {!playersView && (
-            <div className="xl:hidden">
+            <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:hidden">
               <AdminRegistrationSelectAll
                 formId={formId}
                 name="registrationId"
                 scope={tournament.id}
                 showLabel
+                className="w-full"
+              />
+              <AdminRegistrationApproveSelected
+                formId={formId}
+                name="registrationId"
+                scope={tournament.id}
               />
             </div>
           )}

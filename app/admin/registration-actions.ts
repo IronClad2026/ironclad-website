@@ -750,7 +750,9 @@ export async function approveSelectedRegistrations(formData: FormData) {
 
   for (const registration of orderedRegistrations) {
     if (registration.registration_status === "approved") {
-      approvedCount += 1;
+      failures.push(
+        `${registration.player_name || registration.id}: registration is already approved`
+      );
       continue;
     }
 
@@ -764,6 +766,23 @@ export async function approveSelectedRegistrations(formData: FormData) {
     if (registration.registration_status === "withdrawn") {
       failures.push(
         `${registration.player_name || registration.id}: withdrawal is final for this tournament`
+      );
+      continue;
+    }
+
+    if (registration.registration_status === "rejected") {
+      failures.push(
+        `${registration.player_name || registration.id}: rejected registrations require individual administrator review`
+      );
+      continue;
+    }
+
+    if (
+      registration.registration_status !== "pending" &&
+      registration.registration_status !== "manual_review"
+    ) {
+      failures.push(
+        `${registration.player_name || registration.id}: registration is not eligible for bulk approval`
       );
       continue;
     }

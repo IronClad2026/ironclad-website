@@ -783,9 +783,8 @@ function isBulkApprovable(
   return (
     !isTournamentTerminal &&
     !registration.isDivisionLaunched &&
-    registration.status !== "waitlisted" &&
-    registration.status !== "withdrawn" &&
-    registration.status !== "approved"
+    (registration.status === "pending" ||
+      registration.status === "manual_review")
   );
 }
 
