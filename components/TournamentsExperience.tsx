@@ -6672,6 +6672,7 @@ export default function TournamentsExperience({
   const rawPanelParam = searchParams.get("panel");
   const rawMatchParam = searchParams.get("match");
   const rawPollParam = searchParams.get("poll");
+  const rawRegisterParam = searchParams.get("register");
   const activeTab = getValidTab(rawTabParam);
   const publicTournaments = useMemo(
     () => getPublicTournamentNavigation(tournaments),
@@ -6705,6 +6706,7 @@ export default function TournamentsExperience({
   const [showMobilePanel, setShowMobilePanel] = useState(false);
   const mobileHeroStartRef = useRef<HTMLDivElement | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const automaticRegistrationRef = useRef(false);
   const [registrationPresentation, setRegistrationPresentation] =
     useState<RegistrationPresentation>("desktop");
   const [registrationProfile, setRegistrationProfile] =
@@ -6743,6 +6745,7 @@ export default function TournamentsExperience({
         params.delete("panel");
       }
       params.delete("match");
+      params.delete("register");
       if (
         tab !== "decisions" ||
         (rawPollParam !== null && focusedPollId === null)
@@ -6869,7 +6872,7 @@ export default function TournamentsExperience({
     });
   };
 
-  const beginRegistration = async () => {
+  const beginRegistration = useCallback(async () => {
     setRegistrationPresentation(
       typeof window !== "undefined" &&
         (typeof window.matchMedia === "function"
@@ -6941,9 +6944,16 @@ export default function TournamentsExperience({
       console.error("Tournament profile eligibility check failed unexpectedly.");
       setRegistrationGate("error");
     }
-  };
+  }, [
+    authenticatedSupabase,
+    isSignedIn,
+    registrationDocuments,
+    selectedTournament,
+    userId,
+    viewer.relicVerifiedDivision,
+  ]);
 
-  const handleRegisterClick = async () => {
+  const handleRegisterClick = useCallback(async () => {
     if (selectedViewerRegistration) return;
 
     if (locale !== "en") {
@@ -6952,7 +6962,28 @@ export default function TournamentsExperience({
     }
 
     await beginRegistration();
-  };
+  }, [beginRegistration, locale, selectedViewerRegistration]);
+
+  useEffect(() => {
+    if (rawRegisterParam !== "1" || automaticRegistrationRef.current) {
+      return;
+    }
+
+    automaticRegistrationRef.current = true;
+    const params = new URLSearchParams(searchParamString);
+    params.delete("register");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+    void handleRegisterClick();
+  }, [
+    handleRegisterClick,
+    pathname,
+    rawRegisterParam,
+    router,
+    searchParamString,
+  ]);
 
   const continueRegistrationInEnglish = async () => {
     if (isContinuingEnglish) return;

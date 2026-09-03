@@ -337,12 +337,28 @@ export async function loadAdminTournamentBracketWorkspaceData(
   const supabase = createSupabaseAdminClient();
   const brackets = tournament.tournament_brackets ?? [];
   const bracketIds = brackets.map((bracket) => bracket.id);
-  const [registrationResult, generatedResult, mapPoolResult, closureResult] =
-    await Promise.all([
+  const reconciliationResult = await supabase.rpc(
+    "reconcile_tournament_division_invitations",
+    {
+      p_target_tournament_id: null,
+      p_target_tournament_bracket_id: null,
+      p_recipient_player_id: null,
+    }
+  );
+  const [
+    registrationResult,
+    generatedResult,
+    mapPoolResult,
+    closureResult,
+    invitationResult,
+    allBracketResult,
+    allTournamentResult,
+    allClosureResult,
+  ] = await Promise.all([
       supabase
         .from("registrations")
         .select(
-          "id, player_name, country, submitted_elo, registration_status, tournament_bracket_id, waitlist_offer_status"
+          "id, profile_id, clerk_user_id, player_name, country, submitted_elo, registration_status, tournament_bracket_id, waitlist_offer_status"
         )
         .eq("tournament_id", tournament.id),
       bracketIds.length > 0
@@ -368,13 +384,38 @@ export async function loadAdminTournamentBracketWorkspaceData(
             )
             .in("tournament_bracket_id", bracketIds)
         : Promise.resolve({ data: [], error: null }),
+      bracketIds.length > 0
+        ? supabase
+            .from("tournament_division_invitations")
+            .select(
+              "id, source_registration_id, source_tournament_bracket_id, target_tournament_bracket_id, status, created_at, invalidation_reason"
+            )
+            .in("source_tournament_bracket_id", bracketIds)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from("tournament_brackets")
+        .select("id, tournament_id, name, launched_at"),
+      supabase
+        .from("tournaments")
+        .select(
+          "id, title, status, registration_enabled, registration_open_at, registration_close_at, terminal_at"
+        ),
+      supabase
+        .from("tournament_division_not_held_closures")
+        .select("tournament_bracket_id"),
     ]);
 
   if (
+    reconciliationResult.error ||
     registrationResult.error ||
     generatedResult.error ||
     mapPoolResult.error ||
-    closureResult.error
+    closureResult.error ||
+    invitationResult.error ||
+    allBracketResult.error ||
+    allTournamentResult.error ||
+    allClosureResult.error
   ) {
     console.error("Admin Tournament bracket workspace load failed.", {
       operation: "load-tournament-bracket",
@@ -391,6 +432,55 @@ export async function loadAdminTournamentBracketWorkspaceData(
   }
 
   const registrations = registrationResult.data ?? [];
+  const sourcePlayerIds = [
+    ...new Set(
+      registrations.flatMap((registration) =>
+        typeof registration.profile_id === "string"
+          ? [registration.profile_id]
+          : []
+      )
+    ),
+  ];
+  const playerResult =
+    sourcePlayerIds.length > 0
+      ? await supabase
+          .from("players")
+          .select("id, account_closed_at")
+          .in("id", sourcePlayerIds)
+      : { data: [], error: null };
+
+  if (playerResult.error) {
+    console.error("Admin Tournament invitation player load failed.", {
+      operation: "load-tournament-invitation-players",
+    });
+    return {
+      tournament: {
+        id: tournament.id,
+        title: tournament.title,
+        status: tournament.status,
+        brackets: [],
+      },
+      loadError: true,
+    };
+  }
+
+  const openPlayerIds = new Set(
+    (playerResult.data ?? [])
+      .filter((player) => player.account_closed_at === null)
+      .map((player) => player.id)
+  );
+  const allClosures = new Set(
+    (allClosureResult.data ?? []).map(
+      (closure) => closure.tournament_bracket_id
+    )
+  );
+  const tournamentsById = new Map(
+    (allTournamentResult.data ?? []).map((candidate) => [candidate.id, candidate])
+  );
+  const targetBracketsById = new Map(
+    (allBracketResult.data ?? []).map((candidate) => [candidate.id, candidate])
+  );
+  const now = Date.now();
   const generatedByBracket = new Map(
     ((generatedResult.data ?? []) as Array<{
       id: string;
@@ -526,6 +616,84 @@ export async function loadAdminTournamentBracketWorkspaceData(
                   closure.waitlist_registration_count,
               }
             : null,
+          invitationRegistrations: registrations
+            .filter(
+              (registration) =>
+                registration.tournament_bracket_id === bracket.id &&
+                typeof registration.profile_id === "string" &&
+                openPlayerIds.has(registration.profile_id) &&
+                ["pending", "manual_review", "approved", "waitlisted"].includes(
+                  registration.registration_status
+                )
+            )
+            .map((registration) => ({
+              id: registration.id,
+              playerName: registration.player_name,
+              registrationStatus: registration.registration_status as
+                | "pending"
+                | "manual_review"
+                | "approved"
+                | "waitlisted",
+              invitations: (invitationResult.data ?? [])
+                .filter(
+                  (invitation) =>
+                    invitation.source_registration_id === registration.id
+                )
+                .map((invitation) => ({
+                  id: invitation.id,
+                  targetTournamentTitle:
+                    tournamentsById.get(
+                      targetBracketsById.get(
+                        invitation.target_tournament_bracket_id
+                      )?.tournament_id ?? ""
+                    )?.title ?? "Unavailable Tournament",
+                  status: invitation.status as
+                    | "pending"
+                    | "accepted"
+                    | "declined"
+                    | "invalidated",
+                  createdAt: invitation.created_at,
+                  invalidationReason: invitation.invalidation_reason,
+                })),
+            })),
+          invitationTargets: (allBracketResult.data ?? []).flatMap(
+            (candidate) => {
+              const targetTournament = tournamentsById.get(
+                candidate.tournament_id
+              );
+              const registrationOpenAt = targetTournament?.registration_open_at
+                ? Date.parse(targetTournament.registration_open_at)
+                : null;
+              const registrationCloseAt =
+                targetTournament?.registration_close_at
+                  ? Date.parse(targetTournament.registration_close_at)
+                  : null;
+              const acceptsRegistration = Boolean(
+                targetTournament &&
+                  candidate.id !== bracket.id &&
+                  candidate.name === bracket.name &&
+                  candidate.launched_at === null &&
+                  !allClosures.has(candidate.id) &&
+                  ["registration_open", "in_progress"].includes(
+                    targetTournament.status
+                  ) &&
+                  targetTournament.terminal_at === null &&
+                  targetTournament.registration_enabled === true &&
+                  (registrationOpenAt === null || now >= registrationOpenAt) &&
+                  (registrationCloseAt === null || now <= registrationCloseAt)
+              );
+
+              return acceptsRegistration
+                ? [
+                    {
+                      bracketId: candidate.id,
+                      tournamentId: candidate.tournament_id,
+                      tournamentTitle: targetTournament!.title,
+                    },
+                  ]
+                : [];
+            }
+          ),
           participants: approvedParticipants.map((registration) => ({
             id: registration.id,
             name: registration.player_name,

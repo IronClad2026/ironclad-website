@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/app/admin/tournaments/actions", () => ({
   closeTournamentDivisionWithoutLaunch: vi.fn(),
+  createTournamentDivisionInvitationAction: vi.fn(),
   launchTournamentDivision: vi.fn(),
   saveBracketAssignments: vi.fn(),
 }));
@@ -82,6 +83,8 @@ function tournamentOption(
         mapPoolPublishedAt: "2026-08-15T00:00:00.000Z",
         currentMapCount: 5,
         notHeldAudit: null,
+        invitationRegistrations: [],
+        invitationTargets: [],
         ...overrides,
       },
     ],
@@ -234,6 +237,72 @@ describe("administrator private bracket launch controls", () => {
     expect(screen.getByText(/Immutable audit/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Launch Division" }))
       .not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Confirm Not Held Closure" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers optional explicit targets without making an invitation part of closure", () => {
+    const bracketId = "323e4567-e89b-42d3-a456-426614174000";
+    render(
+      <AdminBracketManagement
+        fixedTournamentId="123e4567-e89b-42d3-a456-426614174000"
+        tournaments={[
+          tournamentOption({
+            generatedBracketId: null,
+            format: null,
+            approvedCount: 0,
+            activeRegistrationCount: 1,
+            isReady: false,
+            divisionState: {
+              tournamentId: "123e4567-e89b-42d3-a456-426614174000",
+              canonicalName: "Academy",
+              displayName: "Academy Bracket",
+              bracketId,
+              state: "not_held",
+              terminalOverlay: null,
+              approvedCount: 0,
+              requiredCount: 8,
+              isReady: false,
+              launchedAt: null,
+              generatedBracketId: null,
+              isCompetitionComplete: false,
+              notHeldAt: "2026-09-03T01:00:00.000Z",
+              notHeldReasonCode: "minimum_roster_not_reached",
+            },
+            notHeldAudit: {
+              reasonCode: "minimum_roster_not_reached",
+              detail: null,
+              closedAt: "2026-09-03T01:00:00.000Z",
+              closedByClerkUserId: "admin_test",
+              activeRegistrationCount: 1,
+              waitlistRegistrationCount: 0,
+            },
+            invitationRegistrations: [
+              {
+                id: "registration-one",
+                playerName: "Eligible Player",
+                registrationStatus: "pending",
+                invitations: [],
+              },
+            ],
+            invitationTargets: [
+              {
+                bracketId: "target-bracket",
+                tournamentId: "target-event",
+                tournamentTitle: "IronClad Open Two",
+              },
+            ],
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByText("Optional next-event invitations")).toBeVisible();
+    expect(screen.getByRole("option", { name: "IronClad Open Two" }))
+      .toBeVisible();
+    expect(screen.getByRole("button", { name: "Send invitation" }))
+      .toBeEnabled();
     expect(
       screen.queryByRole("button", { name: "Confirm Not Held Closure" })
     ).not.toBeInTheDocument();

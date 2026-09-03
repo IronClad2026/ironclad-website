@@ -2,7 +2,9 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export type PlayerRegistrationActionState = {
@@ -24,6 +26,11 @@ export type PlayerRegistrationActionCode =
   | "withdrawn"
   | "offer_accepted"
   | "offer_declined";
+
+export type PlayerDivisionInvitationActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
 
 export async function withdrawTournamentRegistrationAction(
   _previousState: PlayerRegistrationActionState,
@@ -160,6 +167,65 @@ export async function respondToWaitlistOfferAction(
   };
 }
 
+export async function respondToTournamentDivisionInvitationAction(
+  _previousState: PlayerDivisionInvitationActionState,
+  formData: FormData
+): Promise<PlayerDivisionInvitationActionState> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return invitationError("Sign in before responding to an invitation.");
+  }
+
+  const invitationId = getUuid(formData, "invitationId");
+  const response = formData.get("response");
+
+  if (!invitationId || (response !== "accept" && response !== "decline")) {
+    return invitationError("Choose Accept or Decline for this invitation.");
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc(
+    "respond_to_tournament_division_invitation",
+    {
+      p_invitation_id: invitationId,
+      p_recipient_clerk_user_id: userId,
+      p_response: response,
+    }
+  );
+  const result = readInvitationResponse(data, invitationId);
+
+  if (error || !result) {
+    logPlayerRegistrationFailure(`division-invitation-${response}`, error);
+    return invitationError("The invitation could not be updated.");
+  }
+
+  if (result.status === "invalidated") {
+    return invitationError(
+      "This invitation is no longer available. Current registration eligibility still applies."
+    );
+  }
+
+  revalidatePlayerRegistrationPaths();
+
+  if (response === "accept" && result.status === "accepted") {
+    const tournament = result.targetTournamentSlug || result.targetTournamentId;
+    redirect(
+      `/tournaments?tournament=${encodeURIComponent(tournament)}&register=1`
+    );
+  }
+
+  if (response === "decline" && result.status === "declined") {
+    return {
+      status: "success",
+      message: "Invitation declined. No registration was created.",
+    };
+  }
+
+  logPlayerRegistrationFailure("division-invitation-invalid-result");
+  return invitationError("The invitation could not be updated.");
+}
+
 type AuthenticatedSupabaseClient = Awaited<
   ReturnType<typeof createAuthenticatedSupabaseClient>
 >;
@@ -203,6 +269,35 @@ function errorState(
   return { status: "error", message, code };
 }
 
+function invitationError(message: string): PlayerDivisionInvitationActionState {
+  return { status: "error", message };
+}
+
+function readInvitationResponse(value: unknown, invitationId: string) {
+  const result = firstRow(value);
+  if (
+    !isRecord(result) ||
+    result.invitationId !== invitationId ||
+    (result.status !== "accepted" &&
+      result.status !== "declined" &&
+      result.status !== "invalidated") ||
+    typeof result.targetTournamentId !== "string" ||
+    !isUuid(result.targetTournamentId) ||
+    typeof result.targetTournamentBracketId !== "string" ||
+    !isUuid(result.targetTournamentBracketId) ||
+    (typeof result.targetTournamentSlug !== "string" &&
+      result.targetTournamentSlug !== null)
+  ) {
+    return null;
+  }
+
+  return {
+    status: result.status,
+    targetTournamentId: result.targetTournamentId,
+    targetTournamentSlug: result.targetTournamentSlug?.trim() ?? "",
+  };
+}
+
 function getUuid(formData: FormData, field: string) {
   const value = formData.get(field);
   return typeof value === "string" &&
@@ -211,6 +306,12 @@ function getUuid(formData: FormData, field: string) {
     )
     ? value
     : null;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
 }
 
 function firstRow(value: unknown) {
