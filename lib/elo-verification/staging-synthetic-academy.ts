@@ -1,6 +1,11 @@
 import "server-only";
 
-import { getRelic1v1Elo, type RelicEloResult } from "@/lib/elo-verification/relic";
+import {
+  getRelic1v1Elo,
+  type Relic1v1Faction,
+  type RelicEloResult,
+} from "@/lib/elo-verification/relic";
+import type { IronCladDivision } from "@/lib/elo-verification/divisions";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { supabaseUrl } from "@/lib/supabase-config";
 
@@ -25,10 +30,26 @@ export type RegistrationRelicEloResult =
   | RelicEloResult
   | SyntheticAcademyRatedResult;
 
-type RegistrationIdentity = {
+export type RegistrationIdentity = {
   playerId: string;
   clerkUserId: string;
   steamId64: string;
+};
+
+export type PersistedRegistrationViewerRelic = {
+  elo: unknown;
+  faction: unknown;
+  division: unknown;
+  calculationVersion: unknown;
+};
+
+export type EffectiveRegistrationViewerRelic = {
+  status: "rated";
+  elo: number | null;
+  faction: Relic1v1Faction | null;
+  division: IronCladDivision;
+  calculationVersion: string | null;
+  source: "persisted" | "staging_synthetic";
 };
 
 export async function getRegistrationRelic1v1Elo({
@@ -54,8 +75,70 @@ export async function getRegistrationRelic1v1EloForProject({
   identity: RegistrationIdentity;
   projectUrl: string;
 }): Promise<RegistrationRelicEloResult> {
+  const syntheticResult = await resolveStagingSyntheticAcademyRelic({
+    supabase,
+    identity,
+    projectUrl,
+  });
+
+  return syntheticResult ?? getRelic1v1Elo(identity.steamId64);
+}
+
+export async function getEffectiveRegistrationViewerRelic({
+  supabase,
+  identity,
+  persisted,
+}: {
+  supabase: SupabaseAdminClient;
+  identity: RegistrationIdentity;
+  persisted: PersistedRegistrationViewerRelic;
+}): Promise<EffectiveRegistrationViewerRelic | null> {
+  return getEffectiveRegistrationViewerRelicForProject({
+    supabase,
+    identity,
+    persisted,
+    projectUrl: supabaseUrl,
+  });
+}
+
+export async function getEffectiveRegistrationViewerRelicForProject({
+  supabase,
+  identity,
+  persisted,
+  projectUrl,
+}: {
+  supabase: SupabaseAdminClient;
+  identity: RegistrationIdentity;
+  persisted: PersistedRegistrationViewerRelic;
+  projectUrl: string;
+}): Promise<EffectiveRegistrationViewerRelic | null> {
+  const syntheticResult = await resolveStagingSyntheticAcademyRelic({
+    supabase,
+    identity,
+    projectUrl,
+  });
+
+  if (syntheticResult) {
+    return {
+      ...syntheticResult,
+      source: "staging_synthetic",
+    };
+  }
+
+  return parsePersistedRegistrationViewerRelic(persisted);
+}
+
+async function resolveStagingSyntheticAcademyRelic({
+  supabase,
+  identity,
+  projectUrl,
+}: {
+  supabase: SupabaseAdminClient;
+  identity: RegistrationIdentity;
+  projectUrl: string;
+}): Promise<SyntheticAcademyRatedResult | null> {
   if (!isConfirmedStagingSupabaseProjectUrl(projectUrl)) {
-    return getRelic1v1Elo(identity.steamId64);
+    return null;
   }
 
   let lookup: { data: unknown; error: unknown };
@@ -68,17 +151,15 @@ export async function getRegistrationRelic1v1EloForProject({
     });
   } catch {
     console.error("Synthetic Academy rating lookup failed unexpectedly.");
-    return getRelic1v1Elo(identity.steamId64);
+    return null;
   }
 
   if (lookup.error) {
     console.error("Synthetic Academy rating lookup failed.");
-    return getRelic1v1Elo(identity.steamId64);
+    return null;
   }
 
-  const syntheticResult = parseSyntheticAcademyResult(lookup.data);
-
-  return syntheticResult ?? getRelic1v1Elo(identity.steamId64);
+  return parseSyntheticAcademyResult(lookup.data);
 }
 
 export function isConfirmedStagingSupabaseProjectUrl(value: string) {
@@ -129,6 +210,46 @@ function parseSyntheticAcademyResult(
     division: STAGING_SYNTHETIC_ACADEMY_DIVISION,
     calculationVersion: STAGING_SYNTHETIC_ACADEMY_CALCULATION_VERSION,
   };
+}
+
+function parsePersistedRegistrationViewerRelic(
+  value: PersistedRegistrationViewerRelic
+): EffectiveRegistrationViewerRelic | null {
+  const division = parseIronCladDivision(value.division);
+
+  if (!division) {
+    return null;
+  }
+
+  return {
+    status: "rated",
+    elo: Number.isSafeInteger(value.elo) ? (value.elo as number) : null,
+    faction: parseRelicFaction(value.faction),
+    division,
+    calculationVersion:
+      typeof value.calculationVersion === "string" &&
+      value.calculationVersion.length > 0
+        ? value.calculationVersion
+        : null,
+    source: "persisted",
+  };
+}
+
+function parseIronCladDivision(value: unknown): IronCladDivision | null {
+  return value === "Academy" ||
+    value === "Challenge" ||
+    value === "Main / Pro"
+    ? value
+    : null;
+}
+
+function parseRelicFaction(value: unknown): Relic1v1Faction | null {
+  return value === "US Forces" ||
+    value === "British Forces" ||
+    value === "Deutsches Afrikakorps" ||
+    value === "Wehrmacht"
+    ? value
+    : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

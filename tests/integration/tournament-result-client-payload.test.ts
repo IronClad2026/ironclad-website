@@ -21,6 +21,7 @@ const mapGeneratedBracketsMock = vi.hoisted(() => vi.fn());
 const mapTournamentRowMock = vi.hoisted(() => vi.fn());
 const loadTournamentPollsForRequestMock = vi.hoisted(() => vi.fn());
 const getRequestLocaleMock = vi.hoisted(() => vi.fn());
+const getEffectiveRegistrationViewerRelicMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -40,6 +41,11 @@ vi.mock("@/lib/player-polls", () => ({
 
 vi.mock("@/lib/i18n/request", () => ({
   getRequestLocale: getRequestLocaleMock,
+}));
+
+vi.mock("@/lib/elo-verification/staging-synthetic-academy", () => ({
+  getEffectiveRegistrationViewerRelic:
+    getEffectiveRegistrationViewerRelicMock,
 }));
 
 vi.mock("@/lib/platform-settings", () => ({
@@ -104,6 +110,7 @@ const REPORT_GROUP_ID = "55555555-5555-4555-8555-555555555555";
 const PROOF_ID = "66666666-6666-4666-8666-666666666666";
 const VIEWER_REGISTRATION_ID =
   "77777777-7777-4777-8777-777777777777";
+const VIEWER_PROFILE_ID = "12121212-1212-4212-8212-121212121212";
 const OPPONENT_REGISTRATION_ID =
   "88888888-8888-4888-8888-888888888888";
 const SECRET_PLAYER_ID = "user_synthetic_browser_player";
@@ -527,7 +534,24 @@ function createPageClient(
     },
   };
   const viewerDivisionQuery = createQuery({
-    data: { relic_verified_division: verifiedDivision },
+    data: {
+      id: VIEWER_PROFILE_ID,
+      clerk_user_id: viewerClerkUserId,
+      steam_id64: "76561198000000000",
+      relic_verified_elo:
+        verifiedDivision === null || verifiedDivision === undefined
+          ? null
+          : 1_500,
+      relic_verified_faction:
+        verifiedDivision === null || verifiedDivision === undefined
+          ? null
+          : "Wehrmacht",
+      relic_verified_division: verifiedDivision,
+      relic_elo_calculation_version:
+        verifiedDivision === null || verifiedDivision === undefined
+          ? null
+          : "relic-highest-1v1-v1",
+    },
     error: verifiedDivisionError,
   });
   const registrationQuery = createQuery(results.registrations);
@@ -694,8 +718,10 @@ describe("tournament Client Component result payload", () => {
     mapTournamentRowMock.mockReset();
     loadTournamentPollsForRequestMock.mockReset();
     getRequestLocaleMock.mockReset();
+    getEffectiveRegistrationViewerRelicMock.mockReset();
 
     getRequestLocaleMock.mockResolvedValue("en");
+    getEffectiveRegistrationViewerRelicMock.mockResolvedValue(null);
     getEloVerificationSettingMock.mockResolvedValue({
       enabled: true,
       error: null,
@@ -865,7 +891,7 @@ describe("tournament Client Component result payload", () => {
     };
 
     expect(client.viewerDivisionQuery.select).toHaveBeenCalledWith(
-      "relic_verified_division"
+      "id, clerk_user_id, steam_id64, relic_verified_elo, relic_verified_faction, relic_verified_division, relic_elo_calculation_version"
     );
     expect(client.viewerDivisionQuery.eq).toHaveBeenCalledWith(
       "clerk_user_id",
@@ -873,6 +899,76 @@ describe("tournament Client Component result payload", () => {
     );
     expect(client.viewerDivisionQuery.maybeSingle).toHaveBeenCalledOnce();
     expect(viewer.relicVerifiedDivision).toBe("Main / Pro");
+    expect(getEffectiveRegistrationViewerRelicMock).toHaveBeenCalledWith({
+      supabase: client,
+      identity: {
+        playerId: VIEWER_PROFILE_ID,
+        clerkUserId: SECRET_PLAYER_ID,
+        steamId64: "76561198000000000",
+      },
+      persisted: {
+        elo: 1_500,
+        faction: "Wehrmacht",
+        division: "Main / Pro",
+        calculationVersion: "relic-highest-1v1-v1",
+      },
+    });
+  });
+
+  it("projects an authorized synthetic Staging viewer as Academy without writing registration data", async () => {
+    getEffectiveRegistrationViewerRelicMock.mockResolvedValue({
+      status: "rated",
+      elo: 1_000,
+      faction: "US Forces",
+      division: "Academy",
+      calculationVersion: "staging-synthetic-academy-v1",
+      source: "staging_synthetic",
+    });
+
+    const { client, props } = await loadClientProps({
+      admin: false,
+      verifiedDivision: null,
+      tournamentStatus: "registration_open",
+    });
+    const viewer = props.viewer as {
+      relicVerifiedDivision: string | null;
+      registrations: unknown[];
+    };
+
+    expect(viewer.relicVerifiedDivision).toBe("Academy");
+    expect(viewer.registrations).toHaveLength(1);
+    expect(getEffectiveRegistrationViewerRelicMock).toHaveBeenCalledWith({
+      supabase: client,
+      identity: {
+        playerId: VIEWER_PROFILE_ID,
+        clerkUserId: SECRET_PLAYER_ID,
+        steamId64: "76561198000000000",
+      },
+      persisted: {
+        elo: null,
+        faction: null,
+        division: null,
+        calculationVersion: null,
+      },
+    });
+    expect(client.rpc).not.toHaveBeenCalledWith(
+      "submit_verified_player_registration",
+      expect.anything()
+    );
+  });
+
+  it("keeps a normal unverified viewer on the existing Profile-verification path", async () => {
+    const { props } = await loadClientProps({
+      admin: false,
+      verifiedDivision: null,
+      tournamentStatus: "registration_open",
+    });
+    const viewer = props.viewer as {
+      relicVerifiedDivision: string | null;
+    };
+
+    expect(viewer.relicVerifiedDivision).toBeNull();
+    expect(getEffectiveRegistrationViewerRelicMock).toHaveBeenCalledOnce();
   });
 
   it("keeps Relic registration ELO snapshots frozen when profile Current ELO changes", async () => {

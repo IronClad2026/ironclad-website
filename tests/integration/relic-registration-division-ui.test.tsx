@@ -374,6 +374,43 @@ describe("Relic verified-division registration UI", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("lets an effective synthetic Academy viewer select TEST 2 and continue on phone", () => {
+    const testTwo: TournamentCard = {
+      ...tournament,
+      slug: "test-2-2",
+      title: "TEST 2",
+    };
+
+    renderModal("Academy", testTwo, { presentation: "phone" });
+
+    const phoneStep = document.querySelector(
+      '[data-registration-phone-step="tournament"]'
+    );
+    expect(phoneStep).not.toBeNull();
+    const selectedSummary = within(phoneStep as HTMLElement).getByRole(
+      "region",
+      { name: competitionEnglish.registrationModal.selectedTournament }
+    );
+
+    expect(within(selectedSummary).getByText("TEST 2")).toBeInTheDocument();
+    expect(
+      within(selectedSummary).getByText("Academy Bracket")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Verify your ELO from the Profile page before registering."
+      )
+    ).not.toBeInTheDocument();
+    const continueButton = screen.getByRole("button", { name: "Continue" });
+    expect(continueButton).toBeEnabled();
+    fireEvent.click(continueButton);
+
+    expect(
+      screen.getByRole("heading", { name: "Player Readiness" })
+    ).toBeInTheDocument();
+    expect(submitTournamentRegistrationMock).not.toHaveBeenCalled();
+  });
+
   it("renders only eligible Tournaments in desktop selection and preserves mobile filtering", () => {
     const completedTournament: TournamentCard = {
       ...alternateTournament,
