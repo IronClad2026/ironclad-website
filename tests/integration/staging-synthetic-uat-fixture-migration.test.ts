@@ -17,6 +17,13 @@ const registrationAction = readFileSync(
   resolve(process.cwd(), "app/tournaments/actions.ts"),
   "utf8"
 );
+const registrationEloAdapter = readFileSync(
+  resolve(
+    process.cwd(),
+    "lib/elo-verification/staging-synthetic-academy.ts"
+  ),
+  "utf8"
+);
 const databaseContract = readFileSync(
   resolve(
     process.cwd(),
@@ -234,12 +241,15 @@ describe("Staging synthetic UAT truthfulness and evidence", () => {
     );
   });
 
-  it("does not replace the real registration RPC or remove its Relic call", () => {
+  it("does not replace the real registration RPC or remove the real Relic fallback", () => {
     expect(migration).not.toMatch(
       /create(?:\s+or\s+replace)?\s+function\s+public\.submit_verified_player_registration\s*\(/i
     );
     expect(registrationAction).toContain(
-      "relicResult = await getRelic1v1Elo(identity.player.steamId64)"
+      "relicResult = await getRegistrationRelic1v1Elo({"
+    );
+    expect(registrationEloAdapter).toContain(
+      "return getRelic1v1Elo(identity.steamId64)"
     );
     expect(registrationAction).toContain(
       '"submit_verified_player_registration"'

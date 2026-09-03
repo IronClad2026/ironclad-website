@@ -7,10 +7,11 @@ import {
   getIronCladDivision,
   type IronCladDivision,
 } from "@/lib/elo-verification/divisions";
+import { type RelicEloResult } from "@/lib/elo-verification/relic";
 import {
-  getRelic1v1Elo,
-  type RelicEloResult,
-} from "@/lib/elo-verification/relic";
+  getRegistrationRelic1v1Elo,
+  type RegistrationRelicEloResult,
+} from "@/lib/elo-verification/staging-synthetic-academy";
 import { createInAppNotification } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getRequestLocale } from "@/lib/i18n/request";
@@ -243,10 +244,17 @@ export async function submitTournamentRegistration(
     return failure(REGISTRATION_UNAVAILABLE_MESSAGE, "REGISTRATION_UNAVAILABLE");
   }
 
-  let relicResult: RelicEloResult;
+  let relicResult: RegistrationRelicEloResult;
 
   try {
-    relicResult = await getRelic1v1Elo(identity.player.steamId64);
+    relicResult = await getRegistrationRelic1v1Elo({
+      supabase,
+      identity: {
+        playerId: identity.player.id,
+        clerkUserId: userId,
+        steamId64: identity.player.steamId64,
+      },
+    });
   } catch {
     console.error("Tournament registration Relic request failed unexpectedly.");
     return failure(
