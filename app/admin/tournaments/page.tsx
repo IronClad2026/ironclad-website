@@ -14,6 +14,7 @@ import {
 import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
 import {
   getTournamentBracketDisplayName,
+  getTournamentRegistrationStatusLabel,
   type TournamentBracketName,
   type TournamentStatus,
 } from "@/lib/tournaments";
@@ -37,6 +38,9 @@ type AdminTournamentListRow = {
   id: string;
   title: string;
   status: TournamentStatus;
+  registration_enabled: boolean;
+  registration_open_at: string | null;
+  registration_close_at: string | null;
   created_at: string;
   tournament_brackets?: Array<{
     id: string;
@@ -73,7 +77,7 @@ export default async function AdminTournamentsPage({
     supabase
       .from("tournaments")
       .select(
-        "id, title, status, created_at, tournament_brackets(id, name, max_players, launched_at)"
+        "id, title, status, registration_enabled, registration_open_at, registration_close_at, created_at, tournament_brackets(id, name, max_players, launched_at)"
       )
       .order("created_at", { ascending: false }),
     supabase
@@ -209,7 +213,12 @@ export default async function AdminTournamentsPage({
                       {tournament.title}
                     </p>
                     <p className="mt-2 text-xs font-black uppercase tracking-wider text-orange-300">
-                      {formatLabel(tournament.status)}
+                      {getTournamentRegistrationStatusLabel({
+                        statusValue: tournament.status,
+                        registrationEnabled: tournament.registration_enabled,
+                        registrationOpenAt: tournament.registration_open_at,
+                        registrationCloseAt: tournament.registration_close_at,
+                      })}
                     </p>
                   </div>
                 </div>

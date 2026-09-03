@@ -181,7 +181,8 @@ const capabilities: Capability[] = [
         file: "editor",
         includes: [
           '["upcoming", "Closed"]',
-          '["registration_open", "Open"]',
+          '["registration_open", registrationOpenLabel]',
+          "getTournamentRegistrationStatusLabel",
         ],
       },
     ],
@@ -1039,6 +1040,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260903130000_not_held_division_closure.sql",
       "20260903160000_division_accounting_cutover.sql",
       "20260903190000_not_held_next_event_invitations.sql",
+      "20260903210000_registration_open_state_consistency.sql",
     ]);
     const platformMigrationNames = migrationNames.filter(
       (name) =>
@@ -1064,29 +1066,32 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.at(-8)).toBe(
+    expect(migrationNames.at(-9)).toBe(
       "20260831133000_staging_badge_cross_division_acceptance.sql"
     );
-    expect(migrationNames.at(-7)).toBe(
+    expect(migrationNames.at(-8)).toBe(
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql"
     );
-    expect(migrationNames.at(-6)).toBe(
+    expect(migrationNames.at(-7)).toBe(
       "20260902100000_unlaunched_event_void_authority.sql"
     );
-    expect(migrationNames.at(-5)).toBe(
+    expect(migrationNames.at(-6)).toBe(
       "20260902130000_event_based_tournament_scheduling.sql"
     );
-    expect(migrationNames.at(-4)).toBe(
+    expect(migrationNames.at(-5)).toBe(
       "20260903100000_division_settlement_shadow_foundation.sql"
     );
-    expect(migrationNames.at(-3)).toBe(
+    expect(migrationNames.at(-4)).toBe(
       "20260903130000_not_held_division_closure.sql"
     );
-    expect(migrationNames.at(-2)).toBe(
+    expect(migrationNames.at(-3)).toBe(
       "20260903160000_division_accounting_cutover.sql"
     );
-    expect(migrationNames.at(-1)).toBe(
+    expect(migrationNames.at(-2)).toBe(
       "20260903190000_not_held_next_event_invitations.sql"
+    );
+    expect(migrationNames.at(-1)).toBe(
+      "20260903210000_registration_open_state_consistency.sql"
     );
     expect(
       normalizedSha256(

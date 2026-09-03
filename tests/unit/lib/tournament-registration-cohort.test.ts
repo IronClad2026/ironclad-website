@@ -6,6 +6,7 @@ import {
   isActiveReviewCohortStatus,
 } from "@/lib/tournament-registration-cohort";
 import {
+  getTournamentRegistrationAvailability,
   isTournamentBracketPublic,
   isTournamentRegistrationOpen,
 } from "@/lib/tournaments";
@@ -80,6 +81,76 @@ describe("Phase 4 registration cohort presentation contract", () => {
         Date.parse("2026-08-05T01:30:00.000Z")
       )
     ).toBe(true);
+  });
+
+  it.each([
+    {
+      name: "opens when both optional timestamps are absent",
+      overrides: { registrationOpenAt: null, registrationCloseAt: null },
+      expected: "open",
+    },
+    {
+      name: "waits for an explicit future opening",
+      overrides: {
+        registrationOpenAt: "2026-08-05T01:31:00.000Z",
+        registrationCloseAt: null,
+      },
+      expected: "scheduled",
+    },
+    {
+      name: "closes after an explicit closing time",
+      overrides: {
+        registrationOpenAt: null,
+        registrationCloseAt: "2026-08-05T01:29:00.000Z",
+      },
+      expected: "window_closed",
+    },
+    {
+      name: "opens inside an explicit active window",
+      overrides: {
+        registrationOpenAt: "2026-08-05T01:00:00.000Z",
+        registrationCloseAt: "2026-08-05T02:00:00.000Z",
+      },
+      expected: "open",
+    },
+    {
+      name: "closes for an upcoming Event",
+      overrides: {
+        statusValue: "upcoming",
+        registrationOpenAt: null,
+        registrationCloseAt: null,
+      },
+      expected: "status_closed",
+    },
+    {
+      name: "closes for a terminal Event",
+      overrides: {
+        statusValue: "voided",
+        registrationOpenAt: null,
+        registrationCloseAt: null,
+      },
+      expected: "status_closed",
+    },
+    {
+      name: "closes when the lifecycle authority disables registration",
+      overrides: {
+        registrationEnabled: false,
+        registrationOpenAt: null,
+        registrationCloseAt: null,
+      },
+      expected: "disabled",
+    },
+  ])("$name", ({ overrides, expected }) => {
+    const availability = getTournamentRegistrationAvailability(
+      {
+        statusValue: "registration_open",
+        registrationEnabled: true,
+        ...overrides,
+      },
+      Date.parse("2026-08-05T01:30:00.000Z")
+    );
+
+    expect(availability).toBe(expected);
   });
 
   it("keeps prelaunch generated brackets private", () => {
