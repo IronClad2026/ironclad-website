@@ -301,6 +301,13 @@ comment on function public.save_tournament(
 -- Repair only the known save-order shape: an otherwise open, wholly
 -- unlaunched Event with at least one unresolved Division. Explicit windows
 -- remain unchanged and continue to govern effective availability.
+-- Supabase migrations run through a dedicated login role rather than a
+-- PostgREST JWT. Mark only this transaction-local maintenance statement as
+-- trusted so the existing invitation reconciliation trigger can run normally.
+set local request.jwt.claim.role = 'service_role';
+set local request.jwt.claims =
+  '{"role":"service_role","sub":"migration:registration-open-state-consistency"}';
+
 update public.tournaments as tournament
 set status = tournament.status
 where tournament.status = 'registration_open'
