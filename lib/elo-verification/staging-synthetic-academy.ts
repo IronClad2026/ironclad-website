@@ -81,7 +81,11 @@ export async function getRegistrationRelic1v1EloForProject({
     projectUrl,
   });
 
-  return syntheticResult ?? getRelic1v1Elo(identity.steamId64);
+  if (syntheticResult) {
+    return syntheticResult;
+  }
+
+  return getRelic1v1Elo(identity.steamId64);
 }
 
 export async function getEffectiveRegistrationViewerRelic({
