@@ -4,6 +4,7 @@ import TournamentsExperience from "@/components/TournamentsExperience";
 import { loadEffectiveRegistrationDocumentSet } from "@/lib/legal-documents";
 import { loadTournamentPollsForRequest } from "@/lib/player-polls";
 import { loadMatchResultData } from "@/lib/match-result-data";
+import { getEffectiveRegistrationViewerRelic } from "@/lib/elo-verification/staging-synthetic-academy";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
 import {
@@ -89,10 +90,12 @@ export default async function TournamentsPage({
       } | null
     )?.metadata?.role === "admin";
   const supabase = createSupabaseAdminClient();
-  const viewerDivisionRequest = userId
+  const viewerProfileRequest = userId
     ? supabase
         .from("players")
-        .select("relic_verified_division")
+        .select(
+          "id, clerk_user_id, steam_id64, relic_verified_elo, relic_verified_faction, relic_verified_division, relic_elo_calculation_version"
+        )
         .eq("clerk_user_id", userId)
         .maybeSingle()
     : Promise.resolve({ data: null, error: null });
@@ -102,7 +105,7 @@ export default async function TournamentsPage({
     registrationResult,
     generatedBracketResult,
     notHeldResult,
-    viewerDivisionResult,
+    viewerProfileResult,
     registrationDocuments,
   ] = await Promise.all([
     supabase
@@ -123,23 +126,53 @@ export default async function TournamentsPage({
       includeAdminAudit: isAdmin,
     }),
     supabase.rpc("get_tournament_division_not_held_states"),
-    viewerDivisionRequest,
+    viewerProfileRequest,
     loadEffectiveRegistrationDocumentSet(supabase),
   ]);
 
-  if (viewerDivisionResult.error) {
+  if (viewerProfileResult.error) {
     console.error("Tournament verified division load failed.");
   }
 
-  const relicVerifiedDivision = viewerDivisionResult.error
+  const viewerProfile = viewerProfileResult.error
     ? null
-    : normalizeRelicVerifiedDivision(
-        (
-          viewerDivisionResult.data as {
-            relic_verified_division?: unknown;
-          } | null
-        )?.relic_verified_division
-      );
+    : (viewerProfileResult.data as {
+        id?: unknown;
+        clerk_user_id?: unknown;
+        steam_id64?: unknown;
+        relic_verified_elo?: unknown;
+        relic_verified_faction?: unknown;
+        relic_verified_division?: unknown;
+        relic_elo_calculation_version?: unknown;
+      } | null);
+  let relicVerifiedDivision = viewerProfileResult.error
+    ? null
+    : normalizeRelicVerifiedDivision(viewerProfile?.relic_verified_division);
+
+  if (
+    userId &&
+    typeof viewerProfile?.id === "string" &&
+    viewerProfile.clerk_user_id === userId &&
+    typeof viewerProfile.steam_id64 === "string"
+  ) {
+    const effectiveViewerRelic = await getEffectiveRegistrationViewerRelic({
+      supabase,
+      identity: {
+        playerId: viewerProfile.id,
+        clerkUserId: userId,
+        steamId64: viewerProfile.steam_id64,
+      },
+      persisted: {
+        elo: viewerProfile.relic_verified_elo,
+        faction: viewerProfile.relic_verified_faction,
+        division: viewerProfile.relic_verified_division,
+        calculationVersion: viewerProfile.relic_elo_calculation_version,
+      },
+    });
+
+    relicVerifiedDivision =
+      effectiveViewerRelic?.division ?? relicVerifiedDivision;
+  }
 
   if (tournamentResult.error) {
     console.error("Tournament list load failed.");
@@ -167,7 +200,7 @@ export default async function TournamentsPage({
     registrationResult.error ||
     generatedBracketResult.error ||
     notHeldResult.error ||
-    viewerDivisionResult.error
+    viewerProfileResult.error
   ) {
     throw new Error("Tournament data could not be loaded.");
   }
