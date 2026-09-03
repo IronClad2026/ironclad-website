@@ -95,6 +95,16 @@ describe("registration-open state consistency repair", () => {
     expect(reconciliation).not.toMatch(/delete from|truncate|insert into/);
   });
 
+  it("keeps invitation reconciliation active in the migration context", () => {
+    expect(migration).toContain(
+      "set local request.jwt.claim.role = 'service_role'"
+    );
+    expect(migration).toContain(
+      "set local request.jwt.claims = '{\"role\":\"service_role\",\"sub\":\"migration:registration-open-state-consistency\"}'"
+    );
+    expect(migration).not.toMatch(/disable trigger|drop trigger/);
+  });
+
   it("adds no Badge, points, season, notification, or registration writer", () => {
     expect(migration).not.toMatch(
       /player_badge|badge\.unlocked|leaderboard_point|season_membership|player_badge_reveal|insert into public\.registrations/
