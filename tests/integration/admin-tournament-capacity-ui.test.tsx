@@ -80,6 +80,7 @@ const existingTournamentValues: TournamentFormValues = {
   title: "Existing Eight Player Cup",
   description: "A current 1v1 tournament.",
   bannerImageUrl: "",
+  registrationEnabled: false,
   registrationOpenAt: "",
   registrationCloseAt: "",
   status: "upcoming",
@@ -152,5 +153,53 @@ describe("Admin tournament fixed capacity presentation", () => {
     ).toBeVisible();
     expect(screen.getByText("Edit Tournament")).toBeVisible();
     expectFixedEightPlayerCapacity();
+  });
+
+  it.each([
+    {
+      name: "an effectively open Event",
+      overrides: {
+        registrationEnabled: true,
+        registrationOpenAt: "",
+        registrationCloseAt: "",
+      },
+      label: "Open",
+    },
+    {
+      name: "a future registration window",
+      overrides: {
+        registrationEnabled: true,
+        registrationOpenAt: "2099-01-01T00:00",
+        registrationCloseAt: "",
+      },
+      label: "Scheduled — opens at the configured time",
+    },
+    {
+      name: "a lifecycle-disabled Event",
+      overrides: {
+        registrationEnabled: false,
+        registrationOpenAt: "",
+        registrationCloseAt: "",
+      },
+      label: "Unavailable — no open Division",
+    },
+  ])("does not mislabel $name as currently open", ({ overrides, label }) => {
+    render(
+      <TournamentEditor
+        values={{
+          ...existingTournamentValues,
+          status: "registration_open",
+          ...overrides,
+        }}
+        generatedByBracket={new Map()}
+        approvedByBracket={new Map()}
+        readinessByBracket={new Map()}
+        isEditing
+        terminal={null}
+        underReview={null}
+      />
+    );
+
+    expect(screen.getByRole("option", { name: label })).toBeInTheDocument();
   });
 });

@@ -97,6 +97,7 @@ begin
       from public.tournaments
       where id = v_academy
         and grand_final_at is null
+        and registration_enabled is true
         and registration_open_at = '2027-01-01T00:00:00Z'
         and registration_close_at = '2027-01-31T00:00:00Z'
     ),
@@ -130,6 +131,7 @@ begin
       where id in (v_challenge, v_main)
         and registration_open_at is null
         and registration_close_at is null
+        and registration_enabled is true
     ),
     'unrelated Divisions or blank optional dates were rejected'
   );

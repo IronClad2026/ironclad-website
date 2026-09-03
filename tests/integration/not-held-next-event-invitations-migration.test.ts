@@ -4,27 +4,19 @@ import { describe, expect, it } from "vitest";
 
 const migrationName = "20260903190000_not_held_next_event_invitations.sql";
 const previousMigrationName = "20260903160000_division_accounting_cutover.sql";
-const migration = readFileSync(
-  resolve(process.cwd(), "supabase/migrations", migrationName),
-  "utf8"
-);
+const migration = readSource("supabase/migrations", migrationName);
 const compact = migration.toLowerCase().replace(/\s+/g, " ").trim();
-const adminActions = readFileSync(
-  resolve(process.cwd(), "app/admin/tournaments/actions.ts"),
-  "utf8"
-);
-const playerActions = readFileSync(
-  resolve(process.cwd(), "app/dashboard/registration-actions.ts"),
-  "utf8"
-);
-const tournamentExperience = readFileSync(
-  resolve(process.cwd(), "components/TournamentsExperience.tsx"),
-  "utf8"
-);
-const notifications = readFileSync(
-  resolve(process.cwd(), "lib/notifications.ts"),
-  "utf8"
-);
+const adminActions = readSource("app/admin/tournaments/actions.ts");
+const playerActions = readSource("app/dashboard/registration-actions.ts");
+const tournamentExperience = readSource("components/TournamentsExperience.tsx");
+const notifications = readSource("lib/notifications.ts");
+
+function readSource(...path: string[]) {
+  return readFileSync(resolve(process.cwd(), ...path), "utf8").replaceAll(
+    "\r\n",
+    "\n"
+  );
+}
 
 function extractFunction(name: string) {
   const markers = [

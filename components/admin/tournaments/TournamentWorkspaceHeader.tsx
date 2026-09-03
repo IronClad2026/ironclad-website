@@ -12,7 +12,10 @@ import {
   formatTournamentDivisionState,
   formatTournamentEventDivisionState,
 } from "@/lib/tournament-division-state";
-import { getTournamentBracketDisplayName } from "@/lib/tournaments";
+import {
+  getTournamentBracketDisplayName,
+  getTournamentRegistrationStatusLabel,
+} from "@/lib/tournaments";
 
 export default function TournamentWorkspaceHeader({
   activeSection,
@@ -44,7 +47,12 @@ export default function TournamentWorkspaceHeader({
           </h1>
           <div className="mt-3 flex min-w-0 flex-wrap gap-2 text-[11px] font-black uppercase tracking-wider">
             <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1.5 text-orange-200">
-              {formatLabel(tournament.status)}
+              {getTournamentRegistrationStatusLabel({
+                statusValue: tournament.status,
+                registrationEnabled: tournament.registration_enabled,
+                registrationOpenAt: tournament.registration_open_at,
+                registrationCloseAt: tournament.registration_close_at,
+              })}
             </span>
             <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-zinc-300">
               {tournament.format}
@@ -120,9 +128,3 @@ const TOURNAMENT_MANAGEMENT_LABELS: Record<
   "map-pool": "Map Pool",
   controls: "Tournament Controls",
 };
-
-function formatLabel(value: string) {
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}

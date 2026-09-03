@@ -12,7 +12,10 @@ import type {
   TournamentBracketRow,
   TournamentRow,
 } from "@/lib/tournaments";
-import { TOURNAMENT_BRACKET_CONFIGS } from "@/lib/tournaments";
+import {
+  getTournamentRegistrationStatusLabel,
+  TOURNAMENT_BRACKET_CONFIGS,
+} from "@/lib/tournaments";
 
 export type TournamentEditorNotice =
   | "invalid"
@@ -40,6 +43,7 @@ export type TournamentFormValues = {
   slug: string;
   description: string;
   bannerImageUrl: string;
+  registrationEnabled: boolean;
   registrationOpenAt: string;
   registrationCloseAt: string;
   status: string;
@@ -112,6 +116,7 @@ export const EMPTY_TOURNAMENT_VALUES: TournamentFormValues = {
   slug: "",
   description: "",
   bannerImageUrl: "",
+  registrationEnabled: false,
   registrationOpenAt: "",
   registrationCloseAt: "",
   status: "upcoming",
@@ -274,7 +279,7 @@ export function TournamentEditor({
             name="status"
             defaultValue={values.status}
             disabled={!isEditing}
-            options={getEditableTournamentStatusOptions(values.status)}
+            options={getEditableTournamentStatusOptions(values)}
           />
           <SelectField
             label="Format"
@@ -682,6 +687,7 @@ export function toTournamentFormValues(
     slug: tournament.slug,
     description: tournament.description,
     bannerImageUrl: tournament.banner_image_url,
+    registrationEnabled: tournament.registration_enabled,
     registrationOpenAt: tournament.registration_open_at
       ? toDateTimeLocal(tournament.registration_open_at)
       : "",
@@ -732,8 +738,10 @@ function formatLabel(value: string) {
 }
 
 function getEditableTournamentStatusOptions(
-  currentStatus: string
+  values: TournamentFormValues
 ): Array<[string, string]> {
+  const currentStatus = values.status;
+
   if (currentStatus === "in_progress") {
     return [["in_progress", "In Progress — managed by division launch"]];
   }
@@ -750,9 +758,19 @@ function getEditableTournamentStatusOptions(
     return [["voided", "Voided — terminal history"]];
   }
 
+  const registrationOpenLabel =
+    currentStatus === "registration_open"
+      ? getTournamentRegistrationStatusLabel({
+          statusValue: values.status,
+          registrationEnabled: values.registrationEnabled,
+          registrationOpenAt: values.registrationOpenAt,
+          registrationCloseAt: values.registrationCloseAt,
+        })
+      : "Open";
+
   return [
     ["upcoming", "Closed"],
-    ["registration_open", "Open"],
+    ["registration_open", registrationOpenLabel],
   ];
 }
 

@@ -521,16 +521,25 @@ export function mapTournamentRow(
   };
 }
 
-export function isTournamentRegistrationOpen(
-  tournament: Pick<
-    TournamentCard,
-    | "statusValue"
-    | "registrationEnabled"
-    | "registrationOpenAt"
-    | "registrationCloseAt"
-  >,
+export type TournamentRegistrationAvailability =
+  | "open"
+  | "status_closed"
+  | "disabled"
+  | "scheduled"
+  | "window_closed"
+  | "invalid_window";
+
+type TournamentRegistrationAvailabilityInput = {
+  statusValue: string;
+  registrationEnabled: boolean;
+  registrationOpenAt: string | null;
+  registrationCloseAt: string | null;
+};
+
+export function getTournamentRegistrationAvailability(
+  tournament: TournamentRegistrationAvailabilityInput,
   now = Date.now()
-) {
+): TournamentRegistrationAvailability {
   const registrationOpens = getOptionalTimestamp(
     tournament.registrationOpenAt
   );
@@ -538,15 +547,59 @@ export function isTournamentRegistrationOpen(
     tournament.registrationCloseAt
   );
 
-  return (
-    (tournament.statusValue === "registration_open" ||
-      tournament.statusValue === "in_progress") &&
-    tournament.registrationEnabled &&
-    registrationOpens !== "invalid" &&
-    registrationCloses !== "invalid" &&
-    (registrationOpens === null || now >= registrationOpens) &&
-    (registrationCloses === null || now <= registrationCloses)
-  );
+  if (
+    tournament.statusValue !== "registration_open" &&
+    tournament.statusValue !== "in_progress"
+  ) {
+    return "status_closed";
+  }
+
+  if (!tournament.registrationEnabled) return "disabled";
+
+  if (registrationOpens === "invalid" || registrationCloses === "invalid") {
+    return "invalid_window";
+  }
+
+  if (registrationOpens !== null && now < registrationOpens) {
+    return "scheduled";
+  }
+
+  if (registrationCloses !== null && now > registrationCloses) {
+    return "window_closed";
+  }
+
+  return "open";
+}
+
+export function isTournamentRegistrationOpen(
+  tournament: TournamentRegistrationAvailabilityInput,
+  now = Date.now()
+) {
+  return getTournamentRegistrationAvailability(tournament, now) === "open";
+}
+
+export function getTournamentRegistrationStatusLabel(
+  tournament: TournamentRegistrationAvailabilityInput,
+  now = Date.now()
+) {
+  if (tournament.statusValue !== "registration_open") {
+    return tournament.statusValue
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  switch (getTournamentRegistrationAvailability(tournament, now)) {
+    case "open":
+      return "Open";
+    case "scheduled":
+      return "Scheduled — opens at the configured time";
+    case "window_closed":
+      return "Closed — registration window ended";
+    case "invalid_window":
+      return "Unavailable — invalid registration window";
+    default:
+      return "Unavailable — no open Division";
+  }
 }
 
 export function isTournamentBracketRegistrationOpen(
@@ -628,7 +681,7 @@ export function getTournamentTerminalPublicMessage(status: TournamentStatus) {
   return null;
 }
 
-function getOptionalTimestamp(value: string) {
+function getOptionalTimestamp(value: string | null) {
   if (!value) return null;
 
   const timestamp = new Date(value).getTime();
