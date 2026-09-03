@@ -794,6 +794,31 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(client.rpc).not.toHaveBeenCalled();
   });
 
+  it.each(["Challenge", "Main"])(
+    "rejects a synthetic Academy result for the %s Division through the normal validator",
+    async (bracketName) => {
+      const client = createRegistrationClient({
+        tournament: createTournament(bracketName),
+      });
+      createSupabaseAdminClientMock.mockReturnValue(client.client);
+      getRelic1v1EloMock.mockResolvedValue({
+        ...ratedResult({ elo: 1_000, division: "Academy" }),
+        calculationVersion: "staging-synthetic-academy-v1",
+      });
+
+      const result = await submitTournamentRegistration(registrationInput());
+
+      expect(result).toEqual({
+        success: false,
+        code: "DIVISION_MISMATCH",
+        message:
+          "Your ELO division has changed. Refresh your verified ELO from the Profile page and try again.",
+      });
+      expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
+      expect(client.rpc).not.toHaveBeenCalled();
+    }
+  );
+
   it("rejects inconsistent Relic division metadata even when the bracket matches it", async () => {
     const client = createRegistrationClient({
       tournament: createTournament("Challenge"),
