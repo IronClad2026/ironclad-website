@@ -35,6 +35,9 @@ const matchSummaries = readSource("components/AdminMatchResultSummaries.tsx");
 const registrationSelectAll = readSource(
   "components/AdminRegistrationSelectAll.tsx"
 );
+const registrationApproveSelected = readSource(
+  "components/AdminRegistrationApproveSelected.tsx"
+);
 const deleteTournament = readSource("components/DeleteTournamentControl.tsx");
 const matchControls = readSource("components/MatchResultControls.tsx");
 const tournamentBannerPicker = readSource(
@@ -189,13 +192,25 @@ describe("admin responsive component and CSS contracts", () => {
     expect(bracketPopulation).toContain('role="dialog"');
     expect(bracketPopulation).toContain('aria-modal="true"');
     expect(bracketPopulation).toContain(
-      "flex h-dvh w-screen max-w-none flex-col overflow-hidden"
+      "flex h-dvh w-screen min-w-0 max-w-none flex-col overflow-hidden"
     );
     expect(bracketPopulation).toContain(
-      "grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[340px_minmax(0,1fr)] lg:overflow-hidden"
+      "grid min-h-0 min-w-0 flex-1 grid-rows-[max-content_max-content] overflow-y-auto overscroll-contain"
     );
     expect(bracketPopulation).toContain(
-      "grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))]"
+      "lg:grid-cols-[340px_minmax(0,1fr)] lg:grid-rows-1 lg:overflow-hidden"
+    );
+    expect(bracketPopulation).toContain(
+      "grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] items-start"
+    );
+    expect(bracketPopulation).toContain(
+      "overflow-visible rounded-2xl border p-4"
+    );
+    expect(bracketPopulation).toContain(
+      "relative z-20 shrink-0 border-t"
+    );
+    expect(bracketPopulation).toContain(
+      "[padding-bottom:max(1rem,env(safe-area-inset-bottom))]"
     );
     expect(bracketPopulation).toContain(
       "Drag approved participants into exact positions or use"
@@ -228,6 +243,13 @@ describe("admin responsive component and CSS contracts", () => {
     expect(registrationSelectAll).toContain(
       "inline-flex min-h-11 min-w-11 cursor-pointer"
     );
+    expect(registrationApproveSelected).toContain(
+      "disabled={selectedCount === 0}"
+    );
+    expect(registrationApproveSelected).toContain(
+      "Approve Selected{selectedCount > 0"
+    );
+    expect(registrationApproveSelected).toContain("min-h-11 w-full");
     expect(matchSummaries).toContain("p-4 sm:p-5");
     expect(matchSummaries).toContain("whitespace-pre-wrap break-words");
     expect(matchSummaries).toContain(

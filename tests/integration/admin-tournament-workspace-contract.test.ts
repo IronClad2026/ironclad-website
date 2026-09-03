@@ -61,6 +61,9 @@ const source = {
   overview: read("components/admin/tournaments/TournamentOverview.tsx"),
   recovery: read("components/TournamentRecoveryControl.tsx"),
   registrationActions: read("app/admin/registration-actions.ts"),
+  registrationApproveSelected: read(
+    "components/AdminRegistrationApproveSelected.tsx"
+  ),
   registrationDialog: read(
     "components/admin/tournaments/AdminRegistrationDetailDialog.tsx"
   ),
@@ -417,7 +420,11 @@ const capabilities: Capability[] = [
     evidence: [
       {
         file: "registrations",
-        includes: ["Approve Selected", "registration-bulk-partial", "Some selected registration(s) were approved"],
+        includes: ["AdminRegistrationApproveSelected", "registration-bulk-partial", "Some selected registration(s) were approved"],
+      },
+      {
+        file: "registrationApproveSelected",
+        includes: ["Approve Selected", "selectedCount"],
       },
       {
         file: "registrationActions",

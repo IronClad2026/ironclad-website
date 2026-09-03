@@ -325,9 +325,8 @@ export async function loadAdminTournamentRegistrationWorkspace(
       (registration) =>
         !terminal &&
         !registration.isDivisionLaunched &&
-        registration.status !== "waitlisted" &&
-        registration.status !== "withdrawn" &&
-        registration.status !== "approved"
+        (registration.status === "pending" ||
+          registration.status === "manual_review")
     ),
   };
 }

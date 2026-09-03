@@ -18,6 +18,9 @@ function sliceSource(value: string, start: string, end: string) {
 const commandCenter = source("app/admin/page.tsx");
 const registrationsPage = source("app/admin/registrations/page.tsx");
 const registrationActions = source("app/admin/registration-actions.ts");
+const registrationApproveSelected = source(
+  "components/AdminRegistrationApproveSelected.tsx"
+);
 const registrationRows = source("components/AdminRegistrationReviewRows.tsx");
 const operationsLoader = source("lib/admin-operations.ts");
 const operationsAttention = source("lib/admin-operations-metrics.ts");
@@ -107,7 +110,11 @@ describe("global Admin Registrations workspace route contract", () => {
       'returnHref="/admin/registrations"'
     );
     expect(registrationsPage).toContain(
-      'form="registration-bulk-form"'
+      'formId="registration-bulk-form"'
+    );
+    expect(registrationApproveSelected).toContain("form={formId}");
+    expect(registrationApproveSelected).toContain(
+      "disabled={selectedCount === 0}"
     );
     expect(registrationsPage).toContain("approveSelectedRegistrations");
     expect(registrationRows).toContain(

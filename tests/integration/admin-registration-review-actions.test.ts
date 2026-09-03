@@ -205,15 +205,21 @@ describe("admin registration review action contracts", () => {
     );
   });
 
-  it("makes terminal registration notes and empty bulk approval read-only", () => {
-    const compactPage = compact(adminPageSource);
+  it("makes terminal notes read-only and bulk approval selection-aware", () => {
+    const approveSelectedControl = readFileSync(
+      resolve(
+        process.cwd(),
+        "components/AdminRegistrationApproveSelected.tsx"
+      ),
+      "utf8"
+    );
     const compactModal = compact(selectedRegistrationModal);
 
-    expect(compactPage).toContain(
-      "const hasBulkApprovableRegistration = registrationReviewRows.some("
+    expect(approveSelectedControl).toContain(
+      "disabled={selectedCount === 0}"
     );
-    expect(compactPage).toContain(
-      "disabled={!hasBulkApprovableRegistration}"
+    expect(approveSelectedControl).toContain(
+      "getSelectableRegistrationInputs(formId, name, scope)"
     );
     expect(compactModal).toContain(
       "readOnly={selectedRegistrationIsTerminal}"
@@ -263,6 +269,22 @@ describe("admin registration review action contracts", () => {
     ]) {
       expect(mutationPayloads).not.toContain(immutableSnapshotField);
     }
+  });
+
+  it("bulk-approves only pending or manual-review rows and reports stale selections", () => {
+    const compactBulk = compact(approveSelectedRegistrationsAction);
+
+    expect(compactBulk).toContain(
+      'registration.registration_status !== "pending" && registration.registration_status !== "manual_review"'
+    );
+    expect(compactBulk).toContain("registration is already approved");
+    expect(compactBulk).toContain(
+      "rejected registrations require individual administrator review"
+    );
+    expect(compactBulk).toContain(
+      'approvedCount > 0 ? "registration-bulk-partial" : "registration-bulk-failed"'
+    );
+    expect(compactBulk).toContain('notice: "registration-bulk-failed"');
   });
 
   it("keeps ordinary deletion unavailable and restricts cleanup to terminal rows", () => {

@@ -13,11 +13,13 @@ export default function AdminRegistrationSelectAll({
   name,
   scope,
   showLabel = false,
+  className = "",
 }: {
   formId: string;
   name: string;
   scope?: string;
   showLabel?: boolean;
+  className?: string;
 }) {
   const checkboxRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<SelectionState>({
@@ -28,7 +30,7 @@ export default function AdminRegistrationSelectAll({
 
   useEffect(() => {
     const refresh = () => {
-      const inputs = getRegistrationInputs(formId, name, scope);
+      const inputs = getSelectableRegistrationInputs(formId, name, scope);
       const checkedCount = inputs.filter((input) => input.checked).length;
 
       setState({
@@ -53,7 +55,9 @@ export default function AdminRegistrationSelectAll({
   }, [state.indeterminate]);
 
   return (
-    <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 text-xs font-black uppercase tracking-wider text-zinc-300 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40">
+    <label
+      className={`inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 text-xs font-black uppercase tracking-wider text-zinc-300 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40 ${className}`}
+    >
       <input
         ref={checkboxRef}
         type="checkbox"
@@ -61,7 +65,7 @@ export default function AdminRegistrationSelectAll({
         checked={state.checked}
         disabled={state.disabled}
         onChange={(event) => {
-          const inputs = getRegistrationInputs(formId, name, scope);
+          const inputs = getSelectableRegistrationInputs(formId, name, scope);
           for (const input of inputs) {
             input.checked = event.currentTarget.checked;
             input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -74,7 +78,7 @@ export default function AdminRegistrationSelectAll({
   );
 }
 
-function getRegistrationInputs(
+export function getSelectableRegistrationInputs(
   formId: string,
   name: string,
   scope?: string

@@ -4,9 +4,9 @@ import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   approveSelectedRegistrations,
-  deleteSelectedRegistrations,
   updateRegistrationStatus,
 } from "@/app/admin/registration-actions";
+import AdminRegistrationApproveSelected from "@/components/AdminRegistrationApproveSelected";
 import AdminRegistrationReviewRows from "@/components/AdminRegistrationReviewRows";
 import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
 import {
@@ -444,12 +444,17 @@ function RegistrationWorkbenchGroup({
             profile ELO. Full immutable evidence remains in Registration
             Details.
           </p>
-          <div className="shrink-0 xl:hidden">
+          <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:hidden">
             <AdminRegistrationSelectAll
               formId="registration-bulk-form"
               name="registrationId"
               scope={group.key}
               showLabel
+              className="w-full"
+            />
+            <AdminRegistrationApproveSelected
+              formId="registration-bulk-form"
+              name="registrationId"
             />
           </div>
         </div>
@@ -721,15 +726,6 @@ export default async function AdminRegistrationsPage({
       : allRegistrationReviewRows.filter(
           (registration) => registration.status === activeFilter
         ).sort(compareAdminRegistrationReviewRows);
-  const hasBulkApprovableRegistration = registrationReviewRows.some(
-    (registration) =>
-      !registration.isDivisionLaunched &&
-      (!registration.tournamentId ||
-        !terminalTournamentIds.has(registration.tournamentId)) &&
-      registration.status !== "waitlisted" &&
-      registration.status !== "withdrawn" &&
-      registration.status !== "approved"
-  );
   const totalRegistrationCountByTournament = registrations.reduce(
     (counts, registration) => {
       const key = registration.tournament_id ?? "unassigned";
@@ -979,7 +975,7 @@ export default async function AdminRegistrationsPage({
           >
             <form
               id="registration-bulk-form"
-              action={deleteSelectedRegistrations}
+              action={approveSelectedRegistrations}
             >
               <input type="hidden" name="activeFilter" value={activeFilter} />
             </form>
@@ -1014,16 +1010,10 @@ export default async function AdminRegistrationsPage({
                 </div>
               </nav>
 
-              <button
-                type="submit"
-                form="registration-bulk-form"
-                formAction={approveSelectedRegistrations}
-                disabled={!hasBulkApprovableRegistration}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-zinc-600 sm:w-auto"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Approve Selected
-              </button>
+              <AdminRegistrationApproveSelected
+                formId="registration-bulk-form"
+                name="registrationId"
+              />
             </div>
             <p className="mt-2 text-xs text-zinc-500">
               Showing {registrationReviewRows.length} registration(s).
