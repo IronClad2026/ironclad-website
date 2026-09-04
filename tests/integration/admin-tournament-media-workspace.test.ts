@@ -19,7 +19,7 @@ const media = read(
 const actions = read("app/admin/tournaments/media-actions.ts");
 
 describe("Admin Tournament Media workspace contract", () => {
-  it("adds Media as the ninth focused section in route, desktop nav, and drawer", () => {
+  it("keeps Media in the focused route, desktop nav, and drawer", () => {
     expect(workspace).toContain('"media",');
     expect(workspace).toContain('if (section === "media")');
     expect(workspace).toContain("<AdminTournamentMedia");
@@ -28,7 +28,7 @@ describe("Admin Tournament Media workspace contract", () => {
       '{ icon: Clapperboard, label: "Media", section: "media" }'
     );
     expect(menu).toContain("?section=${item.section}");
-    expect(menu).toContain("2xl:grid-cols-9");
+    expect(menu).toContain("2xl:grid-cols-10");
     expect(header).toContain('media: "Media"');
   });
 

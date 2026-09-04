@@ -19,7 +19,11 @@ const initialState: MatchDeadlineActionState = {
 export default function AdminMatchDeadlineControls({
   match,
   onPendingChange,
+  compact = false,
+  readOnly = false,
 }: {
+  compact?: boolean;
+  readOnly?: boolean;
   match: GeneratedTournamentMatch;
   onPendingChange?: (key: string, pending: boolean) => void;
 }) {
@@ -85,7 +89,11 @@ export default function AdminMatchDeadlineControls({
   return (
     <section
       aria-busy={actionPending}
-      className="border border-orange-400/20 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20"
+      className={
+        compact
+          ? "min-w-0"
+          : "border border-orange-400/20 bg-orange-500/[0.04] p-5 shadow-xl shadow-black/20"
+      }
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -141,48 +149,50 @@ export default function AdminMatchDeadlineControls({
         <DeadlineValue
           label="Extension"
           value={
-            match.extensionMinutes
-              ? extensionAppliesToCurrentActivation
-                ? (
-                    <>
-                      {formatDuration(match.extensionMinutes)} added to this
-                      activation{" "}
-                      <HydrationSafeLocalDateTime
-                        value={match.extendedAt}
-                        fallback=""
-                      />
-                    </>
-                  )
-                : `${formatDuration(match.extensionMinutes)} lifetime allowance used on a previous activation`
-              : "Unused"
+            match.extensionMinutes ? (
+              extensionAppliesToCurrentActivation ? (
+                <>
+                  {formatDuration(match.extensionMinutes)} added to this
+                  activation{" "}
+                  <HydrationSafeLocalDateTime
+                    value={match.extendedAt}
+                    fallback=""
+                  />
+                </>
+              ) : (
+                `${formatDuration(match.extensionMinutes)} lifetime allowance used on a previous activation`
+              )
+            ) : (
+              "Unused"
+            )
           }
         />
         <DeadlineValue
           label="Administrative hold"
           value={
-            holdActive
-              ? (
-                  <>
-                    Active since{" "}
-                    <HydrationSafeLocalDateTime
-                      value={match.holdStartedAt}
-                      fallback=""
-                    />
-                  </>
-                )
-              : match.holdStartedAt
-                ? holdBelongsToCurrentActivation
-                  ? (
-                      <>
-                        Used this activation; released{" "}
-                        <HydrationSafeLocalDateTime
-                          value={match.holdReleasedAt}
-                          fallback=""
-                        />
-                      </>
-                    )
-                  : "Lifetime allowance used on a previous activation"
-                : "Unused"
+            holdActive ? (
+              <>
+                Active since{" "}
+                <HydrationSafeLocalDateTime
+                  value={match.holdStartedAt}
+                  fallback=""
+                />
+              </>
+            ) : match.holdStartedAt ? (
+              holdBelongsToCurrentActivation ? (
+                <>
+                  Used this activation; released{" "}
+                  <HydrationSafeLocalDateTime
+                    value={match.holdReleasedAt}
+                    fallback=""
+                  />
+                </>
+              ) : (
+                "Lifetime allowance used on a previous activation"
+              )
+            ) : (
+              "Unused"
+            )
           }
         />
       </div>
@@ -194,8 +204,11 @@ export default function AdminMatchDeadlineControls({
         <AuditReason label="Hold reason" reason={match.holdReason} />
       )}
 
-      {canExtend && (
-        <form action={extensionAction} className="mt-5 space-y-3 border-t border-white/10 pt-5">
+      {!readOnly && canExtend && (
+        <form
+          action={extensionAction}
+          className="mt-5 space-y-3 border-t border-white/10 pt-5"
+        >
           <input type="hidden" name="matchId" value={match.id} />
           <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
             <label className="block text-xs font-bold text-zinc-300">
@@ -233,8 +246,11 @@ export default function AdminMatchDeadlineControls({
         </form>
       )}
 
-      {canStartHold && (
-        <form action={holdAction} className="mt-5 space-y-3 border-t border-white/10 pt-5">
+      {!readOnly && canStartHold && (
+        <form
+          action={holdAction}
+          className="mt-5 space-y-3 border-t border-white/10 pt-5"
+        >
           <input type="hidden" name="matchId" value={match.id} />
           <label className="block text-xs font-bold text-zinc-300">
             Exceptional hold reason
@@ -257,8 +273,11 @@ export default function AdminMatchDeadlineControls({
         </form>
       )}
 
-      {holdActive && (
-        <form action={releaseAction} className="mt-5 border-t border-white/10 pt-5">
+      {!readOnly && holdActive && (
+        <form
+          action={releaseAction}
+          className="mt-5 border-t border-white/10 pt-5"
+        >
           <input type="hidden" name="matchId" value={match.id} />
           <ActionMessage state={releaseState} />
           <button
@@ -284,7 +303,7 @@ export default function AdminMatchDeadlineControls({
 
 function DeadlineValue({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-xl border border-white/10 bg-black/25 p-3">
+    <div className="min-w-0 py-2">
       <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </p>

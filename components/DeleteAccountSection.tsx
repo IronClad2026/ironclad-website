@@ -34,6 +34,8 @@ export default function DeleteAccountSection() {
 
   useEffect(() => {
     if (state.status === "success") {
+      // Discard the deleted Clerk identity and client caches with a full reload.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign("/");
     }
   }, [state.status]);

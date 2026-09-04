@@ -1,5 +1,6 @@
 -- Rollback-only contract for reusable future Terms and Privacy acceptance.
--- Run only against the explicitly resolved IronClad Staging project after
+-- Also accepts disposable ironclad_legal_* databases on loopback port 55462.
+-- Otherwise run only against the explicitly resolved IronClad Staging project after
 -- setting `ironclad.target_project_ref` from the verified connection target.
 -- The deliberate sentinel exception rolls back every durable fixture.
 
@@ -16,9 +17,13 @@ set request.jwt.claims =
 do $$
 begin
   if current_setting('ironclad.target_project_ref', true)
-      is distinct from 'zzbnneprhjicmajpjkdg' then
-    raise exception
-      'Future legal gate contract target must be verified IronClad Staging';
+    is distinct from 'zzbnneprhjicmajpjkdg'
+    and not (
+      coalesce(inet_server_addr() = '127.0.0.1'::inet, false)
+      and inet_server_port() = 55462
+      and current_database() ~ '^ironclad_legal_[a-z0-9_]+$'
+    ) then
+    raise exception 'Future legal gate contract requires verified Staging or a disposable loopback legal database';
   end if;
 end;
 $$;
@@ -633,10 +638,14 @@ end;
 $$;
 
 select jsonb_build_object(
-  'target', 'ironclad-staging',
+  'target', case when current_database() ~ '^ironclad_legal_[a-z0-9_]+$'
+    then 'isolated-local' else 'ironclad-staging' end,
   'target_identity_verified',
     current_setting('ironclad.target_project_ref', true) =
-      'zzbnneprhjicmajpjkdg',
+      'zzbnneprhjicmajpjkdg'
+    or (inet_server_addr() = '127.0.0.1'::inet
+      and inet_server_port() = 55462
+      and current_database() ~ '^ironclad_legal_[a-z0-9_]+$'),
   'current_pair_idempotent', true,
   'draft_zero_effect', true,
   'future_effective_boundary_fail_closed', true,

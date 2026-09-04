@@ -275,7 +275,10 @@ end;
 $$;
 
 select jsonb_build_object(
-  'target', 'ironclad-staging',
+  'target', case when inet_server_addr() = '127.0.0.1'::inet
+    and inet_server_port() = 55462
+    and current_database() ~ '^ironclad_legal_[a-z0-9_]+$'
+    then 'isolated-local' else 'ironclad-staging' end,
   'rollback_only', true,
   'zero_residue',
     (select count(*) from public.legal_documents) =

@@ -8,6 +8,7 @@ import type {
   MatchResultSubmission,
   TournamentCard,
 } from "@/lib/tournaments";
+import { createDisabledTournamentDivisionStates } from "@/tests/fixtures/tournament-division-states";
 
 vi.mock("@/components/TournamentsExperience", () => ({
   AdminMatchManagementModal: ({
@@ -164,7 +165,6 @@ function makeTournament(): TournamentCard {
     id: "tournament-1",
     slug: "owner-ux-tournament",
     title: "Owner UX Tournament",
-    month: "August 2026",
     format: "1v1",
     ruleFormat: "format_a",
     ruleFormatLabel: "Format A",
@@ -175,7 +175,6 @@ function makeTournament(): TournamentCard {
     organizer: "IronClad Tournaments",
     game: "Company of Heroes 3",
     region: "Global",
-    time: "Grand Final TBA",
     prizePool: "",
     players: 2,
     maxPlayers: 16,
@@ -183,6 +182,10 @@ function makeTournament(): TournamentCard {
       makeBracket("bracket-academy", "Academy Bracket"),
       makeBracket("bracket-main", "Main / Pro Bracket"),
     ],
+    divisionStates: createDisabledTournamentDivisionStates(
+      "tournament-1",
+      "in_progress"
+    ),
     details: "Tournament workspace fixture.",
     rules: "Managed rules.",
     schedule: [],
@@ -190,7 +193,6 @@ function makeTournament(): TournamentCard {
     registrationEnabled: false,
     registrationOpenAt: "",
     registrationCloseAt: "",
-    grandFinalAt: null,
     createdAt: "2026-08-27T00:00:00.000Z",
     resultConfirmationWindowMinutes: 30,
     rulesUrl: null,

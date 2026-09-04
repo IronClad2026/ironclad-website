@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { BadgeNotificationReconciliationResult } from "@/lib/badge-notifications";
+
 const createBadgeUnlockedNotificationMock = vi.hoisted(() =>
   vi.fn(async () => true)
 );
 const reconcileBadgeUnlockedNotificationsForPlayerMock = vi.hoisted(() =>
-  vi.fn(async () => undefined)
+  vi.fn(
+    async (): Promise<BadgeNotificationReconciliationResult> => ({
+      succeeded: true,
+    })
+  )
 );
 
 vi.mock("@/lib/badge-notifications", () => ({
@@ -74,6 +80,7 @@ type BadgeAwardPayload = {
 
 type FakeAuthorityClientOptions = {
   profile?: Record<string, unknown> | null;
+  playerStatusResult?: unknown;
   summaries?: Record<string, Record<string, unknown>>;
   matchExcellenceSummaries?: Record<string, Record<string, unknown>>;
   reliableCompetitorSummaries?: Record<string, Record<string, unknown>>;
@@ -338,15 +345,17 @@ function createAuthorityClient(options: FakeAuthorityClientOptions = {}) {
         maybeSingle: vi.fn(async () => ({
           data:
             selectedColumns === "id, account_closed_at"
-              ? profile?.account_closed_at
-                ? {
-                    id: requestedPlayerId ?? profile.id,
-                    account_closed_at: profile.account_closed_at,
-                  }
-                : {
-                    id: requestedPlayerId ?? profile?.id ?? PLAYER_ID,
-                    account_closed_at: null,
-                  }
+              ? options.playerStatusResult !== undefined
+                ? options.playerStatusResult
+                : profile?.account_closed_at
+                  ? {
+                      id: requestedPlayerId ?? profile.id,
+                      account_closed_at: profile.account_closed_at,
+                    }
+                  : {
+                      id: requestedPlayerId ?? profile?.id ?? PLAYER_ID,
+                      account_closed_at: null,
+                    }
               : profile &&
                   (requestedPlayerId === null || requestedPlayerId === PLAYER_ID)
                 ? profile
@@ -683,6 +692,73 @@ describe("badge authority evaluators", () => {
     ).not.toHaveBeenCalled();
     expect(backfillResult.playersEvaluated).toBe(0);
     expect(fixture.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects when reconciliation cannot satisfy a canonical Badge notification", async () => {
+    const fixture = createAuthorityClient({
+      existingAwards: [`${PLAYER_ID}:ironclad-recruit`],
+    });
+    reconcileBadgeUnlockedNotificationsForPlayerMock.mockResolvedValueOnce({
+      succeeded: false,
+      errorCode: "BADGE_NOTIFICATION_CREATE_FAILED",
+    });
+
+    await expect(
+      evaluateAllBadgeAwardsForPlayer({
+        playerId: PLAYER_ID,
+        supabase: fixture.client,
+        evaluationMode: "reconciliation",
+      })
+    ).rejects.toMatchObject({
+      name: "BadgeAuthorityError",
+      code: "BADGE_NOTIFICATION_CREATE_FAILED",
+    });
+  });
+
+  it("wraps an unexpected notification reconciliation rejection", async () => {
+    const fixture = createAuthorityClient({
+      existingAwards: [`${PLAYER_ID}:ironclad-recruit`],
+    });
+    reconcileBadgeUnlockedNotificationsForPlayerMock.mockRejectedValueOnce(
+      new Error("private notification failure")
+    );
+
+    await expect(
+      evaluateAllBadgeAwardsForPlayer({
+        playerId: PLAYER_ID,
+        supabase: fixture.client,
+        evaluationMode: "reconciliation",
+      })
+    ).rejects.toMatchObject({
+      name: "BadgeAuthorityError",
+      code: "BADGE_NOTIFICATION_RECONCILIATION_FAILED",
+      message: "Badge notification reconciliation failed unexpectedly.",
+    });
+  });
+
+  it("rejects an invalid player-status result instead of treating it as closed", async () => {
+    const fixture = createAuthorityClient({
+      playerStatusResult: {
+        id: PLAYER_ID,
+        account_closed_at: 42,
+      },
+    });
+    const reconciliationCallCount =
+      reconcileBadgeUnlockedNotificationsForPlayerMock.mock.calls.length;
+
+    await expect(
+      evaluateAllBadgeAwardsForPlayer({
+        playerId: PLAYER_ID,
+        supabase: fixture.client,
+        evaluationMode: "reconciliation",
+      })
+    ).rejects.toMatchObject({
+      name: "BadgeAuthorityError",
+      code: "PLAYER_STATUS_RESULT_INVALID",
+    });
+    expect(
+      reconcileBadgeUnlockedNotificationsForPlayerMock
+    ).toHaveBeenCalledTimes(reconciliationCallCount);
   });
 
   it("awards First Deployment for a qualifying played match", async () => {

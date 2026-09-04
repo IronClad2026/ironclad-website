@@ -4,20 +4,25 @@ import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   approveSelectedRegistrations,
-  deleteSelectedRegistrations,
   updateRegistrationStatus,
 } from "@/app/admin/registration-actions";
+import AdminRegistrationApproveSelected from "@/components/AdminRegistrationApproveSelected";
 import AdminRegistrationReviewRows from "@/components/AdminRegistrationReviewRows";
 import AdminRegistrationSelectAll from "@/components/AdminRegistrationSelectAll";
 import {
+  formatTournamentDivisionState,
+  formatTournamentEventDivisionState,
+  getEffectiveTournamentDivisionState,
+  type TournamentDivisionStateResolution,
+} from "@/lib/tournament-division-state";
+import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
+import {
   getTournamentBracketDisplayName,
   isTournamentTerminalStatus,
+  type TournamentBracketName,
   type TournamentStatus,
 } from "@/lib/tournaments";
-import {
-  PHASE_FOUR_ACTIVE_COHORT_SIZE,
-  isActiveReviewCohortStatus,
-} from "@/lib/tournament-registration-cohort";
+import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
 import {
   buildAdminRegistrationEvidence,
   buildRegistrationOrderMap,
@@ -96,26 +101,25 @@ type AdminTournamentOption = {
   id: string;
   title: string;
   status: TournamentStatus;
-  grand_final_at: string | null;
   created_at: string;
   tournament_brackets?: {
     id: string;
-    name: string;
+    name: TournamentBracketName;
     launched_at: string | null;
   }[];
 };
 
 type RegistrationCohortSummary = {
-  bracketId: string;
+  bracketId: string | null;
+  canonicalName: string;
   tournamentId: string;
   tournamentTitle: string;
   bracketName: string;
   activeCohortCount: number;
-  approvedCount: number;
-  requiredCount: number;
+  approvedCount: number | null;
+  requiredCount: number | null;
   waitlistCount: number;
-  isReady: boolean;
-  launchedAt: string | null;
+  divisionState: TournamentDivisionStateResolution;
 };
 
 type RegistrationReviewGroupStatus =
@@ -308,8 +312,7 @@ function getContextualWaitlistGroups(rows: SupabaseRegistration[]) {
 }
 
 function getAdminTournamentSortTime(tournament: AdminTournamentOption) {
-  const dateValue = tournament.grand_final_at ?? tournament.created_at;
-  const timestamp = new Date(dateValue).getTime();
+  const timestamp = new Date(tournament.created_at).getTime();
 
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
@@ -384,32 +387,45 @@ function RegistrationWorkbenchGroup({
           {group.readiness.length > 0 && (
             <span
               data-registration-readiness-summary={group.key}
+              aria-label={formatTournamentEventDivisionState(
+                group.readiness.map((readiness) => readiness.divisionState)
+              )}
               className="flex min-w-0 flex-wrap gap-2 xl:max-w-[58%] xl:justify-end"
             >
-              {group.readiness.map((readiness) => (
-                <span
-                  key={readiness.bracketId}
-                  className={`rounded-xl border px-3 py-2 text-xs leading-5 ${
-                    readiness.launchedAt
-                      ? "border-sky-400/30 bg-sky-500/10 text-sky-100"
-                      : readiness.isReady
-                        ? "border-orange-400/35 bg-orange-500/10 text-orange-100"
-                        : "border-white/10 bg-black/30 text-zinc-300"
-                  }`}
-                >
-                  <span className="font-black text-white">
-                    {readiness.bracketName}
-                  </span>{" "}
-                  {readiness.approvedCount}/{readiness.requiredCount} approved ·{" "}
-                  {readiness.activeCohortCount} active · {readiness.waitlistCount}{" "}
-                  waiting
-                  {readiness.launchedAt
-                    ? " · LAUNCHED / LOCKED"
-                    : readiness.isReady
-                      ? " · READY"
-                      : ""}
-                </span>
-              ))}
+              {group.readiness.map((readiness) => {
+                const effectiveState = getEffectiveTournamentDivisionState(
+                  readiness.divisionState
+                );
+
+                return (
+                  <span
+                    key={readiness.canonicalName}
+                    className={`rounded-xl border px-3 py-2 text-xs leading-5 ${
+                      effectiveState === "cancelled" ||
+                      effectiveState === "voided"
+                        ? "border-red-400/30 bg-red-500/10 text-red-100"
+                        : effectiveState === "completed"
+                        ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-100"
+                        : effectiveState === "in_progress"
+                          ? "border-sky-400/30 bg-sky-500/10 text-sky-100"
+                          : effectiveState === "ready"
+                            ? "border-orange-400/35 bg-orange-500/10 text-orange-100"
+                            : "border-white/10 bg-black/30 text-zinc-300"
+                    }`}
+                  >
+                    <span className="font-black text-white">
+                      {readiness.bracketName}
+                    </span>{" — "}
+                    {formatTournamentDivisionState(readiness.divisionState)}
+                    {readiness.bracketId && (
+                      <>
+                        {" · "}{readiness.activeCohortCount} active ·{" "}
+                        {readiness.waitlistCount} waiting
+                      </>
+                    )}
+                  </span>
+                );
+              })}
             </span>
           )}
         </span>
@@ -428,12 +444,17 @@ function RegistrationWorkbenchGroup({
             profile ELO. Full immutable evidence remains in Registration
             Details.
           </p>
-          <div className="shrink-0 xl:hidden">
+          <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:hidden">
             <AdminRegistrationSelectAll
               formId="registration-bulk-form"
               name="registrationId"
               scope={group.key}
               showLabel
+              className="w-full"
+            />
+            <AdminRegistrationApproveSelected
+              formId="registration-bulk-form"
+              name="registrationId"
             />
           </div>
         </div>
@@ -507,9 +528,9 @@ export default async function AdminRegistrationsPage({
     supabase
       .from("tournaments")
       .select(
-        "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, launched_at)"
+        "id, title, status, created_at, tournament_brackets(id, name, launched_at)"
       )
-      .order("grand_final_at", { ascending: false, nullsFirst: false }),
+      .order("created_at", { ascending: false }),
   ]);
   const registrationsData = registrationResult.data;
   const error = registrationResult.error;
@@ -547,45 +568,16 @@ export default async function AdminRegistrationsPage({
       ? tournamentResult.data
       : []) as AdminTournamentOption[]),
   ].sort(compareAdminTournaments);
-  const readinessResults = await Promise.all(
-    tournaments.flatMap((tournament) =>
-      (tournament.tournament_brackets ?? []).map(async (bracket) => {
-        const { data, error: readinessError } = await supabase.rpc(
-          "get_tournament_bracket_readiness",
-          { p_tournament_bracket_id: bracket.id }
-        );
-
-        if (readinessError) {
-          console.error(
-            "Admin division readiness load failed:",
-            readinessError.message
-          );
-          return null;
-        }
-
-        const result = Array.isArray(data) ? data[0] : data;
-        if (!result) {
-          console.error("Admin division readiness returned an invalid response.");
-        }
-        return result
-          ? {
-              bracketId: bracket.id,
-              approvedCount: Number(result.approved_count),
-              requiredCount: Number(result.required_count),
-              isReady: result.is_ready === true,
-              launchedAt:
-                typeof result.launched_at === "string"
-                  ? result.launched_at
-                  : bracket.launched_at,
-            }
-          : null;
-      })
+  const divisionStatesByTournament =
+    tournamentResult.error || invalidTournamentResponse
+      ? new Map<string, readonly TournamentDivisionStateResolution[]>()
+      : await loadTournamentDivisionStates(supabase, tournaments);
+  const divisionStateByBracket = new Map(
+    Array.from(divisionStatesByTournament.values()).flatMap((divisions) =>
+      divisions.flatMap((division) =>
+        division.bracketId ? [[division.bracketId, division] as const] : []
+      )
     )
-  );
-  const readinessByBracket = new Map(
-    readinessResults
-      .filter((result) => result !== null)
-      .map((result) => [result.bracketId, result])
   );
   const tournamentsById = new Map(
     tournaments.map((tournament) => [tournament.id, tournament.title])
@@ -603,7 +595,9 @@ export default async function AdminRegistrationsPage({
           tournamentId: tournament.id,
           tournamentTitle: tournament.title,
           bracketName: getTournamentBracketDisplayName(bracket.name),
-          launchedAt: bracket.launched_at,
+          launchedAt:
+            divisionStateByBracket.get(bracket.id)?.launchedAt ??
+            bracket.launched_at,
           isTournamentTerminal: isTournamentTerminalStatus(tournament.status),
         },
       ])
@@ -614,7 +608,6 @@ export default async function AdminRegistrationsPage({
     bracketMetaById.get(bracketId)?.launchedAt === null &&
     bracketMetaById.get(bracketId)?.isTournamentTerminal === false;
   const activeCohortCountByBracket = new Map<string, number>();
-  const approvedCountByBracket = new Map<string, number>();
   const waitlistCountByBracket = new Map<string, number>();
   for (const registration of baseRegistrations) {
     if (!registration.tournament_bracket_id) {
@@ -628,13 +621,6 @@ export default async function AdminRegistrationsPage({
           registration.tournament_bracket_id
         ) ?? 0) + 1
       );
-      if (registration.registration_status === "approved") {
-        approvedCountByBracket.set(
-          registration.tournament_bracket_id,
-          (approvedCountByBracket.get(registration.tournament_bracket_id) ??
-            0) + 1
-        );
-      }
     } else if (
       registration.registration_status === "waitlisted" &&
       registration.waitlist_offer_status === null &&
@@ -647,30 +633,28 @@ export default async function AdminRegistrationsPage({
       );
     }
   }
-  const registrationCohortSummaries: RegistrationCohortSummary[] = Array.from(
-    bracketMetaById,
-    ([bracketId, meta]) => {
-      const activeCohortCount =
-        activeCohortCountByBracket.get(bracketId) ?? 0;
-
-      return {
-        bracketId,
-        ...meta,
-        activeCohortCount,
-        approvedCount:
-          readinessByBracket.get(bracketId)?.approvedCount ??
-          approvedCountByBracket.get(bracketId) ??
-          0,
-        requiredCount:
-          readinessByBracket.get(bracketId)?.requiredCount ??
-          PHASE_FOUR_ACTIVE_COHORT_SIZE,
-        waitlistCount: waitlistCountByBracket.get(bracketId) ?? 0,
-        isReady: readinessByBracket.get(bracketId)?.isReady ?? false,
-        launchedAt:
-          readinessByBracket.get(bracketId)?.launchedAt ?? meta.launchedAt,
-      };
-    }
-  );
+  const registrationCohortSummaries: RegistrationCohortSummary[] =
+    tournaments.flatMap((tournament) =>
+      (divisionStatesByTournament.get(tournament.id) ?? []).map((division) => {
+        const bracketId = division.bracketId;
+        return {
+          bracketId,
+          canonicalName: division.canonicalName,
+          tournamentId: tournament.id,
+          tournamentTitle: tournament.title,
+          bracketName: division.displayName,
+          activeCohortCount: bracketId
+            ? activeCohortCountByBracket.get(bracketId) ?? 0
+            : 0,
+          approvedCount: division.approvedCount,
+          requiredCount: division.requiredCount,
+          waitlistCount: bracketId
+            ? waitlistCountByBracket.get(bracketId) ?? 0
+            : 0,
+          divisionState: division,
+        };
+      })
+    );
   const waitlistPositionByRegistration = buildWaitlistPositionMap(
     registrationOrderInputs.filter(({ tournamentBracketId }) =>
       isBracketWaitlistOpen(tournamentBracketId)
@@ -742,15 +726,6 @@ export default async function AdminRegistrationsPage({
       : allRegistrationReviewRows.filter(
           (registration) => registration.status === activeFilter
         ).sort(compareAdminRegistrationReviewRows);
-  const hasBulkApprovableRegistration = registrationReviewRows.some(
-    (registration) =>
-      !registration.isDivisionLaunched &&
-      (!registration.tournamentId ||
-        !terminalTournamentIds.has(registration.tournamentId)) &&
-      registration.status !== "waitlisted" &&
-      registration.status !== "withdrawn" &&
-      registration.status !== "approved"
-  );
   const totalRegistrationCountByTournament = registrations.reduce(
     (counts, registration) => {
       const key = registration.tournament_id ?? "unassigned";
@@ -1000,7 +975,7 @@ export default async function AdminRegistrationsPage({
           >
             <form
               id="registration-bulk-form"
-              action={deleteSelectedRegistrations}
+              action={approveSelectedRegistrations}
             >
               <input type="hidden" name="activeFilter" value={activeFilter} />
             </form>
@@ -1035,16 +1010,10 @@ export default async function AdminRegistrationsPage({
                 </div>
               </nav>
 
-              <button
-                type="submit"
-                form="registration-bulk-form"
-                formAction={approveSelectedRegistrations}
-                disabled={!hasBulkApprovableRegistration}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/10 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-green-200 transition hover:border-green-400/60 hover:bg-green-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-zinc-600 sm:w-auto"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Approve Selected
-              </button>
+              <AdminRegistrationApproveSelected
+                formId="registration-bulk-form"
+                name="registrationId"
+              />
             </div>
             <p className="mt-2 text-xs text-zinc-500">
               Showing {registrationReviewRows.length} registration(s).

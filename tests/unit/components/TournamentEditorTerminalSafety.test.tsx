@@ -96,6 +96,7 @@ describe("TournamentEditor terminal safety", () => {
                   requiredCount: 8,
                   isReady: true,
                   launchedAt: null,
+                  notHeldAt: null,
                 },
               ],
             ])

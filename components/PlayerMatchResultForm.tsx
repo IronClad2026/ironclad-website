@@ -18,185 +18,161 @@ import {
   submitNoShowReport,
   type MatchResultActionState,
 } from "@/app/tournaments/match-actions";
-import InfoTooltip from "@/components/InfoTooltip";
 import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
-import type { MessageValues } from "@/lib/i18n/types";
+import { getMatchActionMessage } from "@/lib/i18n/match-action-message";
+import {
+  changeMatchOutcome,
+  changeMatchScore,
+  getGameWinnerState,
+  getPerspectiveScores,
+  mapPerspectiveResult,
+  type MatchEntryDraft,
+} from "@/lib/match-result-entry";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { GeneratedTournamentMatch } from "@/lib/tournaments";
 
-const initialState: MatchResultActionState = {
-  status: "idle",
-  message: "",
-};
-
-const maxReplayBytes = 10 * 1024 * 1024;
-
-type ReplaySubmissionPhase =
-  | "idle"
-  | "preparing"
-  | "uploading"
-  | "finalizing";
-
-type CompetitionTranslator = (
-  path: string,
-  values?: MessageValues
-) => string;
+const initialState: MatchResultActionState = { status: "idle", message: "" };
+const inputClass =
+  "min-h-11 w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-orange-400";
+const buttonClass =
+  "min-h-11 rounded-lg border border-white/20 px-3 py-2 text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 disabled:opacity-50";
 
 export default function PlayerMatchResultForm({
   match,
   playerOneName,
   playerTwoName,
+  viewerRegistrationId,
 }: {
   match: GeneratedTournamentMatch;
   playerOneName: string;
   playerTwoName: string;
+  viewerRegistrationId: string | null;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
-  const [noShowState, noShowFormAction, noShowPending] = useActionState(
-    submitNoShowReport,
-    initialState
-  );
   const { getToken } = useAuth();
   const router = useRouter();
-  const submissionInFlightRef = useRef(false);
-  const authenticatedSupabase = useMemo(
+  const id = useId();
+  const supabase = useMemo(
     () => createAuthenticatedBrowserSupabaseClient(getToken),
     [getToken]
   );
-  const replayInputRef = useRef<HTMLInputElement>(null);
-  const replayInputLabelId = useId();
-  const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
-  const [state, setState] = useState(initialState);
-  const [pending, setPending] = useState(false);
-  const [finalizationUncertain, setFinalizationUncertain] = useState(false);
-  const [submissionPhase, setSubmissionPhase] =
-    useState<ReplaySubmissionPhase>("idle");
-  const [uploadGameNumber, setUploadGameNumber] = useState(0);
-  const [playerOneScore, setPlayerOneScore] = useState("");
-  const [playerTwoScore, setPlayerTwoScore] = useState("");
-  const [winnerRegistrationId, setWinnerRegistrationId] = useState("");
-  const [gameWinnerRegistrationIds, setGameWinnerRegistrationIds] = useState<
-    string[]
-  >([]);
-  const [notes, setNotes] = useState("");
-  const [selectedReplays, setSelectedReplays] = useState<File[]>([]);
-  const [replaySelectionError, setReplaySelectionError] = useState("");
-  const [noShowOpen, setNoShowOpen] = useState(false);
-  const scoreInfo = useMemo(
-    () =>
-      getScoreInfo(
-        playerOneScore,
-        playerTwoScore,
-        winsRequired,
-        match.seriesBestOf,
-        t
-      ),
-    [match.seriesBestOf, playerOneScore, playerTwoScore, t, winsRequired]
-  );
-  const displayedGameWinnerRegistrationIds =
-    scoreInfo.requiredReplayCount === null
-      ? []
-      : Array.from(
-          { length: scoreInfo.requiredReplayCount },
-          (_, index) => gameWinnerRegistrationIds[index] ?? ""
-        );
-  const gameWinnerSelectionError = getGameWinnerSelectionError({
-    gameWinnerRegistrationIds: displayedGameWinnerRegistrationIds,
-    playerOneRegistrationId: match.playerOneRegistrationId,
-    playerTwoRegistrationId: match.playerTwoRegistrationId,
-    playerOneScore: parseScore(playerOneScore),
-    playerTwoScore: parseScore(playerTwoScore),
-    winnerRegistrationId,
-    requiredGameCount: scoreInfo.requiredReplayCount,
-    t,
+  const inFlight = useRef(false);
+  const [draft, setDraft] = useState<MatchEntryDraft<File>>({
+    outcome: null,
+    score: "",
+    games: [],
   });
-  const selectedReplayCount = selectedReplays.length;
-  const replayCountMatches =
-    scoreInfo.requiredReplayCount !== null &&
-    selectedReplayCount === scoreInfo.requiredReplayCount &&
-    !replaySelectionError;
-  const submitDisabled =
-    pending ||
-    noShowPending ||
-    finalizationUncertain ||
-    scoreInfo.requiredReplayCount === null ||
-    !replayCountMatches ||
-    Boolean(gameWinnerSelectionError);
-
+  const [notes, setNotes] = useState("");
+  const [state, setState] = useState(initialState);
+  const [phase, setPhase] = useState<
+    "idle" | "preparing" | "uploading" | "finalizing"
+  >("idle");
+  const [uploadGame, setUploadGame] = useState(0);
+  const [uncertain, setUncertain] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [noShowState, noShowAction, noShowPending] = useActionState(
+    submitNoShowReport,
+    initialState
+  );
+  const result = mapPerspectiveResult(
+    match,
+    viewerRegistrationId,
+    draft.outcome,
+    draft.score
+  );
+  const games = result
+    ? getGameWinnerState(
+        match,
+        result,
+        draft.games.map((game) => game.winner)
+      )
+    : null;
+  const pending = phase !== "idle";
+  const locked = pending || noShowPending || uncertain || submitted;
+  const opponentId =
+    viewerRegistrationId === match.playerOneRegistrationId
+      ? match.playerTwoRegistrationId
+      : match.playerOneRegistrationId;
+  const opponentName =
+    viewerRegistrationId === match.playerOneRegistrationId
+      ? playerTwoName
+      : playerOneName;
+  const summary = result
+    ? t("resultUx.namedResult", {
+        winner:
+          result.winnerRegistrationId === match.playerOneRegistrationId
+            ? playerOneName
+            : playerTwoName,
+        loser:
+          result.winnerRegistrationId === match.playerOneRegistrationId
+            ? playerTwoName
+            : playerOneName,
+        winnerScore: Math.max(result.playerOneScore, result.playerTwoScore),
+        loserScore: Math.min(result.playerOneScore, result.playerTwoScore),
+      })
+    : "";
+  const replayError = (file: File | null) => {
+    if (!file) return "";
+    if (file.size <= 0) return t("resultForm.replayEmpty");
+    if (file.size > 10 * 1024 * 1024) return t("resultForm.replayTooLarge");
+    if (!file.name.toLowerCase().endsWith(".rec"))
+      return t("resultForm.replayExtension");
+    return "";
+  };
+  const ready = Boolean(
+    result &&
+      games?.complete &&
+      draft.games.every((game) => game.replay && !replayError(game.replay)) &&
+      notes.length <= 2000
+  );
+  const progress =
+    phase === "uploading"
+      ? t("resultForm.uploading", {
+          current: uploadGame,
+          total: draft.games.length,
+        })
+      : phase === "preparing"
+        ? t("resultForm.preparing")
+        : t("resultForm.finalizing");
+  const updateGame = (
+    index: number,
+    change: Partial<MatchEntryDraft<File>["games"][number]>
+  ) => {
+    setDraft((current) => ({
+      ...current,
+      games: current.games.map((game, i) =>
+        i === index ? { ...game, ...change } : game
+      ),
+    }));
+  };
   useEffect(() => {
-    if (noShowState.status === "success") {
-      router.refresh();
-    }
+    if (noShowState.status === "success") router.refresh();
   }, [noShowState.status, router]);
 
-  const submitMatchResult = async (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (submissionInFlightRef.current || finalizationUncertain) return;
-
-    const parsedPlayerOneScore = parseScore(playerOneScore);
-    const parsedPlayerTwoScore = parseScore(playerTwoScore);
-    const selectionError = validateReplaySelection(selectedReplays, t);
-
-    if (
-      parsedPlayerOneScore === null ||
-      parsedPlayerTwoScore === null ||
-      scoreInfo.requiredReplayCount === null ||
-      !winnerRegistrationId
-    ) {
-      setState({
-        status: "error",
-        message: t("resultForm.finalScoreRequired"),
-      });
+    if (inFlight.current || locked) return;
+    if (!ready || !result || !games) {
+      setState({ status: "error", message: t("resultUx.completeRequired") });
       return;
     }
-
-    if (selectionError) {
-      setReplaySelectionError(selectionError);
-      setState({ status: "error", message: selectionError });
-      return;
-    }
-
-    if (selectedReplays.length !== scoreInfo.requiredReplayCount) {
-      setState({
-        status: "error",
-        message: t(
-          scoreInfo.requiredReplayCount === 1
-            ? "resultForm.uploadExact"
-            : "resultForm.uploadExactPlural",
-          { count: scoreInfo.requiredReplayCount }
-        ),
-      });
-      return;
-    }
-
-    if (gameWinnerSelectionError) {
-      setState({ status: "error", message: gameWinnerSelectionError });
-      return;
-    }
-
-    submissionInFlightRef.current = true;
-    setPending(true);
+    const files = draft.games.map((game) => game.replay!);
+    inFlight.current = true;
     setState(initialState);
-    setSubmissionPhase("preparing");
-    setUploadGameNumber(0);
-    let preparedPaths: string[] = [];
-    let preparedAttemptId = "";
+    setPhase("preparing");
+    let attemptId = "";
     let reachedFinalization = false;
-
     try {
       const preparation = await prepareMatchReplayUploads({
         matchId: match.id,
-        playerOneScore: parsedPlayerOneScore,
-        playerTwoScore: parsedPlayerTwoScore,
-        winnerRegistrationId,
-        replayFiles: selectedReplays.map((file) => ({
+        ...result,
+        replayFiles: files.map((file) => ({
           name: file.name,
           size: file.size,
         })),
-        gameWinnerRegistrationIds: displayedGameWinnerRegistrationIds,
+        gameWinnerRegistrationIds: games.winners,
       });
-
       if (preparation.status === "error") {
         setState({
           ...preparation,
@@ -204,630 +180,394 @@ export default function PlayerMatchResultForm({
         });
         return;
       }
-
-      preparedAttemptId = preparation.attemptId;
-      preparedPaths = preparation.uploads.map((upload) => upload.path);
-
+      attemptId = preparation.attemptId;
+      if (
+        preparation.uploads.length !== files.length ||
+        preparation.uploads.some((upload, i) => upload.gameNumber !== i + 1)
+      )
+        throw new Error("UPLOAD_ORDER_INVALID");
       for (const [index, upload] of preparation.uploads.entries()) {
-        setSubmissionPhase("uploading");
-        setUploadGameNumber(index + 1);
-        const { data, error } = await authenticatedSupabase.storage
+        setPhase("uploading");
+        setUploadGame(index + 1);
+        const { data, error } = await supabase.storage
           .from(preparation.bucket)
-          .uploadToSignedUrl(
-            upload.path,
-            upload.token,
-            selectedReplays[index],
-            {
-              cacheControl: "3600",
-              contentType: "application/octet-stream",
-              upsert: false,
-            }
-          );
-
-        if (error || !data || data.path !== upload.path) {
+          .uploadToSignedUrl(upload.path, upload.token, files[index], {
+            cacheControl: "3600",
+            contentType: "application/octet-stream",
+            upsert: false,
+          });
+        if (error || !data || data.path !== upload.path)
           throw new Error("SIGNED_UPLOAD_FAILED");
-        }
       }
-
-      setSubmissionPhase("finalizing");
+      setPhase("finalizing");
       reachedFinalization = true;
-      const result = await finalizeMatchResult({
+      const response = await finalizeMatchResult({
         matchId: match.id,
-        attemptId: preparedAttemptId,
-        playerOneScore: parsedPlayerOneScore,
-        playerTwoScore: parsedPlayerTwoScore,
-        winnerRegistrationId,
+        attemptId,
+        ...result,
         notes,
       });
-
-      setState({ ...result, message: getMatchActionMessage(result, t) });
-      if (result.status === "error" && result.requiresRefresh) {
-        setFinalizationUncertain(true);
-      }
-
-      if (result.status === "success") {
-        setPlayerOneScore("");
-        setPlayerTwoScore("");
-        setWinnerRegistrationId("");
-        setGameWinnerRegistrationIds([]);
-        setNotes("");
-        setSelectedReplays([]);
-        setReplaySelectionError("");
-        if (replayInputRef.current) replayInputRef.current.value = "";
+      setState({ ...response, message: getMatchActionMessage(response, t) });
+      if (response.status === "error" && response.requiresRefresh)
+        setUncertain(true);
+      if (response.status === "success") {
+        setSubmitted(true);
         router.refresh();
       }
     } catch {
-      // Once finalization is dispatched, its trusted server path exclusively
-      // owns pre-commit cleanup. A second browser cleanup could otherwise race
-      // an in-flight RPC whose response was lost and delete soon-to-be-
-      // referenced proof.
-      if (!reachedFinalization && preparedPaths.length > 0) {
+      // After dispatch, finalization exclusively owns cleanup: the response
+      // may be lost while the trusted result transaction is still committing.
+      if (!reachedFinalization && attemptId)
         await cleanupPreparedReplayUploads({
           matchId: match.id,
-          attemptId: preparedAttemptId,
+          attemptId,
         }).catch(() => undefined);
-      }
-
       setState({
         status: "error",
-        message: reachedFinalization
-          ? t("resultForm.responseUnknown")
-          : t("resultForm.uploadFailed"),
+        message: t(
+          reachedFinalization
+            ? "resultForm.responseUnknown"
+            : "resultForm.uploadFailed"
+        ),
       });
-      if (reachedFinalization) setFinalizationUncertain(true);
+      if (reachedFinalization) setUncertain(true);
     } finally {
-      submissionInFlightRef.current = false;
-      setPending(false);
-      setSubmissionPhase("idle");
-      setUploadGameNumber(0);
+      inFlight.current = false;
+      setPhase("idle");
     }
   };
 
+  if (submitted || noShowState.status === "success" || uncertain)
+    return (
+      <div className="space-y-4" role="status">
+        <p className="text-sm font-black uppercase tracking-wide text-orange-200">
+          {t(uncertain ? "resultUx.reconcileTitle" : "resultUx.waiting")}
+        </p>
+        {submitted && <p className="font-bold text-white">{summary}</p>}
+        <p className="text-sm leading-6 text-zinc-300">
+          {uncertain
+            ? t("resultForm.responseUnknown")
+            : t("resultUx.refreshSaved")}
+        </p>
+        <button
+          type="button"
+          className={buttonClass}
+          onClick={() => router.refresh()}
+        >
+          {t("resultUx.refresh")}
+        </button>
+      </div>
+    );
+
   return (
-    <div className="space-y-5">
-      <form onSubmit={submitMatchResult} className="space-y-5">
-        <div>
-          <p className="text-xs font-black uppercase tracking-wider text-white">
-            {t("resultForm.title")}
-          </p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            {t("resultForm.instructions", { bestOf: match.seriesBestOf })}
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <PlayerLabel label={t("resultForm.playerA")} name={playerOneName} />
-          <PlayerLabel label={t("resultForm.playerB")} name={playerTwoName} />
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <ScoreField
-            name="playerOneScore"
-            label={playerOneName}
-            max={winsRequired}
-            value={playerOneScore}
-            onChange={(value) => {
-              setPlayerOneScore(value);
-              setGameWinnerRegistrationIds([]);
-            }}
-          />
-          <ScoreField
-            name="playerTwoScore"
-            label={playerTwoName}
-            max={winsRequired}
-            value={playerTwoScore}
-            onChange={(value) => {
-              setPlayerTwoScore(value);
-              setGameWinnerRegistrationIds([]);
-            }}
-          />
-          <div className="rounded-xl border border-orange-400/20 bg-orange-500/10 p-4 text-xs text-orange-100/80">
-            {t("resultForm.winnerNeedsWins", { count: winsRequired })}
-          </div>
-        </div>
-
-        <label className="block">
-          <span className="text-xs font-bold text-slate-300">
-            {t("resultForm.winner")}
-          </span>
-          <select
-            name="winnerRegistrationId"
-            required
-            value={winnerRegistrationId}
-            onChange={(event) => {
-              setWinnerRegistrationId(event.target.value);
-              setGameWinnerRegistrationIds([]);
-            }}
-            className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-orange-400"
+    <div className="min-w-0 space-y-5">
+      <form onSubmit={submit} aria-busy={pending} className="space-y-5">
+        {pending && (
+          <div
+            role="status"
+            className="rounded-xl border border-orange-400/40 bg-orange-500/10 p-4 font-bold text-orange-100"
           >
-            <option value="">{t("resultForm.selectWinner")}</option>
-            <option value={match.playerOneRegistrationId ?? ""}>
-              {playerOneName}
-            </option>
-            <option value={match.playerTwoRegistrationId ?? ""}>
-              {playerTwoName}
-            </option>
-          </select>
-        </label>
-
-        <div className="block">
-          <div className="inline-flex items-center gap-2 text-xs font-bold text-slate-300">
-            <span id={replayInputLabelId}>
-              {t("resultForm.replayProofs")}
-            </span>
-            <InfoTooltip
-              align="start"
-              label={t("resultForm.replayHelpLabel")}
-              content={t("resultForm.replayHelp")}
-            />
+            {progress}
           </div>
-          <input
-            ref={replayInputRef}
-            aria-labelledby={replayInputLabelId}
-            type="file"
-            accept=".rec"
-            multiple
-            required
-            onChange={(event) => {
-              const files = Array.from(event.currentTarget.files ?? []);
-              setSelectedReplays(files);
-              setGameWinnerRegistrationIds([]);
-              setReplaySelectionError(validateReplaySelection(files, t));
-            }}
-            className="mt-2 block w-full text-sm text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-3 file:font-bold file:text-white"
-          />
-        </div>
-        <div className="rounded-xl border border-white/10 bg-slate-950/70 p-3 text-[11px] leading-5 text-slate-400">
-          <p>
-            {scoreInfo.message ??
-              t("resultForm.replaySummary", {
-                required: scoreInfo.requiredReplayCount,
-                selected: selectedReplayCount,
-              })}
-          </p>
-          {scoreInfo.requiredReplayCount !== null &&
-            selectedReplayCount > 0 &&
-            selectedReplayCount !== scoreInfo.requiredReplayCount && (
-              <p className="mt-1 font-bold text-orange-200">
-                {t(
-                  scoreInfo.requiredReplayCount === 1
-                    ? "resultForm.uploadExact"
-                    : "resultForm.uploadExactPlural",
-                  { count: scoreInfo.requiredReplayCount }
+        )}
+        <fieldset
+          disabled={locked}
+          className={`min-w-0 space-y-5 ${pending ? "hidden" : ""}`}
+        >
+          <legend className="mb-3 text-xs font-black uppercase tracking-wide text-zinc-300">
+            {t("resultForm.title")}
+          </legend>
+          <div className="flex flex-wrap items-end gap-3">
+            <div
+              role="group"
+              aria-label={t("resultForm.title")}
+              className="flex gap-1 rounded-xl border border-white/15 bg-black/30 p-1"
+            >
+              {(["won", "lost"] as const).map((outcome) => (
+                <button
+                  key={outcome}
+                  type="button"
+                  aria-pressed={draft.outcome === outcome}
+                  onClick={() => {
+                    if (outcome !== draft.outcome) {
+                      setDraft(changeMatchOutcome(outcome));
+                      setState(initialState);
+                    }
+                  }}
+                  className={`${buttonClass} min-w-16 ${draft.outcome === outcome ? "border-orange-400 bg-orange-500 text-black" : "border-transparent text-zinc-300"}`}
+                >
+                  {t(`resultUx.${outcome}`)}
+                </button>
+              ))}
+            </div>
+            <label className="min-w-24 max-w-40 flex-1">
+              <span className="mb-1 block text-xs font-bold text-zinc-300">
+                {t("resultUx.score")}
+              </span>
+              <select
+                required
+                value={draft.score}
+                disabled={!draft.outcome || locked}
+                className={inputClass}
+                onChange={(event) => {
+                  setDraft(
+                    changeMatchScore(
+                      draft,
+                      match.seriesBestOf,
+                      event.target.value
+                    )
+                  );
+                  setState(initialState);
+                }}
+              >
+                <option value="">{t("resultUx.chooseScore")}</option>
+                {getPerspectiveScores(match.seriesBestOf, draft.outcome).map(
+                  (score) => (
+                    <option key={score.value} value={score.value}>
+                      {score.viewerScore}–{score.opponentScore}
+                    </option>
+                  )
                 )}
+              </select>
+            </label>
+          </div>
+          {result && (
+            <div className="space-y-3">
+              <p className="text-xs leading-5 text-zinc-400">
+                {t("resultUx.replayHint")}
               </p>
-            )}
-          {replaySelectionError && (
-            <p className="mt-1 font-bold text-red-200">
-              {replaySelectionError}
-            </p>
-          )}
-        </div>
-        {scoreInfo.requiredReplayCount !== null && (
-          <fieldset className="rounded-xl border border-white/10 bg-slate-950/70 p-4">
-            <legend className="px-1 text-xs font-bold text-slate-300">
-              {t("resultForm.gameWinnersTitle")}
-            </legend>
-            <p className="mb-3 text-[11px] leading-5 text-slate-500">
-              {t("resultForm.gameWinnersHelp")}
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {displayedGameWinnerRegistrationIds.map((registrationId, index) => {
-                const gameNumber = index + 1;
+              {draft.games.map((game, index) => {
+                const error = replayError(game.replay);
+                const inferred = !game.winner && Boolean(games?.winners[index]);
                 return (
-                  <label key={gameNumber} className="block">
-                    <span className="text-xs font-bold text-slate-300">
-                      {t("resultForm.gameWinnerLabel", { game: gameNumber })}
-                    </span>
-                    <select
-                      required
-                      value={registrationId}
-                      onChange={(event) => {
-                        const next = [...displayedGameWinnerRegistrationIds];
-                        next[index] = event.target.value;
-                        setGameWinnerRegistrationIds(next);
-                      }}
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-orange-400"
-                    >
-                      <option value="">
-                        {t("resultForm.selectGameWinner", {
-                          game: gameNumber,
-                        })}
-                      </option>
-                      <option value={match.playerOneRegistrationId ?? ""}>
-                        {playerOneName}
-                      </option>
-                      <option value={match.playerTwoRegistrationId ?? ""}>
-                        {playerTwoName}
-                      </option>
-                    </select>
-                  </label>
+                  <fieldset
+                    key={index}
+                    className="min-w-0 rounded-xl border border-white/15 bg-black/20 p-3 sm:p-4"
+                  >
+                    <legend className="px-1 text-xs font-black uppercase tracking-wide text-orange-200">
+                      {t("resultUx.game", { number: index + 1 })}
+                    </legend>
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                      <div className="min-w-0 space-y-2">
+                        <label
+                          className={`${buttonClass} relative flex cursor-pointer items-center justify-center overflow-hidden text-zinc-200 focus-within:ring-2 focus-within:ring-orange-400`}
+                        >
+                          {t(
+                            game.replay
+                              ? "resultUx.replaceReplay"
+                              : "resultUx.chooseReplay"
+                          )}
+                          <input
+                            type="file"
+                            accept=".rec"
+                            aria-label={t("resultUx.gameReplay", {
+                              number: index + 1,
+                            })}
+                            aria-invalid={Boolean(error)}
+                            aria-describedby={`${id}-replay-${index}`}
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                            onChange={(event) => {
+                              const file = event.currentTarget.files?.[0];
+                              if (file) updateGame(index, { replay: file });
+                              event.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
+                        <div
+                          id={`${id}-replay-${index}`}
+                          className="min-w-0 text-xs leading-5"
+                        >
+                          {game.replay && (
+                            <p className="break-all text-zinc-200">
+                              {game.replay.name}
+                            </p>
+                          )}
+                          {error ? (
+                            <p role="alert" className="text-red-300">
+                              {error}
+                            </p>
+                          ) : (
+                            game.replay && (
+                              <p className="text-emerald-300">
+                                {t("resultUx.replayAttached")}
+                              </p>
+                            )
+                          )}
+                        </div>
+                        {game.replay && (
+                          <button
+                            type="button"
+                            className={`${buttonClass} text-zinc-300`}
+                            onClick={() => updateGame(index, { replay: null })}
+                          >
+                            {t("resultUx.removeReplay")}
+                          </button>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="mb-2 text-xs font-bold text-zinc-400">
+                          {t("resultForm.gameWinnerLabel", { game: index + 1 })}
+                        </p>
+                        {inferred ? (
+                          <p className="py-2 text-sm font-bold text-white">
+                            {games?.winners[index] === viewerRegistrationId
+                              ? t("resultUx.you")
+                              : opponentName}
+                            <span className="mt-1 block text-xs font-normal text-zinc-400">
+                              {t("resultUx.derivedWinner")}
+                            </span>
+                          </p>
+                        ) : (
+                          <div
+                            role="group"
+                            aria-label={t("resultForm.gameWinnerLabel", {
+                              game: index + 1,
+                            })}
+                            className="flex flex-wrap gap-2"
+                          >
+                            {[viewerRegistrationId, opponentId]
+                              .filter((value): value is string =>
+                                Boolean(value)
+                              )
+                              .map((registrationId) => (
+                                <button
+                                  key={registrationId}
+                                  type="button"
+                                  aria-pressed={game.winner === registrationId}
+                                  disabled={
+                                    !games?.choices[index].includes(
+                                      registrationId
+                                    ) || locked
+                                  }
+                                  className={`${buttonClass} max-w-full break-words ${game.winner === registrationId ? "border-orange-400 bg-orange-500/20 text-orange-100" : "text-zinc-300"}`}
+                                  onClick={() =>
+                                    updateGame(index, {
+                                      winner:
+                                        game.winner === registrationId
+                                          ? ""
+                                          : registrationId,
+                                    })
+                                  }
+                                >
+                                  {registrationId === viewerRegistrationId
+                                    ? t("resultUx.you")
+                                    : opponentName}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </fieldset>
                 );
               })}
             </div>
-            {gameWinnerSelectionError && (
-              <p className="mt-3 text-[11px] font-bold text-orange-200">
-                {gameWinnerSelectionError}
-              </p>
-            )}
-          </fieldset>
+          )}
+          <details>
+            <summary className="cursor-pointer py-3 text-sm text-zinc-300 focus-visible:outline focus-visible:outline-orange-400">
+              {t("resultUx.addNote")}
+            </summary>
+            <label className="block">
+              <span className="text-xs text-zinc-400">
+                {t("resultForm.notesOptional")}
+              </span>
+              <textarea
+                name="notes"
+                rows={3}
+                maxLength={2000}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                className={`${inputClass} mt-2 resize-y`}
+              />
+            </label>
+          </details>
+        </fieldset>
+        {ready && !pending && (
+          <div className="space-y-2 rounded-xl border border-orange-400/25 bg-orange-500/5 p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-orange-200">
+              {t("resultUx.summary")}
+            </p>
+            <p className="break-words font-bold text-white">{summary}</p>
+            <p className="text-xs text-zinc-300">
+              {t("resultUx.filesAttached", {
+                count: draft.games.length,
+                total: draft.games.length,
+              })}
+            </p>
+            <p className="text-xs leading-5 text-zinc-400">
+              {t("resultUx.afterSubmit")}
+            </p>
+          </div>
         )}
-        <label className="block">
-          <span className="text-xs font-bold text-slate-300">
-            {t("resultForm.notesOptional")}
-          </span>
-          <textarea
-            name="notes"
-            maxLength={2000}
-            rows={5}
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-orange-400"
-          />
-        </label>
-
-        {pending && (
-          <p
-            aria-live="polite"
-            className="rounded-lg border border-orange-400/30 bg-orange-500/10 p-2 text-xs text-orange-100"
-          >
-            {getSubmissionPhaseLabel(
-              submissionPhase,
-              uploadGameNumber,
-              selectedReplayCount,
-              t
-            )}
-          </p>
-        )}
-
-        {state.status !== "idle" && (
-          <p
-            aria-live="polite"
-            className={`rounded-lg border p-2 text-xs ${
-              state.status === "success"
-                ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
-                : "border-red-400/30 bg-red-500/10 text-red-200"
-            }`}
-          >
+        {state.status === "error" && (
+          <p role="alert" className="text-sm text-red-300">
             {getMatchActionMessage(state, t)}
           </p>
         )}
         <button
           type="submit"
-          disabled={submitDisabled}
-          className="w-full rounded-xl bg-orange-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-400 disabled:opacity-50"
+          disabled={!ready || locked}
+          className="min-h-12 w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-black uppercase tracking-wide text-black transition hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:opacity-40"
         >
-          {pending
-            ? getSubmissionPhaseLabel(
-                submissionPhase,
-                uploadGameNumber,
-                selectedReplayCount,
-                t
-              )
-            : t("resultForm.submitConfirmation")}
+          {pending ? progress : t("resultUx.submit")}
         </button>
       </form>
-
-      <div className="rounded-2xl border border-red-400/20 bg-red-500/[0.04] p-4">
-        <button
-          type="button"
-          disabled={pending || noShowPending || finalizationUncertain}
-          onClick={() => setNoShowOpen((current) => !current)}
-          className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-50"
-        >
-          <span>
-            <span className="block text-xs font-black uppercase tracking-wider text-red-200">
-              {t("resultForm.noShowTitle")}
-            </span>
-            <span className="mt-1 block text-[11px] leading-5 text-slate-500">
-              {t("resultForm.noShowHelp")}
-            </span>
-          </span>
-          <span className="rounded-lg border border-red-400/30 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-red-200">
-            {noShowOpen ? t("resultForm.close") : t("resultForm.open")}
-          </span>
-        </button>
-
-        {noShowOpen && (
-          <form action={noShowFormAction} className="mt-4 space-y-4">
+      {!pending && (
+        <details className="border-t border-white/10 pt-2">
+          <summary className="cursor-pointer py-3 text-sm text-zinc-400 focus-visible:outline focus-visible:outline-orange-400">
+            {t("resultUx.noShow")}
+          </summary>
+          <form action={noShowAction} className="mt-2 space-y-3">
             <input type="hidden" name="matchId" value={match.id} />
-            <label className="block">
-              <span className="text-xs font-bold text-slate-300">
+            <fieldset disabled={locked} className="space-y-3">
+              <label className="block text-xs text-zinc-300">
                 {t("resultForm.missingPlayer")}
-              </span>
-              <select
-                name="noShowRegistrationId"
-                required
-                defaultValue=""
-                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-red-400"
-              >
-                <option value="">{t("resultForm.selectOpponent")}</option>
-                <option value={match.playerOneRegistrationId ?? ""}>
-                  {playerOneName}
-                </option>
-                <option value={match.playerTwoRegistrationId ?? ""}>
-                  {playerTwoName}
-                </option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs font-bold text-slate-300">
+                <select
+                  name="noShowRegistrationId"
+                  defaultValue=""
+                  required
+                  className={`${inputClass} mt-2`}
+                >
+                  <option value="">{t("resultForm.selectOpponent")}</option>
+                  <option value={match.playerOneRegistrationId ?? ""}>
+                    {playerOneName}
+                  </option>
+                  <option value={match.playerTwoRegistrationId ?? ""}>
+                    {playerTwoName}
+                  </option>
+                </select>
+              </label>
+              <label className="block text-xs text-zinc-300">
                 {t("resultForm.evidenceOptional")}
-              </span>
-              <textarea
-                name="noShowNotes"
-                maxLength={2000}
-                rows={3}
-                placeholder={t("resultForm.evidencePlaceholder")}
-                className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-red-400"
-              />
-            </label>
-            <p className="rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-[11px] leading-5 text-red-100/80">
-              {t("resultForm.noShowWarning")}
-            </p>
-            {noShowState.status !== "idle" && (
-              <p
-                className={`rounded-lg border p-2 text-xs ${
-                  noShowState.status === "success"
-                    ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
-                    : "border-red-400/30 bg-red-500/10 text-red-200"
-                }`}
-              >
-                {getMatchActionMessage(noShowState, t)}
+                <textarea
+                  name="noShowNotes"
+                  maxLength={2000}
+                  rows={3}
+                  className={`${inputClass} mt-2`}
+                />
+              </label>
+              <p className="text-xs leading-5 text-orange-200">
+                {t("resultForm.noShowWarning")}
               </p>
-            )}
-            <button
-              type="submit"
-              disabled={noShowPending || pending || finalizationUncertain}
-              className="w-full rounded-xl bg-red-700 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
-            >
-              {noShowPending
-                ? t("resultForm.submitting")
-                : t("resultForm.submitNoShow")}
-            </button>
+              {noShowState.status !== "idle" && (
+                <p role="status" className="text-sm text-orange-200">
+                  {getMatchActionMessage(noShowState, t)}
+                </p>
+              )}
+              <button
+                type="submit"
+                className={`${buttonClass} w-full text-orange-200`}
+              >
+                {t(
+                  noShowPending
+                    ? "resultForm.submitting"
+                    : "resultForm.submitNoShow"
+                )}
+              </button>
+            </fieldset>
           </form>
-        )}
-      </div>
+        </details>
+      )}
     </div>
   );
-}
-
-function PlayerLabel({ label, name }: { label: string; name: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/70 p-4">
-      <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 truncate font-black text-white">{name}</p>
-    </div>
-  );
-}
-
-function ScoreField({
-  name,
-  label,
-  max,
-  value,
-  onChange,
-}: {
-  name: string;
-  label: string;
-  max: number;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="block truncate text-xs font-bold text-slate-300">
-        {label}
-      </span>
-      <input
-        name={name}
-        type="number"
-        min="0"
-        max={max}
-        required
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-base text-white outline-none focus:border-orange-400"
-      />
-    </label>
-  );
-}
-
-function getScoreInfo(
-  playerOneScore: string,
-  playerTwoScore: string,
-  winsRequired: number,
-  seriesBestOf: number,
-  t: CompetitionTranslator
-) {
-  const playerOne = parseScore(playerOneScore);
-  const playerTwo = parseScore(playerTwoScore);
-
-  if (playerOne === null || playerTwo === null) {
-    return {
-      requiredReplayCount: null,
-      message: t("resultForm.scoreFirst"),
-    };
-  }
-
-  if (playerOne === playerTwo) {
-    return {
-      requiredReplayCount: null,
-      message: t("resultForm.scoreTie"),
-    };
-  }
-
-  const winnerScore = Math.max(playerOne, playerTwo);
-  const loserScore = Math.min(playerOne, playerTwo);
-
-  if (winnerScore !== winsRequired || loserScore >= winsRequired) {
-    return {
-      requiredReplayCount: null,
-      message: t("resultForm.bestOfWins", {
-        bestOf: seriesBestOf,
-        count: winsRequired,
-      }),
-    };
-  }
-
-  return {
-    requiredReplayCount: playerOne + playerTwo,
-    message: null,
-  };
-}
-
-function parseScore(value: string) {
-  if (value.trim() === "") return null;
-
-  const score = Number(value);
-  return Number.isInteger(score) && score >= 0 ? score : null;
-}
-
-function validateReplaySelection(files: File[], t: CompetitionTranslator) {
-  if (files.length === 0) {
-    return t("resultForm.replayMissing");
-  }
-
-  if (files.some((file) => file.size <= 0)) {
-    return t("resultForm.replayEmpty");
-  }
-
-  if (files.some((file) => file.size > maxReplayBytes)) {
-    return t("resultForm.replayTooLarge");
-  }
-
-  if (files.some((file) => !file.name.toLowerCase().endsWith(".rec"))) {
-    return t("resultForm.replayExtension");
-  }
-
-  return "";
-}
-
-function getGameWinnerSelectionError({
-  gameWinnerRegistrationIds,
-  playerOneRegistrationId,
-  playerTwoRegistrationId,
-  playerOneScore,
-  playerTwoScore,
-  winnerRegistrationId,
-  requiredGameCount,
-  t,
-}: {
-  gameWinnerRegistrationIds: string[];
-  playerOneRegistrationId: string | null;
-  playerTwoRegistrationId: string | null;
-  playerOneScore: number | null;
-  playerTwoScore: number | null;
-  winnerRegistrationId: string;
-  requiredGameCount: number | null;
-  t: CompetitionTranslator;
-}) {
-  if (requiredGameCount === null) return "";
-
-  if (
-    !playerOneRegistrationId ||
-    !playerTwoRegistrationId ||
-    gameWinnerRegistrationIds.length !== requiredGameCount ||
-    gameWinnerRegistrationIds.some((registrationId) => !registrationId)
-  ) {
-    return t("resultForm.gameWinnersRequired");
-  }
-
-  const participants = new Set([
-    playerOneRegistrationId,
-    playerTwoRegistrationId,
-  ]);
-  const playerOneGameWins = gameWinnerRegistrationIds.filter(
-    (registrationId) => registrationId === playerOneRegistrationId
-  ).length;
-  const playerTwoGameWins = gameWinnerRegistrationIds.filter(
-    (registrationId) => registrationId === playerTwoRegistrationId
-  ).length;
-
-  if (
-    playerOneScore === null ||
-    playerTwoScore === null ||
-    gameWinnerRegistrationIds.some(
-      (registrationId) => !participants.has(registrationId)
-    ) ||
-    playerOneGameWins !== playerOneScore ||
-    playerTwoGameWins !== playerTwoScore ||
-    gameWinnerRegistrationIds.at(-1) !== winnerRegistrationId
-  ) {
-    return t("resultForm.gameWinnersInvalid");
-  }
-
-  return "";
-}
-
-function getSubmissionPhaseLabel(
-  phase: ReplaySubmissionPhase,
-  uploadGameNumber: number,
-  replayCount: number,
-  t: CompetitionTranslator
-) {
-  if (phase === "preparing") return t("resultForm.preparing");
-  if (phase === "uploading") {
-    return t("resultForm.uploading", {
-      current: uploadGameNumber,
-      total: replayCount,
-    });
-  }
-  if (phase === "finalizing") return t("resultForm.finalizing");
-  return t("resultForm.finalizing");
-}
-
-function getMatchActionMessage(
-  state: Pick<MatchResultActionState, "code" | "message" | "values">,
-  t: CompetitionTranslator
-) {
-  switch (state.code) {
-    case "auth_required":
-      return t("actionResults.authRequired");
-    case "prepare_failed":
-      return t("matchAction.prepareFailed");
-    case "cleanup_failed":
-      return t("matchAction.cleanupFailed");
-    case "operation_failed":
-      return t("matchAction.operationFailed");
-    case "duplicate_replay":
-      return t("matchAction.duplicateReplay");
-    case "result_submitted":
-      return t(
-        Number(state.values?.warning) === 1
-          ? "matchAction.resultSubmittedWarning"
-          : "matchAction.resultSubmitted",
-        { submission: state.values?.submission ?? "new" }
-      );
-    case "opponent_required":
-      return t("matchAction.opponentRequired");
-    case "notes_too_long":
-      return t("matchAction.notesTooLong");
-    case "match_unavailable":
-      return t("matchAction.matchUnavailable");
-    case "participants_unavailable":
-      return t("matchAction.participantsUnavailable");
-    case "participant_only":
-      return t("matchAction.participantOnly");
-    case "self_no_show":
-      return t("matchAction.selfNoShow");
-    case "invalid_participant":
-      return t("matchAction.invalidParticipant");
-    case "no_show_submitted":
-      return t("matchAction.noShowSubmitted", {
-        player: state.values?.player ?? "",
-      });
-    case "report_unavailable":
-      return t("matchAction.reportUnavailable");
-    case "confirmed":
-      return t("matchAction.confirmed");
-    case "dispute_notes_too_long":
-      return t("matchAction.disputeNotesTooLong");
-    case "disputed":
-      return t("matchAction.disputed");
-    default:
-      return state.message;
-  }
 }

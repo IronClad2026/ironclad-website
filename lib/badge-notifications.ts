@@ -23,6 +23,46 @@ type BadgeNotificationRecipient = {
   clerkUserId: string;
 };
 
+export type BadgeNotificationReconciliationErrorCode =
+  | "BADGE_NOTIFICATION_PLAYER_LOAD_FAILED"
+  | "BADGE_NOTIFICATION_PLAYER_RESULT_INVALID"
+  | "BADGE_NOTIFICATION_AWARD_LOAD_FAILED"
+  | "BADGE_NOTIFICATION_AWARD_RESULT_INVALID"
+  | "BADGE_NOTIFICATION_CREATE_FAILED";
+
+export type BadgeNotificationReconciliationResult =
+  | {
+      succeeded: true;
+    }
+  | {
+      succeeded: false;
+      errorCode: BadgeNotificationReconciliationErrorCode;
+    };
+
+type BadgeNotificationRecipientLoadResult =
+  | {
+      status: "open";
+      recipient: BadgeNotificationRecipient;
+    }
+  | {
+      status: "unavailable";
+    }
+  | {
+      status: "failed";
+      errorCode:
+        | "BADGE_NOTIFICATION_PLAYER_LOAD_FAILED"
+        | "BADGE_NOTIFICATION_PLAYER_RESULT_INVALID";
+    };
+
+type BadgeAwardLoadResult =
+  | {
+      status: "loaded";
+      data: unknown;
+    }
+  | {
+      status: "failed";
+    };
+
 export async function createBadgeUnlockedNotification({
   awardId,
   playerId,
@@ -52,82 +92,173 @@ export async function createBadgeUnlockedNotification({
     return true;
   }
 
-  const recipient = await loadOpenPlayerRecipient(supabase, playerId);
-  if (!recipient) {
+  const recipientResult = await loadOpenPlayerRecipient(supabase, playerId);
+  if (recipientResult.status !== "open") {
     return false;
   }
 
   return createBadgeNotificationForRecipient({
     award,
-    recipient,
+    recipient: recipientResult.recipient,
   });
 }
 
 export async function reconcileBadgeUnlockedNotificationsForPlayer(
   playerId: string
-): Promise<void> {
+): Promise<BadgeNotificationReconciliationResult> {
   if (!isUuid(playerId)) {
-    return;
+    return reconciliationFailure("BADGE_NOTIFICATION_PLAYER_RESULT_INVALID");
   }
 
   const supabase = createSupabaseAdminClient();
-  const [recipient, awardsResult] = await Promise.all([
+  const [recipientResult, awardsResult] = await Promise.all([
     loadOpenPlayerRecipient(supabase, playerId),
-    supabase
-      .from("player_badge_awards")
-      .select("id, badge_slug, source_metadata")
-      .eq("player_id", playerId)
-      .order("unlocked_at", { ascending: true })
-      .order("id", { ascending: true }),
+    loadBadgeAwardsForPlayer(supabase, playerId),
   ]);
 
-  if (awardsResult.error) {
-    logBadgeNotificationFailure("reconcile-load-awards", awardsResult.error);
-    return;
+  if (recipientResult.status === "unavailable") {
+    return reconciliationSuccess();
   }
 
-  if (!recipient || !Array.isArray(awardsResult.data)) {
-    return;
+  if (awardsResult.status === "failed") {
+    return reconciliationFailure("BADGE_NOTIFICATION_AWARD_LOAD_FAILED");
   }
 
-  // The canonical slug constraint and one-award-per-player/slug uniqueness
-  // bound this set to 30. Slice defensively if a malformed test double or
-  // pre-constraint historical row ever exceeds that contract.
-  const awards = awardsResult.data
-    .filter(isBadgeAwardRow)
-    .slice(0, 30)
-    .filter((award) => !isBackfillAward(award.source_metadata));
+  if (!Array.isArray(awardsResult.data)) {
+    return reconciliationFailure("BADGE_NOTIFICATION_AWARD_RESULT_INVALID");
+  }
+
+  const awards: BadgeAwardRow[] = [];
+  const awardIds = new Set<string>();
+  const badgeSlugs = new Set<string>();
+
+  for (const value of awardsResult.data) {
+    if (
+      !isBadgeAwardRow(value) ||
+      !getBadgeDefinitionBySlug(value.badge_slug as BadgeSlug) ||
+      awardIds.has(value.id) ||
+      badgeSlugs.has(value.badge_slug)
+    ) {
+      return reconciliationFailure("BADGE_NOTIFICATION_AWARD_RESULT_INVALID");
+    }
+
+    awardIds.add(value.id);
+    badgeSlugs.add(value.badge_slug);
+
+    if (isBackfillAward(value.source_metadata)) {
+      continue;
+    }
+
+    awards.push(value);
+  }
+
+  if (awards.length === 0) {
+    return reconciliationSuccess();
+  }
+
+  if (recipientResult.status === "failed") {
+    return reconciliationFailure(recipientResult.errorCode);
+  }
+
+  let notificationFailed = false;
 
   for (const award of awards) {
-    await createBadgeNotificationForRecipient({
-      award,
-      recipient,
-    });
+    try {
+      const notificationCreated = await createBadgeNotificationForRecipient({
+        award,
+        recipient: recipientResult.recipient,
+      });
+
+      if (notificationCreated !== true) {
+        notificationFailed = true;
+      }
+    } catch (error) {
+      logBadgeNotificationFailure("reconcile-create", error);
+      notificationFailed = true;
+    }
   }
+
+  return notificationFailed
+    ? reconciliationFailure("BADGE_NOTIFICATION_CREATE_FAILED")
+    : reconciliationSuccess();
 }
 
 async function loadOpenPlayerRecipient(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   playerId: string
-): Promise<BadgeNotificationRecipient | null> {
-  const { data, error } = await supabase
-    .from("players")
-    .select("clerk_user_id")
-    .eq("id", playerId)
-    .is("account_closed_at", null)
-    .maybeSingle();
+): Promise<BadgeNotificationRecipientLoadResult> {
+  let result: {
+    data: unknown;
+    error: unknown;
+  };
+
+  try {
+    result = await supabase
+      .from("players")
+      .select("clerk_user_id")
+      .eq("id", playerId)
+      .is("account_closed_at", null)
+      .maybeSingle();
+  } catch (error) {
+    logBadgeNotificationFailure("load-recipient", error);
+    return {
+      status: "failed",
+      errorCode: "BADGE_NOTIFICATION_PLAYER_LOAD_FAILED",
+    };
+  }
+
+  const { data, error } = result;
 
   if (error) {
     logBadgeNotificationFailure("load-recipient", error);
-    return null;
+    return {
+      status: "failed",
+      errorCode: "BADGE_NOTIFICATION_PLAYER_LOAD_FAILED",
+    };
+  }
+
+  if (data === null) {
+    return { status: "unavailable" };
   }
 
   if (!isRecord(data)) {
-    return null;
+    return {
+      status: "failed",
+      errorCode: "BADGE_NOTIFICATION_PLAYER_RESULT_INVALID",
+    };
   }
 
   const clerkUserId = stringOrNull(data.clerk_user_id);
-  return clerkUserId ? { clerkUserId } : null;
+  return clerkUserId
+    ? { status: "open", recipient: { clerkUserId } }
+    : {
+        status: "failed",
+        errorCode: "BADGE_NOTIFICATION_PLAYER_RESULT_INVALID",
+      };
+}
+
+async function loadBadgeAwardsForPlayer(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  playerId: string
+): Promise<BadgeAwardLoadResult> {
+  try {
+    const { data, error } = await supabase
+      .from("player_badge_awards")
+      .select("id, badge_slug, source_metadata")
+      .eq("player_id", playerId)
+      .order("unlocked_at", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (error) {
+      logBadgeNotificationFailure("reconcile-load-awards", error);
+      return { status: "failed" };
+    }
+
+    return { status: "loaded", data };
+  } catch (error) {
+    logBadgeNotificationFailure("reconcile-load-awards", error);
+    return { status: "failed" };
+  }
 }
 
 async function createBadgeNotificationForRecipient({
@@ -190,6 +321,19 @@ function isUuid(value: unknown): value is string {
       value
     )
   );
+}
+
+function reconciliationSuccess(): BadgeNotificationReconciliationResult {
+  return { succeeded: true };
+}
+
+function reconciliationFailure(
+  errorCode: BadgeNotificationReconciliationErrorCode
+): BadgeNotificationReconciliationResult {
+  return {
+    succeeded: false,
+    errorCode,
+  };
 }
 
 function logBadgeNotificationFailure(operation: string, error: unknown) {

@@ -224,6 +224,34 @@ describe("administrator registration review responsive interaction", () => {
       .toBeInTheDocument();
   });
 
+  it.each([
+    "approved",
+    "rejected",
+    "waitlisted",
+    "withdrawn",
+  ] as const)("keeps %s registrations out of bulk approval", (status) => {
+    const { container } = renderRows(vi.fn(), reviewRow({ status }));
+
+    for (const checkbox of within(container).getAllByRole("checkbox", {
+      name: `Select registration for ${longPlayerName}`,
+    })) {
+      expect(checkbox).toBeDisabled();
+    }
+  });
+
+  it.each(["pending", "manual_review"] as const)(
+    "keeps %s registrations eligible for bulk approval",
+    (status) => {
+      const { container } = renderRows(vi.fn(), reviewRow({ status }));
+
+      for (const checkbox of within(container).getAllByRole("checkbox", {
+        name: `Select registration for ${longPlayerName}`,
+      })) {
+        expect(checkbox).toBeEnabled();
+      }
+    }
+  );
+
   it.each(["cancelled", "voided"] as const)(
     "locks %s tournament competition controls while retaining review access",
     () => {

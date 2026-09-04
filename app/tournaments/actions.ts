@@ -14,7 +14,10 @@ import {
 import { createInAppNotification } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getRequestLocale } from "@/lib/i18n/request";
-import { WAITLIST_DISCLOSURE_MESSAGE } from "@/lib/tournaments";
+import {
+  isTournamentRegistrationOpen as isTournamentEventRegistrationOpen,
+  WAITLIST_DISCLOSURE_MESSAGE,
+} from "@/lib/tournaments";
 
 const REGISTRATION_UNAVAILABLE_MESSAGE =
   "This tournament is full or already in progress. We hope to see you in the next one.";
@@ -686,24 +689,14 @@ function parseRegistrationTransactionResult(
 }
 
 function isTournamentRegistrationOpen(tournament: RegistrationTournament) {
-  if (
-    (tournament.status !== "registration_open" &&
-      tournament.status !== "in_progress") ||
-    tournament.bracket.launchedAt !== null ||
-    !tournament.registrationEnabled
-  ) {
-    return false;
-  }
-
-  const now = Date.now();
-  const opensAt = parseTimestamp(tournament.registrationOpenAt);
-  const closesAt = parseTimestamp(tournament.registrationCloseAt);
-
   return (
-    opensAt !== "invalid" &&
-    closesAt !== "invalid" &&
-    (opensAt === null || now >= opensAt) &&
-    (closesAt === null || now <= closesAt)
+    tournament.bracket.launchedAt === null &&
+    isTournamentEventRegistrationOpen({
+      statusValue: tournament.status,
+      registrationEnabled: tournament.registrationEnabled,
+      registrationOpenAt: tournament.registrationOpenAt,
+      registrationCloseAt: tournament.registrationCloseAt,
+    })
   );
 }
 
@@ -794,12 +787,6 @@ function revalidateRegistrationPaths() {
       console.error("Tournament registration cache invalidation failed.");
     }
   }
-}
-
-function parseTimestamp(value: string | null) {
-  if (value === null) return null;
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timestamp : "invalid";
 }
 
 function parseSafeInteger(value: unknown) {

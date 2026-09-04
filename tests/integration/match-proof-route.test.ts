@@ -34,6 +34,7 @@ const SUBMITTER_REGISTRATION_ID =
   "66666666-6666-4666-8666-666666666666";
 const OPPONENT_REGISTRATION_ID =
   "77777777-7777-4777-8777-777777777777";
+const REPORT_GROUP_ID = "88888888-8888-4888-8888-888888888888";
 const DEFAULT_REPLAY_PATH = `${MATCH_ID}/proof-${RECORD_ID}/game-1.rec`;
 
 type ProofSource = "submission" | "report-group";
@@ -42,16 +43,24 @@ type StorageError = {
 };
 
 type AdminClientOptions = {
+  divisionName?: string;
+  gameNumber?: number;
   matchId?: string;
+  matchNumber?: number;
+  playerOneName?: string;
+  playerTwoName?: string;
   proofMatchId?: string;
   proofTournamentId?: string;
   proofData?: unknown;
   proofError?: StorageError | null;
+  reportGroupId?: string | null;
+  roundName?: string;
   source?: ProofSource;
   storageError?: StorageError | null;
   storagePath?: string;
   storageStream?: ReadableStream<Uint8Array> | null;
   tournamentId?: string;
+  tournamentTitle?: string;
   viewerRegistrationId?: string | null;
 };
 
@@ -133,7 +142,12 @@ function makeTerminalQuery(
 }
 
 function createAdminClient({
+  divisionName = "Academy",
+  gameNumber = 1,
   matchId = MATCH_ID,
+  matchNumber = 3,
+  playerOneName = "Commander One",
+  playerTwoName = "Commander Two",
   proofMatchId = matchId,
   proofData,
   proofError = null,
@@ -143,6 +157,9 @@ function createAdminClient({
   storageStream = streamFromText("proof-bytes"),
   tournamentId = TOURNAMENT_ID,
   proofTournamentId = tournamentId,
+  reportGroupId = REPORT_GROUP_ID,
+  roundName = "Round 1",
+  tournamentTitle = "IronClad Invitational",
   viewerRegistrationId = SUBMITTER_REGISTRATION_ID,
 }: AdminClientOptions = {}) {
   const resolvedProofData =
@@ -150,7 +167,9 @@ function createAdminClient({
       ? source === "submission"
         ? {
             id: RECORD_ID,
+            game_number: gameNumber,
             match_id: proofMatchId,
+            report_group_id: reportGroupId,
             replay_storage_path: storagePath,
             screenshot_storage_path: storagePath,
             submitted_by_registration_id: SUBMITTER_REGISTRATION_ID,
@@ -172,8 +191,24 @@ function createAdminClient({
     data: {
       generated_bracket_id: "generated-bracket-1",
       id: matchId,
+      match_number: matchNumber,
       player_one_registration_id: SUBMITTER_REGISTRATION_ID,
       player_two_registration_id: OPPONENT_REGISTRATION_ID,
+      player_one: { player_name: playerOneName },
+      player_two: { player_name: playerTwoName },
+      bracket_rounds: { name: roundName },
+      generated_brackets: {
+        id: "generated-bracket-1",
+        tournament_brackets: {
+          id: "tournament-bracket-1",
+          name: divisionName,
+          tournament_id: tournamentId,
+          tournaments: {
+            id: tournamentId,
+            title: tournamentTitle,
+          },
+        },
+      },
     },
   });
   const generatedBracketQuery = createSupabaseQueryMock({
@@ -660,7 +695,7 @@ describe("authenticated match-proof proxy route", () => {
 
     expectPrivateProofResponse(response);
     expect(response.headers.get("Content-Disposition")).toBe(
-      'attachment; filename="match-replay.rec"'
+      'attachment; filename="IronClad_IronClad-Invitational_Academy_Round-1_Match-3_Game-1_Commander-One-vs-Commander-Two.rec"'
     );
     expect(response.headers.get("Content-Type")).toBe(
       "application/octet-stream"
@@ -724,11 +759,50 @@ describe("authenticated match-proof proxy route", () => {
     });
 
     expectPrivateProofResponse(response);
+    expect(response.headers.get("Content-Disposition")).toBe(
+      'attachment; filename="IronClad_IronClad-Invitational_Academy_Round-1_Match-3_Series-Replay_Commander-One-vs-Commander-Two.rec"'
+    );
     expect(await response.text()).toBe("proof-bytes");
     expect(adminClient.from).toHaveBeenCalledWith(
       "match_result_report_groups"
     );
     expect(adminClient.download).toHaveBeenCalledOnce();
+  });
+
+  it("sanitizes contextual replay filenames without weakening private delivery", async () => {
+    const adminClient = createAdminClient({
+      divisionName: "Main/Pro \\ Division",
+      matchNumber: 12,
+      playerOneName: 'Alpha\r\nContent-Disposition: inline',
+      playerTwoName: "Bravó / ..",
+      roundName: "Semi-final / Upper",
+      tournamentTitle: 'Open <Final> : 2026',
+    });
+    configureAuthorizedRequest({ adminClient, identity: adminIdentity });
+
+    const response = await requestProof();
+    const disposition = response.headers.get("Content-Disposition");
+
+    expectPrivateProofResponse(response);
+    expect(disposition).toBe(
+      'attachment; filename="IronClad_Open-Final-2026_Main-Pro-Division_Semi-final-Upper_Match-12_Game-1_Alpha-Content-Disposition-in-vs-Bravo.rec"'
+    );
+    expect(disposition).not.toMatch(/[\\/\r\n]/);
+    expect(await response.text()).toBe("proof-bytes");
+    expect(adminClient.createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("labels a standalone legacy submission as a Series Replay", async () => {
+    const adminClient = createAdminClient({ reportGroupId: null });
+    configureAuthorizedRequest({ adminClient, identity: adminIdentity });
+
+    const response = await requestProof();
+
+    expectPrivateProofResponse(response);
+    expect(response.headers.get("Content-Disposition")).toContain(
+      "_Series-Replay_"
+    );
+    expect(await response.text()).toBe("proof-bytes");
   });
 
   it.each([

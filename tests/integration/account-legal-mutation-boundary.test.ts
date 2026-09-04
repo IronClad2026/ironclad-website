@@ -39,6 +39,8 @@ const ALWAYS_GUARDED_ACTIONS = {
     "generateTournamentBracket",
     "saveBracketAssignments",
     "launchTournamentDivision",
+    "closeTournamentDivisionWithoutLaunch",
+    "createTournamentDivisionInvitationAction",
     "deleteTournament",
   ],
   "app/admin/tournaments/deadline-actions.ts": [
@@ -135,6 +137,7 @@ const FULL_MUTATION_EXEMPTIONS = {
   ],
   "app/dashboard/registration-actions.ts": [
     "withdrawTournamentRegistrationAction",
+    "respondToTournamentDivisionInvitationAction",
   ],
   "app/notifications/actions.ts": ["deleteWebPushSubscription"],
   "app/tournaments/match-actions.ts": ["cleanupPreparedReplayUploads"],
@@ -323,15 +326,15 @@ describe("account legal mutation boundary architecture", () => {
       )
     );
 
-    expect(new Set(expected).size).toBe(77);
-    expect(expected).toHaveLength(77);
+    expect(new Set(expected).size).toBe(80);
+    expect(expected).toHaveLength(80);
     expect(actual.sort()).toEqual(expected.sort());
   });
 
-  it("guards all 56 ordinary authenticated mutations", () => {
+  it("guards all 58 ordinary authenticated mutations", () => {
     const directlyGuarded = flattenedInventory(ALWAYS_GUARDED_ACTIONS);
 
-    expect(directlyGuarded).toHaveLength(54);
+    expect(directlyGuarded).toHaveLength(56);
     expect(DELEGATED_GUARDED_ACTIONS).toHaveLength(2);
 
     for (const [path, actions] of Object.entries(ALWAYS_GUARDED_ACTIONS)) {
@@ -381,7 +384,7 @@ describe("account legal mutation boundary architecture", () => {
   });
 
   it("keeps cleanup, legal, privacy, language, and read-only exemptions unguarded", () => {
-    expect(flattenedInventory(FULL_MUTATION_EXEMPTIONS)).toHaveLength(6);
+    expect(flattenedInventory(FULL_MUTATION_EXEMPTIONS)).toHaveLength(7);
     expect(flattenedInventory(LEGAL_AND_PRIVACY_EXEMPTIONS)).toHaveLength(4);
     expect(flattenedInventory(READ_ONLY_ACTIONS)).toHaveLength(7);
 

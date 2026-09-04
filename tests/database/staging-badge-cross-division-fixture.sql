@@ -119,6 +119,47 @@ begin
       8
     );
 
+  -- Current lifecycle authority disables registration while an Event has no
+  -- Division rows. Re-enable it only after this rollback-only fixture creates
+  -- the intended open Divisions.
+  update public.tournaments
+  set registration_enabled = true
+  where id in (
+    '5b700000-0000-4000-8000-000000000001',
+    '5b700000-0000-4000-8000-000000000002'
+  );
+
+  perform pg_temp.badge_cross_division_assert(
+    (
+      select bool_and(
+        tournament.registration_enabled
+          and tournament.status = 'registration_open'
+          and tournament.registration_open_at <= clock_timestamp()
+          and tournament.registration_close_at >= clock_timestamp()
+      )
+      from public.tournaments as tournament
+      where tournament.id in (
+        '5b700000-0000-4000-8000-000000000001',
+        '5b700000-0000-4000-8000-000000000002'
+      )
+    ),
+    (
+      select jsonb_agg(jsonb_build_object(
+        'id', tournament.id,
+        'status', tournament.status,
+        'registrationEnabled', tournament.registration_enabled,
+        'registrationOpenAt', tournament.registration_open_at,
+        'registrationCloseAt', tournament.registration_close_at,
+        'checkedAt', clock_timestamp()
+      ) order by tournament.id)::text
+      from public.tournaments as tournament
+      where tournament.id in (
+        '5b700000-0000-4000-8000-000000000001',
+        '5b700000-0000-4000-8000-000000000002'
+      )
+    )
+  );
+
   select * into strict v_result
   from public.provision_staging_synthetic_uat_player(
     v_secret,

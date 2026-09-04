@@ -22,6 +22,11 @@ import {
   loadGeneratedBracketPageRows,
   mapGeneratedBrackets,
 } from "@/lib/tournament-bracket-data";
+import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
+import {
+  getTournamentEventSection,
+  projectPublicTournamentDivisionStates,
+} from "@/lib/tournament-division-state";
 import {
   getTournamentBracketDisplayName,
   getPublicTournamentRowsForRequest,
@@ -68,7 +73,7 @@ function normalizeRelicVerifiedDivision(
 
 export default async function TournamentsPage({
   searchParams,
-}: TournamentsPageProps = {}) {
+}: TournamentsPageProps) {
   const [{ userId, sessionClaims }, locale] = await Promise.all([
     auth(),
     getRequestLocale(),
@@ -96,15 +101,16 @@ export default async function TournamentsPage({
     capacityResult,
     registrationResult,
     generatedBracketResult,
+    notHeldResult,
     viewerDivisionResult,
     registrationDocuments,
   ] = await Promise.all([
     supabase
       .from("tournaments")
       .select(
-        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
+        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, rule_format, result_confirmation_window_minutes, terminal_at, first_completed_at, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
       )
-      .order("grand_final_at", { ascending: false, nullsFirst: false }),
+      .order("created_at", { ascending: false }),
     supabase.rpc("get_tournament_bracket_capacity"),
     supabase
       .from("registrations")
@@ -116,6 +122,7 @@ export default async function TournamentsPage({
     loadGeneratedBracketPageRows({
       includeAdminAudit: isAdmin,
     }),
+    supabase.rpc("get_tournament_division_not_held_states"),
     viewerDivisionRequest,
     loadEffectiveRegistrationDocumentSet(supabase),
   ]);
@@ -150,11 +157,16 @@ export default async function TournamentsPage({
     console.error("Generated tournament brackets load failed.");
   }
 
+  if (notHeldResult.error) {
+    console.error("Tournament Division Not Held state load failed.");
+  }
+
   if (
     tournamentResult.error ||
     capacityResult.error ||
     registrationResult.error ||
     generatedBracketResult.error ||
+    notHeldResult.error ||
     viewerDivisionResult.error
   ) {
     throw new Error("Tournament data could not be loaded.");
@@ -164,7 +176,8 @@ export default async function TournamentsPage({
     !Array.isArray(tournamentResult.data) ||
     !Array.isArray(capacityResult.data) ||
     !Array.isArray(registrationResult.data) ||
-    !Array.isArray(generatedBracketResult.data)
+    !Array.isArray(generatedBracketResult.data) ||
+    !Array.isArray(notHeldResult.data)
   ) {
     console.error("Tournament data load returned an invalid response.");
     throw new Error("Tournament data could not be loaded.");
@@ -178,6 +191,15 @@ export default async function TournamentsPage({
   );
   const includedTournamentIds = new Set(
     tournamentRows.map((tournament) => tournament.id)
+  );
+  const divisionStatesByTournament = await loadTournamentDivisionStates(
+    supabase,
+    tournamentRows,
+    {
+      readinessRows: capacityResult.data,
+      generatedBracketRows: generatedBracketResult.data,
+      notHeldRows: notHeldResult.data,
+    }
   );
   const publishedMapPoolBracketIds = tournamentRows.flatMap((tournament) =>
     (tournament.tournament_brackets ?? [])
@@ -481,16 +503,41 @@ export default async function TournamentsPage({
     tournamentRows
   );
   const tournaments = tournamentRows.map((row) => {
-    const tournament = mapTournamentRow(row, { locale, t });
-    tournament.participants = participantsByTournament.get(row.id) ?? [];
+    const divisionStates = divisionStatesByTournament.get(row.id);
+
+    if (!divisionStates) {
+      console.error("Tournament division-state projection was missing.");
+      throw new Error("Tournament data could not be loaded.");
+    }
+
+    const publicDivisionStates = projectPublicTournamentDivisionStates(
+      divisionStates
+    );
+    const notHeldBracketIds = new Set(
+      divisionStates.flatMap((division) =>
+        division.state === "not_held" && division.bracketId
+          ? [division.bracketId]
+          : []
+      )
+    );
+    const tournament = mapTournamentRow(
+      row,
+      { locale, t },
+      publicDivisionStates
+    );
+    tournament.participants = (
+      participantsByTournament.get(row.id) ?? []
+    ).filter((participant) => !notHeldBracketIds.has(participant.bracketId));
     tournament.bracketParticipants =
-      bracketParticipantsByTournament.get(row.id) ?? [];
+      (bracketParticipantsByTournament.get(row.id) ?? []).filter(
+        (participant) => !notHeldBracketIds.has(participant.bracketId)
+      );
     tournament.generatedBrackets = generatedByTournament.get(row.id) ?? [];
     tournament.media = mediaByTournament.get(row.id) ?? [];
     tournament.mapPools = projectPublishedTournamentMapPools(
       (row.tournament_brackets ?? []).map((bracket) => ({
         id: bracket.id,
-        name: getTournamentBracketDisplayName(bracket.name),
+        name: bracket.name,
         mapPoolPublishedAt: bracket.map_pool_published_at,
         launchedAt: bracket.launched_at,
         entries: mapPoolEntriesByBracket.get(bracket.id) ?? [],
@@ -628,18 +675,37 @@ function compareTournamentCards(
   left: ReturnType<typeof mapTournamentRow>,
   right: ReturnType<typeof mapTournamentRow>
 ) {
-  const leftHistorical = left.statusValue === "completed" ? 1 : 0;
-  const rightHistorical = right.statusValue === "completed" ? 1 : 0;
+  const sectionOrder = {
+    in_competition: 0,
+    open: 1,
+    resolved: 2,
+  } as const;
+  const leftSection = getTournamentEventSection(left.divisionStates);
+  const rightSection = getTournamentEventSection(right.divisionStates);
+  const sectionDifference =
+    sectionOrder[leftSection] - sectionOrder[rightSection];
 
-  if (leftHistorical !== rightHistorical) {
-    return leftHistorical - rightHistorical;
+  if (sectionDifference !== 0) {
+    return sectionDifference;
   }
 
-  return getTournamentSortTime(right) - getTournamentSortTime(left);
+  const timeDifference =
+    getTournamentSortTime(right, rightSection) -
+    getTournamentSortTime(left, leftSection);
+
+  return timeDifference || left.id.localeCompare(right.id);
 }
 
-function getTournamentSortTime(tournament: ReturnType<typeof mapTournamentRow>) {
-  const dateValue = tournament.grandFinalAt ?? tournament.createdAt;
+function getTournamentSortTime(
+  tournament: ReturnType<typeof mapTournamentRow>,
+  section: ReturnType<typeof getTournamentEventSection>
+) {
+  const dateValue =
+    section === "resolved"
+      ? tournament.terminalAt ??
+        tournament.firstCompletedAt ??
+        tournament.createdAt
+      : tournament.createdAt;
   const timestamp = new Date(dateValue).getTime();
 
   return Number.isFinite(timestamp) ? timestamp : 0;

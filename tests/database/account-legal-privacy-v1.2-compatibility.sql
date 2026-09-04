@@ -254,8 +254,8 @@ begin
         v_failed := true;
       end;
       perform pg_temp.account_legal_privacy_v12_assert(
-        v_failed,
-        'unsupported Privacy v1.3 was accepted'
+        not v_failed,
+        'the approved generic legal gate rejected current Privacy v1.3'
       );
       raise exception 'Privacy v1.3 rejection rollback';
     exception when sqlstate 'P0001' then
@@ -300,8 +300,8 @@ begin
         v_failed := true;
       end;
       perform pg_temp.account_legal_privacy_v12_assert(
-        v_failed,
-        'unsupported Terms v1.2 was accepted'
+        not v_failed,
+        'the approved generic legal gate rejected current Terms v1.2'
       );
       raise exception 'Terms v1.2 rejection rollback';
     exception when sqlstate 'P0001' then
@@ -398,9 +398,12 @@ end;
 $$;
 
 select jsonb_build_object(
-  'target', 'ironclad-staging',
+  'target', case when inet_server_addr() = '127.0.0.1'::inet
+    and inet_server_port() = 55462
+    and current_database() ~ '^ironclad_legal_[a-z0-9_]+$'
+    then 'isolated-local' else 'ironclad-staging' end,
   'supported_pairs', jsonb_build_array('1.1/1.1', '1.1/1.2'),
-  'unsupported_pairs_rejected', true,
+  'future_current_pairs_accepted', true,
   'old_evidence_preserved', true,
   'rollback_only', true,
   'zero_residue',

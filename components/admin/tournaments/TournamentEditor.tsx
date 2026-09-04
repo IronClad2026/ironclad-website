@@ -12,7 +12,10 @@ import type {
   TournamentBracketRow,
   TournamentRow,
 } from "@/lib/tournaments";
-import { TOURNAMENT_BRACKET_CONFIGS } from "@/lib/tournaments";
+import {
+  getTournamentRegistrationStatusLabel,
+  TOURNAMENT_BRACKET_CONFIGS,
+} from "@/lib/tournaments";
 
 export type TournamentEditorNotice =
   | "invalid"
@@ -40,9 +43,9 @@ export type TournamentFormValues = {
   slug: string;
   description: string;
   bannerImageUrl: string;
+  registrationEnabled: boolean;
   registrationOpenAt: string;
   registrationCloseAt: string;
-  grandFinalAt: string;
   status: string;
   format: string;
   ruleFormat: string;
@@ -77,6 +80,7 @@ export type TournamentBracketReadinessSummary = {
   requiredCount: number;
   isReady: boolean;
   launchedAt: string | null;
+  notHeldAt: string | null;
 };
 
 export type TournamentTerminalPresentation = {
@@ -112,9 +116,9 @@ export const EMPTY_TOURNAMENT_VALUES: TournamentFormValues = {
   slug: "",
   description: "",
   bannerImageUrl: "",
+  registrationEnabled: false,
   registrationOpenAt: "",
   registrationCloseAt: "",
-  grandFinalAt: "",
   status: "upcoming",
   format: "1v1",
   ruleFormat: "format_a",
@@ -275,7 +279,7 @@ export function TournamentEditor({
             name="status"
             defaultValue={values.status}
             disabled={!isEditing}
-            options={getEditableTournamentStatusOptions(values.status)}
+            options={getEditableTournamentStatusOptions(values)}
           />
           <SelectField
             label="Format"
@@ -311,24 +315,49 @@ export function TournamentEditor({
               ["1440", "24 hours"],
             ]}
           />
-          <DateField
-            label="Registration Opens"
-            name="registrationOpenAt"
-            defaultValue={values.registrationOpenAt}
-            readOnly={!isEditing}
-          />
-          <DateField
-            label="Registration Closes"
-            name="registrationCloseAt"
-            defaultValue={values.registrationCloseAt}
-            readOnly={!isEditing}
-          />
-          <DateField
-            label="Grand Final Date/Time"
-            name="grandFinalAt"
-            defaultValue={values.grandFinalAt}
-            readOnly={!isEditing}
-          />
+          <div
+            data-event-scheduling-policy
+            className="md:col-span-2 rounded-2xl border border-orange-400/25 bg-orange-500/10 p-4 text-sm leading-6 text-orange-100"
+          >
+            <p className="font-black text-white">Rolling Division schedule</p>
+            <p className="mt-1">
+              Each Division launches independently when eight approved Players
+              are ready. Each Matchup, including the Grand Final, normally
+              receives seven days after activation.
+            </p>
+          </div>
+          <details
+            data-registration-window-controls
+            className="md:col-span-2 rounded-2xl border border-white/10 bg-black/25 p-4"
+            open={Boolean(
+              values.registrationOpenAt || values.registrationCloseAt
+            )}
+          >
+            <summary className="cursor-pointer text-sm font-black text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
+              Advanced Event-Wide Registration Window
+            </summary>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">
+              These optional times affect every unlaunched Division in this
+              Event. Leave both blank to keep eligible Divisions open until
+              they launch or an administrator deliberately closes Event
+              registration. These controls do not schedule Match deadlines or
+              the Grand Final.
+            </p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <DateField
+                label="Registration Opens (optional)"
+                name="registrationOpenAt"
+                defaultValue={values.registrationOpenAt}
+                readOnly={!isEditing}
+              />
+              <DateField
+                label="Registration Closes (optional)"
+                name="registrationCloseAt"
+                defaultValue={values.registrationCloseAt}
+                readOnly={!isEditing}
+              />
+            </div>
+          </details>
           <TextAreaField
             label="Prize Pool (optional)"
             name="prizePool"
@@ -359,7 +388,14 @@ export function TournamentEditor({
               prefix={config.fieldPrefix}
               label={config.label}
               values={values[config.fieldPrefix]}
-              readOnly={!isEditing}
+              readOnly={
+                !isEditing ||
+                Boolean(
+                  readinessByBracket.get(
+                    values[config.fieldPrefix].id ?? ""
+                  )?.notHeldAt
+                )
+              }
             />
           ))}
         </div>
@@ -387,6 +423,7 @@ export function TournamentEditor({
                 const approvedCount = readiness?.approvedCount ?? approved;
                 const requiredCount = readiness?.requiredCount ?? 8;
                 const launchedAt = readiness?.launchedAt ?? bracket.launchedAt;
+                const notHeldAt = readiness?.notHeldAt ?? null;
                 const isReady = readiness?.isReady ?? false;
 
                 return (
@@ -403,14 +440,18 @@ export function TournamentEditor({
                     </p>
                     <p
                       className={`mt-2 text-xs font-black uppercase tracking-wider ${
-                        launchedAt
+                        notHeldAt
+                          ? "text-zinc-300"
+                          : launchedAt
                           ? "text-sky-300"
                           : isReady
                             ? "text-emerald-300"
                             : "text-amber-300"
                       }`}
                     >
-                      {launchedAt
+                      {notHeldAt
+                        ? "Not Held — Minimum roster requirement not reached"
+                        : launchedAt
                         ? `Launched ${new Date(launchedAt).toLocaleString()}`
                         : isReady
                           ? `${approvedCount}/${requiredCount} approved — ready for private bracket preparation`
@@ -419,10 +460,14 @@ export function TournamentEditor({
                     <button
                       type="submit"
                       form={`generate-bracket-${bracket.id}`}
-                      disabled={Boolean(launchedAt) || !isReady}
+                      disabled={
+                        Boolean(notHeldAt) || Boolean(launchedAt) || !isReady
+                      }
                       className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-center text-sm font-black text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:border-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-500"
                     >
-                      {launchedAt
+                      {notHeldAt
+                        ? "Division Not Held — View Only"
+                        : launchedAt
                         ? "Division Launched"
                         : !isReady
                           ? `Requires ${requiredCount}/${requiredCount} Approved`
@@ -642,14 +687,12 @@ export function toTournamentFormValues(
     slug: tournament.slug,
     description: tournament.description,
     bannerImageUrl: tournament.banner_image_url,
+    registrationEnabled: tournament.registration_enabled,
     registrationOpenAt: tournament.registration_open_at
       ? toDateTimeLocal(tournament.registration_open_at)
       : "",
     registrationCloseAt: tournament.registration_close_at
       ? toDateTimeLocal(tournament.registration_close_at)
-      : "",
-    grandFinalAt: tournament.grand_final_at
-      ? toDateTimeLocal(tournament.grand_final_at)
       : "",
     status: tournament.status,
     format: tournament.format,
@@ -695,8 +738,10 @@ function formatLabel(value: string) {
 }
 
 function getEditableTournamentStatusOptions(
-  currentStatus: string
+  values: TournamentFormValues
 ): Array<[string, string]> {
+  const currentStatus = values.status;
+
   if (currentStatus === "in_progress") {
     return [["in_progress", "In Progress — managed by division launch"]];
   }
@@ -713,9 +758,19 @@ function getEditableTournamentStatusOptions(
     return [["voided", "Voided — terminal history"]];
   }
 
+  const registrationOpenLabel =
+    currentStatus === "registration_open"
+      ? getTournamentRegistrationStatusLabel({
+          statusValue: values.status,
+          registrationEnabled: values.registrationEnabled,
+          registrationOpenAt: values.registrationOpenAt,
+          registrationCloseAt: values.registrationCloseAt,
+        })
+      : "Open";
+
   return [
     ["upcoming", "Closed"],
-    ["registration_open", "Open"],
+    ["registration_open", registrationOpenLabel],
   ];
 }
 

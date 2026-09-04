@@ -167,12 +167,14 @@ describe("match actions card presentation", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    // Focus restoration runs in the dialog's passive-effect cleanup.
+    await waitFor(() => expect(opener).toHaveFocus());
 
     ({ closeButton, dialog } = await openDialog());
     fireEvent.click(closeButton);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    // Focus restoration runs in the dialog's passive-effect cleanup.
+    await waitFor(() => expect(opener).toHaveFocus());
 
     ({ dialog } = await openDialog());
     const backdrop = dialog.parentElement?.querySelector<HTMLElement>(
@@ -181,7 +183,8 @@ describe("match actions card presentation", () => {
     expect(backdrop).toHaveAttribute("aria-hidden", "true");
     fireEvent.mouseDown(backdrop as HTMLElement);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    // Focus restoration runs in the dialog's passive-effect cleanup.
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 
   it("keeps the player dialog open and non-dismissible while a dispute is pending", async () => {
@@ -261,7 +264,8 @@ describe("match actions card presentation", () => {
 
     fireEvent.click(closeButton);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    // Focus restoration runs in the dialog's passive-effect cleanup.
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 });
 

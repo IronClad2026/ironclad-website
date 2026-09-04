@@ -12,7 +12,7 @@ const MATCH_RESULT_SUBMISSION_SELECT =
 const MATCH_RESULT_REPORT_GROUP_SELECT =
   "id, match_id, tournament_id, result_type, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_at, review_notes, no_show_reported_by_registration_id, no_show_registration_id, no_show_status, no_show_note, no_show_resolved_at, finalized_at, finalized_source, created_at";
 const MATCH_RESULT_REPLAY_PROOF_SELECT =
-  "id, report_group_id, match_id, game_number, replay_storage_path";
+  "id, report_group_id, match_id, game_number, replay_storage_path, claimed_winner_registration_id";
 const SUBMISSION_AUDIT_SELECT =
   "id, submitted_by_clerk_user_id, reviewed_by";
 const REPORT_GROUP_AUDIT_SELECT =
@@ -88,6 +88,7 @@ type MatchResultReportGroupRow = {
 };
 
 type MatchResultReplayProofRow = {
+  claimed_winner_registration_id: string | null;
   id: string;
   report_group_id: string;
   match_id: string;
@@ -126,6 +127,10 @@ export type MatchResultData = {
   error: "load-failed" | null;
 };
 
+export type MatchResultDataLoadOptions = {
+  adminMatchIds?: readonly string[];
+};
+
 const emptyAnonymousResult: MatchResultData = {
   submissions: [],
   reportGroups: [],
@@ -133,7 +138,9 @@ const emptyAnonymousResult: MatchResultData = {
   error: null,
 };
 
-export async function loadMatchResultData(): Promise<MatchResultData> {
+export async function loadMatchResultData(
+  options: MatchResultDataLoadOptions = {}
+): Promise<MatchResultData> {
   const { userId, sessionClaims } = await auth();
 
   if (!userId) {
@@ -146,6 +153,20 @@ export async function loadMatchResultData(): Promise<MatchResultData> {
 
   try {
     const supabase = createSupabaseAdminClient();
+    const adminMatchIds =
+      isAdmin && options.adminMatchIds !== undefined
+        ? uniqueIds(options.adminMatchIds)
+        : null;
+
+    if (isAdmin && adminMatchIds?.length === 0) {
+      return {
+        submissions: [],
+        reportGroups: [],
+        viewerRole,
+        error: null,
+      };
+    }
+
     const viewerRegistrationIds = isAdmin
       ? []
       : await loadViewerRegistrationIds(supabase, userId);
@@ -165,12 +186,14 @@ export async function loadMatchResultData(): Promise<MatchResultData> {
     const reportGroupRows = await loadVisibleReportGroupRows(
       supabase,
       isAdmin,
-      viewerRegistrationIds
+      viewerRegistrationIds,
+      adminMatchIds
     );
     const submissionRows = await loadVisibleSubmissionRows(
       supabase,
       isAdmin,
-      participantMatchIds
+      participantMatchIds,
+      adminMatchIds
     );
     const replayProofRows = await loadReplayProofRows(
       supabase,
@@ -368,6 +391,7 @@ export function buildReportGroupPresentation(
           {
             id: row.id,
             gameNumber: 1,
+            winnerRegistrationId: null,
             proofAvailable: true,
             replayAccessHref: buildProofAccessHref(
               row.match_id,
@@ -475,7 +499,8 @@ async function loadParticipantMatchIds(
 async function loadVisibleSubmissionRows(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   isAdmin: boolean,
-  participantMatchIds: string[]
+  participantMatchIds: string[],
+  adminMatchIds: string[] | null
 ) {
   if (!isAdmin && participantMatchIds.length === 0) {
     return [];
@@ -489,6 +514,8 @@ async function loadVisibleSubmissionRows(
 
   if (!isAdmin) {
     query = query.in("match_id", participantMatchIds);
+  } else if (adminMatchIds) {
+    query = query.in("match_id", adminMatchIds);
   }
 
   const { data, error } = await query;
@@ -508,13 +535,20 @@ async function loadVisibleSubmissionRows(
 async function loadVisibleReportGroupRows(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   isAdmin: boolean,
-  viewerRegistrationIds: string[]
+  viewerRegistrationIds: string[],
+  adminMatchIds: string[] | null
 ) {
   if (isAdmin) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("match_result_report_groups")
       .select(MATCH_RESULT_REPORT_GROUP_SELECT)
       .order("created_at", { ascending: false });
+
+    if (adminMatchIds) {
+      query = query.in("match_id", adminMatchIds);
+    }
+
+    const { data, error } = await query;
 
     if (error || !Array.isArray(data)) {
       throw new Error("Match-result report groups unavailable.");
@@ -618,6 +652,7 @@ function buildReplayProofPresentation(
   return {
     id: row.id,
     gameNumber: row.game_number,
+    winnerRegistrationId: row.claimed_winner_registration_id ?? null,
     proofAvailable,
     replayAccessHref: proofAvailable
       ? buildProofAccessHref(

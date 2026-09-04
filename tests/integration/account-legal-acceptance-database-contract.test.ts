@@ -12,8 +12,12 @@ const sql = readFileSync(
 ).toLowerCase();
 
 describe("account legal acceptance executable database contract", () => {
-  it("is fixed to Staging, rollback-only, and proves zero residue", () => {
-    expect(sql).toContain("'target', 'ironclad-staging'");
+  it("identifies Staging or isolated loopback, rolls back, and proves zero residue", () => {
+    expect(sql).toContain("'isolated-local' else 'ironclad-staging'");
+    expect(sql).toContain("inet_server_addr()");
+    expect(sql).toContain("'127.0.0.1'::inet");
+    expect(sql).toContain("inet_server_port() = 55462");
+    expect(sql).toContain("'^ironclad_legal_[a-z0-9_]+$'");
     expect(sql).toContain("raise exception 'account legal contract rollback'");
     expect(sql).toContain("rollback did not restore the staging baseline");
     expect(sql).not.toContain("commit;");

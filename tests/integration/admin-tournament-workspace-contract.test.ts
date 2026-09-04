@@ -45,6 +45,7 @@ const source = {
   deleteControl: read("components/DeleteTournamentControl.tsx"),
   editor: read("components/admin/tournaments/TournamentEditor.tsx"),
   experience: read("components/TournamentsExperience.tsx"),
+  matchPresentation: read("components/AdminMatchWorkspace.tsx"),
   list: read("app/admin/tournaments/page.tsx"),
   mapPool: read("components/AdminTournamentMapPools.tsx"),
   mapPoolActions: read("app/admin/tournaments/map-pool-actions.ts"),
@@ -61,6 +62,9 @@ const source = {
   overview: read("components/admin/tournaments/TournamentOverview.tsx"),
   recovery: read("components/TournamentRecoveryControl.tsx"),
   registrationActions: read("app/admin/registration-actions.ts"),
+  registrationApproveSelected: read(
+    "components/AdminRegistrationApproveSelected.tsx"
+  ),
   registrationDialog: read(
     "components/admin/tournaments/AdminRegistrationDetailDialog.tsx"
   ),
@@ -161,9 +165,10 @@ const capabilities: Capability[] = [
           'label="Format"',
           'label="Rule Format"',
           'label="Result Confirmation Window"',
-          'label="Registration Opens"',
-          'label="Registration Closes"',
-          'label="Grand Final Date/Time"',
+          'label="Registration Opens (optional)"',
+          'label="Registration Closes (optional)"',
+          "data-event-scheduling-policy",
+          "data-registration-window-controls",
           'label="Prize Pool (optional)"',
           'label="Rules URL (optional)"',
           'label="Battlefy URL (optional)"',
@@ -180,7 +185,8 @@ const capabilities: Capability[] = [
         file: "editor",
         includes: [
           '["upcoming", "Closed"]',
-          '["registration_open", "Open"]',
+          '["registration_open", registrationOpenLabel]',
+          "getTournamentRegistrationStatusLabel",
         ],
       },
     ],
@@ -354,11 +360,19 @@ const capabilities: Capability[] = [
     evidence: [
       {
         file: "registrations",
-        includes: ["data.cohortSummaries.map", "Active cohort:", "Ready for private bracket preparation"],
+        includes: [
+          "data.cohortSummaries.map",
+          "Active cohort:",
+          "formatTournamentDivisionState(summary.divisionState)",
+        ],
       },
       {
         file: "registrationWorkspace",
-        includes: ["get_tournament_bracket_readiness"],
+        includes: ["divisionStates", "divisionStateByBracket"],
+      },
+      {
+        file: "workspaceData",
+        includes: ["loadTournamentDivisionStates", "divisionStates"],
       },
     ],
   },
@@ -407,7 +421,11 @@ const capabilities: Capability[] = [
     evidence: [
       {
         file: "registrations",
-        includes: ["Approve Selected", "registration-bulk-partial", "Some selected registration(s) were approved"],
+        includes: ["AdminRegistrationApproveSelected", "registration-bulk-partial", "Some selected registration(s) were approved"],
+      },
+      {
+        file: "registrationApproveSelected",
+        includes: ["Approve Selected", "selectedCount"],
       },
       {
         file: "registrationActions",
@@ -549,8 +567,8 @@ const capabilities: Capability[] = [
     section: "matches",
     evidence: [
       {
-        file: "experience",
-        includes: ["AdminMatchResultSummaries", "Legacy submissions"],
+        file: "matchPresentation",
+        includes: ["AdminMatchResultSummaries", "Submission History"],
       },
       { file: "matchActions", includes: ["reviewMatchResult"] },
     ],
@@ -560,7 +578,7 @@ const capabilities: Capability[] = [
     label: "replay/audit",
     section: "matches",
     evidence: [
-      { file: "experience", includes: ["Replay packages"] },
+      { file: "matchPresentation", includes: ["Result &amp; Replay Evidence"] },
       { file: "matchControls", includes: ["Official Result Audit"] },
       {
         file: "matchActions",
@@ -860,6 +878,28 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(clientPresentation).not.toContain("@/lib/supabase-admin");
   });
 
+  it("projects the central division state across Admin surfaces without direct readiness RPCs", () => {
+    expect(source.workspaceData).toContain("loadTournamentDivisionStates");
+    expect(source.workspace).toContain("summary.divisionStates");
+    expect(source.workspaceHeader).toContain("formatTournamentDivisionState");
+    expect(source.overview).toContain("formatTournamentEventDivisionState");
+    expect(source.bracketStructure).toContain(
+      "formatTournamentDivisionState"
+    );
+    expect(source.bracket).toContain("selectedBracket.divisionState.state");
+
+    for (const key of [
+      "list",
+      "workspace",
+      "workspaceData",
+      "registrationWorkspace",
+    ] as const) {
+      expect(source[key], key).not.toContain(
+        "get_tournament_bracket_readiness"
+      );
+    }
+  });
+
   it("renders one selected section at a time and preserves section-aware actions", () => {
     const workspace = compact(source.workspace);
     const actions = compact(source.actions);
@@ -873,6 +913,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "players-waitlist",
       "bracket",
       "matches",
+      "replays",
       "media",
       "map-pool",
     ]) {
@@ -1000,8 +1041,20 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260831133000_staging_badge_cross_division_acceptance.sql",
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql",
     ]);
+    const postPr5MigrationNames = new Set([
+      "20260902100000_unlaunched_event_void_authority.sql",
+      "20260902130000_event_based_tournament_scheduling.sql",
+      "20260903100000_division_settlement_shadow_foundation.sql",
+      "20260903130000_not_held_division_closure.sql",
+      "20260903160000_division_accounting_cutover.sql",
+      "20260903190000_not_held_next_event_invitations.sql",
+      "20260903210000_registration_open_state_consistency.sql",
+      "20260904120000_canonical_division_launch_ordering.sql",
+    ]);
     const platformMigrationNames = migrationNames.filter(
-      (name) => !badgeIntegrationMigrationNames.has(name)
+      (name) =>
+        !badgeIntegrationMigrationNames.has(name) &&
+        !postPr5MigrationNames.has(name)
     );
 
     expect(platformMigrationNames).toHaveLength(119);
@@ -1018,13 +1071,48 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "8a66ada7bd7cae2874b3d4f6919462a1c2f74439850efac5d99aeddb0cf8b7cb"
     );
     expect(migrationNames).toHaveLength(
-      platformMigrationNames.length + badgeIntegrationMigrationNames.size
+      platformMigrationNames.length +
+        badgeIntegrationMigrationNames.size +
+        postPr5MigrationNames.size
     );
-    expect(migrationNames.at(-2)).toBe(
+    expect(migrationNames.at(-10)).toBe(
       "20260831133000_staging_badge_cross_division_acceptance.sql"
     );
-    expect(migrationNames.at(-1)).toBe(
+    expect(migrationNames.at(-9)).toBe(
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql"
+    );
+    expect(migrationNames.at(-8)).toBe(
+      "20260902100000_unlaunched_event_void_authority.sql"
+    );
+    expect(migrationNames.at(-7)).toBe(
+      "20260902130000_event_based_tournament_scheduling.sql"
+    );
+    expect(migrationNames.at(-6)).toBe(
+      "20260903100000_division_settlement_shadow_foundation.sql"
+    );
+    expect(migrationNames.at(-5)).toBe(
+      "20260903130000_not_held_division_closure.sql"
+    );
+    expect(migrationNames.at(-4)).toBe(
+      "20260903160000_division_accounting_cutover.sql"
+    );
+    expect(migrationNames.at(-3)).toBe(
+      "20260903190000_not_held_next_event_invitations.sql"
+    );
+    expect(migrationNames.at(-2)).toBe(
+      "20260903210000_registration_open_state_consistency.sql"
+    );
+    expect(migrationNames.at(-1)).toBe(
+      "20260904120000_canonical_division_launch_ordering.sql"
+    );
+    expect(
+      normalizedSha256(
+        read(
+          "supabase/migrations/20260902100000_unlaunched_event_void_authority.sql"
+        )
+      )
+    ).toBe(
+      "8e97337efc36276797b3e98ff45bbdbd893533b0ffa13486e0f4bac83e911fd6"
     );
     expect(normalizedSha256(read("package.json"))).toBe(
       "0fa600694cee0d7bfbcb2ddd545ed8f46b0c33ea79d4e9953b39c0b3e7ae5db9"

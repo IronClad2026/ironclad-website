@@ -11,6 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TournamentCard } from "@/lib/tournaments";
+import { createDisabledTournamentDivisionStates } from "@/tests/fixtures/tournament-division-states";
 
 vi.mock("@clerk/nextjs", () => ({
   useAuth: () => ({
@@ -71,7 +72,6 @@ const tournament: TournamentCard = {
   id: "11111111-1111-4111-8111-111111111111",
   slug: "rules-summary-tournament",
   title: "Rules Summary Tournament",
-  month: "August 2026",
   format: "1v1",
   ruleFormat: "format_a",
   ruleFormatLabel: "Format A",
@@ -82,7 +82,6 @@ const tournament: TournamentCard = {
   organizer: "IronClad Tournaments",
   game: "Company of Heroes 3",
   region: "Global",
-  time: "August 2026",
   prizePool: "",
   players: 0,
   maxPlayers: 8,
@@ -102,6 +101,10 @@ const tournament: TournamentCard = {
       prize: "Included in tournament prize pool",
     },
   ],
+  divisionStates: createDisabledTournamentDivisionStates(
+    "tournament-rules-summary",
+    "registration_open"
+  ),
   details: "Rules summary fixture.",
   rules: "Tournament-specific Format A rules remain in effect.",
   schedule: [],
@@ -109,7 +112,6 @@ const tournament: TournamentCard = {
   registrationEnabled: true,
   registrationOpenAt: "2026-08-01T00:00:00.000Z",
   registrationCloseAt: "2026-08-31T00:00:00.000Z",
-  grandFinalAt: "2026-08-31T00:00:00.000Z",
   createdAt: "2026-08-01T00:00:00.000Z",
   resultConfirmationWindowMinutes: 30,
   rulesUrl: "https://example.test/tournament-rules",

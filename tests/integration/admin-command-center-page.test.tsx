@@ -15,6 +15,7 @@ const redirectMock = vi.hoisted(() =>
 );
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const loadAdminNotificationsMock = vi.hoisted(() => vi.fn());
+const loadTournamentDivisionStatesMock = vi.hoisted(() => vi.fn());
 const notificationCenterMock = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
@@ -24,6 +25,9 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 vi.mock("@/lib/notifications", () => ({
   loadAdminNotifications: loadAdminNotificationsMock,
+}));
+vi.mock("@/lib/tournament-division-state-data", () => ({
+  loadTournamentDivisionStates: loadTournamentDivisionStatesMock,
 }));
 vi.mock("@/components/InAppNotificationCenter", () => ({
   default: notificationCenterMock,
@@ -45,6 +49,7 @@ describe("Admin Command Center and global Registrations authorization", () => {
     redirectMock.mockClear();
     createSupabaseAdminClientMock.mockReset();
     loadAdminNotificationsMock.mockReset();
+    loadTournamentDivisionStatesMock.mockReset();
     notificationCenterMock.mockClear();
   });
 
@@ -107,7 +112,7 @@ describe("Admin Command Center and global Registrations authorization", () => {
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
-  it("loads only compact summary data and retains the Admin Notification Center", async () => {
+  it("loads compact summary data, central Division states, and the Admin Notification Center", async () => {
     const registrationSelect = vi.fn().mockResolvedValue({
       data: [
         { registration_status: "pending" },
@@ -115,16 +120,24 @@ describe("Admin Command Center and global Registrations authorization", () => {
       ],
       error: null,
     });
+    const tournamentRows = [
+      {
+        id: "tournament-1",
+        title: "Active Cup",
+        status: "registration_open",
+        grand_final_at: null,
+        created_at: "2026-08-28T00:00:00.000Z",
+        tournament_brackets: [
+          {
+            id: "bracket-1",
+            name: "Academy",
+            launched_at: null,
+          },
+        ],
+      },
+    ];
     const tournamentOrder = vi.fn().mockResolvedValue({
-      data: [
-        {
-          id: "tournament-1",
-          title: "Active Cup",
-          status: "registration_open",
-          grand_final_at: null,
-          created_at: "2026-08-28T00:00:00.000Z",
-        },
-      ],
+      data: tournamentRows,
       error: null,
     });
     const tournamentSelect = vi.fn(() => ({ order: tournamentOrder }));
@@ -138,8 +151,12 @@ describe("Admin Command Center and global Registrations authorization", () => {
       throw new Error(`Unexpected table: ${table}`);
     });
     authMock.mockResolvedValue(adminIdentity);
-    createSupabaseAdminClientMock.mockReturnValue({ from });
+    const supabase = { from };
+    createSupabaseAdminClientMock.mockReturnValue(supabase);
     loadAdminNotificationsMock.mockResolvedValue(notifications);
+    loadTournamentDivisionStatesMock.mockResolvedValue(
+      new Map([["tournament-1", activeTournamentDivisionStates]])
+    );
 
     const page = await AdminPage({ searchParams: Promise.resolve({}) });
     const notificationCenter = findElementByType(page, notificationCenterMock);
@@ -148,7 +165,11 @@ describe("Admin Command Center and global Registrations authorization", () => {
       "registration_status"
     );
     expect(tournamentSelect).toHaveBeenCalledExactlyOnceWith(
-      "id, title, status, grand_final_at, created_at"
+      "id, title, status, created_at, tournament_brackets(id, name, launched_at)"
+    );
+    expect(loadTournamentDivisionStatesMock).toHaveBeenCalledExactlyOnceWith(
+      supabase,
+      tournamentRows
     );
     expect(loadAdminNotificationsMock).toHaveBeenCalledExactlyOnceWith(50);
     expect(notificationCenter?.props).toMatchObject({
@@ -159,9 +180,96 @@ describe("Admin Command Center and global Registrations authorization", () => {
       unreadCount: 0,
       error: null,
     });
+    expect(textContent(page)).toContain("Academy Bracket: Filling — 1/8");
+    expect(textContent(page)).toContain("Challenge Bracket: Disabled");
+    expect(textContent(page)).toContain("Main / Pro Bracket: Disabled");
     expect(redirectMock).not.toHaveBeenCalled();
   });
+
+  it("fails explicitly when an active Tournament is missing central Division evidence", async () => {
+    const registrationSelect = vi.fn().mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    const tournamentOrder = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "tournament-1",
+          title: "Active Cup",
+          status: "registration_open",
+          grand_final_at: null,
+          created_at: "2026-08-28T00:00:00.000Z",
+          tournament_brackets: [],
+        },
+      ],
+      error: null,
+    });
+    const from = vi.fn((table: string) => {
+      if (table === "registrations") {
+        return { select: registrationSelect };
+      }
+      if (table === "tournaments") {
+        return { select: vi.fn(() => ({ order: tournamentOrder })) };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ from });
+    loadAdminNotificationsMock.mockResolvedValue(notifications);
+    loadTournamentDivisionStatesMock.mockResolvedValue(new Map());
+
+    await expect(
+      AdminPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow(
+      "Admin Command Center Tournament state could not be loaded."
+    );
+  });
 });
+
+const activeTournamentDivisionStates = [
+  {
+    tournamentId: "tournament-1",
+    canonicalName: "Academy",
+    displayName: "Academy Bracket",
+    bracketId: "bracket-1",
+    state: "filling",
+    terminalOverlay: null,
+    approvedCount: 1,
+    requiredCount: 8,
+    isReady: false,
+    launchedAt: null,
+    generatedBracketId: null,
+    isCompetitionComplete: false,
+  },
+  {
+    tournamentId: "tournament-1",
+    canonicalName: "Challenge",
+    displayName: "Challenge Bracket",
+    bracketId: null,
+    state: "disabled",
+    terminalOverlay: null,
+    approvedCount: null,
+    requiredCount: null,
+    isReady: false,
+    launchedAt: null,
+    generatedBracketId: null,
+    isCompetitionComplete: false,
+  },
+  {
+    tournamentId: "tournament-1",
+    canonicalName: "Main",
+    displayName: "Main / Pro Bracket",
+    bracketId: null,
+    state: "disabled",
+    terminalOverlay: null,
+    approvedCount: null,
+    requiredCount: null,
+    isReady: false,
+    launchedAt: null,
+    generatedBracketId: null,
+    isCompetitionComplete: false,
+  },
+] as const;
 
 function findElementByType(
   node: ReactNode,
@@ -187,4 +295,20 @@ function findElementByType(
     (node.props as { children?: ReactNode }).children,
     type
   );
+}
+
+function textContent(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") {
+    return "";
+  }
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(textContent).join("");
+  }
+  if (isValidElement(node)) {
+    return textContent((node.props as { children?: ReactNode }).children);
+  }
+  return "";
 }
