@@ -25,7 +25,7 @@ import MatchDiceRollOff, {
 } from "@/components/MatchDiceRollOff";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import RegistrationGuidanceDisclosure from "@/components/RegistrationGuidanceDisclosure";
-import RequestAdminAssistanceButton from "@/components/RequestAdminAssistanceButton";
+import MatchDiscordSupportLink from "@/components/RequestAdminAssistanceButton";
 import MatchResultControls, {
   AdminResetMatchForm,
   ReportGroupReview,
@@ -1942,10 +1942,10 @@ export function BracketMatchResultsWorkspace({
                         return (
                           <article
                             key={match.id}
-                            className="border border-white/12 bg-black/45 p-5 shadow-xl shadow-black/20 sm:p-7"
+                            className="min-w-0 border border-white/12 bg-black/45 p-3 shadow-xl shadow-black/20 sm:p-7"
                           >
                             <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
+                              <div className="min-w-0 flex-1">
                                 <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
                                   {t("tournaments.workspace.matchup", {
                                     round: localizeBracketRoundName(
@@ -1954,8 +1954,10 @@ export function BracketMatchResultsWorkspace({
                                     ),
                                     number: match.matchNumber,
                                   })}
+                                  {" · "}
+                                  {t("resultUx.bestOf", { count: match.seriesBestOf })}
                                 </p>
-                                <h3 className="mt-2 text-xl font-black text-white">
+                                <h3 className="mt-2 break-words text-xl font-black text-white">
                                   {playerOne?.name ?? t("tournaments.workspace.tbd")}{" "}
                                   <span className="px-2 text-orange-300">
                                     {t("tournaments.workspace.versus")}
@@ -1985,20 +1987,15 @@ export function BracketMatchResultsWorkspace({
                                   />
                                 </div>
                               )}
-                            {match.status !== "completed" &&
-                              viewer.registrationIds.some(
-                                (registrationId) =>
-                                  registrationId ===
-                                    match.playerOneRegistrationId ||
-                                  registrationId ===
-                                    match.playerTwoRegistrationId
-                              ) && (
-                                <RequestAdminAssistanceButton
-                                  matchId={match.id}
-                                />
-                              )}
                             <MatchResultControls
                               match={match}
+                              viewerRegistrationId={
+                                viewer.registrationIds.find(
+                                  (registrationId) =>
+                                    registrationId === match.playerOneRegistrationId ||
+                                    registrationId === match.playerTwoRegistrationId
+                                ) ?? null
+                              }
                               deadlineManaged={
                                 bracketFormat === "single_elimination"
                               }
@@ -2024,6 +2021,16 @@ export function BracketMatchResultsWorkspace({
                               )}
                               presentation="workspace"
                             />
+                            {match.status !== "completed" &&
+                              viewer.registrationIds.some(
+                                (registrationId) =>
+                                  registrationId ===
+                                    match.playerOneRegistrationId ||
+                                  registrationId ===
+                                    match.playerTwoRegistrationId
+                              ) && (
+                                <MatchDiscordSupportLink />
+                              )}
                           </article>
                         );
                       })}

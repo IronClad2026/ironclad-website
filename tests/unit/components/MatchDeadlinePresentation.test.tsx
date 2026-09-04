@@ -737,6 +737,7 @@ describe("matchup deadline player and administrator presentation", () => {
 
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={expiredMatch}
         deadlineManaged
         participantsById={participants(participantOne, participantTwo)}
@@ -957,6 +958,7 @@ describe("matchup deadline player and administrator presentation", () => {
   it("tells an early downstream player that no deadline has started", () => {
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={matchFixture({
           status: "scheduled",
           activationVersion: 0,
@@ -986,6 +988,7 @@ describe("matchup deadline player and administrator presentation", () => {
   it("blocks player result controls while an administrative hold is active", () => {
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={matchFixture({
           holdStartedAt: "2099-08-03T00:00:00.000Z",
         })}
@@ -1008,6 +1011,7 @@ describe("matchup deadline player and administrator presentation", () => {
   it("preserves scheduled round-robin player result entry without a matchup deadline", () => {
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={matchFixture({
           status: "scheduled",
           activationVersion: 0,
@@ -1035,6 +1039,7 @@ describe("matchup deadline player and administrator presentation", () => {
   it("keeps scheduled deadline-managed matches blocked until activation", () => {
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={matchFixture({
           status: "scheduled",
           activationVersion: 0,
