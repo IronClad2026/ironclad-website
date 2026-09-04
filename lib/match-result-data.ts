@@ -12,7 +12,7 @@ const MATCH_RESULT_SUBMISSION_SELECT =
 const MATCH_RESULT_REPORT_GROUP_SELECT =
   "id, match_id, tournament_id, result_type, submitted_by_registration_id, opponent_registration_id, winner_registration_id, player_one_score, player_two_score, replay_storage_path, status, confirmation_deadline_at, confirmed_at, disputed_at, dispute_notes, reviewed_at, review_notes, no_show_reported_by_registration_id, no_show_registration_id, no_show_status, no_show_note, no_show_resolved_at, finalized_at, finalized_source, created_at";
 const MATCH_RESULT_REPLAY_PROOF_SELECT =
-  "id, report_group_id, match_id, game_number, replay_storage_path";
+  "id, report_group_id, match_id, game_number, replay_storage_path, claimed_winner_registration_id";
 const SUBMISSION_AUDIT_SELECT =
   "id, submitted_by_clerk_user_id, reviewed_by";
 const REPORT_GROUP_AUDIT_SELECT =
@@ -88,6 +88,7 @@ type MatchResultReportGroupRow = {
 };
 
 type MatchResultReplayProofRow = {
+  claimed_winner_registration_id: string | null;
   id: string;
   report_group_id: string;
   match_id: string;
@@ -390,6 +391,7 @@ export function buildReportGroupPresentation(
           {
             id: row.id,
             gameNumber: 1,
+            winnerRegistrationId: null,
             proofAvailable: true,
             replayAccessHref: buildProofAccessHref(
               row.match_id,
@@ -650,6 +652,7 @@ function buildReplayProofPresentation(
   return {
     id: row.id,
     gameNumber: row.game_number,
+    winnerRegistrationId: row.claimed_winner_registration_id ?? null,
     proofAvailable,
     replayAccessHref: proofAvailable
       ? buildProofAccessHref(

@@ -652,7 +652,7 @@ export function AdminResetMatchForm({
       <button
         type="submit"
         disabled={pending || confirmation !== "RESET"}
-        className="mt-3 w-full rounded-xl bg-red-700 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
+        className="mt-3 min-h-11 w-full rounded-xl bg-red-700 px-4 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
       >
         {pending ? "Resetting..." : "Reset Match"}
       </button>
@@ -668,7 +668,9 @@ export function ReportGroupReview({
   t = translateCompetitionEnglish,
   locale = "en",
   onPendingChange,
+  presentation = "inline",
 }: {
+  presentation?: "inline" | "workspace";
   reportGroup: MatchResultReportGroup;
   match: GeneratedTournamentMatch;
   isAdmin: boolean;
@@ -719,96 +721,142 @@ export function ReportGroupReview({
   }, [onPendingChange, pending, reportGroup.id]);
 
   return (
-    <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className={isAdmin ? "min-w-0" : undefined}>
-          <p className="text-xs font-black uppercase tracking-wider text-sky-200">
+    <div
+      className={
+        presentation === "workspace"
+          ? "min-w-0 [overflow-wrap:anywhere]"
+          : "rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5"
+      }
+    >
+      {presentation === "workspace" ? (
+        <div>
+          <p className="font-bold text-white">
             {isNoShow
-              ? t("matchControls.noShowReport")
-              : t("matchControls.confirmationPackage")}{" "}
-            - {formatReportGroupStatus(reportGroup.status, t)}
+              ? winner + " reported a no-show for " + missingPlayer
+              : winner +
+                " defeated " +
+                loser +
+                ", " +
+                Math.max(
+                  reportGroup.playerOneScore,
+                  reportGroup.playerTwoScore
+                ) +
+                "–" +
+                Math.min(
+                  reportGroup.playerOneScore,
+                  reportGroup.playerTwoScore
+                )}
           </p>
-          <p
-            className={`mt-2 text-sm text-white ${
-              isAdmin ? "break-words" : ""
-            }`}
-          >
+          <p className="mt-2 text-xs text-zinc-400">
+            Submitted by {reporter} ·{" "}
+            <HydrationSafeLocalDateTime
+              value={reportGroup.createdAt}
+              fallback="Date unavailable"
+            />
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            {formatReportGroupStatus(reportGroup.status, t)} ·{" "}
             {isNoShow
-              ? t("matchControls.noShowReported", {
-                  reporter: winner,
-                  player: missingPlayer,
-                })
-              : t("matchControls.scoreReported", {
-                  score: `${reportGroup.playerOneScore}-${reportGroup.playerTwoScore}`,
-                  winner,
-                })}
+              ? "No replay required"
+              : reportGroup.replayProofs.length + " replay files attached"}
           </p>
         </div>
-        <span className="text-[10px] text-slate-500">
-          <HydrationSafeLocalDateTime
-            value={reportGroup.createdAt}
-            fallback={t("deadlines.unavailable")}
-            locale={locale}
-            options={{ dateStyle: "medium", timeStyle: "short" }}
-          />
-        </span>
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className={isAdmin ? "min-w-0" : undefined}>
+              <p className="text-xs font-black uppercase tracking-wider text-sky-200">
+                {isNoShow
+                  ? t("matchControls.noShowReport")
+                  : t("matchControls.confirmationPackage")}{" "}
+                - {formatReportGroupStatus(reportGroup.status, t)}
+              </p>
+              <p
+                className={`mt-2 text-sm text-white ${
+                  isAdmin ? "break-words" : ""
+                }`}
+              >
+                {isNoShow
+                  ? t("matchControls.noShowReported", {
+                      reporter: winner,
+                      player: missingPlayer,
+                    })
+                  : t("matchControls.scoreReported", {
+                      score: `${reportGroup.playerOneScore}-${reportGroup.playerTwoScore}`,
+                      winner,
+                    })}
+              </p>
+            </div>
+            <span className="text-[10px] text-slate-500">
+              <HydrationSafeLocalDateTime
+                value={reportGroup.createdAt}
+                fallback={t("deadlines.unavailable")}
+                locale={locale}
+                options={{ dateStyle: "medium", timeStyle: "short" }}
+              />
+            </span>
+          </div>
 
-      <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-slate-300 sm:grid-cols-2">
-        <SummaryValue
-          label={t("matchControls.match")}
-          value={t("matchControls.matchReference", {
-            round: isAdmin
-              ? match.roundName
-              : localizeBracketRoundName(match.roundName, t),
-            number: match.matchNumber,
-          })}
-        />
-        <SummaryValue
-          label={t("matchControls.reportingPlayer")}
-          value={reporter}
-        />
-        <SummaryValue label={t("matchControls.opponent")} value={opponent} />
-        <SummaryValue
-          label={
-            isNoShow
-              ? t("matchControls.forfeitWinner")
-              : t("matchControls.reportedWinner")
-          }
-          value={winner}
-        />
-        <SummaryValue
-          label={
-            isNoShow
-              ? t("matchControls.missingPlayer")
-              : t("matchControls.reportedLoser")
-          }
-          value={isNoShow ? missingPlayer : loser}
-        />
-        {isNoShow && (
-          <SummaryValue
-            label={t("matchControls.noShowStatus")}
-            value={formatNoShowStatus(reportGroup.noShowStatus, t)}
-          />
-        )}
-        <SummaryValue
-          label={t("matchControls.confirmationDeadline")}
-          value={
-            <HydrationSafeLocalDateTime
-              value={reportGroup.confirmationDeadlineAt}
-              fallback={t("deadlines.unavailable")}
-              locale={locale}
-              options={{ dateStyle: "medium", timeStyle: "short" }}
+          <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-slate-300 sm:grid-cols-2">
+            <SummaryValue
+              label={t("matchControls.match")}
+              value={t("matchControls.matchReference", {
+                round: isAdmin
+                  ? match.roundName
+                  : localizeBracketRoundName(match.roundName, t),
+                number: match.matchNumber,
+              })}
             />
-          }
-        />
-        {reportGroup.finalizedSource && (
-          <SummaryValue
-            label={t("matchControls.finalizedBy")}
-            value={formatFinalizedSource(reportGroup.finalizedSource, t)}
-          />
-        )}
-      </div>
+            <SummaryValue
+              label={t("matchControls.reportingPlayer")}
+              value={reporter}
+            />
+            <SummaryValue
+              label={t("matchControls.opponent")}
+              value={opponent}
+            />
+            <SummaryValue
+              label={
+                isNoShow
+                  ? t("matchControls.forfeitWinner")
+                  : t("matchControls.reportedWinner")
+              }
+              value={winner}
+            />
+            <SummaryValue
+              label={
+                isNoShow
+                  ? t("matchControls.missingPlayer")
+                  : t("matchControls.reportedLoser")
+              }
+              value={isNoShow ? missingPlayer : loser}
+            />
+            {isNoShow && (
+              <SummaryValue
+                label={t("matchControls.noShowStatus")}
+                value={formatNoShowStatus(reportGroup.noShowStatus, t)}
+              />
+            )}
+            <SummaryValue
+              label={t("matchControls.confirmationDeadline")}
+              value={
+                <HydrationSafeLocalDateTime
+                  value={reportGroup.confirmationDeadlineAt}
+                  fallback={t("deadlines.unavailable")}
+                  locale={locale}
+                  options={{ dateStyle: "medium", timeStyle: "short" }}
+                />
+              }
+            />
+            {reportGroup.finalizedSource && (
+              <SummaryValue
+                label={t("matchControls.finalizedBy")}
+                value={formatFinalizedSource(reportGroup.finalizedSource, t)}
+              />
+            )}
+          </div>
+        </>
+      )}
 
       {reportGroup.disputeNotes && (
         <div className="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 p-3">
@@ -843,81 +891,200 @@ export function ReportGroupReview({
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {isNoShow ? (
-          <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-200">
-            {t("matchControls.noReplayNoShow")}
-          </span>
-        ) : reportGroup.replayProofs.length > 0 ? (
-          reportGroup.replayProofs.map((proof) =>
-            proof.replayAccessHref ? (
-              <a
-                key={proof.id}
-                href={proof.replayAccessHref}
-                target="_blank"
-                rel="noreferrer"
-                className={`rounded-md border border-sky-400/30 bg-sky-500/10 text-[10px] font-black uppercase tracking-wider text-sky-200 ${
-                  isAdmin
-                    ? "inline-flex min-h-11 items-center justify-center px-3 py-2"
-                    : "px-2 py-1"
-                }`}
-              >
-                {t("matchControls.gameReplay", { number: proof.gameNumber })}
-              </a>
-            ) : (
-              <span
-                key={proof.id}
-                className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200"
-              >
-                {t("matchControls.gameReplayUnavailable", {
-                  number: proof.gameNumber,
-                })}
-              </span>
+      {presentation === "workspace" && !isNoShow ? (
+        <div className="mt-4 divide-y divide-white/10">
+          {reportGroup.replayProofs.map((proof) => (
+            <div
+              key={proof.id}
+              className="grid min-w-0 gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+            >
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white">
+                  Game {proof.gameNumber}
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  Winner:{" "}
+                  {proof.winnerRegistrationId
+                    ? participantName(
+                        participantsById,
+                        proof.winnerRegistrationId
+                      )
+                    : "Not recorded in legacy evidence"}
+                </p>
+              </div>
+              {proof.replayAccessHref ? (
+                <a
+                  href={proof.replayAccessHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-xs font-bold text-orange-200 hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-orange-300"
+                >
+                  View Game {proof.gameNumber} Replay
+                </a>
+              ) : (
+                <p className="text-xs text-zinc-500">Replay unavailable</p>
+              )}
+            </div>
+          ))}
+          {reportGroup.replayProofs.length === 0 && (
+            <p className="text-xs text-zinc-500">Replay unavailable</p>
+          )}
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {isNoShow ? (
+            <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-200">
+              {t("matchControls.noReplayNoShow")}
+            </span>
+          ) : reportGroup.replayProofs.length > 0 ? (
+            reportGroup.replayProofs.map((proof) =>
+              proof.replayAccessHref ? (
+                <a
+                  key={proof.id}
+                  href={proof.replayAccessHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`rounded-md border border-sky-400/30 bg-sky-500/10 text-[10px] font-black uppercase tracking-wider text-sky-200 ${
+                    isAdmin
+                      ? "inline-flex min-h-11 items-center justify-center px-3 py-2"
+                      : "px-2 py-1"
+                  }`}
+                >
+                  {t("matchControls.gameReplay", { number: proof.gameNumber })}
+                </a>
+              ) : (
+                <span
+                  key={proof.id}
+                  className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200"
+                >
+                  {t("matchControls.gameReplayUnavailable", {
+                    number: proof.gameNumber,
+                  })}
+                </span>
+              )
             )
-          )
-        ) : (
-          <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200">
-            {t("matchControls.replayUnavailable")}
-          </span>
-        )}
-      </div>
+          ) : (
+            <span className="rounded-md border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-wider text-red-200">
+              {t("matchControls.replayUnavailable")}
+            </span>
+          )}
+        </div>
+      )}
+      {presentation === "workspace" && reportGroup.finalizedAt && (
+        <p className="mt-3 text-xs text-zinc-500">
+          Finalized:{" "}
+          <HydrationSafeLocalDateTime
+            value={reportGroup.finalizedAt}
+            fallback="Unavailable"
+          />
+          {reportGroup.finalizedSource &&
+            " · " + formatFinalizedSource(reportGroup.finalizedSource, t)}
+        </p>
+      )}
+
+      {presentation === "workspace" && (
+        <details className="mt-3 text-xs text-zinc-400">
+          <summary className="min-h-11 cursor-pointer py-3 font-bold focus-visible:ring-2 focus-visible:ring-orange-300">
+            Report audit
+          </summary>
+          <dl className="grid gap-3 py-2 sm:grid-cols-2">
+            {(
+              [
+                [
+                  "Original confirmation deadline",
+                  reportGroup.confirmationDeadlineAt,
+                ],
+                ["Confirmed", reportGroup.confirmedAt],
+                ["Disputed", reportGroup.disputedAt],
+                ["Reviewed", reportGroup.reviewedAt],
+                ["No-show resolved", reportGroup.noShowResolvedAt],
+              ] as const
+            ).map(
+              ([label, value]) =>
+                value && (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd className="mt-1 text-zinc-300">
+                      <HydrationSafeLocalDateTime
+                        value={value}
+                        fallback="Unavailable"
+                      />
+                    </dd>
+                  </div>
+                )
+            )}
+            {reportGroup.reviewerLabel && (
+              <div>
+                <dt>Reviewed by</dt>
+                <dd>{reportGroup.reviewerLabel}</dd>
+              </div>
+            )}
+            {isNoShow && (
+              <div>
+                <dt>No-show status</dt>
+                <dd>{formatNoShowStatus(reportGroup.noShowStatus, t)}</dd>
+              </div>
+            )}
+            {reportGroup.noShowResolverLabel && (
+              <div>
+                <dt>No-show resolved by</dt>
+                <dd>{reportGroup.noShowResolverLabel}</dd>
+              </div>
+            )}
+          </dl>
+        </details>
+      )}
 
       {isAdmin && actionable && (
-        <form
-          action={formAction}
-          aria-busy={pending}
-          className="mt-4 space-y-2"
+        <details
+          open={
+            presentation !== "workspace" ||
+            reportGroup.status !== "pending_confirmation"
+          }
+          className="mt-4"
         >
-          <input type="hidden" name="reportGroupId" value={reportGroup.id} />
-          <textarea
-            name="reviewNotes"
-            maxLength={2000}
-            rows={2}
-            placeholder="Administrator message (required for rejection)"
-            className="w-full resize-none rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
-          />
-          <ActionMessage state={state} />
-          <div className="grid gap-2 sm:grid-cols-3">
-            <ReportGroupReviewButton
-              decision="approved"
-              label={isNoShow ? "Approve No-Show" : "Approve Result"}
-              disabled={pending}
-              className="bg-emerald-600 hover:bg-emerald-500"
+          <summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-zinc-300 focus-visible:ring-2 focus-visible:ring-orange-300">
+            {reportGroup.status === "pending_confirmation"
+              ? "Optional Admin Review"
+              : "Review Result"}
+          </summary>
+          <form
+            action={formAction}
+            aria-busy={pending}
+            className="mt-4 space-y-2"
+          >
+            <input type="hidden" name="reportGroupId" value={reportGroup.id} />
+            <textarea
+              aria-label="Administrator review message"
+              name="reviewNotes"
+              maxLength={2000}
+              rows={2}
+              placeholder="Administrator message (required for rejection)"
+              className="w-full resize-none rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
             />
-            <ReportGroupReviewButton
-              decision="under_review"
-              label="Mark Under Review"
-              disabled={pending}
-              className="bg-amber-600 hover:bg-amber-500"
-            />
-            <ReportGroupReviewButton
-              decision="rejected"
-              label={isNoShow ? "Reject No-Show" : "Reject Result"}
-              disabled={pending}
-              className="bg-red-700 hover:bg-red-600"
-            />
-          </div>
-        </form>
+            <ActionMessage state={state} />
+            <div className="grid gap-2 sm:grid-cols-3">
+              <ReportGroupReviewButton
+                decision="approved"
+                label={isNoShow ? "Approve No-Show" : "Approve Result"}
+                disabled={pending}
+                className="bg-emerald-600 hover:bg-emerald-500"
+              />
+              <ReportGroupReviewButton
+                decision="under_review"
+                label="Mark Under Review"
+                disabled={pending}
+                className="border border-white/20 bg-white/5 hover:bg-white/10"
+              />
+              <ReportGroupReviewButton
+                decision="rejected"
+                label={isNoShow ? "Reject No-Show" : "Reject Result"}
+                disabled={pending}
+                className="border border-white/20 bg-transparent hover:bg-white/10"
+              />
+            </div>
+          </form>
+        </details>
       )}
     </div>
   );
