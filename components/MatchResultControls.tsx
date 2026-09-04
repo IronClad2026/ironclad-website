@@ -11,6 +11,7 @@ import {
 import AdminMatchResultSummaries from "@/components/AdminMatchResultSummaries";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import PlayerMatchResultForm from "@/components/PlayerMatchResultForm";
+import PlayerMatchResultStatus from "@/components/PlayerMatchResultStatus";
 import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import {
   useOptionalLocale,
@@ -47,6 +48,7 @@ export default function MatchResultControls({
   deadlineManaged,
   showDirectAdminControls = false,
   presentation = "inline",
+  viewerRegistrationId = null,
 }: {
   match: GeneratedTournamentMatch;
   participantsById: Map<string, TournamentParticipant>;
@@ -57,6 +59,7 @@ export default function MatchResultControls({
   deadlineManaged: boolean;
   showDirectAdminControls?: boolean;
   presentation?: "inline" | "workspace";
+  viewerRegistrationId?: string | null;
 }) {
   const selectedT = useOptionalTranslations("competition", competitionEnglish);
   const selectedLocale = useOptionalLocale();
@@ -81,6 +84,19 @@ export default function MatchResultControls({
       )
   );
   const canOpenForReportGroups = reportGroups.length > 0;
+  // Canonical resets mark prior groups "reset". Public match projections omit
+  // admin audit references, so identify the surviving finalized result here.
+  const officialReport =
+    match.status === "completed"
+      ? (reportGroups.find(
+          (group) =>
+            group.finalizedAt &&
+            ["confirmed", "auto_approved", "approved"].includes(group.status) &&
+            group.winnerRegistrationId === match.winnerRegistrationId &&
+            group.playerOneScore === match.playerOneScore &&
+            group.playerTwoScore === match.playerTwoScore
+        ) ?? null)
+      : null;
   const holdActive = Boolean(match.holdStartedAt && !match.holdReleasedAt);
   const now = useHydrationSafeNow({
     enabled: deadlineManaged && match.status === "in_progress" && !holdActive,
@@ -93,6 +109,7 @@ export default function MatchResultControls({
 
   const canSubmitNewReport =
     canSubmit &&
+    Boolean(viewerRegistrationId) &&
     hasParticipants &&
     (deadlineManaged
       ? match.status === "in_progress" && deadlineOpen && !holdActive
@@ -102,8 +119,7 @@ export default function MatchResultControls({
   const shouldShowAdminResultEntry =
     isAdmin &&
     hasParticipants &&
-    (!deadlineManaged ||
-      (match.status === "in_progress" && !holdActive)) &&
+    (!deadlineManaged || (match.status === "in_progress" && !holdActive)) &&
     !activeReportGroup &&
     !pendingSubmission;
   const playerControlLabel = getPlayerControlLabel({
@@ -125,97 +141,124 @@ export default function MatchResultControls({
     hasPendingSubmission: Boolean(pendingSubmission),
   });
 
-  if (!isAdmin && !canSubmit && submissions.length === 0 && !canOpenForReportGroups) {
+  if (
+    !isAdmin &&
+    !canSubmit &&
+    submissions.length === 0 &&
+    !canOpenForReportGroups
+  ) {
     return null;
   }
 
   const content = (
     <div
       className={
-        presentation === "workspace"
+        presentation === "workspace" && isAdmin
           ? "grid gap-6 xl:grid-cols-2"
           : "space-y-4"
       }
     >
-          {isAdmin && match.status === "completed" && !match.outcomeType && (
-            <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/5 p-3 text-[10px] leading-5 text-slate-400">
-              <p className="font-black uppercase tracking-wider text-emerald-200">
-                Official Result Audit
-              </p>
-              <p className="mt-2 break-all">
-                Submission ID:{" "}
-                <span className="font-mono text-slate-200">
-                  {match.officialResultReference ?? "Direct admin entry"}
-                </span>
-              </p>
-              <p className="break-all">
-                Decided by:{" "}
-                <span className="font-mono text-slate-200">
-                  {match.officialResultDecisionLabel ?? "Legacy result"}
-                </span>
-              </p>
-              <p>
-                Decided at:{" "}
-                <span className="text-slate-200">
-                  <HydrationSafeLocalDateTime
-                    value={match.officialResultDecidedAt}
-                    fallback="Not recorded"
-                    locale="en"
-                  />
-                </span>
-              </p>
-            </div>
-          )}
-
-          {shouldShowAdminResultEntry && (
-            <div className="rounded-2xl border border-orange-400/20 bg-orange-500/[0.04] p-5">
-              <ResultEntryForm
-                match={match}
-                playerOneName={playerOne?.name ?? "Player 1"}
-                playerTwoName={playerTwo?.name ?? "Player 2"}
+      {isAdmin && match.status === "completed" && !match.outcomeType && (
+        <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/5 p-3 text-[10px] leading-5 text-slate-400">
+          <p className="font-black uppercase tracking-wider text-emerald-200">
+            Official Result Audit
+          </p>
+          <p className="mt-2 break-all">
+            Submission ID:{" "}
+            <span className="font-mono text-slate-200">
+              {match.officialResultReference ?? "Direct admin entry"}
+            </span>
+          </p>
+          <p className="break-all">
+            Decided by:{" "}
+            <span className="font-mono text-slate-200">
+              {match.officialResultDecisionLabel ?? "Legacy result"}
+            </span>
+          </p>
+          <p>
+            Decided at:{" "}
+            <span className="text-slate-200">
+              <HydrationSafeLocalDateTime
+                value={match.officialResultDecidedAt}
+                fallback="Not recorded"
+                locale="en"
               />
-            </div>
-          )}
+            </span>
+          </p>
+        </div>
+      )}
 
-          {isAdmin && showDirectAdminControls && (
-            <div className="xl:col-span-2">
-              <AdminResetMatchForm match={match} />
-            </div>
-          )}
+      {shouldShowAdminResultEntry && (
+        <div className="rounded-2xl border border-orange-400/20 bg-orange-500/[0.04] p-5">
+          <ResultEntryForm
+            match={match}
+            playerOneName={playerOne?.name ?? "Player 1"}
+            playerTwoName={playerTwo?.name ?? "Player 2"}
+          />
+        </div>
+      )}
 
-          {canSubmitNewReport && (
-              <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5">
-                <PlayerMatchResultForm
-                  match={match}
-                  playerOneName={playerOne?.name ?? "Player 1"}
-                  playerTwoName={playerTwo?.name ?? "Player 2"}
-                />
-              </div>
-            )}
+      {isAdmin && showDirectAdminControls && (
+        <div className="xl:col-span-2">
+          <AdminResetMatchForm match={match} />
+        </div>
+      )}
 
-          {canSubmit &&
-            activeReportGroup &&
-            match.status !== "completed" && (
-              <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
-                {activeReportGroup.submittedByViewer
-                  ? activeReportGroup.resultType === "no_show"
-                    ? t("matchControls.yourNoShowPending")
-                    : t("matchControls.yourResultPending")
-                  : activeReportGroup.resultType === "no_show"
-                    ? t("matchControls.opponentNoShowPending")
-                    : t("matchControls.opponentResultPending")}
-              </div>
-            )}
+      {canSubmitNewReport && (
+        <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.04] p-5">
+          <PlayerMatchResultForm
+            match={match}
+            playerOneName={playerOne?.name ?? "Player 1"}
+            playerTwoName={playerTwo?.name ?? "Player 2"}
+            viewerRegistrationId={viewerRegistrationId}
+          />
+        </div>
+      )}
 
-          {canSubmit &&
-            pendingSubmission &&
-            match.status !== "completed" &&
-            !activeReportGroup && (
-              <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
-                {t("matchControls.legacyPending")}
-              </div>
-            )}
+      {!isAdmin &&
+        (activeReportGroup ||
+          (match.status === "completed" &&
+            match.winnerRegistrationId &&
+            !match.outcomeType)) && (
+          <PlayerMatchResultStatus
+            key={activeReportGroup?.id ?? officialReport?.id ?? match.id}
+            match={match}
+            report={activeReportGroup ?? officialReport}
+            participantsById={participantsById}
+            viewerRegistrationId={viewerRegistrationId}
+            canRespond={canSubmit}
+          />
+        )}
 
+      {isAdmin &&
+        canSubmit &&
+        activeReportGroup &&
+        match.status !== "completed" && (
+          <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
+            {activeReportGroup.submittedByViewer
+              ? activeReportGroup.resultType === "no_show"
+                ? t("matchControls.yourNoShowPending")
+                : t("matchControls.yourResultPending")
+              : activeReportGroup.resultType === "no_show"
+                ? t("matchControls.opponentNoShowPending")
+                : t("matchControls.opponentResultPending")}
+          </div>
+        )}
+
+      {canSubmit &&
+        pendingSubmission &&
+        match.status !== "completed" &&
+        !activeReportGroup && (
+          <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
+            {t("matchControls.legacyPending")}
+          </div>
+        )}
+
+      {(reportGroups.length > 0 || submissions.length > 0) && (
+        <details open={isAdmin}>
+          <summary className="cursor-pointer py-3 text-sm text-zinc-400 focus-visible:outline focus-visible:outline-orange-400">
+            {t("resultUx.details")}
+          </summary>
           {reportGroups.length > 0 && (
             <div className="space-y-4 xl:col-span-2">
               {reportGroups.map((reportGroup) => (
@@ -255,53 +298,55 @@ export default function MatchResultControls({
               )}
             </div>
           )}
+        </details>
+      )}
 
-          {!hasParticipants && (
-            <p className="text-xs text-slate-500">
-              {deadlineManaged &&
-              (match.playerOneRegistrationId || match.playerTwoRegistrationId)
-                ? t("matchControls.waitingOpponent")
-                : t("matchControls.participantsRequired")}
-            </p>
-          )}
+      {!hasParticipants && (
+        <p className="text-xs text-slate-500">
           {deadlineManaged &&
-            hasParticipants &&
-            holdActive && (
-              <p className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
-                {t("matchControls.hold")}
-              </p>
-            )}
-          {deadlineManaged &&
-            canSubmit &&
-            hasParticipants &&
-            match.status === "scheduled" && (
-              <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-400">
-                {t("matchControls.notActivated")}
-              </p>
-            )}
-          {deadlineManaged &&
-            isAdmin &&
-            hasParticipants &&
-            match.status === "scheduled" && (
-              <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-400">
-                This matchup is waiting for authoritative activation. No direct
-                result action is available yet.
-              </p>
-            )}
-          {deadlineManaged &&
-            canSubmit &&
-            match.status === "in_progress" &&
-            !holdActive &&
-            !deadlineOpen && (
-              <p className="rounded-xl border border-red-400/20 bg-red-500/5 p-4 text-xs leading-5 text-red-100/80">
-                {t("matchControls.deadlinePassedMessage")}
-              </p>
-            )}
-          {canSubmit && match.status === "completed" && match.outcomeType && (
-            <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-300">
-              {formatTerminalOutcome(match, t)}
-            </p>
-          )}
+          (match.playerOneRegistrationId || match.playerTwoRegistrationId)
+            ? t("matchControls.waitingOpponent")
+            : t("matchControls.participantsRequired")}
+        </p>
+      )}
+      {deadlineManaged && hasParticipants && holdActive && (
+        <p className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-100/80">
+          {t("matchControls.hold")}
+        </p>
+      )}
+      {deadlineManaged &&
+        canSubmit &&
+        !activeReportGroup &&
+        hasParticipants &&
+        match.status === "scheduled" && (
+          <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-400">
+            {t("matchControls.notActivated")}
+          </p>
+        )}
+      {deadlineManaged &&
+        isAdmin &&
+        hasParticipants &&
+        match.status === "scheduled" && (
+          <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-400">
+            This matchup is waiting for authoritative activation. No direct
+            result action is available yet.
+          </p>
+        )}
+      {deadlineManaged &&
+        canSubmit &&
+        match.status === "in_progress" &&
+        !activeReportGroup &&
+        !holdActive &&
+        !deadlineOpen && (
+          <p className="rounded-xl border border-red-400/20 bg-red-500/5 p-4 text-xs leading-5 text-red-100/80">
+            {t("matchControls.deadlinePassedMessage")}
+          </p>
+        )}
+      {canSubmit && match.status === "completed" && match.outcomeType && (
+        <p className="rounded-xl border border-white/10 bg-black/25 p-4 text-xs leading-5 text-slate-300">
+          {formatTerminalOutcome(match, t)}
+        </p>
+      )}
     </div>
   );
 
@@ -318,9 +363,7 @@ export default function MatchResultControls({
           isAdmin ? "min-h-11 py-3" : "py-2"
         }`}
       >
-        <span>
-          {isAdmin ? adminControlLabel : playerControlLabel}
-        </span>
+        <span>{isAdmin ? adminControlLabel : playerControlLabel}</span>
         <span className="text-slate-500">
           {expanded
             ? isAdmin
@@ -682,8 +725,8 @@ export function ReportGroupReview({
           <p className="text-xs font-black uppercase tracking-wider text-sky-200">
             {isNoShow
               ? t("matchControls.noShowReport")
-              : t("matchControls.confirmationPackage")} -{" "}
-            {formatReportGroupStatus(reportGroup.status, t)}
+              : t("matchControls.confirmationPackage")}{" "}
+            - {formatReportGroupStatus(reportGroup.status, t)}
           </p>
           <p
             className={`mt-2 text-sm text-white ${
@@ -721,7 +764,10 @@ export function ReportGroupReview({
             number: match.matchNumber,
           })}
         />
-        <SummaryValue label={t("matchControls.reportingPlayer")} value={reporter} />
+        <SummaryValue
+          label={t("matchControls.reportingPlayer")}
+          value={reporter}
+        />
         <SummaryValue label={t("matchControls.opponent")} value={opponent} />
         <SummaryValue
           label={
@@ -928,12 +974,12 @@ function SubmissionReview({
       ? match.playerTwoRegistrationId
       : match.playerOneRegistrationId;
   const loser = loserRegistrationId
-    ? participantsById.get(loserRegistrationId)?.name ??
-      t("matchControls.participant")
+    ? (participantsById.get(loserRegistrationId)?.name ??
+      t("matchControls.participant"))
     : t("matchControls.participant");
   const reporter = submission.submittedByRegistrationId
-    ? participantsById.get(submission.submittedByRegistrationId)?.name ??
-      t("matchControls.participant")
+    ? (participantsById.get(submission.submittedByRegistrationId)?.name ??
+      t("matchControls.participant"))
     : t("matchControls.participant");
 
   return (
@@ -942,7 +988,8 @@ function SubmissionReview({
         <p className="text-xs font-black uppercase tracking-wider text-amber-200">
           {t("matchControls.submission", {
             number: submission.submissionNumber,
-          })} · {formatSubmissionStatus(submission.status, t)}
+          })}{" "}
+          · {formatSubmissionStatus(submission.status, t)}
         </p>
         <span className="text-[10px] text-slate-500">
           <HydrationSafeLocalDateTime
@@ -955,7 +1002,7 @@ function SubmissionReview({
       </div>
       <div className="mt-3 grid gap-2 text-xs text-slate-300 sm:grid-cols-2">
         <p>
-          {t("matchControls.match")}: {" "}
+          {t("matchControls.match")}:{" "}
           <strong className="text-white">
             {t("matchControls.matchReference", {
               round: isAdmin
@@ -966,20 +1013,20 @@ function SubmissionReview({
           </strong>
         </p>
         <p>
-          {t("matchControls.reportingPlayer")}: {" "}
+          {t("matchControls.reportingPlayer")}:{" "}
           <strong className="text-white">{reporter}</strong>
         </p>
         <p>
-          {t("matchControls.reportedWinner")}: {" "}
+          {t("matchControls.reportedWinner")}:{" "}
           <strong className="text-white">{winner}</strong>
         </p>
         <p>
-          {t("matchControls.reportedLoser")}: {" "}
+          {t("matchControls.reportedLoser")}:{" "}
           <strong className="text-white">{loser}</strong>
         </p>
       </div>
       <p className="mt-2 text-xs text-slate-300">
-        {t("matchControls.claimedWinner")}: {" "}
+        {t("matchControls.claimedWinner")}:{" "}
         <strong className="text-white">{winner}</strong>
         {" · "}
         {t("matchControls.score")} {submission.playerOneScore}-
@@ -993,9 +1040,7 @@ function SubmissionReview({
           </p>
           <p className="break-all">
             Submitted by:{" "}
-            <span className="font-mono text-slate-200">
-              {reporter}
-            </span>
+            <span className="font-mono text-slate-200">{reporter}</span>
           </p>
           <p className="break-all">
             Reviewed by:{" "}
@@ -1023,7 +1068,9 @@ function SubmissionReview({
       {submission.reviewNotes && (
         <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
           <p className="text-[10px] font-black uppercase tracking-wider text-orange-300">
-            {isAdmin ? "Administrator Message" : t("matchControls.adminMessage")}
+            {isAdmin
+              ? "Administrator Message"
+              : t("matchControls.adminMessage")}
           </p>
           <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-300">
             {submission.reviewNotes}
@@ -1042,7 +1089,9 @@ function SubmissionReview({
                 : "px-2 py-1"
             }`}
           >
-            {isAdmin ? "Download Replay Proof" : t("matchControls.downloadReplay")}
+            {isAdmin
+              ? "Download Replay Proof"
+              : t("matchControls.downloadReplay")}
           </a>
         )}
         {submission.screenshotAccessHref && (
@@ -1217,11 +1266,13 @@ function formatNoShowStatus(
 }
 
 function formatFinalizedSource(source: string, t: CompetitionTranslator) {
-  return {
-    opponent_confirmation: t("matchControls.sourceOpponent"),
-    cron_auto_approval: t("matchControls.sourceAutomatic"),
-    admin_approval: t("matchControls.sourceAdminApproval"),
-    admin_override: t("matchControls.sourceAdminOverride"),
-    reset: t("matchControls.statusReset"),
-  }[source] ?? source.replaceAll("_", " ");
+  return (
+    {
+      opponent_confirmation: t("matchControls.sourceOpponent"),
+      cron_auto_approval: t("matchControls.sourceAutomatic"),
+      admin_approval: t("matchControls.sourceAdminApproval"),
+      admin_override: t("matchControls.sourceAdminOverride"),
+      reset: t("matchControls.statusReset"),
+    }[source] ?? source.replaceAll("_", " ")
+  );
 }

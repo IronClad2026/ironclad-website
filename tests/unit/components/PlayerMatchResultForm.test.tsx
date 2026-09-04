@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
@@ -45,10 +46,8 @@ import PlayerMatchResultForm from "@/components/PlayerMatchResultForm";
 import type { GeneratedTournamentMatch } from "@/lib/tournaments";
 
 const MATCH_ID = "11111111-1111-4111-8111-111111111111";
-const PLAYER_ONE_REGISTRATION_ID =
-  "22222222-2222-4222-8222-222222222222";
-const PLAYER_TWO_REGISTRATION_ID =
-  "33333333-3333-4333-8333-333333333333";
+const PLAYER_ONE_REGISTRATION_ID = "22222222-2222-4222-8222-222222222222";
+const PLAYER_TWO_REGISTRATION_ID = "33333333-3333-4333-8333-333333333333";
 const ATTEMPT_ID = "44444444-4444-4444-8444-444444444444";
 const firstPath = `${MATCH_ID}/${ATTEMPT_ID}/game-1-55555555-5555-4555-8555-555555555555.rec`;
 const secondPath = `${MATCH_ID}/${ATTEMPT_ID}/game-2-66666666-6666-4666-8666-666666666666.rec`;
@@ -84,39 +83,31 @@ function renderResultForm() {
       match={match}
       playerOneName="Player One"
       playerTwoName="Player Two"
+      viewerRegistrationId={PLAYER_ONE_REGISTRATION_ID}
     />
   );
 }
 
 function selectValidResult(container: HTMLElement) {
-  fireEvent.change(screen.getByLabelText("Player One"), {
-    target: { value: "2" },
-  });
-  fireEvent.change(screen.getByLabelText("Player Two"), {
-    target: { value: "0" },
-  });
-  fireEvent.change(screen.getByLabelText("Winner"), {
-    target: { value: PLAYER_ONE_REGISTRATION_ID },
+  fireEvent.click(screen.getByRole("button", { name: "Won" }));
+  fireEvent.change(screen.getByLabelText("Score"), {
+    target: { value: "2-0" },
   });
   const files = [
-    new File(["game-one"], "private-original-one.REC", {
-      type: "application/octet-stream",
-    }),
-    new File(["game-two"], "private-original-two.rec", {
-      type: "application/octet-stream",
-    }),
+    new File(["game-one"], "private-original-one.REC"),
+    new File(["game-two"], "private-original-two.rec"),
   ];
-  const fileInput = container.querySelector(
-    'input[type="file"]'
-  ) as HTMLInputElement;
-  fireEvent.change(fileInput, { target: { files } });
-  fireEvent.change(screen.getByLabelText("Game 1 winner"), {
-    target: { value: PLAYER_ONE_REGISTRATION_ID },
-  });
-  fireEvent.change(screen.getByLabelText("Game 2 winner"), {
-    target: { value: PLAYER_ONE_REGISTRATION_ID },
-  });
-  return { fileInput, files };
+  files.forEach((file, index) =>
+    fireEvent.change(screen.getByLabelText("Game " + (index + 1) + " replay"), {
+      target: { files: [file] },
+    })
+  );
+  return {
+    fileInput: container.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement,
+    files,
+  };
 }
 
 function recursivelyContainsFileBody(value: unknown): boolean {
@@ -168,14 +159,16 @@ describe("PlayerMatchResultForm direct replay transport", () => {
 
   it("sends File bodies only to Supabase and finalizes with metadata only", async () => {
     const { container } = renderResultForm();
-    const { fileInput, files } = selectValidResult(container);
+    const { files } = selectValidResult(container);
     fireEvent.change(screen.getByLabelText("Notes (optional)"), {
       target: { value: "gg" },
     });
     fireEvent.submit(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      }).closest("form") as HTMLFormElement
+      screen
+        .getByRole("button", {
+          name: "Submit Result",
+        })
+        .closest("form") as HTMLFormElement
     );
 
     await waitFor(() => expect(finalizeMatchResultMock).toHaveBeenCalledOnce());
@@ -230,7 +223,7 @@ describe("PlayerMatchResultForm direct replay transport", () => {
       notes: "gg",
     });
     expect(recursivelyContainsFileBody(finalInput)).toBe(false);
-    expect(fileInput).not.toHaveAttribute("name");
+    expect(container.querySelector('input[type="file"]')).toBeNull();
     expect(container.textContent).not.toContain("native-token");
     expect(container.textContent).not.toContain(firstPath);
     expect(localStorage.length).toBe(0);
@@ -239,46 +232,37 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     expect(refreshMock).toHaveBeenCalled();
   });
 
-  it("passes an ordered comeback sequence with one winner per uploaded game", async () => {
+  it("derives the final and remaining Game winners while preserving ordered replay transport", async () => {
     prepareMatchReplayUploadsMock.mockResolvedValueOnce({
       status: "error",
-      message: "Preparation stopped after validating the request.",
+      message: "stopped",
     });
-    const { container } = renderResultForm();
-    fireEvent.change(screen.getByLabelText("Player One"), {
-      target: { value: "2" },
+    renderResultForm();
+    fireEvent.click(screen.getByRole("button", { name: "Won" }));
+    fireEvent.change(screen.getByLabelText("Score"), {
+      target: { value: "2-1" },
     });
-    fireEvent.change(screen.getByLabelText("Player Two"), {
-      target: { value: "1" },
-    });
-    fireEvent.change(screen.getByLabelText("Winner"), {
-      target: { value: PLAYER_ONE_REGISTRATION_ID },
-    });
-    const files = [
-      new File(["game-one"], "game-one.rec"),
-      new File(["game-two"], "game-two.rec"),
-      new File(["game-three"], "game-three.rec"),
-    ];
-    fireEvent.change(container.querySelector('input[type="file"]')!, {
-      target: { files },
-    });
-    fireEvent.change(screen.getByLabelText("Game 1 winner"), {
-      target: { value: PLAYER_TWO_REGISTRATION_ID },
-    });
-    fireEvent.change(screen.getByLabelText("Game 2 winner"), {
-      target: { value: PLAYER_ONE_REGISTRATION_ID },
-    });
-    fireEvent.change(screen.getByLabelText("Game 3 winner"), {
-      target: { value: PLAYER_ONE_REGISTRATION_ID },
-    });
-
-    fireEvent.submit(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      }).closest("form") as HTMLFormElement
+    expect(screen.getAllByText("Determined by the result")).toHaveLength(1);
+    const files = [1, 2, 3].map(
+      (i) => new File([String(i)], "game-" + i + ".rec")
     );
-
-    await waitFor(() => expect(prepareMatchReplayUploadsMock).toHaveBeenCalledOnce());
+    files.forEach((file, i) =>
+      fireEvent.change(screen.getByLabelText("Game " + (i + 1) + " replay"), {
+        target: { files: [file] },
+      })
+    );
+    const group = screen.getByRole("group", { name: "Game 1 winner" });
+    fireEvent.click(within(group).getByRole("button", { name: "Player Two" }));
+    expect(screen.getAllByText("Determined by the result")).toHaveLength(2);
+    expect(
+      screen.queryByRole("group", { name: "Game 2 winner" })
+    ).not.toBeInTheDocument();
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Submit Result" }).closest("form")!
+    );
+    await waitFor(() =>
+      expect(prepareMatchReplayUploadsMock).toHaveBeenCalledOnce()
+    );
     expect(prepareMatchReplayUploadsMock.mock.calls[0][0]).toMatchObject({
       playerOneScore: 2,
       playerTwoScore: 1,
@@ -288,69 +272,56 @@ describe("PlayerMatchResultForm direct replay transport", () => {
         PLAYER_ONE_REGISTRATION_ID,
         PLAYER_ONE_REGISTRATION_ID,
       ],
+      replayFiles: files.map((file) => ({ name: file.name, size: file.size })),
     });
   });
 
-  it("rejects a sequence that reaches the declared series winner before the final game", () => {
-    const { container } = renderResultForm();
-    fireEvent.change(screen.getByLabelText("Player One"), {
-      target: { value: "2" },
-    });
-    fireEvent.change(screen.getByLabelText("Player Two"), {
-      target: { value: "1" },
-    });
-    fireEvent.change(screen.getByLabelText("Winner"), {
-      target: { value: PLAYER_ONE_REGISTRATION_ID },
-    });
-    fireEvent.change(container.querySelector('input[type="file"]')!, {
-      target: {
-        files: [
-          new File(["one"], "one.rec"),
-          new File(["two"], "two.rec"),
-          new File(["three"], "three.rec"),
-        ],
-      },
-    });
-    fireEvent.change(screen.getByLabelText("Game 1 winner"), {
-      target: { value: PLAYER_ONE_REGISTRATION_ID },
-    });
-    fireEvent.change(screen.getByLabelText("Game 2 winner"), {
-      target: { value: PLAYER_ONE_REGISTRATION_ID },
-    });
-    fireEvent.change(screen.getByLabelText("Game 3 winner"), {
-      target: { value: PLAYER_TWO_REGISTRATION_ID },
-    });
-
-    expect(
-      screen.getByText(
-        "The game winners must match the final score and end with the series winner."
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      })
-    ).toBeDisabled();
-    expect(prepareMatchReplayUploadsMock).not.toHaveBeenCalled();
-  });
-
-  it("clears stale per-game winners when the final score changes", () => {
+  it("reconciles score rows, Replace, Remove, and outcome changes without stale winners", () => {
     const { container } = renderResultForm();
     selectValidResult(container);
-    expect(screen.getByLabelText("Game 1 winner")).toHaveValue(
-      PLAYER_ONE_REGISTRATION_ID
-    );
-
-    fireEvent.change(screen.getByLabelText("Player Two"), {
-      target: { value: "1" },
+    fireEvent.change(screen.getByLabelText("Score"), {
+      target: { value: "2-1" },
     });
-
-    expect(screen.getByLabelText("Game 1 winner")).toHaveValue("");
-    expect(screen.getByLabelText("Game 2 winner")).toHaveValue("");
-    expect(screen.getByLabelText("Game 3 winner")).toHaveValue("");
+    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(3);
+    expect(screen.getByText("private-original-one.REC")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Game 1 replay"), {
+      target: { files: [new File(["replacement"], "replaced.rec")] },
+    });
     expect(
-      screen.getByText("Select one winner for every completed game.")
-    ).toBeInTheDocument();
+      screen.queryByText("private-original-one.REC")
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Remove replay" })[0]
+    );
+    expect(screen.queryByText("replaced.rec")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Score"), {
+      target: { value: "2-0" },
+    });
+    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Lost" }));
+    expect(screen.getByLabelText("Score")).toHaveValue("");
+    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(0);
+    expect(
+      screen.queryByText("private-original-two.rec")
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["empty.rec", 0],
+    ["wrong.txt", 1],
+    ["large.rec", 10 * 1024 * 1024 + 1],
+  ])("rejects invalid replay %s", (name, size) => {
+    const { container } = renderResultForm();
+    selectValidResult(container);
+    const file = new File(["x"], name);
+    Object.defineProperty(file, "size", { value: size });
+    fireEvent.change(screen.getByLabelText("Game 1 replay"), {
+      target: { files: [file] },
+    });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Submit Result" })
+    ).toBeDisabled();
   });
 
   it("shows localized duplicate replay feedback and keeps selected files available", async () => {
@@ -361,12 +332,14 @@ describe("PlayerMatchResultForm direct replay transport", () => {
       message: serverFallback,
     });
     const { container } = renderResultForm();
-    const { fileInput, files } = selectValidResult(container);
+    const { files } = selectValidResult(container);
 
     fireEvent.submit(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      }).closest("form") as HTMLFormElement
+      screen
+        .getByRole("button", {
+          name: "Submit Result",
+        })
+        .closest("form") as HTMLFormElement
     );
 
     expect(
@@ -376,9 +349,8 @@ describe("PlayerMatchResultForm direct replay transport", () => {
       screen.queryByText(competitionEnglish.matchAction.operationFailed)
     ).not.toBeInTheDocument();
     expect(screen.queryByText(serverFallback)).not.toBeInTheDocument();
-    expect(fileInput.files).toHaveLength(2);
-    expect(fileInput.files?.[0]).toBe(files[0]);
-    expect(fileInput.files?.[1]).toBe(files[1]);
+    expect(screen.getByText(files[0].name)).toBeInTheDocument();
+    expect(screen.getByText(files[1].name)).toBeInTheDocument();
     expect(finalizeMatchResultMock).toHaveBeenCalledOnce();
     expect(cleanupPreparedReplayUploadsMock).not.toHaveBeenCalled();
     expect(refreshMock).not.toHaveBeenCalled();
@@ -394,15 +366,19 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     const { container } = renderResultForm();
     selectValidResult(container);
     const form = screen
-      .getByRole("button", { name: "Submit for Opponent Confirmation" })
+      .getByRole("button", { name: "Submit Result" })
       .closest("form") as HTMLFormElement;
     fireEvent.submit(form);
 
-    expect(await screen.findAllByText("Preparing replay upload…")).not.toHaveLength(0);
     expect(
-      screen.getByRole("button", { name: "Preparing replay upload…" })
+      await screen.findAllByText("Preparing secure replay uploads…")
+    ).not.toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Preparing secure replay uploads…" })
     ).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Open$/ })).toBeDisabled();
+    expect(
+      screen.queryByText(competitionEnglish.resultUx.noShow)
+    ).not.toBeInTheDocument();
 
     resolvePreparation({
       status: "error",
@@ -426,19 +402,21 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     const { container } = renderResultForm();
     selectValidResult(container);
     const form = screen
-      .getByRole("button", { name: "Submit for Opponent Confirmation" })
+      .getByRole("button", { name: "Submit Result" })
       .closest("form") as HTMLFormElement;
 
     fireEvent.submit(form);
     expect(
-      await screen.findAllByText("Uploading replay 1 of 2…")
+      await screen.findAllByText("Uploading Game 1 of 2…")
     ).not.toHaveLength(0);
     fireEvent.submit(form);
     expect(prepareMatchReplayUploadsMock).toHaveBeenCalledOnce();
     expect(
-      screen.getByRole("button", { name: "Uploading replay 1 of 2…" })
+      screen.getByRole("button", { name: "Uploading Game 1 of 2…" })
     ).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Open$/ })).toBeDisabled();
+    expect(
+      screen.queryByText(competitionEnglish.resultUx.noShow)
+    ).not.toBeInTheDocument();
 
     resolveFirstUpload({ data: { path: firstPath }, error: null });
     await waitFor(() => expect(finalizeMatchResultMock).toHaveBeenCalledOnce());
@@ -452,11 +430,13 @@ describe("PlayerMatchResultForm direct replay transport", () => {
       error: { message: privateProviderError },
     });
     const { container } = renderResultForm();
-    const { fileInput, files } = selectValidResult(container);
+    const { files } = selectValidResult(container);
     fireEvent.submit(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      }).closest("form") as HTMLFormElement
+      screen
+        .getByRole("button", {
+          name: "Submit Result",
+        })
+        .closest("form") as HTMLFormElement
     );
 
     expect(
@@ -464,8 +444,7 @@ describe("PlayerMatchResultForm direct replay transport", () => {
         "The replay upload failed. Your selected files are still available; please try again."
       )
     ).toBeInTheDocument();
-    expect(fileInput.files).toHaveLength(2);
-    expect(fileInput.files?.[0]).toBe(files[0]);
+    expect(screen.getByText(files[0].name)).toBeInTheDocument();
     expect(cleanupPreparedReplayUploadsMock).toHaveBeenCalledWith({
       matchId: MATCH_ID,
       attemptId: ATTEMPT_ID,
@@ -486,9 +465,11 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     const { container } = renderResultForm();
     selectValidResult(container);
     fireEvent.submit(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      }).closest("form") as HTMLFormElement
+      screen
+        .getByRole("button", {
+          name: "Submit Result",
+        })
+        .closest("form") as HTMLFormElement
     );
 
     await screen.findByText(
@@ -510,9 +491,11 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     const { container } = renderResultForm();
     selectValidResult(container);
     fireEvent.submit(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      }).closest("form") as HTMLFormElement
+      screen
+        .getByRole("button", {
+          name: "Submit Result",
+        })
+        .closest("form") as HTMLFormElement
     );
 
     expect(
@@ -532,9 +515,11 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     const { container } = renderResultForm();
     selectValidResult(container);
     fireEvent.submit(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      }).closest("form") as HTMLFormElement
+      screen
+        .getByRole("button", {
+          name: "Submit Result",
+        })
+        .closest("form") as HTMLFormElement
     );
 
     expect(
@@ -542,12 +527,10 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     ).toBeInTheDocument();
     expect(finalizeMatchResultMock).toHaveBeenCalledOnce();
     expect(cleanupPreparedReplayUploadsMock).not.toHaveBeenCalled();
-    const submitButton = screen.getByRole("button", {
-      name: "Submit for Opponent Confirmation",
-    });
-    expect(submitButton).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Open$/ })).toBeDisabled();
-    fireEvent.submit(submitButton.closest("form") as HTMLFormElement);
+    expect(
+      screen.queryByRole("button", { name: "Submit Result" })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh match" }));
     expect(prepareMatchReplayUploadsMock).toHaveBeenCalledOnce();
     expect(finalizeMatchResultMock).toHaveBeenCalledOnce();
   });
@@ -561,29 +544,29 @@ describe("PlayerMatchResultForm direct replay transport", () => {
     const { container } = renderResultForm();
     selectValidResult(container);
     fireEvent.submit(
-      screen.getByRole("button", {
-        name: "Submit for Opponent Confirmation",
-      }).closest("form") as HTMLFormElement
+      screen
+        .getByRole("button", {
+          name: "Submit Result",
+        })
+        .closest("form") as HTMLFormElement
     );
 
-    await screen.findByText("The result outcome is uncertain. Refresh this match.");
-    const submitButton = screen.getByRole("button", {
-      name: "Submit for Opponent Confirmation",
-    });
-    expect(submitButton).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Open$/ })).toBeDisabled();
+    await screen.findByText(competitionEnglish.resultForm.responseUnknown);
+    expect(
+      screen.queryByRole("button", { name: "Submit Result" })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh match" }));
     expect(cleanupPreparedReplayUploadsMock).not.toHaveBeenCalled();
   });
 
   it("keeps no-show replay-independent and contains no screenshot-proof UI", () => {
     const { container } = renderResultForm();
-    expect(container.querySelector('input[type="file"]')).not.toHaveAttribute(
-      "name"
-    );
+    expect(container.querySelector('input[type="file"]')).toBeNull();
     expect(container.textContent).not.toMatch(/screenshot proof/i);
-    fireEvent.click(screen.getByRole("button", { name: /Open$/ }));
-    expect(screen.getByRole("button", { name: "Submit No-Show Report" }))
-      .toBeInTheDocument();
+    fireEvent.click(screen.getByText(competitionEnglish.resultUx.noShow));
+    expect(
+      screen.getByRole("button", { name: "Submit No-Show Report" })
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/confirmed no-show may affect leaderboard/i)
     ).toBeInTheDocument();
