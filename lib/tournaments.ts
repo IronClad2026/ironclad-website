@@ -302,6 +302,7 @@ export type MatchResultReportGroup = {
   hasReplay: boolean;
   replayAccessHref: string | null;
   replayProofs: {
+    winnerRegistrationId?: string | null;
     id: string;
     gameNumber: number;
     proofAvailable: boolean;

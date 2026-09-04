@@ -45,6 +45,7 @@ const source = {
   deleteControl: read("components/DeleteTournamentControl.tsx"),
   editor: read("components/admin/tournaments/TournamentEditor.tsx"),
   experience: read("components/TournamentsExperience.tsx"),
+  matchPresentation: read("components/AdminMatchWorkspace.tsx"),
   list: read("app/admin/tournaments/page.tsx"),
   mapPool: read("components/AdminTournamentMapPools.tsx"),
   mapPoolActions: read("app/admin/tournaments/map-pool-actions.ts"),
@@ -566,8 +567,8 @@ const capabilities: Capability[] = [
     section: "matches",
     evidence: [
       {
-        file: "experience",
-        includes: ["AdminMatchResultSummaries", "Legacy submissions"],
+        file: "matchPresentation",
+        includes: ["AdminMatchResultSummaries", "Submission History"],
       },
       { file: "matchActions", includes: ["reviewMatchResult"] },
     ],
@@ -577,7 +578,7 @@ const capabilities: Capability[] = [
     label: "replay/audit",
     section: "matches",
     evidence: [
-      { file: "experience", includes: ["Replay packages"] },
+      { file: "matchPresentation", includes: ["Result &amp; Replay Evidence"] },
       { file: "matchControls", includes: ["Official Result Audit"] },
       {
         file: "matchActions",

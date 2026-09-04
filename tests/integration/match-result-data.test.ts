@@ -100,6 +100,7 @@ const replayProofRows = [
     report_group_id: REPORT_GROUP_ID,
     match_id: MATCH_ID,
     game_number: 2,
+    claimed_winner_registration_id: WINNER_REGISTRATION_ID,
     replay_storage_path:
       `${MATCH_ID}/${SECRET_SUBMITTER_ID}/legacy/game-two.rec`,
   },
@@ -108,6 +109,7 @@ const replayProofRows = [
     report_group_id: REPORT_GROUP_ID,
     match_id: MATCH_ID,
     game_number: 1,
+    claimed_winner_registration_id: WINNER_REGISTRATION_ID,
     replay_storage_path: SECRET_REPLAY_PATH,
   },
 ];
@@ -163,6 +165,7 @@ const replayProofShape = {
     id: "value",
     gameNumber: "value",
     proofAvailable: "value",
+    winnerRegistrationId: "value",
     replayAccessHref: "value",
   },
 } satisfies ExactShape;
