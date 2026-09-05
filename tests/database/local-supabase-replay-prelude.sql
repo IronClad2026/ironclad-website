@@ -41,7 +41,11 @@ returns text
 language sql
 stable
 as $$
-  select nullif(auth.jwt() ->> 'role', '');
+  -- Match Supabase Auth's individual-claim precedence, including negative tests.
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    auth.jwt() ->> 'role'
+  );
 $$;
 
 create table if not exists storage.buckets (

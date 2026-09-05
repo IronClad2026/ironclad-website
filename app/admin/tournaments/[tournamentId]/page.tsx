@@ -7,6 +7,7 @@ import AdminTournamentMapPools from "@/components/AdminTournamentMapPools";
 import TournamentFormDraft from "@/components/TournamentFormDraft";
 import AdminTournamentMatches from "@/components/admin/tournaments/AdminTournamentMatches";
 import AdminTournamentMedia from "@/components/admin/tournaments/AdminTournamentMedia";
+import AdminTournamentReplayArchive from "@/components/admin/tournaments/AdminTournamentReplayArchive";
 import AdminTournamentRegistrations from "@/components/admin/tournaments/AdminTournamentRegistrations";
 import TournamentBracketStructureControls from "@/components/admin/tournaments/TournamentBracketStructureControls";
 import TournamentControls from "@/components/admin/tournaments/TournamentControls";
@@ -18,6 +19,7 @@ import type { TournamentManagementSection } from "@/components/admin/tournaments
 import TournamentOverview from "@/components/admin/tournaments/TournamentOverview";
 import TournamentWorkspaceHeader from "@/components/admin/tournaments/TournamentWorkspaceHeader";
 import { loadAdminTournamentMatchWorkspace } from "@/lib/admin-tournament-match-workspace";
+import { loadAdminTournamentReplayArchive } from "@/lib/admin-replay-archive";
 import { loadAdminTournamentRegistrationWorkspace } from "@/lib/admin-tournament-registration-workspace";
 import {
   isAdminTournamentWorkspaceTerminal,
@@ -59,6 +61,7 @@ const VALID_SECTIONS = new Set<TournamentManagementSection>([
   "players-waitlist",
   "bracket",
   "matches",
+  "replays",
   "media",
   "map-pool",
   "controls",
@@ -182,7 +185,10 @@ async function renderWorkspaceSection({
   }
 
   if (section === "edit") {
-    const editor = await loadAdminTournamentEditorWorkspaceData(tournament);
+    const editor = await loadAdminTournamentEditorWorkspaceData(
+      tournament,
+      summary.divisionStates
+    );
     const terminal = isAdminTournamentWorkspaceTerminal(tournament);
     return (
       <TournamentEditor
@@ -212,11 +218,15 @@ async function renderWorkspaceSection({
   }
 
   if (section === "registrations" || section === "players-waitlist") {
-    const data = await loadAdminTournamentRegistrationWorkspace(tournament, {
-      filter: query?.filter,
-      section,
-      selectedRegistrationId: query?.selected,
-    });
+    const data = await loadAdminTournamentRegistrationWorkspace(
+      tournament,
+      summary.divisionStates,
+      {
+        filter: query?.filter,
+        section,
+        selectedRegistrationId: query?.selected,
+      }
+    );
     return (
       <AdminTournamentRegistrations
         key={`${tournament.id}:${section}`}
@@ -232,18 +242,23 @@ async function renderWorkspaceSection({
 
   if (section === "bracket") {
     const [bracket, editor] = await Promise.all([
-      loadAdminTournamentBracketWorkspaceData(tournament),
-      loadAdminTournamentEditorWorkspaceData(tournament),
+      loadAdminTournamentBracketWorkspaceData(
+        tournament,
+        summary.divisionStates
+      ),
+      loadAdminTournamentEditorWorkspaceData(
+        tournament,
+        summary.divisionStates
+      ),
     ]);
     const values = toTournamentFormValues(tournament);
     return (
       <div className="grid min-w-0 gap-5">
         <TournamentBracketStructureControls
-          approvedByBracket={editor.approvedByBracket}
+          divisionStates={summary.divisionStates}
           generatedByBracket={editor.generatedByBracket}
           notice={query?.notice}
           readOnly={isAdminTournamentWorkspaceTerminal(tournament)}
-          readinessByBracket={editor.readinessByBracket}
           values={values}
         />
         <AdminBracketManagement
@@ -281,6 +296,24 @@ async function renderWorkspaceSection({
     );
   }
 
+  if (section === "replays") {
+    const replayWorkspace = await loadAdminTournamentReplayArchive(
+      tournament.id
+    );
+    return replayWorkspace.ok ? (
+      <AdminTournamentReplayArchive
+        key={tournament.id}
+        archive={replayWorkspace.archive}
+      />
+    ) : (
+      <AdminTournamentReplayArchive
+        key={tournament.id}
+        archive={null}
+        loadError={replayWorkspace.reason === "load-failed"}
+      />
+    );
+  }
+
   if (section === "media") {
     const mediaWorkspace = await loadAdminTournamentMediaWorkspace(
       tournament.id
@@ -300,6 +333,13 @@ async function renderWorkspaceSection({
   if (section === "map-pool") {
     const mapPool = await loadAdminTournamentMapPoolWorkspaceData(tournament);
     const brackets = tournament.tournament_brackets ?? [];
+    const divisionStateByBracket = new Map(
+      summary.divisionStates.flatMap((division) =>
+        division.bracketId
+          ? [[division.bracketId, division] as const]
+          : []
+      )
+    );
     return brackets.length > 0 ? (
       <AdminTournamentMapPools
         key={tournament.id}
@@ -313,6 +353,8 @@ async function renderWorkspaceSection({
           id: bracket.id,
           name: bracket.name,
           launchedAt: bracket.launched_at,
+          notHeldAt:
+            divisionStateByBracket.get(bracket.id)?.notHeldAt ?? null,
           mapPoolPublishedAt: bracket.map_pool_published_at,
           currentMapIds:
             mapPool.currentMapIdsByBracket.get(bracket.id) ?? [],
@@ -325,7 +367,7 @@ async function renderWorkspaceSection({
   }
 
   const [editor, deletionPreview] = await Promise.all([
-    loadAdminTournamentEditorWorkspaceData(tournament),
+    loadAdminTournamentEditorWorkspaceData(tournament, summary.divisionStates),
     loadAdminTournamentDeletionPreview(tournament.id),
   ]);
   return (
@@ -407,6 +449,14 @@ function getBracketNotice(value?: string) {
     "division-launched",
     "division-already-launched",
     "division-launch-failed",
+    "division-not-held",
+    "division-already-not-held",
+    "division-not-held-invalid",
+    "division-not-held-failed",
+    "division-invitation-sent",
+    "division-invitation-already-pending",
+    "division-invitation-invalid",
+    "division-invitation-failed",
   ] as const;
   return valid.find((notice) => notice === value);
 }

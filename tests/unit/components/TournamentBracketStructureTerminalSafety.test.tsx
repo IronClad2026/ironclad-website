@@ -34,23 +34,60 @@ function renderTerminalStructure(generated: boolean) {
 
   render(
     <TournamentBracketStructureControls
-      approvedByBracket={new Map([[bracketId, 8]])}
+      divisionStates={[
+        {
+          tournamentId,
+          canonicalName: "Academy",
+          displayName: "Academy Bracket",
+          bracketId,
+          state: "ready",
+          terminalOverlay: "cancelled",
+          approvedCount: 8,
+          requiredCount: 8,
+          isReady: true,
+          launchedAt: null,
+          generatedBracketId: generated
+            ? "33333333-3333-4333-8333-333333333333"
+            : null,
+          isCompetitionComplete: false,
+          notHeldAt: null,
+          notHeldReasonCode: null,
+        },
+        {
+          tournamentId,
+          canonicalName: "Challenge",
+          displayName: "Challenge Bracket",
+          bracketId: null,
+          state: "disabled",
+          terminalOverlay: "cancelled",
+          approvedCount: null,
+          requiredCount: null,
+          isReady: false,
+          launchedAt: null,
+          generatedBracketId: null,
+          isCompetitionComplete: false,
+          notHeldAt: null,
+          notHeldReasonCode: null,
+        },
+        {
+          tournamentId,
+          canonicalName: "Main",
+          displayName: "Main / Pro Bracket",
+          bracketId: null,
+          state: "disabled",
+          terminalOverlay: "cancelled",
+          approvedCount: null,
+          requiredCount: null,
+          isReady: false,
+          launchedAt: null,
+          generatedBracketId: null,
+          isCompetitionComplete: false,
+          notHeldAt: null,
+          notHeldReasonCode: null,
+        },
+      ]}
       generatedByBracket={generatedByBracket}
       readOnly
-      readinessByBracket={
-        new Map([
-          [
-            bracketId,
-            {
-              bracketId,
-              approvedCount: 8,
-              requiredCount: 8,
-              isReady: true,
-              launchedAt: null,
-            },
-          ],
-        ])
-      }
       values={{
         ...EMPTY_TOURNAMENT_VALUES,
         id: tournamentId,
@@ -88,9 +125,7 @@ describe("TournamentBracketStructureControls terminal safety", () => {
         screen.getByRole("heading", { name: "Academy Bracket" })
       ).toBeVisible();
       expect(screen.getByText(historyText)).toBeVisible();
-      expect(
-        screen.getByText("Ready for private bracket preparation")
-      ).toBeVisible();
+      expect(screen.getByText("Cancelled")).toBeVisible();
 
       expect(
         screen.getByRole("button", {

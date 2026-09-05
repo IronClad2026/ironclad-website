@@ -1,11 +1,15 @@
 import {
   mapPublicCoh3MapDatabaseRow,
+  normalizeCoh3MapName,
   projectPublicCoh3Map,
   type Coh3MapRow,
   type PublicCoh3MapDatabaseRow,
   type PublicCoh3Map,
 } from "@/lib/coh3-maps";
-import { getTournamentBracketSortOrder } from "@/lib/tournaments";
+import {
+  getTournamentBracketDisplayName,
+  getTournamentBracketSortOrder,
+} from "@/lib/tournaments";
 
 export type TournamentMapPoolEntryRow = {
   addedAt: string;
@@ -47,22 +51,34 @@ export function projectPublishedTournamentMapPools(
         left.name.localeCompare(right.name)
     )
     .flatMap((bracket) => {
-    if (!bracket.mapPoolPublishedAt) {
-      return [];
-    }
+      if (!bracket.mapPoolPublishedAt) {
+        return [];
+      }
 
-    return [
-      {
-        bracketId: bracket.id,
-        divisionName: bracket.name,
-        publishedAt: bracket.mapPoolPublishedAt,
-        launchedAt: bracket.launchedAt,
-        maps: bracket.entries
-          .filter((entry) => entry.removedAt === null)
-          .map((entry) => projectPublicCoh3Map(entry.map)),
-      },
-    ];
+      return [
+        {
+          bracketId: bracket.id,
+          divisionName: getTournamentBracketDisplayName(bracket.name),
+          publishedAt: bracket.mapPoolPublishedAt,
+          launchedAt: bracket.launchedAt,
+          maps: bracket.entries
+            .filter((entry) => entry.removedAt === null)
+            .map((entry) => projectPublicCoh3Map(entry.map))
+            .sort(comparePublicMaps),
+        },
+      ];
     });
+}
+
+function comparePublicMaps(left: PublicCoh3Map, right: PublicCoh3Map) {
+  const leftName = normalizeCoh3MapName(left.displayName);
+  const rightName = normalizeCoh3MapName(right.displayName);
+
+  if (leftName !== rightName) {
+    return leftName < rightName ? -1 : 1;
+  }
+
+  return left.id.localeCompare(right.id);
 }
 
 export function groupPublicTournamentMapPoolEntries(

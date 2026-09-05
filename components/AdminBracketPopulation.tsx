@@ -242,7 +242,7 @@ function AdminBracketPopulationWorkspace({
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 260 }}
-                  className="absolute inset-0 flex h-dvh w-screen max-w-none flex-col overflow-hidden border-r border-orange-500/30 bg-[#080c14] shadow-[24px_0_100px_rgba(0,0,0,0.75)]"
+                  className="absolute inset-0 flex h-dvh w-screen min-w-0 max-w-none flex-col overflow-hidden border-r border-orange-500/30 bg-[#080c14] shadow-[24px_0_100px_rgba(0,0,0,0.75)]"
             >
               <header className="relative shrink-0 overflow-hidden border-b border-white/10 bg-gradient-to-r from-orange-950/60 via-slate-950 to-black px-5 py-5 sm:px-8">
                 <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 shadow-[0_0_24px_rgba(249,115,22,0.9)]" />
@@ -277,8 +277,14 @@ function AdminBracketPopulationWorkspace({
                 </div>
               </header>
 
-              <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[340px_minmax(0,1fr)] lg:overflow-hidden">
-                <aside className="flex min-h-0 flex-col border-b border-white/10 bg-black/25 p-5 lg:overflow-hidden lg:border-r lg:border-b-0 lg:p-6">
+              <div
+                data-bracket-workspace-scroll-region="true"
+                className="grid min-h-0 min-w-0 flex-1 grid-rows-[max-content_max-content] overflow-y-auto overscroll-contain lg:grid-cols-[340px_minmax(0,1fr)] lg:grid-rows-1 lg:overflow-hidden"
+              >
+                <aside
+                  data-bracket-participant-panel="true"
+                  className="flex min-w-0 flex-col border-b border-white/10 bg-black/25 p-5 lg:min-h-0 lg:overflow-hidden lg:border-r lg:border-b-0 lg:p-6"
+                >
                   <section className="shrink-0">
                     <SectionLabel>Tournament Information</SectionLabel>
                     <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -339,7 +345,7 @@ function AdminBracketPopulationWorkspace({
                         returnToParticipantPool(payload.registrationId);
                       }
                     }}
-                    className={`mt-6 flex min-h-[220px] flex-1 flex-col overflow-hidden rounded-2xl border p-3 transition ${
+                    className={`mt-6 flex min-h-[220px] flex-none flex-col overflow-visible rounded-2xl border p-3 transition lg:min-h-0 lg:flex-1 lg:overflow-hidden ${
                       activeDropTarget === "pool"
                         ? "border-orange-400/60 bg-orange-500/10 shadow-[0_0_28px_rgba(249,115,22,0.12)]"
                         : "border-white/10 bg-white/[0.02]"
@@ -357,7 +363,7 @@ function AdminBracketPopulationWorkspace({
                       </span>
                     </div>
 
-                    <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
+                    <div className="mt-3 space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
                       {availableParticipants.map((participant) => (
                         <div
                           key={participant.id}
@@ -385,7 +391,10 @@ function AdminBracketPopulationWorkspace({
                   </section>
                 </aside>
 
-                <main className="min-h-0 min-w-0 overflow-y-auto p-5 sm:p-7 lg:p-8">
+                <main
+                  data-bracket-slot-panel="true"
+                  className="min-w-0 overflow-visible p-5 sm:p-7 lg:min-h-0 lg:overflow-y-auto lg:p-8"
+                >
                   <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-r from-white/[0.04] to-transparent p-4">
                     <div className="min-w-0">
                       <SectionLabel>Current Assignments</SectionLabel>
@@ -411,7 +420,10 @@ function AdminBracketPopulationWorkspace({
                       the slot selectors.
                     </p>
 
-                    <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
+                    <div
+                      data-bracket-slot-grid="true"
+                      className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] items-start gap-4"
+                    >
                       {Array.from(
                         { length: bracket.slotCount },
                         (_, index) => index + 1
@@ -432,6 +444,7 @@ function AdminBracketPopulationWorkspace({
                         return (
                           <div
                             key={slotNumber}
+                            data-bracket-slot={slotNumber}
                             onDragEnter={() =>
                               setActiveDropTarget(slotNumber)
                             }
@@ -455,7 +468,7 @@ function AdminBracketPopulationWorkspace({
                                 dropIntoSlot(slotNumber, payload);
                               }
                             }}
-                            className={`min-w-0 rounded-2xl border p-4 transition ${
+                            className={`relative min-w-0 self-start overflow-visible rounded-2xl border p-4 transition ${
                               activeDropTarget === slotNumber
                                 ? "scale-[1.01] border-orange-300/80 bg-orange-500/15 shadow-[0_0_32px_rgba(249,115,22,0.18)]"
                                 : participant
@@ -463,12 +476,12 @@ function AdminBracketPopulationWorkspace({
                                 : "border-white/10 bg-white/[0.03]"
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
+                            <div className="flex min-w-0 items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
                                 <span className="inline-flex rounded-md border border-orange-400/30 bg-orange-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-orange-300">
                                   Slot {slotNumber}
                                 </span>
-                                <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+                                <p className="mt-2 break-words text-xs leading-5 font-black uppercase tracking-[0.12em] text-slate-500 [overflow-wrap:anywhere] sm:tracking-[0.2em]">
                                   {slotLabel}
                                 </p>
                               </div>
@@ -497,10 +510,10 @@ function AdminBracketPopulationWorkspace({
                                 onDragEnd={() => setActiveDropTarget(null)}
                                 className="mt-3 cursor-grab rounded-lg border border-orange-400/20 bg-black/30 px-3 py-2 active:cursor-grabbing"
                               >
-                                <p className="truncate text-sm font-black text-white">
+                                <p className="break-words text-sm font-black text-white [overflow-wrap:anywhere]">
                                   {participant.name}
                                 </p>
-                                <p className="text-xs text-zinc-500">
+                                <p className="mt-1 break-words text-xs leading-5 text-zinc-500">
                                   Drag to another slot or back to the player pool
                                 </p>
                               </div>
@@ -514,7 +527,7 @@ function AdminBracketPopulationWorkspace({
                                   event.target.value
                                 )
                               }
-                              className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm font-bold text-white outline-none transition focus:border-orange-400"
+                              className="relative z-10 mt-3 min-h-11 w-full min-w-0 touch-manipulation rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm font-bold text-white outline-none transition focus:border-orange-400"
                             >
                               <option value="">TBD / Empty Slot</option>
                               {bracket.participants.map((option) => {
@@ -554,7 +567,10 @@ function AdminBracketPopulationWorkspace({
                 </main>
               </div>
 
-              <footer className="shrink-0 border-t border-white/10 bg-black/70 px-5 py-4 backdrop-blur-xl sm:px-8">
+              <footer
+                data-bracket-workspace-footer="true"
+                className="relative z-20 shrink-0 border-t border-white/10 bg-black/70 px-5 pt-4 [padding-bottom:max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:px-8"
+              >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <SectionLabel>Save / Reset Controls</SectionLabel>
@@ -572,7 +588,10 @@ function AdminBracketPopulationWorkspace({
                       <RotateCcw size={16} />
                       Reset Changes
                     </button>
-                    <form action={saveBracketAssignments}>
+                    <form
+                      action={saveBracketAssignments}
+                      className="w-full sm:w-auto"
+                    >
                       <input
                         type="hidden"
                         name="tournamentId"

@@ -1002,6 +1002,32 @@ values
     'system'
   );
 
+insert into public.leaderboard_division_settlements (
+  tournament_bracket_id,
+  season_id,
+  settlement_version,
+  calculation_checksum,
+  settled_at,
+  last_reconciled_at
+)
+values
+  (
+    'ba200000-0000-4000-8000-000000000006',
+    'ba700000-0000-4000-8000-000000000001',
+    1,
+    repeat('6', 32),
+    '2199-01-06 00:00:00+00',
+    '2199-01-06 00:00:00+00'
+  ),
+  (
+    'ba200000-0000-4000-8000-000000000007',
+    'ba700000-0000-4000-8000-000000000001',
+    1,
+    repeat('7', 32),
+    '2199-01-07 00:00:00+00',
+    '2199-01-07 00:00:00+00'
+  );
+
 insert into public.tournament_championship_path_summary_authority (
   tournament_id,
   registration_id,

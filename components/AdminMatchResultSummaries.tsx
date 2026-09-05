@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import {
   reviewMatchResult,
   type MatchResultActionState,
@@ -21,7 +22,11 @@ export default function AdminMatchResultSummaries({
   submissions,
   participantsById,
   onPendingChange,
+  compact = false,
+  readOnly = false,
 }: {
+  compact?: boolean;
+  readOnly?: boolean;
   match: GeneratedTournamentMatch;
   submissions: MatchResultSubmission[];
   participantsById: Map<string, TournamentParticipant>;
@@ -52,12 +57,10 @@ export default function AdminMatchResultSummaries({
     (game) => game.winnerIds.size === 1
   );
   const playerOneWins = resolvedGames.filter(
-    (game) =>
-      [...game.winnerIds][0] === match.playerOneRegistrationId
+    (game) => [...game.winnerIds][0] === match.playerOneRegistrationId
   ).length;
   const playerTwoWins = resolvedGames.filter(
-    (game) =>
-      [...game.winnerIds][0] === match.playerTwoRegistrationId
+    (game) => [...game.winnerIds][0] === match.playerTwoRegistrationId
   ).length;
   const winsRequired = Math.floor(match.seriesBestOf / 2) + 1;
   const seriesComplete =
@@ -70,7 +73,13 @@ export default function AdminMatchResultSummaries({
   return (
     <div className="space-y-4">
       {pending.length > 0 && (
-        <div className="rounded-2xl border border-orange-400/25 bg-orange-500/[0.04] p-4 sm:p-5">
+        <div
+          className={
+            compact
+              ? "min-w-0"
+              : "rounded-2xl border border-orange-400/25 bg-orange-500/[0.04] p-4 sm:p-5"
+          }
+        >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-wider text-orange-200">
@@ -81,7 +90,8 @@ export default function AdminMatchResultSummaries({
                   participantsById,
                   match.playerOneRegistrationId ?? ""
                 )}{" "}
-                <strong>{playerOneWins}</strong> - <strong>{playerTwoWins}</strong>{" "}
+                <strong>{playerOneWins}</strong> -{" "}
+                <strong>{playerTwoWins}</strong>{" "}
                 {participantName(
                   participantsById,
                   match.playerTwoRegistrationId ?? ""
@@ -99,18 +109,19 @@ export default function AdminMatchResultSummaries({
             </span>
           </div>
 
-          <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-xs sm:grid-cols-3">
-            <SummaryValue label="Round" value={match.roundName} />
-            <SummaryValue
-              label="Match Format"
-              value={`BO${match.seriesBestOf}`}
-            />
-            <SummaryValue
-              label="Current Series Score"
-              value={`${playerOneWins}-${playerTwoWins}`}
-            />
-          </div>
-
+          {!compact && (
+            <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-xs sm:grid-cols-3">
+              <SummaryValue label="Round" value={match.roundName} />
+              <SummaryValue
+                label="Match Format"
+                value={`BO${match.seriesBestOf}`}
+              />
+              <SummaryValue
+                label="Current Series Score"
+                value={`${playerOneWins}-${playerTwoWins}`}
+              />
+            </div>
+          )}
           {conflictingGames.length > 0 && (
             <div className="mt-4 rounded-xl border border-red-400/40 bg-red-500/10 p-4">
               <p className="text-xs font-black uppercase tracking-wider text-red-200">
@@ -135,18 +146,24 @@ export default function AdminMatchResultSummaries({
             ))}
           </div>
 
-          <ReviewForm
-            submissionId={pending[0].id}
-            approvalDisabled={!seriesComplete}
-            onPendingChange={onPendingChange}
-          />
+          {!readOnly && (
+            <ReviewForm
+              submissionId={pending[0].id}
+              approvalDisabled={!seriesComplete}
+              onPendingChange={onPendingChange}
+            />
+          )}
         </div>
       )}
 
       {historical.map((submission) => (
         <div
           key={submission.id}
-          className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4 sm:p-5"
+          className={
+            compact
+              ? "min-w-0 border-b border-white/10 pb-5"
+              : "rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4 sm:p-5"
+          }
         >
           <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-4">
             <p className="text-xs font-black uppercase tracking-wider text-amber-200">
@@ -157,11 +174,13 @@ export default function AdminMatchResultSummaries({
               {new Date(submission.createdAt).toLocaleString()}
             </span>
           </div>
-          <ResultSummary
-            match={match}
-            submission={submission}
-            participantsById={participantsById}
-          />
+          {!compact && (
+            <ResultSummary
+              match={match}
+              submission={submission}
+              participantsById={participantsById}
+            />
+          )}
           <EvidenceSummary
             submission={submission}
             participantsById={participantsById}
@@ -198,7 +217,7 @@ function ResultSummary({
     <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-slate-300 sm:grid-cols-2">
       <SummaryValue
         label="Match"
-              value={`${match.roundName} - Match ${match.matchNumber}`}
+        value={`${match.roundName} - Match ${match.matchNumber}`}
       />
       <SummaryValue label="Reporting Player" value={reporter} />
       <SummaryValue label="Reported Winner" value={winner} />
@@ -207,7 +226,10 @@ function ResultSummary({
         label="Submission Date"
         value={new Date(submission.createdAt).toLocaleString()}
       />
-      <SummaryValue label="Current Status" value={formatStatus(submission.status)} />
+      <SummaryValue
+        label="Current Status"
+        value={formatStatus(submission.status)}
+      />
     </div>
   );
 }
@@ -222,11 +244,17 @@ function EvidenceSummary({
   return (
     <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4">
       <p className="text-xs font-black text-white">
-                  Submission #{submission.submissionNumber} - Game{" "}
-        {submission.gameNumber}
+        Submission #{submission.submissionNumber} - Game {submission.gameNumber}
       </p>
       <p className="mt-1 text-[11px] text-slate-400">
         Reported by {reporterName(submission, participantsById)}
+      </p>
+      <p className="mt-1 text-xs text-zinc-400">
+        Winner:{" "}
+        {participantName(
+          participantsById,
+          submission.claimedWinnerRegistrationId
+        )}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {submission.replayAccessHref ? (
@@ -248,8 +276,22 @@ function EvidenceSummary({
       </div>
       {submission.screenshotAccessHref && (
         <p className="mt-2 text-[11px] leading-5 text-slate-500">
-          Legacy screenshots remain available for historical context but are
-          not accepted match-result proof.
+          Legacy screenshots remain available for historical context but are not
+          accepted match-result proof.
+        </p>
+      )}
+      {submission.reviewNotes && (
+        <p className="mt-3 whitespace-pre-wrap break-words text-xs text-zinc-300">
+          Review notes: {submission.reviewNotes}
+        </p>
+      )}
+      {submission.reviewedAt && (
+        <p className="mt-2 text-xs text-zinc-500">
+          Reviewed by {submission.reviewerLabel ?? "Administrator"}:{" "}
+          <HydrationSafeLocalDateTime
+            value={submission.reviewedAt}
+            fallback="Unavailable"
+          />
         </p>
       )}
       {submission.notes && (
@@ -327,13 +369,10 @@ function ReviewForm({
   }, [onPendingChange, pending, submissionId]);
 
   return (
-    <form
-      action={formAction}
-      aria-busy={pending}
-      className="mt-4 space-y-2"
-    >
+    <form action={formAction} aria-busy={pending} className="mt-4 space-y-2">
       <input type="hidden" name="submissionId" value={submissionId} />
       <textarea
+        aria-label="Administrator review message"
         name="reviewNotes"
         maxLength={2000}
         rows={2}
@@ -362,13 +401,13 @@ function ReviewForm({
           decision="rejected"
           label="Reject Result"
           disabled={pending}
-          className="bg-red-700 hover:bg-red-600"
+          className="border border-white/20 bg-transparent hover:bg-white/10"
         />
         <ReviewButton
           decision="resubmission_requested"
           label="Request Resubmission"
           disabled={pending}
-          className="bg-amber-600 hover:bg-amber-500"
+          className="border border-white/20 bg-white/5 hover:bg-white/10"
         />
       </div>
     </form>

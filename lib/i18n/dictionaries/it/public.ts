@@ -200,8 +200,12 @@ const dictionary = {
   rankings: {
     metadataTitle: "Classifica e posizioni | IronClad",
     metadataDescription:
-      "Segui la stagione Main / Pro di sei Eventi e le Classifiche permanenti di carriera di Academy e Challenge.",
+      "Segui la stagione attuale e lo storico Main / Pro insieme alle Classifiche permanenti di carriera di Academy e Challenge.",
+    mainDivision: "Main / Pro",
     mainSeason: "Stagione Main / Pro",
+    currentSeasonScope: "Stagione attuale",
+    allTimeScope: "Di sempre",
+    mainScope: "Classifica Main / Pro",
     academyCareer: "Carriera Academy",
     challengeCareer: "Carriera Challenge",
     loadWarning:
@@ -210,6 +214,8 @@ const dictionary = {
     dynamicStandings: "Posizioni dinamiche",
     mainDescription:
       "Classifica ufficiale Main / Pro per la stagione in evidenza di sei Eventi validi.",
+    mainAllTimeDescription:
+      "Classifica permanente Main / Pro per tutti gli Eventi validi con punti, compresa la stagione attiva.",
     academyDescription:
       "I punti e i risultati Academy restano in questa vista permanente della carriera.",
     challengeDescription:
@@ -218,14 +224,20 @@ const dictionary = {
     visibleCompetitors: "Concorrenti visibili",
     rankingModel: "Modello di Classifica",
     sixEventSeason: "Stagione di sei Eventi",
+    permanentMainPro: "Main / Pro permanente",
     permanentCareer: "Carriera permanente",
     seasonState: "Stato della stagione",
     division: "Divisione",
     heroEyebrow: "Comando competitivo IronClad",
     heroTitle: "Classifica e posizioni",
     heroDescription:
-      "Main / Pro è la stagione ufficiale di sei Eventi validi. Academy e Challenge mantengono Classifiche permanenti di carriera separate.",
+      "Main / Pro mostra la stagione ufficiale di sei Eventi validi e il suo storico permanente. Academy e Challenge mantengono Classifiche permanenti separate.",
     featuredSeason: "Stagione Main / Pro in evidenza",
+    mainAllTime: "Main / Pro di sempre",
+    mainAllTimeRecord:
+      "Ogni Evento Main / Pro valido che assegna punti contribuisce a questo storico permanente.",
+    mainAllTimeNoReset:
+      "Include i punti della stagione attuale. Lo storico non si azzera alla chiusura di una stagione e non determina le posizioni premio della stagione attuale.",
     careerStandings: "Classifica di carriera",
     seasonNotStarted: "Stagione non iniziata",
     noSeason:

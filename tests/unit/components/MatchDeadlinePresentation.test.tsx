@@ -329,11 +329,11 @@ describe("matchup deadline player and administrator presentation", () => {
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAccessibleName(
-      "Direct Match Management Responsive Match Management Validation"
+      "Manage Match Responsive Match Management Validation"
     );
     expect(dialog).toHaveAccessibleDescription("Quarterfinals - Match 1");
     expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(dialog).toHaveClass("w-full", "max-w-5xl", "min-w-0");
+    expect(dialog).toHaveClass("w-full", "max-w-4xl", "min-w-0");
     expect(dialog).not.toHaveClass("w-[94vw]");
 
     const closeButton = screen.getByRole("button", {
@@ -346,53 +346,15 @@ describe("matchup deadline player and administrator presentation", () => {
     ).toHaveAttribute("aria-hidden", "true");
 
     const scrollport = dialog.querySelector("[data-admin-match-scrollport]");
-    const overviewGrid = dialog.querySelector(
-      "[data-admin-match-overview-grid]"
-    );
-    const actionsGrid = dialog.querySelector("[data-admin-match-actions-grid]");
-
     expect(scrollport).toHaveClass("w-full", "max-w-full", "min-w-0");
-    expect(scrollport).not.toHaveClass("overflow-x-auto", "overflow-x-hidden");
-    expect(overviewGrid).toHaveClass(
-      "w-full",
-      "max-w-full",
-      "min-w-0",
-      "grid-cols-[minmax(0,1fr)]",
-      "lg:grid-cols-[minmax(0,1fr)_320px]"
-    );
-    expect(actionsGrid).toHaveClass(
-      "w-full",
-      "max-w-full",
-      "min-w-0",
-      "grid-cols-[minmax(0,1fr)]",
-      "lg:grid-cols-2"
-    );
-
-    const playerRows = dialog.querySelectorAll("[data-admin-match-player-row]");
-    expect(playerRows).toHaveLength(2);
-    [longPlayerOne.name, longPlayerTwo.name].forEach((name, index) => {
-      const playerName = playerRows[index].querySelector(
-        "[data-admin-match-player-name]"
-      );
-      expect(playerRows[index]).toHaveClass(
-        "w-full",
-        "max-w-full",
-        "min-w-0"
-      );
-      expect(playerName).toHaveTextContent(name);
-      expect(playerName).toHaveClass(
-        "whitespace-normal",
-        "[overflow-wrap:anywhere]"
-      );
-      expect(playerName).not.toHaveClass("truncate", "whitespace-nowrap");
-    });
-
-    const deadlineSection = screen.getByText("Match Deadline").closest("section");
-    expect(deadlineSection?.parentElement).toHaveClass(
-      "w-full",
-      "max-w-full",
-      "min-w-0"
-    );
+    const names = dialog.querySelectorAll("[data-admin-match-player-name]");
+    expect(names).toHaveLength(2);
+    expect(names[0]).toHaveTextContent(longPlayerOne.name);
+    expect(names[1]).toHaveTextContent(longPlayerTwo.name);
+    expect(names[0]).not.toHaveClass("truncate", "whitespace-nowrap");
+    const schedule = screen.getByText("Deadline & Scheduling").closest("details")!;
+    expect(schedule).not.toHaveAttribute("open");
+    schedule.open = true;
     expect(await screen.findByLabelText("Extension minutes")).toHaveClass(
       "min-h-11",
       "w-full"
@@ -517,7 +479,7 @@ describe("matchup deadline player and administrator presentation", () => {
       opener.focus();
       fireEvent.click(opener);
       const dialog = await screen.findByRole("dialog", {
-        name: "Direct Match Management Accessibility Cup",
+        name: "Manage Match Accessibility Cup",
       });
       const closeButton = within(dialog).getByRole("button", {
         name: "Close match management",
@@ -537,7 +499,7 @@ describe("matchup deadline player and administrator presentation", () => {
       )
     ).filter((element) => element.tabIndex >= 0);
     expect(focusable.length).toBeGreaterThan(1);
-    const lastFocusable = focusable[focusable.length - 1];
+    const lastFocusable = within(dialog).getByText("Danger Zone");
     lastFocusable.focus();
     fireEvent.keyDown(window, { key: "Tab" });
     expect(closeButton).toHaveFocus();
@@ -603,8 +565,9 @@ describe("matchup deadline player and administrator presentation", () => {
     );
 
     const dialog = screen.getByRole("dialog", {
-      name: "Direct Match Management Pending Adjudication Cup",
+      name: "Manage Match Pending Adjudication Cup",
     });
+    within(dialog).getByText("Deadline & Scheduling").closest("details")!.open = true;
     const applyExtension = await within(dialog).findByRole("button", {
       name: "Apply One-Time Extension",
     });
@@ -635,7 +598,7 @@ describe("matchup deadline player and administrator presentation", () => {
       within(dialog).getByLabelText("Extension minutes")
     );
     expect(fireEvent.keyDown(window, { key: "Tab" })).toBe(false);
-    expect(within(dialog).getByLabelText("Extension minutes")).toHaveFocus();
+    expect(within(dialog).getByText("Deadline & Scheduling")).toHaveFocus();
     fireEvent.click(closeButton);
     fireEvent.keyDown(window, { key: "Escape" });
     fireEvent.mouseDown(backdrop as HTMLElement);
@@ -737,6 +700,7 @@ describe("matchup deadline player and administrator presentation", () => {
 
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={expiredMatch}
         deadlineManaged
         participantsById={participants(participantOne, participantTwo)}
@@ -957,6 +921,7 @@ describe("matchup deadline player and administrator presentation", () => {
   it("tells an early downstream player that no deadline has started", () => {
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={matchFixture({
           status: "scheduled",
           activationVersion: 0,
@@ -986,6 +951,7 @@ describe("matchup deadline player and administrator presentation", () => {
   it("blocks player result controls while an administrative hold is active", () => {
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={matchFixture({
           holdStartedAt: "2099-08-03T00:00:00.000Z",
         })}
@@ -1008,6 +974,7 @@ describe("matchup deadline player and administrator presentation", () => {
   it("preserves scheduled round-robin player result entry without a matchup deadline", () => {
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={matchFixture({
           status: "scheduled",
           activationVersion: 0,
@@ -1035,6 +1002,7 @@ describe("matchup deadline player and administrator presentation", () => {
   it("keeps scheduled deadline-managed matches blocked until activation", () => {
     render(
       <MatchResultControls
+        viewerRegistrationId={participantOne.registrationId}
         match={matchFixture({
           status: "scheduled",
           activationVersion: 0,

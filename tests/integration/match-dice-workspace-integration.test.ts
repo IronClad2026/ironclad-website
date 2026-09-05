@@ -44,8 +44,9 @@ describe("authenticated match dice workspace integration", () => {
   it("keeps Admin dice history read-only and suppresses terminal mutation controls", () => {
     expect(source).toContain("forceReadOnly");
     expect(source).toContain("readOnly={terminalTournament}");
-    expect(source).toContain("!readOnly && deadlineManaged");
-    expect(source).toContain("!readOnly && (");
+    const workspace = readFileSync(resolve(process.cwd(), "components/AdminMatchWorkspace.tsx"), "utf8");
+    expect(workspace).toContain("readOnly={readOnly}");
+    expect(workspace).toContain("!readOnly && (");
   });
 
   it("keeps the near-full-screen Match workspace keyboard and safe-area aware", () => {

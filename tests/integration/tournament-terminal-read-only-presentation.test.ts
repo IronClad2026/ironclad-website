@@ -30,9 +30,8 @@ describe("terminal tournament read-only presentation", () => {
     );
     expect(source).toContain("viewer.isAdmin && selectedAdminMatch");
     expect(source).toContain("readOnly={terminalTournament}");
-    expect(source).toContain("isAdmin={!readOnly && viewer.isAdmin}");
-    expect(source).toContain("!readOnly && deadlineManaged");
-    expect(source).toContain("!readOnly && (");
+    expect(readFileSync(resolve(process.cwd(), "components/AdminMatchManagementDialog.tsx"), "utf8")).toContain("isAdmin={!readOnly && viewer.isAdmin}");
+    expect(readFileSync(resolve(process.cwd(), "components/AdminMatchWorkspace.tsx"), "utf8")).toContain("!readOnly && (");
   });
 
   it("keeps factual result and replay presentation available read-only", () => {

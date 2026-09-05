@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SUPPORTED_LOCALES, type Locale } from "@/lib/i18n/config";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { interpolateMessage } from "@/lib/i18n/translate";
+import { resolveTournamentDivisionStates } from "@/lib/tournament-division-state";
 import type {
   GeneratedTournamentMatch,
   TournamentCard,
@@ -143,7 +144,6 @@ function makeTournament(): TournamentCard {
     id: TOURNAMENT_ID,
     slug: "completed-eight-player-bracket",
     title: "Completed Eight Player Bracket",
-    month: "August 2026",
     format: "1v1",
     ruleFormat: "format_a",
     ruleFormatLabel: "Format A",
@@ -154,7 +154,6 @@ function makeTournament(): TournamentCard {
     organizer: "IronClad Tournaments",
     game: "Company of Heroes 3",
     region: "Global",
-    time: "August 2026",
     prizePool: "",
     players: 8,
     maxPlayers: 8,
@@ -174,6 +173,22 @@ function makeTournament(): TournamentCard {
         prize: "Main / Pro division",
       },
     ],
+    divisionStates: resolveTournamentDivisionStates({
+      tournamentId: TOURNAMENT_ID,
+      eventStatus: "completed",
+      divisions: [
+        {
+          canonicalName: "Main",
+          bracketId: BRACKET_ID,
+          approvedCount: 8,
+          requiredCount: 8,
+          isReady: true,
+          launchedAt: "2026-08-25T00:00:00.000Z",
+          generatedBracketId: "33333333-3333-4333-8333-333333333333",
+          isCompetitionComplete: true,
+        },
+      ],
+    }),
     details: "Completed bracket regression fixture.",
     rules: "Format A rules.",
     schedule: [],
@@ -181,7 +196,6 @@ function makeTournament(): TournamentCard {
     registrationEnabled: false,
     registrationOpenAt: "2026-08-01T00:00:00.000Z",
     registrationCloseAt: "2026-08-20T00:00:00.000Z",
-    grandFinalAt: "2026-08-25T00:00:00.000Z",
     createdAt: "2026-08-01T00:00:00.000Z",
     resultConfirmationWindowMinutes: 30,
     rulesUrl: null,

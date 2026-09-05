@@ -5,7 +5,17 @@ import { redirect } from "next/navigation";
 import { retryTournamentStorageCleanup } from "@/app/admin/tournaments/actions";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
+  formatTournamentDivisionState,
+  formatTournamentEventDivisionState,
+  getTournamentEventSection,
+  TOURNAMENT_EVENT_SECTIONS,
+  type TournamentDivisionStateResolution,
+} from "@/lib/tournament-division-state";
+import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
+import {
   getTournamentBracketDisplayName,
+  getTournamentRegistrationStatusLabel,
+  type TournamentBracketName,
   type TournamentStatus,
 } from "@/lib/tournaments";
 
@@ -28,11 +38,13 @@ type AdminTournamentListRow = {
   id: string;
   title: string;
   status: TournamentStatus;
-  grand_final_at: string | null;
+  registration_enabled: boolean;
+  registration_open_at: string | null;
+  registration_close_at: string | null;
   created_at: string;
   tournament_brackets?: Array<{
     id: string;
-    name: string;
+    name: TournamentBracketName;
     max_players: number;
     launched_at: string | null;
   }>;
@@ -65,9 +77,9 @@ export default async function AdminTournamentsPage({
     supabase
       .from("tournaments")
       .select(
-        "id, title, status, grand_final_at, created_at, tournament_brackets(id, name, max_players, launched_at)"
+        "id, title, status, registration_enabled, registration_open_at, registration_close_at, created_at, tournament_brackets(id, name, max_players, launched_at)"
       )
-      .order("grand_final_at", { ascending: false, nullsFirst: false }),
+      .order("created_at", { ascending: false }),
     supabase
       .from("tournament_deletion_jobs")
       .select("id, tournament_title, proof_paths, banner_paths, created_at")
@@ -82,9 +94,16 @@ export default async function AdminTournamentsPage({
     throw new Error("Tournament Administration could not be loaded.");
   }
 
-  const tournaments = [
+  const loadedTournaments = [
     ...((tournamentResult.data ?? []) as AdminTournamentListRow[]),
-  ].sort(compareTournamentRows);
+  ];
+  const divisionStatesByTournament = await loadTournamentDivisionStates(
+    supabase,
+    loadedTournaments
+  );
+  const tournaments = loadedTournaments.sort((left, right) =>
+    compareTournamentRows(left, right, divisionStatesByTournament)
+  );
   const pendingCleanupJobs = pendingCleanupResult.data ?? [];
 
   return (
@@ -165,12 +184,18 @@ export default async function AdminTournamentsPage({
         <div className="mt-8 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {tournaments.map((tournament) => {
             const brackets = tournament.tournament_brackets ?? [];
+            const divisionStates = divisionStatesByTournament.get(tournament.id);
+
+            if (!divisionStates) {
+              throw new Error("Tournament Administration could not be loaded.");
+            }
+
             const capacity = brackets.reduce(
               (total, bracket) => total + bracket.max_players,
               0
             );
-            const launched = brackets.filter(
-              (bracket) => bracket.launched_at !== null
+            const launched = divisionStates.filter(
+              (division) => division.launchedAt !== null
             ).length;
 
             return (
@@ -188,7 +213,12 @@ export default async function AdminTournamentsPage({
                       {tournament.title}
                     </p>
                     <p className="mt-2 text-xs font-black uppercase tracking-wider text-orange-300">
-                      {formatLabel(tournament.status)}
+                      {getTournamentRegistrationStatusLabel({
+                        statusValue: tournament.status,
+                        registrationEnabled: tournament.registration_enabled,
+                        registrationOpenAt: tournament.registration_open_at,
+                        registrationCloseAt: tournament.registration_close_at,
+                      })}
                     </p>
                   </div>
                 </div>
@@ -197,12 +227,10 @@ export default async function AdminTournamentsPage({
                   <ListFact label="Capacity" value={String(capacity)} />
                   <ListFact label="Launched" value={String(launched)} />
                   <ListFact
-                    label="Grand Final"
-                    value={
-                      tournament.grand_final_at
-                        ? formatDate(tournament.grand_final_at)
-                        : "TBA"
-                    }
+                    label="Lifecycle"
+                    value={formatLabel(
+                      getTournamentEventSection(divisionStates)
+                    )}
                   />
                 </dl>
                 {brackets.length > 0 && (
@@ -214,6 +242,19 @@ export default async function AdminTournamentsPage({
                       .join(" · ")}
                   </p>
                 )}
+                <div
+                  aria-label={formatTournamentEventDivisionState(divisionStates)}
+                  className="mt-4 flex flex-wrap gap-2"
+                >
+                  {divisionStates.map((division) => (
+                    <span
+                      key={division.canonicalName}
+                      className="rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-300"
+                    >
+                      {division.displayName}: {formatTournamentDivisionState(division)}
+                    </span>
+                  ))}
+                </div>
               </Link>
             );
           })}
@@ -276,34 +317,36 @@ function ListFact({ label, value }: { label: string; value: string }) {
 
 function compareTournamentRows(
   left: AdminTournamentListRow,
-  right: AdminTournamentListRow
+  right: AdminTournamentListRow,
+  divisionStatesByTournament: ReadonlyMap<
+    string,
+    readonly TournamentDivisionStateResolution[]
+  >
 ) {
-  const leftHistorical = left.status === "completed" ? 1 : 0;
-  const rightHistorical = right.status === "completed" ? 1 : 0;
+  const leftStates = divisionStatesByTournament.get(left.id);
+  const rightStates = divisionStatesByTournament.get(right.id);
 
-  if (leftHistorical !== rightHistorical) {
-    return leftHistorical - rightHistorical;
+  if (!leftStates || !rightStates) {
+    throw new Error("Tournament lifecycle state was unavailable for sorting.");
   }
 
-  return getTournamentSortTime(right) - getTournamentSortTime(left);
+  const leftSection = getTournamentEventSection(leftStates);
+  const rightSection = getTournamentEventSection(rightStates);
+  const sectionDifference =
+    TOURNAMENT_EVENT_SECTIONS.indexOf(leftSection) -
+    TOURNAMENT_EVENT_SECTIONS.indexOf(rightSection);
+
+  if (sectionDifference !== 0) return sectionDifference;
+
+  const createdDifference =
+    getTournamentSortTime(right.created_at) -
+    getTournamentSortTime(left.created_at);
+  return createdDifference || left.id.localeCompare(right.id);
 }
 
-function getTournamentSortTime(tournament: AdminTournamentListRow) {
-  const value = tournament.grand_final_at ?? tournament.created_at;
+function getTournamentSortTime(value: string) {
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isFinite(date.getTime())
-    ? new Intl.DateTimeFormat("en", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      }).format(date)
-    : "TBA";
 }
 
 function formatLabel(value: string) {

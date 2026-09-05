@@ -14,6 +14,7 @@ const dashboardBadgesSectionMock = vi.hoisted(() => vi.fn(() => null));
 const loadPlayerCareerDashboardMock = vi.hoisted(() => vi.fn());
 const loadPlayerNotificationsMock = vi.hoisted(() => vi.fn());
 const loadCommunityPollsForRequestMock = vi.hoisted(() => vi.fn());
+const loadPlayerTournamentDivisionInvitationsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
 vi.mock("@/app/dashboard/badge-reveal-actions", () => ({
@@ -55,6 +56,10 @@ vi.mock("@/lib/player-dashboard", () => ({
 vi.mock("@/lib/player-polls", () => ({
   loadCommunityPollsForRequest: loadCommunityPollsForRequestMock,
 }));
+vi.mock("@/lib/tournament-division-invitations", () => ({
+  loadPlayerTournamentDivisionInvitations:
+    loadPlayerTournamentDivisionInvitationsMock,
+}));
 vi.mock("@/lib/supabase-server", () => ({
   createAuthenticatedSupabaseClient: createAuthenticatedSupabaseClientMock,
 }));
@@ -93,6 +98,10 @@ describe("dashboard Badge section integration", () => {
     loadCommunityPollsForRequestMock.mockResolvedValue({
       polls: [],
       error: null,
+    });
+    loadPlayerTournamentDivisionInvitationsMock.mockResolvedValue({
+      status: "success",
+      invitations: [],
     });
   });
 

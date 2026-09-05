@@ -3,6 +3,7 @@ import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale, type LocaleScope } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
+import { buildReplayDownloadFilename } from "@/lib/replay-download-filename";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -25,14 +26,42 @@ type AuthorizedMatchDescriptor = {
   player_two_registration_id: string | null;
 };
 type ProofRecord = {
+  gameNumber: number | null;
   matchId: string;
+  seriesReplay: boolean;
   tournamentId: string | null;
   storagePath: string;
 };
 type MatchScope = {
+  divisionName: string | null;
   matchId: string;
+  matchNumber: number | null;
   tournamentId: string;
+  tournamentTitle: string | null;
   participantRegistrationIds: string[];
+  playerOneName: string | null;
+  playerTwoName: string | null;
+  roundName: string | null;
+};
+type RelatedRow<T> = T | T[] | null;
+type MatchScopeRow = {
+  id?: unknown;
+  generated_bracket_id?: unknown;
+  match_number?: unknown;
+  player_one_registration_id?: unknown;
+  player_two_registration_id?: unknown;
+  player_one?: RelatedRow<{ player_name?: unknown }>;
+  player_two?: RelatedRow<{ player_name?: unknown }>;
+  bracket_rounds?: RelatedRow<{ name?: unknown }>;
+  generated_brackets?: RelatedRow<{
+    id?: unknown;
+    tournament_brackets?: RelatedRow<{
+      id?: unknown;
+      name?: unknown;
+      tournament_id?: unknown;
+      tournaments?: RelatedRow<{ id?: unknown; title?: unknown }>;
+    }>;
+  }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -187,7 +216,9 @@ export async function GET(
 
     const responseMetadata = getProofResponseMetadata(
       proofRecord.storagePath,
-      kind
+      kind,
+      proofRecord,
+      matchScope
     );
     if (!responseMetadata) {
       return unavailableResponse();
@@ -241,7 +272,7 @@ async function loadProofRecord(
     const { data, error } = await supabase
       .from("match_result_submissions")
       .select(
-        "id, match_id, replay_storage_path, screenshot_storage_path"
+        "id, game_number, match_id, report_group_id, replay_storage_path, screenshot_storage_path"
       )
       .eq("id", recordId)
       .eq("match_id", matchId)
@@ -256,6 +287,9 @@ async function loadProofRecord(
     return typeof storagePath === "string" && storagePath.length > 0
         ? {
           matchId: data.match_id,
+          gameNumber:
+            typeof data.game_number === "number" ? data.game_number : null,
+          seriesReplay: data.report_group_id === null,
           tournamentId: null,
           storagePath,
         }
@@ -277,6 +311,8 @@ async function loadProofRecord(
     data.replay_storage_path.length > 0
       ? {
         matchId: data.match_id,
+        gameNumber: null,
+        seriesReplay: true,
         tournamentId: data.tournament_id,
         storagePath: data.replay_storage_path,
       }
@@ -290,39 +326,59 @@ async function loadMatchScope(
   const { data: match, error: matchError } = await supabase
     .from("tournament_matches")
     .select(
-      "id, generated_bracket_id, player_one_registration_id, player_two_registration_id"
+      "id, generated_bracket_id, match_number, player_one_registration_id, player_two_registration_id, player_one:registrations!tournament_matches_player_one_registration_id_fkey(player_name), player_two:registrations!tournament_matches_player_two_registration_id_fkey(player_name), bracket_rounds!inner(name), generated_brackets!inner(id, tournament_brackets!inner(id, tournament_id, name, tournaments!inner(id, title)))"
     )
     .eq("id", matchId)
     .maybeSingle();
 
   if (matchError || !match) return null;
 
-  const { data: generatedBracket, error: generatedBracketError } =
-    await supabase
-      .from("generated_brackets")
-      .select("id, tournament_bracket_id")
-      .eq("id", match.generated_bracket_id)
-      .maybeSingle();
+  const row = match as unknown as MatchScopeRow;
+  const generatedBracket = first(row.generated_brackets);
+  const tournamentBracket = first(generatedBracket?.tournament_brackets);
+  const tournament = first(tournamentBracket?.tournaments);
+  const tournamentId =
+    typeof tournamentBracket?.tournament_id === "string"
+      ? tournamentBracket.tournament_id
+      : null;
 
-  if (generatedBracketError || !generatedBracket) return null;
-
-  const { data: tournamentBracket, error: tournamentBracketError } =
-    await supabase
-      .from("tournament_brackets")
-      .select("id, tournament_id")
-      .eq("id", generatedBracket.tournament_bracket_id)
-      .maybeSingle();
-
-  if (tournamentBracketError || !tournamentBracket) return null;
+  if (
+    row.id !== matchId ||
+    typeof row.generated_bracket_id !== "string" ||
+    typeof generatedBracket?.id !== "string" ||
+    generatedBracket?.id !== row.generated_bracket_id ||
+    !tournamentBracket ||
+    !tournamentId ||
+    tournament?.id !== tournamentId ||
+    !isNullableUuid(row.player_one_registration_id) ||
+    !isNullableUuid(row.player_two_registration_id)
+  ) {
+    return null;
+  }
 
   return {
-    matchId: match.id,
-    tournamentId: tournamentBracket.tournament_id,
+    divisionName: nullableText(tournamentBracket.name),
+    matchId,
+    matchNumber:
+      typeof row.match_number === "number" ? row.match_number : null,
+    tournamentId,
+    tournamentTitle: nullableText(tournament?.title),
     participantRegistrationIds: [
-      match.player_one_registration_id,
-      match.player_two_registration_id,
-    ].filter((value): value is string => Boolean(value)),
+      row.player_one_registration_id,
+      row.player_two_registration_id,
+    ].filter((value): value is string => typeof value === "string"),
+    playerOneName: nullableText(first(row.player_one)?.player_name),
+    playerTwoName: nullableText(first(row.player_two)?.player_name),
+    roundName: nullableText(first(row.bracket_rounds)?.name),
   };
+}
+
+function first<T>(value: T | T[] | null | undefined): T | null {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+function nullableText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
 function parseAuthorizedMatchDescriptor(
@@ -434,13 +490,29 @@ function isSafeStoragePath(path: string, expectedMatchId: string) {
   );
 }
 
-function getProofResponseMetadata(path: string, kind: ProofKind) {
+function getProofResponseMetadata(
+  path: string,
+  kind: ProofKind,
+  proofRecord: ProofRecord,
+  matchScope: MatchScope
+) {
   const extension = path.split(".").pop()?.toLowerCase();
 
   if (kind === "replay") {
     return extension === "rec"
       ? {
-          contentDisposition: 'attachment; filename="match-replay.rec"',
+          contentDisposition: `attachment; filename="${buildReplayDownloadFilename(
+            {
+              divisionName: matchScope.divisionName,
+              gameNumber: proofRecord.gameNumber,
+              matchNumber: matchScope.matchNumber,
+              playerOneName: matchScope.playerOneName,
+              playerTwoName: matchScope.playerTwoName,
+              roundName: matchScope.roundName,
+              seriesReplay: proofRecord.seriesReplay,
+              tournamentTitle: matchScope.tournamentTitle,
+            }
+          )}"`,
           contentType: "application/octet-stream",
         }
       : null;

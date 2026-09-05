@@ -15,6 +15,7 @@ import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import competitionSpanish from "@/lib/i18n/dictionaries/es/competition";
 import competitionItalian from "@/lib/i18n/dictionaries/it/competition";
 import type { TournamentCard } from "@/lib/tournaments";
+import { createDisabledTournamentDivisionStates } from "@/tests/fixtures/tournament-division-states";
 
 const refreshMock = vi.hoisted(() => vi.fn());
 const pushMock = vi.hoisted(() => vi.fn());
@@ -139,7 +140,6 @@ const tournament: TournamentCard = {
   id: TOURNAMENT_ID,
   slug: "registration-gate-fixture",
   title: "Registration Gate Fixture",
-  month: "August 2026",
   format: "1v1",
   ruleFormat: "format_a",
   ruleFormatLabel: "Format A",
@@ -150,7 +150,6 @@ const tournament: TournamentCard = {
   organizer: "IronClad Tournaments",
   game: "Company of Heroes 3",
   region: "Global",
-  time: "August 2026",
   prizePool: "",
   players: 0,
   maxPlayers: 8,
@@ -170,6 +169,10 @@ const tournament: TournamentCard = {
       prize: "Challenge division",
     },
   ],
+  divisionStates: createDisabledTournamentDivisionStates(
+    TOURNAMENT_ID,
+    "registration_open"
+  ),
   details: "Registration gate fixture.",
   rules: "Format A rules.",
   schedule: [],
@@ -177,7 +180,6 @@ const tournament: TournamentCard = {
   registrationEnabled: true,
   registrationOpenAt: "2026-01-01T00:00:00.000Z",
   registrationCloseAt: "2026-12-31T23:59:59.000Z",
-  grandFinalAt: "2026-12-31T23:59:59.000Z",
   createdAt: "2026-08-01T00:00:00.000Z",
   resultConfirmationWindowMinutes: 30,
   rulesUrl: null,

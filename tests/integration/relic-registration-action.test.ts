@@ -456,6 +456,76 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(client.rpc).not.toHaveBeenCalled();
   });
 
+  it("treats absent optional registration timestamps as an open window", async () => {
+    const client = createRegistrationClient({
+      tournament: createTournament("Challenge", {
+        registration_open_at: null,
+        registration_close_at: null,
+      }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+    const result = await submitTournamentRegistration(registrationInput());
+
+    expect(result).toMatchObject({
+      success: true,
+      code: "REGISTRATION_SUBMITTED",
+    });
+    expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
+    expect(client.rpc).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    {
+      name: "an explicit future opening",
+      overrides: { registration_open_at: "2026-08-04T02:00:00.001Z" },
+    },
+    {
+      name: "an upcoming Event",
+      overrides: {
+        status: "upcoming",
+        registration_open_at: null,
+        registration_close_at: null,
+      },
+    },
+    {
+      name: "a terminal Event",
+      overrides: {
+        status: "voided",
+        registration_open_at: null,
+        registration_close_at: null,
+      },
+    },
+    {
+      name: "a launched Division",
+      overrides: {
+        registration_open_at: null,
+        registration_close_at: null,
+        tournament_brackets: [
+          {
+            id: BRACKET_ID,
+            name: "Challenge",
+            launched_at: "2026-08-04T01:00:00.000Z",
+          },
+        ],
+      },
+    },
+  ])("rejects $name before calling Relic", async ({ overrides }) => {
+    const client = createRegistrationClient({
+      tournament: createTournament("Challenge", overrides),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+    const result = await submitTournamentRegistration(registrationInput());
+
+    expect(result).toMatchObject({
+      success: false,
+      code: "REGISTRATION_UNAVAILABLE",
+    });
+    expect(getRelic1v1EloMock).not.toHaveBeenCalled();
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
   it("accepts waitlist intake at the exact inclusive closing instant", async () => {
     const client = createRegistrationClient({
       tournament: createTournament("Challenge", {

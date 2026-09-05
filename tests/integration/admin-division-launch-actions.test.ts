@@ -20,6 +20,8 @@ vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
 import {
+  closeTournamentDivisionWithoutLaunch,
+  createTournamentDivisionInvitationAction,
   generateTournamentBracket,
   launchTournamentDivision,
 } from "@/app/admin/tournaments/actions";
@@ -60,6 +62,29 @@ function generationFormData() {
   );
   formData.set("bracketId", bracketId);
   formData.set("workspaceSection", "bracket");
+  return formData;
+}
+
+function notHeldFormData({
+  confirmation = "NOT HELD",
+  detail = "  Below minimum roster at the operational cutoff.  ",
+} = {}) {
+  const formData = new FormData();
+  formData.set("tournamentBracketId", bracketId);
+  formData.set("workspaceTournamentId", tournamentId);
+  formData.set("confirmation", confirmation);
+  formData.set("detail", detail);
+  return formData;
+}
+
+function invitationFormData({
+  sourceRegistrationId = "44444444-4444-4444-8444-444444444444",
+  targetTournamentBracketId = "55555555-5555-4555-8555-555555555555",
+} = {}) {
+  const formData = new FormData();
+  formData.set("sourceRegistrationId", sourceRegistrationId);
+  formData.set("targetTournamentBracketId", targetTournamentBracketId);
+  formData.set("workspaceTournamentId", tournamentId);
   return formData;
 }
 
@@ -185,6 +210,173 @@ describe("private bracket generation action", () => {
   });
 });
 
+describe("administrator Not Held Division action", () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    createSupabaseAdminClientMock.mockReset();
+    redirectMock.mockClear();
+    revalidatePathMock.mockReset();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("rejects a non-administrator before privileged access", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+
+    await expect(
+      closeTournamentDivisionWithoutLaunch(notHeldFormData())
+    ).rejects.toThrow("Unauthorized");
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("requires the exact deliberate confirmation before privileged access", async () => {
+    authMock.mockResolvedValue(adminIdentity);
+
+    await expect(
+      closeTournamentDivisionWithoutLaunch(
+        notHeldFormData({ confirmation: "not held" })
+      )
+    ).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&bracketNotice=division-not-held-invalid`
+    );
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("delegates to the single fixed-reason database authority", async () => {
+    const notHeldAt = "2026-09-03T00:00:00.000Z";
+    const rpc = vi.fn(async () => ({
+      data: {
+        tournamentId,
+        tournamentBracketId: bracketId,
+        notHeldAt,
+        reasonCode: "minimum_roster_not_reached",
+        activeRegistrationCount: 3,
+        waitlistRegistrationCount: 2,
+        alreadyNotHeld: false,
+      },
+      error: null,
+    }));
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ rpc });
+
+    await expect(
+      closeTournamentDivisionWithoutLaunch(notHeldFormData())
+    ).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&bracketNotice=division-not-held`
+    );
+    expect(rpc).toHaveBeenCalledExactlyOnceWith(
+      "close_tournament_division_without_launch",
+      {
+        p_tournament_bracket_id: bracketId,
+        p_reason_code: "minimum_roster_not_reached",
+        p_detail: "Below minimum roster at the operational cutoff.",
+        p_actor_clerk_user_id: adminIdentity.userId,
+      }
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith(
+      `/admin/tournaments/${tournamentId}`,
+      "page"
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
+  });
+
+  it("does not claim success for malformed authority output", async () => {
+    const rpc = vi.fn(async () => ({
+      data: {
+        tournamentId,
+        tournamentBracketId: bracketId,
+        notHeldAt: "not-a-time",
+        reasonCode: "minimum_roster_not_reached",
+        activeRegistrationCount: 3,
+        waitlistRegistrationCount: 0,
+        alreadyNotHeld: false,
+      },
+      error: null,
+    }));
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ rpc });
+
+    await expect(
+      closeTournamentDivisionWithoutLaunch(notHeldFormData())
+    ).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&bracketNotice=division-not-held-failed`
+    );
+    expect(console.error).toHaveBeenCalledWith(
+      "Tournament Division Not Held closure failed.",
+      { code: "NOT_HELD_FAILED" }
+    );
+  });
+});
+
+describe("administrator optional Division invitation action", () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    createSupabaseAdminClientMock.mockReset();
+    redirectMock.mockClear();
+    revalidatePathMock.mockReset();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("rejects a non-administrator before privileged access", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+
+    await expect(
+      createTournamentDivisionInvitationAction(invitationFormData())
+    ).rejects.toThrow("Unauthorized");
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("delegates one explicit source and target to the invitation authority", async () => {
+    const sourceRegistrationId = "44444444-4444-4444-8444-444444444444";
+    const targetTournamentBracketId = "55555555-5555-4555-8555-555555555555";
+    const rpc = vi.fn(async () => ({
+      data: {
+        invitationId: "66666666-6666-4666-8666-666666666666",
+        sourceRegistrationId,
+        sourceTournamentBracketId: bracketId,
+        targetTournamentId: "77777777-7777-4777-8777-777777777777",
+        targetTournamentBracketId,
+        status: "pending",
+        createdAt: "2026-09-03T08:00:00.000Z",
+        alreadyPending: false,
+      },
+      error: null,
+    }));
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ rpc });
+
+    await expect(
+      createTournamentDivisionInvitationAction(invitationFormData())
+    ).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&bracketNotice=division-invitation-sent`
+    );
+    expect(rpc).toHaveBeenCalledExactlyOnceWith(
+      "create_tournament_division_invitation",
+      {
+        p_source_registration_id: sourceRegistrationId,
+        p_target_tournament_bracket_id: targetTournamentBracketId,
+        p_actor_clerk_user_id: adminIdentity.userId,
+      }
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("does not claim success for malformed authority output", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { status: "pending", alreadyPending: false },
+      error: null,
+    }));
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ rpc });
+
+    await expect(
+      createTournamentDivisionInvitationAction(invitationFormData())
+    ).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=bracket&bracketNotice=division-invitation-failed`
+    );
+  });
+});
+
 describe("generic tournament editor lifecycle boundary", () => {
   it("does not expose ordinary start or reopen status choices", () => {
     expect(editorSource).not.toContain('["in_progress", "In Progress"]');
@@ -200,7 +392,7 @@ describe("generic tournament editor lifecycle boundary", () => {
 
   it("validates lifecycle transitions against authoritative stored state", () => {
     expect(actionsSource).toContain(
-      '.select("slug, banner_image_url, status, registration_enabled")'
+      '"slug, banner_image_url, status, registration_enabled, grand_final_at"'
     );
     expect(actionsSource).toContain(
       "Tournament lifecycle status is managed by Launch Division and match completion"

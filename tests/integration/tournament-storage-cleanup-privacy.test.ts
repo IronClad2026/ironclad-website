@@ -252,6 +252,7 @@ describe("tournament storage cleanup privacy", () => {
         banner_image_url: previousUrl,
         status: "upcoming",
         registration_enabled: false,
+        grand_final_at: "2026-08-31T00:00:00.000Z",
       },
       error: null,
     });
@@ -265,7 +266,7 @@ describe("tournament storage cleanup privacy", () => {
         banner_image_url: bannerUrl,
         registration_open_at: null,
         registration_close_at: "2026-08-10T00:00:00.000Z",
-        grand_final_at: null,
+        grand_final_at: "2026-08-31T00:00:00.000Z",
         status: "upcoming",
         format: "1v1",
         rule_format: "format_a",
@@ -282,7 +283,7 @@ describe("tournament storage cleanup privacy", () => {
       select: vi.fn((columns: string) => {
         if (
           columns ===
-          "slug, banner_image_url, status, registration_enabled"
+          "slug, banner_image_url, status, registration_enabled, grand_final_at"
         ) return existingQuery;
         if (columns === "id") {
           referenceQueries += 1;
@@ -351,6 +352,7 @@ describe("tournament storage cleanup privacy", () => {
       "save_tournament",
       expect.objectContaining({
         p_registration_close_at: "2026-08-10T00:00:00.000Z",
+        p_grand_final_at: "2026-08-31T00:00:00.000Z",
       })
     );
     expect(storageBucket.remove).toHaveBeenCalledWith([previousPath]);
@@ -364,6 +366,7 @@ describe("tournament storage cleanup privacy", () => {
         banner_image_url: bannerUrl,
         status: "upcoming",
         registration_enabled: false,
+        grand_final_at: null,
       },
       error: null,
     });
@@ -393,7 +396,7 @@ describe("tournament storage cleanup privacy", () => {
       select: vi.fn((columns: string) => {
         if (
           columns ===
-          "slug, banner_image_url, status, registration_enabled"
+          "slug, banner_image_url, status, registration_enabled, grand_final_at"
         ) return existingQuery;
         if (columns === "id") return unreferencedQuery;
         return savedQuery;
@@ -440,7 +443,10 @@ describe("tournament storage cleanup privacy", () => {
     );
     expect(client.rpc).toHaveBeenCalledWith(
       "save_tournament",
-      expect.objectContaining({ p_registration_close_at: null })
+      expect.objectContaining({
+        p_registration_close_at: null,
+        p_grand_final_at: null,
+      })
     );
   });
 
@@ -458,13 +464,14 @@ describe("tournament storage cleanup privacy", () => {
         banner_image_url: previousUrl,
         status: "upcoming",
         registration_enabled: false,
+        grand_final_at: null,
       },
       error: null,
     });
     const unreferencedQuery = createQuery({ data: [], error: null });
     const tournamentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url, status, registration_enabled"
+        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at"
           ? existingQuery
           : unreferencedQuery
       ),
@@ -521,13 +528,14 @@ describe("tournament storage cleanup privacy", () => {
         banner_image_url: bannerUrl,
         status: "upcoming",
         registration_enabled: false,
+        grand_final_at: null,
       },
       error: null,
     });
     const unreferencedQuery = createQuery({ data: [], error: null });
     const currentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url, status, registration_enabled"
+        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at"
           ? currentQuery
           : unreferencedQuery
       ),
@@ -572,6 +580,7 @@ describe("tournament storage cleanup privacy", () => {
         banner_image_url: previousUrl,
         status: "upcoming",
         registration_enabled: false,
+        grand_final_at: null,
       },
       error: null,
     });
@@ -584,7 +593,7 @@ describe("tournament storage cleanup privacy", () => {
       select: vi.fn((columns: string) => {
         if (
           columns ===
-          "slug, banner_image_url, status, registration_enabled"
+          "slug, banner_image_url, status, registration_enabled, grand_final_at"
         ) return existingQuery;
         referenceQueryCount += 1;
         return referenceQueryCount === 1
@@ -631,13 +640,14 @@ describe("tournament storage cleanup privacy", () => {
         banner_image_url: previousUrl,
         status: "upcoming",
         registration_enabled: false,
+        grand_final_at: null,
       },
       error: null,
     });
     const unreferencedQuery = createQuery({ data: [], error: null });
     const tournamentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url, status, registration_enabled"
+        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at"
           ? existingQuery
           : unreferencedQuery
       ),

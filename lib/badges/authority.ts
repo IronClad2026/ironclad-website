@@ -1690,7 +1690,26 @@ export async function evaluateAllBadgeAwardsForPlayer({
   ]);
 
   if (evaluationMode === "reconciliation") {
-    await reconcileBadgeUnlockedNotificationsForPlayer(playerId);
+    try {
+      const notificationResult =
+        await reconcileBadgeUnlockedNotificationsForPlayer(playerId);
+
+      if (!notificationResult.succeeded) {
+        throw new BadgeAuthorityError(
+          notificationResult.errorCode,
+          "Badge notification reconciliation is incomplete."
+        );
+      }
+    } catch (error) {
+      if (error instanceof BadgeAuthorityError) {
+        throw error;
+      }
+
+      throw new BadgeAuthorityError(
+        "BADGE_NOTIFICATION_RECONCILIATION_FAILED",
+        "Badge notification reconciliation failed unexpectedly."
+      );
+    }
   }
 
   return result;
@@ -2411,10 +2430,31 @@ async function isOpenBadgePlayer(
     );
   }
 
-  const player = firstRecord(data);
-  return (
-    stringOrNull(player?.id) === playerId && player?.account_closed_at === null
-  );
+  if (data === null) {
+    return false;
+  }
+
+  if (!isRecord(data) || Array.isArray(data)) {
+    throw new BadgeAuthorityError(
+      "PLAYER_STATUS_RESULT_INVALID",
+      "Badge evaluation received an invalid player account status."
+    );
+  }
+
+  const resolvedPlayerId = stringOrNull(data.id);
+  const accountClosedAt = data.account_closed_at;
+
+  if (
+    resolvedPlayerId !== playerId ||
+    (accountClosedAt !== null && isoOrNull(accountClosedAt) === null)
+  ) {
+    throw new BadgeAuthorityError(
+      "PLAYER_STATUS_RESULT_INVALID",
+      "Badge evaluation received an invalid player account status."
+    );
+  }
+
+  return accountClosedAt === null;
 }
 
 function isFinalizedReportGroupStatus(status: string | null) {

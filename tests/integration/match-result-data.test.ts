@@ -100,6 +100,7 @@ const replayProofRows = [
     report_group_id: REPORT_GROUP_ID,
     match_id: MATCH_ID,
     game_number: 2,
+    claimed_winner_registration_id: WINNER_REGISTRATION_ID,
     replay_storage_path:
       `${MATCH_ID}/${SECRET_SUBMITTER_ID}/legacy/game-two.rec`,
   },
@@ -108,6 +109,7 @@ const replayProofRows = [
     report_group_id: REPORT_GROUP_ID,
     match_id: MATCH_ID,
     game_number: 1,
+    claimed_winner_registration_id: WINNER_REGISTRATION_ID,
     replay_storage_path: SECRET_REPLAY_PATH,
   },
 ];
@@ -163,6 +165,7 @@ const replayProofShape = {
     id: "value",
     gameNumber: "value",
     proofAvailable: "value",
+    winnerRegistrationId: "value",
     replayAccessHref: "value",
   },
 } satisfies ExactShape;
@@ -512,6 +515,64 @@ describe("match-result server data boundary", () => {
       SECRET_SUBMITTER_ID,
     ]);
     expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("scopes Admin archive result reads to the selected Tournament match IDs", async () => {
+    const supabase = createQueuedClient({
+      match_result_report_groups: [
+        { data: [reportGroupRow], error: null },
+        {
+          data: [
+            {
+              id: REPORT_GROUP_ID,
+              submitted_by_clerk_user_id: SECRET_SUBMITTER_ID,
+              reviewed_by: SECRET_REVIEWER_ID,
+              no_show_resolved_by: SECRET_RESOLVER_ID,
+            },
+          ],
+          error: null,
+        },
+      ],
+      match_result_submissions: [
+        { data: [submissionRow], error: null },
+        { data: replayProofRows, error: null },
+        {
+          data: [
+            {
+              id: SUBMISSION_ID,
+              submitted_by_clerk_user_id: SECRET_SUBMITTER_ID,
+              reviewed_by: SECRET_REVIEWER_ID,
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    const result = await loadMatchResultData({
+      adminMatchIds: [MATCH_ID, MATCH_ID, ""],
+    });
+
+    expect(result.viewerRole).toBe("admin");
+    expect(result.error).toBeNull();
+    expect(result.submissions).toHaveLength(1);
+    expect(result.reportGroups).toHaveLength(1);
+    expect(supabase.calls.filter((call) => call.method === "in")).toEqual(
+      expect.arrayContaining([
+        {
+          table: "match_result_report_groups",
+          method: "in",
+          args: ["match_id", [MATCH_ID]],
+        },
+        {
+          table: "match_result_submissions",
+          method: "in",
+          args: ["match_id", [MATCH_ID]],
+        },
+      ])
+    );
   });
 });
 

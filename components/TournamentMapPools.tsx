@@ -29,7 +29,7 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
   return (
     <section
       aria-label={t("mapPools.ariaLabel")}
-      className="overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.9))] p-5 shadow-2xl shadow-black/30 backdrop-blur sm:p-6"
+      className="border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.9))] p-5 shadow-2xl shadow-black/30 backdrop-blur sm:p-6"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -64,14 +64,14 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
           </div>
         </div>
       ) : (
-        <div className="mt-6 grid items-start gap-5 lg:grid-cols-3">
+        <div className="mt-6 grid items-start gap-5">
           {pools.map((pool) => (
             <article
               key={pool.bracketId}
-              className="rounded-3xl border border-white/12 bg-black/35 shadow-xl shadow-black/20"
+              className="min-w-0 rounded-3xl border border-white/12 bg-black/35 shadow-xl shadow-black/20"
             >
               <header className="rounded-t-3xl border-b border-white/10 bg-[linear-gradient(135deg,rgba(249,115,22,0.13),rgba(255,255,255,0.025))] p-4 sm:p-5">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-300">
                       {t("mapPools.divisionPool")}
@@ -80,7 +80,7 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                       {pool.divisionName}
                     </h3>
                   </div>
-                  <span className="flex shrink-0 items-center gap-2">
+                  <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-200">
                       {pool.launchedAt ? (
                         <LockKeyhole size={12} aria-hidden="true" />
@@ -114,11 +114,11 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                 </p>
               </header>
 
-              <ul className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-1 2xl:grid-cols-2">
+              <ul className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 2xl:grid-cols-3">
                 {pool.maps.map((map) => (
                   <li
                     key={map.id}
-                    className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/80"
+                    className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/80"
                   >
                     <div className="relative grid aspect-[16/7] place-items-center overflow-hidden border-b border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.16),transparent_42%),linear-gradient(145deg,#18181b,#09090b)]">
                       {map.thumbnailPath ? (
@@ -128,7 +128,7 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                             name: map.displayName,
                           })}
                           fill
-                          sizes="(min-width: 1536px) 14rem, (min-width: 1024px) 22rem, (min-width: 640px) 45vw, 90vw"
+                          sizes="(min-width: 1536px) 18rem, (min-width: 640px) 24rem, 90vw"
                           className="object-cover"
                         />
                       ) : (
@@ -158,18 +158,22 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                         <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-zinc-300">
                           {map.gameMode}
                         </span>
-                        {map.status !== "active" ? (
-                          <span className="rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-200">
-                            {statusLabels[map.status]}
-                          </span>
-                        ) : null}
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                            map.status === "active"
+                              ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"
+                              : "border-amber-400/25 bg-amber-500/10 text-amber-200"
+                          }`}
+                        >
+                          {statusLabels[map.status]}
+                        </span>
                       </div>
 
-                      <p className="mt-2 break-words text-sm font-black text-white">
+                      <p className="mt-2 break-words [overflow-wrap:anywhere] text-sm font-black text-white">
                         {map.displayName}
                       </p>
                       {map.creatorName ? (
-                        <p className="mt-1 break-words text-xs text-zinc-500">
+                        <p className="mt-1 break-words [overflow-wrap:anywhere] text-xs text-zinc-500">
                           {t("mapPools.createdBy", {
                             name: map.creatorName,
                           })}

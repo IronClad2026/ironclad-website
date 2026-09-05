@@ -64,7 +64,7 @@ describe("published tournament map-pool projection", () => {
     expect(projected).toEqual([
       {
         bracketId: "bracket-academy",
-        divisionName: "Academy",
+        divisionName: "Academy Bracket",
         publishedAt: "2026-08-15T00:00:00.000Z",
         launchedAt: null,
         maps: [
@@ -86,7 +86,7 @@ describe("published tournament map-pool projection", () => {
     expect(JSON.stringify(projected)).not.toContain("map-removed");
   });
 
-  it("orders published pools Academy, Challenge, then Main / Pro", () => {
+  it("orders raw division identities before converting them to public labels", () => {
     const projected = projectPublishedTournamentMapPools(
       ["Main", "Academy", "Challenge"].map((name) => ({
         id: `bracket-${name.toLowerCase()}`,
@@ -98,9 +98,60 @@ describe("published tournament map-pool projection", () => {
     );
 
     expect(projected.map((pool) => pool.divisionName)).toEqual([
-      "Academy",
-      "Challenge",
-      "Main",
+      "Academy Bracket",
+      "Challenge Bracket",
+      "Main / Pro Bracket",
+    ]);
+  });
+
+  it("orders maps by normalized display name with an ID tie-break", () => {
+    const map = (id: string, displayName: string) => ({
+      id,
+      slug: id,
+      displayName,
+      sourceType: "official" as const,
+      creatorName: null,
+      gameMode: "1v1" as const,
+      status: "active" as const,
+      thumbnailPath: null,
+      sourceReference: null,
+      adminNote: null,
+      createdAt: "2026-08-15T00:00:00.000Z",
+      updatedAt: "2026-08-15T00:00:00.000Z",
+      createdByClerkUserId: null,
+      updatedByClerkUserId: null,
+    });
+
+    const projected = projectPublishedTournamentMapPools([
+      {
+        id: "bracket-main",
+        name: "Main",
+        mapPoolPublishedAt: "2026-08-15T00:00:00.000Z",
+        launchedAt: "2026-08-16T00:00:00.000Z",
+        entries: [
+          {
+            addedAt: "2026-08-15T00:00:00.000Z",
+            removedAt: null,
+            map: map("map-zulu", "Zulu Crossing"),
+          },
+          {
+            addedAt: "2026-08-15T00:00:00.000Z",
+            removedAt: null,
+            map: map("map-alpha-b", "  Alpha   Front  "),
+          },
+          {
+            addedAt: "2026-08-15T00:00:00.000Z",
+            removedAt: null,
+            map: map("map-alpha-a", "alpha front"),
+          },
+        ],
+      },
+    ]);
+
+    expect(projected[0]?.maps.map((entry) => entry.id)).toEqual([
+      "map-alpha-a",
+      "map-alpha-b",
+      "map-zulu",
     ]);
   });
 });
