@@ -16,17 +16,20 @@ const snapshot: TournamentParticipantRegistrationSnapshot = {
   bracketId: "22222222-2222-4222-8222-222222222222",
   bracketName: "Main / Pro Bracket",
 };
+const publicPlayerId = "33333333-3333-4333-8333-333333333333";
 
 describe("public tournament participant projection", () => {
   it("uses immutable registration facts for an opted-in competitor", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
+        playerId: publicPlayerId,
         publicProfileEnabled: true,
         accountClosedAt: null,
       })
     ).toEqual({
       registrationId: snapshot.registrationId,
       name: "HistoricalIGN",
+      profileHref: `/players/${publicPlayerId}`,
       country: "AU",
       elo: 1452,
       status: "approved",
@@ -38,7 +41,11 @@ describe("public tournament participant projection", () => {
   it("prefers the verified registration ELO snapshot when present", () => {
     const participant = mapPublicTournamentParticipant(
       { ...snapshot, submittedElo: 1300, verifiedElo: 1452 },
-      { publicProfileEnabled: true, accountClosedAt: null }
+      {
+        playerId: publicPlayerId,
+        publicProfileEnabled: true,
+        accountClosedAt: null,
+      }
     );
 
     expect(participant.elo).toBe(1452);
@@ -47,12 +54,14 @@ describe("public tournament participant projection", () => {
   it("keeps factual competition identity but masks an opted-out competitor", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
+        playerId: publicPlayerId,
         publicProfileEnabled: false,
         accountClosedAt: null,
       })
     ).toEqual(
       expect.objectContaining({
         name: "HistoricalIGN",
+        profileHref: null,
         country: null,
         elo: null,
       })
@@ -62,6 +71,7 @@ describe("public tournament participant projection", () => {
   it("pseudonymizes a closed historical competitor", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
+        playerId: publicPlayerId,
         publicProfileEnabled: false,
         accountClosedAt: "2026-08-14T00:00:00.000Z",
       })
@@ -69,6 +79,7 @@ describe("public tournament participant projection", () => {
       expect.objectContaining({
         registrationId: snapshot.registrationId,
         name: "Former Competitor",
+        profileHref: null,
         country: null,
         elo: null,
       })
@@ -79,6 +90,7 @@ describe("public tournament participant projection", () => {
     expect(mapPublicTournamentParticipant(snapshot, null)).toEqual(
       expect.objectContaining({
         name: "HistoricalIGN",
+        profileHref: null,
         country: null,
         elo: null,
       })
@@ -87,6 +99,7 @@ describe("public tournament participant projection", () => {
 
   it("renders and searches masked fields without fake values", () => {
     const participant = mapPublicTournamentParticipant(snapshot, {
+      playerId: publicPlayerId,
       publicProfileEnabled: false,
       accountClosedAt: null,
     });

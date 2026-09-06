@@ -1141,12 +1141,11 @@ function Overview({
     <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
       <div className="space-y-6">
         <Card>
-          <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center border border-orange-400/25 bg-orange-500/10 text-orange-300"><Info size={20} /></div>
-            <div>
-              <h2 className="text-xl font-black text-white">{t("tournaments.overview.title")}</h2>
-              <p className="mt-2 leading-7 text-zinc-300">{tournament.details}</p>
-            </div>
+          <h2 className="text-sm font-black uppercase tracking-wider text-white">{t("tournaments.overview.published")}</h2>
+          <div className="mt-4 space-y-4">
+            {tournaments.map((item) => (
+              <TournamentLinkCard key={item.id} item={item} />
+            ))}
           </div>
         </Card>
 
@@ -1173,14 +1172,6 @@ function Overview({
       </div>
 
       <div className="space-y-6">
-        <Card>
-          <h3 className="text-sm font-black uppercase tracking-wider text-white">{t("tournaments.overview.published")}</h3>
-          <div className="mt-4 space-y-3">
-            {tournaments.map((item) => (
-              <TournamentLinkCard key={item.id} item={item} />
-            ))}
-          </div>
-        </Card>
         <Card>
           <h3 className="text-sm font-black uppercase tracking-wider text-white">{t("tournaments.overview.archive")}</h3>
           <p className="mt-2 text-xs leading-5 text-zinc-400">
@@ -1212,19 +1203,30 @@ function TournamentLinkCard({ item }: { item: TournamentCard }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
 
   return (
-    <div className={classNames("block p-3", tournamentCardClass)}>
-      <div className="flex items-center gap-3">
-        <div className="h-12 w-16 shrink-0 bg-cover bg-center" style={{ backgroundImage: `url(${item.image})` }} />
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-white">{item.title}</p>
-          <p className="text-xs text-zinc-500">
+    <article
+      data-published-tournament-card
+      className={classNames("min-w-0 overflow-hidden", tournamentCardClass)}
+    >
+      <div className="grid min-w-0 md:grid-cols-[minmax(220px,0.44fr)_minmax(0,1fr)]">
+        <div
+          aria-hidden="true"
+          data-tournament-banner
+          className="min-h-40 bg-cover bg-center md:min-h-48"
+          style={{ backgroundImage: `url(${item.image})` }}
+        />
+        <div className="min-w-0 p-4 sm:p-5">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">
             {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {localizeTournamentStatus(getPublicTournamentStatus(item), t)}
+          </p>
+          <h3 className="mt-2 break-words text-xl font-black text-white">
+            {item.title}
+          </h3>
+          <p className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-zinc-300">
+            {item.description}
           </p>
         </div>
       </div>
-      <TournamentDivisionStateSummary tournament={item} className="mt-3" />
-      <p className="mt-3 text-xs leading-5 text-zinc-400">{item.description}</p>
-    </div>
+    </article>
   );
 }
 
@@ -1373,12 +1375,36 @@ function ParticipantSection({
             <tr><th className="px-4 py-3">#</th><th className="px-4 py-3">{t("tournaments.participants.player")}</th><th className="px-4 py-3">{t("tournaments.participants.country")}</th><th className="px-4 py-3">ELO</th><th className="px-4 py-3">{t("tournaments.participants.status")}</th></tr>
           </thead>
           <tbody className="divide-y divide-white/10 bg-black/30">
-            {participants.map((participant, index) => <tr key={participant.registrationId} className="transition hover:bg-orange-500/12"><td className="px-4 py-3 font-mono text-zinc-400">#{formatNumber(index + 1, locale)}</td><td className="px-4 py-3 font-bold text-white">{participant.name}</td><td className="px-4 py-3 text-zinc-300">{formatParticipantFact(participant.country, locale)}</td><td className="px-4 py-3 text-zinc-300">{formatParticipantFact(participant.elo, locale)}</td><td className="px-4 py-3"><StatusPill tone="green">{t("tournaments.participants.approved")}</StatusPill></td></tr>)}
+            {participants.map((participant, index) => <tr key={participant.registrationId} className="transition hover:bg-orange-500/12"><td className="px-4 py-3 font-mono text-zinc-400">#{formatNumber(index + 1, locale)}</td><td className="px-4 py-3"><ParticipantIdentity participant={participant} className="font-bold text-white" /></td><td className="px-4 py-3 text-zinc-300">{formatParticipantFact(participant.country, locale)}</td><td className="px-4 py-3 text-zinc-300">{formatParticipantFact(participant.elo, locale)}</td><td className="px-4 py-3"><StatusPill tone="green">{t("tournaments.participants.approved")}</StatusPill></td></tr>)}
             {participants.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-zinc-500">{t("tournaments.participants.empty")}</td></tr>}
           </tbody>
         </table>
       </div>
     </Card>
+  );
+}
+
+function ParticipantIdentity({
+  participant,
+  className,
+}: {
+  participant: TournamentParticipant;
+  className: string;
+}) {
+  if (!participant.profileHref) {
+    return <span className={className}>{participant.name}</span>;
+  }
+
+  return (
+    <Link
+      href={participant.profileHref}
+      className={classNames(
+        className,
+        "rounded-sm underline decoration-orange-400/45 underline-offset-4 transition hover:text-orange-200 hover:decoration-orange-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
+      )}
+    >
+      {participant.name}
+    </Link>
   );
 }
 
@@ -5089,18 +5115,13 @@ function MobileOverview({
   return (
     <div className="space-y-5">
       <MobileCard>
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center border border-orange-400/25 bg-orange-500/10 text-orange-300">
-            <Info size={20} />
-          </div>
-          <div className="min-w-0">
-            <h2 className="break-words text-xl font-black text-white">
-              {t("tournaments.overview.title")}
-            </h2>
-            <p className="mt-2 break-words leading-7 text-zinc-300">
-              {tournament.details}
-            </p>
-          </div>
+        <h2 className="text-sm font-black uppercase tracking-wider text-white">
+          {t("tournaments.overview.published")}
+        </h2>
+        <div className="mt-4 space-y-3">
+          {tournaments.map((item) => (
+            <MobileTournamentLinkCard key={item.id} item={item} />
+          ))}
         </div>
       </MobileCard>
 
@@ -5147,17 +5168,6 @@ function MobileOverview({
 
       <MobileCard>
         <h3 className="text-sm font-black uppercase tracking-wider text-white">
-          {t("tournaments.overview.published")}
-        </h3>
-        <div className="mt-4 space-y-3">
-          {tournaments.map((item) => (
-            <MobileTournamentLinkCard key={item.id} item={item} />
-          ))}
-        </div>
-      </MobileCard>
-
-      <MobileCard>
-        <h3 className="text-sm font-black uppercase tracking-wider text-white">
           {t("tournaments.overview.archive")}
         </h3>
         <p className="mt-2 break-words text-xs leading-5 text-zinc-400">
@@ -5199,24 +5209,26 @@ function MobileTournamentLinkCard({ item }: { item: TournamentCard }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
 
   return (
-    <div className={classNames("w-full max-w-full min-w-0 p-3", tournamentInsetCardClass)}>
-      <div className="flex min-w-0 items-center gap-3">
-        <div
-          className="h-12 w-16 shrink-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${item.image})` }}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="break-words font-bold text-white">{item.title}</p>
-          <p className="break-words text-xs text-zinc-500">
-            {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {localizeTournamentStatus(getPublicTournamentStatus(item), t)}
-          </p>
-        </div>
+    <article
+      data-published-tournament-card
+      className={classNames("w-full max-w-full min-w-0 overflow-hidden", tournamentInsetCardClass)}
+    >
+      <div
+        aria-hidden="true"
+        data-tournament-banner
+        className="aspect-[16/7] w-full bg-cover bg-center"
+        style={{ backgroundImage: `url(${item.image})` }}
+      />
+      <div className="min-w-0 p-3">
+        <p className="break-words text-[10px] font-black uppercase tracking-wide text-orange-300">
+          {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {localizeTournamentStatus(getPublicTournamentStatus(item), t)}
+        </p>
+        <h3 className="mt-1.5 break-words font-black text-white">{item.title}</h3>
+        <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 text-zinc-400">
+          {item.description}
+        </p>
       </div>
-      <TournamentDivisionStateSummary tournament={item} className="mt-3" />
-      <p className="mt-3 break-words text-xs leading-5 text-zinc-400">
-        {item.description}
-      </p>
-    </div>
+    </article>
   );
 }
 
@@ -5433,8 +5445,11 @@ function MobileParticipantSection({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-mono text-xs text-zinc-500">#{index + 1}</p>
-                <h4 className="mt-1 break-words text-base font-black text-white">
-                  {participant.name}
+                <h4 className="mt-1 break-words text-base">
+                  <ParticipantIdentity
+                    participant={participant}
+                    className="font-black text-white"
+                  />
                 </h4>
               </div>
               <StatusPill tone="green">{t("tournaments.participants.approved")}</StatusPill>
