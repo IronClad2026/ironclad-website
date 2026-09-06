@@ -128,6 +128,7 @@ describe("dashboard notification reachability", () => {
 
     expect(dashboardNotifications).toHaveLength(1);
     expect(dashboardNotifications[0].props).toEqual({
+      presentation: "competition",
       notifications: matchNotifications,
       error: null,
     });
@@ -135,6 +136,7 @@ describe("dashboard notification reachability", () => {
     expect(unifiedNotificationCenters).toHaveLength(1);
     expect(unifiedNotificationCenters[0].props).toMatchObject({
       scope: "player",
+      presentation: "dashboard",
       notifications: ordinaryNotifications,
       totalCount: 7,
       unreadCount: 3,

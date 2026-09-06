@@ -224,7 +224,7 @@ describe("player registration lifecycle actions", () => {
 
   it("shows never-offered waitlisted registrations as closed after launch", () => {
     const source = readFileSync(
-      resolve(process.cwd(), "app/dashboard/page.tsx"),
+      resolve(process.cwd(), "components/dashboard/DashboardRegistrations.tsx"),
       "utf8"
     );
 

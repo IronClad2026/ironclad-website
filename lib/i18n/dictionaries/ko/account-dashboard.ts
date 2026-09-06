@@ -12,6 +12,18 @@ const dictionary = {
   visibility: { public: "공개", private: "비공개", enabled: "사용", disabled: "사용 안 함", publicTitle: "공개 플레이어 프로필", publicDescription: "IronClad 디렉터리에 공개해도 안전한 플레이어 정보와 아바타를 표시합니다. Discord 연락처 공개는 별도 설정입니다.", updating: "업데이트 중…", makePrivate: "비공개로 전환", makePublic: "공개로 전환", discordTitle: "Discord 연락처", discordDescription: "Discord는 선택 사항이지만 경기 조율을 위해 적극 권장합니다. 사용자명을 추가한 뒤 공개 IronClad 프로필에 표시할지 별도로 선택할 수 있습니다.", discordMissing: "플레이어 프로필에 선택 사항인 사용자명을 추가해야 Discord 연락처를 사용할 수 있습니다.", addDiscord: "프로필에 Discord 추가", turnOff: "끄기", turnOn: "켜기", signInProfile: "공개 프로필 설정을 변경하기 전에 로그인하세요.", invalidProfile: "공개 프로필 사용 여부를 선택하세요.", profileUpdateFailed: "공개 프로필 설정을 업데이트하지 못했습니다.", profileRequired: "이 설정을 변경하기 전에 플레이어 프로필을 완성하세요.", profileVerifyFailed: "공개 프로필 설정을 확인하지 못했습니다.", profileNowPublic: "플레이어 프로필이 이제 공개됩니다.", profileNowPrivate: "플레이어 프로필이 이제 비공개입니다.", signInDiscord: "Discord 연락처 공개 설정을 변경하기 전에 로그인하세요.", invalidDiscord: "Discord 연락처 공개 여부를 선택하세요.", discordUpdateFailed: "Discord 연락처 공개 설정을 업데이트하지 못했습니다.", discordUsernameRequired: "공개로 전환하기 전에 선택 사항인 Discord 사용자명을 프로필에 추가하세요.", discordNowPublic: "공개 프로필에 Discord 연락처가 표시됩니다.", discordNowPrivate: "공개 프로필에서 Discord 연락처가 숨겨집니다." },
   deleteAccount: { eyebrow: "위험 구역", title: "계정 삭제", description: "현재 IronClad 로그인과 프로필 정보, 아바타 및 직접적인 개인 식별자를 영구 삭제합니다. 비공개 계정 연결은 제거되거나 더 이상 개인을 식별하지 않도록 처리됩니다. 공식 토너먼트, 경기, 순위와 챔피언 기록에는 공개적으로 ‘이전 참가자’만 남습니다. 연결된 비공개 리플레이 증거는 승인된 검토를 위해 보존될 수 있습니다.", action: "계정 삭제", permanent: "되돌릴 수 없는 작업", confirmTitle: "IronClad 계정을 삭제하시겠습니까?", close: "계정 삭제 확인 닫기", warning: "이 작업은 되돌릴 수 없습니다. 공식 경쟁 기록이 있다면 등록, 경기 결과, 순위, 챔피언 기록과 연결된 비공개 리플레이 증거가 유지됩니다. 공개 기록에는 ‘이전 참가자’로만 표시되며 비공개 증거는 승인된 검토자에게만 공개됩니다. 공식 기록이 없으면 플레이어 기록이 삭제됩니다.", typeDelete: "확인하려면 DELETE 입력", cancel: "취소", deleting: "계정 삭제 중…", permanentlyDelete: "영구 삭제", sessionExpired: "세션이 만료되었습니다. 삭제하기 전에 다시 로그인하세요.", confirmationInvalid: "계정 삭제를 확인하려면 DELETE를 정확히 입력하세요.", notConfigured: "계정 삭제가 구성되지 않았습니다. IronClad 관리자에게 문의하세요.", avatarFailed: "아바타를 제거하지 못했습니다. Clerk 계정은 삭제되지 않았습니다.", dataFailed: "IronClad 데이터의 계정 종료 처리를 안전하게 완료하지 못했습니다. Clerk 계정은 삭제되지 않았습니다.", clerkFailed: "IronClad 계정 신원 정보는 종료되었지만 Clerk 계정 삭제에 실패했습니다. 관리자에게 문의하세요.", success: "IronClad 계정이 삭제되었습니다." },
   dashboard: {
+    competition: {
+      emptyCurrentTitle: "현재 등록이 없습니다",
+      emptyCurrentDescription: "토너먼트에서 다음 대회를 찾아보세요.",
+      title: "참가 대회",
+      registrations: "현재 등록",
+      updates: "새 소식",
+      invitations: "디비전 초대",
+      invitationHelp: "초대는 이전이나 등록을 자동으로 처리하지 않습니다. 참가하려면 일반 등록 절차를 완료하세요.",
+      noInvitations: "디비전 초대가 없습니다.",
+      previousInvitations: "이전 초대",
+    },
+    utilities: { title: "프로필 및 공개 설정" },
     notAvailable: "해당 없음",
     fallbackTournament: "IronClad 토너먼트",
     fallbackMatch: "토너먼트 경기",
@@ -23,6 +35,7 @@ const dictionary = {
       description: "경쟁 프로필을 확인하고 모든 IronClad 토너먼트 등록을 추적하세요.",
     },
     profile: {
+      navigation: "플레이어 탐색",
       loadError: "플레이어 프로필을 불러오지 못했습니다.",
       country: "국가",
       region: "지역",
@@ -44,6 +57,11 @@ const dictionary = {
       empty: "토너먼트, 등록 및 경기 소식이 여기에 표시됩니다.",
     },
     career: {
+      title: "대회 기록",
+      matches: "경기",
+      champions: "챔피언",
+      registrations: "이전 등록",
+      registrationsEmpty: "이전 등록이 없습니다.",
       loadError: "경쟁 기록을 불러오지 못했습니다.",
       partialError: "일부 토너먼트 표시 정보를 불러오지 못했습니다.",
     },

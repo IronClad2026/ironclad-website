@@ -53,6 +53,26 @@ describe("match actions card presentation", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens competition actions immediately and leaves their authority untouched", async () => {
+    render(<DashboardNotifications presentation="competition" notifications={[actionNotification({ confirmationDeadlineAt: "2099-08-21T01:00:00.000Z" })]} />);
+    const disclosure = screen.getByRole("button", { name: /Match Actions/i });
+    expect(disclosure).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Match result confirmation required")).toBeVisible();
+    expect(confirmDashboardMatchResultMock).not.toHaveBeenCalled();
+    expect(disputeDashboardMatchResultMock).not.toHaveBeenCalled();
+    expect(dismissDashboardNotificationsMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Match result confirmation required").closest("button")!);
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Confirm result" })).toBeEnabled();
+  });
+
+  it("does not expand an empty competition card or manufacture response counts", () => {
+    render(<DashboardNotifications presentation="competition" notifications={[]} />);
+    expect(screen.getByRole("button", { name: /Match Actions/i })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("No actions required")).toBeVisible();
+    expect(screen.queryByText("Action required")).toBeNull();
+  });
+
   it("shows the action-required indicator for a response workflow", () => {
     render(<DashboardNotifications notifications={[actionNotification()]} />);
 
@@ -167,12 +187,12 @@ describe("match actions card presentation", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
 
     ({ closeButton, dialog } = await openDialog());
     fireEvent.click(closeButton);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
 
     ({ dialog } = await openDialog());
     const backdrop = dialog.parentElement?.querySelector<HTMLElement>(
@@ -181,7 +201,7 @@ describe("match actions card presentation", () => {
     expect(backdrop).toHaveAttribute("aria-hidden", "true");
     fireEvent.mouseDown(backdrop as HTMLElement);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 
   it("keeps the player dialog open and non-dismissible while a dispute is pending", async () => {
@@ -261,7 +281,7 @@ describe("match actions card presentation", () => {
 
     fireEvent.click(closeButton);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 });
 
