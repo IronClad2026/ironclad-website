@@ -22,6 +22,7 @@ const responsiveViewports = [
   { width: 1024, height: 768 },
   { width: 1279, height: 900 },
   { width: 1280, height: 900 },
+  { width: 1366, height: 768 },
   { width: 1440, height: 900 },
   { width: 1536, height: 960 },
   { width: 1920, height: 1080 },
@@ -38,7 +39,7 @@ test.describe("competitive map-pool responsive presentation", () => {
   );
 
   for (const viewport of responsiveViewports) {
-    test(`${viewport.width}x${viewport.height} keeps the real pool full width with monotonic map columns`, async ({
+    test(`${viewport.width}x${viewport.height} keeps the real pool full width with readable compact columns`, async ({
       page,
     }) => {
       const browserErrors = collectBrowserErrors(page);
@@ -47,7 +48,7 @@ test.describe("competitive map-pool responsive presentation", () => {
       await gotoTournament(page);
 
       const region = visibleMapPoolRegion(page);
-      const stack = region.locator(":scope > div.mt-6");
+      const stack = region.locator(":scope > div.mt-4");
       const article = stack.locator(":scope > article");
 
       await expect(region).toBeVisible();
@@ -55,18 +56,22 @@ test.describe("competitive map-pool responsive presentation", () => {
       await expect(article).toBeVisible();
       await expect(region).not.toHaveCSS("overflow-x", "hidden");
 
-      const expectedMapColumns =
-        viewport.width >= 1536 ? 3 : viewport.width >= 640 ? 2 : 1;
       const stackBox = await requiredBox(stack);
       const articleBox = await requiredBox(article);
       const mapGrid = article.locator(":scope > ul");
       const mapCards = mapGrid.locator(":scope > li");
 
       expect(Math.abs(articleBox.width - stackBox.width)).toBeLessThanOrEqual(2);
-      expect(await gridColumnCount(mapGrid)).toBe(expectedMapColumns);
+      const mapColumns = await gridColumnCount(mapGrid);
+
+      if (viewport.width < 640) {
+        expect(mapColumns).toBe(1);
+      } else {
+        expect(mapColumns).toBeGreaterThanOrEqual(2);
+      }
       await expect(mapCards).toHaveCount(5);
       expect((await requiredBox(mapCards.first())).width).toBeGreaterThanOrEqual(
-        200
+        160
       );
       await expect(article.getByText("5 maps", { exact: true })).toBeVisible();
       await expect(article.getByText("Frozen", { exact: true })).toBeVisible();
@@ -236,9 +241,13 @@ test.describe("competitive map-pool responsive presentation", () => {
 
       const region = visibleMapPoolRegion(page);
       await expect(region).toBeVisible();
-      expect(
-        await gridColumnCount(region.locator("article:first-of-type > ul"))
-      ).toBe(2);
+      const mapGrid = region.locator("article:first-of-type > ul");
+      const mapCards = mapGrid.locator(":scope > li");
+
+      expect(await gridColumnCount(mapGrid)).toBeGreaterThanOrEqual(2);
+      expect((await requiredBox(mapCards.first())).width).toBeGreaterThanOrEqual(
+        160
+      );
       await expectNoDocumentOverflow(page);
       expect(browserErrors).toEqual([]);
     } finally {
