@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "*.spec.ts",
+  testMatch: process.env.UI_REDESIGN_SURFACE === "dashboard" ? "dashboard.spec.ts" : "flow.spec.ts",
   fullyParallel: false,
   workers: 1,
   outputDir: "../../../.playwright/ui-redesign",

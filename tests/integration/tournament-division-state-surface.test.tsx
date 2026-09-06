@@ -333,6 +333,16 @@ describe("public Tournament division-state surface", () => {
     expect(getEventSummary(view.container, EVENT_B_ID)).toBeInTheDocument();
   });
 
+  it("keeps resolved peers in the browser without crowding current artwork", () => {
+    const view = render(experience([eventB, notHeldEvent]));
+    expect(view.container.querySelectorAll("[data-published-tournament-card]")).toHaveLength(1);
+    selectEvent(NOT_HELD_EVENT_ID);
+    view.rerender(experience([eventB, notHeldEvent]));
+    expect(getEventSummary(view.container, NOT_HELD_EVENT_ID)).toBeInTheDocument();
+    expect(view.container.querySelectorAll("[data-published-tournament-card]")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /^Not Held/ })).toBeDisabled();
+  });
+
   it("shows a terminal overlay for enabled divisions without erasing Disabled", () => {
     window.history.replaceState(
       {},

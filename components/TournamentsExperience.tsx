@@ -837,7 +837,12 @@ function Overview({ tournament, tournaments, activePanel, setActivePanel, select
   const panelId = useId();
   const panels = overviewPanels.filter((item) => item.key !== "prizes" || hasPrize(tournament));
   const visiblePanel = activePanel === "prizes" && !hasPrize(tournament) ? "details" : activePanel;
-  const events = tournaments.some((item) => item.id === tournament.id) ? tournaments : [tournament, ...tournaments];
+  // Keep the existing selection/order, but leave resolved peers in the event
+  // browser so historical records cannot crowd current competition artwork.
+  const currentEvents = tournaments.filter((item) =>
+    item.id === tournament.id || getTournamentEventSection(item.divisionStates) !== "resolved"
+  );
+  const events = currentEvents.some((item) => item.id === tournament.id) ? currentEvents : [tournament, ...currentEvents];
   return <div className="space-y-6">
     <PublishedTournamentGallery
       key={tournament.id}
@@ -5706,7 +5711,7 @@ export default function TournamentsExperience({
           ) : (
             <>
               <div className="border-b border-white/10 py-5"><Hero tournament={selectedTournament} viewerRegistration={selectedViewerRegistration} verifiedDivision={viewer.relicVerifiedDivision} onRegisterClick={handleRegisterClick} /></div>
-              {activeTab === "decisions" ? <main className="py-6"><PollsAndDecisions key={selectedTournament.id} surface="tournament" tournamentId={selectedTournament.id} initialPolls={tournamentPollsByTournament?.[selectedTournament.id] ?? []} initialError={pollLoadError} highlightedPollId={focusedPollId} presentation="desktop" /></main> : <>
+              {activeTab === "decisions" ? <main className="py-6"><PollsAndDecisions key={selectedTournament.id} surface="tournament" tournamentId={selectedTournament.id} initialPolls={tournamentPollsByTournament?.[selectedTournament.id] ?? []} initialError={pollLoadError} highlightedPollId={focusedPollId} /></main> : <>
                 <div className="hidden lg:block"><MainContent activeTab={activeTab} activeOverviewPanel={activeOverviewPanel} setActiveOverviewPanel={handleSetActiveOverviewPanel}
                   tournament={selectedTournament} tournaments={publicTournaments} viewer={viewer}
                   matchResultSubmissions={matchResultSubmissions} matchResultReportGroups={matchResultReportGroups}

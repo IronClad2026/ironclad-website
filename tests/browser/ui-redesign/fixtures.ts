@@ -4,11 +4,39 @@ import type { PlayerProfile } from "@/lib/player-profile";
 import type { PlayerCareerDashboard } from "@/lib/player-dashboard";
 import type { InAppNotification } from "@/lib/notifications";
 import { buildDashboardBadgeData } from "@/lib/badges/dashboard";
+import type { PollViewerProjection } from "@/lib/polls";
 
 export const fixturePlayerId = "11111111-1111-4111-8111-111111111111";
 export const fixtureUserId = "user_ui_redesign_fixture";
 export const fixtureDate = "2026-09-01T12:00:00.000Z";
 export const fixtureDeadline = "2099-09-30T12:00:00.000Z";
+
+export function pollFixture(refreshed = false): PollViewerProjection {
+  return {
+    id: "55555555-5555-4555-8555-555555555555", purpose: "tournament_decision",
+    audienceKind: "tournament_approved", tournamentId: "22222222-2222-4222-8222-000000000001",
+    tournamentBracketId: null, question: refreshed ? "Refreshed fixture decision" : "Fixture tournament decision",
+    context: "In-memory UI verification only.", optionSource: "text", maxSelections: 1, winnerCount: 1,
+    authority: "binding", resultVisibility: "after_close", publicFinalTotals: false,
+    opensAt: fixtureDate, closesAt: fixtureDeadline, publishedAt: fixtureDate,
+    cancelledAt: null, cancellationReason: null, finalDecisionPublishedAt: null,
+    finalDecisionBasis: null, finalRationale: null, bindingTieRuleUsed: false,
+    status: "open", ballotRevision: 0, selectedOptionIds: [],
+    options: ["First option", "Second option"].map((label, index) => ({
+      id: `66666666-6666-4666-8666-${String(index + 1).padStart(12, "0")}`,
+      position: index + 1, label, map: null, pollResultRank: null, finalDecisionRank: null,
+    })),
+  };
+}
+
+export function pollRpcFixture() {
+  const snakeKeys = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(snakeKeys);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`), snakeKeys(item)]));
+    return value;
+  };
+  return { poll: snakeKeys(pollFixture(true)) };
+}
 
 export function parameters() { return new URLSearchParams(location.search); }
 export function fixtureLongText() {
@@ -32,6 +60,7 @@ export function tournamentFixtures(): TournamentCard[] {
   return Array.from({ length: count }, (_, index) => {
     const id = `22222222-2222-4222-8222-${String(index + 1).padStart(12, "0")}`;
     const historical = parameters().has("historical") && index === count - 1;
+    const resolved = parameters().has("resolved") && index === count - 1;
     const mixed = parameters().has("mixed");
     const description = parameters().has("long") ? fixtureLongText() : "Join IronClad for a focused Company of Heroes 3 competition.\n\nFind your Division, read the rules and prepare for your next opponent.";
     const contextMaps = parameters().has("contextMaps") && index === 1;
@@ -47,7 +76,7 @@ export function tournamentFixtures(): TournamentCard[] {
       waitlistedPlayers: 0,
       isFull: false,
       isWaitlistOnly: false,
-      launchedAt: mixed && divisionIndex === 0 ? fixtureDate : null,
+      launchedAt: resolved || (mixed && divisionIndex === 0) ? fixtureDate : null,
       prize: parameters().has("prizes") ? "$100" : "No prize",
     }));
     const statusValue = historical ? "cancelled" as const : "registration_open" as const;
@@ -81,7 +110,7 @@ export function tournamentFixtures(): TournamentCard[] {
           isReady: Boolean(bracket.launchedAt),
           launchedAt: bracket.launchedAt,
           generatedBracketId: bracket.launchedAt ? `generated-${bracket.id}` : null,
-          isCompetitionComplete: false,
+          isCompetitionComplete: resolved,
         })),
       }),
       rules: "Existing Format A rules apply.",
@@ -150,7 +179,7 @@ export function registrationFixtures() {
 export function careerFixture(): PlayerCareerDashboard {
   const empty = parameters().has("empty");
   return {
-    error: null,
+    error: parameters().has("careerError") ? "load-failed" : null,
     statistics: { matchesPlayed: empty ? 0 : 18, matchesWon: empty ? 0 : 12, matchesLost: empty ? 0 : 6, winRate: empty ? 0 : 66.7, tournamentsParticipated: empty ? 0 : 4, tournamentsWon: empty ? 0 : 1 },
     notifications: empty ? [] : [{
       id: "fixture-action-1", source: "report_group", sourceId: "fixture-report-1", reportGroupId: "fixture-report-1",
@@ -173,13 +202,14 @@ export function careerFixture(): PlayerCareerDashboard {
 
 export function notificationFixture(): InAppNotification[] {
   if (parameters().has("empty")) return [];
-  return [{ id: "fixture-update", recipientRole: "player", type: "registration_approved", title: "Your registration was approved", message: "You are in the approved Academy roster. Watch the tournament for Division launch information.", actorDisplayName: null, tournamentId: null, tournamentTitle: "IronClad Open 1", registrationId: "registration-1", matchId: null, reportGroupId: null, deadlineAt: null, readAt: null, createdAt: fixtureDate, href: "/dashboard#registration-registration-1" }];
+  const historical = parameters().has("historicalNotice");
+  return [{ id: "fixture-update", recipientRole: "player", type: historical ? "registration.waitlist_offer" : "registration_approved", title: historical ? "Previous waitlist offer" : "Your registration was approved", message: historical ? "Review the retained previous registration record." : "You are in the approved Academy roster. Watch the tournament for Division launch information.", actorDisplayName: null, tournamentId: null, tournamentTitle: "IronClad Open 1", registrationId: historical ? "registration-3" : "registration-1", matchId: null, reportGroupId: null, deadlineAt: null, readAt: null, createdAt: fixtureDate, href: `/dashboard#registration-registration-${historical ? "3" : "1"}` }];
 }
 
 export function badgeFixture() {
   return buildDashboardBadgeData({ playerId: fixturePlayerId, awards: parameters().has("empty") ? [] : [
     { badgeSlug: "first-deployment", awardedAt: fixtureDate, awardId: "fixture-award-1" },
-    { badgeSlug: "first-victory", awardedAt: fixtureDate, awardId: "fixture-award-2" },
+    { badgeSlug: "first-victory", awardedAt: fixtureDate, originalAwardedAt: fixtureDate, awardId: "fixture-award-2", isUnrevealed: Boolean(window.__uiFixture?.pendingBadgeReveal || parameters().has("pendingBadge")) },
     { badgeSlug: "academy-champion", awardedAt: fixtureDate, awardId: "fixture-award-3" },
   ] });
 }

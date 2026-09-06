@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/postcss";
 
 const root = resolve(import.meta.dirname, "../../..");
 // Optional process-only path lets this test harness validate another isolated
@@ -41,6 +42,7 @@ export default defineConfig({
   envDir: support("no-environment-files"),
   envPrefix: "UI_FIXTURE_UNUSED_",
   plugins: [isolatedActions(), react()],
+  css: { postcss: { plugins: [tailwindcss({ base: sourceRoot })] } },
   resolve: {
     dedupe: ["react", "react-dom", "framer-motion"],
     alias: [

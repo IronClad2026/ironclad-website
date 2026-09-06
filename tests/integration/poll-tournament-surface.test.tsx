@@ -83,6 +83,8 @@ describe("Tournament Polls & Decisions surface", () => {
         highlightedPollId: POLL_ID,
       });
       expect(props).not.toHaveProperty("viewerRegistrations");
+      // A singleton must stay active at every viewport, not use a hidden-pair gate.
+      expect(props).not.toHaveProperty("presentation");
     }
   });
 

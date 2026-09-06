@@ -196,6 +196,9 @@ test("Reference dialog closes on desktop backdrop but not on its content", async
   await expect(page.locator("body")).toHaveCSS("overflow", "hidden");
   const box = await dialog.boundingBox();
   expect(box!.x).toBeGreaterThan(10);
+  await expect(dialog).toHaveCSS("background-color", /^(oklch\(0\.141 0\.005 285\.823\)|rgb\(9, 9, 11\))$/);
+  const contentGap = await dialog.locator("[data-lenis-prevent]").evaluate((element) => element.getBoundingClientRect().bottom - element.lastElementChild!.getBoundingClientRect().bottom);
+  expect(contentGap).toBeLessThanOrEqual(32);
   await page.mouse.click(box!.x - 8, box!.y + 20);
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
@@ -249,5 +252,30 @@ test("explicit cancelled event stays reachable without becoming current", async 
   await expect(page).toHaveURL(/tournament=fixture-event-2/);
   await expect(page.getByRole("heading", { name: "Historical IronClad Open 2", exact: true }).first()).toBeVisible();
   await expect(page.getByText("Cancelled", { exact: true }).first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("phone Tournament Decisions stays live without an inactive desktop gate", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await openFixture(page, "pollRefresh=1");
+  await page.getByRole("button", { name: "Polls & Decisions", exact: true }).click();
+  await expect(page.getByRole("article", { name: "Fixture tournament decision", exact: true })).toBeVisible();
+  await page.evaluate(() => { window.dispatchEvent(new Event("focus")); });
+  await expect(page.getByRole("article", { name: "Refreshed fixture decision", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__uiFixture.actions)).toContain("fixture:get_my_poll");
+  expect(await page.evaluate(() => window.__uiFixture.blockedRequests)).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("resolved Division peers leave the current gallery but remain explicitly reachable", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const errors = await openFixture(page, "events=2&mixed=1&resolved=1");
+  await expect(page.locator("[data-published-tournament-card]:visible")).toHaveCount(1);
+  await expect(page.locator("[data-selected-event]:visible")).toContainText("IronClad Open 1");
+  await page.getByRole("button", { name: "Browse events", exact: true }).click();
+  await page.locator('dialog [data-event-id="22222222-2222-4222-8222-000000000002"]').click();
+  await expect(page).toHaveURL(/tournament=fixture-event-2/);
+  await expect(page.locator("[data-selected-event]:visible")).toContainText("IronClad Open 2");
+  await expectNoOverflow(page);
   expect(errors).toEqual([]);
 });
