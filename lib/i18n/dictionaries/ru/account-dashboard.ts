@@ -56,6 +56,18 @@ const dictionary = {
     typeDelete: "Введите DELETE для подтверждения", cancel: "Отмена", deleting: "Удаление аккаунта…", permanentlyDelete: "Удалить навсегда", sessionExpired: "Сеанс завершён. Войдите снова перед удалением.", confirmationInvalid: "Для подтверждения удаления аккаунта введите DELETE точно.", notConfigured: "Удаление аккаунта не настроено. Свяжитесь с администратором IronClad.", avatarFailed: "Не удалось удалить аватар. Аккаунт Clerk не удалён.", dataFailed: "Не удалось безопасно завершить обработку данных при закрытии учётной записи IronClad. Учётная запись Clerk не удалена.", clerkFailed: "Учётная запись IronClad закрыта, но удалить аккаунт Clerk не удалось. Свяжитесь с администратором.", success: "Ваш аккаунт IronClad удалён.",
   },
   dashboard: {
+    competition: {
+      emptyCurrentTitle: "Нет текущих регистраций",
+      emptyCurrentDescription: "Откройте турниры, чтобы выбрать следующее соревнование.",
+      title: "Ваши соревнования",
+      registrations: "Текущие регистрации",
+      updates: "Обновления",
+      invitations: "Приглашения в дивизионы",
+      invitationHelp: "Приглашение не переносит и не регистрирует вас. Для участия пройдите обычную регистрацию.",
+      noInvitations: "Нет доступных приглашений в дивизионы.",
+      previousInvitations: "Предыдущие приглашения",
+    },
+    utilities: { title: "Профиль и видимость" },
     notAvailable: "Нет данных",
     fallbackTournament: "Турнир IronClad",
     fallbackMatch: "Турнирный матч",
@@ -67,6 +79,7 @@ const dictionary = {
       description: "Проверяйте соревновательный профиль и отслеживайте все регистрации на турниры IronClad.",
     },
     profile: {
+      navigation: "Навигация игрока",
       loadError: "Не удалось загрузить ваш профиль игрока.",
       country: "Страна",
       region: "Регион",
@@ -88,6 +101,11 @@ const dictionary = {
       empty: "Здесь появятся новости о турнирах, регистрациях и матчах.",
     },
     career: {
+      title: "История соревнований",
+      matches: "Матчи",
+      champions: "Чемпионы",
+      registrations: "Предыдущие регистрации",
+      registrationsEmpty: "Нет предыдущих регистраций.",
       loadError: "Не удалось загрузить вашу соревновательную историю.",
       partialError: "Не удалось загрузить некоторые сведения для отображения турниров.",
     },

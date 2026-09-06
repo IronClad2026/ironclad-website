@@ -220,6 +220,18 @@ const dictionary = {
     success: "IronClad 账户已删除。",
   },
   dashboard: {
+    competition: {
+      emptyCurrentTitle: "暂无当前报名",
+      emptyCurrentDescription: "浏览赛事，寻找你的下一场比赛。",
+      title: "你的赛事",
+      registrations: "当前报名",
+      updates: "动态",
+      invitations: "组别邀请",
+      invitationHelp: "邀请不会自动转移或报名。请完成正常报名流程后参赛。",
+      noInvitations: "暂无组别邀请。",
+      previousInvitations: "历史邀请",
+    },
+    utilities: { title: "资料与可见性" },
     notAvailable: "暂无",
     fallbackTournament: "IronClad 锦标赛",
     fallbackMatch: "锦标赛场次",
@@ -231,6 +243,7 @@ const dictionary = {
       description: "查看竞技资料并跟踪每一项 IronClad 锦标赛报名。",
     },
     profile: {
+      navigation: "玩家导航",
       loadError: "无法加载你的玩家资料。",
       country: "国家/地区",
       region: "地区",
@@ -252,6 +265,11 @@ const dictionary = {
       empty: "锦标赛、报名和比赛动态将显示在这里。",
     },
     career: {
+      title: "赛事历史",
+      matches: "比赛",
+      champions: "冠军",
+      registrations: "历史报名",
+      registrationsEmpty: "暂无历史报名。",
       loadError: "无法加载你的竞技记录。",
       partialError: "部分锦标赛展示信息无法加载。",
     },

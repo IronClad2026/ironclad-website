@@ -249,6 +249,18 @@ const dictionary = {
     success: "Il tuo account IronClad è stato eliminato.",
   },
   dashboard: {
+    competition: {
+      emptyCurrentTitle: "Nessuna iscrizione attuale",
+      emptyCurrentDescription: "Esplora i tornei per trovare la tua prossima competizione.",
+      title: "La tua competizione",
+      registrations: "Iscrizioni attuali",
+      updates: "Aggiornamenti",
+      invitations: "Inviti alle Divisioni",
+      invitationHelp: "Un invito non ti trasferisce né ti iscrive. Completa la normale procedura di iscrizione per partecipare.",
+      noInvitations: "Nessun invito alle Divisioni disponibile.",
+      previousInvitations: "Inviti precedenti",
+    },
+    utilities: { title: "Profilo e visibilità" },
     notAvailable: "N/D",
     fallbackTournament: "Torneo IronClad",
     fallbackMatch: "Match del Torneo",
@@ -261,6 +273,7 @@ const dictionary = {
         "Controlla il Profilo competitivo e segui ogni Iscrizione ai Tornei IronClad.",
     },
     profile: {
+      navigation: "Navigazione giocatore",
       loadError: "Impossibile caricare il tuo Profilo giocatore.",
       country: "Paese",
       region: "Regione",
@@ -284,6 +297,11 @@ const dictionary = {
       empty: "Gli aggiornamenti su Tornei, Iscrizioni e Match appariranno qui.",
     },
     career: {
+      title: "Storico competitivo",
+      matches: "Partite",
+      champions: "Campioni",
+      registrations: "Iscrizioni precedenti",
+      registrationsEmpty: "Nessuna iscrizione precedente.",
       loadError: "Impossibile caricare il tuo storico competitivo.",
       partialError:
         "Non è stato possibile caricare alcuni dettagli di presentazione dei Tornei.",
