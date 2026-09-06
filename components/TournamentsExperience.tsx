@@ -30,8 +30,10 @@ import MatchResultControls from "@/components/MatchResultControls";
 import AdminMatchManagementDialog from "@/components/AdminMatchManagementDialog";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import useHydrationSafeNow from "@/components/useHydrationSafeNow";
-import ScrollReveal from "@/components/ScrollReveal";
-import TournamentMapPools from "@/components/TournamentMapPools";
+import PublishedTournamentGallery from "@/components/tournaments/PublishedTournamentGallery";
+import TournamentMapPoolViewer from "@/components/tournaments/TournamentMapPoolViewer";
+import TournamentArchive, { type ArchiveEvent } from "@/components/tournaments/TournamentArchive";
+import ReferenceDialog from "@/components/ui/ReferenceDialog";
 import TournamentMedia from "@/components/TournamentMedia";
 import TournamentRulesEssentials from "@/components/TournamentRulesEssentials";
 import {
@@ -75,14 +77,12 @@ import type {
   TournamentParticipant,
 } from "@/lib/tournaments";
 import {
-  CalendarDays,
   CheckCircle2,
   ChevronDown,
   Clock3,
   Crown,
   Info,
   LayoutDashboard,
-  MessageCircle,
   PlayCircle,
   Radio,
   Search,
@@ -110,12 +110,6 @@ type TabKey =
   | "announcements";
 type OverviewPanelKey = "details" | "rules" | "prizes" | "schedule" | "contact";
 
-type ArchiveEvent = {
-  title: string;
-  image: string;
-  descriptionKey: string;
-  battlefy: string;
-};
 
 type MatchTeam = {
   seed: number;
@@ -247,7 +241,6 @@ const translateCompetitionEnglish: CompetitionTranslator = (
   values?: MessageValues
 ) => translate(competitionEnglish, path, values);
 
-const interactiveHover = "transform-gpu transition-all duration-300 ease-out hover:scale-[1.03] hover:border-orange-500/70 hover:shadow-lg hover:shadow-orange-950/20 active:scale-[0.99]";
 const tournamentCardClass =
   "group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100";
 const tournamentInsetCardClass =
@@ -424,222 +417,24 @@ function isTournamentBracketNotHeld(
   );
 }
 
-function Sidebar({
-  selectedTournament,
-  tournaments,
-  onSelectTournament,
-}: {
-  selectedTournament: TournamentCard;
-  tournaments: TournamentCard[];
-  onSelectTournament: (tournament: TournamentCard) => void;
-}) {
-  const [eventsOpen, setEventsOpen] = useState(true);
-  const t = useOptionalTranslations("competition", competitionEnglish);
-  const eventGroups = groupTournamentsByLifecycle(tournaments, t);
-
-  return (
-    <aside className="hidden w-72 shrink-0 border-r border-orange-500/20 bg-black/70 shadow-2xl shadow-black/30 backdrop-blur-xl lg:block">
-      <div className="sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto">
-        <div className="border-b border-orange-500/15 p-5">
-          <div className="h-32 border border-white/12 bg-center bg-no-repeat shadow-xl shadow-black/20" style={{ backgroundImage: "linear-gradient(135deg,rgba(0,0,0,0.42),rgba(0,0,0,0.84)),url(/images/ironclad-background.jpg)", backgroundSize: "100% auto" }} />
-          <div className="mt-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">{t("tournaments.organizer")}</p>
-            <h2 className="mt-1 text-lg font-black text-white">{t("tournaments.organizerName")}</h2>
-            <p className="mt-1 text-sm text-zinc-400">{t("tournaments.companyEvents")}</p>
-          </div>
-        </div>
-
-        <nav className="p-3">
-          <button
-            onClick={() => setEventsOpen((current) => !current)}
-            className={classNames("group mb-1 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold text-zinc-400 hover:bg-orange-500/10 hover:text-white", interactiveHover)}
-          >
-            <span className="flex items-center gap-3">
-              <CalendarDays size={17} className="text-orange-400" />
-              {t("tournaments.events")}
-            </span>
-            <ChevronDown size={14} className={classNames("text-zinc-500 transition", eventsOpen && "rotate-180")} />
-          </button>
-
-          {eventsOpen && (
-            <div className="mt-2 space-y-4 border border-white/12 bg-black/45 p-3 shadow-inner shadow-black/20">
-              {eventGroups.map((group) => (
-                <div key={group.section}>
-                  <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">{group.label}</p>
-                  <div className="space-y-2">
-                    {group.events.map((event) => {
-                      const selected = selectedTournament.id === event.id;
-                      return (
-                        <button
-                          key={event.id}
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() => onSelectTournament(event)}
-                          className={classNames("relative block w-full overflow-hidden border border-white/12 bg-cover bg-center p-3 text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100", selected && "ring-2 ring-orange-500")}
-                          style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${event.image})` }}
-                        >
-                          <p className="break-words text-sm font-black text-white">{event.title}</p>
-                          <p className="mt-1 text-xs text-zinc-300">{event.format} - {localizeTournamentStatus(getPublicTournamentStatus(event), t)}</p>
-                          <TournamentDivisionStateSummary
-                            tournament={event}
-                            className="mt-2"
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </nav>
-      </div>
-    </aside>
-  );
-}
-
-function MobileTournamentDrawer({
-  open,
-  selectedTournament,
-  tournaments,
-  onClose,
-  onSelectTournament,
-}: {
-  open: boolean;
-  selectedTournament: TournamentCard;
-  tournaments: TournamentCard[];
-  onClose: () => void;
-  onSelectTournament: (tournament: TournamentCard) => void;
+function MobileTournamentDrawer({ open, selectedTournament, tournaments, onClose, onSelectTournament }: {
+  open: boolean; selectedTournament: TournamentCard; tournaments: TournamentCard[];
+  onClose: () => void; onSelectTournament: (tournament: TournamentCard) => void;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const eventGroups = groupTournamentsByLifecycle(tournaments, t);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onClose, open]);
-
-  return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-[80] lg:hidden">
-          <motion.button
-            type="button"
-            aria-label={t("tournaments.closeMenu")}
-            onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="absolute inset-0 z-0 h-full w-full cursor-default bg-black/80 backdrop-blur-sm"
-          />
-          <motion.aside
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mobile-tournament-menu-title"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 360, damping: 36 }}
-            className="fixed bottom-0 right-0 top-[104px] z-10 flex h-auto w-[min(88vw,380px)] max-w-[380px] flex-col border-l border-orange-400/30 bg-[linear-gradient(145deg,rgba(14,14,14,0.98),rgba(0,0,0,0.99))] p-4 text-zinc-100 shadow-[0_0_80px_rgba(0,0,0,0.78)] backdrop-blur-2xl"
-            style={{
-              paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
-              paddingRight: "max(1rem, env(safe-area-inset-right))",
-            }}
-          >
-            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 pb-4">
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
-                  IronClad
-                </p>
-                <h2
-                  id="mobile-tournament-menu-title"
-                  className="mt-1 break-words text-xl font-black text-white"
-                >
-                  {t("tournaments.tournamentMenu")}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/12 bg-white/10 text-zinc-200 shadow-xl shadow-black/25 transition hover:border-orange-300/55 hover:bg-orange-500/15 hover:text-white"
-                aria-label={t("tournaments.closeMenu")}
-              >
-                <X size={20} />
-              </button>
-            </header>
-
-            <div className="min-h-0 flex-1 overflow-y-auto pt-5">
-              <nav aria-label={t("tournaments.tournamentNavigation")}>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-zinc-500">
-                  {t("tournaments.tournaments")}
-                </p>
-                <div className="mt-3 space-y-5">
-                  {eventGroups.map((group) => (
-                    <div key={group.section}>
-                      <p className="mb-2 text-[11px] font-black uppercase tracking-[0.22em] text-orange-300">
-                        {group.label}
-                      </p>
-                      <div className="space-y-2">
-                        {group.events.map((event) => {
-                          const selected = event.id === selectedTournament.id;
-                          return (
-                            <button
-                              key={event.id}
-                              type="button"
-                              aria-pressed={selected}
-                              onClick={() => {
-                                onSelectTournament(event);
-                                onClose();
-                              }}
-                              className={classNames(
-                                "flex min-h-11 w-full min-w-0 flex-wrap items-center gap-3 rounded-lg border px-3 py-3 text-left shadow-lg shadow-black/15 transition",
-                                selected
-                                  ? "border-orange-400/70 bg-orange-500/15 text-white"
-                                  : "border-white/12 bg-white/[0.06] text-zinc-300 hover:border-orange-400/45 hover:bg-orange-500/10 hover:text-white"
-                              )}
-                            >
-                              <CalendarDays
-                                size={16}
-                                className="shrink-0 text-orange-300"
-                              />
-                              <span className="min-w-0">
-                                <span className="block break-words text-sm font-black">
-                                  {event.title}
-                                </span>
-                                <span className="mt-1 block break-words text-xs text-zinc-500">
-                                  {event.format} - {localizeTournamentStatus(getPublicTournamentStatus(event), t)}
-                                </span>
-                              </span>
-                              <TournamentDivisionStateSummary
-                                tournament={event}
-                                className="basis-full pl-7"
-                              />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </nav>
-            </div>
-          </motion.aside>
-        </div>
-      )}
-    </AnimatePresence>
-  );
+  if (!open) return null;
+  return <ReferenceDialog title={t("tournaments.redesign.chooseEvent")} closeLabel={t("tournaments.closeMenu")} onClose={onClose} size="compact">
+    <nav aria-label={t("tournaments.tournamentNavigation")} className="space-y-6">
+      {eventGroups.map((group) => <section key={group.section}>
+        <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-orange-300">{group.label}</h3>
+        <div className="divide-y divide-white/10">{group.events.map((event) => <button key={event.id} data-event-id={event.id} type="button" aria-pressed={event.id === selectedTournament.id} onClick={() => { onSelectTournament(event); onClose(); }} className={classNames("flex min-h-16 w-full min-w-0 items-center justify-between gap-4 px-3 py-4 text-left focus-visible:outline-2 focus-visible:outline-orange-300", event.id === selectedTournament.id ? "bg-orange-500/10 text-white" : "text-zinc-300 hover:bg-white/5")}>
+          <span className="min-w-0"><span className="block break-words text-base font-bold">{event.title}</span><span className="mt-1 block text-xs text-zinc-400">{event.format} · {localizeTournamentStatus(getPublicTournamentStatus(event), t)}</span></span>
+          <ChevronDown size={16} className="-rotate-90 shrink-0 text-orange-300" aria-hidden="true" />
+        </button>)}</div>
+      </section>)}
+    </nav>
+  </ReferenceDialog>;
 }
 
 function Hero({
@@ -683,82 +478,16 @@ function Hero({
   ) || tournament.statusValue === "completed";
 
   return (
-    <section className="relative overflow-hidden border-b border-orange-500/20 bg-black">
-      <motion.div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-55"
-        style={{
-          backgroundImage: `url(${tournament.image})`,
-        }}
-        animate={{ backgroundPositionY: ["0%", "100%", "0%"] }}
-        transition={{ duration: 36, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <div className="absolute inset-0 bg-black/68" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.24),rgba(0,0,0,0.92)),linear-gradient(108deg,rgba(0,0,0,0.96),rgba(0,0,0,0.62),rgba(249,115,22,0.16))]" />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[length:64px_64px] opacity-20" />
-      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
-      <div className="relative z-10 px-5 py-8 lg:px-8 lg:py-10">
-        <TournamentTerminalBanner tournament={tournament} />
-        <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
-          <ScrollReveal>
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusPill
-                tone={
-                  !divisionNotHeld &&
-                  (tournament.statusValue === "registration_open" ||
-                    tournament.statusValue === "in_progress")
-                    ? "green"
-                    : "gray"
-                }
-              >
-                {localizeTournamentStatus(publicStatus, t)}
-              </StatusPill>
-              <StatusPill tone="neutral">{tournament.format}</StatusPill>
-              <StatusPill tone="amber">{tournament.ruleFormatLabel}</StatusPill>
-              <StatusPill tone="gray">{tournament.region}</StatusPill>
-            </div>
-            <h1 className="mt-5 max-w-4xl text-3xl font-black tracking-tight text-white sm:text-5xl">{tournament.title}</h1>
-            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-zinc-300">
-              <span className="flex items-center gap-2">
-                <svg
-                  aria-hidden="true"
-                  className="text-orange-300"
-                  fill="none"
-                  height={16}
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.8}
-                  viewBox="0 0 24 24"
-                  width={16}
-                >
-                  <rect x="2.5" y="4.5" width="11.5" height="8.5" />
-                  <circle cx="11.9" cy="10.8" r="0.55" />
-                  <path d="M8.25 13v2.15" />
-                  <path d="M5.9 15.15h4.7" />
-                  <path d="M3.25 18.1h11.2l1.05 2.1H2.2z" />
-                  <path d="M5.9 18.7v0.8" />
-                  <path d="M8.75 18.55v1.05" />
-                  <path d="M11.6 18.7v0.8" />
-                  <rect x="17" y="4.5" width="4.4" height="15.7" />
-                  <path d="M18.15 6.7h2.1" />
-                  <path d="M18.15 8.45h2.1" />
-                  <circle cx="19.2" cy="12" r="1.05" />
-                  <circle cx="19.2" cy="15" r="0.45" />
-                  <path d="M18.05 17.65h0.9" />
-                  <path d="M19.75 17.65h0.9" />
-                </svg>
-                {tournament.game}
-              </span>
-              <span className="flex items-center gap-2"><CalendarDays size={16} className="text-orange-300" /> {localizeTournamentEventSection(getTournamentEventSection(tournament.divisionStates), t)}</span>
-              <span className="flex items-center gap-2"><Clock3 size={16} className="text-orange-300" /> {tournament.schedule[0]}</span>
-              <span className="flex items-center gap-2"><Users size={16} className="text-orange-300" /> {t("heroMetadata.approvedSlots", { players: formatNumber(tournament.players, locale), maximum: formatNumber(tournament.maxPlayers, locale) })}</span>
-            </div>
-            <TournamentDivisionStateSummary
-              tournament={tournament}
-              className="mt-5"
-            />
-          </ScrollReveal>
-          <div className="w-full max-w-full sm:max-w-sm xl:w-80 xl:flex-none">
+    <section className="min-w-0">
+      <TournamentTerminalBanner tournament={tournament} />
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <StatusPill tone={!divisionNotHeld && (tournament.statusValue === "registration_open" || tournament.statusValue === "in_progress") ? "green" : "gray"}>{localizeTournamentStatus(publicStatus, t)}</StatusPill>
+        <span className="text-zinc-400">{tournament.format} · {tournament.ruleFormatLabel} · {tournament.region}</span>
+      </div>
+      <h1 className="mt-3 break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">{tournament.title}</h1>
+      <p className="mt-2 text-xs leading-5 text-zinc-400">{tournament.game} · {t("heroMetadata.approvedSlots", { players: formatNumber(tournament.players, locale), maximum: formatNumber(tournament.maxPlayers, locale) })}</p>
+      <TournamentDivisionStateSummary tournament={tournament} className="mt-3" />
+          <div className="mt-4 w-full min-w-0">
             {terminalTournament ? (
               <TournamentReadOnlyCard />
             ) : registrationState ? (
@@ -786,8 +515,6 @@ function Hero({
               </>
             )}
           </div>
-        </div>
-      </div>
     </section>
   );
 }
@@ -833,7 +560,7 @@ function TournamentReadOnlyCard() {
   const t = useOptionalTranslations("competition", competitionEnglish);
 
   return (
-    <div className="min-h-[104px] w-full min-w-0 border border-amber-300/35 bg-black/65 p-4 text-left shadow-xl shadow-black/20 backdrop-blur">
+    <div className="w-full min-w-0 border-l-2 border-amber-300/35 bg-white/3 p-3 text-left">
       <Info size={18} className="text-amber-200" />
       <p className="mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider text-white">
         {t("tournaments.terminal.historicalTitle")}
@@ -865,7 +592,7 @@ function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) 
   return (
     <div
       className={classNames(
-        "min-h-[104px] w-full min-w-0 overflow-hidden border p-4 text-left shadow-xl shadow-black/20 backdrop-blur transition hover:border-orange-400/35",
+        "w-full min-w-0 overflow-hidden border-l-2 p-3 text-left",
         tones[state.tone]
       )}
     >
@@ -877,7 +604,7 @@ function RegistrationStateCard({ state }: { state: ViewerRegistrationDisplay }) 
         {state.description}
       </p>
       {state.details.length > 0 && (
-        <div className="mt-3 space-y-1 text-[11px] font-semibold leading-4 opacity-80">
+        <div className="mt-3 space-y-1 text-xs leading-5 opacity-90">
           {state.details.map((detail, index) => (
             <p key={`registration-detail-${index}`}>{detail}</p>
           ))}
@@ -1081,153 +808,63 @@ export function getViewerRegistrationDisplay(
 
 function ActionCard({ label, description, icon: Icon, onClick, disabled = false }: { label: string; description: string; icon: ElementType; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-disabled={disabled} className={classNames("flex min-h-[104px] w-full min-w-0 flex-col justify-start overflow-hidden border p-4 text-left shadow-xl shadow-black/20 backdrop-blur", disabled ? "cursor-not-allowed border-zinc-700 bg-zinc-900/80 text-zinc-500" : classNames("border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] hover:bg-orange-500/10", interactiveHover))}>
-      <Icon size={18} className={classNames("shrink-0", disabled ? "text-zinc-500" : "text-orange-300")} />
-      <p className={classNames("mt-3 break-words text-sm font-black uppercase leading-5 tracking-wider", disabled ? "text-zinc-400" : "text-white")}>{label}</p>
-      <p className="mt-1 break-words text-xs font-semibold leading-5 text-zinc-400">{description}</p>
+    <button type="button" onClick={onClick} disabled={disabled} aria-disabled={disabled} className={classNames("flex min-h-16 w-full min-w-0 items-center gap-3 overflow-hidden border px-3 py-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300", disabled ? "cursor-not-allowed border-zinc-700 bg-zinc-900/80 text-zinc-500" : "border-orange-400/25 bg-orange-500/8 hover:border-orange-400/60 hover:bg-orange-500/15")}>
+      <Icon size={20} className={classNames("shrink-0", disabled ? "text-zinc-500" : "text-orange-300")} />
+      <span className="min-w-0">
+        <span className={classNames("block break-words text-sm font-bold leading-5", disabled ? "text-zinc-400" : "text-white")}>{label}</span>
+        <span className="mt-1 block break-words text-xs leading-5 text-zinc-400">{description}</span>
+      </span>
     </button>
   );
 }
 
 function TopTabs({ activeTab, setActiveTab }: { activeTab: TabKey; setActiveTab: (tab: TabKey) => void }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
-
-  return (
-    <div className="overflow-visible border-b border-orange-500/20 bg-black/70 px-5 py-2 shadow-xl shadow-black/20 backdrop-blur-xl lg:px-8">
-      <div className="flex gap-8 overflow-x-auto overflow-y-visible px-1 py-2">
-        {tabs.map((tab) => {
-          const selected = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={classNames(
-                "relative shrink-0 transform-gpu rounded-md px-1 py-4 text-xs font-black uppercase tracking-wider transition-all duration-300 ease-out hover:scale-[1.04] active:scale-[0.99]",
-                selected ? "text-white" : "text-zinc-500 hover:text-zinc-200"
-              )}
-            >
-              {t(`tournaments.tabs.${tab.key}`)}
-              {selected && <motion.span layoutId="active-tab" className="absolute inset-x-0 bottom-0 h-0.5 bg-orange-500" />}
-            </button>
-          );
-        })}
-      </div>
+  return <nav aria-label={t("tournaments.tournamentNavigation")} className="border-y border-white/10">
+    <div className="grid grid-cols-2 gap-x-3 sm:grid-cols-3 lg:grid-cols-6">
+      {tabs.map((tab) => <button key={tab.key} type="button" aria-pressed={activeTab === tab.key} onClick={() => setActiveTab(tab.key)} className={classNames("min-h-11 min-w-0 border-b-2 px-2 py-3 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-300", activeTab === tab.key ? "border-orange-400 text-white" : "border-transparent text-zinc-400 hover:text-white")}>{t(`tournaments.tabs.${tab.key}`)}</button>)}
     </div>
-  );
+  </nav>;
 }
 
-function Overview({
-  tournament,
-  tournaments,
-  activePanel,
-  setActivePanel,
-}: {
-  tournament: TournamentCard;
-  tournaments: TournamentCard[];
-  activePanel: OverviewPanelKey;
-  setActivePanel: (panel: OverviewPanelKey) => void;
+function Overview({ tournament, tournaments, activePanel, setActivePanel, selectedContext, onSelectTournament }: {
+  tournament: TournamentCard; tournaments: TournamentCard[]; activePanel: OverviewPanelKey;
+  setActivePanel: (panel: OverviewPanelKey) => void; selectedContext: ReactNode;
+  onSelectTournament: (tournament: TournamentCard) => void;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
-  const panels = overviewPanels.filter(
-    (item) => item.key !== "prizes" || hasPrize(tournament)
-  );
-  const visiblePanel =
-    activePanel === "prizes" && !hasPrize(tournament)
-      ? "details"
-      : activePanel;
-
-  return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-      <div className="space-y-6">
-        <Card>
-          <h2 className="text-sm font-black uppercase tracking-wider text-white">{t("tournaments.overview.published")}</h2>
-          <div className="mt-4 space-y-4">
-            {tournaments.map((item) => (
-              <TournamentLinkCard key={item.id} item={item} />
-            ))}
-          </div>
-        </Card>
-
-        {tournament.mapPools.length > 0 ? (
-          <TournamentMapPools pools={tournament.mapPools} />
-        ) : null}
-
-        <Card>
-          <div className="flex gap-3 overflow-x-auto overflow-y-visible border-b border-slate-800 px-1 py-3">
-            {panels.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => setActivePanel(item.key)}
-                className={classNames("shrink-0 rounded border px-4 py-2 text-xs font-black uppercase tracking-wide", interactiveHover, visiblePanel === item.key ? "border-orange-500 bg-orange-500/10 text-white" : "border-slate-700 text-zinc-400 hover:text-white")}
-              >
-                {t(`tournaments.panels.${item.key}`)}
-              </button>
-            ))}
-          </div>
-          <div className="mt-5">
-            {renderOverviewPanel(visiblePanel, tournament, t, locale)}
-          </div>
-        </Card>
+  const panelId = useId();
+  const panels = overviewPanels.filter((item) => item.key !== "prizes" || hasPrize(tournament));
+  const visiblePanel = activePanel === "prizes" && !hasPrize(tournament) ? "details" : activePanel;
+  const events = tournaments.some((item) => item.id === tournament.id) ? tournaments : [tournament, ...tournaments];
+  return <div className="space-y-6">
+    <PublishedTournamentGallery
+      key={tournament.id}
+      entries={events.map((item) => ({ tournament: item, status: localizeTournamentStatus(getPublicTournamentStatus(item), t), section: localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t) }))}
+      selectedId={tournament.id}
+      selectedContext={selectedContext}
+      onSelect={onSelectTournament}
+    />
+    <section aria-label={t("tournaments.redesign.panelNavigation")} className="min-w-0 border border-white/12 bg-zinc-950/80 p-4 sm:p-5">
+      <p className="mb-3 break-words text-xs font-semibold text-zinc-400">{t("tournaments.redesign.selectedEvent")} · {tournament.title}</p>
+      <div role="tablist" aria-label={t("tournaments.redesign.panelNavigation")} className="flex flex-wrap gap-1 border-b border-white/10" onKeyDown={(event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+        const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        if (index < 0) return;
+        const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+        event.preventDefault();
+        buttons[next]?.focus();
+        setActivePanel(panels[next].key);
+      }}>
+        {panels.map((item) => <button key={item.key} type="button" role="tab" id={`${panelId}-${item.key}`} aria-controls={`${panelId}-content`} aria-selected={visiblePanel === item.key} tabIndex={visiblePanel === item.key ? 0 : -1} onClick={() => setActivePanel(item.key)} className={classNames("min-h-11 min-w-0 border-b-2 px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-300", visiblePanel === item.key ? "border-orange-400 text-white" : "border-transparent text-zinc-400 hover:text-white")}>{t(`tournaments.panels.${item.key}`)}</button>)}
       </div>
-
-      <div className="space-y-6">
-        <Card>
-          <h3 className="text-sm font-black uppercase tracking-wider text-white">{t("tournaments.overview.archive")}</h3>
-          <p className="mt-2 text-xs leading-5 text-zinc-400">
-            {t("tournaments.overview.archiveDescription")}
-          </p>
-          <div className="mt-4 space-y-3">
-            {archiveEvents.map((item) => (
-              <a key={item.title} href={item.battlefy} target="_blank" rel="noreferrer" className="group relative block overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1 hover:border-orange-400/35 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-orange-300/55 before:opacity-0 before:transition before:content-[''] hover:before:opacity-100" style={{ backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${item.image})` }}>
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-white">{item.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-zinc-300">
-                      {t(item.descriptionKey)}
-                    </p>
-                    <p className="mt-3 text-xs font-black uppercase tracking-wider text-orange-300">{t("tournaments.actions.viewBattlefy")}</p>
-                  </div>
-                  <MessageCircle size={16} className="mt-1 shrink-0 text-orange-300" />
-                </div>
-              </a>
-            ))}
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function TournamentLinkCard({ item }: { item: TournamentCard }) {
-  const t = useOptionalTranslations("competition", competitionEnglish);
-
-  return (
-    <article
-      data-published-tournament-card
-      className={classNames("min-w-0 overflow-hidden", tournamentCardClass)}
-    >
-      <div className="grid min-w-0 md:grid-cols-[minmax(220px,0.44fr)_minmax(0,1fr)]">
-        <div
-          aria-hidden="true"
-          data-tournament-banner
-          className="min-h-40 bg-cover bg-center md:min-h-48"
-          style={{ backgroundImage: `url(${item.image})` }}
-        />
-        <div className="min-w-0 p-4 sm:p-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">
-            {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {localizeTournamentStatus(getPublicTournamentStatus(item), t)}
-          </p>
-          <h3 className="mt-2 break-words text-xl font-black text-white">
-            {item.title}
-          </h3>
-          <p className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-zinc-300">
-            {item.description}
-          </p>
-        </div>
-      </div>
-    </article>
-  );
+      <div role="tabpanel" id={`${panelId}-content`} aria-labelledby={`${panelId}-${visiblePanel}`} tabIndex={0} className="mt-5 min-w-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300">{renderOverviewPanel(visiblePanel, tournament, t, locale)}</div>
+    </section>
+    <TournamentMapPoolViewer key={`maps-${tournament.id}`} tournamentTitle={tournament.title} pools={tournament.mapPools} />
+    <TournamentArchive events={archiveEvents} />
+  </div>;
 }
 
 function renderOverviewPanel(
@@ -1285,7 +922,7 @@ function renderOverviewPanel(
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div className={classNames("p-4", tournamentInsetCardClass)}><p className="text-xs font-black uppercase tracking-wider text-zinc-500">{label}</p><p className="mt-1 break-words font-bold text-zinc-100">{value}</p></div>;
+return <div className="min-w-0 border-b border-white/8 py-2.5"><p className="text-xs font-semibold text-zinc-400">{label}</p><p className="mt-1 break-words text-sm leading-6 text-zinc-100">{value}</p></div>;
 }
 
 function Timeline({ tournament }: { tournament: TournamentCard }) {
@@ -4837,515 +4474,6 @@ function MobileCard({
   );
 }
 
-function MobileHero({
-  tournament,
-  viewerRegistration,
-  verifiedDivision,
-  onRegisterClick,
-}: {
-  tournament: TournamentCard;
-  viewerRegistration: TournamentViewerRegistration | null;
-  verifiedDivision: RelicVerifiedDivision | null;
-  onRegisterClick: () => void;
-}) {
-  const t = useOptionalTranslations("competition", competitionEnglish);
-  const locale = useOptionalLocale();
-  const registrationAvailability = getRegistrationDivisionAvailability(
-    tournament,
-    verifiedDivision
-  );
-  const registrationOpen =
-    registrationAvailability === "open" ||
-    registrationAvailability === "waitlist";
-  const divisionLaunched = registrationAvailability === "launched";
-  const divisionNotHeld = registrationAvailability === "not_held";
-  const publicStatus = getPublicTournamentStatus(tournament);
-  const registrationIsWaitlistOnly = registrationAvailability === "waitlist";
-  const actionLabel = divisionNotHeld
-    ? t("tournaments.divisionState.notHeld")
-    : divisionLaunched
-      ? t("tournaments.actions.registrationClosed")
-      : registrationOpen
-        ? registrationIsWaitlistOnly
-          ? t("tournaments.actions.joinWaitlist")
-          : t("tournaments.actions.register")
-        : localizeTournamentStatus(publicStatus, t);
-  const registrationState = viewerRegistration
-    ? getViewerRegistrationDisplay(tournament, viewerRegistration, t, locale)
-    : null;
-  const terminalTournament = isTournamentTerminalStatus(
-    tournament.statusValue
-  ) || tournament.statusValue === "completed";
-  const metadata = [
-    {
-      icon: null,
-      label: tournament.game,
-    },
-    {
-      icon: CalendarDays,
-      label: localizeTournamentEventSection(
-        getTournamentEventSection(tournament.divisionStates),
-        t
-      ),
-    },
-    {
-      icon: Clock3,
-      label: tournament.schedule[0],
-    },
-    {
-      icon: Users,
-      label: t("heroMetadata.approvedSlots", {
-        players: formatNumber(tournament.players, locale),
-        maximum: formatNumber(tournament.maxPlayers, locale),
-      }),
-    },
-  ];
-
-  return (
-    <section className="relative isolate w-full max-w-full min-w-0 overflow-hidden border-b border-orange-500/20 bg-black px-4 pb-6 pt-6 sm:px-5">
-      <motion.div
-        className="absolute inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-45"
-        style={{
-          backgroundImage: `url(${tournament.image})`,
-        }}
-        animate={{ backgroundPositionY: ["0%", "100%", "0%"] }}
-        transition={{ duration: 36, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <div className="absolute inset-0 -z-10 bg-black/72" />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94)),linear-gradient(128deg,rgba(0,0,0,0.92),rgba(0,0,0,0.64),rgba(249,115,22,0.18))]" />
-
-      <div className="space-y-5">
-        <TournamentTerminalBanner tournament={tournament} />
-        <div className="flex max-w-full flex-wrap items-center gap-2">
-          <StatusPill
-            tone={
-              !divisionNotHeld &&
-              (tournament.statusValue === "registration_open" ||
-                tournament.statusValue === "in_progress")
-                ? "green"
-                : "gray"
-            }
-          >
-            {localizeTournamentStatus(publicStatus, t)}
-          </StatusPill>
-          <StatusPill tone="neutral">{tournament.format}</StatusPill>
-          <StatusPill tone="amber">{tournament.ruleFormatLabel}</StatusPill>
-          <StatusPill tone="gray">{tournament.region}</StatusPill>
-        </div>
-
-        <div>
-          <h1 className="max-w-full break-words text-3xl font-black leading-tight tracking-tight text-white">
-            {tournament.title}
-          </h1>
-          <div className="mt-4 grid gap-3 text-sm text-zinc-300">
-            {metadata.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={item.label}
-                  className="flex min-w-0 items-start gap-2"
-                >
-                  {Icon ? (
-                    <Icon size={16} className="mt-0.5 shrink-0 text-orange-300" />
-                  ) : (
-                    <svg
-                      aria-hidden="true"
-                      className="mt-0.5 shrink-0 text-orange-300"
-                      fill="none"
-                      height={16}
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.8}
-                      viewBox="0 0 24 24"
-                      width={16}
-                    >
-                      <rect x="2.5" y="4.5" width="11.5" height="8.5" />
-                      <circle cx="11.9" cy="10.8" r="0.55" />
-                      <path d="M8.25 13v2.15" />
-                      <path d="M5.9 15.15h4.7" />
-                      <path d="M3.25 18.1h11.2l1.05 2.1H2.2z" />
-                      <path d="M5.9 18.7v0.8" />
-                      <path d="M8.75 18.55v1.05" />
-                      <path d="M11.6 18.7v0.8" />
-                      <rect x="17" y="4.5" width="4.4" height="15.7" />
-                      <path d="M18.15 6.7h2.1" />
-                      <path d="M18.15 8.45h2.1" />
-                      <circle cx="19.2" cy="12" r="1.05" />
-                      <circle cx="19.2" cy="15" r="0.45" />
-                      <path d="M18.05 17.65h0.9" />
-                      <path d="M19.75 17.65h0.9" />
-                    </svg>
-                  )}
-                  <span className="min-w-0 break-words">{item.label}</span>
-                </div>
-              );
-            })}
-          </div>
-          <TournamentDivisionStateSummary
-            tournament={tournament}
-            className="mt-5"
-          />
-        </div>
-
-        <div className="w-full max-w-full min-w-0">
-          {terminalTournament ? (
-            <TournamentReadOnlyCard />
-          ) : registrationState ? (
-            <RegistrationStateCard state={registrationState} />
-          ) : (
-            <>
-              <ActionCard
-                label={actionLabel}
-                description={
-                  divisionNotHeld
-                    ? t("tournaments.hero.divisionNotHeld")
-                    : divisionLaunched
-                      ? t("tournaments.hero.divisionInProgress")
-                    : registrationOpen
-                      ? registrationIsWaitlistOnly
-                        ? t("tournaments.hero.waitlistOpen")
-                        : t("tournaments.hero.openEvents")
-                      : t("tournaments.hero.scheduleHint")
-                }
-                icon={registrationOpen ? CheckCircle2 : Clock3}
-                onClick={onRegisterClick}
-                disabled={divisionLaunched || divisionNotHeld}
-              />
-              {registrationOpen && <RegistrationGuidanceDisclosure />}
-            </>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function MobileTournamentMenuButton({ onClick }: { onClick: () => void }) {
-  const t = useOptionalTranslations("competition", competitionEnglish);
-
-  return (
-    <div className="w-full max-w-full min-w-0 px-4 py-4 sm:px-5">
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex min-h-11 w-full max-w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-orange-300/35 bg-black/70 px-4 py-3 text-left text-sm font-black uppercase tracking-wide text-orange-100 shadow-[0_14px_40px_rgba(0,0,0,0.38),0_0_22px_rgba(249,115,22,0.18)] backdrop-blur-xl transition hover:border-orange-200/70 hover:bg-orange-500/20 hover:text-white"
-      >
-        <span className="flex min-w-0 items-center gap-3">
-          <CalendarDays size={18} className="shrink-0 text-orange-300" />
-          <span className="min-w-0 break-words">{t("tournaments.tournamentMenu")}</span>
-        </span>
-        <ChevronDown size={17} className="-rotate-90 shrink-0 text-orange-300" />
-      </button>
-    </div>
-  );
-}
-
-function MobileTabs({
-  activeTab,
-  setActiveTab,
-}: {
-  activeTab: TabKey;
-  setActiveTab: (tab: TabKey) => void;
-}) {
-  const t = useOptionalTranslations("competition", competitionEnglish);
-
-  return (
-    <nav
-      aria-label={t("tournaments.tournamentNavigation")}
-      className="w-full max-w-full min-w-0 border-y border-orange-500/20 bg-black/72 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl sm:px-5"
-    >
-      <div className="grid w-full max-w-full min-w-0 grid-cols-3 gap-2">
-        {tabs.map((tab) => {
-          const selected = activeTab === tab.key;
-          const Icon = tab.icon;
-          const spanClass = "col-span-1";
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={classNames(
-                spanClass,
-                "flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-center text-[10px] font-black uppercase leading-tight tracking-normal transition",
-                selected
-                  ? "border-orange-400/70 bg-orange-500/15 text-white"
-                  : "border-white/12 bg-black/45 text-zinc-400 hover:border-orange-400/45 hover:text-white"
-              )}
-            >
-              <Icon size={15} className="shrink-0 text-orange-300" />
-              <span className="min-w-0 max-w-full break-normal">
-                {t(`tournaments.tabs.${tab.key}`)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
-function MobileOverview({
-  tournament,
-  tournaments,
-  activePanel,
-  setActivePanel,
-}: {
-  tournament: TournamentCard;
-  tournaments: TournamentCard[];
-  activePanel: OverviewPanelKey;
-  setActivePanel: (panel: OverviewPanelKey) => void;
-}) {
-  const t = useOptionalTranslations("competition", competitionEnglish);
-  const locale = useOptionalLocale();
-  const panels = overviewPanels.filter(
-    (item) => item.key !== "prizes" || hasPrize(tournament)
-  );
-  const visiblePanel =
-    activePanel === "prizes" && !hasPrize(tournament)
-      ? "details"
-      : activePanel;
-  const panelGridClass =
-    panels.length === 5
-      ? "grid-cols-6"
-      : panels.length === 4
-        ? "grid-cols-2"
-        : "grid-cols-3";
-
-  return (
-    <div className="space-y-5">
-      <MobileCard>
-        <h2 className="text-sm font-black uppercase tracking-wider text-white">
-          {t("tournaments.overview.published")}
-        </h2>
-        <div className="mt-4 space-y-3">
-          {tournaments.map((item) => (
-            <MobileTournamentLinkCard key={item.id} item={item} />
-          ))}
-        </div>
-      </MobileCard>
-
-      <MobileCard>
-        <div
-          className={classNames(
-            "grid w-full max-w-full min-w-0 gap-2 border-b border-slate-800 pb-3",
-            panelGridClass
-          )}
-        >
-          {panels.map((item, index) => {
-            const spanClass =
-              panels.length === 5
-                ? index < 3
-                  ? "col-span-2"
-                  : "col-span-3"
-                : "";
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setActivePanel(item.key)}
-                className={classNames(
-                  spanClass,
-                  "min-h-11 min-w-0 rounded border px-2 py-2 text-center text-[11px] font-black uppercase leading-tight tracking-wide transition",
-                  visiblePanel === item.key
-                    ? "border-orange-500 bg-orange-500/10 text-white"
-                    : "border-slate-700 text-zinc-400 hover:text-white"
-                )}
-              >
-                <span className="block min-w-0 break-words">
-                  {t(`tournaments.panels.${item.key}`)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="mt-5">{renderMobileOverviewPanel(visiblePanel, tournament, t, locale)}</div>
-      </MobileCard>
-
-      {tournament.mapPools.length > 0 ? (
-        <TournamentMapPools pools={tournament.mapPools} />
-      ) : null}
-
-      <MobileCard>
-        <h3 className="text-sm font-black uppercase tracking-wider text-white">
-          {t("tournaments.overview.archive")}
-        </h3>
-        <p className="mt-2 break-words text-xs leading-5 text-zinc-400">
-          {t("tournaments.overview.archiveDescription")}
-        </p>
-        <div className="mt-4 space-y-3">
-          {archiveEvents.map((item) => (
-            <a
-              key={item.title}
-              href={item.battlefy}
-              target="_blank"
-              rel="noreferrer"
-              className="group relative block w-full max-w-full overflow-hidden border border-white/12 bg-cover bg-center p-4 shadow-2xl shadow-black/30 backdrop-blur transition hover:border-orange-400/35"
-              style={{
-                backgroundImage: `linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86)),linear-gradient(135deg,rgba(0,0,0,0.96),rgba(0,0,0,0.9)),url(${item.image})`,
-              }}
-            >
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="break-words font-bold text-white">{item.title}</p>
-                  <p className="mt-1 break-words text-xs leading-5 text-zinc-300">
-                    {t(item.descriptionKey)}
-                  </p>
-                  <p className="mt-3 text-xs font-black uppercase tracking-wider text-orange-300">
-                    {t("tournaments.actions.viewBattlefy")}
-                  </p>
-                </div>
-                <MessageCircle size={16} className="mt-1 shrink-0 text-orange-300" />
-              </div>
-            </a>
-          ))}
-        </div>
-      </MobileCard>
-    </div>
-  );
-}
-
-function MobileTournamentLinkCard({ item }: { item: TournamentCard }) {
-  const t = useOptionalTranslations("competition", competitionEnglish);
-
-  return (
-    <article
-      data-published-tournament-card
-      className={classNames("w-full max-w-full min-w-0 overflow-hidden", tournamentInsetCardClass)}
-    >
-      <div
-        aria-hidden="true"
-        data-tournament-banner
-        className="aspect-[16/7] w-full bg-cover bg-center"
-        style={{ backgroundImage: `url(${item.image})` }}
-      />
-      <div className="min-w-0 p-3">
-        <p className="break-words text-[10px] font-black uppercase tracking-wide text-orange-300">
-          {localizeTournamentEventSection(getTournamentEventSection(item.divisionStates), t)} - {item.format} - {localizeTournamentStatus(getPublicTournamentStatus(item), t)}
-        </p>
-        <h3 className="mt-1.5 break-words font-black text-white">{item.title}</h3>
-        <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 text-zinc-400">
-          {item.description}
-        </p>
-      </div>
-    </article>
-  );
-}
-
-function renderMobileOverviewPanel(
-  panel: OverviewPanelKey,
-  tournament: TournamentCard,
-  t: CompetitionTranslator,
-  locale: Locale
-) {
-  const shared = "break-words leading-7 text-zinc-300";
-
-  if (panel === "rules") {
-    return <TournamentRulesEssentials tournament={tournament} />;
-  }
-
-  if (panel === "prizes") {
-    return (
-      <div className={classNames("w-full max-w-full min-w-0 p-5", tournamentInsetCardClass)}>
-        <Trophy className="text-amber-300" size={24} />
-        <p className="mt-4 text-sm font-black uppercase tracking-wider text-amber-200">
-          {t("tournaments.overview.prizes")}
-        </p>
-        <p className="mt-3 whitespace-pre-line break-words text-lg font-bold leading-8 text-white">
-          {tournament.prizePool}
-        </p>
-      </div>
-    );
-  }
-
-  if (panel === "schedule") {
-    return (
-      <div className="space-y-3">
-        {tournament.schedule.map((item, index) => (
-          <div
-            key={item}
-            className={classNames("flex min-w-0 items-start gap-3 p-4", tournamentInsetCardClass)}
-          >
-            <div className="grid h-8 w-8 shrink-0 place-items-center border border-orange-400/25 bg-orange-500/10 text-xs font-black text-orange-200">
-              {index + 1}
-            </div>
-            <span className="min-w-0 break-words font-semibold text-zinc-200">
-              {item}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (panel === "contact") {
-    return <div className={shared}>{tournament.contact}</div>;
-  }
-
-  return (
-    <div className="grid gap-3">
-      <MobileDetail label={t("tournaments.overview.event")} value={tournament.title} />
-      <MobileDetail label={t("tournaments.overview.format")} value={tournament.format} />
-      <MobileDetail label={t("tournaments.overview.ruleFormat")} value={tournament.ruleFormatLabel} />
-      <MobileDetail
-        label={t("tournaments.overview.registrationStatus")}
-        value={localizeTournamentStatus(getPublicTournamentStatus(tournament), t)}
-      />
-      <MobileDetail
-        label={t("tournaments.overview.registrationOpens")}
-        value={formatOptionalDateTime(
-          tournament.registrationOpenAt,
-          t("tournaments.overview.registrationOpenStatus"),
-          locale
-        )}
-      />
-      <MobileDetail
-        label={t("tournaments.overview.registrationCloses")}
-        value={formatOptionalDateTime(
-          tournament.registrationCloseAt,
-          t("tournaments.overview.registrationCloseAdmin"),
-          locale
-        )}
-      />
-      <MobileDetail
-        label={t("tournaments.panels.schedule")}
-        value={tournament.schedule[0]}
-      />
-      {hasPrize(tournament) && (
-        <MobileDetail label={t("tournaments.overview.prizePool")} value={tournament.prizePool} />
-      )}
-      <MobileDetail
-        label={t("tournaments.overview.approvedParticipants")}
-        value={`${tournament.players} / ${tournament.maxPlayers}`}
-      />
-      {tournament.divisionStates.map((resolution) => (
-        <MobileDetail
-          key={resolution.canonicalName}
-          label={resolution.displayName}
-          value={localizeTournamentDivisionState(resolution, t)}
-        />
-      ))}
-      {tournament.brackets.map((bracket) => (
-        <MobileDetail
-          key={bracket.name}
-          label={bracket.name}
-          value={t("tournaments.overview.cohortSummary", { requirement: bracket.requirement, active: bracket.activeCohortPlayers, capacity: bracket.activeCohortSize, approved: bracket.registeredPlayers, waitlisted: bracket.waitlistedPlayers })}
-        />
-      ))}
-    </div>
-  );
-}
-
-function MobileDetail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={classNames("w-full max-w-full min-w-0 p-4", tournamentInsetCardClass)}>
-      <p className="break-words text-xs font-black uppercase tracking-wider text-zinc-500">
-        {label}
-      </p>
-      <p className="mt-1 break-words font-bold text-zinc-100">{value}</p>
-    </div>
-  );
-}
 
 function MobileParticipants({ tournament }: { tournament: TournamentCard }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
@@ -5862,10 +4990,7 @@ function getAnnouncementMessages(
 
 function MobileMainContent({
   activeTab,
-  activeOverviewPanel,
-  setActiveOverviewPanel,
   tournament,
-  tournaments,
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
@@ -5889,14 +5014,6 @@ function MobileMainContent({
 }) {
   return (
     <main className="relative z-10 w-full max-w-full min-w-0 px-4 py-5 sm:px-5">
-      {activeTab === "overview" && (
-        <MobileOverview
-          tournament={tournament}
-          tournaments={tournaments}
-          activePanel={activeOverviewPanel}
-          setActivePanel={setActiveOverviewPanel}
-        />
-      )}
       {activeTab === "participants" && <MobileParticipants tournament={tournament} />}
       {activeTab === "brackets" && (
         <MobileBrackets
@@ -5928,10 +5045,7 @@ function MobileMainContent({
 
 function MainContent({
   activeTab,
-  activeOverviewPanel,
-  setActiveOverviewPanel,
   tournament,
-  tournaments,
   viewer,
   matchResultSubmissions,
   matchResultReportGroups,
@@ -5955,14 +5069,6 @@ function MainContent({
 }) {
   return (
     <main className="relative z-10 px-5 py-6 lg:px-8">
-      {activeTab === "overview" && (
-        <Overview
-          tournament={tournament}
-          tournaments={tournaments}
-          activePanel={activeOverviewPanel}
-          setActivePanel={setActiveOverviewPanel}
-        />
-      )}
       {activeTab === "participants" && <Participants tournament={tournament} />}
       {activeTab === "brackets" && (
         <Brackets
@@ -6583,88 +5689,38 @@ export default function TournamentsExperience({
 
   return (
     <>
-      <div
-        className="hidden min-h-screen bg-black bg-cover bg-center bg-fixed pt-20 text-zinc-100 lg:block"
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
-          backgroundAttachment: "fixed",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          backgroundSize: "cover",
-        }}
-      >
-        <div className="mx-auto flex max-w-[1600px]">
-          <Sidebar
-            selectedTournament={selectedTournament}
-            tournaments={publicTournaments}
-            onSelectTournament={handleSelectTournament}
-          />
-          <div className="min-w-0 flex-1">
-            <Hero
-              tournament={selectedTournament}
-              viewerRegistration={selectedViewerRegistration}
-              verifiedDivision={viewer.relicVerifiedDivision}
-              onRegisterClick={handleRegisterClick}
-            />
-            <TopTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
-            <MainContent
-              activeTab={activeTab}
-              activeOverviewPanel={activeOverviewPanel}
-              setActiveOverviewPanel={handleSetActiveOverviewPanel}
-              tournament={selectedTournament}
-              tournaments={publicTournaments}
-              viewer={viewer}
-              matchResultSubmissions={matchResultSubmissions}
-              matchResultReportGroups={matchResultReportGroups}
-              focusedMatchId={focusedMatchId}
-              tournamentPollsByTournament={tournamentPollsByTournament ?? {}}
-              pollLoadError={pollLoadError}
-              highlightedPollId={focusedPollId}
-            />
-          </div>
+      <div className="min-h-screen bg-black pt-24 text-zinc-100 sm:pt-28">
+        <div ref={mobileHeroStartRef} className="mx-auto w-full max-w-[1360px] scroll-mt-24 px-4 sm:px-6 lg:px-8">
+          <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div><p className="text-sm font-bold text-white">{t("tournaments.tournaments")}</p><p className="mt-1 text-xs text-zinc-500">{t("tournaments.organizerName")}</p></div>
+            <button type="button" aria-haspopup="dialog" onClick={() => setShowMobilePanel(true)} className="inline-flex min-h-11 items-center gap-2 border border-white/15 px-3 text-sm font-semibold text-zinc-200 hover:border-orange-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">{t("tournaments.redesign.chooseEvent")}<ChevronDown size={16} aria-hidden="true" /></button>
+          </header>
+          <TopTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
+          {activeTab === "overview" ? (
+            <main className="py-6">
+              <Overview tournament={selectedTournament} tournaments={publicTournaments} activePanel={activeOverviewPanel} setActivePanel={handleSetActiveOverviewPanel}
+                onSelectTournament={handleMobileSelectTournament}
+                selectedContext={<Hero tournament={selectedTournament} viewerRegistration={selectedViewerRegistration} verifiedDivision={viewer.relicVerifiedDivision} onRegisterClick={handleRegisterClick} />}
+              />
+            </main>
+          ) : (
+            <>
+              <div className="border-b border-white/10 py-5"><Hero tournament={selectedTournament} viewerRegistration={selectedViewerRegistration} verifiedDivision={viewer.relicVerifiedDivision} onRegisterClick={handleRegisterClick} /></div>
+              {activeTab === "decisions" ? <main className="py-6"><PollsAndDecisions key={selectedTournament.id} surface="tournament" tournamentId={selectedTournament.id} initialPolls={tournamentPollsByTournament?.[selectedTournament.id] ?? []} initialError={pollLoadError} highlightedPollId={focusedPollId} presentation="desktop" /></main> : <>
+                <div className="hidden lg:block"><MainContent activeTab={activeTab} activeOverviewPanel={activeOverviewPanel} setActiveOverviewPanel={handleSetActiveOverviewPanel}
+                  tournament={selectedTournament} tournaments={publicTournaments} viewer={viewer}
+                  matchResultSubmissions={matchResultSubmissions} matchResultReportGroups={matchResultReportGroups}
+                  focusedMatchId={focusedMatchId} tournamentPollsByTournament={tournamentPollsByTournament ?? {}}
+                  pollLoadError={pollLoadError} highlightedPollId={focusedPollId} /></div>
+                <div className="lg:hidden"><MobileMainContent activeTab={activeTab} activeOverviewPanel={activeOverviewPanel} setActiveOverviewPanel={handleSetActiveOverviewPanel}
+                  tournament={selectedTournament} tournaments={publicTournaments} viewer={viewer}
+                  matchResultSubmissions={matchResultSubmissions} matchResultReportGroups={matchResultReportGroups}
+                  focusedMatchId={focusedMatchId} tournamentPollsByTournament={tournamentPollsByTournament ?? {}}
+                  pollLoadError={pollLoadError} highlightedPollId={focusedPollId} /></div>
+              </>}
+            </>
+          )}
         </div>
-      </div>
-
-      <div
-        className="min-h-screen w-full max-w-full min-w-0 bg-black bg-cover bg-center pt-20 text-zinc-100 lg:hidden"
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg,rgba(0,0,0,0.92),rgba(0,0,0,0.78) 44%,rgba(0,0,0,0.96)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.66),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/4.jpg')",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          backgroundSize: "cover",
-        }}
-      >
-        <div
-          ref={mobileHeroStartRef}
-          className="scroll-mt-24"
-          style={{ scrollMarginTop: "calc(5rem + env(safe-area-inset-top))" }}
-        />
-        <MobileHero
-          tournament={selectedTournament}
-          viewerRegistration={selectedViewerRegistration}
-          verifiedDivision={viewer.relicVerifiedDivision}
-          onRegisterClick={handleRegisterClick}
-        />
-        <MobileTournamentMenuButton
-          onClick={() => setShowMobilePanel(true)}
-        />
-        <MobileTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
-        <MobileMainContent
-          activeTab={activeTab}
-          activeOverviewPanel={activeOverviewPanel}
-          setActiveOverviewPanel={handleSetActiveOverviewPanel}
-          tournament={selectedTournament}
-          tournaments={publicTournaments}
-          viewer={viewer}
-          matchResultSubmissions={matchResultSubmissions}
-          matchResultReportGroups={matchResultReportGroups}
-          focusedMatchId={focusedMatchId}
-          tournamentPollsByTournament={tournamentPollsByTournament ?? {}}
-          pollLoadError={pollLoadError}
-          highlightedPollId={focusedPollId}
-        />
       </div>
 
       {showRegisterModal && registrationProfile && registrationDocuments && (

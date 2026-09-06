@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
+import { stubNativeDialog } from "@/tests/helpers/native-dialog";
+let restoreNativeDialog: (() => void) | undefined;
+afterEach(() => restoreNativeDialog?.());
+
 import type { ReactNode } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import { translate } from "@/lib/i18n/translate";
@@ -214,6 +218,7 @@ const originalScrollIntoView = Object.getOwnPropertyDescriptor(
 
 describe("public Tournament division-state surface", () => {
   beforeEach(() => {
+    restoreNativeDialog = stubNativeDialog();
     window.history.replaceState(
       {},
       "",
@@ -254,10 +259,11 @@ describe("public Tournament division-state surface", () => {
   });
 
   it("shows independent mixed states for each Event", () => {
-    const { container } = renderExperience();
-    const sidebar = getDesktopSidebar(container);
-    const eventASummary = getEventSummary(sidebar, EVENT_A_ID);
-    const eventBSummary = getEventSummary(sidebar, EVENT_B_ID);
+    const view = renderExperience();
+    const eventBSummary = getEventSummary(view.container, EVENT_B_ID);
+    selectEvent(EVENT_A_ID);
+    view.rerender(experience());
+    const eventASummary = getEventSummary(view.container, EVENT_A_ID);
 
     expectDivisionState(
       eventASummary,
@@ -306,54 +312,25 @@ describe("public Tournament division-state surface", () => {
     );
   });
 
-  it("selects duplicate-title Events by stable ID on desktop and mobile", () => {
+  it("selects duplicate-title Events by stable ID in the shared event browser", () => {
     const view = renderExperience();
-    let sidebar = getDesktopSidebar(view.container);
-    let eventAButton = getEventButton(getEventSummary(sidebar, EVENT_A_ID));
-    let eventBButton = getEventButton(getEventSummary(sidebar, EVENT_B_ID));
-
     expect(eventA.title).toBe(eventB.title);
-    expect(eventAButton).toHaveAttribute("aria-pressed", "false");
-    expect(eventBButton).toHaveAttribute("aria-pressed", "true");
-    expect(eventAButton).not.toHaveClass("ring-2", "ring-orange-500");
-    expect(eventBButton).toHaveClass("ring-2", "ring-orange-500");
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: competitionEnglish.tournaments.tournamentMenu,
-      })
-    );
-    const mobileMenu = screen.getByRole("dialog", {
-      name: competitionEnglish.tournaments.tournamentMenu,
-    });
-    const mobileEventAButton = getEventButton(
-      getEventSummary(mobileMenu, EVENT_A_ID)
-    );
-    const mobileEventBButton = getEventButton(
-      getEventSummary(mobileMenu, EVENT_B_ID)
-    );
-
-    expect(mobileEventAButton).toHaveClass("border-white/12");
-    expect(mobileEventBButton).toHaveClass("border-orange-400/70");
-    expect(mobileEventAButton).toHaveAttribute("aria-pressed", "false");
-    expect(mobileEventBButton).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.click(mobileEventAButton);
-
+    fireEvent.click(screen.getByRole("button", { name: "Browse events" }));
+    const menu = screen.getByRole("dialog", { name: "Browse events" });
+    const buttons = within(menu).getAllByRole("button", { name: /Shared Event Title/ });
+    expect(buttons).toHaveLength(2);
+    expect(buttons.find((button) => button.dataset.eventId === EVENT_A_ID)).toHaveAttribute("aria-pressed", "false");
+    expect(buttons.find((button) => button.dataset.eventId === EVENT_B_ID)).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(buttons.find((button) => button.dataset.eventId === EVENT_A_ID)!);
     expect(routerPush).toHaveBeenCalledWith(
-      "/tournaments?tournament=event-a&tab=overview&panel=details",
-      { scroll: false }
+      "/tournaments?tournament=event-a&tab=overview&panel=details", { scroll: false }
     );
-
     view.rerender(experience());
-    sidebar = getDesktopSidebar(view.container);
-    eventAButton = getEventButton(getEventSummary(sidebar, EVENT_A_ID));
-    eventBButton = getEventButton(getEventSummary(sidebar, EVENT_B_ID));
-
-    expect(eventAButton).toHaveClass("ring-2", "ring-orange-500");
-    expect(eventBButton).not.toHaveClass("ring-2", "ring-orange-500");
-    expect(eventAButton).toHaveAttribute("aria-pressed", "true");
-    expect(eventBButton).toHaveAttribute("aria-pressed", "false");
+    expect(getEventSummary(view.container, EVENT_A_ID)).toBeInTheDocument();
+    expect(view.container.querySelector('[data-tournament-division-state-summary="' + EVENT_B_ID + '"]')).toBeNull();
+    selectEvent(EVENT_B_ID);
+    view.rerender(experience());
+    expect(getEventSummary(view.container, EVENT_B_ID)).toBeInTheDocument();
   });
 
   it("shows a terminal overlay for enabled divisions without erasing Disabled", () => {
@@ -403,7 +380,7 @@ describe("public Tournament division-state surface", () => {
     expect(academy).toHaveTextContent(
       `Academy Bracket: ${competitionEnglish.tournaments.divisionState.notHeld}`
     );
-    expect(getEventButton(summary)).toHaveTextContent("Not Held");
+    expect(screen.getByRole("button", { name: /^Not Held/ })).toBeDisabled();
     expect(
       screen
         .getAllByRole("button")
@@ -514,14 +491,12 @@ function makeBracket(
   };
 }
 
-function getDesktopSidebar(container: HTMLElement) {
-  const sidebar = container.querySelector("aside.hidden");
-
-  if (!(sidebar instanceof HTMLElement)) {
-    throw new Error("Desktop Tournament sidebar was not rendered.");
-  }
-
-  return sidebar;
+function selectEvent(id: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Browse events" }));
+  const menu = screen.getByRole("dialog", { name: "Browse events" });
+  const button = menu.querySelector('[data-event-id="' + id + '"]');
+  if (!(button instanceof HTMLButtonElement)) throw new Error("Missing event " + id);
+  fireEvent.click(button);
 }
 
 function getEventSummary(container: HTMLElement, tournamentId: string) {
@@ -536,15 +511,6 @@ function getEventSummary(container: HTMLElement, tournamentId: string) {
   return summary;
 }
 
-function getEventButton(summary: HTMLElement) {
-  const button = summary.closest("button");
-
-  if (!(button instanceof HTMLButtonElement)) {
-    throw new Error("Division-state summary was not inside an Event button.");
-  }
-
-  return button;
-}
 
 function expectDivisionState(
   summary: HTMLElement,

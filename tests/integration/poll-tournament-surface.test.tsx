@@ -73,8 +73,8 @@ describe("Tournament Polls & Decisions surface", () => {
       />
     );
 
-    expect(screen.getAllByTestId("polls-and-decisions")).toHaveLength(2);
-    expect(pollsAndDecisionsMock).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByTestId("polls-and-decisions")).toHaveLength(1);
+    expect(pollsAndDecisionsMock).toHaveBeenCalledTimes(1);
     for (const [props] of pollsAndDecisionsMock.mock.calls) {
       expect(props).toMatchObject({
         surface: "tournament",
@@ -86,7 +86,7 @@ describe("Tournament Polls & Decisions surface", () => {
     }
   });
 
-  it("presents all six mobile tabs as an accessible three-by-two grid", () => {
+  it("presents all six mobile tabs as an accessible responsive grid", () => {
     render(
       <TournamentsExperience
         tournaments={[makeTournament()]}
@@ -107,15 +107,14 @@ describe("Tournament Polls & Decisions surface", () => {
       name: competitionEnglish.tournaments.tournamentNavigation,
     });
     expect(within(navigation).getAllByRole("button")).toHaveLength(6);
-    expect(navigation.firstElementChild).toHaveClass("grid-cols-3");
+    expect(navigation.firstElementChild).toHaveClass("grid-cols-2", "sm:grid-cols-3", "lg:grid-cols-6");
     expect(
       within(navigation).getByRole("button", { name: /Polls & Decisions/i })
-    ).toHaveClass("min-h-11", "col-span-1");
+    ).toHaveClass("min-h-11");
     const announcements = within(navigation).getByRole("button", {
       name: /Announcements/i,
     });
-    expect(announcements).toHaveClass("flex-col", "tracking-normal");
-    expect(announcements.querySelector("span")).toHaveClass("break-normal");
+    expect(announcements).toHaveClass("min-h-11", "text-sm");
   });
 });
 
