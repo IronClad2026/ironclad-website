@@ -1,35 +1,16 @@
 import { auth } from "@clerk/nextjs/server";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  MapPin,
-  ShieldAlert,
-  Target,
-  Trophy,
-  UserRound,
-  XCircle,
-} from "lucide-react";
-import Link from "next/link";
+import { MapPin, Target, Trophy } from "lucide-react";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
 import DashboardChampionHistory from "@/components/DashboardChampionHistory";
 import DashboardMatchHistory from "@/components/DashboardMatchHistory";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
-import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
 import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
 import PlayerDivisionInvitations from "@/components/PlayerDivisionInvitations";
-import PlayerRegistrationActions from "@/components/PlayerRegistrationActions";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import { acknowledgeBadgeReveal } from "@/app/dashboard/badge-reveal-actions";
-import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import { loadPlayerBadgeRevealDashboardState } from "@/lib/badges/reveals";
-import {
-  getLocalizedCountryName,
-  getLocalizedPlayerRegion,
-} from "@/lib/countries";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import { loadPlayerNotifications } from "@/lib/notifications";
 import type { Locale } from "@/lib/i18n/config";
@@ -49,10 +30,11 @@ import {
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
-import {
-  isTournamentTerminalStatus,
-  type TournamentStatus,
-} from "@/lib/tournaments";
+import type { TournamentStatus } from "@/lib/tournaments";
+import DashboardIdentity from "@/components/dashboard/DashboardIdentity";
+import DashboardPreviousRegistrations from "@/components/dashboard/DashboardPreviousRegistrations";
+import { EmptyRegistrations, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
+import { groupDashboardRegistrations, type PlayerRegistration } from "@/components/dashboard/registration-presentation";
 
 export const dynamic = "force-dynamic";
 
@@ -60,40 +42,6 @@ type DashboardTranslator = (
   path: string,
   values?: MessageValues
 ) => string;
-
-type RegistrationStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "manual_review"
-  | "waitlisted"
-  | "withdrawn";
-
-type WaitlistOfferStatus =
-  | "offered"
-  | "accepted"
-  | "declined"
-  | "expired"
-  | "cancelled"
-  | null;
-
-type PlayerRegistration = {
-  id: string;
-  tournament_title: string;
-  bracket_name: string;
-  registration_status: RegistrationStatus;
-  tournament_bracket_id: string;
-  elo_status: string;
-  submitted_elo: number | null;
-  withdrawn_at: string | null;
-  waitlist_offer_status: WaitlistOfferStatus;
-  waitlist_offer_created_at: string | null;
-  waitlist_offer_expires_at: string | null;
-  waitlist_offer_resolved_at: string | null;
-  launched_at: string | null;
-  tournament_status: TournamentStatus;
-  created_at: string;
-};
 
 type PlayerRegistrationRow = Omit<
   PlayerRegistration,
@@ -169,7 +117,6 @@ export default async function PlayerDashboardPage() {
     tournament_status:
       first(registration.tournaments)?.status ?? "upcoming",
   }));
-  const profileComplete = profile?.profile_completed === true;
   const divisionInvitationState =
     profileResult.error
       ? { status: "error" as const, invitations: [] }
@@ -193,9 +140,15 @@ export default async function PlayerDashboardPage() {
       ? dictionaries.badges.dashboard.loadErrorDescription
       : null;
 
+  const { current: currentRegistrations, previous: previousRegistrations } =
+    groupDashboardRegistrations(registrations);
+  const previousRegistrationNodes = previousRegistrations.map((registration) => (
+    <RegistrationCard key={registration.id} registration={registration} locale={locale} t={t} />
+  ));
+
   return (
     <main
-      className="min-h-screen bg-black bg-cover bg-center bg-fixed px-4 pb-16 pt-24 text-white sm:px-6 sm:pt-28 lg:pb-20 lg:pt-30"
+      className="min-h-screen bg-black bg-cover bg-center bg-fixed px-4 pb-16 pt-24 text-white sm:px-6 sm:pt-28 lg:pb-20 lg:pt-28"
       data-dashboard-command-centre
       style={{
         backgroundImage:
@@ -207,223 +160,93 @@ export default async function PlayerDashboardPage() {
       }}
     >
       <div className="relative z-10 mx-auto max-w-7xl">
-        <header
-          className="relative overflow-hidden border border-orange-500/25 bg-black/72 px-5 py-5 shadow-[0_0_36px_rgba(0,0,0,0.5)] backdrop-blur sm:px-6 md:py-6"
-          data-dashboard-section="header"
-        >
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:42px_42px] opacity-20" />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(0,0,0,0.82)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(249,115,22,0.13),rgba(0,0,0,0.9))]" />
+        <DashboardIdentity profile={profile} error={Boolean(profileResult.error)} locale={locale} t={t} />
 
-          <div className="relative z-10 grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(360px,1.2fr)] lg:items-end">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-orange-400 sm:text-xs">
-                {t("dashboard.hero.eyebrow")}
-              </p>
-              <h1 className="mt-1.5 text-3xl font-black tracking-tight sm:text-4xl">
-                {t("dashboard.hero.title")}
-              </h1>
-            </div>
-            <p className="max-w-2xl text-sm leading-6 text-zinc-300 lg:justify-self-end">
-              {t("dashboard.hero.description")}
-            </p>
-          </div>
-        </header>
-
-        <section
-          className="mt-4 border border-orange-500/20 bg-black/68 p-4 shadow-2xl shadow-black/25 backdrop-blur-xl sm:p-5"
-          data-dashboard-section="identity"
-        >
-          {profileResult.error ? (
-            <DashboardError message={t("dashboard.profile.loadError")} />
-          ) : profile ? (
-            <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center xl:grid-cols-[auto_minmax(0,1fr)_auto]">
-              <PlayerAvatar
-                avatarUrl={getPlayerAvatarDisplayUrl(profile)}
-                avatarLabel={t("dashboard.profile.avatarLabel", {
-                  name: profile.display_name,
-                })}
-              />
-
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h2 className="break-words text-2xl font-black text-white sm:text-3xl">
-                    {profile.display_name}
-                  </h2>
-                  <CompletionBadge
-                    complete={profileComplete}
-                    t={t}
-                  />
-                </div>
-                <p className="mt-1 text-sm font-bold text-orange-300 sm:text-base">
-                  {profile.in_game_name}
-                </p>
-
-                <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                  <ProfileValue
-                    label={t("dashboard.profile.country")}
-                    value={
-                      profile.country
-                        ? getLocalizedCountryName(profile.country, locale)
-                        : null
-                    }
-                    fallback={t("dashboard.notAvailable")}
-                  />
-                  <ProfileValue
-                    label={t("dashboard.profile.region")}
-                    value={
-                      profile.region
-                        ? getLocalizedPlayerRegion(profile.region, (path) =>
-                            t(path)
-                          )
-                        : null
-                    }
-                    fallback={t("dashboard.notAvailable")}
-                  />
-                  <ProfileValue
-                    label={t("dashboard.profile.timezone")}
-                    value={profile.timezone}
-                    fallback={t("dashboard.notAvailable")}
-                  />
-                  <ProfileValue
-                    label={t("dashboard.profile.currentElo")}
-                    value={
-                      profile.current_elo === null
-                        ? null
-                        : formatNumber(profile.current_elo, locale)
-                    }
-                    fallback={t("dashboard.notAvailable")}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row xl:col-span-1 xl:flex-col">
-                <Link
-                  href="/profile"
-                  className="inline-flex min-h-11 items-center justify-center border border-white/15 bg-white/[0.04] px-4 py-2.5 text-center text-sm font-bold text-white transition hover:border-orange-400/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-                >
-                  {t("dashboard.profile.viewEdit")}
-                </Link>
-                <Link
-                  href="/tournaments"
-                  className="inline-flex min-h-11 items-center justify-center border border-orange-400 bg-orange-500 px-4 py-2.5 text-center text-sm font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-                >
-                  {t("dashboard.profile.goTournaments")}
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white">
-                  {t("dashboard.profile.requiredTitle")}
-                </h2>
-                <p className="mt-2 text-zinc-400">
-                  {t("dashboard.profile.requiredDescription")}
-                </p>
-              </div>
-              <Link
-                href="/profile"
-                className="border border-orange-400 bg-orange-500 px-5 py-3 text-center font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-              >
-                {t("dashboard.profile.complete")}
-              </Link>
-            </div>
-          )}
-        </section>
-
-        <div
-          className="mt-6 grid gap-3 lg:grid-cols-2 lg:items-start"
-          data-dashboard-section="current-actions"
-        >
-          <InAppNotificationCenter
-            key={[
-              locale,
-              playerNotifications.unreadCount,
-              ...playerNotifications.notifications.map(
-                (notification) =>
-                  `${notification.id}:${notification.readAt ?? ""}`
-              ),
-            ].join("|")}
-            scope="player"
-            title={t("dashboard.notificationCenter.title")}
-            eyebrow={t("dashboard.notificationCenter.eyebrow")}
-            description={t("dashboard.notificationCenter.description")}
-            emptyMessage={t("dashboard.notificationCenter.empty")}
-            notifications={playerNotifications.notifications}
-            totalCount={playerNotifications.totalCount}
-            unreadCount={playerNotifications.unreadCount}
-            error={playerNotifications.error}
-            className="!max-w-none !rounded-none !border-orange-500/20 !bg-black/65 !shadow-xl !shadow-black/25 [&_button]:rounded-none [&_div]:rounded-none"
-          />
-
-          <DashboardNotifications
-            key={[
-              locale,
-              ...career.notifications.map(
-                (notification) => `${notification.id}:${notification.status}`
-              ),
-            ].join("|")}
-            notifications={career.notifications}
-            error={
-              career.error
-                ? t(
-                    career.error === "load-failed"
-                      ? "dashboard.career.loadError"
-                      : "dashboard.career.partialError"
-                  )
-                : null
-            }
-          />
-        </div>
-
-        <section
-          className="mt-6"
-          data-dashboard-section="registrations"
-        >
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-400 sm:text-xs">
-                {t("dashboard.registrations.eyebrow")}
-              </p>
-              <h2 className="mt-1.5 text-2xl font-black text-white sm:text-3xl">
-                {t("dashboard.registrations.title")}
+        <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)]" data-dashboard-section="current-actions">
+          <section className="min-w-0" aria-labelledby="dashboard-competition-title">
+            <div className="mb-4">
+              <h2 id="dashboard-competition-title" className="text-xl font-black tracking-tight text-white sm:text-2xl">
+                {t("dashboard.competition.title")}
               </h2>
             </div>
-            <p className="text-xs font-bold text-zinc-500 sm:text-sm">
-              {formatDashboardRegistrationCount(
-                registrations.length,
+            <DashboardNotifications
+              key={[
                 locale,
-                t
+                ...career.notifications.map(
+                  (notification) => `${notification.id}:${notification.status}`
+                ),
+              ].join("|")}
+              presentation="competition"
+              notifications={career.notifications}
+              error={
+                career.error
+                  ? t(
+                      career.error === "load-failed"
+                        ? "dashboard.career.loadError"
+                        : "dashboard.career.partialError"
+                    )
+                  : null
+              }
+            />
+            <section className="mt-5" data-dashboard-section="registrations" aria-labelledby="dashboard-registrations-title">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 id="dashboard-registrations-title" className="text-base font-bold text-zinc-200">
+                  {t("dashboard.competition.registrations")}
+                </h3>
+                {!registrationsResult.error && (
+                  <p className="text-xs text-zinc-400">
+                    {formatDashboardRegistrationCount(currentRegistrations.length, locale, t)}
+                  </p>
+                )}
+              </div>
+              {registrationsResult.error ? (
+                <div className="mt-3"><DashboardError message={t("dashboard.registrations.loadError")} /></div>
+              ) : currentRegistrations.length === 0 ? (
+                <EmptyRegistrations t={t} />
+              ) : (
+                <div className="mt-3 grid gap-3">
+                  {currentRegistrations.map((registration) => (
+                    <RegistrationCard key={registration.id} registration={registration} locale={locale} t={t} />
+                  ))}
+                </div>
               )}
-            </p>
+            </section>
+            <PlayerDivisionInvitations
+              invitations={divisionInvitationState.invitations}
+              loadError={divisionInvitationState.status === "error"}
+            />
+          </section>
+          <aside className="min-w-0" aria-label={t("dashboard.competition.updates")}>
+            <InAppNotificationCenter
+              key={[
+                locale,
+                playerNotifications.unreadCount,
+                ...playerNotifications.notifications.map(
+                  (notification) =>
+                    `${notification.id}:${notification.readAt ?? ""}`
+                ),
+              ].join("|")}
+              scope="player"
+              presentation="dashboard"
+              title={t("dashboard.competition.updates")}
+              eyebrow={t("dashboard.notificationCenter.eyebrow")}
+              description={t("dashboard.notificationCenter.description")}
+              emptyMessage={t("dashboard.notificationCenter.empty")}
+              notifications={playerNotifications.notifications}
+              totalCount={playerNotifications.totalCount}
+              unreadCount={playerNotifications.unreadCount}
+              error={playerNotifications.error}
+            />
+          </aside>
+        </div>
+
+        {!registrationsResult.error && previousRegistrations.length > 0 && (
+          <div className="mt-6">
+            <DashboardPreviousRegistrations title={t("dashboard.career.registrations")} count={previousRegistrations.length}>
+              {previousRegistrationNodes}
+            </DashboardPreviousRegistrations>
           </div>
-
-          {registrationsResult.error ? (
-            <div className="mt-4">
-              <DashboardError
-                message={t("dashboard.registrations.loadError")}
-              />
-            </div>
-          ) : registrations.length === 0 ? (
-            <EmptyRegistrations t={t} />
-          ) : (
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              {registrations.map((registration) => (
-                <RegistrationCard
-                  key={registration.id}
-                  registration={registration}
-                  locale={locale}
-                  t={t}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <PlayerDivisionInvitations
-          invitations={divisionInvitationState.invitations}
-          loadError={divisionInvitationState.status === "error"}
-        />
+        )}
 
         {!career.error && (
           <PlayerStatisticsSection
@@ -589,343 +412,6 @@ function SectionHeading({
   );
 }
 
-function PlayerAvatar({
-  avatarUrl,
-  avatarLabel,
-}: {
-  avatarUrl: string | null;
-  avatarLabel: string;
-}) {
-  return (
-    <div
-      role="img"
-      aria-label={avatarLabel}
-      className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-orange-500/50 bg-black/60 bg-cover bg-center shadow-[0_0_28px_rgba(249,115,22,0.18)] sm:h-28 sm:w-28"
-      style={
-        avatarUrl ? { backgroundImage: `url("${avatarUrl}")` } : undefined
-      }
-    >
-      {!avatarUrl && <UserRound size={40} className="text-zinc-600" />}
-    </div>
-  );
-}
-
-function CompletionBadge({
-  complete,
-  t,
-}: {
-  complete: boolean;
-  t: DashboardTranslator;
-}) {
-  return (
-    <span
-      className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
-        complete
-          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-          : "border-orange-500/40 bg-orange-500/10 text-orange-300"
-      }`}
-    >
-      {complete
-        ? t("dashboard.profile.completeStatus")
-        : t("dashboard.profile.incompleteStatus")}
-    </span>
-  );
-}
-
-function ProfileValue({
-  label,
-  value,
-  fallback,
-}: {
-  label: string;
-  value: string | null;
-  fallback: string;
-}) {
-  return (
-    <div className="min-w-0 border border-white/10 bg-black/38 p-3 shadow-inner shadow-black/20">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-        {label}
-      </p>
-      <p className="mt-1 break-words text-sm font-black text-white">
-        {value || fallback}
-      </p>
-    </div>
-  );
-}
-
-function RegistrationCard({
-  registration,
-  locale,
-  t,
-}: {
-  registration: PlayerRegistration;
-  locale: Locale;
-  t: DashboardTranslator;
-}) {
-  const terminalTournament = isTournamentTerminalStatus(
-    registration.tournament_status
-  );
-
-  return (
-    <article id={`registration-${registration.id}`} className="scroll-mt-28 border border-orange-500/20 bg-black/70 p-5 shadow-2xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/80">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-orange-300">
-            <Trophy size={18} />
-            <p className="text-xs font-black uppercase tracking-[0.22em]">
-              {t("dashboard.registrations.cardEyebrow")}
-            </p>
-          </div>
-          <h3 className="mt-3 break-words text-xl font-black text-white">
-            {registration.tournament_title}
-          </h3>
-          <p className="mt-2 text-sm font-semibold text-zinc-400">
-            {registration.bracket_name}
-          </p>
-        </div>
-        <StatusBadge status={registration.registration_status} t={t} />
-      </div>
-
-      <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-        <RegistrationValue
-          label={t("dashboard.registrations.eloStatus")}
-          value={eloStatusLabel(registration.elo_status, t)}
-        />
-        <RegistrationValue
-          label={t("dashboard.registrations.submittedElo")}
-          value={
-            registration.submitted_elo === null
-              ? t("dashboard.notAvailable")
-              : formatNumber(registration.submitted_elo, locale)
-          }
-        />
-        <RegistrationValue
-          label={t("dashboard.registrations.submitted")}
-          value={
-            <HydrationSafeLocalDateTime
-              value={registration.created_at}
-              fallback={t("dashboard.notAvailable")}
-            />
-          }
-        />
-      </div>
-
-      {terminalTournament ? (
-        <div
-          role="status"
-          className="mt-5 border border-amber-400/30 bg-amber-950/20 p-4 text-amber-100"
-        >
-          <p className="text-sm font-black uppercase tracking-wider">
-            {t("dashboard.registrations.historicalTitle")}
-          </p>
-          <p className="mt-2 text-sm leading-6">
-            {t(
-              registration.tournament_status === "cancelled"
-                ? "dashboard.registrations.cancelledMessage"
-                : "dashboard.registrations.voidedMessage"
-            )}
-          </p>
-        </div>
-      ) : (
-        <RegistrationDecision registration={registration} t={t} />
-      )}
-      <PlayerRegistrationActions
-        registrationId={registration.id}
-        registrationStatus={registration.registration_status}
-        waitlistOfferStatus={registration.waitlist_offer_status}
-        waitlistOfferExpiresAt={registration.waitlist_offer_expires_at}
-        launchedAt={registration.launched_at}
-        tournamentStatus={registration.tournament_status}
-      />
-    </article>
-  );
-}
-
-function RegistrationDecision({
-  registration,
-  t,
-}: {
-  registration: PlayerRegistration;
-  t: DashboardTranslator;
-}) {
-  const waitlistContent = {
-    offered: {
-      title: t("dashboard.registrations.offerTitle"),
-      message: t("dashboard.registrations.offerMessage"),
-      className: "border-amber-400/40 bg-amber-500/10 text-amber-100",
-    },
-    declined: {
-      title: t("dashboard.registrations.declinedTitle"),
-      message: t("dashboard.registrations.declinedMessage"),
-      className: "border-white/10 bg-white/[0.04] text-zinc-300",
-    },
-    expired: {
-      title: t("dashboard.registrations.expiredTitle"),
-      message: t("dashboard.registrations.expiredMessage"),
-      className: "border-white/10 bg-white/[0.04] text-zinc-300",
-    },
-    cancelled: {
-      title: t("dashboard.registrations.waitlistClosedTitle"),
-      message: t("dashboard.registrations.waitlistClosedMessage"),
-      className: "border-white/10 bg-white/[0.04] text-zinc-300",
-    },
-    accepted: {
-      title: t("dashboard.registrations.acceptedTitle"),
-      message: t("dashboard.registrations.acceptedMessage"),
-      className:
-        "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-    },
-    waiting: registration.launched_at
-      ? {
-          title: t("dashboard.registrations.waitlistClosedTitle"),
-          message: t("dashboard.registrations.launchedWaitlistMessage"),
-          className: "border-white/10 bg-white/[0.04] text-zinc-300",
-        }
-      : {
-          title: t("dashboard.registrations.waitlistedTitle"),
-          message: t("dashboard.registrations.waitlistedMessage"),
-          className: "border-amber-500/30 bg-amber-500/10 text-amber-200",
-        },
-  }[registration.waitlist_offer_status ?? "waiting"];
-  const content = {
-    approved: {
-      title: t("dashboard.registrations.approvedTitle"),
-      message: t("dashboard.registrations.approvedMessage"),
-      className:
-        "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-    },
-    rejected: {
-      title: t("dashboard.registrations.rejectedTitle"),
-      message: t("dashboard.registrations.rejectedMessage"),
-      className: "border-red-500/30 bg-red-500/10 text-red-200",
-    },
-    manual_review: {
-      title: t("dashboard.registrations.manualReviewTitle"),
-      message: t("dashboard.registrations.manualReviewMessage"),
-      className:
-        "border-orange-500/30 bg-orange-500/10 text-orange-200",
-    },
-    waitlisted: waitlistContent,
-    withdrawn: {
-      title: t("dashboard.registrations.withdrawnTitle"),
-      message: t("dashboard.registrations.withdrawnMessage"),
-      className: "border-white/10 bg-white/[0.04] text-zinc-300",
-    },
-    pending: {
-      title: t("dashboard.registrations.pendingTitle"),
-      message: t("dashboard.registrations.pendingMessage"),
-      className: "border-white/10 bg-white/[0.04] text-zinc-300",
-    },
-  }[registration.registration_status] ?? {
-    title: t("dashboard.registrations.fallbackTitle"),
-    message: t("dashboard.registrations.fallbackMessage"),
-    className: "border-white/10 bg-white/[0.04] text-zinc-300",
-  };
-  return (
-    <div className={`mt-4 border p-4 ${content.className}`}>
-      <p className="text-sm font-black uppercase tracking-wider">
-        {content.title}
-      </p>
-      <p className="mt-2 text-sm leading-6 opacity-90">{content.message}</p>
-    </div>
-  );
-}
-
-function StatusBadge({
-  status,
-  t,
-}: {
-  status: RegistrationStatus;
-  t: DashboardTranslator;
-}) {
-  const content = {
-    approved: {
-      label: t("dashboard.registrations.statusApproved"),
-      icon: CheckCircle2,
-      className:
-        "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
-    },
-    rejected: {
-      label: t("dashboard.registrations.statusRejected"),
-      icon: XCircle,
-      className: "border-red-500/40 bg-red-500/10 text-red-300",
-    },
-    manual_review: {
-      label: t("dashboard.registrations.statusManualReview"),
-      icon: ShieldAlert,
-      className: "border-orange-500/40 bg-orange-500/10 text-orange-300",
-    },
-    waitlisted: {
-      label: t("dashboard.registrations.statusWaitlisted"),
-      icon: Clock3,
-      className: "border-amber-500/40 bg-amber-500/10 text-amber-300",
-    },
-    withdrawn: {
-      label: t("dashboard.registrations.statusWithdrawn"),
-      icon: XCircle,
-      className: "border-zinc-500/40 bg-zinc-500/10 text-zinc-300",
-    },
-    pending: {
-      label: t("dashboard.registrations.statusPending"),
-      icon: Clock3,
-      className: "border-white/15 bg-white/5 text-zinc-300",
-    },
-  }[status] ?? {
-    label: t("dashboard.registrations.statusPending"),
-    icon: Clock3,
-    className: "border-white/15 bg-white/5 text-zinc-300",
-  };
-  const Icon = content.icon;
-
-  return (
-    <span
-      className={`inline-flex w-fit shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-black uppercase tracking-wider ${content.className}`}
-    >
-      <Icon size={14} />
-      {content.label}
-    </span>
-  );
-}
-
-function RegistrationValue({
-  label,
-  value,
-}: {
-  label: string;
-  value: ReactNode;
-}) {
-  return (
-    <div className="border border-white/10 bg-black/40 p-3 shadow-inner shadow-black/20">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-        {label}
-      </p>
-      <p className="mt-1.5 break-words text-sm font-bold text-white">{value}</p>
-    </div>
-  );
-}
-
-function EmptyRegistrations({ t }: { t: DashboardTranslator }) {
-  return (
-    <div className="mt-4 border border-dashed border-orange-400/25 bg-black/60 px-5 py-10 text-center shadow-2xl shadow-black/25 backdrop-blur">
-      <div className="mx-auto grid h-11 w-11 place-items-center rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-300">
-        <CalendarDays size={21} />
-      </div>
-      <h3 className="mt-4 text-lg font-bold text-white">
-        {t("dashboard.registrations.emptyTitle")}
-      </h3>
-      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-400">
-        {t("dashboard.registrations.emptyDescription")}
-      </p>
-      <Link
-        href="/tournaments"
-        className="mt-5 inline-flex min-h-11 items-center border border-orange-400 bg-orange-500 px-5 py-2.5 text-sm font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-      >
-        {t("dashboard.registrations.explore")}
-      </Link>
-    </div>
-  );
-}
-
 function DashboardError({ message }: { message: string }) {
   return (
     <div className="flex items-center gap-3 border border-red-500/35 bg-red-500/10 p-5 text-red-300 shadow-xl shadow-black/20 backdrop-blur">
@@ -933,18 +419,6 @@ function DashboardError({ message }: { message: string }) {
       <p>{message}</p>
     </div>
   );
-}
-
-function eloStatusLabel(status: string, t: DashboardTranslator) {
-  const path = {
-    pending: "dashboard.registrations.eloPending",
-    verified: "dashboard.registrations.eloVerified",
-    rejected: "dashboard.registrations.eloRejected",
-    failed: "dashboard.registrations.eloFailed",
-    manual_review: "dashboard.registrations.eloManualReview",
-  }[status.trim().toLowerCase()];
-
-  return t(path ?? "dashboard.registrations.eloUnavailable");
 }
 
 function first<T>(value: T | T[] | null | undefined): T | null {

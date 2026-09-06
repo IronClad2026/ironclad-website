@@ -53,12 +53,17 @@ type NotificationTranslator = (
 export default function DashboardNotifications({
   notifications: initialNotifications,
   error = null,
+  presentation = "default",
 }: {
   notifications: DashboardNotification[];
   error?: string | null;
+  presentation?: "default" | "competition";
 }) {
   const [notifications, setNotifications] = useState(initialNotifications);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() =>
+    presentation === "competition" && initialNotifications.some(requiresMatchAttention)
+  );
+  const contentId = useId();
   const [selected, setSelected] = useState<DashboardNotification | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
@@ -75,13 +80,10 @@ export default function DashboardNotifications({
       (notification) => notification.confirmationDeadlineAt !== null
     ),
   });
-  const actionRequired = notifications.filter(
-    (notification) =>
-      notification.canConfirm ||
-      notification.canDispute ||
-      notification.status === "rejected" ||
-      notification.status === "resubmission_requested"
-  ).length;
+  const actionRequired = notifications.filter(requiresMatchAttention).length;
+  const displayedNotifications = presentation === "competition"
+    ? [...notifications].sort((left, right) => Number(requiresMatchAttention(right)) - Number(requiresMatchAttention(left)))
+    : notifications;
   const allSelected =
     notifications.length > 0 && selectedIds.size === notifications.length;
 
@@ -197,25 +199,26 @@ export default function DashboardNotifications({
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
-        className="flex w-full items-center justify-between gap-4 border border-amber-700/35 bg-[linear-gradient(135deg,rgba(127,29,29,0.18),rgba(63,63,70,0.2),rgba(0,0,0,0.45))] p-5 text-left shadow-xl shadow-black/20 transition hover:border-amber-500/55"
+        aria-controls={contentId}
+        className={`flex min-h-14 w-full items-center justify-between gap-3 border p-4 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${presentation === "competition" ? actionRequired > 0 ? "border-orange-400/35 bg-orange-500/[0.06] hover:border-orange-300/60" : "border-white/10 bg-zinc-950/60 hover:border-white/25" : "border-amber-700/35 bg-black/60 hover:border-amber-500/55"}`}
       >
         <span className="flex min-w-0 items-center gap-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center border border-red-400/30 bg-red-500/10 text-red-200">
+          <span className={`grid h-10 w-10 shrink-0 place-items-center ${actionRequired > 0 ? "text-orange-300" : "text-zinc-400"}`}>
             <ShieldAlert size={20} />
           </span>
           <span className="min-w-0">
             <span className="block text-sm font-black uppercase tracking-[0.18em] text-white">
               {t("dashboard.title")}
             </span>
-            <span className="mt-1 block max-w-2xl text-xs leading-5 text-zinc-400">
+            <span className={presentation === "competition" ? "sr-only" : "mt-1 block max-w-2xl text-xs leading-5 text-zinc-400"}>
               {t("dashboard.description")}
             </span>
-            <span className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-wider">
+            <span className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-semibold">
               <span
                 className={
                   actionRequired > 0
                     ? "border border-red-400/35 bg-red-500/10 px-2 py-1 text-red-200"
-                    : "border border-white/10 bg-white/[0.03] px-2 py-1 text-zinc-500"
+                    : "text-zinc-400"
                 }
               >
                 {actionRequired > 0
@@ -259,15 +262,16 @@ export default function DashboardNotifications({
             initial={{ opacity: 0, height: 0, y: -8 }}
             animate={{ opacity: 1, height: "auto", y: 0 }}
             exit={{ opacity: 0, height: 0, y: -8 }}
-            className="relative z-20 mt-2 overflow-hidden border border-amber-900/30 bg-[#0b0d12]/95 shadow-2xl shadow-black/50 backdrop-blur-xl"
+            id={contentId}
+            className="relative z-20 overflow-hidden border-x border-b border-white/10 bg-zinc-950/95"
           >
             {notifications.length === 0 ? (
               <p className="p-5 text-sm text-zinc-500">
                 {t("dashboard.empty")}
               </p>
             ) : (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 p-3">
+              <div className="flex flex-col">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-y border-white/10 p-3">
                   <button
                     type="button"
                     onClick={() =>
@@ -282,7 +286,7 @@ export default function DashboardNotifications({
                       )
                     }
                     disabled={pending}
-                    className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-zinc-300 transition hover:border-orange-400/30 hover:text-white disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-black uppercase tracking-wider text-zinc-300 transition hover:border-orange-400/30 hover:text-white disabled:opacity-50"
                   >
                     <CheckSquare2 size={14} />
                     {allSelected
@@ -296,7 +300,7 @@ export default function DashboardNotifications({
                         deleteNotifications([...selectedIds])
                       }
                       disabled={pending || selectedIds.size === 0}
-                      className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-red-200 transition hover:bg-red-500/20 disabled:opacity-40"
+                      className="min-h-11 rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-black uppercase tracking-wider text-red-200 transition hover:bg-red-500/20 disabled:opacity-40"
                     >
                       {t("dashboard.deleteSelected")}
                     </button>
@@ -306,15 +310,15 @@ export default function DashboardNotifications({
                         deleteNotifications([], true)
                       }
                       disabled={pending}
-                      className="rounded-lg bg-red-700 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
+                      className="min-h-11 rounded-lg bg-red-700 px-3 py-2 text-xs font-black uppercase tracking-wider text-white transition hover:bg-red-600 disabled:opacity-50"
                     >
                       {t("dashboard.deleteAll")}
                     </button>
                   </div>
                 </div>
 
-                <div className="max-h-80 overflow-y-auto p-2">
-                  {notifications.map((notification) => (
+                <div className={`max-h-80 overflow-y-auto p-2 ${presentation === "competition" ? "order-first" : ""}`}>
+                  {displayedNotifications.map((notification) => (
                     <NotificationRow
                       key={notification.id}
                       notification={notification}
@@ -334,7 +338,7 @@ export default function DashboardNotifications({
                     />
                   ))}
                 </div>
-              </>
+              </div>
             )}
 
             {message && !selected && (
@@ -371,6 +375,11 @@ export default function DashboardNotifications({
   );
 }
 
+function requiresMatchAttention(notification: DashboardNotification) {
+  return notification.canConfirm || notification.canDispute ||
+    notification.status === "rejected" || notification.status === "resubmission_requested";
+}
+
 function NotificationRow({
   notification,
   checked,
@@ -397,7 +406,7 @@ function NotificationRow({
 
   return (
     <div className="flex items-start gap-2 rounded-xl px-2 py-2 transition hover:bg-white/5">
-      <label className="mt-1 grid h-8 w-8 shrink-0 cursor-pointer place-items-center">
+      <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center">
         <input
           type="checkbox"
           checked={checked}
@@ -413,21 +422,21 @@ function NotificationRow({
         type="button"
         onClick={onOpen}
         disabled={pending}
-        className="flex min-w-0 flex-1 items-start gap-3 rounded-lg px-1 py-1 text-left disabled:cursor-wait disabled:opacity-50"
+        className="flex min-h-11 min-w-0 flex-1 items-start gap-2 rounded-lg py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-50"
       >
         <span className={`mt-0.5 shrink-0 ${content.iconClassName}`}>
           <Icon size={17} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-bold text-white">
+          <span className="block break-words text-sm font-bold leading-5 text-white">
             {content.title}
           </span>
-          <span className="mt-1 block truncate text-xs text-zinc-500">
+          <span className="mt-1 block break-words text-xs leading-5 text-zinc-400">
             {notification.tournamentName} · {notificationLabel(notification, t)}
           </span>
           {notification.confirmationDeadlineAt &&
             notification.status === "pending_confirmation" && (
-              <span className="mt-1 block text-[10px] font-bold uppercase tracking-wider text-orange-300">
+              <span className="mt-1 block text-xs font-semibold text-orange-300">
                 {formatTimeRemaining(
                   notification.confirmationDeadlineAt,
                   now,
@@ -436,13 +445,9 @@ function NotificationRow({
                 )}
               </span>
             )}
-        </span>
-        <span className="shrink-0 text-[10px] text-zinc-600">
-          <HydrationSafeLocalDateTime
-            value={notification.reviewedAt ?? notification.submittedAt}
-            fallback={t("dashboard.unavailable")}
-            options={{ month: "short", day: "numeric" }}
-          />
+          <span className="mt-1 block text-xs text-zinc-400">
+            <HydrationSafeLocalDateTime value={notification.reviewedAt ?? notification.submittedAt} fallback={t("dashboard.unavailable")} options={{ month: "short", day: "numeric" }} />
+          </span>
         </span>
       </button>
       <button
@@ -452,7 +457,7 @@ function NotificationRow({
         aria-label={t("dashboard.deleteNotification", {
           label: notificationLabel(notification, t),
         })}
-        className="mt-0.5 shrink-0 rounded-lg p-2 text-zinc-600 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-2 text-zinc-400 transition hover:bg-red-500/10 hover:text-red-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 disabled:opacity-40"
       >
         <Trash2 size={15} />
       </button>

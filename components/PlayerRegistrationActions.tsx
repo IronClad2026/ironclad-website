@@ -115,9 +115,9 @@ export default function PlayerRegistrationActions({
   }
 
   return (
-    <div className="mt-4 space-y-3 border border-white/10 bg-black/35 p-4">
+    <div className="mt-3 space-y-3">
       {waitlistOfferStatus === "offered" && (
-        <div className="border border-amber-400/45 bg-amber-500/10 p-4 text-amber-100">
+        <div className="border-l-2 border-amber-400/60 bg-amber-500/[0.06] px-3 py-2.5 text-amber-100">
           <p className="text-sm font-black uppercase tracking-wider">
             {t("registrationActions.offerTitle")}
           </p>
@@ -174,7 +174,7 @@ export default function PlayerRegistrationActions({
             name="response"
             value="accept"
             disabled={offerPending}
-            className="border border-emerald-400 bg-emerald-500 px-4 py-3 text-sm font-black uppercase tracking-wider text-black transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60"
+            className="min-h-11 border border-emerald-400 bg-emerald-500 px-4 py-3 text-sm font-black uppercase tracking-wider text-black transition hover:bg-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
           >
             {offerPending
               ? t("registrationActions.updating")
@@ -185,7 +185,7 @@ export default function PlayerRegistrationActions({
             name="response"
             value="decline"
             disabled={offerPending}
-            className="border border-white/20 bg-zinc-900 px-4 py-3 text-sm font-black uppercase tracking-wider text-white transition hover:border-red-400 hover:text-red-200 disabled:cursor-wait disabled:opacity-60"
+            className="min-h-11 border border-white/20 bg-zinc-900 px-4 py-3 text-sm font-black uppercase tracking-wider text-white transition hover:border-red-400 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
           >
             {t("registrationActions.declineSpot")}
           </button>
@@ -213,7 +213,7 @@ export default function PlayerRegistrationActions({
           <button
             type="submit"
             disabled={withdrawPending}
-            className="border border-red-500/50 bg-red-950/25 px-4 py-3 text-sm font-black uppercase tracking-wider text-red-200 transition hover:border-red-400 hover:bg-red-500/15 disabled:cursor-wait disabled:opacity-60"
+            className="min-h-11 border border-red-500/50 bg-red-950/25 px-4 py-3 text-sm font-black uppercase tracking-wider text-red-200 transition hover:border-red-400 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
           >
             {withdrawPending
               ? t("registrationActions.withdrawing")

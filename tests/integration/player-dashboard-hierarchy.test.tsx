@@ -152,26 +152,17 @@ describe("Player Dashboard information hierarchy", () => {
       ).toBeTruthy();
     }
 
-    expect(
-      screen.getByRole("heading", { name: "Player Dashboard" })
-    ).toHaveClass("text-3xl", "sm:text-4xl");
-    expect(
-      commandCentre?.querySelector('[data-dashboard-section="identity"]')
-    ).toHaveClass("mt-4", "p-4", "sm:p-5");
-    expect(
-      commandCentre?.querySelector('[data-dashboard-section="current-actions"]')
-    ).toHaveClass("lg:grid-cols-2");
-    expect(
-      commandCentre?.querySelector(
-        '[data-dashboard-section="profile-visibility"]'
-      )
-    ).toHaveClass("md:grid-cols-2");
-    expect(commandCentre?.querySelector('[role="img"]')).toHaveClass(
-      "h-24",
-      "w-24",
-      "sm:h-28",
-      "sm:w-28"
-    );
+    const identity = commandCentre?.querySelector('[data-dashboard-section="identity"]');
+    expect(screen.getByRole("heading", { name: "Player Dashboard" })).toBeVisible();
+    expect(identity).toHaveTextContent("Command Centre Player");
+    expect(identity).toHaveTextContent("1,420");
+    expect(identity).toHaveTextContent("Profile Complete");
+    expect(identity).toHaveTextContent("Australia/Sydney");
+    expect(screen.getByRole("heading", { name: "Your Competition" })).toBeVisible();
+    const matchActions = commandCentre?.querySelector('[data-dashboard-surface="match-actions"]');
+    const updates = commandCentre?.querySelector('[data-dashboard-surface="notifications"]');
+    expect((matchActions?.compareDocumentPosition(updates!) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText("Review your competitive profile and track every IronClad Tournament Registration.")).toBeNull();
 
     expect(
       document.querySelectorAll("[data-profile-visibility-control]")
@@ -191,6 +182,13 @@ describe("Player Dashboard information hierarchy", () => {
     expect(
       document.querySelector("[data-dashboard-surface='community-polls']")
     ).not.toBeNull();
+  });
+
+  it("redirects signed-out requests before accessing player data", async () => {
+    authMock.mockResolvedValue({ userId: null });
+    await expect(PlayerDashboardPage()).rejects.toThrow("NEXT_REDIRECT");
+    expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
+    expect(loadPlayerCareerDashboardMock).not.toHaveBeenCalled();
   });
 });
 

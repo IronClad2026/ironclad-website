@@ -12,6 +12,18 @@ const dictionary = {
   visibility: { public: "Público", private: "Privado", enabled: "Ativado", disabled: "Desativado", publicTitle: "Perfil público de jogador", publicDescription: "Mostre dados públicos seguros e seu avatar no diretório IronClad. A visibilidade do contato do Discord é uma configuração separada.", updating: "Atualizando…", makePrivate: "Tornar privado", makePublic: "Tornar público", discordTitle: "Contato do Discord", discordDescription: "O Discord é opcional, mas altamente recomendado para coordenação. Se você adicionar um nome, pode escolher separadamente se ele aparecerá no perfil público IronClad.", discordMissing: "O contato do Discord fica indisponível até você adicionar um nome opcional ao perfil.", addDiscord: "Adicionar Discord no perfil", turnOff: "Desativar", turnOn: "Ativar", signInProfile: "Entre antes de atualizar a visibilidade do perfil público.", invalidProfile: "Escolha se o perfil público deve ficar ativado.", profileUpdateFailed: "Não foi possível atualizar a visibilidade do perfil público.", profileRequired: "Complete seu perfil de jogador antes de alterar esta configuração.", profileVerifyFailed: "Não foi possível verificar a visibilidade do perfil público.", profileNowPublic: "Seu perfil de jogador agora é público.", profileNowPrivate: "Seu perfil de jogador agora é privado.", signInDiscord: "Entre antes de atualizar a visibilidade do contato do Discord.", invalidDiscord: "Escolha se o contato do Discord deve ser público.", discordUpdateFailed: "Não foi possível atualizar a visibilidade do contato do Discord.", discordUsernameRequired: "Adicione um nome opcional do Discord ao perfil antes de torná-lo público.", discordNowPublic: "O contato do Discord está visível no seu perfil público.", discordNowPrivate: "O contato do Discord está oculto no seu perfil público." },
   deleteAccount: { eyebrow: "Zona de risco", title: "Excluir conta", description: "Remova permanentemente seu acesso e identidade de perfil ativos do IronClad, avatar e identificadores pessoais diretos. Vínculos privados da conta são removidos ou neutralizados. O histórico oficial de torneios, partidas, classificações e campeões permanece público apenas como ex-competidor. Replays privados citados como prova podem permanecer para análise autorizada.", action: "Excluir conta", permanent: "Ação permanente", confirmTitle: "Excluir sua conta IronClad?", close: "Fechar confirmação de exclusão da conta", warning: "Isto não pode ser desfeito. Se você tiver histórico competitivo oficial, suas inscrições, resultados de partidas, posições nas classificações, registros de campeão e replays privados citados como prova permanecerão. O histórico público identificará você apenas como ex-competidor, e as provas privadas continuarão restritas a revisores autorizados. Caso contrário, seu registro de jogador será removido.", typeDelete: "Digite DELETE para confirmar", cancel: "Cancelar", deleting: "Excluindo conta…", permanentlyDelete: "Excluir permanentemente", sessionExpired: "Sua sessão expirou. Entre novamente antes de excluir.", confirmationInvalid: "Digite DELETE exatamente para confirmar a exclusão da conta.", notConfigured: "A exclusão da conta não está configurada. Contate a administração do IronClad.", avatarFailed: "Não foi possível remover seu avatar. Sua conta Clerk não foi excluída.", dataFailed: "Não foi possível encerrar seus dados do IronClad com segurança. Sua conta Clerk não foi excluída.", clerkFailed: "Sua identidade IronClad foi encerrada, mas a exclusão da conta Clerk falhou. Contate a administração.", success: "Sua conta IronClad foi excluída." },
   dashboard: {
+    competition: {
+      emptyCurrentTitle: "Nenhuma inscrição atual",
+      emptyCurrentDescription: "Explore os torneios para encontrar sua próxima competição.",
+      title: "Sua competição",
+      registrations: "Inscrições atuais",
+      updates: "Atualizações",
+      invitations: "Convites para Divisões",
+      invitationHelp: "Um convite não transfere nem inscreve você. Conclua o processo normal de inscrição para participar.",
+      noInvitations: "Nenhum convite para Divisões disponível.",
+      previousInvitations: "Convites anteriores",
+    },
+    utilities: { title: "Perfil e visibilidade" },
     notAvailable: "N/D",
     fallbackTournament: "Torneio IronClad",
     fallbackMatch: "Partida do torneio",
@@ -23,6 +35,7 @@ const dictionary = {
       description: "Confira seu perfil competitivo e acompanhe todas as inscrições em torneios IronClad.",
     },
     profile: {
+      navigation: "Navegação do jogador",
       loadError: "Não foi possível carregar seu perfil de jogador.",
       country: "País",
       region: "Região",
@@ -44,6 +57,11 @@ const dictionary = {
       empty: "Atualizações de torneios, inscrições e partidas aparecerão aqui.",
     },
     career: {
+      title: "Histórico competitivo",
+      matches: "Partidas",
+      champions: "Campeões",
+      registrations: "Inscrições anteriores",
+      registrationsEmpty: "Nenhuma inscrição anterior.",
       loadError: "Não foi possível carregar seu histórico competitivo.",
       partialError: "Alguns dados de apresentação dos torneios não puderam ser carregados.",
     },
