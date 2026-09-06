@@ -62,8 +62,8 @@ describe("match actions card presentation", () => {
     expect(disputeDashboardMatchResultMock).not.toHaveBeenCalled();
     expect(dismissDashboardNotificationsMock).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("Match result confirmation required").closest("button")!);
-    expect(await screen.findByRole("dialog")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Confirm result" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeVisible());
+    expect(await screen.findByRole("button", { name: "Confirm result" })).toBeEnabled();
   });
 
   it("does not expand an empty competition card or manufacture response counts", () => {
