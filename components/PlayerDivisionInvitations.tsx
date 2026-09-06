@@ -22,29 +22,33 @@ export default function PlayerDivisionInvitations({
   loadError: boolean;
 }) {
   return (
-    <section id="division-invitations" className="mt-8 scroll-mt-28">
-      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
+    <section
+      id="division-invitations"
+      className="mt-6 scroll-mt-28"
+      data-dashboard-section="division-invitations"
+    >
+      <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-400 sm:text-xs">
         Tournament invitations
       </p>
-      <h2 className="mt-3 text-3xl font-bold text-white">
+      <h2 className="mt-1.5 text-2xl font-black text-white sm:text-3xl">
         Optional next-event invitations
       </h2>
-      <p className="mt-3 max-w-3xl leading-7 text-zinc-400">
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
         An invitation does not transfer or register you. Accepting opens the
         existing registration flow, where current profile, consent, Steam,
         Relic ELO, Division capacity, and waitlist checks still apply.
       </p>
 
       {loadError ? (
-        <p role="alert" className="mt-5 border border-red-500/30 bg-red-500/10 p-4 text-sm font-bold text-red-200">
+        <p role="alert" className="mt-4 border border-red-500/30 bg-red-500/10 p-4 text-sm font-bold text-red-200">
           Tournament invitations could not be loaded. Refresh and try again.
         </p>
       ) : invitations.length === 0 ? (
-        <p className="mt-5 border border-dashed border-white/10 bg-black/30 p-4 text-sm text-zinc-500">
+        <p className="mt-4 border border-dashed border-white/10 bg-black/30 p-4 text-sm text-zinc-500">
           No Tournament Division invitations are available.
         </p>
       ) : (
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
           {invitations.map((invitation) => (
             <InvitationCard key={invitation.id} invitation={invitation} />
           ))}
@@ -65,7 +69,7 @@ function InvitationCard({
   );
 
   return (
-    <article className="border border-orange-500/20 bg-black/65 p-5 shadow-2xl shadow-black/25">
+    <article className="border border-orange-500/20 bg-black/65 p-4 shadow-xl shadow-black/25 sm:p-5">
       <p className="text-xs font-black uppercase tracking-wider text-orange-300">
         {invitation.status === "pending" ? "Response requested" : invitation.status}
       </p>

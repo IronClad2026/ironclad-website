@@ -195,7 +195,8 @@ export default async function PlayerDashboardPage() {
 
   return (
     <main
-      className="min-h-screen bg-black bg-cover bg-center bg-fixed px-6 pt-32 pb-20 text-white"
+      className="min-h-screen bg-black bg-cover bg-center bg-fixed px-4 pb-16 pt-24 text-white sm:px-6 sm:pt-28 lg:pb-20 lg:pt-30"
+      data-dashboard-command-centre
       style={{
         backgroundImage:
           "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/7.jpg')",
@@ -207,29 +208,35 @@ export default async function PlayerDashboardPage() {
     >
       <div className="relative z-10 mx-auto max-w-7xl">
         <header
-          className="relative overflow-hidden border border-orange-500/25 bg-black/70 p-8 shadow-[0_0_45px_rgba(0,0,0,0.55)] backdrop-blur md:p-10"
+          className="relative overflow-hidden border border-orange-500/25 bg-black/72 px-5 py-5 shadow-[0_0_36px_rgba(0,0,0,0.5)] backdrop-blur sm:px-6 md:py-6"
+          data-dashboard-section="header"
         >
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:52px_52px] opacity-25" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:42px_42px] opacity-20" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(0,0,0,0.82)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(249,115,22,0.13),rgba(0,0,0,0.9))]" />
 
-          <div className="relative z-10">
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-orange-400">
-              {t("dashboard.hero.eyebrow")}
-            </p>
-            <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">
-              {t("dashboard.hero.title")}
-            </h1>
-            <p className="mt-5 max-w-2xl leading-7 text-zinc-300">
+          <div className="relative z-10 grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(360px,1.2fr)] lg:items-end">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-orange-400 sm:text-xs">
+                {t("dashboard.hero.eyebrow")}
+              </p>
+              <h1 className="mt-1.5 text-3xl font-black tracking-tight sm:text-4xl">
+                {t("dashboard.hero.title")}
+              </h1>
+            </div>
+            <p className="max-w-2xl text-sm leading-6 text-zinc-300 lg:justify-self-end">
               {t("dashboard.hero.description")}
             </p>
           </div>
         </header>
 
-        <section className="mt-8 border border-orange-500/20 bg-black/65 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl md:p-8">
+        <section
+          className="mt-4 border border-orange-500/20 bg-black/68 p-4 shadow-2xl shadow-black/25 backdrop-blur-xl sm:p-5"
+          data-dashboard-section="identity"
+        >
           {profileResult.error ? (
             <DashboardError message={t("dashboard.profile.loadError")} />
           ) : profile ? (
-            <div className="grid gap-8 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+            <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center xl:grid-cols-[auto_minmax(0,1fr)_auto]">
               <PlayerAvatar
                 avatarUrl={getPlayerAvatarDisplayUrl(profile)}
                 avatarLabel={t("dashboard.profile.avatarLabel", {
@@ -238,8 +245,8 @@ export default async function PlayerDashboardPage() {
               />
 
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-3xl font-black text-white">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="break-words text-2xl font-black text-white sm:text-3xl">
                     {profile.display_name}
                   </h2>
                   <CompletionBadge
@@ -247,11 +254,11 @@ export default async function PlayerDashboardPage() {
                     t={t}
                   />
                 </div>
-                <p className="mt-2 text-lg font-bold text-orange-300">
+                <p className="mt-1 text-sm font-bold text-orange-300 sm:text-base">
                   {profile.in_game_name}
                 </p>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
                   <ProfileValue
                     label={t("dashboard.profile.country")}
                     value={
@@ -289,23 +296,23 @@ export default async function PlayerDashboardPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row xl:col-span-1 xl:flex-col">
                 <Link
                   href="/profile"
-                  className="border border-white/15 bg-white/[0.04] px-5 py-3 text-center font-bold text-white transition hover:border-orange-400/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+                  className="inline-flex min-h-11 items-center justify-center border border-white/15 bg-white/[0.04] px-4 py-2.5 text-center text-sm font-bold text-white transition hover:border-orange-400/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
                 >
                   {t("dashboard.profile.viewEdit")}
                 </Link>
                 <Link
                   href="/tournaments"
-                  className="border border-orange-400 bg-orange-500 px-5 py-3 text-center font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+                  className="inline-flex min-h-11 items-center justify-center border border-orange-400 bg-orange-500 px-4 py-2.5 text-center text-sm font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
                 >
                   {t("dashboard.profile.goTournaments")}
                 </Link>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-white">
                   {t("dashboard.profile.requiredTitle")}
@@ -324,80 +331,106 @@ export default async function PlayerDashboardPage() {
           )}
         </section>
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] lg:items-start">
-          <div className="grid min-w-0 gap-3">
-            <InAppNotificationCenter
-              key={[
-                locale,
-                playerNotifications.unreadCount,
-                ...playerNotifications.notifications.map(
-                  (notification) =>
-                    `${notification.id}:${notification.readAt ?? ""}`
-                ),
-              ].join("|")}
-              scope="player"
-              title={t("dashboard.notificationCenter.title")}
-              eyebrow={t("dashboard.notificationCenter.eyebrow")}
-              description={t("dashboard.notificationCenter.description")}
-              emptyMessage={t("dashboard.notificationCenter.empty")}
-              notifications={playerNotifications.notifications}
-              totalCount={playerNotifications.totalCount}
-              unreadCount={playerNotifications.unreadCount}
-              error={playerNotifications.error}
-              className="max-w-2xl !rounded-none !border-orange-500/20 !bg-black/65 !shadow-2xl !shadow-black/30 [&_button]:rounded-none [&_div]:rounded-none lg:max-w-none"
-            />
+        <div
+          className="mt-6 grid gap-3 lg:grid-cols-2 lg:items-start"
+          data-dashboard-section="current-actions"
+        >
+          <InAppNotificationCenter
+            key={[
+              locale,
+              playerNotifications.unreadCount,
+              ...playerNotifications.notifications.map(
+                (notification) =>
+                  `${notification.id}:${notification.readAt ?? ""}`
+              ),
+            ].join("|")}
+            scope="player"
+            title={t("dashboard.notificationCenter.title")}
+            eyebrow={t("dashboard.notificationCenter.eyebrow")}
+            description={t("dashboard.notificationCenter.description")}
+            emptyMessage={t("dashboard.notificationCenter.empty")}
+            notifications={playerNotifications.notifications}
+            totalCount={playerNotifications.totalCount}
+            unreadCount={playerNotifications.unreadCount}
+            error={playerNotifications.error}
+            className="!max-w-none !rounded-none !border-orange-500/20 !bg-black/65 !shadow-xl !shadow-black/25 [&_button]:rounded-none [&_div]:rounded-none"
+          />
 
-            <DashboardNotifications
-              key={[
-                locale,
-                ...career.notifications.map(
-                  (notification) => `${notification.id}:${notification.status}`
-                ),
-              ].join("|")}
-              notifications={career.notifications}
-              error={
-                career.error
-                  ? t(
-                      career.error === "load-failed"
-                        ? "dashboard.career.loadError"
-                        : "dashboard.career.partialError"
-                    )
-                  : null
-              }
-            />
-          </div>
-
-          {profile && (
-            <div className="grid gap-5">
-              <PublicProfileVisibilityCard
-                initialEnabled={Boolean(profile.public_profile_enabled)}
-              />
-              <DiscordContactVisibilityCard
-                initialEnabled={Boolean(profile.discord_public_enabled)}
-                hasDiscordUsername={Boolean(profile.discord_username?.trim())}
-              />
-            </div>
-          )}
-        </div>
-
-        <div id="community-polls" className="mt-8 scroll-mt-28">
-          <PollsAndDecisions
-            surface="community"
-            initialPolls={communityPolls.polls}
-            initialError={communityPolls.error}
+          <DashboardNotifications
+            key={[
+              locale,
+              ...career.notifications.map(
+                (notification) => `${notification.id}:${notification.status}`
+              ),
+            ].join("|")}
+            notifications={career.notifications}
+            error={
+              career.error
+                ? t(
+                    career.error === "load-failed"
+                      ? "dashboard.career.loadError"
+                      : "dashboard.career.partialError"
+                  )
+                : null
+            }
           />
         </div>
 
+        <section
+          className="mt-6"
+          data-dashboard-section="registrations"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-400 sm:text-xs">
+                {t("dashboard.registrations.eyebrow")}
+              </p>
+              <h2 className="mt-1.5 text-2xl font-black text-white sm:text-3xl">
+                {t("dashboard.registrations.title")}
+              </h2>
+            </div>
+            <p className="text-xs font-bold text-zinc-500 sm:text-sm">
+              {formatDashboardRegistrationCount(
+                registrations.length,
+                locale,
+                t
+              )}
+            </p>
+          </div>
+
+          {registrationsResult.error ? (
+            <div className="mt-4">
+              <DashboardError
+                message={t("dashboard.registrations.loadError")}
+              />
+            </div>
+          ) : registrations.length === 0 ? (
+            <EmptyRegistrations t={t} />
+          ) : (
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              {registrations.map((registration) => (
+                <RegistrationCard
+                  key={registration.id}
+                  registration={registration}
+                  locale={locale}
+                  t={t}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <PlayerDivisionInvitations
+          invitations={divisionInvitationState.invitations}
+          loadError={divisionInvitationState.status === "error"}
+        />
+
         {!career.error && (
-          <>
-            <PlayerStatisticsSection
-              statistics={career.statistics}
-              locale={locale}
-              t={t}
-            />
-            <DashboardChampionHistory champions={career.champions} />
-            <DashboardMatchHistory matches={career.matchHistory} />
-          </>
+          <PlayerStatisticsSection
+            statistics={career.statistics}
+            locale={locale}
+            t={t}
+          />
         )}
 
         <DashboardBadgesSection
@@ -418,51 +451,42 @@ export default async function PlayerDashboardPage() {
           locale={locale}
         />
 
-        <PlayerDivisionInvitations
-          invitations={divisionInvitationState.invitations}
-          loadError={divisionInvitationState.status === "error"}
-        />
-
-        <section className="mt-8">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
-                {t("dashboard.registrations.eyebrow")}
-              </p>
-              <h2 className="mt-3 text-3xl font-bold text-white">
-                {t("dashboard.registrations.title")}
-              </h2>
-            </div>
-            <p className="text-sm text-zinc-500">
-              {formatDashboardRegistrationCount(
-                registrations.length,
-                locale,
-                t
-              )}
-            </p>
+        {!career.error && (
+          <div
+            className="mt-8 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.55fr)] [&>section]:mt-0 [&>section]:max-w-none"
+            data-dashboard-section="history"
+          >
+            <DashboardChampionHistory champions={career.champions} />
+            <DashboardMatchHistory matches={career.matchHistory} />
           </div>
+        )}
 
-          {registrationsResult.error ? (
-            <div className="mt-6">
-              <DashboardError
-                message={t("dashboard.registrations.loadError")}
-              />
-            </div>
-          ) : registrations.length === 0 ? (
-            <EmptyRegistrations t={t} />
-          ) : (
-            <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              {registrations.map((registration) => (
-                <RegistrationCard
-                  key={registration.id}
-                  registration={registration}
-                  locale={locale}
-                  t={t}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+        {profile && (
+          <div
+            className="mt-8 grid gap-3 md:grid-cols-2"
+            data-dashboard-section="profile-visibility"
+          >
+            <PublicProfileVisibilityCard
+              initialEnabled={Boolean(profile.public_profile_enabled)}
+            />
+            <DiscordContactVisibilityCard
+              initialEnabled={Boolean(profile.discord_public_enabled)}
+              hasDiscordUsername={Boolean(profile.discord_username?.trim())}
+            />
+          </div>
+        )}
+
+        <div
+          id="community-polls"
+          className="mt-8 scroll-mt-28"
+          data-dashboard-section="community"
+        >
+          <PollsAndDecisions
+            surface="community"
+            initialPolls={communityPolls.polls}
+            initialError={communityPolls.error}
+          />
+        </div>
       </div>
     </main>
   );
@@ -508,20 +532,32 @@ function PlayerStatisticsSection({
   ];
 
   return (
-    <section className="mt-10">
+    <section className="mt-8" data-dashboard-section="statistics">
       <SectionHeading
         eyebrow={t("dashboard.statistics.eyebrow")}
         title={t("dashboard.statistics.title")}
         icon={Target}
       />
-      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        {values.map((item) => (
+      <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-3 xl:grid-cols-6">
+        {values.map((item, index) => (
           <div
             key={item.label}
-            className="border border-white/12 bg-black/55 p-5 shadow-xl shadow-black/15 backdrop-blur"
+            className={`relative overflow-hidden border bg-black/58 p-4 shadow-xl shadow-black/15 backdrop-blur ${
+              index === 3 || index === 5
+                ? "border-orange-400/30"
+                : "border-white/12"
+            }`}
           >
-            <p className="text-2xl font-black text-white">{item.value}</p>
-            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+            {(index === 3 || index === 5) && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-0 top-0 h-px bg-orange-300/70"
+              />
+            )}
+            <p className="text-2xl font-black tabular-nums text-white">
+              {item.value}
+            </p>
+            <p className="mt-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500">
               {item.label}
             </p>
           </div>
@@ -542,11 +578,13 @@ function SectionHeading({
 }) {
   return (
     <div>
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
+      <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.28em] text-orange-400 sm:text-xs">
         <Icon size={15} />
         {eyebrow}
       </p>
-      <h2 className="mt-3 text-3xl font-bold text-white">{title}</h2>
+      <h2 className="mt-1.5 text-2xl font-black text-white sm:text-3xl">
+        {title}
+      </h2>
     </div>
   );
 }
@@ -562,12 +600,12 @@ function PlayerAvatar({
     <div
       role="img"
       aria-label={avatarLabel}
-      className="grid h-32 w-32 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-orange-500/50 bg-black/60 bg-cover bg-center shadow-[0_0_35px_rgba(249,115,22,0.2)]"
+      className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-orange-500/50 bg-black/60 bg-cover bg-center shadow-[0_0_28px_rgba(249,115,22,0.18)] sm:h-28 sm:w-28"
       style={
         avatarUrl ? { backgroundImage: `url("${avatarUrl}")` } : undefined
       }
     >
-      {!avatarUrl && <UserRound size={48} className="text-zinc-600" />}
+      {!avatarUrl && <UserRound size={40} className="text-zinc-600" />}
     </div>
   );
 }
@@ -581,7 +619,7 @@ function CompletionBadge({
 }) {
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+      className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
         complete
           ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
           : "border-orange-500/40 bg-orange-500/10 text-orange-300"
@@ -604,9 +642,11 @@ function ProfileValue({
   fallback: string;
 }) {
   return (
-    <div className="border border-white/12 bg-black/45 p-4 shadow-inner shadow-black/20">
-      <p className="text-xs uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-2 break-words font-bold text-white">
+    <div className="min-w-0 border border-white/10 bg-black/38 p-3 shadow-inner shadow-black/20">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-black text-white">
         {value || fallback}
       </p>
     </div>
@@ -627,7 +667,7 @@ function RegistrationCard({
   );
 
   return (
-    <article id={`registration-${registration.id}`} className="scroll-mt-28 border border-orange-500/20 bg-black/70 p-6 shadow-2xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/80">
+    <article id={`registration-${registration.id}`} className="scroll-mt-28 border border-orange-500/20 bg-black/70 p-5 shadow-2xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/80">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-orange-300">
@@ -646,7 +686,7 @@ function RegistrationCard({
         <StatusBadge status={registration.registration_status} t={t} />
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
         <RegistrationValue
           label={t("dashboard.registrations.eloStatus")}
           value={eloStatusLabel(registration.elo_status, t)}
@@ -855,28 +895,30 @@ function RegistrationValue({
   value: ReactNode;
 }) {
   return (
-    <div className="border border-white/12 bg-black/45 p-4 shadow-inner shadow-black/20">
-      <p className="text-xs uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-2 break-words text-sm font-bold text-white">{value}</p>
+    <div className="border border-white/10 bg-black/40 p-3 shadow-inner shadow-black/20">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+        {label}
+      </p>
+      <p className="mt-1.5 break-words text-sm font-bold text-white">{value}</p>
     </div>
   );
 }
 
 function EmptyRegistrations({ t }: { t: DashboardTranslator }) {
   return (
-    <div className="mt-6 border border-dashed border-orange-400/25 bg-black/60 px-6 py-16 text-center shadow-2xl shadow-black/25 backdrop-blur">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-300">
-        <CalendarDays size={25} />
+    <div className="mt-4 border border-dashed border-orange-400/25 bg-black/60 px-5 py-10 text-center shadow-2xl shadow-black/25 backdrop-blur">
+      <div className="mx-auto grid h-11 w-11 place-items-center rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-300">
+        <CalendarDays size={21} />
       </div>
-      <h3 className="mt-5 text-xl font-bold text-white">
+      <h3 className="mt-4 text-lg font-bold text-white">
         {t("dashboard.registrations.emptyTitle")}
       </h3>
-      <p className="mx-auto mt-2 max-w-lg leading-7 text-zinc-400">
+      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-400">
         {t("dashboard.registrations.emptyDescription")}
       </p>
       <Link
         href="/tournaments"
-        className="mt-6 inline-flex border border-orange-400 bg-orange-500 px-5 py-3 font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+        className="mt-5 inline-flex min-h-11 items-center border border-orange-400 bg-orange-500 px-5 py-2.5 text-sm font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
       >
         {t("dashboard.registrations.explore")}
       </Link>
