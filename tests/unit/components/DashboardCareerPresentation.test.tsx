@@ -100,6 +100,23 @@ describe("Dashboard career presentation", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("wraps forward and reverse Tab inside the native match dialog", () => {
+    render(<DashboardMatchHistory matches={[match]} />);
+    fireEvent.click(screen.getByRole("button", { name: /IronClad Autumn Championship/ }));
+    const dialog = screen.getByRole("dialog", { name: match.tournamentName });
+    const close = within(dialog).getByRole("button");
+    vi.spyOn(close, "getClientRects").mockReturnValue([new DOMRect(0, 0, 44, 44)] as unknown as DOMRectList);
+
+    // Reverse Tab from the initially focused heading reaches the last control.
+    expect(fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true })).toBe(false);
+    expect(close).toHaveFocus();
+    for (const shiftKey of [false, true, false, true]) {
+      expect(fireEvent.keyDown(close, { key: "Tab", shiftKey })).toBe(false);
+      expect(close).toHaveFocus();
+    }
+    expect(fireEvent.keyDown(close, { key: "ArrowDown" })).toBe(true);
+  });
+
   it("supports keyboard history views while keeping every registration anchor mounted", () => {
     render(<DashboardCareerHistory matches={[match]} champions={[]} previousRegistrationCount={1} previousRegistrations={<article id="registration-old">Historical registration</article>} />);
     const tabs = screen.getAllByRole("tab");

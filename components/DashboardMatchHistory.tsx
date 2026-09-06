@@ -123,6 +123,26 @@ function MatchHistoryModal({
       ref={dialogRef}
       aria-modal="true"
       aria-labelledby={`match-history-${match.id}`}
+      onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+          'a[href], button, input, select, textarea, summary, [tabindex]'
+        )).filter((element) =>
+          element.tabIndex >= 0 && !element.matches(":disabled") &&
+          element.getClientRects().length > 0
+        );
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (!first || !last) { event.preventDefault(); return; }
+        const active = document.activeElement;
+        if (event.shiftKey && (active === first || !controls.includes(active as HTMLElement))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (active === last || !event.currentTarget.contains(active))) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
       onCancel={(event) => { event.preventDefault(); onClose(); }}
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
       className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-2xl overflow-hidden border border-white/20 bg-zinc-950 p-0 text-white shadow-2xl backdrop:bg-black/80 open:flex open:flex-col"
