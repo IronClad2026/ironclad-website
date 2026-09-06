@@ -131,6 +131,26 @@ describe("notification-center mutation reliability", () => {
     vi.clearAllMocks();
   });
 
+  it("renders a dashboard update preview without marking anything read", () => {
+    render(<InAppNotificationCenter scope="player" presentation="dashboard" title="Updates" description="Recent updates." emptyMessage="No updates." notifications={[notification()]} totalCount={4} unreadCount={3} />);
+    expect(screen.getByText("Registration Rejected")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Updates/i })).toHaveAttribute("aria-expanded", "false");
+    expect(markReadMock).not.toHaveBeenCalled();
+    expect(markAllMock).not.toHaveBeenCalled();
+    expect(markSelectedMock).not.toHaveBeenCalled();
+    expect(dismissDashboardNotificationsMock).not.toHaveBeenCalled();
+    expect(screen.getByText("4 total · 3 unread")).toBeVisible();
+  });
+
+  it("keeps preview failures visible and preserves the existing unread count", async () => {
+    markReadMock.mockResolvedValue({ ok: false, code: "unavailable" });
+    render(<InAppNotificationCenter scope="player" presentation="dashboard" title="Updates" description="Recent updates." emptyMessage="No updates." notifications={[notification()]} totalCount={4} unreadCount={3} />);
+    fireEvent.click(screen.getByRole("button", { name: /Registration Rejected/i }));
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.getByText("4 total · 3 unread")).toBeVisible();
+    expect(screen.getByText("Registration Rejected")).toBeVisible();
+  });
+
   it("uses the authoritative post-mutation unread count on success", async () => {
     renderPlayerCenter(notification());
 
