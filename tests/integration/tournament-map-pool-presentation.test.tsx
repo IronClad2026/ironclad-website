@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
 
+import { stubNativeDialog } from "@/tests/helpers/native-dialog";
+let restoreNativeDialog: (() => void) | undefined;
+afterEach(() => restoreNativeDialog?.());
+
 import type { ReactNode } from "react";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentCard } from "@/lib/tournaments";
 import { createDisabledTournamentDivisionStates } from "@/tests/fixtures/tournament-division-states";
 
@@ -131,9 +135,12 @@ const tournament: TournamentCard = {
 };
 
 describe("public tournament map-pool presentation", () => {
-  afterEach(cleanup);
+  beforeEach(() => {
+    restoreNativeDialog = stubNativeDialog();
+  });
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-  it("plumbs a published pool into both desktop and mobile overview paths", () => {
+  it("keeps published maps on demand in one shared responsive viewer", () => {
     render(
       <TournamentsExperience
         tournaments={[tournament]}
@@ -149,11 +156,13 @@ describe("public tournament map-pool presentation", () => {
       />
     );
 
+    expect(screen.queryByText("Community Crossing")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "View Maps" }));
     const desktopAndMobilePools = screen.getAllByRole("region", {
       name: "Published division map pools",
     });
 
-    expect(desktopAndMobilePools).toHaveLength(2);
+    expect(desktopAndMobilePools).toHaveLength(1);
     for (const pool of desktopAndMobilePools) {
       expect(within(pool).getByRole("heading", { name: "Academy Bracket" }))
         .toBeInTheDocument();
@@ -166,7 +175,7 @@ describe("public tournament map-pool presentation", () => {
     }
   });
 
-  it("keeps one formatted description in each responsive Published Tournament card", () => {
+  it("keeps the exact formatted description in one responsive Published Tournament card", () => {
     const { container } = render(
       <TournamentsExperience
         tournaments={[tournament]}
@@ -191,7 +200,7 @@ describe("public tournament map-pool presentation", () => {
     const publishedCards = Array.from(
       container.querySelectorAll<HTMLElement>("[data-published-tournament-card]")
     );
-    expect(publishedCards).toHaveLength(2);
+    expect(publishedCards).toHaveLength(1);
 
     for (const card of publishedCards) {
       const description = Array.from(card.querySelectorAll("p")).find(
@@ -202,7 +211,7 @@ describe("public tournament map-pool presentation", () => {
         "break-words",
         "[overflow-wrap:anywhere]"
       );
-      expect(card.querySelector("[data-division-effective-state]")).toBeNull();
+      expect(card.querySelector("[data-division-effective-state]")).not.toBeNull();
       expect(card.querySelector("[data-tournament-banner]")).not.toBeNull();
     }
   });

@@ -244,7 +244,7 @@ describe("non-English registration gate", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("keeps mobile disclosures and adds desktop dialog triggers beside each Register card", () => {
+  it("keeps mobile disclosures and adds desktop dialog triggers beside the shared Register card", () => {
     renderExperience("en");
 
     const registerActions = screen.getAllByRole("button", {
@@ -255,10 +255,10 @@ describe("non-English registration gate", () => {
       name: "How Registration Works",
     });
 
-    expect(registerActions).toHaveLength(2);
-    expect(mobileDisclosures).toHaveLength(2);
-    expect(desktopTriggers).toHaveLength(2);
-    expect(screen.getAllByText("How Registration Works")).toHaveLength(4);
+    expect(registerActions).toHaveLength(1);
+    expect(mobileDisclosures).toHaveLength(1);
+    expect(desktopTriggers).toHaveLength(1);
+    expect(screen.getAllByText("How Registration Works")).toHaveLength(2);
 
     mobileDisclosures.forEach((details, index) => {
       const summary = details.querySelector("summary");
@@ -288,7 +288,7 @@ describe("non-English registration gate", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the same guidance beside each actionable Join Waitlist card", () => {
+  it("renders the same guidance beside the shared actionable Join Waitlist card", () => {
     const waitlistTournament: TournamentCard = {
       ...tournament,
       id: "11111111-1111-4111-8111-111111111112",
@@ -311,12 +311,12 @@ describe("non-English registration gate", () => {
 
     expect(
       screen.getAllByRole("button", { name: /^Join Waitlist/ })
-    ).toHaveLength(2);
-    expect(document.querySelectorAll("details")).toHaveLength(2);
+    ).toHaveLength(1);
+    expect(document.querySelectorAll("details")).toHaveLength(1);
     expect(
       screen.getAllByRole("button", { name: "How Registration Works" })
-    ).toHaveLength(2);
-    expect(screen.getAllByText("How Registration Works")).toHaveLength(4);
+    ).toHaveLength(1);
+    expect(screen.getAllByText("How Registration Works")).toHaveLength(2);
   });
 
   it("does not show guidance for an unavailable Tournament or duplicate an existing Registration state", () => {
@@ -353,7 +353,7 @@ describe("non-English registration gate", () => {
     expect(
       screen.queryByText("How Registration Works")
     ).not.toBeInTheDocument();
-    expect(screen.getAllByText(/Registration Submitted/)).toHaveLength(2);
+    expect(screen.getAllByText(/Registration Submitted/)).toHaveLength(1);
   });
 
   it("presents the existing controlling-English registration gate in Italian", () => {
@@ -404,7 +404,7 @@ describe("non-English registration gate", () => {
           `^${competitionSpanish.tournaments.actions.register}`
         ),
       })
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(setLocalePreferenceMock).not.toHaveBeenCalled();
     expect(profileMaybeSingleMock).not.toHaveBeenCalled();
     expect(submitTournamentRegistrationMock).not.toHaveBeenCalled();
