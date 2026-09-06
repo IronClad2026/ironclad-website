@@ -1,8 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
-import { MapPin, Target, Trophy } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { redirect } from "next/navigation";
-import DashboardChampionHistory from "@/components/DashboardChampionHistory";
-import DashboardMatchHistory from "@/components/DashboardMatchHistory";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
@@ -13,18 +11,13 @@ import { acknowledgeBadgeReveal } from "@/app/dashboard/badge-reveal-actions";
 import { loadPlayerBadgeRevealDashboardState } from "@/lib/badges/reveals";
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import { loadPlayerNotifications } from "@/lib/notifications";
-import type { Locale } from "@/lib/i18n/config";
 import { formatDashboardRegistrationCount } from "@/lib/i18n/dashboard-count";
-import { formatNumber } from "@/lib/i18n/format";
 import { loadDictionaries } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
 import { loadCommunityPollsForRequest } from "@/lib/player-polls";
-import {
-  loadPlayerCareerDashboard,
-  type PlayerStatistics,
-} from "@/lib/player-dashboard";
+import { loadPlayerCareerDashboard } from "@/lib/player-dashboard";
 import { loadPlayerTournamentDivisionInvitations } from "@/lib/tournament-division-invitations";
 import {
   type PlayerProfile,
@@ -32,7 +25,8 @@ import {
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 import type { TournamentStatus } from "@/lib/tournaments";
 import DashboardIdentity from "@/components/dashboard/DashboardIdentity";
-import DashboardPreviousRegistrations from "@/components/dashboard/DashboardPreviousRegistrations";
+import DashboardCareerHistory from "@/components/dashboard/DashboardCareerHistory";
+import DashboardPerformance from "@/components/dashboard/DashboardPerformance";
 import { EmptyRegistrations, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
 import { groupDashboardRegistrations, type PlayerRegistration } from "@/components/dashboard/registration-presentation";
 
@@ -240,16 +234,8 @@ export default async function PlayerDashboardPage() {
           </aside>
         </div>
 
-        {!registrationsResult.error && previousRegistrations.length > 0 && (
-          <div className="mt-6">
-            <DashboardPreviousRegistrations title={t("dashboard.career.registrations")} count={previousRegistrations.length}>
-              {previousRegistrationNodes}
-            </DashboardPreviousRegistrations>
-          </div>
-        )}
-
         {!career.error && (
-          <PlayerStatisticsSection
+          <DashboardPerformance
             statistics={career.statistics}
             locale={locale}
             t={t}
@@ -274,30 +260,18 @@ export default async function PlayerDashboardPage() {
           locale={locale}
         />
 
-        {!career.error && (
-          <div
-            className="mt-8 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.55fr)] [&>section]:mt-0 [&>section]:max-w-none"
-            data-dashboard-section="history"
-          >
-            <DashboardChampionHistory champions={career.champions} />
-            <DashboardMatchHistory matches={career.matchHistory} />
-          </div>
-        )}
-
-        {profile && (
-          <div
-            className="mt-8 grid gap-3 md:grid-cols-2"
-            data-dashboard-section="profile-visibility"
-          >
-            <PublicProfileVisibilityCard
-              initialEnabled={Boolean(profile.public_profile_enabled)}
-            />
-            <DiscordContactVisibilityCard
-              initialEnabled={Boolean(profile.discord_public_enabled)}
-              hasDiscordUsername={Boolean(profile.discord_username?.trim())}
-            />
-          </div>
-        )}
+        <DashboardCareerHistory
+          matches={career.matchHistory}
+          champions={career.champions}
+          previousRegistrations={<div className="grid gap-3">{previousRegistrationNodes}</div>}
+          previousRegistrationCount={previousRegistrations.length}
+          loadError={career.error ? t(
+            career.error === "load-failed"
+              ? "dashboard.career.loadError"
+              : "dashboard.career.partialError"
+          ) : null}
+          registrationLoadError={registrationsResult.error ? t("dashboard.registrations.loadError") : null}
+        />
 
         <div
           id="community-polls"
@@ -306,109 +280,28 @@ export default async function PlayerDashboardPage() {
         >
           <PollsAndDecisions
             surface="community"
+            density="compact"
             initialPolls={communityPolls.polls}
             initialError={communityPolls.error}
           />
         </div>
+
+        {profile && (
+          <section className="mt-8" aria-labelledby="dashboard-visibility-title" data-dashboard-section="profile-visibility">
+            <h2 id="dashboard-visibility-title" className="text-xl font-bold text-white sm:text-2xl">
+              {t("dashboard.utilities.title")}
+            </h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <PublicProfileVisibilityCard initialEnabled={Boolean(profile.public_profile_enabled)} />
+              <DiscordContactVisibilityCard
+                initialEnabled={Boolean(profile.discord_public_enabled)}
+                hasDiscordUsername={Boolean(profile.discord_username?.trim())}
+              />
+            </div>
+          </section>
+        )}
       </div>
     </main>
-  );
-}
-
-function PlayerStatisticsSection({
-  statistics,
-  locale,
-  t,
-}: {
-  statistics: PlayerStatistics;
-  locale: Locale;
-  t: DashboardTranslator;
-}) {
-  const values = [
-    {
-      label: t("dashboard.statistics.matchesPlayed"),
-      value: formatNumber(statistics.matchesPlayed, locale),
-    },
-    {
-      label: t("dashboard.statistics.matchesWon"),
-      value: formatNumber(statistics.matchesWon, locale),
-    },
-    {
-      label: t("dashboard.statistics.matchesLost"),
-      value: formatNumber(statistics.matchesLost, locale),
-    },
-    {
-      label: t("dashboard.statistics.winRate"),
-      value: formatNumber(statistics.winRate / 100, locale, {
-        style: "percent",
-        maximumFractionDigits: 0,
-      }),
-    },
-    {
-      label: t("dashboard.statistics.tournamentsParticipated"),
-      value: formatNumber(statistics.tournamentsParticipated, locale),
-    },
-    {
-      label: t("dashboard.statistics.tournamentsWon"),
-      value: formatNumber(statistics.tournamentsWon, locale),
-    },
-  ];
-
-  return (
-    <section className="mt-8" data-dashboard-section="statistics">
-      <SectionHeading
-        eyebrow={t("dashboard.statistics.eyebrow")}
-        title={t("dashboard.statistics.title")}
-        icon={Target}
-      />
-      <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-3 xl:grid-cols-6">
-        {values.map((item, index) => (
-          <div
-            key={item.label}
-            className={`relative overflow-hidden border bg-black/58 p-4 shadow-xl shadow-black/15 backdrop-blur ${
-              index === 3 || index === 5
-                ? "border-orange-400/30"
-                : "border-white/12"
-            }`}
-          >
-            {(index === 3 || index === 5) && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-0 top-0 h-px bg-orange-300/70"
-              />
-            )}
-            <p className="text-2xl font-black tabular-nums text-white">
-              {item.value}
-            </p>
-            <p className="mt-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500">
-              {item.label}
-            </p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SectionHeading({
-  eyebrow,
-  title,
-  icon: Icon,
-}: {
-  eyebrow: string;
-  title: string;
-  icon: typeof Trophy;
-}) {
-  return (
-    <div>
-      <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.28em] text-orange-400 sm:text-xs">
-        <Icon size={15} />
-        {eyebrow}
-      </p>
-      <h2 className="mt-1.5 text-2xl font-black text-white sm:text-3xl">
-        {title}
-      </h2>
-    </div>
   );
 }
 

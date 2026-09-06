@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import BadgeRevealOverlay from "@/components/badges/BadgeRevealOverlay";
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
+import DashboardMatchHistory from "@/components/DashboardMatchHistory";
 import { buildDashboardBadgeData } from "@/lib/badges/dashboard";
 import type {
   BadgeRevealQueueItem,
@@ -121,6 +122,57 @@ describe("Badge reveal experience", () => {
   let destinationRect: DOMRect;
   let destinationRectReads: number;
   let sourceRect: DOMRect;
+
+  it("yields an open match viewer to a newly mounted Badge reveal without acknowledging it", async () => {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+      configurable: true,
+      value: function (this: HTMLDialogElement) { this.open = true; },
+    });
+    Object.defineProperty(HTMLDialogElement.prototype, "close", {
+      configurable: true,
+      value: function (this: HTMLDialogElement) { this.open = false; },
+    });
+    const fixture = buildRevealFixture("first-victory", "new-award");
+    const acknowledge = vi.fn();
+    const match = {
+      id: "old-match", tournamentName: "Previous Championship", bracketName: "Challenge",
+      opponentName: "Opponent", result: "win" as const, score: "2–0",
+      playedAt: "2026-08-01T12:00:00.000Z", roundName: "Final", matchNumber: 1,
+      seriesBestOf: 3, replayAvailable: false, screenshotAvailable: false,
+    };
+    const { rerender } = render(
+      <main>
+        <DashboardMatchHistory matches={[match]} />
+        <DashboardBadgesSection badgeData={fixture.badgeData} pendingReveals={[]} acknowledgeRevealAction={acknowledge} reducedMotion />
+      </main>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Previous Championship/ }));
+    expect(screen.getByRole("dialog", { name: "Previous Championship" })).toBeInTheDocument();
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    await act(async () => {
+      rerender(
+        <main>
+          <DashboardMatchHistory matches={[match]} />
+          <DashboardBadgesSection badgeData={fixture.badgeData} pendingReveals={[fixture.queueItem]} acknowledgeRevealAction={acknowledge} reducedMotion />
+        </main>,
+      );
+      await Promise.resolve();
+    });
+    expect(document.querySelector("dialog")).not.toBeInTheDocument();
+    const reveal = document.querySelector<HTMLElement>('[role="dialog"][aria-labelledby^="badge-reveal-"]');
+    expect(reveal).toBeInTheDocument();
+    expect(reveal).toHaveFocus();
+    expect(document.documentElement.style.overflow).toBe("");
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(acknowledge).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-badge-reveal-destination="true"]')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(600));
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(document.body.style.overflow).toBe("");
+    expect(acknowledge).not.toHaveBeenCalled();
+    Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
+    Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
+  });
 
   beforeEach(() => {
     vi.useFakeTimers();

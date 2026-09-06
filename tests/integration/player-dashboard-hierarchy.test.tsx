@@ -132,8 +132,8 @@ describe("Player Dashboard information hierarchy", () => {
       "division-invitations",
       "statistics",
       "history",
-      "profile-visibility",
       "community",
+      "profile-visibility",
     ].map((name) =>
       commandCentre?.querySelector(`[data-dashboard-section="${name}"]`)
     );
@@ -159,6 +159,10 @@ describe("Player Dashboard information hierarchy", () => {
     expect(identity).toHaveTextContent("Profile Complete");
     expect(identity).toHaveTextContent("Australia/Sydney");
     expect(screen.getByRole("heading", { name: "Your Competition" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Career History" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Profile & Visibility" })).toBeVisible();
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(screen.getAllByRole("tab")[0]).toHaveAttribute("aria-selected", "true");
     const matchActions = commandCentre?.querySelector('[data-dashboard-surface="match-actions"]');
     const updates = commandCentre?.querySelector('[data-dashboard-surface="notifications"]');
     expect((matchActions?.compareDocumentPosition(updates!) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

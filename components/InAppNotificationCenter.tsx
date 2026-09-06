@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { dismissDashboardNotifications } from "@/app/dashboard/actions";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import NotificationPermissionControl from "@/components/NotificationPermissionControl";
+import { notifyDashboardRegistrationNavigation } from "@/components/dashboard/registration-navigation";
 import {
   deleteSelectedInAppNotifications,
   markAllInAppNotificationsRead,
@@ -450,7 +451,9 @@ export default function InAppNotificationCenter({
           setMutationError(t("dashboard.actions.updateFailed"));
         }
 
-        router.push(notification.href ?? "/tournaments");
+        const href = notification.href ?? "/tournaments";
+        notifyDashboardRegistrationNavigation(href);
+        router.push(href);
       });
       return;
     }
@@ -517,6 +520,7 @@ export default function InAppNotificationCenter({
                     onDeleteSelected={deleteSelected}
                     onOpenContext={(href) => {
                       setAdminModalOpen(false);
+                      notifyDashboardRegistrationNavigation(href);
                       router.push(href);
                     }}
                   />

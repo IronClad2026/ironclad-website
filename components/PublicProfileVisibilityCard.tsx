@@ -66,18 +66,18 @@ export default function PublicProfileVisibilityCard({
 
   return (
     <section
-      className="min-w-0 border border-white/12 bg-black/50 p-4 shadow-xl shadow-black/20 backdrop-blur"
+      className="min-w-0 border border-white/12 bg-zinc-950/85 p-4 sm:p-5"
       data-profile-visibility-control="public-profile"
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center border border-white/10 bg-white/5 text-zinc-300">
           <UserRound size={17} />
         </span>
-        <p className="min-w-0 flex-1 text-sm font-black uppercase tracking-[0.15em] text-white">
+        <p className="min-w-0 flex-1 text-base font-semibold text-white">
           {t("visibility.publicTitle")}
         </p>
         <span
-          className={`shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${
+          className={`shrink-0 rounded-sm border px-2.5 py-1 text-xs font-semibold ${
             enabled
               ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-300"
               : "border-zinc-500/30 bg-zinc-500/10 text-zinc-400"
