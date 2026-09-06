@@ -42,6 +42,15 @@ describe("PublicProfileVisibilityCard", () => {
     render(<PublicProfileVisibilityCard initialEnabled={false} />);
 
     const visibilitySwitch = screen.getByRole("switch");
+    expect(
+      document.querySelector(
+        '[data-profile-visibility-control="public-profile"]'
+      )
+    ).not.toBeNull();
+    expect(visibilitySwitch).toHaveClass(
+      "min-h-11",
+      "focus-visible:ring-2"
+    );
     expect(visibilitySwitch).toHaveAttribute("aria-checked", "false");
 
     fireEvent.click(visibilitySwitch);
