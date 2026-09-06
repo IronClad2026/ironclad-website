@@ -88,7 +88,7 @@ export default function DashboardBadgesSection({
       <section
         id="dashboard-badges"
         aria-labelledby="dashboard-badges-title"
-        className="mt-10 scroll-mt-28 border border-red-400/25 bg-black/65 p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-6"
+        className="mt-8 scroll-mt-28 border border-red-400/25 bg-zinc-950/85 p-4 sm:p-5"
       >
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
           {copy.dashboard.eyebrow}
@@ -149,29 +149,29 @@ export default function DashboardBadgesSection({
       <section
         id="dashboard-badges"
         aria-labelledby="dashboard-badges-title"
-        className="mt-10 scroll-mt-28 border border-orange-500/20 bg-black/65 p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-6"
+        className="mt-8 scroll-mt-28 border border-white/12 bg-zinc-950/85 p-4 sm:p-5"
       >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <div className="min-w-0">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
+          <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-orange-300">
             <Award size={15} aria-hidden="true" />
             {copy.dashboard.eyebrow}
           </p>
           <h2
             id="dashboard-badges-title"
-            className="mt-3 text-3xl font-bold text-white"
+            className="mt-1 text-xl font-bold text-white sm:text-2xl"
           >
             {copy.dashboard.title}
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-400">
             {hasEarnedBadges
               ? copy.dashboard.earnedWithBadges
               : copy.dashboard.empty}
           </p>
         </div>
 
-        <div className="min-w-[11rem] border border-white/10 bg-black/35 p-4">
-          <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+        <div className="flex items-center gap-3 sm:min-w-28 sm:flex-col sm:items-end sm:gap-0">
+          <p className="text-xs font-medium text-zinc-400">
             {copy.dashboard.earnedLabel}
           </p>
           <p
@@ -179,17 +179,17 @@ export default function DashboardBadgesSection({
               earned: progress.earnedCount,
               total: progress.totalCount,
             })}
-            className="mt-2 text-3xl font-black text-white"
+            className="text-xl font-bold tabular-nums text-white sm:mt-1 sm:text-2xl"
           >
             {progress.earnedCount}
             <span className="text-lg text-zinc-500">/{progress.totalCount}</span>
           </p>
           <div
-            className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"
+            className="h-1 w-24 overflow-hidden rounded-full bg-white/10 sm:mt-2"
             aria-hidden="true"
           >
             <span
-              className="block h-full rounded-full bg-gradient-to-r from-orange-500 via-amber-300 to-orange-200"
+              className="block h-full rounded-full bg-orange-400"
               style={{ width: `${progress.percentComplete}%` }}
             />
           </div>
@@ -199,7 +199,7 @@ export default function DashboardBadgesSection({
       <div
         role="list"
         aria-label={copy.dashboard.featuredAria}
-        className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
+        className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
         data-dashboard-badge-showcase-count={showcaseItems.length}
       >
         {showcaseItems.map((item) => (
@@ -223,15 +223,15 @@ export default function DashboardBadgesSection({
         ))}
       </div>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs leading-5 text-zinc-500">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-5 text-zinc-400">
           {hasEarnedBadges
             ? copy.dashboard.inspect
             : copy.dashboard.explore}
         </p>
         <Link
           href="/dashboard/badges"
-          className="inline-flex min-h-11 items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black uppercase tracking-wider text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+          className="inline-flex min-h-11 items-center justify-center gap-2 border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-orange-300/50 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
         >
           {copy.dashboard.viewCollection}
           <ArrowRight size={16} aria-hidden="true" />
@@ -319,54 +319,49 @@ function DashboardBadgeShowcaseCard({
           : { scale: 1 }
       }
       transition={{ duration: prefersReducedMotion ? 0.24 : 0.62 }}
-      className={`group relative isolate flex h-full min-h-[17rem] w-full cursor-pointer flex-col border p-3 text-left transition hover:-translate-y-0.5 hover:border-orange-300/45 hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 ${
+      className={`group relative isolate flex h-full min-h-52 w-full cursor-pointer flex-col border p-2.5 text-left transition hover:border-orange-300/45 hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 ${
         isEarned && !isNew
-          ? `${tokens.borderClassName} bg-[linear-gradient(180deg,rgba(31,26,21,0.88),rgba(7,7,8,0.94))] shadow-[0_18px_34px_rgba(0,0,0,0.25)]`
+          ? `${tokens.borderClassName} bg-zinc-900/65`
           : isNew
-            ? "border-zinc-500/35 bg-[linear-gradient(180deg,rgba(40,40,43,0.9),rgba(8,8,9,0.94))] shadow-[0_18px_34px_rgba(0,0,0,0.25)]"
-          : "border-zinc-800/80 bg-[linear-gradient(180deg,rgba(24,24,27,0.72),rgba(8,8,9,0.9))]"
+            ? "border-zinc-500/35 bg-zinc-900/70"
+          : "border-zinc-800/80 bg-zinc-900/35"
       }`}
     >
       <span
-        className="relative isolate flex h-40 shrink-0 items-center justify-center"
+        className="relative isolate flex h-24 shrink-0 items-center justify-center sm:h-28"
       >
         <BadgeArtwork
           item={localizedItem}
           variant="slot"
-          className="relative z-10 w-full max-w-32"
+          className="relative z-10 w-full max-w-24"
           presentation={isNew ? "unrevealed" : "revealed"}
           dictionary={dictionary}
           rootRef={destinationRef}
           revealDestination={isEarned}
         />
       </span>
-      <span className="mt-3 flex min-w-0 flex-1 flex-col">
-        <span className="flex h-5 shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider">
+      <span className="mt-2 flex min-w-0 flex-1 flex-col">
+        <span className="flex min-h-5 shrink-0 flex-wrap items-center gap-1.5 text-[11px] font-semibold">
           <StatusIcon size={13} aria-hidden="true" />
-          <span className={isEarned ? tokens.textClassName : "text-zinc-500"}>
+          <span className={isEarned ? tokens.textClassName : "text-zinc-400"}>
             {isNew
               ? dictionary.states.new
               : isEarned
                 ? dictionary.states.earned
                 : dictionary.states.locked}
           </span>
-          <span className="ml-auto text-zinc-500">
+          <span className="ml-auto text-zinc-400">
             {String(localizedItem.definition.number).padStart(2, "0")}
           </span>
         </span>
-        {isNew ? (
-          <span className="mt-2 w-fit border border-orange-300/45 bg-orange-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-orange-200">
-            {dictionary.states.new}
-          </span>
-        ) : null}
-        <span className="mt-2 flex h-10 shrink-0 items-start line-clamp-2 text-sm font-black leading-5 text-white">
+        <span className="mt-1.5 min-h-10 break-words text-sm font-bold leading-5 text-white">
           {localizedItem.definition.name}
         </span>
         <span
-          className={`mt-auto flex min-h-7 w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
+          className={`mt-2 flex min-h-6 w-fit items-center rounded-sm border px-2 py-0.5 text-[11px] font-semibold ${
             isEarned
               ? tokens.badgeClassName
-              : "border-white/10 bg-white/[0.03] text-zinc-500"
+              : "border-white/10 bg-white/[0.03] text-zinc-400"
           }`}
         >
           {rarityLabel}

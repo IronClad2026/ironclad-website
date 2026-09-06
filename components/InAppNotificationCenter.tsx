@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { dismissDashboardNotifications } from "@/app/dashboard/actions";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
 import NotificationPermissionControl from "@/components/NotificationPermissionControl";
+import { notifyDashboardRegistrationNavigation } from "@/components/dashboard/registration-navigation";
 import {
   deleteSelectedInAppNotifications,
   markAllInAppNotificationsRead,
@@ -56,6 +57,7 @@ type InAppNotificationCenterProps = {
   error?: string | null;
   className?: string;
   matchNotifications?: DashboardNotification[];
+  presentation?: "default" | "dashboard";
 };
 
 type NotificationTranslator = (
@@ -75,7 +77,9 @@ export default function InAppNotificationCenter({
   error,
   className = "",
   matchNotifications = [],
+  presentation = "default",
 }: InAppNotificationCenterProps) {
+  const dashboardPresentation = scope === "player" && presentation === "dashboard";
   const [notifications, setNotifications] = useState(initialNotifications);
   const [notificationTotalCount, setNotificationTotalCount] =
     useState(totalCount);
@@ -447,7 +451,9 @@ export default function InAppNotificationCenter({
           setMutationError(t("dashboard.actions.updateFailed"));
         }
 
-        router.push(notification.href ?? "/tournaments");
+        const href = notification.href ?? "/tournaments";
+        notifyDashboardRegistrationNavigation(href);
+        router.push(href);
       });
       return;
     }
@@ -473,7 +479,7 @@ export default function InAppNotificationCenter({
                 {description}
               </p>
             </div>
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
+            <span className={dashboardPresentation ? "grid h-9 w-9 shrink-0 place-items-center text-zinc-400" : "grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-orange-400/30 bg-orange-500/10 text-orange-300"}>
               <Bell className="h-6 w-6" />
             </span>
           </div>
@@ -514,6 +520,7 @@ export default function InAppNotificationCenter({
                     onDeleteSelected={deleteSelected}
                     onOpenContext={(href) => {
                       setAdminModalOpen(false);
+                      notifyDashboardRegistrationNavigation(href);
                       router.push(href);
                     }}
                   />
@@ -528,21 +535,21 @@ export default function InAppNotificationCenter({
 
   return (
     <section
-      className={`overflow-hidden rounded-3xl border border-orange-500/20 bg-[linear-gradient(135deg,rgba(249,115,22,0.08),rgba(255,255,255,0.035))] shadow-xl shadow-black/20 backdrop-blur ${className}`}
+      className={`overflow-hidden border ${dashboardPresentation ? "border-white/12 bg-zinc-950/75" : "rounded-3xl border-orange-500/20 bg-[linear-gradient(135deg,rgba(249,115,22,0.08),rgba(255,255,255,0.035))] shadow-xl shadow-black/20 backdrop-blur"} ${className}`}
     >
       <button
         type="button"
         onClick={() => setPlayerExpanded((current) => !current)}
         aria-expanded={playerExpanded}
-        className="flex w-full flex-wrap items-center justify-between gap-4 p-6 text-left transition hover:bg-orange-500/5"
+        className={`flex min-h-14 w-full flex-wrap items-center justify-between gap-3 text-left transition hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300 ${dashboardPresentation ? "p-4" : "p-6"}`}
       >
         <span className="flex min-w-0 items-center gap-4">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
             <Bell className="h-6 w-6" />
           </span>
           <span className="min-w-0">
-            <span className="block text-xl font-black text-white">{title}</span>
-            <span className="mt-1 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <span className={`block font-bold text-white ${dashboardPresentation ? "text-lg" : "text-xl"}`}>{title}</span>
+            <span className="mt-1 block text-xs font-semibold text-zinc-400">
               {t("center.totalSummary", {
                 total: displayTotalCount,
                 unread: displayUnreadCount,
@@ -556,6 +563,35 @@ export default function InAppNotificationCenter({
           }`}
         />
       </button>
+
+      {dashboardPresentation && !playerExpanded && (
+        <div className="border-t border-white/10 px-4 pb-3">
+          {visibleError && <p role="alert" className="mt-3 border-l-2 border-red-400 bg-red-500/10 p-3 text-sm text-red-200">{visibleError}</p>}
+          {notifications.length === 0 ? (
+            <p className="py-3 text-sm leading-5 text-zinc-400">{emptyMessage}</p>
+          ) : (
+            <ol className="divide-y divide-white/10">
+              {notifications.slice(0, 2).map((notification) => (
+                <li key={notification.id}>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => handlePlayerNotificationClick(notification)}
+                    className="flex min-h-11 w-full items-start gap-2 py-3 text-left transition hover:text-orange-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 disabled:opacity-60"
+                  >
+                    {notification.readAt === null && <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />}
+                    <span className="min-w-0">
+                      <span className="block break-words text-sm font-semibold text-zinc-200">{notification.title}</span>
+                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-zinc-400">{notification.message}</span>
+                      {notification.readAt === null && <span className="sr-only">{t("center.new")}</span>}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
 
       <AnimatePresence initial={false}>
         {playerExpanded && (

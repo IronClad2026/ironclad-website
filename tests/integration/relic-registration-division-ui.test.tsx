@@ -1206,7 +1206,7 @@ describe("Relic verified-division registration UI", () => {
     expect(source).not.toContain("coh3_player_card_url");
   });
 
-  it("keeps Registration guidance beside both actionable Hero cards", () => {
+  it("keeps Registration guidance beside the shared actionable Hero card", () => {
     const source = readFileSync(
       path.join(process.cwd(), "components/TournamentsExperience.tsx"),
       "utf8"
@@ -1215,7 +1215,7 @@ describe("Relic verified-division registration UI", () => {
       /<ActionCard[\s\S]*?\/>\s*\{registrationOpen && <RegistrationGuidanceDisclosure \/>\}/g
     );
 
-    expect(siblingPlacements).toHaveLength(2);
+    expect(siblingPlacements).toHaveLength(1);
     expect(source).toContain(
       'import RegistrationGuidanceDisclosure from "@/components/RegistrationGuidanceDisclosure";'
     );

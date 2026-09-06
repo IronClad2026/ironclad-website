@@ -1,13 +1,9 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, FileCheck2, Swords, X } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { FileCheck2, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
-import {
-  useOptionalLocale,
-  useOptionalTranslations,
-} from "@/components/i18n/LocaleProvider";
+import { useOptionalLocale, useOptionalTranslations } from "@/components/i18n/LocaleProvider";
 import type { Locale } from "@/lib/i18n/config";
 import accountDashboardEnglish from "@/lib/i18n/dictionaries/en/account-dashboard";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
@@ -16,150 +12,67 @@ import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import type { MessageValues } from "@/lib/i18n/types";
 import type { MatchHistoryEntry } from "@/lib/player-dashboard";
 
-type DashboardTranslator = (
-  path: string,
-  values?: MessageValues
-) => string;
+type DashboardTranslator = (path: string, values?: MessageValues) => string;
 
-export default function DashboardMatchHistory({
-  matches,
-}: {
-  matches: MatchHistoryEntry[];
-}) {
-  const [expanded, setExpanded] = useState(false);
+export default function DashboardMatchHistory({ matches }: { matches: MatchHistoryEntry[] }) {
   const [selected, setSelected] = useState<MatchHistoryEntry | null>(null);
   const locale = useOptionalLocale();
-  const t = useOptionalTranslations(
-    "account-dashboard",
-    accountDashboardEnglish
-  );
+  const t = useOptionalTranslations("account-dashboard", accountDashboardEnglish);
   const roundT = useOptionalTranslations("competition", competitionEnglish);
 
-  useEffect(() => {
-    if (!selected) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelected(null);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [selected]);
-
   return (
-    <section className="relative mt-10 max-w-xl">
-      <button
-        type="button"
-        onClick={() => setExpanded((current) => !current)}
-        aria-expanded={expanded}
-        className="flex w-full items-center justify-between gap-4 border border-orange-500/20 bg-black/65 p-5 text-left shadow-xl shadow-black/25 backdrop-blur transition hover:border-orange-400/45 hover:bg-black/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-      >
-        <span className="flex min-w-0 items-center gap-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center border border-orange-400/30 bg-orange-500/10 text-orange-300">
-            <Swords size={20} />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-black uppercase tracking-[0.18em] text-white">
-              {t("dashboard.matchHistory.title")}
-            </span>
-            <span className="mt-1 block truncate text-xs text-zinc-400">
-              {matches.length === 0
-                ? t("dashboard.matchHistory.noCompleted")
-                : completedMatchSummary(matches.length, locale, t)}
-            </span>
-          </span>
-        </span>
-        <ChevronDown
-          size={19}
-          className={`shrink-0 text-zinc-400 transition ${
-            expanded ? "rotate-180" : ""
-          }`}
-        />
-      </button>
-
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, y: -8 }}
-            animate={{ opacity: 1, height: "auto", y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -8 }}
-            className="relative z-10 mt-2 overflow-hidden border border-orange-500/20 bg-[#07090d]/95 shadow-2xl shadow-black/50 backdrop-blur-xl"
-          >
-            {matches.length === 0 ? (
-              <p className="p-5 text-sm text-zinc-500">
-                {t("dashboard.matchHistory.empty")}
-              </p>
-            ) : (
-              <div className="max-h-80 overflow-y-auto p-2">
-                {matches.map((match) => (
-                  <button
-                    key={match.id}
-                    type="button"
-                    onClick={() => setSelected(match)}
-                    className="grid w-full grid-cols-[1fr_auto] gap-3 px-3 py-3 text-left transition hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-white">
-                        {match.tournamentName}
-                      </span>
-                      <span className="mt-1 block truncate text-xs text-zinc-500">
-                        {t("dashboard.matchHistory.versus", {
-                          opponent: match.opponentName,
-                          round: localizeBracketRoundName(
-                            match.roundName,
-                            roundT
-                          ),
-                        })}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-3">
-                      <span
-                        className={
-                          match.result === "win"
-                            ? "text-xs font-black text-emerald-300"
-                            : "text-xs font-black text-red-300"
-                        }
-                      >
-                        {t(`dashboard.matchHistory.${match.result}`)}
-                      </span>
-                      <span className="min-w-10 text-right font-black text-white">
-                        {match.score}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {selected && (
-          <MatchHistoryModal
-            match={selected}
-            locale={locale}
-            t={t}
-            roundT={roundT}
-            onClose={() => setSelected(null)}
-          />
-        )}
-      </AnimatePresence>
+    <section aria-label={t("dashboard.matchHistory.title")}>
+      <p className="border-b border-white/10 px-4 py-3 text-xs text-zinc-400 sm:px-5">
+        {matches.length === 0
+          ? t("dashboard.matchHistory.noCompleted")
+          : completedMatchSummary(matches.length, locale, t)}
+      </p>
+      {matches.length === 0 ? (
+        <p className="px-4 py-6 text-sm leading-6 text-zinc-400">
+          {t("dashboard.matchHistory.empty")}
+        </p>
+      ) : (
+        <div className="max-h-[34rem] overflow-y-auto overscroll-contain divide-y divide-white/10" data-lenis-prevent>
+          {matches.map((match) => (
+            <button
+              key={match.id}
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setSelected(match)}
+              className="grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-4 text-left transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-300 sm:px-5"
+            >
+              <span className="min-w-0">
+                <span className="block break-words text-sm font-bold text-white">{match.tournamentName}</span>
+                <span className="mt-1 block break-words text-xs leading-5 text-zinc-300">
+                  {t("dashboard.matchHistory.versus", {
+                    opponent: match.opponentName,
+                    round: localizeBracketRoundName(match.roundName, roundT),
+                  })}
+                </span>
+                <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
+                  <span>{match.bracketName}</span>
+                  <HydrationSafeLocalDateTime value={match.playedAt} fallback={t("dashboard.notAvailable")} options={{ dateStyle: "medium" }} />
+                </span>
+              </span>
+              <span className="flex flex-col items-end justify-center gap-1 sm:flex-row sm:items-center sm:gap-3">
+                <span className={match.result === "win" ? "text-xs font-bold text-emerald-300" : "text-xs font-bold text-red-300"}>
+                  {t(`dashboard.matchHistory.${match.result}`)}
+                </span>
+                <span className="text-right font-bold tabular-nums text-white">{match.score}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {selected ? (
+        <MatchHistoryModal match={selected} locale={locale} t={t} roundT={roundT} onClose={() => setSelected(null)} />
+      ) : null}
     </section>
   );
 }
 
 function MatchHistoryModal({
-  match,
-  locale,
-  t,
-  roundT,
-  onClose,
+  match, locale, t, roundT, onClose,
 }: {
   match: MatchHistoryEntry;
   locale: Locale;
@@ -167,57 +80,91 @@ function MatchHistoryModal({
   roundT: DashboardTranslator;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const onCloseRef = useRef(onClose);
   const localizedRoundName = localizeBracketRoundName(match.roundName, roundT);
 
-  return (
-    <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
-      <motion.button
-        type="button"
-        aria-label={t("dashboard.matchHistory.close")}
-        onClick={onClose}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 h-full w-full cursor-default bg-black/85 backdrop-blur-md"
-      />
-      <motion.article
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`match-history-${match.id}`}
-        initial={{ opacity: 0, scale: 0.96, y: 18 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.97, y: 12 }}
-        className="relative w-full max-w-2xl overflow-hidden border border-orange-400/30 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.16),transparent_35%),linear-gradient(145deg,#111827,#030712)] shadow-[0_0_80px_rgba(249,115,22,0.16)]"
-      >
-        <header className="flex items-start justify-between gap-5 border-b border-white/10 p-6 sm:p-8">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
-              {t("dashboard.matchHistory.detailEyebrow")}
-            </p>
-            <h2
-              id={`match-history-${match.id}`}
-              className="mt-2 text-2xl font-black text-white"
-            >
-              {match.tournamentName}
-            </h2>
-            <p className="mt-2 text-sm text-zinc-400">
-              {t("dashboard.matchHistory.bracketRound", {
-                bracket: match.bracketName,
-                round: localizedRoundName,
-              })}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("dashboard.matchHistory.close")}
-            className="shrink-0 border border-white/10 bg-white/5 p-2.5 text-zinc-400 transition hover:border-orange-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
-          >
-            <X size={19} />
-          </button>
-        </header>
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-        <div className="grid gap-3 p-6 sm:grid-cols-2 sm:p-8">
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Badge reveals own the body lock; keep this read-only viewer's lock separate
+    // so handing focus to a newly mounted reveal cannot leave scrolling locked.
+    const previousOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    dialog.showModal();
+    titleRef.current?.focus();
+    const dismissForBadgeReveal = () => {
+      if (getActiveBadgeReveal()) onCloseRef.current();
+    };
+    const observer = new MutationObserver(dismissForBadgeReveal);
+    observer.observe(document.body, { childList: true, subtree: true });
+    dismissForBadgeReveal();
+    return () => {
+      observer.disconnect();
+      dialog.close();
+      document.documentElement.style.overflow = previousOverflow;
+      const badgeReveal = getActiveBadgeReveal();
+      if (badgeReveal) {
+        // Native dialogs occupy the browser top layer, above the existing Badge
+        // portal. Yield this viewer without changing the reveal or its queue.
+        badgeReveal.focus({ preventScroll: true });
+      } else if (opener?.isConnected) {
+        opener.focus({ preventScroll: true });
+      }
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-modal="true"
+      aria-labelledby={`match-history-${match.id}`}
+      onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+          'a[href], button, input, select, textarea, summary, [tabindex]'
+        )).filter((element) =>
+          element.tabIndex >= 0 && !element.matches(":disabled") &&
+          element.getClientRects().length > 0
+        );
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (!first || !last) { event.preventDefault(); return; }
+        const active = document.activeElement;
+        if (event.shiftKey && (active === first || !controls.includes(active as HTMLElement))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (active === last || !event.currentTarget.contains(active))) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
+      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-2xl overflow-hidden border border-white/20 bg-zinc-950 p-0 text-white shadow-2xl backdrop:bg-black/80 open:flex open:flex-col"
+    >
+      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 p-4 sm:p-5">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold tracking-wide text-orange-300">
+            {t("dashboard.matchHistory.detailEyebrow")}
+          </p>
+          <h2 ref={titleRef} tabIndex={-1} id={`match-history-${match.id}`} className="mt-1 break-words text-xl font-bold text-white focus:outline-none">
+            {match.tournamentName}
+          </h2>
+          <p className="mt-1 break-words text-sm text-zinc-400">
+            {t("dashboard.matchHistory.bracketRound", { bracket: match.bracketName, round: localizedRoundName })}
+          </p>
+        </div>
+        <button type="button" onClick={onClose} aria-label={t("dashboard.matchHistory.close")} className="grid min-h-11 min-w-11 shrink-0 place-items-center border border-white/15 bg-white/5 text-zinc-300 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-300">
+          <X size={20} aria-hidden="true" />
+        </button>
+      </header>
+      <div className="min-h-0 overflow-y-auto overscroll-contain" data-lenis-prevent>
+        <dl className="grid gap-x-5 gap-y-4 p-4 sm:grid-cols-2 sm:p-5">
           <Detail
             label={t("dashboard.matchHistory.opponent")}
             value={match.opponentName}
@@ -267,26 +214,30 @@ function MatchHistoryModal({
                 : t("dashboard.matchHistory.notAttached")
             }
           />
-        </div>
-
+        </dl>
         {(match.replayAvailable || match.screenshotAvailable) && (
-          <div className="mx-6 mb-6 flex items-center gap-3 border border-sky-400/20 bg-sky-500/5 p-4 text-sm text-sky-200 sm:mx-8 sm:mb-8">
+          <div className="mx-4 mb-4 flex items-center gap-3 border border-sky-400/20 bg-sky-500/5 p-4 text-sm text-sky-200 sm:mx-5 sm:mb-5">
             <FileCheck2 size={18} className="shrink-0" />
             {t("dashboard.matchHistory.proofRetained")}
           </div>
         )}
-      </motion.article>
-    </div>
+
+      </div>
+    </dialog>
+  );
+}
+
+function getActiveBadgeReveal() {
+  return document.querySelector<HTMLElement>(
+    '[data-reveal-phase]:not([data-reveal-phase="complete"]) [role="dialog"][aria-labelledby^="badge-reveal-"]'
   );
 }
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="border border-white/10 bg-black/30 p-4">
-      <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-        {label}
-      </p>
-      <p className="mt-2 text-sm font-bold text-white">{value}</p>
+    <div className="min-w-0">
+      <dt className="text-xs text-zinc-400">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-semibold text-white">{value}</dd>
     </div>
   );
 }

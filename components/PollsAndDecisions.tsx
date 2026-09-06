@@ -53,6 +53,7 @@ export type PollsAndDecisionsProps = {
   tournamentId?: string;
   highlightedPollId?: string | null;
   presentation?: "desktop" | "mobile";
+  density?: "default" | "compact";
   pollIntervalMs?: number;
   loadPolls?: (signal?: AbortSignal) => Promise<PollLoadResult>;
   castBallot?: (
@@ -92,6 +93,7 @@ export default function PollsAndDecisions({
   initialError = null,
   highlightedPollId = null,
   presentation,
+  density = "default",
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   loadPolls,
   castBallot = castPollBallotAction,
@@ -451,30 +453,35 @@ export default function PollsAndDecisions({
     surface === "community"
       ? t("polls.communityDescription")
       : t("polls.tournamentDescription");
+  const compact = surface === "community" && density === "compact";
 
   return (
     <section
       aria-labelledby={headingId}
-      className="min-w-0 border border-orange-500/20 bg-black/65 p-4 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-6"
+      className={compact
+        ? "min-w-0 border border-white/12 bg-zinc-950/85 p-4 sm:p-5"
+        : "min-w-0 border border-orange-500/20 bg-black/65 p-4 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-6"}
     >
-      <header className="flex min-w-0 flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-start sm:justify-between">
+      <header className={compact
+        ? "flex min-w-0 items-start justify-between gap-3"
+        : "flex min-w-0 flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-start sm:justify-between"}>
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-400">
+          <p className={compact ? "sr-only" : "text-xs font-black uppercase tracking-[0.28em] text-orange-400"}>
             {surface === "community"
               ? t("polls.communityEyebrow")
               : t("polls.tournamentEyebrow")}
           </p>
           <h2
             id={headingId}
-            className="mt-2 break-words text-2xl font-black uppercase text-white sm:text-3xl"
+            className={compact ? "break-words text-xl font-bold text-white sm:text-2xl" : "mt-2 break-words text-2xl font-black uppercase text-white sm:text-3xl"}
           >
             {heading}
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+          <p className={compact && orderedPolls.length === 0 ? "sr-only" : "mt-2 max-w-3xl text-sm leading-6 text-zinc-400"}>
             {description}
           </p>
         </div>
-        <Vote aria-hidden="true" className="h-8 w-8 shrink-0 text-orange-400" />
+        <Vote aria-hidden="true" className={compact ? "h-5 w-5 shrink-0 text-zinc-400" : "h-8 w-8 shrink-0 text-orange-400"} />
       </header>
 
       {refreshMessage && (
@@ -484,7 +491,7 @@ export default function PollsAndDecisions({
       )}
 
       {orderedPolls.length === 0 ? (
-        <div className="mt-5 border border-white/10 bg-black/35 p-6 text-sm leading-6 text-zinc-400">
+        <div className={compact ? "mt-2 text-sm leading-6 text-zinc-400" : "mt-5 border border-white/10 bg-black/35 p-6 text-sm leading-6 text-zinc-400"}>
           {surface === "community"
             ? t("polls.communityEmpty")
             : t("polls.tournamentEmpty")}
