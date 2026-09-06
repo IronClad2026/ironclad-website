@@ -11,9 +11,10 @@ import type { PublishedTournamentMapPool } from "@/lib/tournament-map-pools";
 
 type TournamentMapPoolsProps = {
   pools: PublishedTournamentMapPool[];
+  embedded?: boolean;
 };
 
-export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
+export default function TournamentMapPools({ pools, embedded = false }: TournamentMapPoolsProps) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
   const sourceTypeLabels = {
@@ -29,9 +30,9 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
   return (
     <section
       aria-label={t("mapPools.ariaLabel")}
-      className="border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.9))] p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-5"
+      className={embedded ? "min-w-0" : "border border-white/12 bg-zinc-950/90 p-4 sm:p-5"}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className={embedded ? "hidden" : "flex flex-wrap items-start justify-between gap-3"}>
         <div className="flex items-start gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
             <MapPinned size={18} aria-hidden="true" />
@@ -64,13 +65,13 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
           </div>
         </div>
       ) : (
-        <div className="mt-4 grid items-start gap-3">
+        <div className={embedded ? "grid items-start gap-3" : "mt-4 grid items-start gap-3"}>
           {pools.map((pool) => (
             <article
               key={pool.bracketId}
-              className="min-w-0 rounded-xl border border-white/12 bg-black/35 shadow-xl shadow-black/20"
+              className="min-w-0 border border-white/12 bg-black/35"
             >
-              <header className="rounded-t-xl border-b border-white/10 bg-[linear-gradient(135deg,rgba(249,115,22,0.13),rgba(255,255,255,0.025))] p-3 sm:p-4">
+              <header className="border-b border-white/10 p-3 sm:p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-300">
@@ -114,13 +115,13 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                 </div>
               </header>
 
-              <ul className="grid grid-cols-1 gap-2 p-2 sm:[grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))] sm:p-3">
+              <ul className={embedded ? "grid grid-cols-1 gap-2 p-2 sm:[grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))] sm:p-3" : "grid grid-cols-1 gap-2 p-2 sm:[grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))] sm:p-3"}>
                 {pool.maps.map((map) => (
                   <li
                     key={map.id}
                     className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-950/80"
                   >
-                    <div className="relative grid h-24 place-items-center overflow-hidden border-b border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.16),transparent_42%),linear-gradient(145deg,#18181b,#09090b)] sm:h-20 xl:h-24">
+                    <div className={map.thumbnailPath ? "relative grid h-24 place-items-center overflow-hidden border-b border-white/10 bg-zinc-900" : "float-left ml-2.5 mt-3 grid h-6 w-6 place-items-center text-zinc-500"}>
                       {map.thumbnailPath ? (
                         <Image
                           src={map.thumbnailPath}
@@ -137,18 +138,18 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                           aria-label={t("mapPools.thumbnailUnavailable", {
                             name: map.displayName,
                           })}
-                          className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-black/35 text-zinc-600"
+                          className="grid h-6 w-6 place-items-center text-zinc-500"
                         >
                           <MapPinned size={20} aria-hidden="true" />
                         </span>
                       )}
                     </div>
 
-                    <div className="p-2.5">
+                    <div className={map.thumbnailPath ? "p-3" : "py-3 pl-11 pr-3"}>
                       <p className="break-words [overflow-wrap:anywhere] text-sm font-black leading-5 text-white">
                         {map.displayName}
                       </p>
-                      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+                      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-zinc-400">
                         <span
                           className={
                             map.sourceType === "official"
@@ -172,7 +173,7 @@ export default function TournamentMapPools({ pools }: TournamentMapPoolsProps) {
                         </span>
                       </div>
                       {map.creatorName ? (
-                        <p className="mt-1.5 break-words [overflow-wrap:anywhere] text-[11px] leading-4 text-zinc-500">
+                        <p className="mt-1.5 break-words [overflow-wrap:anywhere] text-xs leading-5 text-zinc-400">
                           {t("mapPools.createdBy", {
                             name: map.creatorName,
                           })}
