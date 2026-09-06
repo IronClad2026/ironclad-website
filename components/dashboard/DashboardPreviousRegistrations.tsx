@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
+import { DASHBOARD_REGISTRATION_NAVIGATION } from "@/components/dashboard/registration-navigation";
 
 /** Native disclosure keeps all registration anchors mounted and discoverable. */
 export default function DashboardPreviousRegistrations({
@@ -15,10 +16,10 @@ export default function DashboardPreviousRegistrations({
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
-    const revealTarget = () => {
+    const revealTarget = (hash: string) => {
       let id: string;
       try {
-        id = decodeURIComponent(window.location.hash.slice(1));
+        id = decodeURIComponent(hash);
       } catch {
         return;
       }
@@ -28,9 +29,19 @@ export default function DashboardPreviousRegistrations({
       ref.current.open = true;
       target.scrollIntoView?.({ block: "start" });
     };
-    revealTarget();
-    window.addEventListener("hashchange", revealTarget);
-    return () => window.removeEventListener("hashchange", revealTarget);
+    const revealCurrentHash = () => revealTarget(window.location.hash.slice(1));
+    const handleContextNavigation = (event: Event) => {
+      if (event instanceof CustomEvent && typeof event.detail === "string") {
+        revealTarget(event.detail);
+      }
+    };
+    revealCurrentHash();
+    window.addEventListener("hashchange", revealCurrentHash);
+    window.addEventListener(DASHBOARD_REGISTRATION_NAVIGATION, handleContextNavigation);
+    return () => {
+      window.removeEventListener("hashchange", revealCurrentHash);
+      window.removeEventListener(DASHBOARD_REGISTRATION_NAVIGATION, handleContextNavigation);
+    };
   }, []);
   return (
     <details ref={ref} className="group border-t border-white/10" data-dashboard-section="previous-registrations">
