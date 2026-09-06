@@ -170,13 +170,16 @@ describe("TournamentMapPools", () => {
 
     expect(articles).toHaveLength(3);
     expect(region).not.toHaveClass("overflow-hidden");
-    expect(region.querySelector(":scope > div.mt-6")).not.toHaveClass(
+    expect(region.querySelector(":scope > div.mt-4")).not.toHaveClass(
       "lg:grid-cols-3"
     );
 
     for (const article of articles) {
       const mapList = article.querySelector("ul");
-      expect(mapList).toHaveClass("sm:grid-cols-2", "2xl:grid-cols-3");
+      expect(mapList).toHaveClass(
+        "grid-cols-1",
+        "sm:[grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))]"
+      );
       expect(mapList).not.toHaveClass("lg:grid-cols-1", "2xl:grid-cols-2");
     }
 

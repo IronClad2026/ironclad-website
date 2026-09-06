@@ -372,6 +372,7 @@ function createPageClient(
       country?: string | null;
       currentElo?: number | null;
       inGameName?: string;
+      playerId?: string;
       publicProfileEnabled?: boolean;
     }
   > = {},
@@ -493,6 +494,7 @@ function createPageClient(
       clerk_user_id: registration.clerk_user_id,
       country: profile?.country ?? registration.country,
       current_elo: profile?.currentElo ?? participantCurrentElo,
+      id: profile?.playerId ?? registration.id,
       in_game_name: profile?.inGameName ?? registration.player_name,
       public_profile_enabled: profile?.publicProfileEnabled ?? true,
     };
@@ -1016,11 +1018,12 @@ describe("tournament Client Component result payload", () => {
     ).mock.calls[0];
 
     expect(selectedColumns).toBe(
-      "clerk_user_id, public_profile_enabled, account_closed_at"
+      "id, clerk_user_id, public_profile_enabled, account_closed_at"
     );
     expect(participant).toEqual(
       expect.objectContaining({
         name: "Safe Viewer",
+        profileHref: `/players/${VIEWER_REGISTRATION_ID}`,
         country: "Australia",
         elo: 1500,
       })
@@ -1052,7 +1055,12 @@ describe("tournament Client Component result payload", () => {
     );
 
     expect(participant).toEqual(
-      expect.objectContaining({ name: "Safe Viewer", country: null, elo: null })
+      expect.objectContaining({
+        name: "Safe Viewer",
+        profileHref: null,
+        country: null,
+        elo: null,
+      })
     );
     expect(serializePrivacyValue(tournament.participants)).not.toContain(
       "PrivateCurrentIGN"
@@ -1089,6 +1097,7 @@ describe("tournament Client Component result payload", () => {
     expect(participant).toEqual(
       expect.objectContaining({
         name: "Former Competitor",
+        profileHref: null,
         country: null,
         elo: null,
         registrationId: VIEWER_REGISTRATION_ID,

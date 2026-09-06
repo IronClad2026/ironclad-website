@@ -244,37 +244,48 @@ describe("non-English registration gate", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("renders an expandable guidance sibling beside each actionable Register card", () => {
+  it("keeps mobile disclosures and adds desktop dialog triggers beside each Register card", () => {
     renderExperience("en");
 
     const registerActions = screen.getAllByRole("button", {
       name: /^Register/,
     });
-    const guidanceLabels = screen.getAllByText("How Registration Works");
+    const mobileDisclosures = Array.from(document.querySelectorAll("details"));
+    const desktopTriggers = screen.getAllByRole("button", {
+      name: "How Registration Works",
+    });
 
     expect(registerActions).toHaveLength(2);
-    expect(guidanceLabels).toHaveLength(2);
+    expect(mobileDisclosures).toHaveLength(2);
+    expect(desktopTriggers).toHaveLength(2);
+    expect(screen.getAllByText("How Registration Works")).toHaveLength(4);
 
-    guidanceLabels.forEach((label, index) => {
-      const summary = label.closest("summary");
-      const details = summary?.closest("details");
+    mobileDisclosures.forEach((details, index) => {
+      const summary = details.querySelector("summary");
 
-      expect(summary).toBeVisible();
+      expect(summary).not.toBeNull();
       expect(details).not.toHaveAttribute("open");
-      expect(details?.previousElementSibling).toBe(registerActions[index]);
+      expect(details.previousElementSibling).toBe(registerActions[index]);
       expect(registerActions[index]).not.toContainElement(summary);
       expect(
-        details?.querySelector("[data-registration-guidance-icon]")
+        details.querySelector("[data-registration-guidance-icon]")
       ).not.toBeNull();
 
       fireEvent.click(summary as HTMLElement);
       expect(details).toHaveAttribute("open");
       expect(
-        within(details as HTMLElement).getByRole("heading", {
+        within(details).getByRole("heading", {
           name: "What Happens After You Register?",
         })
-      ).toBeVisible();
+      ).toBeInTheDocument();
     });
+
+    fireEvent.click(desktopTriggers[0]);
+    expect(
+      screen.getByRole("dialog", {
+        name: "What Happens After You Register?",
+      })
+    ).toBeInTheDocument();
   });
 
   it("renders the same guidance beside each actionable Join Waitlist card", () => {
@@ -301,7 +312,11 @@ describe("non-English registration gate", () => {
     expect(
       screen.getAllByRole("button", { name: /^Join Waitlist/ })
     ).toHaveLength(2);
-    expect(screen.getAllByText("How Registration Works")).toHaveLength(2);
+    expect(document.querySelectorAll("details")).toHaveLength(2);
+    expect(
+      screen.getAllByRole("button", { name: "How Registration Works" })
+    ).toHaveLength(2);
+    expect(screen.getAllByText("How Registration Works")).toHaveLength(4);
   });
 
   it("does not show guidance for an unavailable Tournament or duplicate an existing Registration state", () => {

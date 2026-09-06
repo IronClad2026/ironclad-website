@@ -53,6 +53,9 @@ vi.mock("@/lib/supabase-browser", () => ({
 
 import TournamentsExperience from "@/components/TournamentsExperience";
 
+const formattedDescription =
+  "Opening paragraph.\n\n- Manual bullet\n2. Numbered line\n\nUnbrokenTournamentDescriptionTokenThatMustWrapSafelyAcrossResponsiveWidths";
+
 const tournament: TournamentCard = {
   id: "11111111-1111-4111-8111-111111111111",
   slug: "published-map-pool-tournament",
@@ -63,7 +66,7 @@ const tournament: TournamentCard = {
   status: "Open",
   statusValue: "registration_open",
   image: "/images/tournaments/1v1-operation-skyfall.jpeg",
-  description: "Public map-pool presentation fixture.",
+  description: formattedDescription,
   organizer: "IronClad Tournaments",
   game: "Company of Heroes 3",
   region: "Global",
@@ -90,7 +93,7 @@ const tournament: TournamentCard = {
     "tournament-map-pool",
     "registration_open"
   ),
-  details: "Public map-pool presentation fixture.",
+  details: formattedDescription,
   rules: "Format A rules.",
   schedule: [],
   contact: "IronClad Admin",
@@ -160,6 +163,47 @@ describe("public tournament map-pool presentation", () => {
       expect(within(pool).getByText("Active")).toBeInTheDocument();
       expect(within(pool).getByText("Created by Community Cartographer"))
         .toBeInTheDocument();
+    }
+  });
+
+  it("keeps one formatted description in each responsive Published Tournament card", () => {
+    const { container } = render(
+      <TournamentsExperience
+        tournaments={[tournament]}
+        viewer={{
+          isAdmin: false,
+          relicVerifiedDivision: null,
+          registrationIds: [],
+          registrations: [],
+        }}
+        matchResultSubmissions={[]}
+        matchResultReportGroups={[]}
+        eloVerificationEnabled
+      />
+    );
+
+    expect(
+      screen.queryByRole("heading", {
+        name: "IronClad Company of Heroes 3 Tournaments",
+      })
+    ).not.toBeInTheDocument();
+
+    const publishedCards = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-published-tournament-card]")
+    );
+    expect(publishedCards).toHaveLength(2);
+
+    for (const card of publishedCards) {
+      const description = Array.from(card.querySelectorAll("p")).find(
+        (paragraph) => paragraph.textContent === formattedDescription
+      );
+      expect(description).toHaveClass(
+        "whitespace-pre-wrap",
+        "break-words",
+        "[overflow-wrap:anywhere]"
+      );
+      expect(card.querySelector("[data-division-effective-state]")).toBeNull();
+      expect(card.querySelector("[data-tournament-banner]")).not.toBeNull();
     }
   });
 

@@ -119,6 +119,7 @@ export type TournamentCard = {
 export type TournamentParticipant = {
   registrationId: string;
   name: string;
+  profileHref?: string | null;
   country: string | null;
   elo: number | null;
   status:
@@ -144,6 +145,7 @@ export type TournamentParticipantRegistrationSnapshot = {
 };
 
 export type TournamentParticipantPrivacyState = {
+  playerId?: string;
   publicProfileEnabled: boolean;
   accountClosedAt: string | null;
 } | null;
@@ -155,10 +157,15 @@ export function mapPublicTournamentParticipant(
   const isClosed = privacy?.accountClosedAt != null;
   const showOptionalFacts =
     !isClosed && privacy?.publicProfileEnabled === true;
+  const profileHref =
+    showOptionalFacts && privacy?.playerId
+      ? `/players/${privacy.playerId}`
+      : null;
 
   return {
     registrationId: registration.registrationId,
     name: isClosed ? "Former Competitor" : registration.playerName,
+    profileHref,
     country: showOptionalFacts ? registration.country : null,
     elo: showOptionalFacts
       ? (registration.verifiedElo ?? registration.submittedElo)
