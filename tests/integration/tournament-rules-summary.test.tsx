@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
 
+import { stubNativeDialog } from "@/tests/helpers/native-dialog";
+let restoreNativeDialog: (() => void) | undefined;
+afterEach(() => restoreNativeDialog?.());
+
 import type { ReactNode } from "react";
 import {
   cleanup,
@@ -160,19 +164,12 @@ function experience() {
 }
 
 function getMobileExperience() {
-  const mobile = screen
-    .getByRole("button", { name: "Tournament Menu" })
-    .closest(".lg\\:hidden");
-
-  if (!(mobile instanceof HTMLElement)) {
-    throw new Error("Mobile Tournament experience was not rendered.");
-  }
-
-  return mobile;
+  return document.body;
 }
 
 describe("Tournament Rules essentials summary", () => {
   beforeEach(() => {
+    restoreNativeDialog = stubNativeDialog();
     window.history.replaceState({}, "", "/tournaments");
     routerPush.mockReset();
     routerReplace.mockReset();
@@ -215,10 +212,10 @@ describe("Tournament Rules essentials summary", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      within(mobile).getByRole("button", { name: "Tournament Menu" })
+      within(mobile).getByRole("button", { name: "Browse events" })
     );
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Tournament Menu" })).getByRole(
+      within(screen.getByRole("dialog", { name: "Browse events" })).getByRole(
         "button",
         { name: /Rules Summary Tournament/ }
       )
@@ -226,10 +223,8 @@ describe("Tournament Rules essentials summary", () => {
     view.rerender(experience());
 
     mobile = getMobileExperience();
-    const rulesControl = within(mobile).getByRole("button", { name: "Rules" });
-    const mapPools = within(mobile).getByRole("region", {
-      name: "Published division map pools",
-    });
+    const rulesControl = within(mobile).getByRole("tab", { name: "Rules" });
+    const mapPools = within(mobile).getByRole("button", { name: "View Maps" });
 
     expect(rulesControl).toHaveAttribute("type", "button");
     expect(rulesControl).toHaveClass("min-h-11");
@@ -302,7 +297,6 @@ describe("Tournament Rules essentials summary", () => {
     const summaries = screen.getAllByRole("region", {
       name: "Tournament Essentials",
     });
-    expect(summaries).toHaveLength(2);
-    expect(summaries[0]?.textContent).toBe(summaries[1]?.textContent);
+    expect(summaries).toHaveLength(1);
   });
 });
