@@ -1,8 +1,6 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import WebsiteTrafficSection from "@/components/admin/operations/WebsiteTrafficSection";
@@ -43,27 +41,19 @@ function unavailable(
 describe("WebsiteTrafficSection", () => {
   afterEach(cleanup);
 
-  it("renders the six truthful UTC summary cards and measurement caveats", () => {
+  it("renders the six exact values in a compact UTC comparison and measurement caveats", () => {
     render(<WebsiteTrafficSection analytics={availableAnalytics} />);
 
     expect(
       screen.getByRole("heading", { name: "Public-site reach" })
     ).toBeInTheDocument();
 
-    const expectedCards = [
-      ["Vercel Visitors — Today", "12"],
-      ["Vercel Visitors — 7 days", "61"],
-      ["Vercel Visitors — 30 days", "205"],
-      ["Page Views — Today", "24"],
-      ["Page Views — 7 days", "132"],
-      ["Page Views — 30 days", "468"],
-    ] as const;
-
-    for (const [name, value] of expectedCards) {
-      const card = screen.getByRole("article", { name });
-      expect(within(card).getByText(value)).toBeInTheDocument();
-      expect(within(card).getByText(/UTC/)).toBeInTheDocument();
+    const summary = screen.getByRole("table", { name: "Website traffic summary · fixed UTC windows" });
+    for (const [name, values] of [["Vercel Visitors", ["12", "61", "205"]], ["Page Views", ["24", "132", "468"]]] as const) {
+      const row = within(summary).getByRole("rowheader", { name }).closest("tr")!;
+      expect(within(row).getAllByRole("cell").map((cell) => cell.textContent)).toEqual(values);
     }
+    for (const label of ["Today", "7 days", "30 days"]) expect(within(summary).getByRole("columnheader", { name: new RegExp(label + ".*UTC") })).toBeInTheDocument();
 
     expect(
       screen.getByText(/anonymous, request-derived daily measure/i)
@@ -75,7 +65,7 @@ describe("WebsiteTrafficSection", () => {
       screen.getByText(/latest 30-day UTC reporting window/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/not globally unique people/i)
+      screen.getAllByText(/not globally unique people/i)[0]
     ).toBeInTheDocument();
     expect(
       screen.getByText(/declined consent.*blockers.*free-tier collection pauses/i)
@@ -229,28 +219,12 @@ describe("WebsiteTrafficSection", () => {
     }
   );
 
-  it("uses narrow-mobile-first cards and viewport-safe native chart contracts", () => {
-    const source = readFileSync(
-      resolve(
-        process.cwd(),
-        "components/admin/operations/WebsiteTrafficSection.tsx"
-      ),
-      "utf8"
-    );
-
-    expect(source).toContain("p-4 sm:p-6");
-    expect(source).toContain(
-      "grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-    );
-    expect(source).toContain(
-      "grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-3"
-    );
-    expect(source).toContain("grid-cols-1");
-    expect(source).toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
-    expect(source).toContain('className="h-44 w-full max-w-full"');
-    expect(source).toContain('<table className="sr-only">');
-    expect(source).toContain("break-all");
-    expect(source).not.toContain("overflow-x-auto");
-    expect(source).not.toContain("min-w-max");
+  it("keeps secondary breakdowns and exact daily values in native disclosures", () => {
+    const { container } = render(<WebsiteTrafficSection analytics={availableAnalytics} />);
+    expect(screen.getByText("Audience breakdowns").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("View daily values").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("Measurement context").closest("details")).not.toHaveAttribute("open");
+    expect(container.querySelector('table th[scope="row"]')).toBeInTheDocument();
+    expect(container.querySelector('g[data-series="Page Views"] path')).toHaveAttribute("stroke-dasharray", "6 4");
   });
 });
