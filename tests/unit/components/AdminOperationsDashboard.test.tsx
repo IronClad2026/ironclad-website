@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 import AdminOperationsDashboard from "@/components/admin/operations/AdminOperationsDashboard";
 import { emptyOperationsMetrics } from "../../fixtures/admin-operations";
 const traffic = { status: "unavailable", reason: "non-production" } as const;
-afterEach(cleanup);
+afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
+Element.prototype.scrollIntoView = vi.fn();
 describe("Operations hierarchy", () => {
   it("preserves domain coverage, record destinations and truthful terminology", () => {
     const metrics = emptyOperationsMetrics();
@@ -14,10 +15,11 @@ describe("Operations hierarchy", () => {
     const { container } = render(<AdminOperationsDashboard metrics={metrics} websiteTraffic={traffic} />);
     for (const id of ["operations-overview", "attention-required", "players", "registrations", "tournaments", "matches", "website-traffic", "platform-health"]) expect(container.querySelector("#" + id)).toBeInTheDocument();
     for (const label of ["Open Player Accounts", "Registrations submitted", "Waiting Now", "Opponent Confirmed"]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Registrations" }));
     expect(screen.getByRole("link", { name: /Withdrawn Player/ })).toHaveAttribute("href", metrics.registrations.who.withdrawn[0].href);
     for (const label of ["Approved Players", "Rejected Players", "Waitlisted Players"]) expect(screen.queryByText(label, { exact: true })).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/Subscriptions|Revenue|subscriber|tracker/i);
-    for (const [label, period] of [["Today", "today"], ["7 days", "7d"], ["30 days", "30d"], ["All time", "all"]]) expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", "/admin/operations?period=" + period);
+    for (const [label, period] of [["Today", "today"], ["7 days", "7d"], ["30 days", "30d"], ["All time", "all"]]) expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", "/admin/operations?period=" + period + "#registrations");
   });
   it("keeps operational totals distinct from exact registration aggregates", () => {
     const metrics = emptyOperationsMetrics();
