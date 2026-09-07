@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, Activity, type LucideIcon } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AdminOperationsDailyPoint, AdminOperationsGroupPoint, AdminOperationsGrowth } from "@/lib/admin-operations-metrics";
 const numberFormatter = new Intl.NumberFormat("en-AU");
@@ -24,7 +24,7 @@ export function SectionShell({
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="scroll-mt-28 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl shadow-black/20 sm:p-6 xl:scroll-mt-44"
+      className="scroll-mt-28 rounded-xl border border-white/10 bg-zinc-950/50 p-4 sm:p-6 xl:scroll-mt-44"
     >
       <SectionHeading
         id={`${id}-title`}
@@ -33,7 +33,7 @@ export function SectionShell({
         description={description}
         icon={icon}
       />
-      <div className="mt-6">{children}</div>
+      <div className="mt-4">{children}</div>
     </section>
   );
 }
@@ -53,14 +53,14 @@ export function SectionHeading({
 }) {
   return (
     <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-orange-500/30 bg-orange-500/10 text-orange-300">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-300">
         <Icon aria-hidden="true" className="h-5 w-5" />
       </span>
       <div className="min-w-0">
         <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-400">
           {eyebrow}
         </p>
-        <h2 id={id} className="mt-2 break-words text-2xl font-black sm:text-3xl">
+        <h2 id={id} className="mt-2 break-words text-xl font-bold sm:text-2xl">
           {title}
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
@@ -88,262 +88,60 @@ export function SubsectionHeading({
   );
 }
 
-function ChangeLine({ value }: { value: number | null }) {
-  if (value === null) {
-    return (
-      <p className="mt-3 text-xs font-bold text-zinc-500">
-        No comparable previous period
-      </p>
-    );
-  }
-
-  const positive = value > 0;
-  const negative = value < 0;
-  const Icon = positive ? ArrowUpRight : negative ? ArrowDownRight : Activity;
-
-  return (
-    <p
-      className={`mt-3 inline-flex items-center gap-1 text-xs font-black ${
-        positive
-          ? "text-emerald-300"
-          : negative
-            ? "text-amber-300"
-            : "text-zinc-400"
-      }`}
-    >
-      <Icon aria-hidden="true" className="h-3.5 w-3.5" />
-      {formatSignedPercent(value)} vs previous period
-    </p>
-  );
+export function MetricBand({ title, metrics, className = "" }: { title: string; metrics: Array<{ label: string; value: number | string; qualifier?: string }>; className?: string }) {
+  return <section aria-label={title} className={"rounded-xl border border-white/10 bg-zinc-950 p-4 " + className}>
+    <h3 className="text-sm font-semibold text-zinc-300">{title}</h3>
+    <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3 xl:grid-cols-4">{metrics.map((metric) => <div key={metric.label} className="min-w-0"><dt className="text-xs leading-5 text-zinc-400">{metric.label}</dt><dd className="mt-1 text-xl font-bold tabular-nums text-white">{typeof metric.value === "number" ? numberFormatter.format(metric.value) : metric.value}</dd>{metric.qualifier && <p className="mt-1 text-xs text-zinc-400">{metric.qualifier}</p>}</div>)}</dl>
+  </section>;
 }
-
-export function MetricBand({
-  title,
-  metrics,
-  className = "",
-}: {
-  title: string;
-  metrics: Array<{
-    label: string;
-    value: number | string;
-    qualifier?: string;
-  }>;
-  className?: string;
-}) {
-  return (
-    <section
-      aria-label={title}
-      className={`rounded-2xl border border-white/10 bg-black/25 p-4 ${className}`}
-    >
-      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">
-        {title}
-      </h3>
-      <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <div
-            key={metric.label}
-            className="min-w-0 rounded-xl border border-white/10 bg-white/[0.035] p-3"
-          >
-            <dt className="break-words text-[10px] font-black uppercase tracking-wider text-zinc-500">
-              {metric.label}
-            </dt>
-            <dd className="mt-2 break-words text-xl font-black text-white sm:text-2xl">
-              {typeof metric.value === "number"
-                ? numberFormatter.format(metric.value)
-                : metric.value}
-            </dd>
-            {metric.qualifier ? (
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
-                {metric.qualifier}
-              </p>
-            ) : null}
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
+export function GrowthCard({ title, periodLabel, growth }: { title: string; periodLabel: string; growth: AdminOperationsGrowth }) {
+  return <section aria-label={title} className="flex flex-wrap items-baseline gap-x-6 gap-y-2 rounded-xl border border-white/10 bg-zinc-950 p-4 text-sm">
+    <h3 className="font-semibold text-zinc-300">{title}</h3><p><strong className="text-xl tabular-nums">{numberFormatter.format(growth.current)}</strong> <span className="text-zinc-400">· {periodLabel}</span></p>
+    <p className="text-zinc-400">Previous comparable period: <strong className="text-zinc-200">{growth.previous === null ? "Not available" : numberFormatter.format(growth.previous)}</strong></p>
+    <p className="text-zinc-300">{growth.changePercent === null ? "No comparable previous period" : formatSignedPercent(growth.changePercent) + " vs previous period"}</p>
+  </section>;
 }
-
-export function GrowthCard({
-  title,
-  periodLabel,
-  growth,
-}: {
-  title: string;
-  periodLabel: string;
-  growth: AdminOperationsGrowth;
-}) {
-  return (
-    <section className="rounded-2xl border border-white/10 bg-black/25 p-4 sm:p-5">
-      <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-300">
-        {title}
-      </p>
-      <p className="mt-4 text-3xl font-black text-white">
-        {numberFormatter.format(growth.current)}
-      </p>
-      <p className="mt-1 text-xs text-zinc-500">Current · {periodLabel}</p>
-
-      <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.035] p-3">
-        <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-          Previous comparable period
-        </p>
-        <p className="mt-2 text-xl font-black text-zinc-200">
-          {growth.previous === null
-            ? "Not available"
-            : numberFormatter.format(growth.previous)}
-        </p>
-      </div>
-      <ChangeLine value={growth.changePercent} />
-    </section>
-  );
-}
-
-type TrendSeries = {
-  label: string;
-  points: AdminOperationsDailyPoint[];
-  color: string;
-};
-
-export function TrendChart({
-  id,
-  title,
-  description,
-  series,
-}: {
-  id: string;
-  title: string;
-  description: string;
-  series: TrendSeries[];
-}) {
-  const axis = series.reduce<AdminOperationsDailyPoint[]>(
-    (longest, item) => (item.points.length > longest.length ? item.points : longest),
-    []
-  );
+type TrendSeries = { label: string; points: AdminOperationsDailyPoint[]; color: string };
+export function TrendChart({ id, title, description, series, emptyMessage = "No daily activity is available for this period.", tableCaption = title + " in UTC" }: { id: string; title: string; description: string; series: TrendSeries[]; emptyMessage?: string; tableCaption?: string }) {
+  const dates = [...new Set(series.flatMap((item) => item.points.map((point) => point.date)))].sort();
   const values = series.flatMap((item) => item.points.map((point) => point.value));
   const maximum = Math.max(1, ...values);
-  const hasData = axis.length > 0;
+  const first = Date.parse(dates[0] ?? "");
+  const last = Date.parse(dates.at(-1) ?? "");
+  const x = (date: string) => first === last ? 360 : 12 + ((Date.parse(date) - first) / (last - first)) * 696;
+  const y = (value: number) => 166 - (value / maximum) * 150;
+  const indexed = series.map((item) => new Map(item.points.map((point) => [point.date, point.value])));
+  return <figure aria-labelledby={id + "-title"} className="min-w-0 rounded-xl border border-white/10 bg-zinc-950 p-4">
+    <figcaption><h3 id={id + "-title"} className="font-bold">{title}</h3><p className="mt-1 text-xs leading-5 text-zinc-400">{description}</p></figcaption>
+    {dates.length ? <>
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-zinc-300">{series.map((item, index) => <span key={item.label} className="inline-flex items-center gap-2"><svg aria-hidden="true" width="30" height="12"><line x1="0" x2="30" y1="6" y2="6" stroke={item.color} strokeWidth="2" strokeDasharray={index % 2 ? "4 3" : undefined} />{index % 2 ? <rect x="12" y="3" width="6" height="6" fill={item.color} /> : <circle cx="15" cy="6" r="3" fill={item.color} />}</svg>{item.label}</span>)}</div>
+      <div className="mt-3 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-2">
+        <div aria-hidden="true" className="flex flex-col justify-between py-3 text-right text-xs tabular-nums text-zinc-400"><span>{numberFormatter.format(maximum)}</span><span>0</span></div>
+        <div className="relative min-w-0"><svg aria-hidden="true" className="h-44 w-full max-w-full" preserveAspectRatio="none" viewBox="0 0 720 180">
+          {[0, 0.5, 1].map((fraction) => <line key={fraction} x1="12" x2="708" y1={y(maximum * fraction)} y2={y(maximum * fraction)} stroke="rgba(255,255,255,0.12)" />)}
+          {series.map((item, index) => {
+            const sorted = [...item.points].sort((a, b) => a.date.localeCompare(b.date));
+            // Break the trace at unreported days: absence is not a zero or interpolation.
+            const path = sorted.map((point, i) => ((i === 0 || Date.parse(point.date) - Date.parse(sorted[i - 1].date) !== 86400000) ? "M" : "L") + x(point.date) + "," + y(point.value)).join(" ");
+            return <g key={item.label} data-series={item.label}><path d={path} fill="none" stroke={item.color} strokeWidth="2" strokeDasharray={index % 2 ? "6 4" : undefined} vectorEffect="non-scaling-stroke" />
 
-  return (
-    <figure
-      aria-labelledby={`${id}-title`}
-      className="min-w-0 rounded-2xl border border-white/10 bg-black/25 p-4 sm:p-5"
-    >
-      <figcaption>
-        <h3
-          id={`${id}-title`}
-          className="break-words font-black text-white"
-        >
-          {title}
-        </h3>
-        <p className="mt-1 text-xs leading-5 text-zinc-500">{description}</p>
-      </figcaption>
-
-      {hasData ? (
-        <>
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-bold text-zinc-400">
-            {series.map((item) => (
-              <span key={item.label} className="inline-flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
-                {item.label}
-              </span>
-            ))}
-            <span className="ml-auto text-zinc-500">
-              Peak {numberFormatter.format(Math.max(0, ...values))}
-            </span>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-white/10 bg-zinc-950/80 p-2 sm:p-3">
-            <svg
-              aria-hidden="true"
-              className="h-44 w-full"
-              preserveAspectRatio="none"
-              viewBox="0 0 720 180"
-            >
-              {[0, 1, 2, 3].map((line) => (
-                <line
-                  key={line}
-                  x1="0"
-                  x2="720"
-                  y1={12 + line * 52}
-                  y2={12 + line * 52}
-                  stroke="rgba(255,255,255,0.08)"
-                  strokeWidth="1"
-                />
-              ))}
-              {series.map((item) => (
-                <g key={item.label}>
-                  <path
-                    d={buildTrendPath(item.points, maximum)}
-                    fill="none"
-                    stroke={item.color}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="3"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  {item.points.map((point, index) => {
-                    const coordinate = trendCoordinate(
-                      point.value,
-                      index,
-                      item.points.length,
-                      maximum
-                    );
-                    return (
-                      <circle
-                        key={`${item.label}-${point.date}`}
-                        cx={coordinate.x}
-                        cy={coordinate.y}
-                        fill={item.color}
-                        r="3"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    );
-                  })}
-                </g>
-              ))}
-            </svg>
-          </div>
-
-          <div className="mt-2 flex items-center justify-between gap-4 text-[10px] font-black uppercase tracking-wider text-zinc-600">
-            <span>{axis[0]?.label}</span>
-            <span>{axis.at(-1)?.label}</span>
-          </div>
-
-          <div className="sr-only"><table>
-            <caption>{title}</caption>
-            <thead>
-              <tr>
-                <th>Date</th>
-                {series.map((item) => (
-                  <th key={item.label}>{item.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {axis.map((point, index) => (
-                <tr key={point.date}>
-                  <th>{point.label}</th>
-                  {series.map((item) => (
-                    <td key={item.label}>{item.points[index]?.value ?? 0}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table></div>
-        </>
-      ) : (
-        <EmptyPanel className="mt-4">
-          No daily activity is available for this period.
-        </EmptyPanel>
-      )}
-    </figure>
-  );
+            </g>;
+          })}
+        </svg>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0">{series.map((item, index) => <div key={item.label} data-markers={item.label}>{item.points.map((point) => <span key={point.date} data-date={point.date} data-value={point.value} title={point.date + " · " + item.label + ": " + point.value} className={"absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 " + (index % 2 ? "" : "rounded-full")} style={{ left: (x(point.date) / 720) * 100 + "%", top: (y(point.value) / 180) * 100 + "%", backgroundColor: item.color }} />)}</div>)}</div>
+        </div>
+      </div>
+      <div aria-hidden="true" className="mt-1 flex justify-between gap-4 text-xs text-zinc-400"><span>{dates[0]}</span><span>{dates.at(-1)}</span></div>
+      <details className="group mt-3 border-t border-white/10">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-semibold text-orange-200">View daily values <ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" /></summary>
+        <p className="mb-3 text-xs leading-5 text-zinc-400">Exact reported values by UTC date. “Not reported” means no observation, not zero. Gaps in the trace represent unreported days.</p>
+        <div className="max-h-80 overflow-auto rounded-lg border border-white/10" tabIndex={0} role="region" aria-label={title + " daily values"}>
+          <table className="w-full table-fixed text-left text-xs tabular-nums"><caption className="sr-only">{tableCaption}</caption><thead className="sticky top-0 bg-zinc-900"><tr><th scope="col" className="p-2">Date (UTC)</th>{series.map((item) => <th scope="col" key={item.label} className="p-2">{item.label}</th>)}</tr></thead><tbody>{dates.map((date) => <tr key={date} className="border-t border-white/10"><th scope="row" className="p-2 font-normal text-zinc-300">{date}</th>{indexed.map((points, index) => <td key={series[index].label} className="p-2">{points.has(date) ? numberFormatter.format(points.get(date)!) : "Not reported"}</td>)}</tr>)}</tbody></table>
+        </div>
+      </details>
+    </> : <EmptyPanel className="mt-4">{emptyMessage}</EmptyPanel>}
+  </figure>;
 }
-
 export function DistributionChart({
   title,
   description,
@@ -356,10 +154,10 @@ export function DistributionChart({
   const total = points.reduce((sum, point) => sum + point.value, 0);
 
   return (
-    <figure className="min-w-0 rounded-2xl border border-white/10 bg-black/25 p-4 sm:p-5">
+    <figure className="min-w-0 rounded-xl border border-white/10 bg-black/25 p-4 sm:p-5">
       <figcaption>
         <h3 className="break-words font-black text-white">{title}</h3>
-        <p className="mt-1 text-xs leading-5 text-zinc-500">{description}</p>
+        <p className="mt-1 text-xs leading-5 text-zinc-400">{description}</p>
       </figcaption>
 
       {points.length > 0 && total > 0 ? (
@@ -374,7 +172,7 @@ export function DistributionChart({
                   </span>
                   <span className="shrink-0 font-black text-white">
                     {numberFormatter.format(point.value)}
-                    <span className="ml-1 text-[10px] text-zinc-600">
+                    <span className="ml-1 text-xs text-zinc-400">
                       {percentFormatter.format(share)}%
                     </span>
                   </span>
@@ -383,7 +181,7 @@ export function DistributionChart({
                   <div
                     aria-hidden="true"
                     className={`h-full rounded-full ${barColors[index % barColors.length]}`}
-                    style={{ width: `${Math.max(share, point.value > 0 ? 2 : 0)}%` }}
+                    style={{ width: `${share}%` }}
                   />
                 </div>
               </div>
@@ -408,39 +206,11 @@ export function EmptyPanel({
 }) {
   return (
     <p
-      className={`rounded-xl border border-dashed border-white/10 p-4 text-sm leading-6 text-zinc-500 ${className}`}
+      className={`rounded-xl border border-dashed border-white/10 p-4 text-sm leading-6 text-zinc-400 ${className}`}
     >
       {children}
     </p>
   );
-}
-
-function trendCoordinate(
-  value: number,
-  index: number,
-  length: number,
-  maximum: number
-) {
-  const x = length <= 1 ? 360 : (index / (length - 1)) * 720;
-  const y = 168 - (value / maximum) * 156;
-  return { x, y };
-}
-
-function buildTrendPath(
-  points: AdminOperationsDailyPoint[],
-  maximum: number
-) {
-  return points
-    .map((point, index) => {
-      const coordinate = trendCoordinate(
-        point.value,
-        index,
-        points.length,
-        maximum
-      );
-      return `${index === 0 ? "M" : "L"}${coordinate.x},${coordinate.y}`;
-    })
-    .join(" ");
 }
 
 function formatSignedPercent(value: number) {
