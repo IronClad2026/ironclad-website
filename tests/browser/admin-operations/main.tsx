@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import AdminOperationsDashboard from "@/components/admin/operations/AdminOperationsDashboard";
+import SmoothScrollProvider from "@/components/SmoothScrollProvider";
+import AdminOperationsLoading from "@/app/admin/operations/loading";
+import AdminOperationsError from "@/app/admin/operations/error";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import { emptyOperationsMetrics } from "../../fixtures/admin-operations";
 import { parseAdminOperationsPeriod, resolveAdminOperationsPeriod } from "@/lib/admin-operations-metrics";
@@ -10,6 +13,7 @@ import "@/app/globals.css";
 blockNetwork();
 function Fixture() {
   const [refreshes, setRefreshes] = useState(0);
+  const [errorDismissed, setErrorDismissed] = useState(false);
   useEffect(() => { const refresh = () => setRefreshes((count) => count + 1); window.addEventListener("operations-fixture-refresh", refresh); return () => window.removeEventListener("operations-fixture-refresh", refresh); }, []);
   const query = new URLSearchParams(location.search);
   const metrics = emptyOperationsMetrics();
@@ -43,6 +47,6 @@ function Fixture() {
     trend: [{ date: "2026-09-01", visitors: 2, pageViews: 5 }, ...(query.has("single") ? [] : [{ date: "2026-09-02", visitors: 5, pageViews: 9 }, { date: "2026-09-07", visitors: 4, pageViews: 11 }])],
     breakdowns: { routes: [point], countries: [{ ...point, label: "Australia" }], referrers: [{ ...point, label: "example.com" }], devices: [{ ...point, label: "Desktop" }], browsers: [{ ...point, label: "Chrome" }], operatingSystems: [{ ...point, label: "Windows" }] },
   };
-  return <><div className="fixed inset-x-0 top-0 z-50 flex h-24 items-center border-b border-white/10 bg-black px-6 font-bold text-white">IRONCLAD <span className="ml-3 text-xs font-normal text-zinc-400">Isolated presentation fixture</span></div><div className="w-full min-w-0 xl:mx-auto xl:grid xl:max-w-[1680px] xl:grid-cols-[15rem_minmax(0,1fr)] xl:items-start"><AdminSidebar /><AdminOperationsDashboard metrics={metrics} websiteTraffic={traffic} /></div></>;
+  return <><div className="fixed inset-x-0 top-0 z-50 flex h-24 items-center border-b border-white/10 bg-black px-6 font-bold text-white">IRONCLAD <span className="ml-3 text-xs font-normal text-zinc-400">Isolated presentation fixture</span></div><div className="w-full min-w-0 bg-black xl:mx-auto xl:grid xl:max-w-[1680px] xl:grid-cols-[15rem_minmax(0,1fr)] xl:items-start"><AdminSidebar />{query.has("loading") ? <AdminOperationsLoading /> : query.has("error") && !errorDismissed ? <AdminOperationsError error={new Error("Isolated test error")} reset={() => setErrorDismissed(true)} /> : <AdminOperationsDashboard metrics={metrics} websiteTraffic={traffic} />}</div></>;
 }
-createRoot(document.getElementById("root")!).render(<Fixture />);
+createRoot(document.getElementById("root")!).render(<SmoothScrollProvider><Fixture /></SmoothScrollProvider>);

@@ -38,7 +38,7 @@ const publicRouteLabels = new Set([
 
 type AvailableWebsiteTrafficAnalytics = Extract<
   WebsiteTrafficAnalytics,
-  { status: "available" }
+  { status: "available"; }
 >;
 
 type BreakdownKind = keyof AvailableWebsiteTrafficAnalytics["breakdowns"];
@@ -48,12 +48,12 @@ type WebsiteTrafficBreakdownPoint =
 
 type UnavailableReason = Extract<
   WebsiteTrafficAnalytics,
-  { status: "unavailable" }
+  { status: "unavailable"; }
 >["reason"];
 
 const unavailableCopy: Record<
   UnavailableReason,
-  { label: string; description: string }
+  { label: string; description: string; }
 > = {
   "non-production": {
     label: "Preview / non-Production",
@@ -88,43 +88,43 @@ const breakdowns: Array<{
   emptyLabel: string;
   icon: LucideIcon;
 }> = [
-  {
-    key: "routes",
-    title: "Top Public Routes",
-    emptyLabel: "No approved public routes were reported.",
-    icon: Route,
-  },
-  {
-    key: "countries",
-    title: "Countries",
-    emptyLabel: "No country breakdown is available.",
-    icon: MapPin,
-  },
-  {
-    key: "referrers",
-    title: "Referrer Hostnames",
-    emptyLabel: "No referrer hostnames were reported.",
-    icon: Globe2,
-  },
-  {
-    key: "devices",
-    title: "Device Types",
-    emptyLabel: "No device breakdown is available.",
-    icon: MonitorSmartphone,
-  },
-  {
-    key: "browsers",
-    title: "Browsers",
-    emptyLabel: "No browser breakdown is available.",
-    icon: AppWindow,
-  },
-  {
-    key: "operatingSystems",
-    title: "Operating Systems",
-    emptyLabel: "No operating-system breakdown is available.",
-    icon: Laptop,
-  },
-];
+    {
+      key: "routes",
+      title: "Top Public Routes",
+      emptyLabel: "No approved public routes were reported.",
+      icon: Route,
+    },
+    {
+      key: "countries",
+      title: "Countries",
+      emptyLabel: "No country breakdown is available.",
+      icon: MapPin,
+    },
+    {
+      key: "referrers",
+      title: "Referrer Hostnames",
+      emptyLabel: "No referrer hostnames were reported.",
+      icon: Globe2,
+    },
+    {
+      key: "devices",
+      title: "Device Types",
+      emptyLabel: "No device breakdown is available.",
+      icon: MonitorSmartphone,
+    },
+    {
+      key: "browsers",
+      title: "Browsers",
+      emptyLabel: "No browser breakdown is available.",
+      icon: AppWindow,
+    },
+    {
+      key: "operatingSystems",
+      title: "Operating Systems",
+      emptyLabel: "No operating-system breakdown is available.",
+      icon: Laptop,
+    },
+  ];
 
 export default function WebsiteTrafficSection({
   analytics,
@@ -212,7 +212,7 @@ function AvailableTraffic({
   );
 }
 
-function UnavailableTraffic({ reason }: { reason: UnavailableReason }) {
+function UnavailableTraffic({ reason }: { reason: UnavailableReason; }) {
   const copy = unavailableCopy[reason];
 
   return (
@@ -233,7 +233,7 @@ function UnavailableTraffic({ reason }: { reason: UnavailableReason }) {
   );
 }
 
-function TrafficTrend({ points }: { points: AvailableWebsiteTrafficAnalytics["trend"] }) {
+function TrafficTrend({ points }: { points: AvailableWebsiteTrafficAnalytics["trend"]; }) {
   return <TrendChart id="website-traffic-trend" title="Daily public-site traffic" tableCaption="Daily public-site traffic in UTC" description="Vercel Visitors and Page Views grouped by UTC day." emptyMessage="No daily trend history is available for this UTC reporting window." series={[
     { label: "Vercel Visitors", color: "#fb923c", points: points.map((point) => ({ date: point.date, label: point.date, value: point.visitors })) },
     { label: "Page Views", color: "#38bdf8", points: points.map((point) => ({ date: point.date, label: point.date, value: point.pageViews })) },
@@ -268,11 +268,10 @@ function BreakdownCard({
               className="grid min-w-0 grid-cols-1 gap-2 rounded-xl border border-white/[0.08] bg-zinc-950/70 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
             >
               <span
-                className={`min-w-0 text-sm font-bold text-zinc-300 ${
-                  kind === "routes" || kind === "referrers"
+                className={`min-w-0 text-sm font-bold text-zinc-300 ${kind === "routes" || kind === "referrers"
                     ? "break-all"
                     : "break-words"
-                }`}
+                  }`}
               >
                 {safeBreakdownLabel(kind, point.label)}
               </span>

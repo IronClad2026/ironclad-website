@@ -21,7 +21,7 @@ function domainFor(id: string): Domain | undefined {
   if (id === "platform-health") return "tournaments";
   return domains.find(([key]) => key === id)?.[0];
 }
-export default function AnalyticsWorkspace({ period, panels }: { period: AdminOperationsPeriodRange; panels: Record<Domain, ReactNode> }) {
+export default function AnalyticsWorkspace({ period, panels }: { period: AdminOperationsPeriodRange; panels: Record<Domain, ReactNode>; }) {
   const hash = useSyncExternalStore(subscribe, getHash, () => "");
   const [lastSelected, setLastSelected] = useState<Domain>("players");
   const selected = hash ? domainFor(hash) ?? lastSelected : "players";

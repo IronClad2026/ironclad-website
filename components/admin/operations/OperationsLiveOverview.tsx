@@ -13,16 +13,16 @@ const tones = {
 };
 const order = { critical: 0, warning: 1, info: 2 };
 
-export default function OperationsLiveOverview({ metrics, navigation }: { metrics: AdminOperationsMetrics; navigation: ReactNode }) {
+export default function OperationsLiveOverview({ metrics, navigation }: { metrics: AdminOperationsMetrics; navigation: ReactNode; }) {
   const pending = metrics.registrations.statusGroups.find((point) => point.label === "Pending")?.value ?? 0;
   const review = metrics.registrations.statusGroups.find((point) => point.label === "Manual review")?.value ?? 0;
   const active = metrics.attention.filter((item) => item.count > 0).sort((a, b) => order[a.tone] - order[b.tone]);
   const quiet = metrics.attention.filter((item) => item.count === 0);
-  const previews: Record<string, { title: string; rows: AdminOperationsRow[] }> = {
-    disputes: { title: "Recent dispute records", rows: metrics.matches.who.disputed },
-    "admin-review": { title: "Recent Admin review records", rows: metrics.matches.who.underReview },
-    "overdue-matches": { title: "Recent overdue Match records", rows: metrics.matches.who.overdue },
-    "admin-assistance": { title: "Recent assistance requests", rows: metrics.matches.who.adminAssistance },
+  const previews: Record<string, { title: string; dateLabel: string; rows: AdminOperationsRow[]; }> = {
+    disputes: { title: "Recent dispute records", dateLabel: "Disputed / created", rows: metrics.matches.who.disputed },
+    "admin-review": { title: "Recent Admin review records", dateLabel: "Recorded", rows: metrics.matches.who.underReview },
+    "overdue-matches": { title: "Recent overdue Match records", dateLabel: "Deadline", rows: metrics.matches.who.overdue },
+    "admin-assistance": { title: "Recent assistance requests", dateLabel: "Requested", rows: metrics.matches.who.adminAssistance },
   };
   return (
     <>
@@ -30,11 +30,11 @@ export default function OperationsLiveOverview({ metrics, navigation }: { metric
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-widest text-orange-300">Private Admin Area</p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Operations &amp; Analytics</h1>
-          <p className="mt-2 text-xs text-zinc-400">Snapshot <time dateTime={metrics.generatedAt}>{formatAdminDateTime(metrics.generatedAt)}</time></p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <OperationsRefreshButton />
-          <Link href="/admin" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 px-3 text-sm font-semibold text-zinc-300 xl:hidden">Admin Command Centre <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+          <OperationsRefreshButton generatedAt={metrics.generatedAt} />
+          <Link href="/admin" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 px-3 text-sm font-semibold text-zinc-300 xl:hidden">Command Centre <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+          <p className="w-full text-xs text-zinc-400">Snapshot <time dateTime={metrics.generatedAt}>{formatAdminDateTime(metrics.generatedAt)}</time></p>
         </div>
       </header>
       {navigation}
@@ -53,11 +53,11 @@ export default function OperationsLiveOverview({ metrics, navigation }: { metric
           <h2 id="attention-required-title" className="text-xl font-bold">Attention Required</h2>
           <span className="text-xs text-zinc-400">Current recorded queues</span>
         </div>
-        <div id="match-issues" className="scroll-mt-32 space-y-2">
+        <div id="match-issues" className="grid scroll-mt-32 items-start gap-2 xl:grid-cols-2">
           {active.length === 0 ? <p className="rounded-xl border border-white/10 bg-zinc-950 p-4 text-sm text-zinc-300">No items in these operational queues. Registration decisions are shown separately above.</p> : active.map((item) => (
             <div key={item.key} className={"rounded-xl border px-3 py-2 " + tones[item.tone].style}>
               <QueueLine item={item} />
-              {previews[item.key] ? <WhoDisclosure title={previews[item.key].title} description={item.description} rows={previews[item.key].rows} emptyMessage="No recent preview rows are available. Open the existing workflow to inspect records." /> : <p className="pb-1 text-xs leading-5 text-zinc-400">{item.description} The linked workflow is broader than this count.</p>}
+              {previews[item.key] ? <WhoDisclosure compact dateLabel={previews[item.key].dateLabel} title={previews[item.key].title} description={item.description + (item.key === "admin-review" ? " Recorded time may use the existing creation or activation fallback." : "")} rows={previews[item.key].rows} emptyMessage="No recent preview rows are available. Open the existing workflow to inspect records." /> : <p className="pb-1 text-xs leading-5 text-zinc-400">{item.description} The linked workflow is broader than this count.</p>}
             </div>
           ))}
         </div>
@@ -79,11 +79,11 @@ export default function OperationsLiveOverview({ metrics, navigation }: { metric
   );
 }
 
-function Summary({ label, value, href, note = "Now", emphasis = false }: { label: string; value: number; href: string; note?: string; emphasis?: boolean }) {
+function Summary({ label, value, href, note = "Now", emphasis = false }: { label: string; value: number; href: string; note?: string; emphasis?: boolean; }) {
   return <div className={emphasis ? "min-w-0 col-span-2 rounded-xl border border-orange-400/35 bg-orange-400/5 lg:col-span-1" : "min-w-0 rounded-xl border border-white/10 bg-zinc-950"}><Link href={href} className="block h-full rounded-xl p-3 hover:bg-white/5"><span className="block text-xs font-semibold text-zinc-300">{label}</span><strong className="mt-2 block text-2xl font-bold tabular-nums">{number.format(value)}</strong><span className="mt-1 block text-xs leading-4 text-zinc-400">{note}</span></Link></div>;
 }
 
-function QueueLine({ item }: { item: AdminOperationsAttentionItem }) {
+function QueueLine({ item }: { item: AdminOperationsAttentionItem; }) {
   const href = item.href.startsWith("/admin/operations#") ? "/admin/tournaments" : item.href;
   return <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1">
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"><strong className="text-xl tabular-nums">{number.format(item.count)}</strong><h3 className="text-sm font-bold">{item.label}</h3><span className="text-xs">{tones[item.tone].label}</span></div>

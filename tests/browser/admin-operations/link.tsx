@@ -1,5 +1,6 @@
 import type { AnchorHTMLAttributes } from "react";
-export default function FixtureLink({ href, onClick, ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) {
+export default function FixtureLink({ href, onClick, scroll, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { scroll?: boolean }) {
+  void scroll;
   return <a {...props} href={href} onClick={(event) => {
     onClick?.(event);
     if (event.defaultPrevented || !href?.startsWith("/")) return;
