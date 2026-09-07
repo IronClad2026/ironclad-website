@@ -1,0 +1,20 @@
+.workspace :is(a, button, summary, select, [tabindex]):focus-visible {
+  outline: 2px solid #fdba74;
+  outline-offset: 3px;
+}
+.workspace [id] {
+  scroll-margin-top: 8rem;
+}
+.workspace summary {
+  touch-action: manipulation;
+}
+.workspace :is(p, dt, dd, h1, h2, h3, span, a, th, td) {
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace *, .workspace *::before, .workspace *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

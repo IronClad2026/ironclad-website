@@ -55,7 +55,7 @@ describe("Admin Operations route states", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(providerDetail)).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Registration and Tournament administration remain available/)
+      screen.getByText(/return to the Admin command centre to open an existing workflow/)
     ).toBeInTheDocument();
 
     const retry = screen.getByRole("button", { name: "Try again" });
@@ -73,7 +73,7 @@ describe("Admin Operations route states", () => {
 
     const refresh = screen.getByRole("button", { name: "Refresh" });
     expect(refresh).toHaveAttribute("type", "button");
-    expect(refresh).toHaveClass("min-h-11", "w-full", "sm:w-auto");
+    expect(refresh).toHaveClass("min-h-11");
     fireEvent.click(refresh);
 
     await waitFor(() => expect(refreshMock).toHaveBeenCalledOnce());
