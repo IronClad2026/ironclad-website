@@ -88,21 +88,21 @@ export function SubsectionHeading({
   );
 }
 
-export function MetricBand({ title, metrics, className = "" }: { title: string; metrics: Array<{ label: string; value: number | string; qualifier?: string }>; className?: string }) {
+export function MetricBand({ title, metrics, className = "" }: { title: string; metrics: Array<{ label: string; value: number | string; qualifier?: string; }>; className?: string; }) {
   return <section aria-label={title} className={"rounded-xl border border-white/10 bg-zinc-950 p-4 " + className}>
     <h3 className="text-sm font-semibold text-zinc-300">{title}</h3>
     <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3 xl:grid-cols-4">{metrics.map((metric) => <div key={metric.label} className="min-w-0"><dt className="text-xs leading-5 text-zinc-400">{metric.label}</dt><dd className="mt-1 text-xl font-bold tabular-nums text-white">{typeof metric.value === "number" ? numberFormatter.format(metric.value) : metric.value}</dd>{metric.qualifier && <p className="mt-1 text-xs text-zinc-400">{metric.qualifier}</p>}</div>)}</dl>
   </section>;
 }
-export function GrowthCard({ title, periodLabel, growth }: { title: string; periodLabel: string; growth: AdminOperationsGrowth }) {
+export function GrowthCard({ title, periodLabel, growth }: { title: string; periodLabel: string; growth: AdminOperationsGrowth; }) {
   return <section aria-label={title} className="flex flex-wrap items-baseline gap-x-6 gap-y-2 rounded-xl border border-white/10 bg-zinc-950 p-4 text-sm">
     <h3 className="font-semibold text-zinc-300">{title}</h3><p><strong className="text-xl tabular-nums">{numberFormatter.format(growth.current)}</strong> <span className="text-zinc-400">· {periodLabel}</span></p>
     <p className="text-zinc-400">Previous comparable period: <strong className="text-zinc-200">{growth.previous === null ? "Not available" : numberFormatter.format(growth.previous)}</strong></p>
     <p className="text-zinc-300">{growth.changePercent === null ? "No comparable previous period" : formatSignedPercent(growth.changePercent) + " vs previous period"}</p>
   </section>;
 }
-type TrendSeries = { label: string; points: AdminOperationsDailyPoint[]; color: string };
-export function TrendChart({ id, title, description, series, emptyMessage = "No daily activity is available for this period.", tableCaption = title + " in UTC" }: { id: string; title: string; description: string; series: TrendSeries[]; emptyMessage?: string; tableCaption?: string }) {
+type TrendSeries = { label: string; points: AdminOperationsDailyPoint[]; color: string; };
+export function TrendChart({ id, title, description, series, emptyMessage = "No daily activity is available for this period.", tableCaption = title + " in UTC" }: { id: string; title: string; description: string; series: TrendSeries[]; emptyMessage?: string; tableCaption?: string; }) {
   const dates = [...new Set(series.flatMap((item) => item.points.map((point) => point.date)))].sort();
   const values = series.flatMap((item) => item.points.map((point) => point.value));
   const maximum = Math.max(1, ...values);

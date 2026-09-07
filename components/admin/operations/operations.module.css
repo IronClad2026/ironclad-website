@@ -1,4 +1,4 @@
-.workspace :is(a, button, summary, select):focus-visible {
+.workspace :is(a, button, summary, select, [tabindex]):focus-visible {
   outline: 2px solid #fdba74;
   outline-offset: 3px;
 }
@@ -8,7 +8,7 @@
 .workspace summary {
   touch-action: manipulation;
 }
-.workspace :is(p, dt, dd, h1, h2, h3) {
+.workspace :is(p, dt, dd, h1, h2, h3, span, a, th, td) {
   overflow-wrap: anywhere;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -18,4 +18,3 @@
     scroll-behavior: auto !important;
   }
 }
-
