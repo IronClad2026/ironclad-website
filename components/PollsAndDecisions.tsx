@@ -810,7 +810,7 @@ function PollCard({
                     name={poll.maxSelections === 1 ? radioGroupName : undefined}
                     aria-label={option.map?.name ?? option.label}
                     checked={checked}
-                    disabled={pending || (!checked && atLimit)}
+                    disabled={pending || (poll.maxSelections > 1 && !checked && atLimit)}
                     onChange={(event) => onToggle(option.id, event.target.checked)}
                     className="h-4 w-4 shrink-0 accent-orange-500"
                   />
