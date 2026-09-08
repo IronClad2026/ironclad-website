@@ -450,6 +450,8 @@ const dictionary = {
   },
   polls: {
     refreshError: "투표를 새로고침하지 못했습니다.",
+    missingPlayer: "회원 투표는 플레이어 프로필을 설정한 후 이용할 수 있습니다.",
+    closedPlayer: "폐쇄된 계정은 회원 투표를 이용할 수 없습니다.",
     savingBallot: "투표용지 저장 중…",
     ballotConfirmed: "기존 투표용지가 확인되었습니다.",
     ballotSaved: "투표용지를 저장했습니다. 투표가 종료될 때까지 변경할 수 있습니다.",

@@ -451,6 +451,33 @@ export function parseSinglePollProjection(
   return parsePollProjection(value.poll, scope);
 }
 
+// Browser recovery receives the already-projected camelCase model, not a raw RPC
+// payload. Convert only known fields and reuse the same privacy/scope validator.
+export function parsePollClientListProjection(
+  value: unknown,
+  scope: PollProjectionScope
+): PollListProjection | null {
+  if (!Array.isArray(value)) return null;
+  const polls = value.map((poll) => {
+    const converted = restoreProjectionKeys(poll, POLL_KEYS);
+    if (!converted || !Array.isArray(converted.options)) return null;
+    converted.options = converted.options.map((option) =>
+      restoreProjectionKeys(option, OPTION_KEYS)
+    );
+    return converted;
+  });
+  return parsePollListProjection({ polls }, scope);
+}
+
+function restoreProjectionKeys(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
+  if (!isRecord(value)) return null;
+  const allowed = new Map(keys.map((key) => [
+    key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()), key,
+  ]));
+  if (Object.keys(value).some((key) => !allowed.has(key))) return null;
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [allowed.get(key)!, entry]));
+}
+
 export function parsePollVoteResult(
   value: unknown,
   expectedPollId?: string

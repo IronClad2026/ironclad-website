@@ -34,22 +34,29 @@ import {
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import { formatNumber, selectPlural } from "@/lib/i18n/format";
 import {
-  parseSinglePollProjection,
+  isPollListSnapshotComplete,
+  mergePollListSnapshot,
+  parsePollListSnapshot,
+  projectPollListSnapshot,
+  type PollListSnapshot,
+  type PollSurface,
+} from "@/lib/poll-loading";
+import {
   type PollOptionProjection,
   type PollViewerProjection,
   type SubmitPollVoteInput,
 } from "@/lib/polls";
-import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 
-export type PollSurface = "tournament" | "community";
+export type { PollSurface } from "@/lib/poll-loading";
 export type PollLoadResult =
-  | { ok: true; polls: PollViewerProjection[] }
-  | { ok: false; message: string };
+  | { ok: true; polls: PollViewerProjection[]; snapshot?: PollListSnapshot }
+  | { ok: false; message: string; snapshot?: PollListSnapshot; resetPrivate?: boolean };
 
 export type PollsAndDecisionsProps = {
   surface: PollSurface;
   initialPolls: PollViewerProjection[];
   initialError?: string | null;
+  initialSnapshot?: PollListSnapshot;
   tournamentId?: string;
   highlightedPollId?: string | null;
   presentation?: "desktop" | "mobile";
@@ -63,6 +70,8 @@ export type PollsAndDecisionsProps = {
 
 const DEFAULT_POLL_INTERVAL_MS = 7_000;
 const MAX_TIMER_MS = 2_147_000_000;
+const REQUEST_TIMEOUT_MS = 20_000;
+const MAX_AUTOMATIC_FAILURES = 3;
 
 type PollMessage = {
   text: string;
@@ -87,43 +96,99 @@ function getInitialViewportActivity(
   return presentation === "desktop" ? desktop : !desktop;
 }
 
-export default function PollsAndDecisions({
+export default function PollsAndDecisions(props: PollsAndDecisionsProps) {
+  const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
+  const authReady = isLoaded !== false;
+  const viewerUserId = authReady && isSignedIn ? userId ?? null : null;
+  const viewerSessionId = authReady && isSignedIn ? sessionId ?? null : null;
+  const [initialLegacyContext] = useState({ userId: viewerUserId, sessionId: viewerSessionId });
+
+  // A new Clerk session owns a new controller, drafts and response generation.
+  // In particular, old server props must never seed another account's state.
+  return (
+    <PollsAndDecisionsSession
+      key={JSON.stringify([
+        props.surface,
+        props.tournamentId ?? null,
+        authReady,
+        viewerUserId,
+        viewerSessionId,
+      ])}
+      {...props}
+      authReady={authReady}
+      viewerUserId={viewerUserId}
+      viewerSessionId={viewerSessionId}
+      allowLegacyInitial={authReady &&
+        initialLegacyContext.userId === viewerUserId &&
+        initialLegacyContext.sessionId === viewerSessionId}
+    />
+  );
+}
+
+function PollsAndDecisionsSession({
   surface,
   initialPolls,
   initialError = null,
+  initialSnapshot,
+  tournamentId,
   highlightedPollId = null,
   presentation,
   density = "default",
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   loadPolls,
   castBallot = castPollBallotAction,
-}: PollsAndDecisionsProps) {
+  authReady,
+  viewerUserId,
+  viewerSessionId,
+  allowLegacyInitial,
+}: PollsAndDecisionsProps & {
+  authReady: boolean;
+  viewerUserId: string | null;
+  viewerSessionId: string | null;
+  allowLegacyInitial: boolean;
+}) {
   const t = useOptionalTranslations("competition", competitionEnglish);
-  const { getToken, isSignedIn } = useAuth();
   const headingId = useId();
-  const [polls, setPolls] = useState(initialPolls);
+  const [seed] = useState(() => createInitialPollState({
+    initialSnapshot,
+    initialPolls,
+    initialError,
+    surface,
+    tournamentId: tournamentId ?? null,
+    viewerUserId,
+    viewerSessionId,
+    authReady,
+    allowLegacyInitial,
+  }));
+  const [polls, setPolls] = useState(seed.polls);
   const [draftSelections, setDraftSelections] = useState<
     Record<string, string[]>
-  >(() => buildInitialSelections(initialPolls));
+  >(() => buildInitialSelections(seed.polls));
   const [messages, setMessages] = useState<Record<string, PollMessage | null>>(
     {}
   );
   const [pendingPollId, setPendingPollId] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(
-    initialError ? t("polls.refreshError") : null
+    seed.needsRecovery ? t("polls.refreshError") : null
   );
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [accountState, setAccountState] = useState(seed.snapshot?.accountState);
   const [viewportActive, setViewportActive] = useState(() =>
     getInitialViewportActivity(presentation)
   );
   const [isPending, startTransition] = useTransition();
   const mountedRef = useRef(false);
   const viewportWasActiveRef = useRef(viewportActive);
-  const pollsRef = useRef(initialPolls);
+  const pollsRef = useRef(seed.polls);
+  const snapshotRef = useRef(seed.snapshot);
+  const lastInitialSnapshotRef = useRef(initialSnapshot);
+  const initialRequestPendingRef = useRef(seed.needsRecovery);
   const inFlightRef = useRef(false);
   const controllerRef = useRef<AbortController | null>(null);
   const sequenceRef = useRef(0);
   const appliedSequenceRef = useRef(0);
   const mutationRevisionRef = useRef(0);
+  const mutationPendingRef = useRef(false);
   const failureCountRef = useRef(0);
   const dirtyPollsRef = useRef(new Set<string>());
   const pollCardRefs = useRef(new Map<string, HTMLElement>());
@@ -142,54 +207,50 @@ export default function PollsAndDecisions({
     };
   }, [presentation]);
 
-  const browserClient = useMemo(
-    () =>
-      loadPolls === undefined
-        ? createAuthenticatedBrowserSupabaseClient(getToken)
-        : null,
-    [getToken, loadPolls]
-  );
-
-  const loadFromDatabase = useCallback(
+  const loadFromServer = useCallback(
     async (signal?: AbortSignal): Promise<PollLoadResult> => {
-      if (!browserClient) {
+      const params = new URLSearchParams({ surface });
+      if (surface === "tournament" && tournamentId) {
+        params.set("tournamentId", tournamentId);
+      }
+      const response = await fetch(`/api/polls?${params.toString()}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+        signal,
+      });
+      if (!response.ok) {
         return { ok: false, message: t("polls.refreshError") };
       }
-
-      if (!isSignedIn) return { ok: true, polls: pollsRef.current };
-
-      const targets = pollsRef.current.filter(
-        (poll) =>
-          typeof poll.ballotRevision === "number" &&
-          (poll.status === "open" || poll.status === "scheduled")
+      const snapshot = parsePollListSnapshot(
+        await response.json(),
+        surface,
+        tournamentId ?? null
       );
-      if (targets.length === 0) {
-        return { ok: true, polls: pollsRef.current };
-      }
-
-      const refreshed = await Promise.all(
-        targets.map(async (poll) => {
-          const query = browserClient.rpc("get_my_poll", {
-            p_poll_id: poll.id,
-          });
-          if (signal) query.abortSignal(signal);
-          const { data, error } = await query;
-          return error ? null : parseSinglePollProjection(data, "viewer");
-        })
-      );
-      if (refreshed.some((poll) => poll === null)) {
+      if (!snapshot) {
         return { ok: false, message: t("polls.refreshError") };
       }
-
-      const merged = new Map(pollsRef.current.map((poll) => [poll.id, poll]));
-      for (const poll of refreshed) {
-        if (poll) merged.set(poll.id, poll);
+      if (!matchesViewer(snapshot, viewerUserId, viewerSessionId)) {
+        // Public data is independent of the failed/changed session. Never adopt
+        // its private half, but allow a missing public list to recover now.
+        return {
+          ok: false,
+          message: t("polls.refreshError"),
+          resetPrivate: true,
+          snapshot: {
+            ...snapshot,
+            private: { status: "unavailable" },
+            accountState: "unavailable",
+            viewerContext: { userId: viewerUserId, sessionId: viewerSessionId },
+          },
+        };
       }
-      return { ok: true, polls: [...merged.values()] };
-    }, [browserClient, isSignedIn, t]
+      return isPollListSnapshotComplete(snapshot)
+        ? { ok: true, polls: projectPollListSnapshot(snapshot), snapshot }
+        : { ok: false, message: t("polls.refreshError"), snapshot };
+    }, [surface, tournamentId, viewerUserId, viewerSessionId, t]
   );
 
-  const performLoad = loadPolls ?? loadFromDatabase;
+  const performLoad = loadPolls ?? loadFromServer;
 
   const applyPolls = useCallback((nextPolls: PollViewerProjection[]) => {
     if (!mountedRef.current) return;
@@ -204,7 +265,9 @@ export default function PollsAndDecisions({
     async ({ force = false }: { force?: boolean } = {}) => {
       if (
         !mountedRef.current ||
+        !authReady ||
         !viewportActive ||
+        mutationPendingRef.current ||
         (!force && !isVisibleAndOnline())
       ) {
         return null;
@@ -220,11 +283,16 @@ export default function PollsAndDecisions({
       const controller = new AbortController();
       controllerRef.current = controller;
       inFlightRef.current = true;
+      let timedOut = false;
+      const timeout = window.setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, REQUEST_TIMEOUT_MS);
 
       try {
         const result = await performLoad(controller.signal);
         if (
-          controller.signal.aborted ||
+          (controller.signal.aborted && !timedOut) ||
           !mountedRef.current ||
           mutationRevision !== mutationRevisionRef.current ||
           sequence < appliedSequenceRef.current
@@ -233,29 +301,46 @@ export default function PollsAndDecisions({
         }
 
         appliedSequenceRef.current = sequence;
-        if (!result.ok) {
-          failureCountRef.current = Math.min(failureCountRef.current + 1, 3);
+        if (!timedOut && result && !result.ok && result.resetPrivate) {
+          const current = snapshotRef.current;
+          snapshotRef.current = current ? {
+            ...current,
+            private: { status: "unavailable" },
+            accountState: "unavailable",
+          } : undefined;
+          setAccountState("unavailable");
+          applyPolls(snapshotRef.current ? projectPollListSnapshot(snapshotRef.current) : []);
+        }
+        if (!timedOut && result?.snapshot) {
+          snapshotRef.current = mergePollListSnapshot(result.snapshot, snapshotRef.current);
+          setAccountState(result.snapshot.accountState);
+          applyPolls(projectPollListSnapshot(snapshotRef.current));
+        }
+        if (timedOut || !result?.ok) {
+          failureCountRef.current = Math.min(failureCountRef.current + 1, MAX_AUTOMATIC_FAILURES);
           setRefreshMessage(t("polls.refreshError"));
           return false;
         }
 
         failureCountRef.current = 0;
         setRefreshMessage(null);
-        applyPolls(result.polls);
+        if (!result.snapshot) applyPolls(result.polls);
         return true;
       } catch {
-        if (!controller.signal.aborted && mountedRef.current) {
-          failureCountRef.current = Math.min(failureCountRef.current + 1, 3);
+        if ((!controller.signal.aborted || timedOut) && mountedRef.current) {
+          failureCountRef.current = Math.min(failureCountRef.current + 1, MAX_AUTOMATIC_FAILURES);
           setRefreshMessage(t("polls.refreshError"));
         }
         return false;
       } finally {
+        window.clearTimeout(timeout);
         if (controllerRef.current === controller) {
           controllerRef.current = null;
           inFlightRef.current = false;
+          if (mountedRef.current) setRefreshVersion((version) => version + 1);
         }
       }
-    }, [applyPolls, performLoad, t, viewportActive]
+    }, [applyPolls, authReady, performLoad, t, viewportActive]
   );
 
   useEffect(() => {
@@ -269,66 +354,63 @@ export default function PollsAndDecisions({
   }, []);
 
   useEffect(() => {
+    if (initialSnapshot === lastInitialSnapshotRef.current) return;
+    if (!initialSnapshot || !matchesViewer(initialSnapshot, viewerUserId, viewerSessionId)) return;
+    // Router props may have been rendered before an in-flight ballot write.
+    // They can invalidate this session, but only a new read may replace it.
+    // A pending mutation already performs that read after it settles.
+    const timer = window.setTimeout(() => {
+      lastInitialSnapshotRef.current = initialSnapshot;
+      if (isVisibleAndOnline()) void refreshPolls({ force: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialSnapshot, refreshPolls, viewerUserId, viewerSessionId]);
+
+  useEffect(() => {
     const wasActive = viewportWasActiveRef.current;
     viewportWasActiveRef.current = viewportActive;
-    if (!wasActive && viewportActive && isVisibleAndOnline()) {
+    if (!viewportActive) {
+      controllerRef.current?.abort();
+    } else if (!wasActive && isVisibleAndOnline()) {
+      initialRequestPendingRef.current = false;
+      failureCountRef.current = 0;
       void refreshPolls();
     }
   }, [refreshPolls, viewportActive]);
 
-  const hasOpenLivePoll = polls.some(
-    (poll) => poll.status === "open" && poll.resultVisibility === "live"
-  );
-
   useEffect(() => {
-    if (!viewportActive || !hasOpenLivePoll) return;
-
-    let timer: number | null = null;
-    let stopped = false;
-    const schedule = () => {
-      if (stopped) return;
-      const delay = pollIntervalMs * (failureCountRef.current + 1);
-      timer = window.setTimeout(async () => {
-        await refreshPolls();
-        schedule();
-      }, delay);
-    };
-    schedule();
-
-    return () => {
-      stopped = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [hasOpenLivePoll, pollIntervalMs, refreshPolls, viewportActive]);
-
-  useEffect(() => {
-    if (!viewportActive) return;
-    const delay = getNextBoundaryDelay(polls);
-    if (delay === null) return;
-    let timer: number | null = null;
-    let stopped = false;
-    const schedule = (wait: number) => {
-      timer = window.setTimeout(async () => {
-        const refreshed = await refreshPolls();
-        if (!stopped && refreshed === false) {
-          schedule(pollIntervalMs * (failureCountRef.current + 1));
-        }
-      }, Math.min(wait, MAX_TIMER_MS));
-    };
-    schedule(delay);
-    return () => {
-      stopped = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [pollIntervalMs, polls, refreshPolls, viewportActive]);
+    if (!authReady || !viewportActive || pendingPollId || failureCountRef.current >= MAX_AUTOMATIC_FAILURES) return;
+    const hasOpenLivePoll = polls.some(
+      (poll) => poll.status === "open" && poll.resultVisibility === "live"
+    );
+    const intervalDelay = Math.max(1_000, pollIntervalMs) * (failureCountRef.current + 1);
+    const boundaryDelay = getNextBoundaryDelay(polls);
+    const delays = [
+      initialRequestPendingRef.current ? 0 : null,
+      hasOpenLivePoll || refreshMessage ? intervalDelay : null,
+      refreshMessage ? null : boundaryDelay,
+    ].filter((delay): delay is number => delay !== null);
+    if (delays.length === 0) return;
+    // One timer handles live polling, clock boundaries and bounded recovery.
+    const timer = window.setTimeout(() => {
+      initialRequestPendingRef.current = false;
+      void refreshPolls();
+    }, Math.min(...delays, MAX_TIMER_MS));
+    return () => window.clearTimeout(timer);
+  }, [authReady, pendingPollId, pollIntervalMs, polls, refreshMessage, refreshPolls, refreshVersion, viewportActive]);
 
   useEffect(() => {
     if (!viewportActive) return;
     const refreshIfAvailable = () => {
-      if (isVisibleAndOnline()) void refreshPolls();
+      if (isVisibleAndOnline()) {
+        initialRequestPendingRef.current = false;
+        failureCountRef.current = 0;
+        void refreshPolls();
+      }
     };
     const onVisibilityChange = () => {
-      if (document.visibilityState !== "hidden") refreshIfAvailable();
+      if (document.visibilityState === "hidden") controllerRef.current?.abort();
+      else refreshIfAvailable();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("focus", refreshIfAvailable);
@@ -377,23 +459,34 @@ export default function PollsAndDecisions({
   };
 
   const submitBallot = (poll: PollViewerProjection) => {
-    if (pendingPollId || isPending || typeof poll.ballotRevision !== "number") {
+    if (!authReady || pendingPollId || isPending || typeof poll.ballotRevision !== "number") {
       return;
     }
     const selectedOptionIds = draftSelections[poll.id] ?? [];
     if (selectedOptionIds.length < 1) return;
 
+    mutationPendingRef.current = true;
+    mutationRevisionRef.current += 1;
+    controllerRef.current?.abort();
     setPendingPollId(poll.id);
     setMessages((current) => ({
       ...current,
       [poll.id]: { text: t("polls.savingBallot"), role: "status" },
     }));
     startTransition(async () => {
-      const result = await castBallot({
-        pollId: poll.id,
-        expectedRevision: poll.ballotRevision as number,
-        selectedOptionIds,
-      });
+      let result: PollBallotActionResult;
+      try {
+        result = await castBallot({
+          pollId: poll.id,
+          expectedRevision: poll.ballotRevision as number,
+          selectedOptionIds,
+        });
+      } catch {
+        result = { ok: false, code: "save_failed", error: "" };
+      }
+      if (!mountedRef.current) return;
+      mutationPendingRef.current = false;
+      mutationRevisionRef.current += 1;
       if (!result.ok) {
         setMessages((current) => ({
           ...current,
@@ -412,8 +505,20 @@ export default function PollsAndDecisions({
         return;
       }
 
-      mutationRevisionRef.current += 1;
       dirtyPollsRef.current.delete(poll.id);
+      const currentSnapshot = snapshotRef.current;
+      if (currentSnapshot && currentSnapshot.private.status !== "not_applicable" && currentSnapshot.private.polls) {
+        const privatePart = currentSnapshot.private;
+        snapshotRef.current = {
+          ...currentSnapshot,
+          private: {
+            ...privatePart,
+            polls: currentSnapshot.private.polls.map((candidate) => candidate.id === poll.id
+              ? { ...candidate, ballotRevision: result.data.ballotRevision, selectedOptionIds: result.data.selectedOptionIds }
+              : candidate),
+          },
+        };
+      }
       setPolls((current) => {
         const next = current.map((candidate) =>
           candidate.id === poll.id
@@ -458,6 +563,8 @@ export default function PollsAndDecisions({
   return (
     <section
       aria-labelledby={headingId}
+      data-poll-load-state={refreshMessage ? (polls.length > 0 ? "partial" : "unavailable") : (polls.length > 0 ? "populated" : "empty")}
+      data-poll-account-state={accountState}
       className={compact
         ? "min-w-0 border border-white/12 bg-zinc-950/85 p-4 sm:p-5"
         : "min-w-0 border border-orange-500/20 bg-black/65 p-4 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-6"}
@@ -490,13 +597,19 @@ export default function PollsAndDecisions({
         </p>
       )}
 
-      {orderedPolls.length === 0 ? (
+      {(accountState === "missing" || accountState === "closed") && (
+        <p role="status" className="mt-4 border border-white/10 bg-black/35 p-3 text-sm leading-6 text-zinc-400">
+          {accountState === "missing" ? t("polls.missingPlayer") : t("polls.closedPlayer")}
+        </p>
+      )}
+
+      {orderedPolls.length === 0 && !refreshMessage && accountState !== "missing" && accountState !== "closed" ? (
         <div className={compact ? "mt-2 text-sm leading-6 text-zinc-400" : "mt-5 border border-white/10 bg-black/35 p-6 text-sm leading-6 text-zinc-400"}>
           {surface === "community"
             ? t("polls.communityEmpty")
             : t("polls.tournamentEmpty")}
         </div>
-      ) : (
+      ) : orderedPolls.length > 0 ? (
         <div className="mt-5 grid min-w-0 gap-5">
           {orderedPolls.map((poll) => {
             const selected = draftSelections[poll.id] ?? poll.selectedOptionIds ?? [];
@@ -520,7 +633,7 @@ export default function PollsAndDecisions({
             );
           })}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -1025,15 +1138,88 @@ function buildInitialSelections(polls: PollViewerProjection[]) {
   );
 }
 
+function matchesViewer(
+  snapshot: PollListSnapshot,
+  userId: string | null,
+  sessionId: string | null
+) {
+  return snapshot.viewerContext.userId === userId &&
+    snapshot.viewerContext.sessionId === sessionId;
+}
+
+function createInitialPollState({
+  initialSnapshot,
+  initialPolls,
+  initialError,
+  surface,
+  tournamentId,
+  viewerUserId,
+  viewerSessionId,
+  authReady,
+  allowLegacyInitial,
+}: {
+  initialSnapshot?: PollListSnapshot;
+  initialPolls: PollViewerProjection[];
+  initialError: string | null;
+  surface: PollSurface;
+  tournamentId: string | null;
+  viewerUserId: string | null;
+  viewerSessionId: string | null;
+  authReady: boolean;
+  allowLegacyInitial: boolean;
+}) {
+  if (!initialSnapshot) {
+    return {
+      polls: allowLegacyInitial ? initialPolls : [],
+      snapshot: undefined,
+      needsRecovery: Boolean(initialError) || !allowLegacyInitial,
+    };
+  }
+  const sameSurface = initialSnapshot.surface === surface &&
+    initialSnapshot.tournamentId === tournamentId;
+  if (authReady && sameSurface && matchesViewer(initialSnapshot, viewerUserId, viewerSessionId)) {
+    return {
+      polls: projectPollListSnapshot(initialSnapshot),
+      snapshot: initialSnapshot,
+      needsRecovery: !isPollListSnapshotComplete(initialSnapshot),
+    };
+  }
+  const snapshot: PollListSnapshot = {
+    surface,
+    tournamentId,
+    public: surface === "community"
+      ? { status: "not_applicable" }
+      : sameSurface ? initialSnapshot.public : { status: "unavailable" },
+    private: authReady && !viewerUserId
+      ? { status: "not_applicable" }
+      : { status: "unavailable" },
+    accountState: authReady && !viewerUserId ? "anonymous" : "unavailable",
+    viewerContext: { userId: viewerUserId, sessionId: viewerSessionId },
+  };
+  return {
+    polls: projectPollListSnapshot(snapshot),
+    snapshot,
+    needsRecovery: true,
+  };
+}
+
 function mergeAuthoritativeSelections(
   current: Record<string, string[]>,
   polls: PollViewerProjection[],
   dirtyPolls: Set<string>
 ) {
-  const next = { ...current };
+  const next: Record<string, string[]> = {};
+  const remainingPollIds = new Set(polls.map((poll) => poll.id));
+  for (const pollId of dirtyPolls) {
+    if (!remainingPollIds.has(pollId)) dirtyPolls.delete(pollId);
+  }
   for (const poll of polls) {
-    if (!dirtyPolls.has(poll.id)) {
+    if (!dirtyPolls.has(poll.id) || poll.status !== "open") {
       next[poll.id] = [...(poll.selectedOptionIds ?? [])];
+      if (poll.status !== "open") dirtyPolls.delete(poll.id);
+    } else {
+      const validOptionIds = new Set(poll.options.map((option) => option.id));
+      next[poll.id] = (current[poll.id] ?? []).filter((id) => validOptionIds.has(id)).slice(0, poll.maxSelections);
     }
   }
   return next;

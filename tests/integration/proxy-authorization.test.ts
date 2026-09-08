@@ -52,6 +52,7 @@ describe("Next.js proxy authorization", () => {
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/report-group/11111111-1111-4111-8111-111111111111/replay",
     "/api/internal/transactional-email",
     "/api/notifications/click",
+    "/api/polls",
   ])(
     "lets the self-authenticated route %s reach its own auth boundary",
     async (pathname) => {
@@ -84,6 +85,9 @@ describe("Next.js proxy authorization", () => {
     "/api/notifications/click/private",
     "/api/notifications/click-private",
     "/api/notifications/clicks",
+    "/api/polls/",
+    "/api/polls/private",
+    "/api/polls-private",
   ])("calls auth.protect for %s", async (pathname) => {
     const protect = vi.fn(async () => undefined);
 

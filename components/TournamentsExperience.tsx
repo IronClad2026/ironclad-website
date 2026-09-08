@@ -24,6 +24,7 @@ import MatchDiceRollOff, {
   type MatchDiceLoadResult,
 } from "@/components/MatchDiceRollOff";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
+import type { PollListSnapshot } from "@/lib/poll-loading";
 import RegistrationGuidanceDisclosure from "@/components/RegistrationGuidanceDisclosure";
 import MatchDiscordSupportLink from "@/components/RequestAdminAssistanceButton";
 import MatchResultControls from "@/components/MatchResultControls";
@@ -5335,6 +5336,7 @@ export type TournamentViewerRegistration = {
 export default function TournamentsExperience({
   tournaments,
   tournamentPollsByTournament,
+  pollSnapshotsByTournament,
   pollLoadError = null,
   viewer,
   matchResultSubmissions,
@@ -5343,6 +5345,7 @@ export default function TournamentsExperience({
 }: {
   tournaments: TournamentCard[];
   tournamentPollsByTournament?: Record<string, PollViewerProjection[]>;
+  pollSnapshotsByTournament?: Record<string, PollListSnapshot>;
   pollLoadError?: string | null;
   viewer: TournamentViewer;
   matchResultSubmissions: MatchResultSubmission[];
@@ -5711,7 +5714,7 @@ export default function TournamentsExperience({
           ) : (
             <>
               <div className="border-b border-white/10 py-5"><Hero tournament={selectedTournament} viewerRegistration={selectedViewerRegistration} verifiedDivision={viewer.relicVerifiedDivision} onRegisterClick={handleRegisterClick} /></div>
-              {activeTab === "decisions" ? <main className="py-6"><PollsAndDecisions key={selectedTournament.id} surface="tournament" tournamentId={selectedTournament.id} initialPolls={tournamentPollsByTournament?.[selectedTournament.id] ?? []} initialError={pollLoadError} highlightedPollId={focusedPollId} /></main> : <>
+              {activeTab === "decisions" ? <main className="py-6"><PollsAndDecisions key={selectedTournament.id} surface="tournament" tournamentId={selectedTournament.id} initialPolls={tournamentPollsByTournament?.[selectedTournament.id] ?? []} initialSnapshot={pollSnapshotsByTournament?.[selectedTournament.id]} initialError={pollLoadError} highlightedPollId={focusedPollId} /></main> : <>
                 <div className="hidden lg:block"><MainContent activeTab={activeTab} activeOverviewPanel={activeOverviewPanel} setActiveOverviewPanel={handleSetActiveOverviewPanel}
                   tournament={selectedTournament} tournaments={publicTournaments} viewer={viewer}
                   matchResultSubmissions={matchResultSubmissions} matchResultReportGroups={matchResultReportGroups}
