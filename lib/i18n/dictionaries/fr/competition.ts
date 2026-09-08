@@ -454,6 +454,8 @@ const dictionary = {
   },
   polls: {
     refreshError: "Impossible d'actualiser les sondages.",
+    missingPlayer: "Les sondages réservés aux membres sont disponibles après la création de votre profil de joueur.",
+    closedPlayer: "Les sondages réservés aux membres ne sont pas disponibles pour un compte fermé.",
     savingBallot: "Enregistrement de votre bulletin…",
     ballotConfirmed: "Votre bulletin existant est confirmé.",
     ballotSaved: "Votre bulletin est enregistré. Vous pouvez le modifier jusqu'à la clôture du sondage.",

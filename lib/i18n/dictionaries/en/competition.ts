@@ -715,6 +715,8 @@ const dictionary = {
   },
   polls: {
     refreshError: "Polls could not be refreshed.",
+    missingPlayer: "Member polls are available after your player profile is set up.",
+    closedPlayer: "Member polls are not available for a closed account.",
     savingBallot: "Saving your ballot…",
     ballotConfirmed: "Your existing ballot is confirmed.",
     ballotSaved: "Your ballot is saved. You may change it until the Poll closes.",

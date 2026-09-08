@@ -269,6 +269,7 @@ const clientPropsShape = {
     matchResultSubmissions: { array: submissionShape },
     matchResultReportGroups: { array: reportGroupShape },
     tournamentPollsByTournament: "value",
+    pollSnapshotsByTournament: "value",
     pollLoadError: "value",
     registrationDocuments: {
       object: {
@@ -746,6 +747,7 @@ describe("tournament Client Component result payload", () => {
     });
     loadTournamentPollsForRequestMock.mockResolvedValue({
       pollsByTournament: { [TOURNAMENT_ID]: [] },
+      snapshotsByTournament: {},
       error: null,
     });
     mapGeneratedBracketsMock.mockImplementation((rows: unknown[]) =>

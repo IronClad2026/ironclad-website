@@ -455,6 +455,8 @@ const dictionary = {
   },
   polls: {
     refreshError: "无法刷新投票。",
+    missingPlayer: "设置玩家资料后，即可查看成员投票。",
+    closedPlayer: "已关闭的账户无法查看成员投票。",
     savingBallot: "正在保存选票…",
     ballotConfirmed: "你现有的选票已确认。",
     ballotSaved: "选票已保存。在投票关闭前仍可更改。",

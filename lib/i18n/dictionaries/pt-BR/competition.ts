@@ -454,6 +454,8 @@ const dictionary = {
   },
   polls: {
     refreshError: "Não foi possível atualizar as enquetes.",
+    missingPlayer: "As enquetes para membros ficam disponíveis após a configuração do seu perfil de jogador.",
+    closedPlayer: "As enquetes para membros não estão disponíveis para uma conta encerrada.",
     savingBallot: "Salvando sua cédula…",
     ballotConfirmed: "Sua cédula existente foi confirmada.",
     ballotSaved: "Sua cédula foi salva. Você pode alterá-la até o fechamento da enquete.",

@@ -765,6 +765,8 @@ const dictionary = {
   },
   polls: {
     refreshError: "Impossibile aggiornare i Sondaggi.",
+    missingPlayer: "I sondaggi riservati sono disponibili dopo la creazione del profilo giocatore.",
+    closedPlayer: "I sondaggi riservati non sono disponibili per un account chiuso.",
     savingBallot: "Salvataggio del voto…",
     ballotConfirmed: "Il voto esistente è confermato.",
     ballotSaved: "Il voto è stato salvato. Puoi modificarlo fino alla chiusura del Sondaggio.",

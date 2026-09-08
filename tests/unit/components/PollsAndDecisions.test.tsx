@@ -70,6 +70,99 @@ describe("PollsAndDecisions", () => {
     );
   });
 
+  it("allows switching an unsaved single-choice ballot without submitting", () => {
+    const castBallot = vi.fn();
+    render(
+      <PollsAndDecisions
+        surface="tournament"
+        initialPolls={[makePoll()]}
+        castBallot={castBallot}
+        loadPolls={vi.fn()}
+      />
+    );
+
+    const card = screen.getByRole("article", { name: "Choose our opening map" });
+    const radios = within(card).getAllByRole("radio");
+    const submit = within(card).getByRole("button", { name: "Submit vote" });
+    expect(submit).toBeDisabled();
+    fireEvent.click(radios[0]);
+    expect(radios[0]).toBeChecked();
+    expect(submit).toBeEnabled();
+    expect(radios[1]).toBeEnabled();
+    fireEvent.click(radios[1]);
+    expect(radios[0]).not.toBeChecked();
+    expect(radios[1]).toBeChecked();
+    expect(within(card).getAllByRole("radio", { checked: true })).toHaveLength(1);
+    expect(radios[0]).toBeEnabled();
+    expect(radios[2]).toBeEnabled();
+    expect(castBallot).not.toHaveBeenCalled();
+  });
+
+  it("allows changing a saved single-choice ballot and preserves pending protection", async () => {
+    const poll = makePoll({
+      purpose: "community_feedback",
+      audienceKind: "selected_active_players",
+      tournamentId: null,
+      authority: "advisory",
+      ballotRevision: 4,
+      selectedOptionIds: [OPTION_A_ID],
+    });
+    const savedPoll = { ...poll, ballotRevision: 5, selectedOptionIds: [OPTION_B_ID] };
+    const saved = {
+      ok: true as const,
+      data: {
+        pollId: POLL_ID,
+        ballotRevision: 5,
+        selectedOptionIds: [OPTION_B_ID],
+        firstVotedAt: "2026-08-18T01:00:00.000Z",
+        ballotUpdatedAt: "2026-08-18T01:02:00.000Z",
+        idempotent: false,
+      },
+    };
+    let releaseSave: ((result: typeof saved) => void) | undefined;
+    const castBallot = vi.fn(() => new Promise<typeof saved>((resolve) => {
+      releaseSave = resolve;
+    }));
+    const loadPolls = vi.fn(async () => ({ ok: true as const, polls: [savedPoll] }));
+    render(
+      <PollsAndDecisions
+        surface="community"
+        initialPolls={[poll]}
+        castBallot={castBallot}
+        loadPolls={loadPolls}
+      />
+    );
+
+    const card = screen.getByRole("article", { name: poll.question });
+    const radios = within(card).getAllByRole("radio");
+    const update = within(card).getByRole("button", { name: "Update vote" });
+    expect(radios[0]).toBeChecked();
+    expect(update).toBeDisabled();
+    expect(radios[1]).toBeEnabled();
+    fireEvent.click(radios[1]);
+    expect(radios[0]).not.toBeChecked();
+    expect(radios[1]).toBeChecked();
+    expect(update).toBeEnabled();
+    fireEvent.click(update);
+    expect(castBallot).toHaveBeenCalledExactlyOnceWith({
+      pollId: POLL_ID, expectedRevision: 4, selectedOptionIds: [OPTION_B_ID],
+    });
+    for (const radio of radios) expect(radio).toBeDisabled();
+    expect(within(card).getByRole("button", { name: "Saving…" })).toBeDisabled();
+
+    await act(async () => releaseSave?.(saved));
+    expect(loadPolls).toHaveBeenCalledTimes(1);
+    expect(radios[1]).toBeChecked();
+    expect(within(card).getByRole("status")).toHaveTextContent("Your ballot is saved");
+    expect(within(card).getByRole("button", { name: "Update vote" })).toBeDisabled();
+    for (const radio of radios) expect(radio).toBeEnabled();
+    fireEvent.click(radios[0]);
+    expect(radios[0]).toBeChecked();
+    expect(radios[1]).not.toBeChecked();
+    expect(within(card).getByRole("button", { name: "Update vote" })).toBeEnabled();
+    expect(castBallot).toHaveBeenCalledTimes(1);
+  });
+
   it("uses native checkboxes and enforces the published choose-up-to limit", () => {
     const poll = makePoll({ maxSelections: 2, winnerCount: 2 });
     render(
@@ -95,6 +188,13 @@ describe("PollsAndDecisions", () => {
       )
     ).toBeInTheDocument();
     expect(checkboxes[2]).toBeDisabled();
+    expect(checkboxes[0]).toBeEnabled();
+    fireEvent.click(checkboxes[0]);
+    expect(checkboxes[0]).not.toBeChecked();
+    expect(checkboxes[2]).toBeEnabled();
+    fireEvent.click(checkboxes[2]);
+    expect(within(card).getAllByRole("checkbox", { checked: true })).toHaveLength(2);
+    expect(checkboxes[0]).toBeDisabled();
   });
 
   it("does not render hidden aggregate or private identity fields while open", () => {
