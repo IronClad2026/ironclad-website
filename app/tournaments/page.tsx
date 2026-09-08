@@ -555,8 +555,7 @@ export default async function TournamentsPage({
   }
 
   const tournamentPolls = await loadTournamentPollsForRequest(
-    tournaments.map((tournament) => tournament.id),
-    Boolean(userId)
+    tournaments.map((tournament) => tournament.id)
   );
   const matchResultData = await loadMatchResultData();
 
@@ -580,6 +579,7 @@ export default async function TournamentsPage({
     <TournamentsExperience
       tournaments={tournaments}
       tournamentPollsByTournament={tournamentPolls.pollsByTournament}
+      pollSnapshotsByTournament={tournamentPolls.snapshotsByTournament}
       pollLoadError={tournamentPolls.error}
       viewer={{
         isAdmin,

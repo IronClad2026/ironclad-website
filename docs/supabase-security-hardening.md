@@ -1,228 +1,224 @@
-# Supabase Security Hardening
+# Supabase Security Boundaries
 
-This document records the conservative A2 security boundary introduced by
-`20260724090000_supabase_security_hardening.sql`. The migration must be applied
-only after the matching application code is deployed or as part of the same
-controlled release. It has not been applied to the linked Supabase project by
-this work.
+Updated 8 September 2026 against the focused Phase 1 investigation and source
+`112cad6fac88bead5f2e7444c9ee583a1c1032f0`. The five view definitions and ten
+reviewed privileged function definitions were compared with deployed Production
+and staging. This is a scoped contract, not a platform-wide security audit or
+a claim that proposed fixes are already deployed. Deployment status belongs in
+the release manifest; the initial environment audit is in
+`poll-rpc-release-readiness.md`.
 
-## Public view decisions
+## Migration lineage
 
-| View | A2 security mode | API grants | Intended audience |
-| --- | --- | --- | --- |
-| `public_player_profiles` | Owner rights (`security_invoker=false`) | `SELECT` only for `anon`, `authenticated`, and `service_role` | Public, opted-in player profiles |
-| `leaderboard_current_season` | `security_invoker=true` | `SELECT` only for `anon`, `authenticated`, and `service_role` | Public leaderboard |
-| `leaderboard_public_season_standings` | `security_invoker=true` | `SELECT` only for `anon`, `authenticated`, and `service_role` | Public leaderboard |
-| `leaderboard_public_all_time_standings` | `security_invoker=true` | `SELECT` only for `anon`, `authenticated`, and `service_role` | Public leaderboard |
+| Migration | Relevant responsibility |
+| --- | --- |
+| `20260724090000_supabase_security_hardening.sql` | Historical A2 server-mediated bracket/settings boundary, restricted helpers, sanitized profiles and then-invoker leaderboard views. |
+| `20260806130000_phase4_withdrawal_waitlist_division_launch.sql` | Owned withdrawal/waitlist RPCs; locks, capacity/FIFO and lifecycle behavior. |
+| `20260813101000_competition_history_safe_account_closure.sql` | Active opted-in profiles, closed-account masking and intentional history retention. |
+| `20260813102000_phase7_public_leaderboard_integration.sql` | Current four owner-rights leaderboard views, including champions; competition facts survive optional-profile opt-out. |
+| `20260817100000_authenticated_match_dice_rolloff.sql` | Participant/admin dice reads and participant-only rolls. |
+| `20260817120000_polls_decisions.sql` | Private poll eligibility, ballots, sanitized public decisions and internal helpers. |
+| `20260903130000_not_held_division_closure.sql` | Public-safe division closure getter and terminal-state safeguards. |
 
-The three leaderboard views are altered in place. Their definitions, columns,
-ordering, object identities, dependencies, and existing column comments are
-not recreated or changed. Their public source tables retain the existing
-anonymous `SELECT` grants and RLS read policies.
+The August definitions deliberately supersede July's invoker-rights leaderboard
+design. They read protected source tables directly, not through
+`public_player_profiles`. Do not replay obsolete hardening instructions or
+edit an applied migration. Ledger presence alone does not prove the current
+definition; compare deployed bodies, signatures, owners and effective ACLs.
 
-Both standings views join `public_player_profiles`. That nested view remains
-the reviewed masking boundary, so anonymous standings continue to include only
-players who enabled their public profile.
+## Five intentional owner-rights views
 
-## Intentional player-profile exception
+All five have owner `postgres`, `security_barrier=true` and
+`security_invoker=false`. The owner has `BYPASSRLS`: explicit projections and
+predicates provide the public boundary, not caller RLS on base tables.
+`anon`, `authenticated` and `service_role` have SELECT only; PUBLIC has no
+relation grant. Effective API-role view mutation privileges are denied.
 
-`public_player_profiles` remains an intentionally public, sanitized
-owner-rights view. Converting it directly to invoker rights would make
-anonymous reads fail because `players` has no anonymous table access or public
-row policy. Granting direct access to `players` would be unsafe: row-level
-security cannot prevent callers from selecting private base columns such as
-Clerk identifiers, raw avatar paths, and unmasked Discord values.
+| View | Public contract |
+| --- | --- |
+| `public.public_player_profiles` | Only opted-in, nonclosed profiles; conditional Discord and player-ID avatar linkage. |
+| `public.leaderboard_current_season` | Featured season and valid-event aggregate; public finalization/review booleans, not internal reasons, actors or membership rows. |
+| `public.leaderboard_public_season_standings` | Official seasonal facts with optional-profile and closed-account masking. |
+| `public.leaderboard_public_all_time_standings` | Official career facts with equivalent identity/location/ELO/avatar masking. |
+| `public.leaderboard_public_season_champions` | Historical champion facts with masked profile linkage and pseudonymous private champion identifiers. |
 
-The retained view exposes the existing compatibility contract only:
+### Profile privacy is not competition-history deletion
 
-- opted-in profiles are selected;
-- Discord names are returned only after the player's explicit opt-in;
-- raw avatar storage paths remain `NULL`;
-- Clerk identifiers and private profile fields are not projected;
-- external API roles receive `SELECT` only.
+The profile view has exactly 12 columns: `id`, `display_name`,
+`player_name`, `country`, `region`, `current_elo`,
+`public_profile_enabled`, `discord_public_enabled`, `discord_username`,
+`has_avatar`, `avatar_url`, `created_at`.
+`player_name` aliases `in_game_name`. Rows require
+`public_profile_enabled=true AND account_closed_at IS NULL`. Discord requires
+explicit opt-in. Raw `avatar_url` is always NULL; `has_avatar` supports the
+server-mediated player-ID proxy. Clerk IDs, email, raw avatar/proof paths,
+private Steam/COH3 identifiers and administrative fields are not projected.
+The opted-in profile UUID and creation date are intentionally public.
 
-Eliminating this final Security Definer View finding requires a separately
-reviewed replacement. The safe options are a dedicated public projection
-relation that never stores private columns, or a server-only API/loader with a
-fixed output allowlist. The `/players` directory, player detail, champion
-archive, avatar proxy, opt-out behavior, and anonymous leaderboard results must
-all move to and pass role-level tests against that replacement before this
-view can become invoker-rights or lose anonymous access.
+Active opted-out competitors are absent from the profile directory but remain
+in official standings/champions. Their factual in-game names and statistics
+remain; player IDs and optional location/ELO/avatar linkage are masked. Closed
+competitors are labelled `Former Competitor`. Seasonal
+`last_tournament_id` is also NULL for closed accounts; the historical
+tournament title remains. Raw avatar paths are never published. Private/closed
+champion IDs use `private-champion:` plus a hash of the record UUID. This is
+pseudonymity, not guaranteed unlinkability from earlier public history.
 
-## Tournament bracket data boundary
+Mechanical SECURITY INVOKER conversion would break legitimate reads: API
+roles do not have general raw players/leaderboard SELECT access. The featured
+season's membership source is owner-only. Authenticated self-profile column
+reads under textual Clerk-sub RLS are not general public player access.
+Granting broad base-table reads to make invoker views work would violate this
+boundary. An Advisor warning alone justifies neither change.
 
-Direct `anon` and `authenticated` access is removed from
-`generated_brackets` and `tournament_matches`, and their permissive public read
-policies are dropped. Public tournament presentation now uses
-`lib/tournament-bracket-data.ts`, which is protected by `server-only` and uses
-the service-role client with a fixed projection.
+The Phase 1 aggregate snapshot found no disabled/closed public-profile rows,
+unapproved Discord values or raw public avatar URLs in either environment.
+Production standings were empty, so their zero-violation counts were vacuous.
+Populated staging standings/champions had matching definitions and no observed
+masking violations. These observations do not replace synthetic transition tests.
 
-The public projection includes only:
+## Ten reviewed privileged functions
 
-- generated bracket identity, bracket identity, format, slot count, and
-  generation time;
-- round number and display name;
-- match identity, number, series length, status, public participant slots and
-  registration identifiers, scores, and winner;
-- public standings registration identity, wins, losses, points, and rank.
+All signatures below are in `public`. At baseline they are SECURITY DEFINER,
+owner postgres, `search_path=pg_catalog`, with inherited PUBLIC EXECUTE revoked.
+Two public getters allow anon/authenticated/service_role; the remaining eight
+allow authenticated and owner only. A service-role client is not a drop-in
+replacement for a member's identity.
 
-It does not select or copy `generated_by`,
-`official_result_submission_id`, `official_result_decided_by`, or
-`official_result_decided_at`. Unexpected extra properties are discarded while
-the server rebuilds the safe response. Non-admin client props omit the three
-official-result audit properties entirely.
+| Signature | Boundary and intentional privilege |
+| --- | --- |
+| `get_public_tournament_decisions(uuid)` | Public getter: requested tournament, decision purpose, final published/noncancelled state. Fixed payload without voters/individual ballots; totals depend on `public_final_totals`. |
+| `get_tournament_division_not_held_states()` | Public getter: bracket ID, tournament ID, closure timestamp, reason code only; no administrator/private detail/registration snapshots. |
+| `get_my_community_polls()` | Active player from textual JWT sub; own frozen eligibility, published community polls. |
+| `get_my_tournament_polls(uuid)` | Same identity/eligibility plus requested tournament and purpose. |
+| `get_my_poll(uuid)` | Own eligible published poll or generic 42501 denial; no alternate player ID. |
+| `cast_poll_ballot(uuid, integer, uuid[])` | Own eligible voter under locks; post-lock voting window, revision, options/count/duplicates/NULL validation and idempotent retries. S1 caveat below. |
+| `get_match_dice_rolloff(uuid)` | Current participant or verified administrator read; fixed projection without raw Clerk IDs. |
+| `roll_match_dice(uuid, integer, smallint, integer)` | Current participant, not admin shortcut; match/tournament locks, launched single elimination, active/deadline state, activation/game/tie checks and idempotency. S1 caveat below. |
+| `respond_to_waitlist_offer(uuid, text)` | Ownership before/after locks; offered waitlisted state, unlaunched division and expiry; accept becomes pending, not approved; capacity/FIFO/lifecycle triggers remain. S1/S2 caveats below. |
+| `withdraw_tournament_registration(uuid)` | Owned registration rechecked under locks, supported state, unlaunched division and guarded downstream effects; exit remains available without new acceptance. |
 
-Administrators receive audit data through a second query. That helper calls
-Clerk `auth()` again, requires both a user ID and
-`sessionClaims.metadata.role === "admin"`, creates its own service-role client
-only after authorization, selects only the three audit columns plus match ID,
-and limits the query to match IDs already present in the safe bracket result.
-An audit-query failure returns no audit properties and does not widen the
-public projection.
+`current_poll_player_id()` and `build_poll_payload(uuid, uuid, text)` are
+owner-only helpers. API callers cannot supply another identity or request an
+admin projection through them. `polls`, `poll_options`,
+`poll_eligible_voters`, `poll_ballot_choices` and `match_dice_rolls` have
+FORCE RLS without direct API-role table access in the inspected ACLs, including
+no direct service-role table access. Composite keys, constraints and triggers
+protect poll/option/voter identity, revisions and dice version history.
 
-## Platform settings and protected workflows
+Clerk is the session authority: use its textual sub, not UUID auth.uid() or a
+client-provided player identifier. Navigation is not authorization. Keep
+authentication, ownership, eligibility and lifecycle checks at every callable
+mutation boundary. Fixed search_path and grants supplement caller validation.
 
-`platform_settings` loses all direct `anon` and `authenticated` table
-privileges and its public read policy. `service_role` retains explicit table
-access. Existing application reads go through the server-only platform settings
-module, and updates remain behind Clerk-admin-authorized Server Actions.
+## Targeted September corrections and explicit deferrals
 
-The authenticated admin-update RLS policy remains in the catalog but is inert
-without an authenticated table privilege. Removing that policy can be
-considered separately; A2 does not need it to enforce service-only access.
+The owner has confirmed current account Terms/Privacy acceptance is required
+for ballot casting, dice rolls and **accepting** a waitlist offer. Withdrawal
+and **decline** remain available without accepting new terms.
 
-The capacity, ELO setting, and leaderboard mutation RPCs are also restricted
-to the owner and `service_role`. Application capacity reads, ELO configuration
-reads, recalculations, and adjustments already use protected service-role
-clients.
+At baseline the website enforces this rule but the three direct RPCs do not.
+S1 is an authorized separate database-hardening release, not something this
+documentation or the application-only poll release fixes. Use the existing
+canonical effective-document/acceptance-evidence contract; unavailable evidence
+must fail safely. Never manufacture acceptances or alter legal text, versions,
+effective dates or historical evidence.
 
-This batch does not revoke the existing authenticated-administrator DML grants
-or `"Admins can manage ..."` policies on the six leaderboard base tables.
-Those direct table paths predate A2. The audited mutation RPCs become
-service-role-only here, but a future hardening batch must separately inventory
-and remove the base-table grants and policies before the leaderboard write
-boundary can be described as exclusively service mediated.
+S2 also requires separate verified SQL release: reject NULL, empty and
+unsupported waitlist responses before mutation. The old
+`p_response NOT IN ('accept','decline')` check does not reject NULL, which then
+selects the decline branch. Ordinary website validation already rejects it;
+ownership restrictions still apply. This is not another-user account takeover
+or a proven Production incident.
 
-The non-verified registration path inserts as `authenticated`, and its RLS
-policy must read the ELO feature flag. A2 keeps that write on the existing RLS
-boundary and preserves the policy's complete eligibility expression. The
-policy now calls an equivalent security-definer helper in the non-exposed
-`ironclad_private` schema. `authenticated` receives only schema `USAGE` and
-function `EXECUTE` so PostgreSQL can evaluate the policy; the helper is not in
-the exposed API schema and `ironclad_private` must never be added to the
-project's Data API exposed-schema list. The public
-`is_elo_verification_enabled()` RPC can therefore become
-owner/service-role-only without bypassing registration-window,
-identity-canonicalization, or eligibility triggers.
+S3 is specifically deferred unless individual dependency review and tests
+justify revocation: TRUNCATE, REFERENCES, TRIGGER, MAINTAIN on
+`public.players` and `public.tournaments` for anon/authenticated only.
+No ordinary API exploit was demonstrated. RLS does not protect TRUNCATE, but
+this does not authorize blanket revocation. Any approved cleanup requires a
+separate forward migration preserving required DML/column access.
 
-The schema and helper use fail-closed `CREATE` statements. An unexpected
-pre-existing object with either name stops and rolls back the migration rather
-than reusing an unknown owner or ACL.
+The poll identity helper rejects missing or closed players before checking for
+polls. An incomplete existing active profile is different. Application handling
+must positively verify account state, preserve public decisions, never
+blanket-suppress 42501, and retain individual-poll denial. Historical Production
+log attribution remains unproven. Keep strict projection validation and bounded
+privacy-safe diagnostics: never log arbitrary error objects/messages, payloads,
+tokens, private identifiers or ballot contents.
 
-## Function hardening
+## Existing server-mediated boundaries retained
 
-Direct `PUBLIC`, `anon`, and `authenticated` execution is removed from the
-eight audited trigger functions. Existing triggers continue to invoke them,
-and `service_role` retains explicit execution for protected workflows.
+July A2 bracket/settings work remains historical context, but its obsolete
+leaderboard assumptions and old unresolved-review claims are not current
+evidence. Public bracket data uses the server-only fixed allowlist in
+`lib/tournament-bracket-data.ts`; privileged audit data needs a separate
+Clerk-admin check and scoped query. Platform settings and private match proofs
+remain server mediated. Check current source/deployed ACLs before changing
+adjacent workflows; this focused release does not re-audit or redesign them.
 
-The same API-role revocation is applied to:
+RLS-enabled tables without client policies may intentionally serve only
+owner/service workflows. The private ELO-policy helper schema must stay outside
+Data API exposed schemas. Do not add permissive policies to remove an
+informational warning. Verify effective table/column ACLs, memberships, exposed
+schemas and caller context.
 
-- `get_tournament_bracket_capacity()`;
-- `is_elo_verification_enabled()`;
-- `leaderboard_require_write_access()`;
-- the five audited leaderboard season/recalculation/adjustment functions.
+## Expected Advisor findings
 
-The exact zero-argument functions below receive
-`search_path = pg_catalog` without replacing their bodies:
+Phase 1 rule `0010 security_definer_view` reported all five intentional views.
+Rules `0028 anon_security_definer_function_executable` and
+`0029 authenticated_security_definer_function_executable` reported the two
+public getters and ten authenticated-callable functions respectively: twelve
+function notices, ten distinct functions. They are expected while these
+contracts remain intentional and protected, not a command to convert views or
+revoke needed RPC access.
 
-- `ironclad_set_updated_at()`;
-- `is_admin_jwt()`;
-- `sync_tournament_registration_enabled()`.
+New unexpected grants, mutable search paths, private projections or missing
+caller checks still need investigation. Database lint is supplemental, not
+equivalent to every Dashboard Advisor check. No platform-wide clearance, full
+auth-configuration audit or complete exposed-schema audit is asserted.
 
-## Intentional RLS-with-no-policy state
+## Required verification and zero-data-loss release rules
 
-These existing tables remain unchanged and deliberately deny API-role access:
-
-- `player_notification_dismissals`;
-- `player_report_group_notification_dismissals`;
-- `tournament_deletion_jobs`.
-
-They are service-role workflow tables. RLS is enabled, there are no client
-policies, and application access is server mediated.
-
-After A2, `generated_brackets` and `tournament_matches` also have RLS enabled
-without client policies. This is intentional because public reads now use the
-server allowlist. Security Advisor may report these five tables as
-RLS-enabled-with-no-policy informational findings; adding permissive policies
-would undo the boundary.
-
-## Independent review follow-ups outside A2
-
-The independent application review found older tournament-result DTOs that
-serialize raw proof storage paths and internal reviewer or resolver Clerk IDs
-to some authenticated participant clients. Signed proof URLs are required for
-participant workflows, but raw storage paths and internal actor identifiers
-must be split into an administrator-only DTO. The signed-out path receives no
-result DTOs, and A2 does not introduce or change this behavior. It remains a
-high-priority follow-up and must not be treated as resolved by the generated
-bracket allowlist.
-
-The same review found defense-in-depth gaps in existing service-role helpers:
-platform-setting mutation helpers rely on their Clerk-admin-authorized Server
-Action callers, and the player-dashboard helper relies on its page caller to
-pass the authenticated Clerk ID. Their current callers authorize correctly,
-but the helpers should eventually derive or revalidate identity internally
-before creating service-role clients.
-
-## Expected Advisor and lint state
-
-After applying A2 to a matching database:
-
-- the three leaderboard Security Definer View errors should clear;
-- the `public_player_profiles` Security Definer View error remains as the
-  documented exception;
-- the three audited mutable-search-path warnings should clear;
-- the three permissive public-table exposures should clear;
-- the five intentional RLS-with-no-policy findings described above may remain;
-- extension placement, RLS init-plan/performance findings, multiple permissive
-  policy findings, shadowed variables, temporary-table findings, project auth
-  settings, and platform-version findings remain outside this batch.
-
-`supabase db lint` is supplemental and does not reproduce every Dashboard
-Security Advisor result.
-
-## Required release verification
-
-The repository tests are mock/static contract tests. They verify application
-allowlists, authorization order, payload shaping, preserved public loader
-contracts, opt-out behavior, migration statements, and protected settings
-actions. They do not prove deployed PostgreSQL ownership, grants, RLS, trigger
-execution, or view behavior.
-
-Before production application, replay all migrations in a disposable Supabase
-instance and test as `anon`, an ordinary authenticated user, an authenticated
-admin, and `service_role`:
-
-1. Compare all four view columns, row counts, ordering, and representative
-   values before and after A2.
-2. Confirm anonymous seasonal and all-time standings remain populated through
-   the nested player-profile view.
-3. Confirm opted-out players remain absent from profiles, standings, and
-   champions, Discord masking remains intact, and raw avatar paths and Clerk
-   IDs cannot be read.
-4. Confirm direct API-role reads of `generated_brackets`,
-   `tournament_matches`, and `platform_settings` fail.
-5. Smoke signed-out and signed-in `/tournaments`, `/players`, player detail,
-   avatar proxy, and `/rankings` flows.
-6. Confirm public bracket payloads contain no generator or audit identifiers,
-   while admins retain the official-result audit display.
-7. Exercise default and verified registrations, all eight affected trigger
-   paths, capacity reads, platform-setting reads/updates, leaderboard
-   recalculation, and admin adjustment.
-8. Inspect view owners/options, table and function ACLs, RLS flags/policies,
-   and rerun both Dashboard Security Advisor and linked database lint.
-
-Deploy the application boundary before the migration or release them
-together. Applying only the migration preserves the current server-side page
-query, but the older page code would still serialize audit identifiers obtained
-through its service-role client.
+1. Compare actual definitions, signatures, owners, search_path, view options,
+   inherited PUBLIC/effective grants, column ACLs, RLS and trigger dependencies.
+   Retain secure scoped pre-change definitions/ACLs.
+2. Test actual PostgreSQL definitions/dependencies with synthetic local data,
+   then exact allowlisted migrations in verified hosted staging. Member tests
+   use authenticated role plus the intended textual-sub identity, not
+   postgres/service-role calls labelled as user tests.
+3. Test profiles/rankings/champions across opted-in/out/closed identities:
+   conditional Discord, avatar proxy, denied raw private reads/view mutations,
+   and preserved official facts despite profile opt-out.
+4. Test canonical acceptance current/missing/stale/unavailable states and
+   successor activation; direct RPC and website agree. Preserve decline,
+   withdrawal, ownership, expiry/terminal denials, capacity/FIFO, concurrency,
+   revisions/idempotency. Invalid offer inputs must not change state; admins
+   gain no participant mutation shortcut.
+5. Test poll full-list recovery, empty versus unavailable/partial states, each
+   RPC half failing, multiple tournaments, account distinctions, malformed
+   output and token/transport failure. Preserve drafts, cancel stale responses,
+   prevent duplicate surfaces and clear private data on account changes.
+   Redaction tests must include synthetic private values.
+6. Verify staging app/database/Clerk targets and external-effect isolation
+   before fixtures. No real email/push/webhook/charges, integration changes or
+   Production dataset copies. Isolate task fixtures and preserve partner data.
+7. Run lint, TypeScript, build, regression tests and required CI on the actual
+   candidate. Fulfil human review/last-pusher gates without bypass. Record
+   SHA/tree, migration checksums, affected objects, compatibility, order and
+   recovery conditions.
+8. Before Production, reverify target/candidate/pending migrations and exact
+   top-level SQL. Only narrow forward definitions and justified grants: no
+   business-data rewrite, destructive DDL, resets, backfills or cleanup.
+   Existing mutations inside a replaced function body are not executed by
+   CREATE OR REPLACE, but must retain their reviewed invariants.
+9. Verify available backup capability without changing it; a platform feature
+   or WAL-G flag does not prove a usable backup. Record important table
+   counts/state aggregates before/after Production. Investigate unexpected
+   decreases using timestamps/audit context without exporting private data or
+   repairing business records.
+10. Production smoke tests are read-only after source-side-effect review.
+    Verify both domains, source/environment, definitions/ACLs and bounded logs.
+    Empty polls/inaccessible logs cannot prove error elimination. A compatible
+    application rollback does not undo SQL; never automatically restore
+    acceptance bypasses or NULL-decline behavior. SQL correction needs a tested
+    explicit forward migration; destructive recovery needs separate approval.

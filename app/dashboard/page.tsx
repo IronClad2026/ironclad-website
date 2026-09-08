@@ -283,6 +283,7 @@ export default async function PlayerDashboardPage() {
             density="compact"
             initialPolls={communityPolls.polls}
             initialError={communityPolls.error}
+            initialSnapshot={communityPolls.snapshot}
           />
         </div>
 

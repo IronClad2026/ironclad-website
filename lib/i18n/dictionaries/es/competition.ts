@@ -452,6 +452,8 @@ const dictionary = {
   },
   polls: {
     refreshError: "No se pudieron actualizar las encuestas.",
+    missingPlayer: "Las encuestas para miembros están disponibles después de configurar tu perfil de jugador.",
+    closedPlayer: "Las encuestas para miembros no están disponibles para una cuenta cerrada.",
     savingBallot: "Guardando tu papeleta…",
     ballotConfirmed: "Tu papeleta existente está confirmada.",
     ballotSaved: "Tu papeleta se ha guardado. Puedes cambiarla hasta que se cierre la encuesta.",
