@@ -1,7 +1,12 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import { revalidatePath } from "next/cache";
+import {
+  AccountLegalMutationBlockedError,
+  requireCurrentAccountLegalAcceptance,
+} from "@/lib/account-legal-mutation-guard";
+import { isAccountLegalAcceptanceRpcError } from "@/lib/account-legal-rpc-error";
 import {
   isSubmitPollVoteInput,
   parsePollVoteResult,
@@ -41,7 +46,13 @@ export async function castPollBallot(
     return { ok: false, error: "Sign in before voting in this Poll.", code: "auth_required" };
   }
 
-  await requireCurrentAccountLegalAcceptance();
+  try {
+    await requireCurrentAccountLegalAcceptance();
+  } catch (error) {
+    if (!(error instanceof AccountLegalMutationBlockedError)) throw error;
+    revalidatePath("/", "layout");
+    return { ok: false, error: GENERIC_BALLOT_ERROR, code: "save_failed" };
+  }
 
   if (!isSubmitPollVoteInput(input)) {
     return { ok: false, error: "The Poll ballot request is invalid.", code: "invalid_request" };
@@ -64,13 +75,15 @@ export async function castPollBallot(
       p_expected_revision: input.expectedRevision,
       p_option_ids: input.selectedOptionIds,
     });
-  } catch {
-    console.error("Poll ballot RPC failed unexpectedly.");
+  } catch (error) {
+    if (isAccountLegalAcceptanceRpcError(error)) revalidatePath("/", "layout");
+    else console.error("Poll ballot RPC failed unexpectedly.");
     return { ok: false, error: GENERIC_BALLOT_ERROR, code: "save_failed" };
   }
 
   if (result.error) {
-    console.error("Poll ballot RPC rejected the request.");
+    if (isAccountLegalAcceptanceRpcError(result.error)) revalidatePath("/", "layout");
+    else console.error("Poll ballot RPC rejected the request.");
     return { ok: false, error: GENERIC_BALLOT_ERROR, code: "save_failed" };
   }
 
