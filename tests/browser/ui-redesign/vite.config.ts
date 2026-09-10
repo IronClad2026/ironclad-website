@@ -51,7 +51,7 @@ export default defineConfig({
         "@/lib/supabase-browser", "@/lib/supabase-server", "@/lib/supabase-admin",
         "@/lib/notifications", "@/lib/player-dashboard", "@/lib/player-polls",
         "@/lib/tournament-division-invitations", "@/lib/badges/reveals",
-        "@/lib/i18n/request",
+        "@/lib/i18n/request", "@/lib/player-showcase/read",
       ].map((find) => ({ find, replacement: support("runtime.ts") })),
       { find: "next/link", replacement: support("link.tsx") },
       { find: "next/image", replacement: support("image.tsx") },

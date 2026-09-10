@@ -4,6 +4,9 @@ import { ChevronLeft, ShieldAlert, Wrench } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { loadDictionary } from "@/lib/i18n/loaders";
+import { getRequestLocale } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
 import AdminEloVerificationChecker from "@/components/AdminEloVerificationChecker";
 import AdminLeaderboardControls from "@/components/AdminLeaderboardControls";
 import {
@@ -34,6 +37,7 @@ export default async function AdminSystemPage() {
     redirect("/");
   }
 
+  const showcaseDictionary = await loadDictionary(await getRequestLocale(), "account-dashboard");
   const [
     completedLeaderboardTournaments,
     leaderboardRecalculationRuns,
@@ -49,6 +53,7 @@ export default async function AdminSystemPage() {
   return (
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32">
       <div className="mx-auto max-w-7xl space-y-8">
+        <Link href="/admin/player-showcase" className="inline-flex min-h-11 items-center text-zinc-300 underline underline-offset-4 hover:text-orange-300">{translate(showcaseDictionary, "showcase.adminTitle")}</Link>
         <header className="rounded-3xl border border-orange-500/25 bg-[linear-gradient(135deg,rgba(24,24,27,0.96),rgba(67,20,7,0.42))] p-5 shadow-2xl shadow-black/30 sm:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">

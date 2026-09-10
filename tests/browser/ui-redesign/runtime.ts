@@ -98,3 +98,6 @@ export async function fixtureAction(name: string, _args: unknown[]) {
   if (name === "loadAuthoritativeNotificationUnreadCount") return { ok: true, unreadCount: notificationFixture().length };
   return { status: "error", ok: false, message: "Local UI fixture: action isolated; no data was changed." };
 }
+
+// Preserve this existing isolated dashboard fixture when the optional feature is off.
+export const getPlayerShowcaseEnabled = async () => false;

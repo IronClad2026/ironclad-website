@@ -18,6 +18,7 @@ import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
 import { loadCommunityPollsForRequest } from "@/lib/player-polls";
 import { loadPlayerCareerDashboard } from "@/lib/player-dashboard";
+import { getPlayerShowcaseEnabled } from "@/lib/player-showcase/read";
 import { loadPlayerTournamentDivisionInvitations } from "@/lib/tournament-division-invitations";
 import {
   type PlayerProfile,
@@ -71,6 +72,7 @@ export default async function PlayerDashboardPage() {
     career,
     playerNotifications,
     communityPolls,
+    showcaseEnabled,
   ] =
     await Promise.all([
       supabase
@@ -90,6 +92,7 @@ export default async function PlayerDashboardPage() {
       loadPlayerCareerDashboard(userId, locale),
       loadPlayerNotifications(userId, 8, locale),
       loadCommunityPollsForRequest(),
+      getPlayerShowcaseEnabled(),
     ]);
 
   if (profileResult.error) {
@@ -154,7 +157,7 @@ export default async function PlayerDashboardPage() {
       }}
     >
       <div className="relative z-10 mx-auto max-w-7xl">
-        <DashboardIdentity profile={profile} error={Boolean(profileResult.error)} locale={locale} t={t} />
+        <DashboardIdentity profile={profile} error={Boolean(profileResult.error)} locale={locale} t={t} showcaseEnabled={showcaseEnabled} />
 
         <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)]" data-dashboard-section="current-actions">
           <section className="min-w-0" aria-labelledby="dashboard-competition-title">
