@@ -1,0 +1,15 @@
+{
+  "version": "20260910020800",
+  "name": "player_showcase_owner_read_rls",
+  "sha256": "78387a72713365898ce977159d2a0574bdfb68fe06bcea0e81fc9f814ff64319",
+  "metadata": {
+    "schemaVersion": 1,
+    "project": { "name": "ironclad-staging", "ref": "zzbnneprhjicmajpjkdg" },
+    "sourcePath": "supabase/migrations/20260910020800_player_showcase_owner_read_rls.sql",
+    "requiresAppliedMigration": "20260909234122",
+    "hashBasis": "UTF-8 source with CRLF normalized to LF; no other transformation",
+    "scope": "Explicit approval for one normal shared forward correction, applied only on Staging after fresh history and schema checks. Production application, historical replay, ledger repair and deployment are not authorized by this record.",
+    "afterApplication": "Retain this record as audit evidence. Once the exact migration is present in the remote ledger, omit it from approvedPendingMigrations; a stale pending approval must fail comparison.",
+    "historicalBaseline": "docs/staging-migration-history/baseline.json remains unchanged with approvedPendingMigrations empty."
+  }
+}

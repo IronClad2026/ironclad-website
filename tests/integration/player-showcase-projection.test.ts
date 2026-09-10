@@ -64,6 +64,8 @@ function makeEditorClient({
   awardError?: { message: string } | null;
 } = {}) {
   const playerQuery = createSupabaseQueryMock({ data: player });
+  // Match the live authenticated column boundary instead of allowing private filters.
+  playerQuery.query.is = () => { throw new Error("permission denied: private players column"); };
   const awardQuery = createSupabaseQueryMock({ data: awards, error: awardError });
   const from = vi.fn((table: string) => {
     if (table === "players") return playerQuery.query;
@@ -179,7 +181,7 @@ describe("Player Showcase private editor projection", () => {
     expect(publicClientMock).not.toHaveBeenCalled();
   });
 
-  it("derives the player from Clerk, filters closed accounts and strips private evidence", async () => {
+  it("uses active-owner RPC identity and granted player columns while stripping private evidence", async () => {
     const fixture = makeEditorClient({ awards: [{
       id: AWARD, badge_slug: "ironclad-recruit", unlocked_at: DATE,
       original_unlocked_at: "2026-08-01T12:00:00Z",
@@ -197,7 +199,8 @@ describe("Player Showcase private editor projection", () => {
     });
     expect(fixture.playerQuery.calls).toEqual(expect.arrayContaining([
       { method: "eq", args: ["clerk_user_id", "clerk-owner"] },
-      { method: "is", args: ["account_closed_at", null] },
+      { method: "eq", args: ["id", PLAYER] },
+      { method: "select", args: ["id, public_profile_enabled"] },
     ]));
     expect(fixture.awardQuery.calls).toEqual(expect.arrayContaining([
       { method: "eq", args: ["player_id", PLAYER] },
@@ -214,13 +217,37 @@ describe("Player Showcase private editor projection", () => {
     });
   });
 
-  it("rejects a mismatched private RPC player", async () => {
-    makeEditorClient({ state: {
+  it("rejects a mismatched private RPC player before reading awards", async () => {
+    const fixture = makeEditorClient({ state: {
       player_id: OTHER, current_thought: "Private other player", revision: 3,
+      featured_badge_award_id: null, thought_hidden_at: null,
     } });
     await expect(getMyPlayerShowcase()).resolves.toEqual({
       status: "error", code: "unavailable",
     });
+    expect(fixture.playerQuery.calls).toEqual(expect.arrayContaining([
+      { method: "eq", args: ["clerk_user_id", "clerk-owner"] },
+      { method: "eq", args: ["id", OTHER] },
+    ]));
+    expect(fixture.awardQuery.calls).toEqual([]);
+  });
+
+  it("uses a null owner RPC for missing or closed accounts without table reads", async () => {
+    const fixture = makeEditorClient({ state: null });
+    await expect(getMyPlayerShowcase()).resolves.toEqual({ status: "error", code: "profileRequired" });
+    expect(fixture.from).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { player_id: "clerk-owner" }, { revision: "3" }, { revision: -1 },
+    { current_thought: undefined }, { featured_badge_award_id: "bad" }, { thought_hidden_at: undefined },
+  ])("rejects malformed owner DTO %j before table reads", async (change) => {
+    const fixture = makeEditorClient({ state: {
+      player_id: PLAYER, current_thought: null, featured_badge_award_id: null,
+      thought_hidden_at: null, revision: 3, ...change,
+    } });
+    await expect(getMyPlayerShowcase()).resolves.toEqual({ status: "error", code: "unavailable" });
+    expect(fixture.from).not.toHaveBeenCalled();
   });
 
   it("does not turn an award read failure into an empty or editable collection", async () => {

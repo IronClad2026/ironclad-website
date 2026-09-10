@@ -35,27 +35,35 @@ function savedReply(thought: string | null = "GGs", award: string | null = null)
 function makeClient({
   player = { id: PLAYER },
   playerError = null,
+  ownerData = { player_id: PLAYER, current_thought: null, featured_badge_award_id: null, thought_hidden_at: null, revision: 3 },
+  ownerError = null,
   award = { id: AWARD, badge_slug: "ironclad-recruit" },
   rpcData = savedReply(),
   rpcError = null,
 }: {
   player?: unknown;
   playerError?: { message: string } | null;
+  ownerData?: unknown;
+  ownerError?: { message: string } | null;
   award?: unknown;
   rpcData?: unknown;
   rpcError?: { message: string } | null;
 } = {}) {
   const playerQuery = createSupabaseQueryMock({ data: player, error: playerError });
+  // Authenticated players reads have no SELECT grant on account_closed_at.
+  playerQuery.query.is = () => { throw new Error("permission denied: private players column"); };
   const awardQuery = createSupabaseQueryMock({ data: award });
   const from = vi.fn((table: string) => {
     if (table === "players") return playerQuery.query;
     if (table === "player_badge_awards") return awardQuery.query;
     throw new Error("Unexpected table: " + table);
   });
-  const rpc = vi.fn().mockResolvedValue({ data: rpcData, error: rpcError });
+  const saveRpc = vi.fn().mockResolvedValue({ data: rpcData, error: rpcError });
+  const rpc = vi.fn((name: string, parameters?: unknown) => name === "get_my_player_showcase"
+    ? Promise.resolve({ data: ownerData, error: ownerError }) : saveRpc(name, parameters));
   const client = { from, rpc };
   authenticatedClientMock.mockResolvedValue(client);
-  return { client, playerQuery, awardQuery };
+  return { client, saveRpc, playerQuery, awardQuery };
 }
 
 describe("Player Showcase authenticated actions", () => {
@@ -87,12 +95,14 @@ describe("Player Showcase authenticated actions", () => {
     });
     expect(fixture.playerQuery.calls).toEqual(expect.arrayContaining([
       { method: "eq", args: ["clerk_user_id", "clerk-owner"] },
-      { method: "is", args: ["account_closed_at", null] },
+      { method: "eq", args: ["id", PLAYER] },
+      { method: "select", args: ["id"] },
     ]));
-    expect(fixture.client.rpc).toHaveBeenCalledExactlyOnceWith(
+    expect(fixture.saveRpc).toHaveBeenCalledExactlyOnceWith(
       "save_my_player_showcase_thought",
       { p_current_thought: "GGs", p_expected_revision: 3 }
     );
+    expect(fixture.client.rpc).toHaveBeenNthCalledWith(1, "get_my_player_showcase");
     expect(legalMock).toHaveBeenCalledTimes(1);
     expect(revalidateMock.mock.calls).toEqual([
       ["/dashboard/showcase"], [`/players/${PLAYER}`],
@@ -109,7 +119,7 @@ describe("Player Showcase authenticated actions", () => {
   ])("rejects invalid thought payload %j without writing", async (input, code) => {
     const fixture = makeClient();
     await expect(saveCurrentThought(input as never)).resolves.toEqual({ status: "error", code });
-    expect(fixture.client.rpc).not.toHaveBeenCalled();
+    expect(fixture.saveRpc).not.toHaveBeenCalled();
     expect(revalidateMock).not.toHaveBeenCalled();
   });
 
@@ -132,7 +142,7 @@ describe("Player Showcase authenticated actions", () => {
     await expect(saveCurrentThought({ currentThought: "GGs", revision: 3 })).resolves.toEqual({
       status: "error", code: reason === "required" ? "legalRequired" : "unavailable",
     });
-    expect(fixture.client.rpc).not.toHaveBeenCalled();
+    expect(fixture.saveRpc).not.toHaveBeenCalled();
   });
 
   it("fails closed when the owned open profile is missing", async () => {
@@ -140,9 +150,42 @@ describe("Player Showcase authenticated actions", () => {
     await expect(saveFeaturedBadge({ awardId: AWARD, revision: 3 })).resolves.toEqual({
       status: "error", code: "profileRequired",
     });
-    expect(fixture.client.rpc).not.toHaveBeenCalled();
+    expect(fixture.saveRpc).not.toHaveBeenCalled();
   });
 
+  it("treats a null owner RPC as a missing or closed account without reading players", async () => {
+    const fixture = makeClient({ ownerData: null });
+    await expect(saveCurrentThought({ currentThought: "GGs", revision: 3 })).resolves.toEqual({
+      status: "error", code: "profileRequired",
+    });
+    expect(fixture.client.from).not.toHaveBeenCalled();
+    expect(fixture.saveRpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { player_id: OTHER }, { player_id: "clerk-owner" }, { revision: "3" },
+    { current_thought: 123 }, { featured_badge_award_id: "bad" }, { thought_hidden_at: undefined },
+  ])("rejects wrong-owner or malformed owner RPC data %j before writing", async (change) => {
+    const fixture = makeClient({ ownerData: {
+      player_id: PLAYER, revision: 3, current_thought: null,
+      featured_badge_award_id: null, thought_hidden_at: null, ...change,
+    } });
+    await expect(saveFeaturedBadge({ awardId: AWARD, revision: 3 })).resolves.toEqual({
+      status: "error", code: "unavailable",
+    });
+    expect(fixture.saveRpc).not.toHaveBeenCalled();
+    expect(fixture.awardQuery.calls).toEqual([]);
+    expect(legalMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on an owner RPC read error", async () => {
+    const fixture = makeClient({ ownerError: { message: "PRIVATE_DATABASE_DETAIL" } });
+    await expect(saveCurrentThought({ currentThought: "GGs", revision: 3 })).resolves.toEqual({
+      status: "error", code: "unavailable",
+    });
+    expect(fixture.client.from).not.toHaveBeenCalled();
+    expect(fixture.saveRpc).not.toHaveBeenCalled();
+  });
   it("validates exact award ownership and canonical catalogue membership before featuring", async () => {
     const fixture = makeClient({ rpcData: savedReply("GGs", AWARD) });
     await expect(saveFeaturedBadge({ awardId: AWARD, revision: 3 })).resolves.toMatchObject({
@@ -152,7 +195,7 @@ describe("Player Showcase authenticated actions", () => {
       { method: "eq", args: ["id", AWARD] },
       { method: "eq", args: ["player_id", PLAYER] },
     ]));
-    expect(fixture.client.rpc).toHaveBeenCalledExactlyOnceWith(
+    expect(fixture.saveRpc).toHaveBeenCalledExactlyOnceWith(
       "save_my_player_showcase_badge", { p_award_id: AWARD, p_expected_revision: 3 }
     );
     expect(fixture.client.from.mock.calls.map(([table]) => table)).toEqual([
@@ -167,7 +210,7 @@ describe("Player Showcase authenticated actions", () => {
       await expect(saveFeaturedBadge({ awardId: OTHER, revision: 3 })).resolves.toEqual({
         status: "error", code: "awardNotOwned",
       });
-      expect(fixture.client.rpc).not.toHaveBeenCalled();
+      expect(fixture.saveRpc).not.toHaveBeenCalled();
     }
   );
 
@@ -177,7 +220,7 @@ describe("Player Showcase authenticated actions", () => {
       status: "error", code: "invalidAward",
     });
     expect(fixture.awardQuery.calls).toEqual([]);
-    expect(fixture.client.rpc).not.toHaveBeenCalled();
+    expect(fixture.saveRpc).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -206,7 +249,7 @@ describe("Player Showcase authenticated actions", () => {
       status: "error", code: "conflict", revision: 8,
       currentThought: "Saved in another session", featuredBadgeAwardId: AWARD, thoughtHidden: true,
     });
-    expect(fixture.client.rpc).toHaveBeenCalledTimes(1);
+    expect(fixture.saveRpc).toHaveBeenCalledTimes(1);
     expect(revalidateMock).not.toHaveBeenCalled();
   });
 

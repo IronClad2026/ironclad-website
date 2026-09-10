@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
-import { canonicalShowcaseSlug } from "./read";
+import { canonicalShowcaseSlug, parseShowcaseOwnerState } from "./read";
 import type { ActionResult, ShowcaseMessageCode } from "./types";
 import { isShowcaseRevision, isShowcaseUuid, validateCurrentThought } from "./validation";
 
@@ -42,9 +42,16 @@ async function mutationContext() {
   const { userId } = await auth();
   if (!userId) return null;
   const client = await createAuthenticatedSupabaseClient();
-  const { data: player, error } = await client.from("players")
-    .select("id").eq("clerk_user_id", userId).is("account_closed_at", null).maybeSingle();
-  return { client, playerId: !error && isShowcaseUuid(player?.id) ? player.id : null, error };
+  const { data, error } = await client.rpc("get_my_player_showcase");
+  if (error || data === null) return { client, playerId: null, error };
+  const owner = parseShowcaseOwnerState(data);
+  if (!owner) return { client, playerId: null, error: true };
+  const { data: player, error: playerError } = await client.from("players")
+    .select("id").eq("clerk_user_id", userId).eq("id", owner.playerId).maybeSingle();
+  if (playerError || (player && player.id !== owner.playerId)) {
+    return { client, playerId: null, error: true };
+  }
+  return { client, playerId: player ? owner.playerId : null, error: null };
 }
 
 async function legalFailure(): Promise<ActionResult | null> {

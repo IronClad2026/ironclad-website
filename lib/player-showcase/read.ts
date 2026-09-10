@@ -22,6 +22,22 @@ function safeDate(value: unknown): string | null {
   return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
 }
 
+export function parseShowcaseOwnerState(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const thought = validateCurrentThought(row.current_thought);
+  if (!isShowcaseUuid(row.player_id) || !isShowcaseRevision(row.revision) || !thought.ok ||
+      (row.featured_badge_award_id !== null && !isShowcaseUuid(row.featured_badge_award_id)) ||
+      (row.thought_hidden_at !== null && safeDate(row.thought_hidden_at) === null)) return null;
+  return {
+    playerId: row.player_id,
+    currentThought: thought.value,
+    featuredBadgeAwardId: row.featured_badge_award_id,
+    thoughtHidden: row.thought_hidden_at !== null,
+    revision: row.revision,
+  };
+}
+
 export async function getPlayerShowcaseEnabled(): Promise<boolean> {
   try {
     const { data, error } = await createNoStoreSupabaseClient().rpc("player_showcase_enabled");
@@ -64,20 +80,23 @@ export async function getMyPlayerShowcase(): Promise<ShowcaseEditorLoad> {
     if (!userId) return { status: "error", code: "signInRequired" };
     if (!await getPlayerShowcaseEnabled()) return { status: "error", code: "unavailable" };
     const client = await createAuthenticatedSupabaseClient();
+    // The authenticated RPC owns active-account resolution; its private closure
+    // predicate must not be repeated through ungranted players columns.
+    const { data, error } = await client.rpc("get_my_player_showcase");
+    if (error) return { status: "error", code: "unavailable" };
+    if (data === null) return { status: "error", code: "profileRequired" };
+    const owner = parseShowcaseOwnerState(data);
+    if (!owner) return { status: "error", code: "unavailable" };
     const { data: player, error: playerError } = await client.from("players")
       .select("id, public_profile_enabled")
-      .eq("clerk_user_id", userId).is("account_closed_at", null).maybeSingle();
+      .eq("clerk_user_id", userId).eq("id", owner.playerId).maybeSingle();
     if (playerError) return { status: "error", code: "unavailable" };
-    if (!player || !isShowcaseUuid(player.id)) return { status: "error", code: "profileRequired" };
-    const [showcase, awardResult] = await Promise.all([
-      client.rpc("get_my_player_showcase"),
-      client.from("player_badge_awards").select(OWNED_SHOWCASE_AWARD_COLUMNS)
-        .eq("player_id", player.id).order("unlocked_at", { ascending: false }),
-    ]);
-    if (showcase.error || awardResult.error || !showcase.data ||
-        showcase.data.player_id !== player.id || !isShowcaseRevision(showcase.data.revision)) {
-      return { status: "error", code: "unavailable" };
-    }
+    if (!player) return { status: "error", code: "profileRequired" };
+    if (player.id !== owner.playerId) return { status: "error", code: "unavailable" };
+    const awardResult = await client.from("player_badge_awards")
+      .select(OWNED_SHOWCASE_AWARD_COLUMNS)
+      .eq("player_id", owner.playerId).order("unlocked_at", { ascending: false });
+    if (awardResult.error) return { status: "error", code: "unavailable" };
     const awards: OwnedShowcaseBadge[] = [];
     for (const award of awardResult.data ?? []) {
       const slug = canonicalShowcaseSlug(award.badge_slug);
@@ -85,19 +104,9 @@ export async function getMyPlayerShowcase(): Promise<ShowcaseEditorLoad> {
         awards.push({ awardId: award.id, slug, unlockedAt: safeDate(award.original_unlocked_at ?? award.unlocked_at) });
       }
     }
-    const thought = validateCurrentThought(showcase.data.current_thought);
-    const selectedId = showcase.data.featured_badge_award_id;
     return {
       status: "success",
-      state: {
-        playerId: player.id,
-        currentThought: thought.ok ? thought.value : null,
-        featuredBadgeAwardId: isShowcaseUuid(selectedId) ? selectedId : null,
-        thoughtHidden: showcase.data.thought_hidden_at !== null,
-        revision: showcase.data.revision,
-        awards,
-        publicProfileEnabled: player.public_profile_enabled === true,
-      },
+      state: { ...owner, awards, publicProfileEnabled: player.public_profile_enabled === true },
     };
   } catch {
     return { status: "error", code: "unavailable" };
