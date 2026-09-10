@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "ironclad-staging",
+    "ref": "zzbnneprhjicmajpjkdg"
+  },
+  "source": {
+    "baseCommit": "631e5ad225fdd8e702e99a3e80e57e2f62368051",
+    "canonicalMigration": {
+      "version": "20260904120000",
+      "name": "canonical_division_launch_ordering",
+      "path": "supabase/migrations/20260904120000_canonical_division_launch_ordering.sql",
+      "sha256": "5b72390cbfdcc88278b4bf9b697c5581b093fa3d5984885f9aca39746dc5497b",
+      "hashBasis": "UTF-8 source with CRLF normalized to LF; no other transformation",
+      "productionPullRequest": 108,
+      "stagingPullRequest": 109,
+      "stagingCommit": "1feb267814ee3f457e41a382cd0826f06da6d8ad"
+    },
+    "restoredSharedChange": {
+      "pullRequest": 123,
+      "commit": "6b37295ce9e6874cc753d902f93223566e82015d",
+      "migration": {
+        "version": "20260908052210",
+        "name": "member_rpc_current_account_acceptance",
+        "path": "supabase/migrations/20260908052210_member_rpc_current_account_acceptance.sql",
+        "sha256": "aaaa8061da7860cc213f0b8f307282b17d1bb3ad86f5c493293951930872fd72",
+        "hashBasis": "UTF-8 source with CRLF normalized to LF; no other transformation",
+        "classification": "shared-applied"
+      }
+    }
+  },
+  "archives": [
+    {
+      "path": "docs/staging-migration-history/20260905013141.json",
+      "version": "20260905013141",
+      "name": "20260904120000_canonical_division_launch_ordering",
+      "statementCount": 1,
+      "statementsSha256": "cd66dfc4b1295934e54de187d3d6ea38c278938bc533fbf4e238ca6842106958",
+      "hashBasis": "Exact UTF-8 bytes of decoded statements[0]; no normalization"
+    },
+    {
+      "path": "docs/staging-migration-history/20260908104335.json",
+      "version": "20260908104335",
+      "name": "staging_only_canonical_launch_parity",
+      "statementCount": 1,
+      "statementsSha256": "8362739c1c095c21baa68be4cb5f481502fa7baa5e5d2e462549669840fcf40c",
+      "hashBasis": "Exact UTF-8 bytes of decoded statements[0]; no normalization"
+    }
+  ],
+  "reconciliations": [
+    {
+      "repositoryVersion": "20260904120000",
+      "classification": "historically-satisfied",
+      "requiredLedgerVersions": ["20260905013141", "20260908104335"],
+      "function": {
+        "signature": "public.launch_tournament_division_without_matchup_activation(uuid,text)",
+        "predecessorDefinitionSha256": "3b5c75ef8fa82f1d73daa7c4141c08081400a0c0cb9148de13740824a6c703f5",
+        "currentDefinitionSha256": "fe7825482f866487fa62c6f0f711027d12bd55fd6e516a2706789e6d30376f0c",
+        "hashBasis": "UTF-8 pg_get_functiondef output"
+      }
+    }
+  ],
+  "approvedPendingMigrations": [],
+  "unknownDifferencePolicy": "fail-closed",
+  "applicationAuthorization": false
+}
