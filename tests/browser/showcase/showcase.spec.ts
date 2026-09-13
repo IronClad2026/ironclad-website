@@ -29,6 +29,14 @@ for (const viewport of [{ width: 320, height: 740 }, { width: 390, height: 844 }
     const avatarBox = await avatar.boundingBox();
     expect(badgeBox!.y).toBeGreaterThanOrEqual(avatarBox!.y + avatarBox!.height);
     expect(badgeBox!.width).toBeGreaterThanOrEqual(44);
+    const thought = page.locator("[data-current-thought]");
+    const thoughtBox = await thought.boundingBox();
+    expect(thoughtBox!.x).toBeGreaterThan(avatarBox!.x + avatarBox!.width);
+    expect(thoughtBox!.y).toBeLessThan(avatarBox!.y + avatarBox!.height);
+    expect(thoughtBox!.y + thoughtBox!.height).toBeGreaterThan(avatarBox!.y);
+    const thoughtText = thought.locator("p[dir=auto]");
+    await expect(thoughtText).toHaveText("界".repeat(160));
+    expect(await thoughtText.evaluate((node) => node.scrollWidth <= node.clientWidth + 1 && node.scrollHeight <= node.clientHeight + 1)).toBe(true);
     await noOverflow(page);
     await expect(page.locator("video")).toHaveCount(0);
     const cap = await page.locator("[data-player-showcase] > div").boundingBox();
