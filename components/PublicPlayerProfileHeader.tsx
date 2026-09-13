@@ -12,13 +12,20 @@ import {
 import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
 import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
 import { formatNumber } from "@/lib/i18n/format";
+import type { BadgesDictionary } from "@/lib/i18n/badges";
+import type { PublicPlayerShowcase } from "@/lib/player-showcase/types";
+import ShowcaseProfileHeader from "@/components/showcase/ShowcaseProfileHeader";
 
 type PublicPlayerProfileHeaderProps = {
   player: PublicPlayerProfile;
+  showcase?: PublicPlayerShowcase | null;
+  badgeDictionary?: BadgesDictionary;
 };
 
 export default function PublicPlayerProfileHeader({
   player,
+  showcase,
+  badgeDictionary,
 }: PublicPlayerProfileHeaderProps) {
   const t = useOptionalTranslations("public", englishPublicDictionary);
   const locale = useOptionalLocale();
@@ -27,6 +34,10 @@ export default function PublicPlayerProfileHeader({
     typeof player.currentElo === "number"
       ? formatNumber(player.currentElo, locale)
       : t("players.unrated");
+
+  if (showcase) {
+    return <ShowcaseProfileHeader player={player} showcase={showcase} badgeDictionary={badgeDictionary} />;
+  }
 
   return (
     <section className="relative overflow-hidden border-b border-orange-500/20 px-6 pt-32 pb-12">

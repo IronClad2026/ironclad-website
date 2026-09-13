@@ -20,6 +20,7 @@ const eloSupportLinkSettingMock = vi.hoisted(() => vi.fn());
 const leaderboardControlsMock = vi.hoisted(() => vi.fn(() => null));
 const eloCheckerMock = vi.hoisted(() => vi.fn(() => null));
 
+vi.mock("@/lib/i18n/request", () => ({ getRequestLocale: async () => "en" }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/lib/leaderboard/admin", () => ({

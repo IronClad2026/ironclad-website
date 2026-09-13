@@ -1,3 +1,4 @@
+vi.mock("@/lib/i18n/request", () => ({ getRequestLocale: async () => "en" }));
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

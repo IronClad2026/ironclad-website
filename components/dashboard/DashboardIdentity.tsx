@@ -14,11 +14,13 @@ export default function DashboardIdentity({
   error,
   locale,
   t,
+  showcaseEnabled = false,
 }: {
   profile: PlayerProfile | null;
   error: boolean;
   locale: Locale;
   t: Translator;
+  showcaseEnabled?: boolean;
 }) {
   const complete = profile?.profile_completed === true;
   const avatarUrl = profile ? getPlayerAvatarDisplayUrl(profile) : null;
@@ -79,6 +81,11 @@ export default function DashboardIdentity({
                 <Pencil size={14} aria-hidden="true" />
                 {t(complete ? "dashboard.profile.viewEdit" : "dashboard.profile.complete")}
               </Link>
+              {showcaseEnabled ? (
+                <Link href="/dashboard/showcase" className="inline-flex min-h-11 items-center justify-center border border-white/20 px-3 py-2 text-sm font-semibold text-zinc-200 transition hover:border-white/40 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300">
+                  {t("showcase.manage")}
+                </Link>
+              ) : null}
             </nav>
             <dl className="col-span-2 flex min-w-0 flex-wrap gap-x-4 gap-y-1.5 text-xs leading-5 text-zinc-400 xl:col-start-2">
               {facts.map((fact) => (

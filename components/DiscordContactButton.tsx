@@ -8,11 +8,13 @@ import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
 type DiscordContactButtonProps = {
   discordUsername: string | null;
   discordPublicEnabled: boolean;
+  presentation?: "card" | "compact";
 };
 
 export default function DiscordContactButton({
   discordUsername,
   discordPublicEnabled,
+  presentation = "card",
 }: DiscordContactButtonProps) {
   const t = useOptionalTranslations("public", englishPublicDictionary);
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
@@ -29,6 +31,27 @@ export default function DiscordContactButton({
     }
   }
 
+  if (presentation === "compact") {
+    if (!canContact) return null;
+    return (
+      <div className="min-w-0">
+        <button
+          type="button"
+          onClick={copyDiscordUsername}
+          className="inline-flex min-h-11 max-w-full items-center justify-center gap-2 border border-white/20 px-3 py-2 text-sm font-semibold text-zinc-200 motion-safe:transition-colors hover:border-white/40 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+        >
+          {status === "copied" ? <Check size={16} aria-hidden="true" /> : <MessageCircle size={16} aria-hidden="true" />}
+          <span>{t("players.contactPlayer")}</span>
+        </button>
+        {status !== "idle" ? (
+          <p role="status" className="mt-2 break-words text-xs leading-5 text-zinc-300 [overflow-wrap:anywhere]">
+            <span className="block font-semibold">{discordUsername}</span>
+            {t(status === "copied" ? "players.copied" : "players.copyFailed")}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
   if (!canContact) {
     return (
       <div className="group relative overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] p-5 shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1">

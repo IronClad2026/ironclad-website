@@ -3,6 +3,7 @@ import PublicPlayerProfileHeader from "@/components/PublicPlayerProfileHeader";
 import PublicPlayerStats from "@/components/PublicPlayerStats";
 import { getPublicActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
 import { getPublicPlayerById } from "@/lib/public-players";
+import { getPublicPlayerShowcase } from "@/lib/player-showcase/read";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
@@ -47,8 +48,12 @@ export default async function PublicPlayerProfilePage({
     notFound();
   }
 
-  const activeTournamentEloSnapshots =
-    await getPublicActiveTournamentEloSnapshots(player.id);
+  const locale = await getRequestLocale();
+  const [activeTournamentEloSnapshots, showcase, badgeDictionary] = await Promise.all([
+    getPublicActiveTournamentEloSnapshots(player.id),
+    getPublicPlayerShowcase(player.id),
+    loadDictionary(locale, "badges"),
+  ]);
 
   return (
     <main
@@ -62,7 +67,7 @@ export default async function PublicPlayerProfilePage({
         backgroundSize: "cover",
       }}
     >
-      <PublicPlayerProfileHeader player={player} />
+      <PublicPlayerProfileHeader player={player} showcase={showcase} badgeDictionary={badgeDictionary} />
       <PublicPlayerStats
         player={player}
         activeTournamentEloSnapshots={activeTournamentEloSnapshots}
