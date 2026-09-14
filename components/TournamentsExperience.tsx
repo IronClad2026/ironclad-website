@@ -32,6 +32,8 @@ import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime"
 import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import PublishedTournamentGallery from "@/components/tournaments/PublishedTournamentGallery";
 import TournamentMapPoolViewer from "@/components/tournaments/TournamentMapPoolViewer";
+import useBracketLayout from "@/components/tournaments/useBracketLayout";
+import type { BracketCardPosition } from "@/components/tournaments/bracket-layout";
 import TournamentArchive, { type ArchiveEvent } from "@/components/tournaments/TournamentArchive";
 import ReferenceDialog from "@/components/ui/ReferenceDialog";
 import TournamentMedia from "@/components/TournamentMedia";
@@ -1882,7 +1884,7 @@ function NoChampionPresentation({ bracketName }: { bracketName: string }) {
   );
 }
 
-function SingleEliminationBracket({
+export function SingleEliminationBracket({
   matches,
   participantsById,
   adminReadOnly,
@@ -1928,13 +1930,12 @@ function SingleEliminationBracket({
       round.matches.some((match) => match.status !== "completed")
     ) ??
     rounds.at(-1);
-  const boardHeight = Math.max(
-    520,
-    (rounds[0]?.matches.length ?? 1) * 150
+  const { boardRef, layout } = useBracketLayout(
+    rounds.map((round) => round.matches.map((match) => match.id))
   );
 
   return (
-    <div className={classNames("relative mt-6 overflow-x-auto p-5", tournamentInsetCardClass)}>
+    <div data-bracket-scroll className={classNames("relative mt-6 overflow-x-auto p-5", tournamentInsetCardClass)}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">
@@ -1957,9 +1958,12 @@ function SingleEliminationBracket({
       </div>
 
       <div
-        className="grid min-w-max gap-14"
+        ref={boardRef}
+        data-bracket-board
+        className="grid min-w-max gap-x-14 gap-y-4"
         style={{
           gridTemplateColumns: `repeat(${rounds.length}, minmax(260px, 280px))`,
+          gridTemplateRows: "auto auto",
         }}
       >
         {rounds.map((round, roundIndex) => {
@@ -1967,10 +1971,10 @@ function SingleEliminationBracket({
           return (
             <motion.section
               key={round.number}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.35, delay: roundIndex * 0.07 }}
-              className="min-w-0"
+              className="row-span-2 grid min-w-0 grid-cols-1 grid-rows-subgrid"
             >
               <div
                 className={classNames(
@@ -1998,9 +2002,34 @@ function SingleEliminationBracket({
               </div>
 
               <div
-                className="mt-4 flex flex-col justify-around"
-                style={{ minHeight: boardHeight }}
+                data-bracket-round={roundIndex}
+                className="relative flex min-w-0 flex-col gap-6"
+                style={layout ? { height: layout.height } : undefined}
               >
+                {layout && rounds[roundIndex + 1] && (
+                  <svg
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-full top-0 h-full w-14 overflow-visible text-slate-600"
+                    viewBox={`0 0 56 ${layout.height}`}
+                    preserveAspectRatio="none"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                  >
+                    {round.matches.map((match, matchIndex) => {
+                      const target = rounds[roundIndex + 1].matches[Math.floor(matchIndex / 2)];
+                      if (!target) return null;
+                      return (
+                        <path
+                          key={match.id}
+                          data-bracket-connector={match.id}
+                          data-target-match={target.id}
+                          d={`M0 ${layout.positions[match.id].anchor} H28 V${layout.positions[target.id].anchor} H56`}
+                        />
+                      );
+                    })}
+                  </svg>
+                )}
                 {round.matches.map((match, matchIndex) => (
                   <ModernBracketMatch
                     key={match.id}
@@ -2009,10 +2038,9 @@ function SingleEliminationBracket({
                     anchorId={`${anchorPrefix}-${match.id}`}
                     focused={focusedMatchId === match.id}
                     isActiveRound={isActive}
-                    hasNextRound={roundIndex < rounds.length - 1}
-                    connectorDirection={
-                      matchIndex % 2 === 0 ? "down" : "up"
-                    }
+                    position={layout?.positions[match.id]}
+                    roundIndex={roundIndex}
+                    matchIndex={matchIndex}
                     adminReadOnly={adminReadOnly}
                     onAdminSelect={
                       onAdminMatchSelect
@@ -2047,8 +2075,9 @@ function ModernBracketMatch({
   anchorId,
   focused,
   isActiveRound,
-  hasNextRound,
-  connectorDirection,
+  position,
+  roundIndex,
+  matchIndex,
   adminReadOnly,
   onAdminSelect,
   onPlayerSelect,
@@ -2058,8 +2087,9 @@ function ModernBracketMatch({
   anchorId: string;
   focused: boolean;
   isActiveRound: boolean;
-  hasNextRound: boolean;
-  connectorDirection: "up" | "down";
+  position?: BracketCardPosition;
+  roundIndex: number;
+  matchIndex: number;
   adminReadOnly: boolean;
   onAdminSelect?: () => void;
   onPlayerSelect?: () => void;
@@ -2069,7 +2099,7 @@ function ModernBracketMatch({
     <div
       id={anchorId}
       className={classNames(
-        "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition hover:-translate-y-1",
+        "overflow-hidden border bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(8,8,8,0.86))] text-left shadow-2xl shadow-black/30 backdrop-blur transition-colors",
         (onAdminSelect || onPlayerSelect) &&
           "hover:border-orange-300/80",
         focused && "ring-2 ring-orange-300 ring-offset-4 ring-offset-black",
@@ -2084,52 +2114,42 @@ function ModernBracketMatch({
                 : "border-white/10 shadow-black/30"
       )}
     >
-      <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-          {onAdminSelect && !onPlayerSelect
-            ? `Match ${match.id}`
-            : t("tournaments.brackets.matchLabel", { id: match.id })}
-        </span>
-        <div className="flex items-center gap-2">
-          {onAdminSelect && (
-            <span className="rounded border border-orange-400/25 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">
-              {adminReadOnly ? "Inspect" : "Manage"}
-            </span>
-          )}
-          {onPlayerSelect && (
-            <span className="rounded border border-orange-300/40 bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-100">
-              {t("tournaments.brackets.openMatch")}
-            </span>
-          )}
-          <MatchStatus status={match.status} />
+      <div data-bracket-core>
+        <div className="flex items-center justify-between border-b border-white/5 bg-white/[0.03] px-3 py-2">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+            {onAdminSelect && !onPlayerSelect
+              ? `Match ${match.id}`
+              : t("tournaments.brackets.matchLabel", { id: match.id })}
+          </span>
+          <div className="flex items-center gap-2">
+            {onAdminSelect && (
+              <span className="rounded border border-orange-400/25 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-200">
+                {adminReadOnly ? "Inspect" : "Manage"}
+              </span>
+            )}
+            {onPlayerSelect && (
+              <span className="rounded border border-orange-300/40 bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-orange-100">
+                {t("tournaments.brackets.openMatch")}
+              </span>
+            )}
+            <MatchStatus status={match.status} />
+          </div>
         </div>
+        <BroadcastTeamRow team={match.teamA} />
+        <BroadcastTeamRow team={match.teamB} />
       </div>
-      <BroadcastTeamRow team={match.teamA} />
-      <BroadcastTeamRow team={match.teamB} />
       <MatchDeadlinePresentation match={deadlineMatch} compact />
     </div>
   );
 
   return (
-    <motion.div
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.2 }}
-      className="relative my-3"
+    <div
+      data-bracket-match={deadlineMatch.id}
+      data-round-index={roundIndex}
+      data-match-index={matchIndex}
+      className={classNames("w-full min-w-0", position ? "absolute left-0" : "relative")}
+      style={position ? { top: position.top } : undefined}
     >
-      {hasNextRound && (
-        <>
-          <span className="pointer-events-none absolute left-full top-1/2 h-px w-7 bg-gradient-to-r from-orange-400/70 to-slate-600" />
-          <span
-            className={classNames(
-              "pointer-events-none absolute left-[calc(100%+1.75rem)] w-px bg-slate-600",
-              connectorDirection === "down"
-                ? "top-1/2 h-[calc(50%+2.2rem)]"
-                : "bottom-1/2 h-[calc(50%+2.2rem)]"
-            )}
-          />
-          <span className="pointer-events-none absolute left-[calc(100%+1.75rem)] top-1/2 h-px w-7 bg-slate-600" />
-        </>
-      )}
       {onAdminSelect ? (
         <button
           type="button"
@@ -2151,7 +2171,7 @@ function ModernBracketMatch({
           {t("tournaments.brackets.openMatch")}
         </button>
       )}
-    </motion.div>
+    </div>
   );
 }
 
