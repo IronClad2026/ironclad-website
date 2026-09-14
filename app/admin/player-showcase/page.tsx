@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
 import { loadDictionary } from "@/lib/i18n/loaders";
@@ -30,6 +31,7 @@ export default async function PlayerShowcaseModerationPage({
         <section className="mx-auto max-w-3xl">
           <h1 className="text-3xl font-black">{t("adminTitle")}</h1>
           <p className="mt-3 text-zinc-300">{t("adminDescription")}</p>
+          <Link href="/admin/combat-highlights" className="mt-4 inline-flex min-h-11 items-center text-sm text-orange-200 underline underline-offset-4">Combat Highlights moderation</Link>
           <form className="mt-6 flex flex-wrap items-end gap-3" action="/admin/player-showcase">
             <label className="min-w-0 flex-1 text-sm font-bold">
               {t("playerId")}

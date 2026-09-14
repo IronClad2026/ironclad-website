@@ -24,7 +24,8 @@ const localMigrations = readdirSync(resolve(process.cwd(), "supabase/migrations"
 // The original snapshot predates the correction and excludes it from both inventories.
 function snapshot(phase: "original" | "correction" = "correction") {
   const approval = phase === "original" ? original : correction;
-  const source = localMigrations.filter(({ version }) => phase !== "original" || version !== correction.version);
+  const source = localMigrations.filter(({ version }) => version <= correction.version &&
+    (phase !== "original" || version !== correction.version));
   return {
     projectRef: STAGING_PROJECT_REF, localMigrations: [...source],
     remoteMigrations: [

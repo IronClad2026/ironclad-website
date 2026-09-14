@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "ironclad-staging-combat-highlights",
+  "main": "src/index.ts",
+  "account_id": "cbe0a3809d7429e07e97e3795803182b",
+  "compatibility_date": "2026-09-13",
+  "workers_dev": true,
+  "preview_urls": false,
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "ironclad-staging-combat-highlights" }],
+  "vars": {
+    "DEPLOYMENT_ENV": "staging",
+    "ENABLED": "false",
+    "SUPABASE_URL": "https://zzbnneprhjicmajpjkdg.supabase.co",
+    "ALLOWED_ORIGINS": ""
+  },
+  "observability": { "enabled": false }
+}

@@ -1,0 +1,26 @@
+{
+  "repository": "https://chromium.googlesource.com/chromium/src/",
+  "commit": "7cd1b58d2e94268c8645ec1b250ed51c142841a6",
+  "license": "Chromium BSD-style license, preserved in LICENSE.chromium",
+  "upstreamDocumentation": "https://chromium.googlesource.com/chromium/src/+/7cd1b58d2e94268c8645ec1b250ed51c142841a6/media/test/data/README.md",
+  "files": [
+    {
+      "name": "bear-1280x720.mp4",
+      "byteLength": 715963,
+      "sha256": "bcb75d3db0a1a5056f4cd5c770ceccdb4cae920f21abb8139b29cd9ad39e3857",
+      "source": "https://chromium.googlesource.com/chromium/src/+/7cd1b58d2e94268c8645ec1b250ed51c142841a6/media/test/data/bear-1280x720.mp4"
+    },
+    {
+      "name": "bear-320x240.webm",
+      "byteLength": 219229,
+      "sha256": "834dbadab368d6dbdeaf973d8f2398a36d6fe584965781877ee46ffcc570ed59",
+      "source": "https://chromium.googlesource.com/chromium/src/+/7cd1b58d2e94268c8645ec1b250ed51c142841a6/media/test/data/bear-320x240.webm"
+    },
+    {
+      "name": "bear-vp9-opus.webm",
+      "byteLength": 101414,
+      "sha256": "c7fd18fbb644ca6f49c56cf386e679c0290e79cd50234ddfed9945f71bf07deb",
+      "source": "https://chromium.googlesource.com/chromium/src/+/7cd1b58d2e94268c8645ec1b250ed51c142841a6/media/test/data/bear-vp9-opus.webm"
+    }
+  ]
+}

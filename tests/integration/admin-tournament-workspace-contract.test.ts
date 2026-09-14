@@ -1054,6 +1054,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260908052210_member_rpc_current_account_acceptance.sql",
       "20260909234122_player_showcase_phase_a.sql",
       "20260910020800_player_showcase_owner_read_rls.sql",
+      "20260913235133_player_combat_highlights.sql",
     ]);
     const platformMigrationNames = migrationNames.filter(
       (name) =>
@@ -1079,7 +1080,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.slice(-14)).toEqual([
+    expect(migrationNames.slice(-15)).toEqual([
       "20260831133000_staging_badge_cross_division_acceptance.sql",
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql",
       "20260902100000_unlaunched_event_void_authority.sql",
@@ -1094,6 +1095,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260908052210_member_rpc_current_account_acceptance.sql",
       "20260909234122_player_showcase_phase_a.sql",
       "20260910020800_player_showcase_owner_read_rls.sql",
+      "20260913235133_player_combat_highlights.sql",
     ]);
     expect(
       normalizedSha256(
@@ -1105,10 +1107,10 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "8e97337efc36276797b3e98ff45bbdbd893533b0ffa13486e0f4bac83e911fd6"
     );
     expect(normalizedSha256(read("package.json"))).toBe(
-      "0fa600694cee0d7bfbcb2ddd545ed8f46b0c33ea79d4e9953b39c0b3e7ae5db9"
+      "11b734c524f725e2067561bec3376969fa2f8cfdf4c56d43f6886e48bcb8783a"
     );
     expect(normalizedSha256(read("package-lock.json"))).toBe(
-      "520e696974594503ed6f61f05f5937dd64f75fc9255d56f16bf9c9b57ff238a0"
+      "92d13476ff42aab93a1e538a7bda2e767923bf0890cae8813ee2e48cbec43be4"
     );
     expect(normalizedSha256(read(".env.example"))).toBe(
       "a36a452c337407aa53c29a8499cb1658023caed00bd41b605859d07ce166dbd4"

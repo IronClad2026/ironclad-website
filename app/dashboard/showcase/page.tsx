@@ -1,6 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import CombatHighlightsEditor from "@/components/combat-highlights/CombatHighlightsEditor";
+import { getMyCombatHighlights } from "@/lib/combat-highlights/read";
+import { reserveHighlight, completeHighlight, cancelHighlight, clearHighlight, reorderHighlights, previewHighlight } from "./highlight-actions";
 import PlayerShowcaseEditor from "@/components/showcase/PlayerShowcaseEditor";
 import { loadDictionaries } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
@@ -19,9 +22,10 @@ export default async function PlayerShowcasePage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
   const locale = await getRequestLocale();
-  const [dictionaries, result] = await Promise.all([
+  const [dictionaries, result, highlights] = await Promise.all([
     loadDictionaries(locale, ["account-dashboard", "badges"] as const),
     getMyPlayerShowcase(),
+    getMyCombatHighlights(),
   ]);
   const t = (key: string) => translate(dictionaries["account-dashboard"], `showcase.${key}`);
   return (
@@ -40,6 +44,7 @@ export default async function PlayerShowcasePage() {
           <Link href="/dashboard" className="mt-6 inline-flex min-h-11 items-center text-orange-300 underline underline-offset-4">{t("backToDashboard")}</Link>
         </section>
       )}
+      {highlights ? <CombatHighlightsEditor initialState={highlights} actions={{ reserve: reserveHighlight, complete: completeHighlight, cancel: cancelHighlight, clear: clearHighlight, reorder: reorderHighlights, preview: previewHighlight }} /> : null}
     </main>
   );
 }
