@@ -11,7 +11,7 @@
     "DEPLOYMENT_ENV": "staging",
     "ENABLED": "false",
     "SUPABASE_URL": "https://zzbnneprhjicmajpjkdg.supabase.co",
-    "ALLOWED_ORIGINS": ""
+    "ALLOWED_ORIGINS": "https://ironclad-website-git-codex-player-s-18697e-ironclad-tournaments.vercel.app"
   },
   "observability": { "enabled": false }
 }

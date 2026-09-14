@@ -25,7 +25,7 @@ begin
   end if;
   select encode(sha256(convert_to(jsonb_agg(to_jsonb(m) order by m.version)::text,'UTF8')),'hex')
   into v_history from supabase_migrations.schema_migrations m
-  where version not in ('20260909234122','20260910020800','20260913235133');
+  where version not in ('20260909234122','20260910020800','20260914004801');
   if v_history is distinct from '86d032ff2d6bb18210713ef8d35304f52d4464d4fbbc471fa4a87146bf961891'
     or (select count(*) from supabase_migrations.schema_migrations)<>151
     or not exists(select 1 from supabase_migrations.schema_migrations
@@ -37,7 +37,7 @@ begin
       and encode(sha256(convert_to(statements[1],'UTF8')),'hex')
         ='78387a72713365898ce977159d2a0574bdfb68fe06bcea0e81fc9f814ff64319')
     or not exists(select 1 from supabase_migrations.schema_migrations
-      where version='20260913235133' and name='player_combat_highlights' and cardinality(statements)=1
+      where version='20260914004801' and name='player_combat_highlights' and cardinality(statements)=1
       and encode(sha256(convert_to(statements[1],'UTF8')),'hex')
         ='99b319d9d478db2fabd3110434efe69e50da65b234b189de21e81edee17e5b8f')
     or not exists(select 1 from supabase_migrations.schema_migrations

@@ -1054,7 +1054,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260908052210_member_rpc_current_account_acceptance.sql",
       "20260909234122_player_showcase_phase_a.sql",
       "20260910020800_player_showcase_owner_read_rls.sql",
-      "20260913235133_player_combat_highlights.sql",
+      "20260914004801_player_combat_highlights.sql",
     ]);
     const platformMigrationNames = migrationNames.filter(
       (name) =>
@@ -1095,7 +1095,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260908052210_member_rpc_current_account_acceptance.sql",
       "20260909234122_player_showcase_phase_a.sql",
       "20260910020800_player_showcase_owner_read_rls.sql",
-      "20260913235133_player_combat_highlights.sql",
+      "20260914004801_player_combat_highlights.sql",
     ]);
     expect(
       normalizedSha256(

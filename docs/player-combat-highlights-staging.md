@@ -91,20 +91,43 @@ exist on GitHub. Values stay in process memory/child stdin; never print or commi
 
 ## Migration and rollout checkpoint
 
-New additive migration: `20260913235133_player_combat_highlights.sql`.
+New additive migration: `20260914004801_player_combat_highlights.sql`.
 SHA-256 (LF): `99b319d9d478db2fabd3110434efe69e50da65b234b189de21e81edee17e5b8f`.
 It creates the new tables/RPCs and a **disabled** `player_combat_highlights` setting.
 It preserves the existing account-closure chain while adding private-media cleanup.
 Never rewrite/replay the already applied Phase A migrations or historical Staging aliases.
 
-At initial source publication: the private bucket and disabled Worker exist; Phase B
-is not yet applied to Staging, and branch Preview configuration is pending publication.
-Phase A remains enabled. Update the PR deployment notes after each rollout step.
+Staging migration application completed through the official Supabase migration tool
+on 2026-09-14. The tool assigned canonical version `20260914004801`; the new file
+was renamed from its unapplied draft timestamp `20260913235133` to match that record.
+SQL bytes and checksum are identical. The original 150 ledger entries are unchanged;
+the ledger now contains 151. No manual ledger insertion, repair or historical replay
+was performed. Phase A remains ON; Phase B and the Worker remain OFF.
 
-Before activation: verify the exact migration ledger and protected-table fingerprints;
-apply only the new migration; run the guarded Staging transaction/rollback contract;
-compare fingerprints and advisors; configure the actual Preview origin; deploy the
-current Worker; verify fresh authenticated owner/public/private media authorization.
+Draft review PR: https://github.com/IronClad2026/ironclad-website/pull/127 (base staging).
+Stable Preview: https://ironclad-website-git-codex-player-s-18697e-ironclad-tournaments.vercel.app/dashboard/showcase
+
+The five branch-scoped Preview settings and two Worker key bindings are configured.
+The only allowed browser upload origin is the verified stable Phase B Preview origin.
+The Worker source is deployed as `662543b1-c869-4c95-8fb9-b3692e758bac`; health returns
+Staging, inactive, HTTP 200 with private/no-store. The Preview reaches the normal
+Clerk Development-mode sign-in screen. User sign-in is the next manual action.
+
+Security advisors report expected RPC-only private tables without row policies and
+intentionally callable security-definer RPCs. Their explicit ownership/public filters,
+safe search paths and narrow grants are covered by the security contracts. Existing
+security-definer-view findings are outside this change. See the Supabase guidance on
+[private RLS tables](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
+and [intentional public RPCs](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable).
+
+The guarded hosted Staging transaction passed all **71 assertions** and rolled back.
+Slots, uploads and reports are empty. All 53 protected tables exactly match their
+post-application/pre-test fingerprints. Across migration plus tests, only the expected
+new disabled setting was added; the other 52 tables and filtered settings hash match
+the original baseline. The original 150-entry ledger digest remains
+`790245bda7054bbc3f9e038483c19fe5e1a5459c563a4eb84dc277ee9e214512`.
+
+Before activation: verify fresh authenticated owner/public/private media authorization.
 Keep Phase B off until these checks pass. Use actual Clerk Staging sign-in and the
 normal legal gate. A real clip upload requires the player's truthful rights declaration.
 Do not fabricate acceptance or use fixture footage as a player's real gameplay.
@@ -120,6 +143,8 @@ Do not fabricate acceptance or use fixture footage as a player's real gameplay.
   separately exercised locally. The local baseline deliberately stubs existing legal
   and closure functions and does not prove hosted Postgres 17 behavior or concurrency.
 - Focused migration/history/inventory: 65 tests passed.
+- After canonical filename reconciliation: 65 focused tests and local PostgreSQL
+  131 + 71 assertions passed again. The SQL itself did not change.
 - Isolated Chromium UI/browser checks: 12 passed, including desktop/mobile 0/1/2/3
   layouts, actual local fixture playback/upload, lazy loading and one active player.
 
@@ -127,6 +152,12 @@ The full app gates used synthetic loopback-only CI configuration. Browser fixtur
 block external/API traffic and use licensed public test media. No exploratory fixture
 is connected to a live database. The Staging contract is a single guarded BEGIN/ROLLBACK
 transaction and must be accompanied by independent before/after protected-table hashes.
+
+Next session: have the user complete the open Clerk Development-mode sign-in, verify
+the real owner RPC and normal legal flow on the stable Preview, then enable only the
+Staging Worker/Phase B flag for the controlled clip checks. A real CoH3 clip and the
+player's truthful declaration are needed for hosted upload validation. Do not replay
+the migration or rerun the guarded empty-table contract after real clips are uploaded.
 
 Hosted Clerk/upload/playback/Range/revocation, provider Free-plan CPU behavior and real
 mobile-device codec support remain required. Local fixtures do not substitute for those

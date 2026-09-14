@@ -7,7 +7,7 @@ import {
   compareStagingMigrationBaseline,
 } from "@/scripts/migrations/staging-migration-baseline";
 
-const file = "20260913235133_player_combat_highlights.sql";
+const file = "20260914004801_player_combat_highlights.sql";
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8").replace(/\r\n/g, "\n");
 const migration = read("supabase/migrations/" + file);
 const normalized = migration.toLowerCase().replace(/\s+/g, " ");

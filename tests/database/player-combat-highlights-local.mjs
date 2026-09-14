@@ -18,7 +18,7 @@ const { PGlite } = await import(pathToFileURL(modulePath).href);
 const db = await PGlite.create();
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const migration = readFileSync(resolve(root,
-  "supabase/migrations/20260913235133_player_combat_highlights.sql"), "utf8");
+  "supabase/migrations/20260914004801_player_combat_highlights.sql"), "utf8");
 const phaseA = readFileSync(resolve(root,
   "supabase/migrations/20260909234122_player_showcase_phase_a.sql"), "utf8").replace(/\r\n/g, "\n");
 const helperStart = phaseA.indexOf("create function ironclad_private.normalize_player_showcase_thought(");
