@@ -53,3 +53,8 @@ supabase.temp/
 _recovery_backup/
 
 _recovery_backup_*/
+
+# Local Cloudflare artifacts and credentials
+.wrangler/
+.dev.vars*
+.worker-build/
