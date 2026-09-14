@@ -102,16 +102,16 @@ on 2026-09-14. The tool assigned canonical version `20260914004801`; the new fil
 was renamed from its unapplied draft timestamp `20260913235133` to match that record.
 SQL bytes and checksum are identical. The original 150 ledger entries are unchanged;
 the ledger now contains 151. No manual ledger insertion, repair or historical replay
-was performed. Phase A remains ON; Phase B and the Worker remain OFF.
+was performed. At the initial checkpoint, Phase A was ON and Phase B/Worker were OFF.
 
 Draft review PR: https://github.com/IronClad2026/ironclad-website/pull/127 (base staging).
 Stable Preview: https://ironclad-website-git-codex-player-s-18697e-ironclad-tournaments.vercel.app/dashboard/showcase
 
 The five branch-scoped Preview settings and two Worker key bindings are configured.
 The only allowed browser upload origin is the verified stable Phase B Preview origin.
-The Worker source is deployed as `662543b1-c869-4c95-8fb9-b3692e758bac`; health returns
-Staging, inactive, HTTP 200 with private/no-store. The Preview reaches the normal
-Clerk Development-mode sign-in screen. User sign-in is the next manual action.
+The initial disabled Worker deployment was `662543b1-c869-4c95-8fb9-b3692e758bac`.
+The Preview uses the normal Clerk Development-mode sign-in and Staging legal flow.
+See the activation checkpoint below for the current state.
 
 Security advisors report expected RPC-only private tables without row policies and
 intentionally callable security-definer RPCs. Their explicit ownership/public filters,
@@ -127,9 +127,8 @@ new disabled setting was added; the other 52 tables and filtered settings hash m
 the original baseline. The original 150-entry ledger digest remains
 `790245bda7054bbc3f9e038483c19fe5e1a5459c563a4eb84dc277ee9e214512`.
 
-Before activation: verify fresh authenticated owner/public/private media authorization.
-Keep Phase B off until these checks pass. Use actual Clerk Staging sign-in and the
-normal legal gate. A real clip upload requires the player's truthful rights declaration.
+Use actual Clerk Staging sign-in and the normal legal gate. A real clip upload requires
+the player's truthful rights declaration.
 Do not fabricate acceptance or use fixture footage as a player's real gameplay.
 
 ## Validation completed before publication
@@ -153,11 +152,40 @@ block external/API traffic and use licensed public test media. No exploratory fi
 is connected to a live database. The Staging contract is a single guarded BEGIN/ROLLBACK
 transaction and must be accompanied by independent before/after protected-table hashes.
 
-Next session: have the user complete the open Clerk Development-mode sign-in, verify
-the real owner RPC and normal legal flow on the stable Preview, then enable only the
-Staging Worker/Phase B flag for the controlled clip checks. A real CoH3 clip and the
-player's truthful declaration are needed for hosted upload validation. Do not replay
-the migration or rerun the guarded empty-table contract after real clips are uploaded.
+## Authorized manual QA activation, 2026-09-14
+
+The user completed Clerk Staging sign-in and explicitly authorized enabling Phase B
+and the Staging Worker, with **no agent clip uploads**. The actual owner page loaded
+the authenticated RPC state and all three empty slots. After activation, refreshing
+the page showed all three Add clip controls enabled and no unavailable message.
+Current Thought and Featured Badge were unchanged. No upload, reservation, file
+selection, declaration or clip mutation was performed by the agent.
+
+Current state: **Phase A ON, Combat Highlights ON, Staging Worker ON**. Production
+and master remain untouched. The only database change during activation was setting
+`platform_settings.player_combat_highlights.enabled` to true, guarded by the exact
+151-entry ledger/new migration hash. No migration was applied or rewritten.
+
+Worker version: `de239710-6f69-4e32-9ecf-85466507b39c`. Activation uses the explicit
+`--var ENABLED:true` deployment override; repository configuration retains its safe
+disabled default. A subsequent deployment without that override disables the Worker.
+Workers Free, private Standard R2 and the single exact Preview origin are unchanged.
+
+A live preflight exposed workerd rejecting `redirect: "error"` before contacting
+Supabase. The Worker now uses `redirect: "manual"` and rejects non-success responses,
+so it never forwards credentials to a redirect target. Native local workerd reproduced
+the incompatibility and confirmed manual mode. Focused lint, TypeScript and all 25
+Worker tests passed, including a redirect credential-leak regression. No Node server
+fetch behavior or database/privacy contract changed.
+
+Live read-only checks passed: health 200/active; unknown public GET and Range 404;
+owner HEAD without token 404; exact Preview upload preflight 204; foreign origin 403;
+all responses no-store. No upload bytes were sent. The earlier full regression results
+remain above; full suites were not unnecessarily repeated for this Worker-only fix.
+
+Next action belongs to the user: upload and test a real CoH3 clip through the ready
+Preview. The agent must not perform that upload. Do not replay the migration or rerun
+the guarded empty-table contract after real clips are uploaded.
 
 Hosted Clerk/upload/playback/Range/revocation, provider Free-plan CPU behavior and real
 mobile-device codec support remain required. Local fixtures do not substitute for those

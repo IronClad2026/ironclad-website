@@ -50,7 +50,8 @@ async function eligible(env: Env, id: string, ownerToken: string | null, purpose
   const response = await fetch(stage + "/rest/v1/rpc/" + rpc, {
     method: "POST", headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, ...(ownerToken ? { Authorization: "Bearer " + ownerToken } : {}), "Content-Type": "application/json", "Cache-Control": "no-store" },
     body: JSON.stringify(ownerToken ? { p_upload_id: id, p_purpose: purpose } : { p_upload_id: id }),
-    cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5000),
+    // workerd supports manual/follow; reject redirects below without forwarding credentials.
+    cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(5000),
   });
   return response.ok && await response.json() === true;
 }

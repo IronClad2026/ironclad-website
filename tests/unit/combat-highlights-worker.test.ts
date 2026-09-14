@@ -40,6 +40,17 @@ describe("Combat Highlights Worker authority", () => {
     expect((await worker.fetch(request(), env)).status).toBe(404); expect(rpc).toHaveBeenCalledTimes(2); expect(media.get).toHaveBeenCalledTimes(1);
   });
   it("fails closed on database outage without reading media", async () => { const { env, rpc, media } = setup(); rpc.mockRejectedValue(new Error("offline")); expect((await worker.fetch(new Request("https://worker.test/public/" + id + "/video"), env)).status).toBe(503); expect(media.head).not.toHaveBeenCalled(); });
+  it("rejects authority redirects without forwarding credentials or reading media", async () => {
+    const { env, rpc, media } = setup();
+    rpc.mockResolvedValue(new Response(null, { status: 307, headers: { Location: "https://untrusted.example/rpc" } }));
+    const response = await worker.fetch(new Request("https://worker.test/owner/" + id + "/video", { headers: { Authorization: "Bearer real.clerk.jwt", Origin: origin } }), env);
+    expect(response.status).toBe(404);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][0]).toBe("https://zzbnneprhjicmajpjkdg.supabase.co/rest/v1/rpc/can_access_my_player_combat_highlight");
+    expect(rpc.mock.calls[0][1].redirect).toBe("manual");
+    expect(media.head).not.toHaveBeenCalled();
+    expect(media.get).not.toHaveBeenCalled();
+  });
   it("returns streamed single ranges after authorization", async () => { const { env, media } = setup(); const response = await worker.fetch(new Request("https://worker.test/public/" + id + "/video", { headers: { Range: "bytes=1-2" } }), env); expect(response.status).toBe(206); expect(response.headers.get("Content-Range")).toBe("bytes 1-2/4"); expect(media.get).toHaveBeenCalledWith("assets/" + id + "/video", { range: { offset: 1, length: 2 }, onlyIf: { etagMatches: "abc" } }); });
   it("does not read the body for HEAD", async () => { const { env, media } = setup(); const response = await worker.fetch(new Request("https://worker.test/public/" + id + "/video", { method: "HEAD" }), env); expect(response.status).toBe(200); expect(media.get).not.toHaveBeenCalled(); });
   it("rejects malformed and multiple ranges", async () => { const { env, media } = setup(); const response = await worker.fetch(new Request("https://worker.test/public/" + id + "/video", { headers: { Range: "bytes=0-1,2-3" } }), env); expect(response.status).toBe(416); expect(media.get).not.toHaveBeenCalled(); });
