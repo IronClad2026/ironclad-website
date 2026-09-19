@@ -1,7 +1,7 @@
 # Match Room Phase 1: lifecycle authority decision checkpoint
 
 Date: 2026-09-19
-Status: stopped at the user-defined critical architecture boundary; Phase 1 is not implemented.
+Historical checkpoint: the lifecycle integration was subsequently explicitly approved on 2026-09-19. See match-room-phase-1.md for implementation and delivery status.
 
 ## Verified environment
 
