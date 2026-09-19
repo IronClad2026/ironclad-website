@@ -1139,7 +1139,7 @@ function Brackets({
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
-  const pinnedRoomId = useSearchParams().get("room");
+  const pinnedRoomId = useSearchParams()?.get("room") ?? null;
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
       participant.registrationId,
@@ -1399,7 +1399,7 @@ export function BracketMatchResultsWorkspace({
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
   const roomSearchParams = useSearchParams();
-  const pinnedRoomId = roomSearchParams.get("match") === selectedMatchId ? roomSearchParams.get("room") : null;
+  const pinnedRoomId = roomSearchParams?.get("match") === selectedMatchId ? roomSearchParams?.get("room") ?? null : null;
   const [manualOpen, setManualOpen] = useState(false);
   const dialogTitleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1723,7 +1723,7 @@ export function BracketMatchResultsWorkspace({
 
 export function AdminMatchManagementModal(props: ComponentProps<typeof AdminMatchManagementDialog>) {
   const roomSearchParams = useSearchParams();
-  const pinnedRoomId = roomSearchParams.get("match") === props.match.id ? roomSearchParams.get("room") : null;
+  const pinnedRoomId = roomSearchParams?.get("match") === props.match.id ? roomSearchParams?.get("room") ?? null : null;
   return <AdminMatchManagementDialog {...props} roomId={props.roomId ?? pinnedRoomId} diceHistory={
     props.bracketFormat === "single_elimination" && props.match.activationVersion > 0
       ? <AuthenticatedMatchDiceRollOff matchId={props.match.id} forceReadOnly />
@@ -4664,7 +4664,7 @@ function MobileBrackets({
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
-  const pinnedRoomId = useSearchParams().get("room");
+  const pinnedRoomId = useSearchParams()?.get("room") ?? null;
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
       participant.registrationId,
