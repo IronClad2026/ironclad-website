@@ -95,6 +95,14 @@
     "productionModified": false
   },
   "delivery": {
-    "status": "awaiting PR CI and staging merge"
+    "status": "Staging migration and security verification complete; live CI and merge status are recorded on the PR",
+    "pullRequest": "https://github.com/IronClad2026/ironclad-website/pull/130",
+    "initialCiRun": "https://github.com/IronClad2026/ironclad-website/actions/runs/35412187262",
+    "initialCiResult": "3502 passed; 1 historical migration-count assertion required Match Room classification",
+    "applicationCommit": "1b2ed913a8215206b6fe3f162e36dda16735b90d",
+    "previewDeployment": "dpl_6kBF4sQ9Eqd92mAKLnWeKXE9rDLP",
+    "previewState": "READY",
+    "previewTarget": "nonproduction",
+    "previewUrl": "https://ironclad-website-48vn85pr3-ironclad-tournaments.vercel.app"
   }
 }
