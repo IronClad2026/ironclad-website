@@ -30,6 +30,7 @@ vi.mock("@/app/admin/tournaments/deadline-actions", () => ({
   holdTournamentMatchDeadline: vi.fn(),
   releaseTournamentMatchDeadline: vi.fn(),
 }));
+vi.mock("@/components/MatchRoom", () => ({ default: () => <section aria-label="Match Room" /> }));
 vi.mock("@/components/PlayerMatchResultForm", () => ({ default: () => null }));
 afterEach(() => {
   cleanup();

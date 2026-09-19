@@ -4,6 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
 import { createInAppNotification } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { getPublicPlayerById } from "@/lib/public-players";
+import { getMatchRoomHistory } from "@/app/tournaments/room-actions";
 
 const REQUEST_FAILED_MESSAGE =
   "Admin assistance could not be requested. Please try again.";
@@ -20,13 +22,10 @@ export type MatchAdminAssistanceResult = {
     | "requested";
 };
 
-type AssistanceRequestRow = {
-  id: string;
-  in_app_hidden_at: string | null;
-};
-
 export async function requestMatchAdminAssistance(input: {
   matchId: string;
+  roomId: string;
+  roomRevision: number;
 }): Promise<MatchAdminAssistanceResult> {
   let userId: string | null;
 
@@ -40,10 +39,32 @@ export async function requestMatchAdminAssistance(input: {
     return failure("Sign in before requesting admin assistance.", "auth_required");
   }
 
-  await requireCurrentAccountLegalAcceptance();
+  try {
+    await requireCurrentAccountLegalAcceptance();
+  } catch {
+    return failure(REQUEST_FAILED_MESSAGE, "request_failed");
+  }
 
-  if (!isRecord(input) || !isUuid(input.matchId)) {
+  if (!isRecord(input) || !isUuid(input.matchId) || !isUuid(input.roomId) || !Number.isSafeInteger(input.roomRevision) || input.roomRevision < 1) {
     return failure(REQUEST_FAILED_MESSAGE, "invalid_request");
+  }
+
+  // Authenticate the exact immutable room, including historical membership.
+  // Never resolve a current replacement room for an old assistance request.
+  const history = await getMatchRoomHistory({
+    roomId: input.roomId,
+    afterSequence: 0,
+    limit: 1,
+  });
+  if (!history.ok) {
+    return failure("Only a participant in this match can request assistance.", "participant_only");
+  }
+  const room = history.data.room;
+  if (room.matchId !== input.matchId || room.roomRevision !== input.roomRevision) {
+    return failure(REQUEST_FAILED_MESSAGE, "invalid_request");
+  }
+  if (!room.viewerRegistrationId) {
+    return failure("Only a participant in this match can request assistance.", "participant_only");
   }
 
   let supabase: ReturnType<typeof createSupabaseAdminClient>;
@@ -65,25 +86,15 @@ export async function requestMatchAdminAssistance(input: {
 
     if (
       matchError ||
-      !isMatchRow(matchData) ||
-      matchData.status === "completed"
+      !isMatchRow(matchData)
     ) {
-      return failure("Admin assistance is not available for this match.", "unavailable");
-    }
-
-    const participantIds = [
-      matchData.player_one_registration_id,
-      matchData.player_two_registration_id,
-    ].filter((value): value is string => typeof value === "string");
-
-    if (participantIds.length === 0) {
       return failure("Admin assistance is not available for this match.", "unavailable");
     }
 
     const { data: registrationData, error: registrationError } = await supabase
       .from("registrations")
       .select("id, tournament_id, tournament_title, player_name")
-      .in("id", participantIds)
+      .eq("id", room.viewerRegistrationId)
       .eq("clerk_user_id", userId)
       .limit(1)
       .maybeSingle();
@@ -95,52 +106,10 @@ export async function requestMatchAdminAssistance(input: {
       );
     }
 
-    const { data: previousRequests, error: previousRequestError } =
-      await supabase
-        .from("notifications")
-        .select("id, in_app_hidden_at")
-        .eq("recipient_role", "admin")
-        .eq("type", "match.admin_assistance_requested")
-        .eq("actor_clerk_user_id", userId)
-        .eq("match_id", input.matchId)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(1);
-
-    if (previousRequestError) {
-      return failure(REQUEST_FAILED_MESSAGE, "request_failed");
-    }
-
-    if (
-      !Array.isArray(previousRequests) ||
-      previousRequests.length > 1
-    ) {
-      return failure(REQUEST_FAILED_MESSAGE, "request_failed");
-    }
-
-    let previousRequest: AssistanceRequestRow | null = null;
-
-    if (previousRequests.length === 1) {
-      const candidate = previousRequests[0];
-
-      if (!isAssistanceRequestRow(candidate)) {
-        return failure(REQUEST_FAILED_MESSAGE, "request_failed");
-      }
-
-      previousRequest = candidate;
-    }
-
-    if (previousRequest?.in_app_hidden_at === null) {
-      return success();
-    }
-
-    const requestCycle = previousRequest
-      ? `after:${previousRequest.id}`
-      : "initial";
-    const eventKey =
-      `match:${input.matchId}:registration:${registrationData.id}:` +
-      `admin-assistance-request:${requestCycle}`;
-
+    // Dismissal is presentation state, never assistance resolution.
+    // Every retry uses the same database-unique event.
+    const eventKey = "match-room:" + room.id + ":revision:" + room.roomRevision +
+      ":registration:" + registrationData.id + ":admin-assistance";
     const created = await createInAppNotification({
       recipientRole: "admin",
       type: "match.admin_assistance_requested",
@@ -155,6 +124,8 @@ export async function requestMatchAdminAssistance(input: {
       eventKey,
       metadata: {
         source: "tournament_match_workspace",
+        roomId: room.id,
+        roomRevision: room.roomRevision,
       },
     });
 
@@ -212,15 +183,6 @@ function isRegistrationRow(value: unknown): value is {
   );
 }
 
-function isAssistanceRequestRow(value: unknown): value is AssistanceRequestRow {
-  return (
-    isRecord(value) &&
-    isUuid(value.id) &&
-    (value.in_app_hidden_at === null ||
-      typeof value.in_app_hidden_at === "string")
-  );
-}
-
 function isNullableUuid(value: unknown): value is string | null {
   return value === null || isUuid(value);
 }
@@ -244,4 +206,38 @@ function isBoundedText(value: unknown): value is string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Fetch fresh, opt-in public contact for the immutable room's actual opponent. */
+export async function getMatchRoomOpponentDiscord(input: {
+  roomId: string;
+}): Promise<{ discordUsername: string | null }> {
+  try {
+    const { userId } = await auth();
+    if (!userId || !isRecord(input) || !isUuid(input.roomId)) {
+      return { discordUsername: null };
+    }
+    const history = await getMatchRoomHistory({ roomId: input.roomId, afterSequence: 0, limit: 1 });
+    if (!history.ok || !history.data.room.viewerRegistrationId) {
+      return { discordUsername: null };
+    }
+    const room = history.data.room;
+    const opponentId = room.viewerRegistrationId === room.playerOneRegistrationId
+      ? room.playerTwoRegistrationId : room.playerOneRegistrationId;
+    const { data, error } = await createSupabaseAdminClient()
+      .from("registrations")
+      .select("profile_id")
+      .eq("id", opponentId)
+      .maybeSingle();
+    if (error || !isRecord(data) || !isUuid(data.profile_id)) {
+      return { discordUsername: null };
+    }
+    const profile = await getPublicPlayerById(data.profile_id);
+    return {
+      discordUsername: profile?.publicProfileEnabled && profile.discordPublicEnabled
+        ? profile.discordUsername : null,
+    };
+  } catch {
+    return { discordUsername: null };
+  }
 }

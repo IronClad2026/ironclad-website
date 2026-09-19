@@ -36,12 +36,12 @@ vi.mock("@/lib/supabase-browser", () => ({
 }));
 vi.mock("@/app/tournaments/support-actions", () => ({
   requestMatchAdminAssistance: mocks.support,
+  getMatchRoomOpponentDiscord: vi.fn(async () => ({ discordUsername: null })),
 }));
 import MatchConfirmationCountdown from "@/components/MatchConfirmationCountdown";
 import PlayerMatchResultStatus from "@/components/PlayerMatchResultStatus";
 import MatchResultControls from "@/components/MatchResultControls";
-import DiscordSupportLink from "@/components/RequestAdminAssistanceButton";
-import { OFFICIAL_DISCORD_SUPPORT_CHANNEL_URL } from "@/lib/support";
+import DiscordSupportLink, { MatchRoomSupportFooter } from "@/components/RequestAdminAssistanceButton";
 import {
   uxMatch,
   uxParticipants,
@@ -347,14 +347,22 @@ describe("existing public match projections", () => {
   });
 });
 
-it("links directly to the central owner-verified ticket channel without creating an internal request", () => {
-  render(<DiscordSupportLink />);
-  const link = screen.getByRole("link", {
-    name: "Open Discord Support Ticket",
+it("requests in-app assistance for the exact room instead of opening an external channel", async () => {
+  mocks.support.mockResolvedValue({ success: true });
+  render(<DiscordSupportLink matchId={uxMatch.id} roomId="22222222-2222-4222-8222-222222222222" roomRevision={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Request Admin Assistance" }));
+  await tick();
+  expect(mocks.support).toHaveBeenCalledWith({
+    matchId: uxMatch.id,
+    roomId: "22222222-2222-4222-8222-222222222222",
+    roomRevision: 1,
   });
-  expect(link).toHaveAttribute("href", OFFICIAL_DISCORD_SUPPORT_CHANNEL_URL);
-  expect(link).toHaveAttribute("target", "_blank");
-  expect(link).toHaveAttribute("rel", "noopener noreferrer");
-  fireEvent.click(link);
-  expect(mocks.support).not.toHaveBeenCalled();
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+});
+
+it("shows not-shared contact without a Discord copy control when the live projection is private", async () => {
+  render(<MatchRoomSupportFooter matchId={uxMatch.id} roomId="22222222-2222-4222-8222-222222222222" roomRevision={1} />);
+  await tick();
+  expect(screen.getByText("Discord contact not shared.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Copy.*Discord/i })).not.toBeInTheDocument();
 });

@@ -87,7 +87,7 @@ export async function markMatchRoomRead(
     { p_room_id: input.roomId, p_through_sequence: input.throughSequence },
     (value) => parseMatchRoomReadResult(value, input)
   );
-  if (result.ok) revalidateRoomRoutes();
+  // The room owns its refresh; preserve result/replay drafts in the workspace.
   return result;
 }
 
@@ -119,7 +119,7 @@ async function sendRoomMessage(
     },
     (value) => parseMatchRoomSendResult(value, input, admin ? "admin" : "player")
   );
-  if (result.ok) revalidateRoomRoutes();
+  // The room owns its refresh; preserve result/replay drafts in the workspace.
   return result;
 }
 
@@ -182,9 +182,4 @@ function roomRpcFailure(error: unknown): MatchRoomActionFailure {
 
 function failure(code: MatchRoomErrorCode): MatchRoomActionFailure {
   return { ok: false, code };
-}
-
-function revalidateRoomRoutes() {
-  revalidatePath("/tournaments");
-  revalidatePath("/dashboard");
 }

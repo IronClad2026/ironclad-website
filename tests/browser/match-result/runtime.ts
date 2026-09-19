@@ -93,3 +93,11 @@ export const reviewMatchResultReportGroup = submitNoShowReport;
 export const saveAdminMatchResult = submitNoShowReport;
 export const resetAdminMatch = submitNoShowReport;
 export const fixtureMatch = uxMatch;
+
+
+export async function requestMatchAdminAssistance() {
+  return { success: true, code: "requested", message: "Fixture assistance requested" };
+}
+export async function getMatchRoomOpponentDiscord() {
+  return { discordUsername: null };
+}

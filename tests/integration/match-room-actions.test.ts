@@ -161,8 +161,7 @@ describe("Match Room command contract", () => {
       p_body: input.body,
     });
     expect(JSON.stringify(mocks.rpc.mock.calls)).not.toMatch(/clerk|sender|opponent|admin|registration/i);
-    expect(mocks.revalidate).toHaveBeenCalledWith("/tournaments");
-    expect(mocks.revalidate).toHaveBeenCalledWith("/dashboard");
+    expect(mocks.revalidate).not.toHaveBeenCalled();
   });
 
   it.each([

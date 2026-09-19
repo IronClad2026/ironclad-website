@@ -619,6 +619,14 @@ function buildNotificationHref(
   }
 
   if (scope === "admin") {
+    if (row.type === "match.admin_assistance_requested" && row.match_id && row.tournament_id) {
+      const params = new URLSearchParams({ section: "matches", match: row.match_id });
+      // An explicitly room-scoped request must retain its exact room target.
+      if (typeof row.metadata?.roomId === "string") {
+        params.set("room", row.metadata.roomId);
+      }
+      return "/admin/tournaments/" + encodeURIComponent(row.tournament_id) + "?" + params.toString();
+    }
     if (row.match_id) {
       return buildMatchHref(row);
     }

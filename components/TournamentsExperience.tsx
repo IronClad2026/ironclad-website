@@ -25,7 +25,8 @@ import MatchDiceRollOff, {
 } from "@/components/MatchDiceRollOff";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import RegistrationGuidanceDisclosure from "@/components/RegistrationGuidanceDisclosure";
-import MatchDiscordSupportLink from "@/components/RequestAdminAssistanceButton";
+import { MatchRoomSupportFooter } from "@/components/RequestAdminAssistanceButton";
+import MatchRoom from "@/components/MatchRoom";
 import MatchResultControls from "@/components/MatchResultControls";
 import AdminMatchManagementDialog from "@/components/AdminMatchManagementDialog";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
@@ -1138,6 +1139,7 @@ function Brackets({
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
+  const pinnedRoomId = useSearchParams().get("room");
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
       participant.registrationId,
@@ -1187,8 +1189,7 @@ function Brackets({
 
       if (
         focusedMatch &&
-        focusedMatch.activationVersion > 0 &&
-        viewerOwnsMatch
+        (viewerOwnsMatch || Boolean(pinnedRoomId && !viewer.isAdmin && viewer.registrationIds.length))
       ) {
         setSelectedPlayerMatchId(focusedMatchId);
       } else if (viewer.isAdmin) {
@@ -1198,7 +1199,7 @@ function Brackets({
         .getElementById(`match-desktop-${focusedMatchId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-  }, [focusedMatchId, tournament.generatedBrackets, viewer]);
+  }, [focusedMatchId, pinnedRoomId, tournament.generatedBrackets, viewer]);
 
   return (
     <div className="space-y-5">
@@ -1256,7 +1257,7 @@ function Brackets({
         );
         const canOpenResults = Boolean(
           generated &&
-            (hasOwnedMatch || (!viewer.isAdmin && hasVisibleResultHistory))
+            (hasOwnedMatch || (!viewer.isAdmin && hasVisibleResultHistory) || Boolean(pinnedRoomId && generated.matches.some((match) => match.id === focusedMatchId)))
         );
         return (
           <Card key={bracket.id} className="overflow-visible">
@@ -1397,6 +1398,8 @@ export function BracketMatchResultsWorkspace({
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
+  const roomSearchParams = useSearchParams();
+  const pinnedRoomId = roomSearchParams.get("match") === selectedMatchId ? roomSearchParams.get("room") : null;
   const [manualOpen, setManualOpen] = useState(false);
   const dialogTitleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1418,7 +1421,8 @@ export function BracketMatchResultsWorkspace({
     return (
       canSubmit ||
       hasVisibleSubmission ||
-      hasVisibleReportGroup
+      hasVisibleReportGroup ||
+      Boolean(pinnedRoomId && match.id === selectedMatchId)
     );
   });
   const workspaceMatches = selectedMatchId
@@ -1652,6 +1656,22 @@ export function BracketMatchResultsWorkspace({
                                   />
                                 </div>
                               )}
+                            <MatchRoom
+                              matchId={match.id}
+                              roomId={match.id === selectedMatchId ? pinnedRoomId : null}
+                              participants={Array.from(participantsById.values(), (participant) => ({
+                                registrationId: participant.registrationId,
+                                name: participant.name,
+                              }))}
+                              footer={(room) => room?.viewerRegistrationId ? (
+                                <MatchRoomSupportFooter
+                                  key={room.id}
+                                  matchId={match.id}
+                                  roomId={room.id}
+                                  roomRevision={room.roomRevision}
+                                />
+                              ) : null}
+                            />
                             <MatchResultControls
                               match={match}
                               viewerRegistrationId={
@@ -1686,16 +1706,6 @@ export function BracketMatchResultsWorkspace({
                               )}
                               presentation="workspace"
                             />
-                            {match.status !== "completed" &&
-                              viewer.registrationIds.some(
-                                (registrationId) =>
-                                  registrationId ===
-                                    match.playerOneRegistrationId ||
-                                  registrationId ===
-                                    match.playerTwoRegistrationId
-                              ) && (
-                                <MatchDiscordSupportLink />
-                              )}
                           </article>
                         );
                       })}
@@ -1712,7 +1722,9 @@ export function BracketMatchResultsWorkspace({
 }
 
 export function AdminMatchManagementModal(props: ComponentProps<typeof AdminMatchManagementDialog>) {
-  return <AdminMatchManagementDialog {...props} diceHistory={
+  const roomSearchParams = useSearchParams();
+  const pinnedRoomId = roomSearchParams.get("match") === props.match.id ? roomSearchParams.get("room") : null;
+  return <AdminMatchManagementDialog {...props} roomId={props.roomId ?? pinnedRoomId} diceHistory={
     props.bracketFormat === "single_elimination" && props.match.activationVersion > 0
       ? <AuthenticatedMatchDiceRollOff matchId={props.match.id} forceReadOnly />
       : null
@@ -4652,6 +4664,7 @@ function MobileBrackets({
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
+  const pinnedRoomId = useSearchParams().get("room");
   const participantsById = new Map(
     tournament.bracketParticipants.map((participant) => [
       participant.registrationId,
@@ -4701,8 +4714,7 @@ function MobileBrackets({
 
       if (
         focusedMatch &&
-        focusedMatch.activationVersion > 0 &&
-        viewerOwnsMatch
+        (viewerOwnsMatch || Boolean(pinnedRoomId && !viewer.isAdmin && viewer.registrationIds.length))
       ) {
         setSelectedPlayerMatchId(focusedMatchId);
       } else if (viewer.isAdmin) {
@@ -4712,7 +4724,7 @@ function MobileBrackets({
         .getElementById(`match-mobile-${focusedMatchId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-  }, [focusedMatchId, tournament.generatedBrackets, viewer]);
+  }, [focusedMatchId, pinnedRoomId, tournament.generatedBrackets, viewer]);
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-5">
@@ -4770,7 +4782,7 @@ function MobileBrackets({
         );
         const canOpenResults = Boolean(
           generated &&
-            (hasOwnedMatch || (!viewer.isAdmin && hasVisibleResultHistory))
+            (hasOwnedMatch || (!viewer.isAdmin && hasVisibleResultHistory) || Boolean(pinnedRoomId && generated.matches.some((match) => match.id === focusedMatchId)))
         );
 
         return (
@@ -5454,6 +5466,7 @@ export default function TournamentsExperience({
         params.delete("panel");
       }
       params.delete("match");
+      params.delete("room");
       params.delete("register");
       if (
         tab !== "decisions" ||
