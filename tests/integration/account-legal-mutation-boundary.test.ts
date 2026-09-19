@@ -153,6 +153,7 @@ const LEGAL_AND_PRIVACY_EXEMPTIONS = {
 } as const;
 
 const READ_ONLY_ACTIONS = {
+  "app/tournaments/support-actions.ts": ["getMatchRoomOpponentDiscord"],
   "app/admin/polls/actions.ts": [
     "loadAdminPollSnapshot",
     "previewPollEligibility",
@@ -326,8 +327,8 @@ describe("account legal mutation boundary architecture", () => {
       )
     );
 
-    expect(new Set(expected).size).toBe(80);
-    expect(expected).toHaveLength(80);
+    expect(new Set(expected).size).toBe(81);
+    expect(expected).toHaveLength(81);
     expect(actual.sort()).toEqual(expected.sort());
   });
 
@@ -386,7 +387,7 @@ describe("account legal mutation boundary architecture", () => {
   it("keeps cleanup, legal, privacy, language, and read-only exemptions unguarded", () => {
     expect(flattenedInventory(FULL_MUTATION_EXEMPTIONS)).toHaveLength(7);
     expect(flattenedInventory(LEGAL_AND_PRIVACY_EXEMPTIONS)).toHaveLength(4);
-    expect(flattenedInventory(READ_ONLY_ACTIONS)).toHaveLength(7);
+    expect(flattenedInventory(READ_ONLY_ACTIONS)).toHaveLength(8);
 
     for (const inventory of [
       FULL_MUTATION_EXEMPTIONS,

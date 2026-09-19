@@ -491,6 +491,25 @@ describe("Admin Operations canonical loader metrics", () => {
     vi.useRealTimers();
   });
 
+  it("retains dismissed assistance events and pins their historical room links", async () => {
+    const tables = fixtureTables();
+    const roomId = "22222222-2222-4222-8222-222222222222";
+    tables.notifications = [{
+      id: "retained-help", actor_display_name: "Original Player",
+      tournament_id: "tournament-live", tournament_title: "IronClad Live",
+      match_id: "match-playable", created_at: CURRENT,
+      in_app_hidden_at: CURRENT, metadata: { roomId, roomRevision: 1 },
+    }];
+    const notificationsQuery = queryFor(tables.notifications);
+    createSupabaseAdminClientMock.mockReturnValue({
+      from: vi.fn((table: string) => table === "notifications" ? notificationsQuery : queryFor(tables[table] ?? [])),
+    });
+    const metrics = await loadAdminOperationsMetrics("7d");
+    expect(notificationsQuery.is).not.toHaveBeenCalledWith("in_app_hidden_at", null);
+    expect(JSON.stringify(metrics)).toContain(
+      "/admin/tournaments/tournament-live?section=matches&match=match-playable&room=" + roomId
+    );
+  });
   it("groups Players, registrations, Tournaments, and Divisions without merging statuses", async () => {
     const metrics = await loadAdminOperationsMetrics("7d");
     expect(metrics).not.toBeNull();

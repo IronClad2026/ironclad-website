@@ -79,6 +79,20 @@ describe("notification destination ownership resolution", () => {
     });
   });
 
+  it("pins room-scoped assistance to the original room in the admin match workspace", async () => {
+    const roomId = "22222222-2222-4222-8222-222222222222";
+    const supabase = createSupabaseQueryMock({
+      data: destinationRow({
+        recipient_role: "admin",
+        type: "match.admin_assistance_requested",
+        metadata: { roomId, roomRevision: 1 },
+      }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+    await expect(resolveNotificationDestination(NOTIFICATION_ID, "admin")).resolves.toBe(
+      "/admin/tournaments/tournament-1?section=matches&match=match-1&room=" + roomId
+    );
+  });
   it("routes an Admin registration notification to the global registrations workspace", async () => {
     const supabase = createSupabaseQueryMock({
       data: destinationRow({

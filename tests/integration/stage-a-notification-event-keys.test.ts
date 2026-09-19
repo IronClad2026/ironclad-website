@@ -86,12 +86,10 @@ describe("Stage A canonical notification event keys", () => {
     expect(assistanceProducer).toContain(
       'type: "match.admin_assistance_requested"'
     );
-    expect(assistanceProducer).toContain(
-      "const requestCycle = previousRequest ? `after:${previousRequest.id}` : \"initial\""
-    );
-    expect(assistanceProducer).toContain(
-      "`match:${input.matchId}:registration:${registrationData.id}:` + `admin-assistance-request:${requestCycle}`"
-    );
+    expect(assistanceProducer).toContain('":revision:" + room.roomRevision');
+    expect(assistanceProducer).toContain('":registration:" + registrationData.id + ":admin-assistance"');
+    expect(assistanceProducer).not.toContain("in_app_hidden_at");
+    expect(assistanceProducer).toContain("roomId: room.id");
     expect(assistanceProducer).toContain("eventKey,");
   });
 

@@ -105,6 +105,7 @@ type AssistanceRow = {
   tournament_title: string | null;
   match_id: string | null;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 type QueryResult = {
@@ -186,12 +187,11 @@ export async function loadAdminOperationsMetrics(
       supabase
         .from("notifications")
         .select(
-          "id, actor_display_name, tournament_id, tournament_title, match_id, created_at",
+          "id, actor_display_name, tournament_id, tournament_title, match_id, created_at, metadata",
           { count: "exact" }
         )
         .eq("recipient_role", "admin")
         .eq("type", "match.admin_assistance_requested")
-        .is("in_app_hidden_at", null)
         .limit(MAX_NARROW_ROWS + 1),
     ]);
 
@@ -700,7 +700,18 @@ function buildMetrics(input: {
         ),
         adminAssistance: recentRows(
           launchedAssistance
-            .map((row) => matchWho(row.match_id as string, row.created_at, `Admin Assistance · ${row.actor_display_name?.trim() || "Player"}`))
+            .map((row) => {
+              const item = matchWho(row.match_id as string, row.created_at, "Admin Assistance · " + (row.actor_display_name?.trim() || "Player"));
+              const roomId = row.metadata?.roomId;
+              if (typeof roomId !== "string" || !row.tournament_id) return item;
+              const params = new URLSearchParams({ section: "matches", match: row.match_id as string, room: roomId });
+              return {
+                ...item,
+                id: row.id,
+                primary: "Match Room assistance",
+                href: "/admin/tournaments/" + encodeURIComponent(row.tournament_id) + "?" + params.toString(),
+              };
+            })
         ),
       },
     },
