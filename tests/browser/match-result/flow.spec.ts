@@ -57,7 +57,8 @@ for (const width of [360, 390, 412, 430, 1280])
     const assistance = page.getByRole("button", { name: "Request Admin Assistance" });
     await expect(assistance).toBeVisible();
     await assistance.click();
-    await expect(assistance).toBeDisabled();
+    await expect(page.getByText("Assistance requested", { exact: true })).toBeVisible();
+    await expect(assistance).toHaveCount(0);
     await page.screenshot({
       path: testInfo.outputPath("waiting-" + width + ".png"),
       fullPage: true,

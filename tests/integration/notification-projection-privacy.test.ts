@@ -51,6 +51,33 @@ describe("notification browser privacy boundary", () => {
     createInAppNotificationsMock.mockReset();
   });
 
+
+  it("forces generic message copy and keeps private transcript/episode metadata out of browser DTOs", async () => {
+    const roomId = "22222222-2222-4222-8222-222222222222";
+    const matchId = "33333333-3333-4333-8333-333333333333";
+    const notificationQuery = createNotificationProjectionClient({
+      id: "notification-message", recipient_role: "player",
+      type: "match.message_received", title: "PRIVATE_BODY", message: "PRIVATE_BODY",
+      actor_display_name: "PRIVATE_BODY", actor_clerk_user_id: actorClerkUserId,
+      tournament_id: null, tournament_title: null, registration_id: null,
+      match_id: matchId, report_group_id: null, event_key: "PRIVATE_EPISODE_KEY",
+      metadata: { roomId, body: "PRIVATE_BODY", episodeId: "PRIVATE_EPISODE_ID", actorClerkUserId },
+      read_at: null, created_at: "2026-09-20T00:00:00.000Z",
+    });
+    createSupabaseAdminClientMock.mockReturnValue(notificationQuery.client);
+    const result = await loadPlayerNotifications(recipientClerkUserId);
+    expect(result.notifications[0]).toMatchObject({
+      title: "New Match Room message",
+      message: "You have new messages in your Match Room.",
+      actorDisplayName: null,
+      href: "/tournaments?tab=brackets&match=" + matchId + "&room=" + roomId,
+    });
+    const serialized = JSON.stringify(result.notifications);
+    expect(serialized).not.toContain("PRIVATE_");
+    expect(serialized).not.toContain(actorClerkUserId);
+    expect(result.notifications[0]).not.toHaveProperty("metadata");
+  });
+
   it("projects notifications without recipient or actor Clerk identifiers", async () => {
     const notificationQuery = createNotificationProjectionClient({
       id: "notification-1",

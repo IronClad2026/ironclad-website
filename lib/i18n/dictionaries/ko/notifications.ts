@@ -184,6 +184,8 @@ const dictionary = {
       "보고된 결과를 관리자가 검토하고 있습니다. 이 메시지를 열어 보고 내용을 확인하세요.",
   },
   server: {
+    matchMessageReceivedTitle: "매치룸 새 메시지",
+    matchMessageReceivedMessage: "매치룸에 새 메시지가 있습니다.",
     loadError: "알림을 불러올 수 없습니다.",
     badgeUnlockedTitle: "배지 해제",
     badgeUnlockedMessage: "{badgeName} 배지를 해제했습니다.",

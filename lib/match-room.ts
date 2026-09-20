@@ -40,6 +40,11 @@ export type MatchRoomHistoryInput = {
   afterSequence: number;
   limit: number;
 };
+export type MatchRoomEarlierHistoryInput = {
+  roomId: string;
+  beforeSequence: number;
+  limit: number;
+};
 export type SendMatchRoomMessageInput = {
   matchId: string;
   expectedRoomId: string;
@@ -57,6 +62,12 @@ export type MatchRoomHistory = {
   messages: MatchRoomMessage[];
   hasMore: boolean;
   nextAfterSequence: number;
+};
+export type MatchRoomEarlierHistory = {
+  room: MatchRoom;
+  messages: MatchRoomMessage[];
+  hasMore: boolean;
+  nextBeforeSequence: number;
 };
 export type MatchRoomSendResult = {
   message: MatchRoomMessage;
@@ -106,6 +117,15 @@ export function isMatchRoomHistoryInput(value: unknown): value is MatchRoomHisto
     hasExactKeys(value, ["roomId", "afterSequence", "limit"]) &&
     isUuid(value.roomId) &&
     isSequence(value.afterSequence) &&
+    isPositiveInteger(value.limit) &&
+    value.limit <= MATCH_ROOM_HISTORY_MAX_LIMIT;
+}
+
+export function isMatchRoomEarlierHistoryInput(value: unknown): value is MatchRoomEarlierHistoryInput {
+  return isRecord(value) &&
+    hasExactKeys(value, ["roomId", "beforeSequence", "limit"]) &&
+    isUuid(value.roomId) &&
+    isPositiveInteger(value.beforeSequence) &&
     isPositiveInteger(value.limit) &&
     value.limit <= MATCH_ROOM_HISTORY_MAX_LIMIT;
 }
@@ -254,6 +274,45 @@ export function parseMatchRoomHistory(
     hasMore: value.hasMore,
     nextAfterSequence: value.nextAfterSequence,
   };
+}
+
+/** Earlier pages are chronological but use an exclusive descending cursor. */
+export function parseMatchRoomEarlierHistory(
+  value: unknown,
+  input: MatchRoomEarlierHistoryInput
+): MatchRoomEarlierHistory | null {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ["room", "messages", "hasMore", "nextBeforeSequence"]) ||
+    !Array.isArray(value.messages) ||
+    value.messages.length > input.limit ||
+    typeof value.hasMore !== "boolean" ||
+    !isPositiveInteger(value.nextBeforeSequence)
+  ) return null;
+
+  const room = parseMatchRoom(value.room);
+  if (!room || room.id !== input.roomId) return null;
+  const messages: MatchRoomMessage[] = [];
+  const messageIds = new Set<string>();
+  let sequence = 0;
+  for (const row of value.messages) {
+    const message = parseMatchRoomMessage(row);
+    if (
+      !message || message.roomId !== room.id ||
+      message.sequence <= sequence || message.sequence >= input.beforeSequence ||
+      message.sequence > room.lastSequence || messageIds.has(message.id) ||
+      (message.senderKind === "player" &&
+        message.senderRegistrationId !== room.playerOneRegistrationId &&
+        message.senderRegistrationId !== room.playerTwoRegistrationId)
+    ) return null;
+    messages.push(message);
+    messageIds.add(message.id);
+    sequence = message.sequence;
+  }
+  const nextBeforeSequence = messages[0]?.sequence ?? input.beforeSequence;
+  if (value.nextBeforeSequence !== nextBeforeSequence ||
+    (value.hasMore && (messages.length !== input.limit || nextBeforeSequence <= 1))) return null;
+  return { room, messages, hasMore: value.hasMore, nextBeforeSequence };
 }
 
 export function parseMatchRoomSendResult(

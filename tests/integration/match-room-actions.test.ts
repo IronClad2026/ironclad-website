@@ -23,6 +23,7 @@ vi.mock("@/lib/account-legal-mutation-guard", () => ({
 
 import {
   getMatchRoomHistory,
+  getMatchRoomEarlierHistory,
   markMatchRoomRead,
   resolveMatchRoom,
   sendAdminMatchRoomMessage,
@@ -69,6 +70,7 @@ const message = {
 };
 const boundaries = [
   ["resolve", () => resolveMatchRoom({ matchId: MATCH_ID })],
+  ["earlier history", () => getMatchRoomEarlierHistory({ roomId: ROOM_ID, beforeSequence: 2, limit: 50 })],
   ["history", () => getMatchRoomHistory({ roomId: ROOM_ID, afterSequence: 0, limit: 50 })],
   ["player send", () => sendMatchRoomMessage(input)],
   ["admin send", () => sendAdminMatchRoomMessage(input)],
@@ -251,5 +253,35 @@ describe("Match Room command contract", () => {
     await expect(markMatchRoomRead({ roomId: ROOM_ID, throughSequence: -1 }))
       .resolves.toEqual({ ok: false, code: "invalid_request" });
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("earlier Match Room history action", () => {
+  const input = { roomId: ROOM_ID, beforeSequence: 2, limit: 50 };
+  it("authenticates each bounded request without advancing reads or refreshing the workspace", async () => {
+    const data = { room, messages: [message], hasMore: false, nextBeforeSequence: 1 };
+    mocks.rpc.mockResolvedValue({ data, error: null });
+    await expect(getMatchRoomEarlierHistory(input)).resolves.toEqual({ ok: true, data });
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("get_match_room_earlier_history", {
+      p_room_id: ROOM_ID, p_before_sequence: 2, p_limit: 50,
+    });
+    expect(mocks.legal).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+  it("rejects unsafe cursors, oversized pages and spoofed identity before the RPC", async () => {
+    for (const candidate of [
+      { ...input, beforeSequence: 0 }, { ...input, limit: 51 },
+      { ...input, actorClerkUserId: "spoofed" },
+    ]) await expect(getMatchRoomEarlierHistory(candidate)).resolves.toEqual({ ok: false, code: "invalid_request" });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("fails closed for unauthorized history and private unexpected response fields", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "private details" } });
+    await expect(getMatchRoomEarlierHistory(input)).resolves.toEqual({ ok: false, code: "forbidden" });
+    mocks.rpc.mockResolvedValueOnce({ data: {
+      room, messages: [{ ...message, actorClerkUserId: "private" }], hasMore: false, nextBeforeSequence: 1,
+    }, error: null });
+    await expect(getMatchRoomEarlierHistory(input)).resolves.toEqual({ ok: false, code: "unavailable" });
   });
 });

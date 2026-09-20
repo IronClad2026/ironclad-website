@@ -19,7 +19,7 @@ const databaseTest = readFileSync(
 
 describe("Match Room phase 1 release boundary", () => {
   it("ships as an additive transactional forward migration without extra services", () => {
-    expect(readdirSync(migrationDirectory).sort().at(-1)).toBe(migrationName);
+    expect(migrationName).toBe("20260919011425_match_room_phase_one.sql");
     expect(sql).toMatch(/^begin;/i);
     expect(sql).toMatch(/commit;$/i);
     expect(sql).toContain("add column communication_generation bigint not null default 1");

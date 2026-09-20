@@ -484,6 +484,7 @@ describe("Admin Operations canonical loader metrics", () => {
     const tables = fixtureTables();
     createSupabaseAdminClientMock.mockReturnValue({
       from: vi.fn((table: string) => queryFor(tables[table] ?? [])),
+      rpc: vi.fn(async () => ({ data: { requests: [{ roomId: "room-1", matchId: "match-playable", tournamentId: "tournament-live", tournamentTitle: "IronClad Live", status: "requested", requestVersion: 1, requestedAt: CURRENT }], totalCount: 1 }, error: null })),
     });
   });
 
@@ -491,24 +492,27 @@ describe("Admin Operations canonical loader metrics", () => {
     vi.useRealTimers();
   });
 
-  it("retains dismissed assistance events and pins their historical room links", async () => {
+  it("uses canonical requests, independent of notification dismissal, with exact room links", async () => {
     const tables = fixtureTables();
     const roomId = "22222222-2222-4222-8222-222222222222";
-    tables.notifications = [{
-      id: "retained-help", actor_display_name: "Original Player",
-      tournament_id: "tournament-live", tournament_title: "IronClad Live",
-      match_id: "match-playable", created_at: CURRENT,
-      in_app_hidden_at: CURRENT, metadata: { roomId, roomRevision: 1 },
-    }];
-    const notificationsQuery = queryFor(tables.notifications);
-    createSupabaseAdminClientMock.mockReturnValue({
-      from: vi.fn((table: string) => table === "notifications" ? notificationsQuery : queryFor(tables[table] ?? [])),
-    });
+    const from = vi.fn((table: string) => queryFor(tables[table] ?? []));
+    const rpc = vi.fn(async () => ({ data: { requests: [{ roomId, matchId: "match-playable", tournamentId: "tournament-live", tournamentTitle: "IronClad Live", status: "requested", requestVersion: 3, requestedAt: CURRENT }], totalCount: 1 }, error: null }));
+    createSupabaseAdminClientMock.mockReturnValue({ from, rpc });
     const metrics = await loadAdminOperationsMetrics("7d");
-    expect(notificationsQuery.is).not.toHaveBeenCalledWith("in_app_hidden_at", null);
-    expect(JSON.stringify(metrics)).toContain(
-      "/admin/tournaments/tournament-live?section=matches&match=match-playable&room=" + roomId
-    );
+    expect(from).not.toHaveBeenCalledWith("notifications");
+    expect(rpc).toHaveBeenCalledWith("list_match_room_assistance_requests", { p_limit: 5000 });
+    expect(JSON.stringify(metrics)).toContain("/admin/tournaments/tournament-live?section=matches&match=match-playable&room=" + roomId);
+  });
+  it("removes resolved requests and fails closed for a truncated request queue", async () => {
+    const tables = fixtureTables();
+    const rpc = vi.fn().mockResolvedValue({ data: { requests: [], totalCount: 0 }, error: null });
+    createSupabaseAdminClientMock.mockReturnValue({ from: vi.fn((table: string) => queryFor(tables[table] ?? [])), rpc });
+    const metrics = await loadAdminOperationsMetrics("7d");
+    expect(JSON.stringify(metrics)).not.toContain("Match Room assistance");
+    rpc.mockResolvedValue({ data: { requests: [], totalCount: 1 }, error: null });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(loadAdminOperationsMetrics("7d")).rejects.toThrow();
+    errorLog.mockRestore();
   });
   it("groups Players, registrations, Tournaments, and Divisions without merging statuses", async () => {
     const metrics = await loadAdminOperationsMetrics("7d");
@@ -659,9 +663,9 @@ describe("Admin Operations canonical loader metrics", () => {
     expect(metrics.matches.who.underReview[0].id).toBe("match-review");
     expect(metrics.matches.who.overdue[0].id).toBe("match-overdue");
     expect(metrics.matches.who.adminAssistance[0]).toMatchObject({
-      id: "match-playable",
-      primary: "Repeat Player vs Open Player",
-      href: "/tournaments?tournament=tournament-live&tab=brackets&match=match-playable",
+      id: "room-1:1",
+      primary: "Match Room assistance",
+      href: "/admin/tournaments/tournament-live?section=matches&match=match-playable&room=room-1",
     });
   });
 });

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   getMatchRoomHistory,
+  getMatchRoomEarlierHistory,
   markMatchRoomRead,
   resolveMatchRoom,
   sendAdminMatchRoomMessage,
@@ -17,6 +18,7 @@ import {
   type MatchRoom as Room,
   type MatchRoomErrorCode,
   type MatchRoomHistory,
+  type MatchRoomMessage,
   type SendMatchRoomMessageInput,
 } from "@/lib/match-room";
 
@@ -31,6 +33,29 @@ export type MatchRoomProps = {
 
 function visibleAndOnline() {
   return document.visibilityState !== "hidden" && navigator.onLine !== false;
+}
+
+function mergeMessages(existing: MatchRoomMessage[], incoming: MatchRoomMessage[]) {
+  const ids = new Set(existing.map((message) => message.id));
+  const sequences = new Set(existing.map((message) => message.sequence));
+  return [...existing, ...incoming.filter((message) => {
+    if (ids.has(message.id) || sequences.has(message.sequence)) return false;
+    ids.add(message.id);
+    sequences.add(message.sequence);
+    return true;
+  })].sort((left, right) => left.sequence - right.sequence);
+}
+
+function mergeRoomSnapshot(previous: Room | undefined, incoming: Room): Room {
+  if (!previous) return incoming;
+  return {
+    ...incoming,
+    lastSequence: Math.max(previous.lastSequence, incoming.lastSequence),
+    lastReadSequence: Math.max(previous.lastReadSequence, incoming.lastReadSequence),
+    ...(previous.closedAt ? {
+      closedAt: previous.closedAt, closureReason: previous.closureReason, writable: false,
+    } : {}),
+  };
 }
 
 export default function MatchRoom(props: MatchRoomProps) {
@@ -51,7 +76,12 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [newMessages, setNewMessages] = useState(false);
-  const [recentOnly, setRecentOnly] = useState(false);
+  const [hasEarlier, setHasEarlier] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [earlierFailed, setEarlierFailed] = useState(false);
+  const earlierCursor = useRef<number | null>(null);
+  const earlierPending = useRef<object | null>(null);
+  const prependAnchor = useRef<{ roomId: string; messageId: string; top: number } | null>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const current = useRef<MatchRoomHistory | null>(null);
   const scope = useRef({ alive: false, epoch: 0, session: 0 });
@@ -77,7 +107,12 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
     setSendError(null);
     setReadFailed(false);
     setNewMessages(false);
-    setRecentOnly(false);
+    setHasEarlier(false);
+    setLoadingEarlier(false);
+    setEarlierFailed(false);
+    earlierCursor.current = null;
+    earlierPending.current = null;
+    prependAnchor.current = null;
   }, []);
 
   const refresh = useCallback(async function refreshRoom() {
@@ -88,6 +123,9 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
     }
     busy.current = true;
     const session = scope.current.session;
+    let requestEpoch = scope.current.epoch;
+    const isCurrentRequest = () => scope.current.alive &&
+      session === scope.current.session && requestEpoch === scope.current.epoch;
     setRefreshing(true);
     try {
       let target: Room | null;
@@ -96,12 +134,14 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
         if (!target) {
           // History itself authorizes the pinned immutable membership.
           const first = await getMatchRoomHistory({ roomId, afterSequence: 0, limit: 50 });
-          if (!scope.current.alive || session !== scope.current.session) return;
+          if (!isCurrentRequest()) return;
           if (!first.ok) throw first.code;
           if (first.data.room.matchId !== matchId) throw "forbidden";
           target = first.data.room;
           if (target.lastSequence <= 50) {
             current.current = first.data;
+            earlierCursor.current = first.data.messages[0]?.sequence ?? null;
+            setHasEarlier((earlierCursor.current ?? 0) > 1);
             setHistory(first.data);
             setLoaded(true);
             setLoadError(null);
@@ -110,12 +150,15 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
         }
       } else {
         const result = await resolveMatchRoom({ matchId });
-        if (!scope.current.alive || session !== scope.current.session) return;
+        if (!isCurrentRequest()) return;
         if (!result.ok) throw result.code;
         target = result.data.room;
       }
 
-      if (current.current && current.current.room.id !== target?.id) discardRoom();
+      if (current.current && current.current.room.id !== target?.id) {
+        discardRoom();
+        requestEpoch = scope.current.epoch;
+      }
       if (!target) {
         setLoaded(true);
         setLoadError(null);
@@ -124,23 +167,27 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
       const previous = current.current;
       const afterSequence = previous?.nextAfterSequence ?? Math.max(0, target.lastSequence - 50);
       const result = await getMatchRoomHistory({ roomId: target.id, afterSequence, limit: 50 });
-      if (!scope.current.alive || session !== scope.current.session) return;
+      if (!isCurrentRequest()) return;
       if (!result.ok) throw result.code;
       if (result.data.room.matchId !== matchId) throw "forbidden";
       const incoming = result.data;
-      const messages = previous
-        ? [...previous.messages, ...incoming.messages.filter((message) =>
-          message.sequence > previous.nextAfterSequence)]
-        : incoming.messages;
-      const next = { ...incoming, messages };
+      // An earlier page or read acknowledgement may have arrived during this poll.
+      const latest = current.current;
+      const messages = mergeMessages(latest?.messages ?? [], incoming.messages);
+      const nextRoom = mergeRoomSnapshot(latest?.room, incoming.room);
+      const next = { ...incoming, room: nextRoom, messages,
+        hasMore: incoming.hasMore || incoming.nextAfterSequence < nextRoom.lastSequence };
+      if (!latest) {
+        earlierCursor.current = messages[0]?.sequence ?? null;
+        setHasEarlier((earlierCursor.current ?? 0) > 1);
+      }
       current.current = next;
       setHistory(next);
-      if (!previous) setRecentOnly(afterSequence > 0);
       if (previous && incoming.messages.length > 0 && !nearBottom.current) setNewMessages(true);
       setLoaded(true);
       setLoadError(null);
     } catch (error) {
-      if (!scope.current.alive || session !== scope.current.session) return;
+      if (!isCurrentRequest()) return;
       const code = typeof error === "string" ? error as MatchRoomErrorCode : "unavailable";
       if (code === "forbidden" || code === "auth_required") discardRoom();
       setLoadError(code);
@@ -156,6 +203,61 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
       }
     }
   }, [discardRoom, matchId, roomId]);
+
+  async function loadEarlier() {
+    const previous = current.current;
+    const beforeSequence = earlierCursor.current;
+    if (!previous || !hasEarlier || !beforeSequence || earlierPending.current || !visibleAndOnline()) return;
+    const request = {};
+    const requestEpoch = scope.current.epoch;
+    const session = scope.current.session;
+    earlierPending.current = request;
+    // Browsing older history must never acknowledge newly arriving messages.
+    nearBottom.current = false;
+    setLoadingEarlier(true);
+    setEarlierFailed(false);
+    const isCurrentRequest = () => scope.current.alive && session === scope.current.session &&
+      requestEpoch === scope.current.epoch && current.current?.room.id === previous.room.id;
+    try {
+      const result = await getMatchRoomEarlierHistory({ roomId: previous.room.id, beforeSequence, limit: 50 });
+      if (!isCurrentRequest()) return;
+      if (!result.ok) throw result.code;
+      if (result.data.room.matchId !== matchId || result.data.room.id !== previous.room.id) throw "forbidden";
+      const latest = current.current!;
+      const node = transcript.current;
+      const anchor = node?.querySelector<HTMLElement>("[data-match-room-message]");
+      if (anchor) prependAnchor.current = {
+        roomId: previous.room.id,
+        messageId: anchor.dataset.matchRoomMessage!,
+        top: anchor.getBoundingClientRect().top,
+      };
+      nearBottom.current = false;
+      const nextRoom = mergeRoomSnapshot(latest.room, result.data.room);
+      const next = {
+        ...latest, room: nextRoom,
+        messages: mergeMessages(latest.messages, result.data.messages),
+        hasMore: latest.hasMore || latest.nextAfterSequence < nextRoom.lastSequence,
+      };
+      earlierCursor.current = result.data.nextBeforeSequence;
+      setHasEarlier(result.data.hasMore);
+      current.current = next;
+      setHistory(next);
+    } catch (error) {
+      if (!isCurrentRequest()) return;
+      if (error === "forbidden" || error === "auth_required") {
+        discardRoom();
+        setLoadError(error);
+        setLoaded(true);
+      } else {
+        setEarlierFailed(true);
+      }
+    } finally {
+      if (earlierPending.current === request) {
+        earlierPending.current = null;
+        if (scope.current.alive) setLoadingEarlier(false);
+      }
+    }
+  }
 
   useEffect(() => {
     const lifecycle = scope.current;
@@ -183,13 +285,20 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
   }, [refresh]);
 
   useLayoutEffect(() => {
-    if (transcript.current && nearBottom.current) {
-      transcript.current.scrollTop = transcript.current.scrollHeight;
+    const node = transcript.current;
+    const anchor = prependAnchor.current;
+    prependAnchor.current = null;
+    if (node && anchor && anchor.roomId === history?.room.id) {
+      const element = Array.from(node.querySelectorAll<HTMLElement>("[data-match-room-message]"))
+        .find((message) => message.dataset.matchRoomMessage === anchor.messageId);
+      if (element) node.scrollTop += element.getBoundingClientRect().top - anchor.top;
+    } else if (node && nearBottom.current) {
+      node.scrollTop = node.scrollHeight;
     }
   }, [history]);
 
   useEffect(() => {
-    if (!history || !visibleAndOnline() || !nearBottom.current || history.hasMore) return;
+    if (!history || earlierPending.current || !visibleAndOnline() || !nearBottom.current || history.hasMore) return;
     const throughSequence = history.messages.at(-1)?.sequence ?? 0;
     if (throughSequence !== history.room.lastSequence || throughSequence <= history.room.lastReadSequence) return;
     const key = `${history.room.id}:${throughSequence}`;
@@ -283,14 +392,22 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
       {loaded && !room && !loadError && <p className="mt-4 text-sm text-zinc-400">{copy.noRoom}</p>}
       {history && room && (
         <>
-          {recentOnly && <p className="mt-3 text-xs text-zinc-500">{copy.historyNotice}</p>}
+          {hasEarlier && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-zinc-500">{copy.historyNotice}</p>
+              <button type="button" className={buttonClass} disabled={loadingEarlier} onClick={() => void loadEarlier()}>
+                {loadingEarlier ? copy.loadingOlder : copy.loadOlder}
+              </button>
+            </div>
+          )}
+          {earlierFailed && <p role="alert" className="mt-2 text-xs text-amber-300">{copy.historyLoadFailed}</p>}
           <div
             ref={transcript}
             role="log"
             aria-label={copy.title}
             aria-live="off"
             tabIndex={0}
-            className="mt-4 max-h-80 min-w-0 space-y-4 overflow-y-auto overscroll-contain rounded-lg border border-zinc-800/80 p-3 [overflow-wrap:anywhere] sm:max-h-96"
+            className="mt-4 max-h-80 min-w-0 space-y-4 overflow-y-auto overscroll-contain [overflow-anchor:none] rounded-lg border border-zinc-800/80 p-3 [overflow-wrap:anywhere] sm:max-h-96"
             onScroll={() => {
               const node = transcript.current;
               if (!node) return;
@@ -303,9 +420,9 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
           >
             {history.messages.length === 0 && <p className="text-sm text-zinc-500">{copy.empty}</p>}
             {history.messages.map((message) => (
-              <article key={message.id} className={message.senderKind === "admin" ? "border-l-2 border-orange-500/60 pl-3" : "border-l-2 border-zinc-700 pl-3"}>
+              <article key={message.id} data-match-room-message={message.id} className={message.senderKind === "admin" ? "border-l-2 border-orange-500/60 pl-3" : "border-l-2 border-zinc-700 pl-3"}>
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span id={countId} className={`min-w-0 text-xs font-semibold ${message.senderKind === "admin" ? "text-orange-300" : "text-zinc-200"}`}>
+                  <span className={`min-w-0 text-xs font-semibold ${message.senderKind === "admin" ? "text-orange-300" : "text-zinc-200"}`}>
                     {message.senderKind === "admin" ? copy.adminLabel :
                       participants.find((participant) => participant.registrationId === message.senderRegistrationId &&
                         (participant.registrationId === room.playerOneRegistrationId ||

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   isMarkMatchRoomReadInput,
   isMatchRoomHistoryInput,
+  isMatchRoomEarlierHistoryInput,
   isMatchRoomMessageBody,
   isResolveMatchRoomInput,
   isSendMatchRoomMessageInput,
   parseMatchRoom,
   parseMatchRoomHistory,
+  parseMatchRoomEarlierHistory,
   parseMatchRoomReadResult,
   parseMatchRoomSendResult,
   parseResolveMatchRoomResult,
@@ -185,5 +187,53 @@ describe("Match Room safe projections", () => {
     expect(parseMatchRoomReadResult({ roomId: ROOM_ID, lastReadSequence: 0 }, input)).toBeNull();
     expect(parseMatchRoomReadResult({ roomId: OUTSIDER, lastReadSequence: 2 }, input)).toBeNull();
     expect(parseMatchRoomReadResult({ roomId: ROOM_ID, lastReadSequence: 2, viewerId: PLAYER_ONE }, input)).toBeNull();
+  });
+});
+
+
+describe("earlier Match Room history boundaries", () => {
+  const input = { roomId: ROOM_ID, beforeSequence: 3, limit: 2 };
+  const second = { ...message, id: OUTSIDER, sequence: 2 };
+  const earlier = { room, messages: [message, second], hasMore: false, nextBeforeSequence: 1 };
+
+  it("requires an exclusive positive safe cursor and a bounded unspoofed request", () => {
+    expect(isMatchRoomEarlierHistoryInput(input)).toBe(true);
+    for (const beforeSequence of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, "3"]) {
+      expect(isMatchRoomEarlierHistoryInput({ ...input, beforeSequence })).toBe(false);
+    }
+    for (const limit of [0, 51, 1.5, "50"]) {
+      expect(isMatchRoomEarlierHistoryInput({ ...input, limit })).toBe(false);
+    }
+    expect(isMatchRoomEarlierHistoryInput({ ...input, actorId: PLAYER_ONE })).toBe(false);
+  });
+
+  it("accepts chronological earlier pages and stable empty cursors", () => {
+    expect(parseMatchRoomEarlierHistory(earlier, input)).toEqual(earlier);
+    const empty = { room, messages: [], hasMore: false, nextBeforeSequence: 1 };
+    expect(parseMatchRoomEarlierHistory(empty, { ...input, beforeSequence: 1 })).toEqual(empty);
+  });
+
+  it("rejects overlaps, duplicates, wrong order and impossible cursors", () => {
+    for (const change of [
+      { messages: [second, message] },
+      { messages: [message, { ...second, id: message.id }] },
+      { messages: [message, { ...second, sequence: 1 }] },
+      { nextBeforeSequence: 2 },
+      { hasMore: true },
+      { messages: [], nextBeforeSequence: 3, hasMore: true },
+    ]) expect(parseMatchRoomEarlierHistory({ ...earlier, ...change }, input)).toBeNull();
+    expect(parseMatchRoomEarlierHistory(earlier, { ...input, beforeSequence: 2 })).toBeNull();
+    expect(parseMatchRoomEarlierHistory(earlier, { ...input, limit: 1 })).toBeNull();
+  });
+
+  it("rejects foreign rooms, authors and private response fields", () => {
+    for (const change of [
+      { roomId: OUTSIDER }, { senderRegistrationId: OUTSIDER },
+      { actorClerkUserId: "secret" }, { clientMessageId: MESSAGE_ID },
+    ]) expect(parseMatchRoomEarlierHistory({
+      ...earlier, messages: [{ ...message, ...change }, second],
+    }, input)).toBeNull();
+    expect(parseMatchRoomEarlierHistory({ ...earlier, room: { ...room, id: OUTSIDER } }, input)).toBeNull();
+    expect(parseMatchRoomEarlierHistory({ ...earlier, privateField: "secret" }, input)).toBeNull();
   });
 });

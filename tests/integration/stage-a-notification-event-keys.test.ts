@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -24,6 +24,10 @@ const matchActions = read("app/tournaments/match-actions.ts");
 const dashboardActions = read("app/dashboard/actions.ts");
 const adminRegistrationActions = read("app/admin/registration-actions.ts");
 const assistanceAction = read("app/tournaments/support-actions.ts");
+const phaseThreeMigrationName = readdirSync(resolve(process.cwd(), "supabase/migrations"))
+  .find((name) => name.endsWith("_match_room_phase_three.sql"));
+if (!phaseThreeMigrationName) throw new Error("Phase 3 migration is missing");
+const phaseThreeMigration = read("supabase/migrations/" + phaseThreeMigrationName);
 const stageAMigration = read(
   "supabase/migrations/20260820130000_notification_truth_reliability.sql"
 );
@@ -84,13 +88,21 @@ describe("Stage A canonical notification event keys", () => {
       "await notifynoshowreporterofresponse("
     );
     expect(assistanceProducer).toContain(
-      'type: "match.admin_assistance_requested"'
+      'callAssistance("request_match_room_assistance"'
     );
-    expect(assistanceProducer).toContain('":revision:" + room.roomRevision');
-    expect(assistanceProducer).toContain('":registration:" + registrationData.id + ":admin-assistance"');
-    expect(assistanceProducer).not.toContain("in_app_hidden_at");
-    expect(assistanceProducer).toContain("roomId: room.id");
-    expect(assistanceProducer).toContain("eventKey,");
+    expect(assistanceProducer).not.toContain("createInAppNotification");
+    const roomAssistanceProducer = compact(sliceSource(
+      phaseThreeMigration,
+      "create function public.request_match_room_assistance(",
+      "create function public.resolve_match_room_assistance("
+    ));
+    expect(roomAssistanceProducer).toContain("'match.admin_assistance_requested'");
+    expect(roomAssistanceProducer).toContain(
+      "'match-room:' || p_room_id || ':assistance:' || v_version"
+    );
+    expect(roomAssistanceProducer).toContain("'roomId', p_room_id");
+    expect(roomAssistanceProducer).toContain("'requestVersion', v_version");
+    expect(roomAssistanceProducer).not.toContain("in_app_hidden_at");
   });
 
   it("does not add event keys to the two Admin in-site-only producers", () => {
