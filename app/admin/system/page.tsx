@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
+import AdminMatchRoomControl from "@/components/AdminMatchRoomControl";
+import { getAdminMatchRoomSetting } from "@/lib/match-room-settings";
 import AdminEloVerificationChecker from "@/components/AdminEloVerificationChecker";
 import AdminLeaderboardControls from "@/components/AdminLeaderboardControls";
 import {
@@ -37,13 +39,16 @@ export default async function AdminSystemPage() {
     redirect("/");
   }
 
-  const showcaseDictionary = await loadDictionary(await getRequestLocale(), "account-dashboard");
+  const locale = await getRequestLocale();
+  const showcaseDictionary = await loadDictionary(locale, "account-dashboard");
   const [
+    matchRoomSetting,
     completedLeaderboardTournaments,
     leaderboardRecalculationRuns,
     eloVerificationSetting,
     eloVerificationSupportLinkSetting,
   ] = await Promise.all([
+    getAdminMatchRoomSetting(),
     getCompletedLeaderboardTournaments(),
     getRecentLeaderboardRecalculationRuns(8),
     getEloVerificationSetting(),
@@ -80,6 +85,8 @@ export default async function AdminSystemPage() {
             </Link>
           </div>
         </header>
+
+        <AdminMatchRoomControl setting={matchRoomSetting} locale={locale} />
 
         <section
           aria-labelledby="leaderboard-recovery-heading"

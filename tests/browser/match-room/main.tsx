@@ -5,6 +5,7 @@ import MatchResultControls from "@/components/MatchResultControls";
 import MatchRoomAssistanceControls from "@/components/MatchRoomAssistanceControls";
 import { uxMatch, uxParticipants } from "@/tests/fixtures/match-result-ux";
 import { fixture, ROOM_ID } from "./runtime";
+import { SECOND_MATCH_ID } from "./visibility-runtime";
 import "@/app/globals.css";
 const params = new URLSearchParams(location.search);
 const scenario = params.get("scenario");
@@ -32,6 +33,17 @@ function Fixture() {
   const destination = new URLSearchParams({
     scenario: "notifications", viewer, match: uxMatch.id, room: episode?.roomId ?? ROOM_ID,
   });
+  if (scenario === "visibility") return (
+    <main className="min-h-screen bg-zinc-950 p-3 text-white">
+      <div className="mx-auto max-w-3xl" data-testid="first-room">
+        <MatchRoom matchId={uxMatch.id} participants={participants} />
+      </div>
+      <div className="h-[1200px]" aria-hidden="true" />
+      <div className="mx-auto max-w-3xl" data-testid="second-room">
+        <MatchRoom matchId={SECOND_MATCH_ID} participants={participants} />
+      </div>
+    </main>
+  );
   return (
     <main className="min-h-screen bg-zinc-950 p-3 text-white">
       <article className="mx-auto min-w-0 max-w-3xl border border-white/10 p-3 sm:p-6">

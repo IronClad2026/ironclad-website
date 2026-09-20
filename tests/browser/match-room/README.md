@@ -11,6 +11,8 @@ The fixtures start isolated Vite servers on `127.0.0.1:3137` (Match Room) and `1
 
 Scenarios: default player, `?scenario=admin`, `closed`, `unavailable`, `outsider`, `historical`, and `history`. History contains 125 messages. The `notifications` scenario uses browser localStorage solely to share synthetic messages and generic notification episodes between two local fixture tabs; `viewer=player`, `opponent`, and `replacement` select the simulated viewer.
 
+The `visibility` scenario mounts two real MatchRoom components with independent synthetic unread episodes and pending push state, separated by a page-length gap. Tests exercise actual viewport intersections and scrolling at 375/390 px. Hidden-document checks deterministically override `document.visibilityState` and dispatch its event; they do not claim native tab or mobile OS lifecycle verification.
+
 Coverage:
 
 - 375/390 px layout, 44 px assistance controls, wrapping author names, long Unicode text and plain-text rendering.
@@ -18,6 +20,7 @@ Coverage:
 - Two earlier pages, chronological order without duplicates, scroll-anchor preservation, and unchanged private read cursor when loading older messages.
 - Real assistance controls: request, duplicate request, explicit admin resolution, and participant reopening, without changing result/replay controls.
 - Generic one-episode notification presentation across two fixture tabs, exact-room return, no sender self-alert, and denied replacement access without current-room fallback.
+- Offscreen rooms keep polling without moving their read cursor or clearing their pending episode; scrolling the latest transcript into view acknowledges it. A hidden document cannot acknowledge an intersecting transcript.
 - Existing result/replay workflow at 360/390/412/430/1280 px, confirmation/dispute controls, expiry, admin-review and automatic-result states.
 
 Artifacts are separated under `test-results/match-room/` and `test-results/match-result/` so one suite cannot erase the other suite's screenshots.

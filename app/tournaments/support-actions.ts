@@ -65,6 +65,7 @@ async function callAssistance(name: string, args: Record<string, string | number
     const client = await createAuthenticatedSupabaseClient();
     const { data, error } = await client.rpc(name, args);
     if (error) {
+      if (error.code === "P0001" && error.message === "MATCH_ROOM_DISABLED") return { ok: false, code: "disabled" };
       if (error.code === "42501") return { ok: false, code: "forbidden" };
       if (error.code === "22023") return { ok: false, code: "invalid_request" };
       if (error.code === "40001") return { ok: false, code: "stale_room" };

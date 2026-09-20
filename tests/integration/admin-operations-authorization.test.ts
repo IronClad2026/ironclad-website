@@ -28,7 +28,7 @@ type MockQueryResult = {
 
 function thenableQuery(result: MockQueryResult, rejection?: unknown) {
   const query: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "is", "limit"]) {
+  for (const method of ["select", "eq", "is", "or", "limit"]) {
     query[method] = vi.fn(() => query);
   }
   query.then = (
@@ -79,7 +79,7 @@ describe("Admin Operations loader authorization and failure isolation", () => {
     expect(authMock.mock.invocationCallOrder[0]).toBeLessThan(
       createSupabaseAdminClientMock.mock.invocationCallOrder[0]
     );
-    expect(from).toHaveBeenCalledTimes(9);
+    expect(from).toHaveBeenCalledTimes(10);
     expect(rpc).toHaveBeenCalledExactlyOnceWith("list_match_room_assistance_requests", { p_limit: 5000 });
     expect(authMock.mock.invocationCallOrder[0]).toBeLessThan(rpc.mock.invocationCallOrder[0]);
     expect(metrics).not.toBeNull();

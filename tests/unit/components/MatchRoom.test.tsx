@@ -46,7 +46,37 @@ async function refresh() {
   fireEvent.click(screen.getByRole("button", { name: copy.refresh }));
 }
 
+const observedTails = new Map<Element, (visible: boolean) => void>();
+let initialIntersection = true;
+let outsideViewport = new WeakSet<Element>();
+function setTailVisible(log: HTMLElement, visible: boolean) {
+  const tail = log.querySelector("[data-match-room-tail]")!;
+  if (visible) outsideViewport.delete(tail);
+  else outsideViewport.add(tail);
+  observedTails.get(tail)!(visible);
+}
+
 beforeEach(() => {
+  initialIntersection = true;
+  observedTails.clear();
+  outsideViewport = new WeakSet();
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    return new DOMRect(0, outsideViewport.has(this) ? 1000 : 0, 300,
+      this.hasAttribute("data-match-room-tail") ? 1 : 200);
+  });
+  vi.stubGlobal("IntersectionObserver", class {
+    private targets: Element[] = [];
+    constructor(private callback: IntersectionObserverCallback) {}
+    observe(target: Element) {
+      this.targets.push(target);
+      const update = (visible: boolean) => this.callback([
+        { target, isIntersecting: visible, intersectionRatio: visible ? 1 : 0 } as IntersectionObserverEntry,
+      ], this as unknown as IntersectionObserver);
+      observedTails.set(target, update);
+      update(initialIntersection);
+    }
+    disconnect() { this.targets.forEach((target) => observedTails.delete(target)); }
+  });
   Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
   Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
   vi.mocked(actions.resolveMatchRoom).mockResolvedValue(ok({ room: room() }));
@@ -56,7 +86,7 @@ beforeEach(() => {
   vi.mocked(actions.sendMatchRoomMessage).mockResolvedValue(ok({ message: message(2), duplicate: false }));
   vi.mocked(actions.sendAdminMatchRoomMessage).mockResolvedValue(ok({ message: message(2, { senderKind: "admin", senderRegistrationId: null }), duplicate: false }));
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("Match Room", () => {
   it("loads the authorized operational log, fixed author label, disclosure and private read cursor", async () => {
@@ -200,6 +230,24 @@ describe("Match Room", () => {
     expect(screen.getByRole("textbox")).toHaveValue("Unsent draft");
   });
 
+  it("refreshes and retains localized disabled feedback when the switch closes the composer", async () => {
+    renderRoom();
+    await ready();
+    vi.mocked(actions.sendMatchRoomMessage).mockResolvedValueOnce({ ok: false, code: "disabled" });
+    vi.mocked(actions.getMatchRoomHistory).mockResolvedValue(ok(page({ room: room({ writable: false }) })));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Unsent during shutdown" } });
+    fireEvent.click(screen.getByRole("button", { name: copy.send }));
+    await waitFor(() => expect(screen.queryByRole("textbox")).not.toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.errors.disabled);
+    expect(screen.getByText("Message 1")).toBeInTheDocument();
+    expect(actions.resolveMatchRoom).toHaveBeenCalledTimes(2);
+    vi.mocked(actions.getMatchRoomHistory).mockResolvedValue(ok(page()));
+    await refresh();
+    expect(await screen.findByRole("textbox")).toHaveValue("Unsent during shutdown");
+    expect(screen.getByRole("button", { name: copy.send })).toBeEnabled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("polls at 10 seconds, pauses hidden tabs, and refreshes on focus and reconnect", async () => {
     vi.useFakeTimers();
     renderRoom();
@@ -238,6 +286,69 @@ describe("Match Room", () => {
     fireEvent.click(screen.getByRole("button", { name: copy.newMessages }));
     await waitFor(() => expect(actions.markMatchRoomRead).toHaveBeenLastCalledWith({ roomId: id(100), throughSequence: 2 }));
     expect(log.scrollTop).toBe(1000);
+  });
+
+  it("polls multiple mounted rooms while acknowledging only the room whose latest transcript is visible", async () => {
+    vi.useFakeTimers();
+    initialIntersection = false;
+    const rooms = [room(), room({ id: id(101), matchId: id(301) })];
+    vi.mocked(actions.resolveMatchRoom).mockImplementation(async ({ matchId }) =>
+      ok({ room: rooms.find((entry) => entry.matchId === matchId)! }));
+    vi.mocked(actions.getMatchRoomHistory).mockImplementation(async ({ roomId }) => ok(page({
+      room: rooms.find((entry) => entry.id === roomId)!,
+      messages: [message(1, { id: roomId, roomId, body: roomId })],
+    })));
+    render(<><MatchRoom matchId={id(300)} participants={participants} />
+      <MatchRoom matchId={id(301)} participants={participants} /></>);
+    await act(async () => {});
+    const [first, second] = screen.getAllByRole("log");
+    expect(actions.markMatchRoomRead).not.toHaveBeenCalled();
+    await act(async () => { setTailVisible(first, true); });
+    expect(actions.markMatchRoomRead).toHaveBeenCalledExactlyOnceWith({ roomId: id(100), throughSequence: 1 });
+    await act(async () => { vi.advanceTimersByTime(10_000); });
+    expect(actions.resolveMatchRoom).toHaveBeenCalledTimes(4);
+    expect(actions.getMatchRoomHistory).toHaveBeenCalledTimes(4);
+    expect(actions.markMatchRoomRead).toHaveBeenCalledTimes(1);
+    await act(async () => { setTailVisible(first, false); setTailVisible(second, true); });
+    expect(actions.markMatchRoomRead).toHaveBeenLastCalledWith({ roomId: id(101), throughSequence: 1 });
+  });
+
+  it.each(["hidden", "offline"])("does not acknowledge a visible tail while %s", async (state) => {
+    initialIntersection = false;
+    renderRoom();
+    await ready();
+    if (state === "hidden") Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    else Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    await act(async () => { setTailVisible(screen.getByRole("log"), true); });
+    expect(actions.markMatchRoomRead).not.toHaveBeenCalled();
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    await waitFor(() => expect(actions.markMatchRoomRead).toHaveBeenCalledExactlyOnceWith({ roomId: id(100), throughSequence: 1 }));
+  });
+
+  it("rechecks current bounds when an observer has not yet reported the tail leaving the viewport", async () => {
+    renderRoom();
+    await ready();
+    await waitFor(() => expect(actions.markMatchRoomRead).toHaveBeenCalledTimes(1));
+    outsideViewport.add(screen.getByRole("log").querySelector("[data-match-room-tail]")!);
+    vi.mocked(actions.getMatchRoomHistory).mockResolvedValue(ok(page({
+      room: room({ lastSequence: 2, lastReadSequence: 1 }), messages: [message(2)], nextAfterSequence: 2,
+    })));
+    await refresh();
+    await screen.findByText("Message 2");
+    expect(actions.markMatchRoomRead).toHaveBeenCalledTimes(1);
+    await act(async () => { setTailVisible(screen.getByRole("log"), true); });
+    await waitFor(() => expect(actions.markMatchRoomRead).toHaveBeenLastCalledWith({ roomId: id(100), throughSequence: 2 }));
+  });
+
+  it("fails closed for read acknowledgments if viewport observation is unavailable", async () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+    renderRoom();
+    await ready();
+    await refresh();
+    expect(actions.markMatchRoomRead).not.toHaveBeenCalled();
+    expect(actions.getMatchRoomHistory).toHaveBeenCalledTimes(2);
   });
 
   it("ignores old asynchronous history after selecting another match", async () => {

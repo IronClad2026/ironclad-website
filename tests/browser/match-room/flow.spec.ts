@@ -1,8 +1,70 @@
 import { expect, test } from "@playwright/test";
+const FIRST_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const SECOND_ROOM_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 test.beforeEach(async ({ page }) => {
   await page.route("**/*", route => new URL(route.request().url()).hostname === "127.0.0.1" ? route.continue() : route.abort());
 });
 for (const width of [375,390]) {
+  test("only the visible latest transcript clears its unread episode at " + width + "px", async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.clock.install();
+    await page.goto("/tests/browser/match-room/?scenario=visibility");
+    const first = page.getByTestId("first-room");
+    const second = page.getByTestId("second-room");
+    await expect(first.getByText("First room unread message")).toBeInViewport();
+    await expect(second.getByText("Second room unread message")).not.toBeInViewport();
+    await expect.poll(() => page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId).room.lastReadSequence, FIRST_ROOM_ID)).toBe(1);
+    const unseen = await page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId), SECOND_ROOM_ID);
+    expect(unseen.room.lastReadSequence).toBe(0);
+    expect(unseen.readCalls).toBe(0);
+    expect(unseen.episode).not.toBeNull();
+    expect(unseen.pushStatus).toBe("pending");
+
+    await page.evaluate((roomId) => window.matchRoomVisibilityFixture.incoming(roomId, "Offscreen poll message"), SECOND_ROOM_ID);
+    await page.clock.runFor(10_000);
+    await expect(second.getByText("Offscreen poll message")).toBeAttached();
+    await expect(second.getByText("Offscreen poll message")).not.toBeInViewport();
+    const polled = await page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId), SECOND_ROOM_ID);
+    expect(polled.historyCalls).toBeGreaterThan(unseen.historyCalls);
+    expect(polled.room.lastReadSequence).toBe(0);
+    expect(polled.readCalls).toBe(0);
+    expect(polled.episode).toBe(unseen.episode);
+    expect(polled.pushStatus).toBe("pending");
+
+    await second.getByRole("log").scrollIntoViewIfNeeded();
+    await expect(second.locator("[data-match-room-tail]")).toBeInViewport();
+    await expect.poll(() => page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId).room.lastReadSequence, SECOND_ROOM_ID)).toBe(2);
+    const seen = await page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId), SECOND_ROOM_ID);
+    expect(seen.episode).toBeNull();
+    expect(seen.pushStatus).toBe("skipped");
+
+    // Drive the browser's visibility handler deterministically: the transcript
+    // can intersect while the page is hidden, but that cannot acknowledge it.
+    await page.evaluate((roomId) => {
+      window.matchRoomVisibilityFixture.incoming(roomId, "First room unseen return");
+      window.dispatchEvent(new Event("focus"));
+    }, FIRST_ROOM_ID);
+    await expect(first.getByText("First room unseen return")).toBeAttached();
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await first.getByRole("log").scrollIntoViewIfNeeded();
+    await expect(first.locator("[data-match-room-tail]")).toBeInViewport();
+    await page.clock.runFor(10_000);
+    const hidden = await page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId), FIRST_ROOM_ID);
+    expect(hidden.room.lastReadSequence).toBe(1);
+    expect(hidden.episode).not.toBeNull();
+    expect(hidden.pushStatus).toBe("pending");
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect.poll(() => page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId).room.lastReadSequence, FIRST_ROOM_ID)).toBe(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: testInfo.outputPath("visible-transcript-" + width + ".png"), fullPage: true });
+  });
+
   test("persisted room workflow and replay draft at " + width + "px", async ({page},testInfo) => {
     await page.setViewportSize({width,height:844});
     await page.goto("/tests/browser/match-room/");

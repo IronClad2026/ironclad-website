@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SUPPORTED_LOCALES, toIntlLocale } from "@/lib/i18n/config";
+import { getMatchRoomControlCopy } from "@/lib/i18n/match-room-control";
 import { getMatchRoomCopy } from "@/lib/i18n/match-room";
 import type { MatchRoomErrorCode } from "@/lib/match-room";
 
@@ -9,6 +10,7 @@ const ERROR_CODES = [
   "invalid_request",
   "stale_room",
   "read_only",
+  "disabled",
   "rate_limited",
   "idempotency_conflict",
   "legal_required",
@@ -17,6 +19,14 @@ const ERROR_CODES = [
 ] satisfies MatchRoomErrorCode[];
 
 describe("Match Room localization", () => {
+  it.each(SUPPORTED_LOCALES)("provides emergency control copy in %s", (locale) => {
+    const copy = getMatchRoomControlCopy(locale);
+    expect(Object.keys(copy).sort()).toEqual(Object.keys(getMatchRoomControlCopy("en")).sort());
+    for (const [key, value] of Object.entries(copy)) {
+      expect(value.trim().length).toBeGreaterThan(0);
+      if (locale !== "en") expect(value).not.toBe(getMatchRoomControlCopy("en")[key as keyof typeof copy]);
+    }
+  });
   it.each(SUPPORTED_LOCALES)("provides complete room and action copy in %s", (locale) => {
     const copy = getMatchRoomCopy(locale);
     expect(Object.keys(copy).sort()).toEqual(Object.keys(getMatchRoomCopy("en")).sort());
