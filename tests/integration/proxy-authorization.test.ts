@@ -34,6 +34,7 @@ describe("Next.js proxy authorization", () => {
   it.each([
     "/",
     "/about",
+    "/news",
     "/players",
     "/players/11111111-1111-4111-8111-111111111111",
     "/players/11111111-1111-4111-8111-111111111111/avatar",
@@ -72,6 +73,7 @@ describe("Next.js proxy authorization", () => {
     "/unknown",
     "/players-private",
     "/aboutness",
+    "/news-private",
     "/api/match-proof",
     "/api/match-proofs-private",
     "/api/match-proofs.example",

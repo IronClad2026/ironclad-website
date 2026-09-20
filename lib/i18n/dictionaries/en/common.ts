@@ -2,6 +2,12 @@ import type { DictionaryShape } from "@/lib/i18n/types";
 
 const dictionary = {
   nav: {
+    news: "News",
+    more: "More",
+    updates: "Updates",
+    compete: "Compete",
+    information: "Information",
+    leaderboards: "Leaderboards",
     home: "Home",
     tournaments: "Tournaments",
     players: "Players",

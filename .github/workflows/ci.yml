@@ -45,5 +45,11 @@ jobs:
       - name: Unit and integration tests
         run: npm run test
 
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Official News browser regression tests
+        run: npx playwright test --config tests/browser/news/playwright.config.ts
+
       - name: Build
         run: npm run build

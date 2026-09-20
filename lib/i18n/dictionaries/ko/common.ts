@@ -2,6 +2,12 @@ import type { CommonDictionary } from "@/lib/i18n/dictionaries/en/common";
 
 const dictionary = {
   nav: {
+    news: "뉴스",
+    more: "더 보기",
+    updates: "소식",
+    compete: "대회",
+    information: "안내",
+    leaderboards: "순위표",
     home: "홈",
     tournaments: "토너먼트",
     players: "선수",

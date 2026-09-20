@@ -2,6 +2,12 @@ import type { CommonDictionary } from "@/lib/i18n/dictionaries/en/common";
 
 const dictionary = {
   nav: {
+    news: "Noticias",
+    more: "Más",
+    updates: "Novedades",
+    compete: "Compite",
+    information: "Información",
+    leaderboards: "Clasificaciones",
     home: "Inicio",
     tournaments: "Torneos",
     players: "Jugadores",
