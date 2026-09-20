@@ -1,4 +1,6 @@
 import HomeAccountSection from "@/components/HomeAccountSection";
+import LatestNewsSection from "@/components/news/LatestNewsSection";
+import { Suspense } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
 import {
   ArrowRight,
@@ -94,6 +96,9 @@ export default async function Home() {
       <HomeAccountSection />
       <PlayersSection copy={copy} />
       <CompetitionPathSection copy={copy} />
+      <Suspense fallback={null}>
+        <LatestNewsSection copy={copy.news} locale={locale} />
+      </Suspense>
     </main>
   );
 }

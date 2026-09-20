@@ -9,9 +9,7 @@ const loadAnnouncementNavigationStateMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs", () => ({
   useAuth: useAuthMock,
-  UserButton: () => (
-    <button type="button" aria-label="Clerk account control" />
-  ),
+  UserButton: () => <button type="button" aria-label="Clerk account control" />,
 }));
 vi.mock("next/navigation", () => ({ usePathname: usePathnameMock }));
 vi.mock("@/app/announcements/actions", () => ({
@@ -22,18 +20,16 @@ vi.mock("@/app/locale-actions", () => ({
   syncLocalePreferenceAfterAuth: vi.fn(),
 }));
 vi.mock("@/components/InstallAppPrompt", () => ({ default: () => null }));
-vi.mock("@/components/i18n/LocalePreferenceSync", () => ({
-  default: () => null,
-}));
+vi.mock("@/components/i18n/LocalePreferenceSync", () => ({ default: () => null }));
 
 import Navbar from "@/components/Navbar";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
 import italianCommon from "@/lib/i18n/dictionaries/it/common";
+import frenchCommon from "@/lib/i18n/dictionaries/fr/common";
 
-const LANGUAGE_TRIGGER_NAME =
-  "Scegli la lingua. Lingua attuale: Italiano";
+const LANGUAGE_TRIGGER_NAME = "Scegli la lingua. Lingua attuale: Italiano";
 
-function renderItalianAdminNavbar() {
+function renderItalianNavbar() {
   return render(
     <LocaleProvider locale="it" dictionaries={{ common: italianCommon }}>
       <Navbar />
@@ -41,24 +37,26 @@ function renderItalianAdminNavbar() {
   );
 }
 
-function requireElement<T extends Element>(
-  value: T | null,
-  message: string
-): T {
-  if (!value) {
-    throw new Error(message);
-  }
+function getArea(name: string): HTMLElement {
+  const element = document.querySelector<HTMLElement>(`[data-navbar-area="${name}"]`);
+  if (!element) throw new Error(`Missing navbar area: ${name}`);
+  return element;
+}
 
-  return value;
+function hrefs(element: HTMLElement) {
+  return Array.from(element.querySelectorAll("a")).map((link) => link.getAttribute("href"));
+}
+
+function openItalianMobileMenu() {
+  fireEvent.click(screen.getByRole("button", { name: "Apri il menu di navigazione" }));
+  return screen.getByRole("dialog", { name: "Navigazione mobile" });
 }
 
 function expectBefore(first: Element, second: Element) {
-  expect(
-    first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
-  ).toBeTruthy();
+  expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 }
 
-describe("Navbar language and responsive ordering", () => {
+describe("Navbar grouped navigation", () => {
   beforeEach(() => {
     usePathnameMock.mockReturnValue("/dashboard");
     useAuthMock.mockReturnValue({
@@ -80,356 +78,175 @@ describe("Navbar language and responsive ordering", () => {
     document.body.style.overflow = "";
   });
 
-  it("renders the shared Italian indicator and native label in the desktop trigger", () => {
-    renderItalianAdminNavbar();
-
-    const trigger = screen.getByRole("button", {
-      name: LANGUAGE_TRIGGER_NAME,
-    });
-
-    expect(within(trigger).getByText("🇮🇹")).toHaveAttribute(
-      "aria-hidden",
-      "true"
-    );
-    expect(within(trigger).getByText("Italiano")).toHaveAttribute("lang", "it");
+  it("puts Announcements and News beside the logo and only core destinations in the middle", () => {
+    renderItalianNavbar();
+    const updates = getArea("updates");
+    const primary = getArea("primary");
+    const utilities = getArea("utilities");
+    expect(hrefs(updates)).toEqual(["/announcements", "/news"]);
+    expect(hrefs(primary)).toEqual(["/tournaments", "/players", "/rankings", "/rules"]);
+    expect(within(primary).getByRole("button", { name: italianCommon.nav.more })).toBeInTheDocument();
+    expectBefore(updates, primary);
+    expectBefore(primary, utilities);
+    expect(document.querySelectorAll('a[href="/"]')).toHaveLength(1);
+    expect(document.querySelector('a[href="/"] img')).toHaveAttribute("alt", "IronClad");
+    expect(screen.queryByRole("link", { name: italianCommon.nav.home })).not.toBeInTheDocument();
   });
 
-  it("keeps brand, centered navigation, then Language, Account, and Support in separate desktop areas", () => {
-    renderItalianAdminNavbar();
-
-    const primaryNavigation = screen.getByRole("navigation", {
-      name: "Navigazione principale",
-    });
-    const brandGroup = requireElement(
-      primaryNavigation.querySelector('[data-navbar-area="brand"]'),
-      "Desktop brand area was not rendered."
-    );
-    const primaryGroup = requireElement(
-      primaryNavigation.querySelector('[data-navbar-area="primary"]'),
-      "Desktop primary navigation area was not rendered."
-    );
-    const utilityGroup = requireElement(
-      primaryNavigation.querySelector<HTMLElement>(
-        '[data-navbar-area="utilities"]'
-      ),
-      "Desktop utility area was not rendered."
-    );
-    const trigger = screen.getByRole("button", {
-      name: LANGUAGE_TRIGGER_NAME,
-    });
-    const dashboard = requireElement(
-      primaryGroup.querySelector('a[href="/dashboard"]'),
-      "Desktop Dashboard link was not rendered."
-    );
-    const admin = requireElement(
-      primaryGroup.querySelector('a[href="/admin"]'),
-      "Desktop Admin link was not rendered."
-    );
-    const account = within(utilityGroup).getByRole("button", {
-      name: "Clerk account control",
-    });
-    const support = within(utilityGroup).getByRole("button", {
-      name: "Apri l’assistenza",
-    });
-
-    expectBefore(brandGroup, primaryGroup);
-    expectBefore(primaryGroup, utilityGroup);
-    expectBefore(dashboard, admin);
-    expectBefore(trigger, account);
-    expectBefore(account, support);
-    expect(primaryNavigation).toHaveClass(
-      "xl:grid",
-      "xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
-    );
-    expect(brandGroup).toHaveClass("justify-self-start");
-    expect(primaryGroup).toHaveClass("justify-center", "xl:flex");
-    expect(utilityGroup).toHaveClass(
-      "shrink-0",
-      "justify-self-end",
-      "xl:flex"
-    );
-  });
-
-  it("keeps the 1280–1536 desktop tier compact and restores spacious geometry at 1800px", () => {
-    renderItalianAdminNavbar();
-
-    const primaryNavigation = screen.getByRole("navigation", {
-      name: "Navigazione principale",
-    });
-    const logo = screen.getByRole("img", { name: "IronClad" });
-    const brandGroup = requireElement(
-      logo.closest("div"),
-      "Brand and announcement group was not rendered."
-    );
-    const announcementGroup = requireElement(
-      brandGroup.querySelector('a[href="/announcements"]')?.parentElement ??
-        null,
-      "Desktop Announcements group was not rendered."
-    );
-    const desktopTrigger = screen.getByRole("button", {
-      name: LANGUAGE_TRIGGER_NAME,
-    });
-    const primaryGroup = requireElement(
-      primaryNavigation.querySelector('[data-navbar-area="primary"]'),
-      "Desktop primary navigation area was not rendered."
-    );
-    const utilityGroup = requireElement(
-      primaryNavigation.querySelector('[data-navbar-area="utilities"]'),
-      "Desktop utility area was not rendered."
-    );
-    const linkGroup = requireElement(
-      primaryGroup.firstElementChild,
-      "Desktop navigation link group was not rendered."
-    );
-
-    expect(primaryNavigation).toHaveClass(
-      "max-w-7xl",
-      "min-[1800px]:max-w-[1600px]"
-    );
-    expect(brandGroup).toHaveClass(
-      "text-xs",
-      "font-medium",
-      "text-zinc-300",
-      "min-[1800px]:text-sm"
-    );
-    expect(logo).toHaveClass("xl:h-14", "min-[1800px]:h-16");
-    expect(announcementGroup).toHaveClass(
-      "ml-3",
-      "pl-3",
-      "min-[1800px]:ml-7",
-      "min-[1800px]:pl-7"
-    );
-    expect(primaryGroup).toHaveClass(
-      "text-[11px]",
-      "min-[1480px]:text-xs",
-      "min-[1800px]:text-sm"
-    );
-    expect(linkGroup).toHaveClass(
-      "gap-2",
-      "min-[1480px]:gap-3",
-      "min-[1800px]:gap-7"
-    );
-    expect(utilityGroup).toHaveClass(
-      "gap-2",
-      "min-[1800px]:gap-3"
-    );
-    expect(desktopTrigger.parentElement).toBe(utilityGroup);
-  });
-
-  it("isolates Italian Announcements beside the logo before the ordinary desktop cluster", () => {
-    renderItalianAdminNavbar();
-
-    const logo = screen.getByRole("img", { name: "IronClad" });
-    const brandGroup = requireElement(
-      logo.closest("div"),
-      "Brand and announcement group was not rendered."
-    );
-    const announcements = requireElement(
-      brandGroup.querySelector('a[href="/announcements"]'),
-      "Desktop Announcements link was not rendered beside the logo."
-    );
-    const home = requireElement(
-      document.querySelector('a[href="/"]:not(:has(img))'),
-      "Ordinary Home navigation link was not rendered."
-    );
-
-    expect(announcements).toHaveTextContent("Annunci");
-    expect(announcements.parentElement).toHaveClass("border-l", "shrink-0");
-    expectBefore(announcements, home);
-  });
-
-  it("keeps Announcements first and makes Language, Account, and Support reachable on mobile", () => {
-    renderItalianAdminNavbar();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Apri il menu di navigazione" })
-    );
-
-    const mobileMenu = screen.getByRole("dialog", {
-      name: "Navigazione mobile",
-    });
-    const dashboard = requireElement(
-      mobileMenu.querySelector('a[href="/dashboard"]'),
-      "Mobile Dashboard link was not rendered."
-    );
-    const admin = requireElement(
-      mobileMenu.querySelector('a[href="/admin"]'),
-      "Mobile Admin link was not rendered."
-    );
-    const language = within(mobileMenu).getByRole("button", {
-      name: LANGUAGE_TRIGGER_NAME,
-    });
-    const account = within(mobileMenu).getByRole("button", {
-      name: "Clerk account control",
-    });
-    const support = within(mobileMenu).getByRole("button", {
-      name: "Apri l’assistenza",
-    });
-    const announcements = requireElement(
-      mobileMenu.querySelector('a[href="/announcements"]'),
-      "Mobile Announcements link was not rendered."
-    );
-    const home = requireElement(
-      mobileMenu.querySelector('a[href="/"]'),
-      "Mobile Home link was not rendered."
-    );
-
-    expectBefore(announcements, home);
+  it("retains account links and Language, Account, Support ordering", () => {
+    renderItalianNavbar();
+    const utilities = getArea("utilities");
+    const dashboard = within(utilities).getByRole("link", { name: italianCommon.nav.dashboard });
+    const admin = within(utilities).getByRole("link", { name: italianCommon.nav.admin });
+    const language = within(utilities).getByRole("button", { name: LANGUAGE_TRIGGER_NAME });
+    const account = within(utilities).getByRole("button", { name: "Clerk account control" });
+    const support = within(utilities).getByRole("button", { name: "Apri l’assistenza" });
     expectBefore(dashboard, admin);
     expectBefore(admin, language);
     expectBefore(language, account);
     expectBefore(account, support);
-    expect(within(language).getByText("🇮🇹")).toHaveAttribute(
-      "aria-hidden",
-      "true"
-    );
-    expect(within(language).getByText("Italiano")).toHaveAttribute(
-      "lang",
-      "it"
-    );
+    expect(within(language).getByText("🇮🇹")).toHaveAttribute("aria-hidden", "true");
+    expect(within(language).getByText("Italiano")).toHaveAttribute("lang", "it");
   });
 
-  it("opens the localized Support popover on the approved direct Discord channel", () => {
-    renderItalianAdminNavbar();
+  it("retains the player Dashboard without exposing Admin to a normal signed-in player", () => {
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: true, sessionClaims: {} });
+    renderItalianNavbar();
+    expect(hrefs(getArea("account-links"))).toEqual(["/dashboard"]);
+    expect(document.querySelector('a[href="/admin"]')).toBeNull();
+  });
 
-    const utilities = requireElement(
-      document.querySelector<HTMLElement>('[data-navbar-area="utilities"]'),
-      "Desktop utility area was not rendered."
-    );
-    fireEvent.click(
-      within(utilities).getByRole("button", { name: "Apri l’assistenza" })
-    );
+  it("retains canonical sign-in controls for signed-out visitors", () => {
+    useAuthMock.mockReturnValue({ isLoaded: true, isSignedIn: false, sessionClaims: null });
+    renderItalianNavbar();
+    expect(getArea("utilities").querySelector('a[href="/sign-in"]')).not.toBeNull();
+    expect(document.querySelector('a[href="/dashboard"]')).toBeNull();
+    expect(document.querySelector('a[href="/admin"]')).toBeNull();
+    expect(openItalianMobileMenu().querySelector('a[href="/sign-in"]')).not.toBeNull();
+  });
 
+  it("uses readable desktop links and one responsive boundary for all surfaces", () => {
+    renderItalianNavbar();
+    expect(getArea("primary")).toHaveClass("text-sm", "hidden", "min-[1440px]:flex");
+    expect(getArea("primary")).not.toHaveClass("text-[11px]");
+    expect(getArea("updates")).toHaveClass("hidden", "min-[1440px]:flex");
+    expect(getArea("utilities")).toHaveClass("hidden", "min-[1440px]:flex");
+    expect(screen.getByRole("button", { name: "Apri il menu di navigazione" })).toHaveClass("min-[1440px]:hidden");
+    expect(openItalianMobileMenu()).toHaveClass("min-[1440px]:hidden");
+    const backdrop = screen.getAllByRole("button", { name: "Chiudi il menu di navigazione" })
+      .find((button) => button.classList.contains("fixed"));
+    expect(backdrop).toHaveClass("min-[1440px]:hidden");
+  });
+
+  it("reserves extra room for long localized desktop labels", () => {
+    render(<LocaleProvider locale="fr" dictionaries={{ common: frenchCommon }}><Navbar /></LocaleProvider>);
+    expect(getArea("primary")).toHaveClass("text-sm", "min-[1600px]:flex");
+    expect(getArea("updates")).toHaveClass("min-[1600px]:flex");
+    expect(getArea("utilities")).toHaveClass("min-[1600px]:flex");
+    expect(screen.getByRole("button", { name: frenchCommon.nav.openMenu })).toHaveClass("min-[1600px]:hidden");
+  });
+
+  it("uses the English navigation boundary on admin routes", () => {
+    usePathnameMock.mockReturnValue("/admin/announcements");
+    render(<LocaleProvider locale="fr" dictionaries={{ common: frenchCommon }}><Navbar /></LocaleProvider>);
+    expect(getArea("primary")).toHaveClass("min-[1440px]:flex");
+    expect(within(getArea("updates")).getByRole("link", { name: "News" })).toHaveAttribute("href", "/news");
+    expect(document.querySelector("header")).toHaveAttribute("lang", "en");
+  });
+
+  it("groups mobile destinations into Updates, Compete, Information and Account", () => {
+    renderItalianNavbar();
+    const menu = openItalianMobileMenu();
+    const updates = within(menu).getByRole("region", { name: italianCommon.nav.updates });
+    const compete = within(menu).getByRole("region", { name: italianCommon.nav.compete });
+    const information = within(menu).getByRole("region", { name: italianCommon.nav.information });
+    const account = within(menu).getByRole("region", { name: italianCommon.nav.account });
+    expect(hrefs(updates)).toEqual(["/announcements", "/news"]);
+    expect(hrefs(compete)).toEqual(["/tournaments", "/players", "/rankings", "/rules"]);
+    expect(hrefs(information)).toEqual(["/about"]);
+    expect(hrefs(account)).toEqual(["/dashboard", "/admin"]);
+    expectBefore(updates, compete);
+    expectBefore(compete, information);
+    expectBefore(information, account);
+    expect(menu.querySelector('a[href="/"]')).toBeNull();
+    expect(menu.querySelector('a[href="/announcements"]')).toHaveFocus();
+  });
+
+  it("closes mobile navigation on Escape and restores focus and page scrolling", () => {
+    renderItalianNavbar();
+    const menu = openItalianMobileMenu();
+    fireEvent.keyDown(menu.querySelector('a[href="/announcements"]')!, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Navigazione mobile" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apri il menu di navigazione" })).toHaveFocus();
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("keeps keyboard focus inside the open mobile dialog", () => {
+    renderItalianNavbar();
+    const menu = openItalianMobileMenu();
+    const first = menu.querySelector<HTMLAnchorElement>('a[href="/announcements"]')!;
+    const last = within(menu).getByRole("button", { name: "Apri l’assistenza" });
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(last).toHaveFocus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(first).toHaveFocus();
+  });
+
+  it("closes the mobile dialog after selecting News", () => {
+    renderItalianNavbar();
+    fireEvent.click(within(openItalianMobileMenu()).getByRole("link", { name: italianCommon.nav.news }));
+    expect(screen.queryByRole("dialog", { name: "Navigazione mobile" })).not.toBeInTheDocument();
+  });
+
+  it("preserves localized Support and its approved direct Discord link", () => {
+    renderItalianNavbar();
+    fireEvent.click(within(getArea("utilities")).getByRole("button", { name: "Apri l’assistenza" }));
     const dialog = screen.getByRole("dialog", { name: "Assistenza" });
-    expect(dialog).toHaveAccessibleDescription(
-      "Apri un ticket con noi su Discord per ricevere assistenza."
-    );
-    expect(
-      within(dialog).getByRole("link", {
-        name: "Apri l’assistenza Discord",
-      })
-    ).toHaveAttribute(
-      "href",
-      "https://discord.com/channels/1440092095619662105/1440201093110960137"
+    expect(dialog).toHaveAccessibleDescription("Apri un ticket con noi su Discord per ricevere assistenza.");
+    expect(within(dialog).getByRole("link", { name: "Apri l’assistenza Discord" })).toHaveAttribute(
+      "href", "https://discord.com/channels/1440092095619662105/1440201093110960137"
     );
   });
 
   it("closes only the top Support layer on mobile Escape and returns focus", () => {
-    renderItalianAdminNavbar();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Apri il menu di navigazione" })
-    );
-    const mobileMenu = screen.getByRole("dialog", {
-      name: "Navigazione mobile",
-    });
-    const supportTrigger = within(mobileMenu).getByRole("button", {
-      name: "Apri l’assistenza",
-    });
-
-    fireEvent.click(supportTrigger);
-    const supportAction = within(mobileMenu).getByRole("link", {
-      name: "Apri l’assistenza Discord",
-    });
-    expect(supportAction).toHaveFocus();
-
-    fireEvent.keyDown(supportAction, { key: "Escape" });
-
-    expect(
-      screen.getByRole("dialog", { name: "Navigazione mobile" })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("dialog", { name: "Assistenza" })
-    ).not.toBeInTheDocument();
-    expect(supportTrigger).toHaveFocus();
+    renderItalianNavbar();
+    const menu = openItalianMobileMenu();
+    const trigger = within(menu).getByRole("button", { name: "Apri l’assistenza" });
+    fireEvent.click(trigger);
+    const action = within(menu).getByRole("link", { name: "Apri l’assistenza Discord" });
+    expect(action).toHaveFocus();
+    fireEvent.keyDown(action, { key: "Escape" });
+    expect(menu).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Assistenza" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 
-  it("links the signed-out desktop and mobile Account controls to the canonical Clerk sign-in route", () => {
-    useAuthMock.mockReturnValue({
-      isLoaded: true,
-      isSignedIn: false,
-      sessionClaims: null,
-    });
-    renderItalianAdminNavbar();
-
-    const utilities = requireElement(
-      document.querySelector('[data-navbar-area="utilities"]'),
-      "Desktop utility area was not rendered."
-    );
-    expect(utilities.querySelector('a[href="/sign-in"]')).not.toBeNull();
-    expect(document.querySelector('a[href="/dashboard"]')).toBeNull();
-    expect(document.querySelector('a[href="/admin"]')).toBeNull();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Apri il menu di navigazione" })
-    );
-
-    const mobileMenu = screen.getByRole("dialog", {
-      name: "Navigazione mobile",
-    });
-    expect(mobileMenu.querySelector('a[href="/sign-in"]')).not.toBeNull();
-  });
-
-  it("uses the label itself as a slow accessible unread cue", async () => {
+  it("preserves unread Announcements on both surfaces without applying it to News", async () => {
+    usePathnameMock.mockReturnValue("/news");
     loadAnnouncementNavigationStateMock.mockResolvedValue({
       ok: true,
       viewer: "authenticated",
-      latest: {
-        id: "123e4567-e89b-42d3-a456-426614174000",
-        publishedAt: "2026-08-26T00:00:00.000Z",
-      },
+      latest: { id: "123e4567-e89b-42d3-a456-426614174000", publishedAt: "2026-08-26T00:00:00.000Z" },
       unread: true,
     });
-    renderItalianAdminNavbar();
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("link", {
-          name: "Annunci — nuovo annuncio ufficiale",
-        })
-      ).toBeInTheDocument();
-    });
-    const unreadLabel = screen.getByText("Annunci");
-    expect(unreadLabel.className).toMatch(/unread/);
-    expect(unreadLabel.querySelector('[aria-hidden="true"]')).toBeTruthy();
+    renderItalianNavbar();
+    await waitFor(() => expect(screen.getByRole("link", { name: "Annunci — nuovo annuncio ufficiale" })).toBeInTheDocument());
+    const updates = getArea("updates");
+    const desktopNews = within(updates).getByRole("link", { name: italianCommon.nav.news });
+    expect(within(updates).getByText("Annunci").className).toMatch(/unread/);
+    expect(desktopNews).toHaveAttribute("aria-current", "page");
+    expect(desktopNews.className).not.toMatch(/unread|shadow|glow/);
+    expect(desktopNews.querySelector('[aria-hidden="true"]')).toBeNull();
+    const menu = openItalianMobileMenu();
+    expect(within(menu).getByRole("link", { name: "Annunci — nuovo annuncio ufficiale" }).querySelector('[aria-hidden="true"]')).not.toBeNull();
+    expect(within(menu).getByRole("link", { name: italianCommon.nav.news }).className).not.toMatch(/unread|shadow|glow/);
   });
 
-  it("uses the coupled xl visibility boundary for desktop and mobile surfaces", () => {
-    renderItalianAdminNavbar();
-
-    const primaryNavigation = screen.getByRole("navigation", {
-      name: "Navigazione principale",
-    });
-    const desktopShell = requireElement(
-      primaryNavigation.querySelector('[data-navbar-area="primary"]'),
-      "Desktop primary navigation area was not rendered."
-    );
-    const desktopUtilities = requireElement(
-      primaryNavigation.querySelector('[data-navbar-area="utilities"]'),
-      "Desktop utility area was not rendered."
-    );
-    const menuToggle = screen.getByRole("button", {
-      name: "Apri il menu di navigazione",
-    });
-
-    expect(desktopShell).toHaveClass("hidden", "xl:flex");
-    expect(desktopShell).not.toHaveClass("md:flex");
-    expect(desktopUtilities).toHaveClass("hidden", "xl:flex");
-    expect(menuToggle).toHaveClass("xl:hidden");
-    expect(menuToggle).not.toHaveClass("md:hidden");
-
-    fireEvent.click(menuToggle);
-
-    const mobileMenu = screen.getByRole("dialog", {
-      name: "Navigazione mobile",
-    });
-    const backdrop = screen
-      .getAllByRole("button", { name: "Chiudi il menu di navigazione" })
-      .find((button) => button.classList.contains("fixed"));
-
-    expect(mobileMenu).toHaveClass("xl:hidden");
-    expect(mobileMenu).not.toHaveClass("md:hidden");
-    expect(backdrop).toHaveClass("xl:hidden");
-    expect(backdrop).not.toHaveClass("md:hidden");
+  it("leaves read Announcements without an unread label or dot", async () => {
+    renderItalianNavbar();
+    await waitFor(() => expect(loadAnnouncementNavigationStateMock).toHaveBeenCalled());
+    const announcement = within(getArea("updates")).getByRole("link", { name: "Annunci" });
+    expect(within(announcement).getByText("Annunci").className).not.toMatch(/unread/);
+    expect(announcement.querySelector('[aria-hidden="true"]')).toBeNull();
   });
 });

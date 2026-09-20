@@ -10,6 +10,7 @@ const PUBLIC_ROUTE_ROOTS = [
   "/about",
   "/players",
   "/announcements",
+  "/news",
 ] as const;
 
 const SELF_AUTHENTICATED_API_ROOTS = ["/api/match-proofs"] as const;
