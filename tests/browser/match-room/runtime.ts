@@ -2,6 +2,7 @@
 import type { MatchRoom, MatchRoomMessage, SendMatchRoomMessageInput } from "@/lib/match-room";
 import type { MatchRoomAssistance } from "@/lib/match-room-assistance";
 import { uxMatch } from "@/tests/fixtures/match-result-ux";
+import { visibilityTransport } from "./visibility-runtime";
 const params = new URLSearchParams(location.search);
 const scenario = params.get("scenario");
 export const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -76,12 +77,14 @@ function room(): MatchRoom {
   };
 }
 const forbidden = () => ({ ok: false as const, code: "forbidden" as const });
-export async function resolveMatchRoom() {
+export async function resolveMatchRoom(input: { matchId: string }) {
+  if (scenario === "visibility") return visibilityTransport.resolve(input);
   reload(); resolveCalls++;
   if (inaccessible()) return forbidden();
   return { ok: true as const, data: { room: scenario === "unavailable" ? null : room() } };
 }
 export async function getMatchRoomHistory(input: {roomId:string;afterSequence:number;limit:number}) {
+  if (scenario === "visibility") return visibilityTransport.history(input);
   reload(); historyCalls++;
   if (inaccessible() || input.roomId !== ROOM_ID) return forbidden();
   if (historyFails) return { ok: false as const, code: "unavailable" as const };
@@ -127,6 +130,7 @@ async function send(input: SendMatchRoomMessageInput, admin: boolean) {
 export const sendMatchRoomMessage = (input: SendMatchRoomMessageInput) => send(input,false);
 export const sendAdminMatchRoomMessage = (input: SendMatchRoomMessageInput) => send(input,true);
 export async function markMatchRoomRead(input: {roomId:string;throughSequence:number}) {
+  if (scenario === "visibility") return visibilityTransport.read(input);
   reload(); readCalls++;
   if (inaccessible() || input.roomId !== ROOM_ID) return forbidden();
   state.reads[viewer] = Math.max(state.reads[viewer] ?? 0,Math.min(input.throughSequence,state.messages.length));

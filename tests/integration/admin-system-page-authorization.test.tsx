@@ -7,6 +7,8 @@ import {
   playerIdentity,
 } from "@/tests/fixtures/auth";
 
+const matchRoomSettingMock = vi.hoisted(() => vi.fn());
+const matchRoomControlMock = vi.hoisted(() => vi.fn(() => null));
 const authMock = vi.hoisted(() => vi.fn());
 const redirectMock = vi.hoisted(() =>
   vi.fn((href: string) => {
@@ -19,6 +21,9 @@ const eloSettingMock = vi.hoisted(() => vi.fn());
 const eloSupportLinkSettingMock = vi.hoisted(() => vi.fn());
 const leaderboardControlsMock = vi.hoisted(() => vi.fn(() => null));
 const eloCheckerMock = vi.hoisted(() => vi.fn(() => null));
+
+vi.mock("@/lib/match-room-settings", () => ({ getAdminMatchRoomSetting: matchRoomSettingMock }));
+vi.mock("@/components/AdminMatchRoomControl", () => ({ default: matchRoomControlMock }));
 
 vi.mock("@/lib/i18n/request", () => ({ getRequestLocale: async () => "en" }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
@@ -42,6 +47,8 @@ import AdminSystemPage from "@/app/admin/system/page";
 
 describe("Admin System & Recovery page authorization", () => {
   beforeEach(() => {
+    matchRoomSettingMock.mockReset();
+    matchRoomSettingMock.mockResolvedValue({ ok: true, enabled: false });
     authMock.mockReset();
     redirectMock.mockClear();
     completedTournamentsMock.mockReset();
@@ -58,6 +65,7 @@ describe("Admin System & Recovery page authorization", () => {
 
     await expect(AdminSystemPage()).rejects.toThrow("NEXT_REDIRECT:/");
 
+    expect(matchRoomSettingMock).not.toHaveBeenCalled();
     expect(completedTournamentsMock).not.toHaveBeenCalled();
     expect(recentRunsMock).not.toHaveBeenCalled();
     expect(eloSettingMock).not.toHaveBeenCalled();
@@ -107,6 +115,8 @@ describe("Admin System & Recovery page authorization", () => {
     );
     const eloChecker = findElementByType(page, eloCheckerMock);
 
+    expect(matchRoomSettingMock).toHaveBeenCalledExactlyOnceWith();
+    expect(findElementByType(page, matchRoomControlMock)?.props).toMatchObject({ setting: { ok: true, enabled: false }, locale: "en" });
     expect(completedTournamentsMock).toHaveBeenCalledExactlyOnceWith();
     expect(recentRunsMock).toHaveBeenCalledExactlyOnceWith(8);
     expect(eloSettingMock).toHaveBeenCalledExactlyOnceWith();

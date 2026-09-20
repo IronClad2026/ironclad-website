@@ -218,6 +218,8 @@ describe("Match Room command contract", () => {
     ["40001", "MATCH_ROOM_STALE", "stale_room"],
     ["55000", "MATCH_ROOM_READ_ONLY", "read_only"],
     ["23505", "MATCH_ROOM_IDEMPOTENCY_CONFLICT", "idempotency_conflict"],
+    ["P0001", "MATCH_ROOM_DISABLED", "disabled"],
+    ["55P03", "lock not available", "unavailable"],
     ["P0001", "MATCH_ROOM_RATE_LIMITED", "rate_limited"],
     ["P0001", "private database detail", "unavailable"],
     ["XX000", "private database detail", "unavailable"],

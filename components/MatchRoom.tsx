@@ -83,6 +83,8 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
   const earlierPending = useRef<object | null>(null);
   const prependAnchor = useRef<{ roomId: string; messageId: string; top: number } | null>(null);
   const transcript = useRef<HTMLDivElement>(null);
+  const transcriptTail = useRef<HTMLDivElement>(null);
+  const tailIntersecting = useRef(false);
   const current = useRef<MatchRoomHistory | null>(null);
   const scope = useRef({ alive: false, epoch: 0, session: 0 });
   const busy = useRef(false);
@@ -100,6 +102,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
     readPending.current = null;
     sendingRef.current = false;
     nearBottom.current = true;
+    tailIntersecting.current = false;
     setHistory(null);
     setLoaded(false);
     setDraft("");
@@ -145,6 +148,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
             setHistory(first.data);
             setLoaded(true);
             setLoadError(null);
+            if (target.writable) setSendError((error) => error === "disabled" ? null : error);
             return;
           }
         }
@@ -186,6 +190,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
       if (previous && incoming.messages.length > 0 && !nearBottom.current) setNewMessages(true);
       setLoaded(true);
       setLoadError(null);
+      if (nextRoom.writable) setSendError((error) => error === "disabled" ? null : error);
     } catch (error) {
       if (!isCurrentRequest()) return;
       const code = typeof error === "string" ? error as MatchRoomErrorCode : "unavailable";
@@ -298,7 +303,36 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
   }, [history]);
 
   useEffect(() => {
+    const tail = transcriptTail.current;
+    tailIntersecting.current = false;
+    if (!tail || typeof IntersectionObserver === "undefined") return;
+    // The viewport observer also respects the transcript's clipping container.
+    // Merely mounting a room or polling it is not evidence that it was viewed.
+    const observer = new IntersectionObserver(([entry]) => {
+      tailIntersecting.current = entry.isIntersecting && entry.intersectionRatio === 1;
+      if (tailIntersecting.current) setViewVersion((value) => value + 1);
+    }, { threshold: 1 });
+    observer.observe(tail);
+    return () => {
+      tailIntersecting.current = false;
+      observer.disconnect();
+    };
+  }, [history?.room.id]);
+
+  useEffect(() => {
     if (!history || earlierPending.current || !visibleAndOnline() || !nearBottom.current || history.hasMore) return;
+    const tail = transcriptTail.current;
+    const log = transcript.current;
+    if (!tailIntersecting.current || !tail || !log) return;
+    // Intersection callbacks are asynchronous. Recheck current layout so an old
+    // visible entry cannot acknowledge a newly appended tail outside the view.
+    const bounds = tail.getBoundingClientRect();
+    const logBounds = log.getBoundingClientRect();
+    if (bounds.height <= 0 || bounds.width <= 0 ||
+        bounds.top < Math.max(0, logBounds.top) ||
+        bounds.bottom > Math.min(window.innerHeight, logBounds.bottom) ||
+        bounds.left < Math.max(0, logBounds.left) ||
+        bounds.right > Math.min(window.innerWidth, logBounds.right)) return;
     const throughSequence = history.messages.at(-1)?.sequence ?? 0;
     if (throughSequence !== history.room.lastSequence || throughSequence <= history.room.lastReadSequence) return;
     const key = `${history.room.id}:${throughSequence}`;
@@ -343,7 +377,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
       if (!scope.current.alive || requestEpoch !== scope.current.epoch) return;
       if (!result.ok) {
         setSendError(result.code);
-        if (result.code === "stale_room" || result.code === "read_only" ||
+        if (result.code === "stale_room" || result.code === "read_only" || result.code === "disabled" ||
             result.code === "forbidden" || result.code === "auth_required") void refresh();
         return;
       }
@@ -375,7 +409,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
   const errorText = (code: MatchRoomErrorCode) =>
     admin && code === "forbidden" ? copy.adminProfileRequired : copy.errors[code];
   const sendBlocked = sendError === "stale_room" || sendError === "read_only" ||
-    sendError === "forbidden" || sendError === "auth_required";
+    sendError === "forbidden" || sendError === "auth_required" || sendError === "disabled";
   const buttonClass = "min-h-11 rounded-lg border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-orange-400/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
@@ -435,6 +469,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{message.body}</p>
               </article>
             ))}
+            <div ref={transcriptTail} aria-hidden="true" data-match-room-tail className="h-px" />
           </div>
           <div aria-live="polite">
           {(newMessages || history.hasMore) && (
@@ -467,9 +502,9 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
                   {sending ? copy.sending : sendError ? copy.retry : copy.send}
                 </button>
               </div>
-              {sendError && <p role="alert" className="mt-3 text-sm text-amber-300">{errorText(sendError)}</p>}
             </form>
           )}
+          {sendError && <p role="alert" className="mt-3 text-sm text-amber-300">{errorText(sendError)}</p>}
           {footer && <div className="mt-4 border-t border-zinc-800 pt-4">{footer(room)}</div>}
         </>
       )}

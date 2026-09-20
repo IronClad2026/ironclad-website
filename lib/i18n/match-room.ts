@@ -114,6 +114,7 @@ const MATCH_ROOM_COPY: Record<Locale, MatchRoomCopy> = {
     discordCopyFailed: "Could not copy the username. Please try again.",
     characterUnit: "characters",
     errors: {
+      disabled: "Match Room activity is temporarily disabled. Existing messages remain available.",
       auth_required: "Sign in to access this Match Room.",
       forbidden: "You do not have access to this Match Room.",
       invalid_request: "Check your message. Use 1–1,000 characters and include visible text.",
@@ -174,6 +175,7 @@ const MATCH_ROOM_COPY: Record<Locale, MatchRoomCopy> = {
     discordCopyFailed: "Impossibile copiare il nome utente. Riprova.",
     characterUnit: "caratteri",
     errors: {
+      disabled: "L’attività della stanza è temporaneamente disattivata. I messaggi esistenti restano disponibili.",
       auth_required: "Accedi per aprire questa sala partita.",
       forbidden: "Non hai accesso a questa sala partita.",
       invalid_request: "Controlla il messaggio. Usa da 1 a 1.000 caratteri e includi testo visibile.",
@@ -234,6 +236,7 @@ const MATCH_ROOM_COPY: Record<Locale, MatchRoomCopy> = {
     discordCopyFailed: "无法复制用户名，请重试。",
     characterUnit: "字符",
     errors: {
+      disabled: "比赛聊天室活动已暂时禁用。现有消息仍可查看。",
       auth_required: "请登录后访问此比赛聊天室。",
       forbidden: "你无权访问此比赛聊天室。",
       invalid_request: "请检查消息。长度须为 1–1,000 个字符，且须包含可见文字。",
@@ -294,6 +297,7 @@ const MATCH_ROOM_COPY: Record<Locale, MatchRoomCopy> = {
     discordCopyFailed: "Не удалось скопировать имя пользователя. Повторите попытку.",
     characterUnit: "символов",
     errors: {
+      disabled: "Активность комнаты временно отключена. Существующие сообщения остаются доступными.",
       auth_required: "Войдите, чтобы открыть эту комнату матча.",
       forbidden: "У вас нет доступа к этой комнате матча.",
       invalid_request: "Проверьте сообщение: от 1 до 1 000 символов, включая видимый текст.",
@@ -354,6 +358,7 @@ const MATCH_ROOM_COPY: Record<Locale, MatchRoomCopy> = {
     discordCopyFailed: "No se pudo copiar el nombre de usuario. Inténtalo de nuevo.",
     characterUnit: "caracteres",
     errors: {
+      disabled: "La actividad de la sala está desactivada temporalmente. Los mensajes existentes siguen disponibles.",
       auth_required: "Inicia sesión para acceder a esta sala.",
       forbidden: "No tienes acceso a esta sala.",
       invalid_request: "Revisa el mensaje. Usa entre 1 y 1000 caracteres e incluye texto visible.",
@@ -414,6 +419,7 @@ const MATCH_ROOM_COPY: Record<Locale, MatchRoomCopy> = {
     discordCopyFailed: "Não foi possível copiar o nome de usuário. Tente novamente.",
     characterUnit: "caracteres",
     errors: {
+      disabled: "A atividade da sala está temporariamente desativada. As mensagens existentes continuam disponíveis.",
       auth_required: "Entre na sua conta para acessar esta sala.",
       forbidden: "Você não tem acesso a esta sala.",
       invalid_request: "Confira a mensagem. Use de 1 a 1.000 caracteres e inclua texto visível.",
@@ -474,6 +480,7 @@ const MATCH_ROOM_COPY: Record<Locale, MatchRoomCopy> = {
     discordCopyFailed: "사용자 이름을 복사하지 못했습니다. 다시 시도해 주세요.",
     characterUnit: "자",
     errors: {
+      disabled: "경기 대화방 활동이 일시적으로 비활성화되었습니다. 기존 메시지는 계속 볼 수 있습니다.",
       auth_required: "이 경기 대화방에 접근하려면 로그인하세요.",
       forbidden: "이 경기 대화방에 접근할 권한이 없습니다.",
       invalid_request: "메시지를 확인하세요. 표시되는 텍스트를 포함해 1~1,000자를 입력하세요.",
@@ -534,6 +541,7 @@ const MATCH_ROOM_COPY: Record<Locale, MatchRoomCopy> = {
     discordCopyFailed: "Impossible de copier le nom d’utilisateur. Réessayez.",
     characterUnit: "caractères",
     errors: {
+      disabled: "L’activité du salon est temporairement désactivée. Les messages existants restent disponibles.",
       auth_required: "Connectez-vous pour accéder à ce salon.",
       forbidden: "Vous n’avez pas accès à ce salon.",
       invalid_request: "Vérifiez votre message. Utilisez de 1 à 1 000 caractères et incluez du texte visible.",

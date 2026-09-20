@@ -11,7 +11,7 @@ const races = readFileSync(resolve(process.cwd(), "tests/database/match-room-pha
 
 describe("Match Room Phase 3 migration boundary", () => {
   it("adds only operational state in one forward transaction", () => {
-    expect(readdirSync(directory).sort().at(-1)).toBe(name);
+    expect(readdirSync(directory).sort().filter((entry) => entry <= name).at(-1)).toBe(name);
     expect(sql).toMatch(/^begin;.*commit;$/i);
     expect(sql).not.toMatch(/pg_get_functiondef|create extension|create publication|cron\.|storage\./i);
     expect(sql).not.toMatch(/(?:update|delete from|insert into) public\.(?:tournament_matches|tournaments|registrations|match_result|leaderboard)/i);

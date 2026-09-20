@@ -33,6 +33,11 @@ beforeEach(() => {
 });
 
 describe("room assistance commands", () => {
+  it("reports shutdown denial without returning private database errors", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "MATCH_ROOM_DISABLED" } });
+    expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: "disabled" });
+    expect(await requestMatchAdminAssistance({ ...input, expectedRequestVersion: 1 })).toEqual({ ok: false, code: "disabled" });
+  });
   it("requires authentication before any private RPC", async () => {
     mocks.auth.mockResolvedValue({ userId: null });
     expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: "auth_required" });

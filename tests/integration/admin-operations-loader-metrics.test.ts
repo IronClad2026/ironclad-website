@@ -18,7 +18,7 @@ const PREVIOUS = "2026-08-10T09:00:00.000Z";
 
 function queryFor(rows: unknown[]) {
   const query: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "is", "limit"]) {
+  for (const method of ["select", "eq", "is", "or", "limit"]) {
     query[method] = vi.fn(() => query);
   }
   query.then = (
@@ -34,6 +34,31 @@ function queryFor(rows: unknown[]) {
       reject
     );
   return query;
+}
+
+function legacyAssistance(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "legacy-assistance-1",
+    actor_display_name: "Repeat Player",
+    tournament_id: "tournament-live",
+    tournament_title: "IronClad Live",
+    match_id: "match-playable",
+    created_at: CURRENT,
+    metadata: null,
+    event_key: "match:old-request:admin_assistance_requested",
+    in_app_hidden_at: null,
+    ...overrides,
+  };
+}
+
+function installAssistanceQueues(legacyRows: unknown[], requests: unknown[] = []) {
+  const tables = fixtureTables();
+  const notifications = queryFor(legacyRows);
+  const from = vi.fn((table: string) => table === "notifications"
+    ? notifications : queryFor(tables[table] ?? []));
+  const rpc = vi.fn(async () => ({ data: { requests, totalCount: requests.length }, error: null }));
+  createSupabaseAdminClientMock.mockReturnValue({ from, rpc });
+  return { from, rpc, notifications, tables };
 }
 
 function match(
@@ -466,6 +491,9 @@ function fixtureTables(): Record<string, unknown[]> {
     notifications: [
       {
         id: "assistance-1",
+        metadata: { roomId: "22222222-2222-4222-8222-222222222222" },
+        event_key: null,
+        in_app_hidden_at: null,
         actor_display_name: "Repeat Player",
         tournament_id: "tournament-live",
         tournament_title: "IronClad Live",
@@ -499,7 +527,8 @@ describe("Admin Operations canonical loader metrics", () => {
     const rpc = vi.fn(async () => ({ data: { requests: [{ roomId, matchId: "match-playable", tournamentId: "tournament-live", tournamentTitle: "IronClad Live", status: "requested", requestVersion: 3, requestedAt: CURRENT }], totalCount: 1 }, error: null }));
     createSupabaseAdminClientMock.mockReturnValue({ from, rpc });
     const metrics = await loadAdminOperationsMetrics("7d");
-    expect(from).not.toHaveBeenCalledWith("notifications");
+    expect(from).toHaveBeenCalledWith("notifications");
+    expect(metrics?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
     expect(rpc).toHaveBeenCalledWith("list_match_room_assistance_requests", { p_limit: 5000 });
     expect(JSON.stringify(metrics)).toContain("/admin/tournaments/tournament-live?section=matches&match=match-playable&room=" + roomId);
   });
@@ -514,6 +543,137 @@ describe("Admin Operations canonical loader metrics", () => {
     await expect(loadAdminOperationsMetrics("7d")).rejects.toThrow();
     errorLog.mockRestore();
   });
+
+  it("keeps visible read legacy requests beside canonical requests using only their proven Match route", async () => {
+    const roomId = "22222222-2222-4222-8222-222222222222";
+    const { notifications } = installAssistanceQueues([
+      legacyAssistance({ read_at: CURRENT, tournament_id: "untrusted-tournament-hint" }),
+    ], [{ roomId, matchId: "match-playable", tournamentId: "tournament-live", tournamentTitle: "IronClad Live", status: "requested", requestVersion: 2, requestedAt: CURRENT }]);
+    const metrics = await loadAdminOperationsMetrics("7d");
+
+    expect(metrics?.matches.operationalHealth.pendingAdminAssistance).toBe(2);
+    const legacy = metrics?.matches.who.adminAssistance.find((row) => row.id === "legacy-assistance-1");
+    expect(legacy).toMatchObject({
+      primary: "Legacy assistance request",
+      href: "/admin/tournaments/tournament-live?section=matches&match=match-playable",
+    });
+    expect(legacy?.meta).toContain("dismiss the legacy notification in Notifications");
+    expect(JSON.stringify(legacy)).not.toContain("untrusted-tournament-hint");
+    expect(notifications.eq).toHaveBeenCalledWith("recipient_role", "admin");
+    expect(notifications.eq).toHaveBeenCalledWith("type", "match.admin_assistance_requested");
+    expect(notifications.is).toHaveBeenCalledExactlyOnceWith("in_app_hidden_at", null);
+    expect(notifications.or).toHaveBeenCalledExactlyOnceWith("event_key.is.null,event_key.not.like.match-room:%");
+    expect(notifications.select).toHaveBeenCalledWith(expect.not.stringContaining("clerk"), { count: "exact" });
+    expect(notifications.limit).toHaveBeenCalledExactlyOnceWith(5001);
+  });
+
+  it.each([undefined, null, {}, { roomId: null }, { roomId: "" }, { roomId: "not-a-room" }, { roomId: 123 }])(
+    "retains truly legacy requests with absent or malformed room hints: %j", async (metadata) => {
+      installAssistanceQueues([legacyAssistance({ metadata })]);
+      const metrics = await loadAdminOperationsMetrics("7d");
+      expect(metrics?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
+      expect(metrics?.matches.who.adminAssistance[0].href).toBe("/admin/tournaments/tournament-live?section=matches&match=match-playable");
+      expect(metrics?.matches.who.adminAssistance[0].primary).toBe("Legacy assistance request");
+    }
+  );
+
+  it("does not double-count canonical notices or room-only Phase 2 backfill notices", async () => {
+    const roomId = "22222222-2222-4222-8222-222222222222";
+    installAssistanceQueues([
+      legacyAssistance({ id: "backfilled-no-key", metadata: { roomId }, event_key: null }),
+      legacyAssistance({ id: "backfilled-old-key", metadata: { roomId } }),
+      legacyAssistance({ id: "canonical", metadata: { roomId }, event_key: "match-room:" + roomId + ":assistance:1" }),
+      legacyAssistance({ id: "canonical-bad-hint", metadata: { roomId: "" }, event_key: "match-room:" + roomId + ":assistance:1" }),
+    ], [{ roomId, matchId: "match-playable", tournamentId: "tournament-live", tournamentTitle: "IronClad Live", status: "requested", requestVersion: 1, requestedAt: CURRENT }]);
+    const metrics = await loadAdminOperationsMetrics("7d");
+    expect(metrics?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
+    expect(metrics?.matches.who.adminAssistance).toHaveLength(1);
+    expect(metrics?.matches.who.adminAssistance[0].primary).toBe("Match Room assistance");
+  });
+
+  it("dismisses only the legacy queue item and never resolves canonical assistance through notification state", async () => {
+    const roomId = "22222222-2222-4222-8222-222222222222";
+    const rows = [legacyAssistance({ read_at: CURRENT })];
+    installAssistanceQueues(rows, [{ roomId, matchId: "match-playable", tournamentId: "tournament-live", tournamentTitle: "IronClad Live", status: "requested", requestVersion: 1, requestedAt: CURRENT }]);
+    expect((await loadAdminOperationsMetrics("7d"))?.matches.operationalHealth.pendingAdminAssistance).toBe(2);
+    rows[0] = legacyAssistance({ in_app_hidden_at: CURRENT });
+    const dismissed = await loadAdminOperationsMetrics("7d");
+    expect(dismissed?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
+    expect(dismissed?.matches.who.adminAssistance[0].primary).toBe("Match Room assistance");
+  });
+
+  it("loads an old-writer request inserted after the first snapshot without a migration or room invention", async () => {
+    const rows: unknown[] = [];
+    const { from } = installAssistanceQueues(rows);
+    expect((await loadAdminOperationsMetrics("7d"))?.matches.operationalHealth.pendingAdminAssistance).toBe(0);
+    rows.push(legacyAssistance({ created_at: NOW, event_key: null }));
+    const next = await loadAdminOperationsMetrics("7d");
+    expect(next?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
+    expect(next?.matches.who.adminAssistance[0].id).toBe("legacy-assistance-1");
+    expect(next?.matches.who.adminAssistance[0].href).not.toContain("room=");
+    expect(from.mock.calls.filter(([table]) => table === "notifications")).toHaveLength(2);
+  });
+
+  it("keeps legacy requests for existing unlaunched Matches with the proven admin Match route", async () => {
+    installAssistanceQueues([legacyAssistance({ match_id: "match-unlaunched" })]);
+    const metrics = await loadAdminOperationsMetrics("7d");
+    expect(metrics?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
+    expect(metrics?.matches.who.adminAssistance[0]).toMatchObject({
+      primary: "Legacy assistance request",
+      secondary: "IronClad Registration Open",
+      href: "/admin/tournaments/tournament-registration-open?section=matches&match=match-unlaunched",
+    });
+  });
+
+  it("keeps unresolved legacy requests after reset, reassignment and removal of the launch marker", async () => {
+    const { tables } = installAssistanceQueues([legacyAssistance()]);
+    expect((await loadAdminOperationsMetrics("7d"))?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
+    const match = tables.tournament_matches.find((row) => (row as Record<string, unknown>).id === "match-playable") as Record<string, unknown>;
+    Object.assign(match, { status: "scheduled", activation_version: 0, activated_at: null,
+      player_one_registration_id: null, player_two_registration_id: null });
+    (tables.tournament_brackets[0] as Record<string, unknown>).launched_at = null;
+
+    const metrics = await loadAdminOperationsMetrics("7d");
+    expect(metrics?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
+    expect(metrics?.matches.who.adminAssistance[0]).toMatchObject({
+      id: "legacy-assistance-1", primary: "Legacy assistance request",
+      href: "/admin/tournaments/tournament-live?section=matches&match=match-playable",
+    });
+    expect(metrics?.matches.who.adminAssistance[0].href).not.toContain("room=");
+  });
+
+  it("retains orphan legacy requests with an unavailable label and existing Notifications fallback", async () => {
+    installAssistanceQueues([
+      legacyAssistance({ id: "null-match", match_id: null }),
+      legacyAssistance({ id: "deleted-match", match_id: "unknown-match" }),
+    ]);
+    const metrics = await loadAdminOperationsMetrics("7d");
+    expect(metrics?.matches.operationalHealth.pendingAdminAssistance).toBe(2);
+    expect(metrics?.matches.who.adminAssistance).toHaveLength(2);
+    for (const row of metrics!.matches.who.adminAssistance) {
+      expect(row).toMatchObject({ primary: "Legacy assistance request", secondary: "Match unavailable", href: "/admin" });
+      expect(row.meta).toContain("Admin Notification Center");
+    }
+  });
+
+  it("does not route by a notification's Tournament hint if the retained Match hierarchy is unavailable", async () => {
+    const { tables } = installAssistanceQueues([legacyAssistance()]);
+    tables.generated_brackets.length = 0;
+    const metrics = await loadAdminOperationsMetrics("7d");
+    expect(metrics?.matches.operationalHealth.pendingAdminAssistance).toBe(1);
+    expect(metrics?.matches.who.adminAssistance[0]).toMatchObject({ secondary: "Match unavailable", href: "/admin" });
+  });
+
+  it("fails closed when the legacy exact-count query is incomplete", async () => {
+    const { notifications } = installAssistanceQueues([]);
+    notifications.then = (resolve: (value: unknown) => unknown) => Promise.resolve({
+      data: [], count: 5001, error: null,
+    }).then(resolve);
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(loadAdminOperationsMetrics("7d")).rejects.toMatchObject({ name: "AdminOperationsMetricsError" });
+    errorLog.mockRestore();
+  });
+
   it("groups Players, registrations, Tournaments, and Divisions without merging statuses", async () => {
     const metrics = await loadAdminOperationsMetrics("7d");
     expect(metrics).not.toBeNull();

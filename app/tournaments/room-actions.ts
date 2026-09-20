@@ -197,6 +197,7 @@ function roomRpcFailure(error: unknown): MatchRoomActionFailure {
     case "55000": return failure("read_only");
     case "23505": return failure("idempotency_conflict");
     case "P0001":
+      if (message === "MATCH_ROOM_DISABLED") return failure("disabled");
       return failure(message === "MATCH_ROOM_RATE_LIMITED" ? "rate_limited" : "unavailable");
     default: return failure("unavailable");
   }

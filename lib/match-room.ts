@@ -84,6 +84,7 @@ export type MatchRoomErrorCode =
   | "invalid_request"
   | "stale_room"
   | "read_only"
+  | "disabled"
   | "rate_limited"
   | "idempotency_conflict"
   | "legal_required"
