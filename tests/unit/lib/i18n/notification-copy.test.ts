@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { SUPPORTED_LOCALES } from "@/lib/i18n/config";
+import { loadDictionary } from "@/lib/i18n/loaders";
 
 import notificationsEnglish from "@/lib/i18n/dictionaries/en/notifications";
 import notificationsItalian from "@/lib/i18n/dictionaries/it/notifications";
@@ -35,6 +37,23 @@ const KNOWN_TYPES = [
 ] as const;
 
 describe("localized notification copy", () => {
+  it.each(SUPPORTED_LOCALES)("uses generic message episode copy in %s without private metadata", async (locale) => {
+    const dictionary = await loadDictionary(locale, "notifications");
+    const copy = localizePlayerNotificationCopy({
+      type: "match.message_received", tournamentTitle: "PRIVATE_TOURNAMENT",
+      metadata: { body: "PRIVATE_MESSAGE", actorClerkUserId: "PRIVATE_ACTOR" },
+    }, dictionary);
+    expect(copy).toEqual({
+      title: dictionary.server.matchMessageReceivedTitle,
+      message: dictionary.server.matchMessageReceivedMessage,
+    });
+    expect(copy?.title.length).toBeGreaterThan(0);
+    expect(copy?.title.length).toBeLessThanOrEqual(80);
+    expect(copy?.message.length).toBeGreaterThan(0);
+    expect(copy?.message.length).toBeLessThanOrEqual(180);
+    expect(JSON.stringify(copy)).not.toContain("PRIVATE_");
+    if (locale !== "en") expect(copy?.message).not.toBe(notificationsEnglish.server.matchMessageReceivedMessage);
+  });
   it.each(KNOWN_TYPES)("renders known type %s from stable type data", (type) => {
     const copy = localizePlayerNotificationCopy(
       { type, tournamentTitle: "Admin Authored Cup" },

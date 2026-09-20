@@ -10,9 +10,11 @@ import { isAccountLegalAcceptanceRpcError } from "@/lib/account-legal-rpc-error"
 import {
   isMarkMatchRoomReadInput,
   isMatchRoomHistoryInput,
+  isMatchRoomEarlierHistoryInput,
   isResolveMatchRoomInput,
   isSendMatchRoomMessageInput,
   parseMatchRoomHistory,
+  parseMatchRoomEarlierHistory,
   parseMatchRoomReadResult,
   parseMatchRoomSendResult,
   parseResolveMatchRoomResult,
@@ -21,6 +23,8 @@ import {
   type MatchRoomActionResult,
   type MatchRoomErrorCode,
   type MatchRoomHistory,
+  type MatchRoomEarlierHistory,
+  type MatchRoomEarlierHistoryInput,
   type MatchRoomHistoryInput,
   type MatchRoomReadResult,
   type MatchRoomSendResult,
@@ -60,6 +64,24 @@ export async function getMatchRoomHistory(
       p_limit: input.limit,
     },
     (value) => parseMatchRoomHistory(value, input)
+  );
+}
+
+/** Each bounded earlier page repeats the authenticated immutable-room check. */
+export async function getMatchRoomEarlierHistory(
+  input: MatchRoomEarlierHistoryInput
+): Promise<MatchRoomActionResult<MatchRoomEarlierHistory>> {
+  const denied = await authorizeRoomAction();
+  if (denied) return denied;
+  if (!isMatchRoomEarlierHistoryInput(input)) return failure("invalid_request");
+  return callRoomRpc(
+    "get_match_room_earlier_history",
+    {
+      p_room_id: input.roomId,
+      p_before_sequence: input.beforeSequence,
+      p_limit: input.limit,
+    },
+    (value) => parseMatchRoomEarlierHistory(value, input)
   );
 }
 

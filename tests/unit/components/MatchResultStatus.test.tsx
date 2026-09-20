@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   dispute: vi.fn(),
   support: vi.fn(),
+  supportState: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: mocks.refresh }),
@@ -36,6 +37,8 @@ vi.mock("@/lib/supabase-browser", () => ({
 }));
 vi.mock("@/app/tournaments/support-actions", () => ({
   requestMatchAdminAssistance: mocks.support,
+  getMatchRoomAssistance: mocks.supportState,
+  resolveMatchAdminAssistance: vi.fn(),
   getMatchRoomOpponentDiscord: vi.fn(async () => ({ discordUsername: null })),
 }));
 import MatchConfirmationCountdown from "@/components/MatchConfirmationCountdown";
@@ -49,6 +52,7 @@ import {
 } from "@/tests/fixtures/match-result-ux";
 
 beforeEach(() => {
+  mocks.supportState.mockResolvedValue({ ok: true, data: { roomId: "22222222-2222-4222-8222-222222222222", status: "none", requestVersion: 0, requestedAt: null, resolvedAt: null, canResolve: false } });
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-09-04T14:00:00Z"));
 });
@@ -348,14 +352,14 @@ describe("existing public match projections", () => {
 });
 
 it("requests in-app assistance for the exact room instead of opening an external channel", async () => {
-  mocks.support.mockResolvedValue({ success: true });
+  mocks.support.mockResolvedValue({ ok: true, data: { roomId: "22222222-2222-4222-8222-222222222222", status: "requested", requestVersion: 1, requestedAt: "2026-09-20T01:00:00Z", resolvedAt: null, canResolve: false } });
   render(<DiscordSupportLink matchId={uxMatch.id} roomId="22222222-2222-4222-8222-222222222222" roomRevision={1} />);
+  await tick();
   fireEvent.click(screen.getByRole("button", { name: "Request Admin Assistance" }));
   await tick();
   expect(mocks.support).toHaveBeenCalledWith({
-    matchId: uxMatch.id,
     roomId: "22222222-2222-4222-8222-222222222222",
-    roomRevision: 1,
+    expectedRequestVersion: 0,
   });
   expect(screen.queryByRole("link")).not.toBeInTheDocument();
 });

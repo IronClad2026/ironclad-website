@@ -46,7 +46,11 @@ describe("Match Room localization", () => {
         "title", "privateNotice", "placeholder", "send", "sending", "retry",
         "readOnly", "historical", "empty", "newMessages", "historyNotice",
         "adminProfileRequired", "assistanceLabel", "assistanceSuccess",
-        "discordOptional", "discordNotShared",
+        "discordOptional", "discordNotShared", "historyLoadFailed",
+        "assistanceStatusNone", "assistanceStatusRequested", "assistanceStatusResolved",
+        "assistanceRequestAgain", "assistanceReopen", "assistanceResolve", "assistanceResolving",
+        "assistanceLoadFailed", "assistanceActionFailed", "assistanceRequestConfirmation",
+        "assistanceResolutionConfirmation",
       ] as const) {
         expect(copy[key], `${locale}.${key}`).not.toBe(english[key]);
       }

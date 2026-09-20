@@ -8,6 +8,7 @@ export default defineConfig({
   root, plugins: [react()],
   resolve: { alias: [
     { find: "@/app/tournaments/room-actions", replacement: runtime },
+    { find: "@/app/tournaments/support-actions", replacement: runtime },
     ...["@/app/tournaments/match-actions", "@/lib/supabase-browser", "@clerk/nextjs", "next/navigation"]
       .map((find) => ({ find, replacement: resultRuntime })),
     { find: "@", replacement: root },

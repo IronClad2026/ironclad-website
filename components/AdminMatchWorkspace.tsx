@@ -1,6 +1,7 @@
 "use client";
 
 import MatchRoom from "@/components/MatchRoom";
+import MatchRoomAssistanceControls from "@/components/MatchRoomAssistanceControls";
 
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
@@ -195,6 +196,7 @@ export default function AdminMatchWorkspace({
           name: participant.name,
         }))}
         admin
+        footer={(room) => room ? <MatchRoomAssistanceControls key={room.id} roomId={room.id} admin /> : null}
       />
       <section
         aria-label="Result & Replay Evidence"

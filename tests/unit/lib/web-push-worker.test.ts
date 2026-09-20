@@ -215,6 +215,111 @@ describe("Web Push worker", () => {
     mocks.sendNotification.mockResolvedValue({ statusCode: 201 });
   });
 
+
+  function useMessageClaim() {
+    mocks.rpc.mockImplementation(async (name: string) =>
+      name === "claim_web_push_notifications"
+        ? { data: [claimRow({
+          notification_type: "match.message_received",
+          event_key: "room:r:recipient:p:episode:e",
+          metadata: { roomId: SUBSCRIPTION_ID, body: "PRIVATE_MESSAGE", actor: "PRIVATE_ACTOR" },
+        })], error: null }
+        : { data: true, error: null }
+    );
+    mocks.localizeCopy.mockReturnValue({
+      title: "New Match Room message", message: "You have new messages in your Match Room.",
+    });
+  }
+
+  it("delivers generic localized message episode copy through the existing worker", async () => {
+    useMessageClaim();
+    await expect(runWebPushWorker()).resolves.toMatchObject({ claimed: 1, sent: 1 });
+    expect(mocks.rpc).toHaveBeenCalledWith("claim_web_push_notifications", { p_limit: 10 });
+    expect(mocks.localizeCopy).toHaveBeenCalledWith(
+      { type: "match.message_received", tournamentTitle: null }, { fixture: true }
+    );
+    expect(mocks.loadDictionary).toHaveBeenCalledWith("fr", "notifications");
+    expect(mocks.sendNotification).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(mocks.sendNotification.mock.calls[0][1]);
+    expect(payload).toMatchObject({
+      type: "match.message_received", scope: "player",
+      body: "You have new messages in your Match Room.",
+    });
+    expect(JSON.stringify(payload)).not.toMatch(/PRIVATE_|roomId|episodeId|user_player/);
+  });
+
+  it("suppresses a message push when its room is caught up during recipient lookup", async () => {
+    useMessageClaim();
+    mocks.getUser.mockImplementation(async () => {
+      mocks.notificationStateRows = [{
+        id: NOTIFICATION_ID, read_at: "2026-09-20T00:00:00Z",
+        in_app_hidden_at: null, push_delivery_status: "processing", push_claim_token: CLAIM_TOKEN,
+      }];
+      return {
+        id: "user_player", banned: false, locked: false,
+        publicMetadata: { role: "player" }, privateMetadata: {},
+      };
+    });
+    await expect(runWebPushWorker()).resolves.toMatchObject({ skipped: 1, sent: 0 });
+    expect(mocks.sendNotification).not.toHaveBeenCalled();
+    expect(completionCalls().at(-1)?.[1]).toMatchObject({
+      p_outcome: "skipped", p_error_code: "NO_LONGER_UNREAD",
+    });
+  });
+
+
+  it("skips assistance resolved during admin lookup even when other alerts remain unread", async () => {
+    mocks.rpc.mockImplementation(async (name: string) =>
+      name === "claim_web_push_notifications"
+        ? { data: [claimRow({
+          recipient_clerk_user_id: null, recipient_role: "admin",
+          notification_type: "match.admin_assistance_requested",
+          event_key: "match-room:r:assistance:1", metadata: { roomId: SUBSCRIPTION_ID },
+        })], error: null }
+        : { data: true, error: null }
+    );
+    mocks.getUserList.mockImplementation(async () => {
+      mocks.notificationStateRows = [{
+        id: NOTIFICATION_ID, read_at: "2026-09-20T00:00:00Z",
+        in_app_hidden_at: "2026-09-20T00:00:00Z",
+        push_delivery_status: "processing", push_claim_token: CLAIM_TOKEN,
+      }];
+      return { data: [{
+        id: "admin_current", banned: false, locked: false, publicMetadata: { role: "admin" },
+      }], totalCount: 1 };
+    });
+    mocks.subscriptionRows = [{ ...subscriptionRow(), owner_clerk_user_id: "admin_current" }];
+    mocks.loadUnreadCount.mockResolvedValue(3);
+    await expect(runWebPushWorker()).resolves.toMatchObject({ skipped: 1, sent: 0 });
+    expect(mocks.loadUnreadCount).toHaveBeenCalledWith({ scope: "admin", clerkUserId: null });
+    expect(mocks.sendNotification).not.toHaveBeenCalled();
+    expect(completionCalls().at(-1)?.[1]).toMatchObject({
+      p_outcome: "skipped", p_error_code: "NO_LONGER_UNREAD",
+    });
+  });
+
+  it("retries a late episode-state lookup failure without sending speculative push", async () => {
+    useMessageClaim();
+    mocks.loadDictionary.mockImplementation(async () => {
+      mocks.notificationStateError = { code: "TEMPORARY" };
+      return { fixture: true };
+    });
+    await expect(runWebPushWorker()).resolves.toMatchObject({ retryableFailures: 1, sent: 0 });
+    expect(mocks.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("keeps provider failure isolated from persisted messages and notification creation", async () => {
+    useMessageClaim();
+    mocks.sendNotification.mockRejectedValue({ statusCode: 503, body: "PRIVATE_PROVIDER_DETAILS" });
+    await expect(runWebPushWorker()).resolves.toMatchObject({ retryableFailures: 1 });
+    expect(completionCalls().at(-1)?.[1]).toMatchObject({
+      p_outcome: "retryable_failure", p_error_code: "PUSH_PROVIDER_TRANSIENT",
+    });
+    expect(mocks.queryCalls.every(([table]) => table === "notifications" || table === "push_subscriptions")).toBe(true);
+    expect(mocks.rpc.mock.calls.every(([name]) =>
+      name === "claim_web_push_notifications" || name === "complete_web_push_notification")).toBe(true);
+  });
+
   it("does not claim or construct delivery clients when VAPID is disabled", async () => {
     mocks.loadConfig.mockReturnValue({ mode: "disabled" });
 
