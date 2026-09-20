@@ -1112,11 +1112,12 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     ).toBe(
       "8e97337efc36276797b3e98ff45bbdbd893533b0ffa13486e0f4bac83e911fd6"
     );
+    // P04 Official CoH3 News authorizes the XML and HTML parser dependencies.
     expect(normalizedSha256(read("package.json"))).toBe(
-      "11b734c524f725e2067561bec3376969fa2f8cfdf4c56d43f6886e48bcb8783a"
+      "d701c98388bac497e70fadd3f4306a36b1a2e5a6f1f4eae23234f9c3fb5db096"
     );
     expect(normalizedSha256(read("package-lock.json"))).toBe(
-      "92d13476ff42aab93a1e538a7bda2e767923bf0890cae8813ee2e48cbec43be4"
+      "a591feee6254289c59f30dc81e7b7f6482a18cfc82f6059d894f8f99cb8ee5e7"
     );
     expect(normalizedSha256(read(".env.example"))).toBe(
       "a36a452c337407aa53c29a8499cb1658023caed00bd41b605859d07ce166dbd4"
