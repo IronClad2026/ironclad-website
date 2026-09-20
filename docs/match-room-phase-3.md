@@ -48,7 +48,7 @@ The rollback suite temporarily isolates claimable push rows inside its transacti
 
 No provider, dependency, worker platform or queue was added. The existing combined transactional-email/push cron remains every five minutes and points to the staging branch alias. Only Boolean checks of worker configuration/secret presence were read; no secret values were exposed.
 
-The existing push claim cap is 10 per run, with up to three provider requests concurrently. Existing non-chat critical events are selected ahead of message notifications. Nominal capacity is 120 notification claims/hour at the current schedule, reduced by retries/backlog; delivery is best effort and not instant. An active transcript still polls about every 10 seconds.
+The existing push claim cap is 10 per run, processing up to three notifications concurrently (each may fan out to multiple subscriptions). Existing non-chat critical events are selected ahead of message notifications. Nominal capacity is 120 notification claims/hour at the current schedule, reduced by retries/backlog; delivery is best effort and not instant. An active transcript still polls about every 10 seconds.
 
 The worker rechecks message/assistance actionability immediately before provider delivery, including after recipient and subscription lookups. Already processing claims keep their token so the worker can finish them correctly. A read/resolve occurring after the final check and during an external send can still produce an already in-flight generic alert; provider delivery cannot be recalled. Push failure/retry never changes the authoritative stored message.
 
@@ -65,6 +65,7 @@ Local validation used synthetic identities and a disposable PostgreSQL 17.11 clu
 | Final focused application regression batch | 188 tests / 11 files passed |
 | Notification projection/policy/copy/worker batch | 104 tests / 7 files passed; later worker race fix covered in the final batch |
 | History, room parser/action, UI/locales batch | 118 tests / 4 files passed |
+| Admin authority and canonical queue regressions | 11 tests / 2 files passed |
 | Migration contracts | 19 tests / 3 files passed, including preserved historical platform boundary |
 | Phase 3 local SQL | 89 assertions passed |
 | Phase 3 hosted staging SQL | 89 assertions passed, rolled back |
@@ -153,6 +154,7 @@ The following inventory is relative to the implementation worktree. It includes 
 - `tests/database/match-room-phase-3-concurrency.mjs`
 - `tests/database/match-room-phase-3.sql`
 - `tests/integration/account-legal-mutation-boundary.test.ts`
+- `tests/integration/admin-operations-authorization.test.ts`
 - `tests/integration/admin-operations-loader-metrics.test.ts`
 - `tests/integration/admin-tournament-workspace-contract.test.ts`
 - `tests/integration/match-admin-assistance-action.test.ts`

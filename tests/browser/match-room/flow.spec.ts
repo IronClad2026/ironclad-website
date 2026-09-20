@@ -159,6 +159,20 @@ test("two synthetic users return through a generic notification to the pinned ro
   await expect(opponent.getByText(body, { exact: true })).toBeVisible();
   await expect.poll(() => opponent.evaluate(() => window.matchRoomFixture.snapshot().episode)).toBeNull();
   expect(await opponent.evaluate(() => window.matchRoomFixture.snapshot().resolveCalls)).toBe(0);
+  const reply = "PRIVATE fixture reply from opponent";
+  await opponent.locator("textarea").first().fill(reply);
+  await opponent.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(opponent.locator("textarea").first()).toHaveValue("");
+  await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().episode?.roomId))
+    .toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  expect(await opponent.evaluate(() => window.matchRoomFixture.snapshot().episode)).toBeNull();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByText(reply, { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().episode)).toBeNull();
+  const replied = await page.evaluate(() => window.matchRoomFixture.snapshot());
+  expect(replied.lastRead).toBe(replied.count);
+  expect(replied.messages.filter((entry) => entry.body === reply)).toHaveLength(1);
+  expect(replied.messages.at(-1)?.roomId).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   const oldLink = new URL(opponent.url());
   oldLink.searchParams.set("viewer", "replacement");
   await opponent.goto(oldLink.toString());

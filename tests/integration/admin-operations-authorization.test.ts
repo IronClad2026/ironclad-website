@@ -44,8 +44,11 @@ function thenableQuery(result: MockQueryResult, rejection?: unknown) {
 
 function adminClientWithResult(result: MockQueryResult, rejection?: unknown) {
   const from = vi.fn(() => thenableQuery(result, rejection));
-  createSupabaseAdminClientMock.mockReturnValue({ from });
-  return { from };
+  const rpc = vi.fn().mockResolvedValue({
+    data: { requests: [], totalCount: 0 }, error: null,
+  });
+  createSupabaseAdminClientMock.mockReturnValue({ from, rpc });
+  return { from, rpc };
 }
 
 describe("Admin Operations loader authorization and failure isolation", () => {
@@ -68,7 +71,7 @@ describe("Admin Operations loader authorization and failure isolation", () => {
 
   it("constructs the trusted client only after an Admin identity is proven", async () => {
     authMock.mockResolvedValue(adminIdentity);
-    const { from } = adminClientWithResult({ data: [], error: null, count: 0 });
+    const { from, rpc } = adminClientWithResult({ data: [], error: null, count: 0 });
 
     const metrics = await loadAdminOperationsMetrics("today");
 
@@ -76,7 +79,9 @@ describe("Admin Operations loader authorization and failure isolation", () => {
     expect(authMock.mock.invocationCallOrder[0]).toBeLessThan(
       createSupabaseAdminClientMock.mock.invocationCallOrder[0]
     );
-    expect(from).toHaveBeenCalledTimes(10);
+    expect(from).toHaveBeenCalledTimes(9);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("list_match_room_assistance_requests", { p_limit: 5000 });
+    expect(authMock.mock.invocationCallOrder[0]).toBeLessThan(rpc.mock.invocationCallOrder[0]);
     expect(metrics).not.toBeNull();
     expect(metrics).toMatchObject({
       overview: {
