@@ -11,6 +11,7 @@ import {
 } from "@/app/tournaments/room-actions";
 import { useOptionalLocale } from "@/components/i18n/LocaleProvider";
 import { getMatchRoomCopy } from "@/lib/i18n/match-room";
+import { notifyMatchRoomReadAcknowledged } from "@/lib/match-room-unread-events";
 import { formatDateTime } from "@/lib/i18n/format";
 import {
   isMatchRoomMessageBody,
@@ -351,6 +352,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
         current.current = next;
         setHistory(next);
         setReadFailed(false);
+        if (!admin) notifyMatchRoomReadAcknowledged({ matchId, ...result.data });
       } else {
         setReadFailed(true);
       }
@@ -359,7 +361,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
     }).finally(() => {
       if (readPending.current === key) readPending.current = null;
     });
-  }, [history, viewVersion]);
+  }, [admin, history, matchId, viewVersion]);
 
   async function send() {
     const room = current.current?.room;

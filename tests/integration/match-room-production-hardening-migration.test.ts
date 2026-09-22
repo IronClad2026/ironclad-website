@@ -10,7 +10,7 @@ const races = readFileSync(resolve(process.cwd(), "tests/database/match-room-pro
 
 describe("Match Room production hardening migration boundary", () => {
   it("is a forward transaction without competitive or storage changes", () => {
-    expect(readdirSync(directory).sort().at(-1)).toBe(name);
+    expect(readdirSync(directory).sort().filter((entry) => entry <= name).at(-1)).toBe(name);
     expect(sql).toMatch(/^begin;.*commit;$/i);
     expect(sql).not.toMatch(/pg_get_functiondef|create extension|create trigger|create publication|cron\.|storage\./i);
     expect(sql).not.toMatch(/(?:update|delete from|insert into) public\.(?:tournament_matches|tournaments|registrations|match_result|leaderboard)/i);

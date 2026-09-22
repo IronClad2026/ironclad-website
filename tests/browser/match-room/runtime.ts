@@ -1,6 +1,7 @@
 // Isolated browser transport. Synthetic data only; no hosted requests or credentials.
 import type { MatchRoom, MatchRoomMessage, SendMatchRoomMessageInput } from "@/lib/match-room";
 import type { MatchRoomAssistance } from "@/lib/match-room-assistance";
+import type { MatchRoomUnreadItem } from "@/lib/match-room-unread";
 import { uxMatch } from "@/tests/fixtures/match-result-ux";
 import { visibilityTransport } from "./visibility-runtime";
 const params = new URLSearchParams(location.search);
@@ -31,6 +32,9 @@ let historyCalls = 0;
 let earlierCalls = 0;
 let readCalls = 0;
 let assistanceMutations = 0;
+let summaryCalls = 0;
+let enabled = true;
+let readRaceMessage: string | null = null;
 function reload() {
   if (shared && localStorage.getItem(storageKey)) {
     state = JSON.parse(localStorage.getItem(storageKey)!) as FixtureState;
@@ -134,9 +138,25 @@ export async function markMatchRoomRead(input: {roomId:string;throughSequence:nu
   reload(); readCalls++;
   if (inaccessible() || input.roomId !== ROOM_ID) return forbidden();
   state.reads[viewer] = Math.max(state.reads[viewer] ?? 0,Math.min(input.throughSequence,state.messages.length));
+  if (readRaceMessage) { message(readRaceMessage); readRaceMessage = null; }
   if (state.reads[viewer] >= state.messages.length) state.episodes[viewer] = null;
   persist();
   return { ok: true as const, data: { roomId: ROOM_ID, lastReadSequence: state.reads[viewer] } };
+}
+export async function getMatchRoomUnreadSummary(input: { matchIds: string[] }) {
+  reload(); summaryCalls++;
+  const items: MatchRoomUnreadItem[] = [];
+  const active = room();
+  if (enabled && !inaccessible() && viewer !== "admin" && active.writable && input.matchIds.includes(uxMatch.id)) {
+    const unread = state.messages.filter((entry) => entry.sequence > (state.reads[viewer] ?? 0) &&
+      (entry.senderKind === "admin" || entry.senderRegistrationId !== active.viewerRegistrationId));
+    if (unread.length) {
+      const admin = unread.some((entry) => entry.senderKind === "admin");
+      const opponent = unread.some((entry) => entry.senderKind === "player");
+      items.push({ matchId: uxMatch.id, roomId: ROOM_ID, unreadSource: admin && opponent ? "generic" : admin ? "admin" : "opponent" });
+    }
+  }
+  return { ok: true as const, data: { items } };
 }
 function assistance(): MatchRoomAssistance {
   return { ...state.assistance, canResolve: viewer === "admin" && state.assistance.status === "requested" };
@@ -172,6 +192,10 @@ export async function resolveMatchAdminAssistance(input: { roomId: string; expec
 export async function getMatchRoomOpponentDiscord() { return { discordUsername: null }; }
 export const fixture = {
   incoming: (body: string) => { reload(); const entry = message(body); persist(); return entry; },
+  incomingAdmin: (body: string) => { reload(); const entry = message(body, true); persist(); return entry; },
+  dismissNotification: () => { state.episodes[viewer] = null; persist(); },
+  raceNextRead: (body: string) => { readRaceMessage = body; },
+  setEnabled: (value: boolean) => { enabled = value; },
   failResponse: () => { failedResponse = true; },
   failHistory: (fail: boolean) => { historyFails = fail; },
   deny: () => { denied = true; },
@@ -180,7 +204,7 @@ export const fixture = {
   duplicateRequest: () => requestMatchAdminAssistance({ roomId: ROOM_ID, expectedRequestVersion: state.assistance.requestVersion }),
   snapshot: () => {
     reload();
-    return { count: state.messages.length, lastRead: state.reads[viewer] ?? 0, resolveCalls, historyCalls,
+    return { count: state.messages.length, lastRead: state.reads[viewer] ?? 0, resolveCalls, historyCalls, summaryCalls,
       earlierCalls, readCalls, assistanceMutations, assistance: assistance(), episode: state.episodes[viewer] ?? null,
       messages: structuredClone(state.messages) };
   },

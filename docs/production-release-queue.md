@@ -1,5 +1,21 @@
 # Production release queue
 
+## P03 — Match Room
+
+**Delivery scope:** Staging only; Production release remains separately gated.
+
+- Existing private Match Room messaging, read cursors, notification episodes,
+  assistance, historical routing and database kill switch.
+- Private unread Match-card attention indicator: the current participant's
+  actionable pairing gains an orange ring and localized message action until
+  the authoritative room read cursor catches up. No message preview or public
+  unread projection is added.
+- Implementation, lifecycle rule and verification evidence:
+  [Unread Match-card attention](match-room-unread-card-indicator.md).
+
+This enhancement belongs to P03, not a new release package. The P04 scope and
+release destination below are unchanged.
+
 ## P04 — Official CoH3 News
 
 **Release destination:** planned post-tournament Production release.

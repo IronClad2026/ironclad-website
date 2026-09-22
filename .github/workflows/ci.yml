@@ -51,5 +51,11 @@ jobs:
       - name: Official News browser regression tests
         run: npx playwright test --config tests/browser/news/playwright.config.ts
 
+      - name: Bracket geometry and private unread attention browser tests
+        run: npx playwright test --config tests/browser/bracket-layout/playwright.config.ts
+
+      - name: Match Room browser regression tests
+        run: npx playwright test --config tests/browser/match-room/playwright.config.ts
+
       - name: Build
         run: npm run build
