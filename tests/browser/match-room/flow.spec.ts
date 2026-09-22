@@ -243,3 +243,71 @@ test("two synthetic users return through a generic notification to the pinned ro
   expect(await opponent.evaluate(() => window.matchRoomFixture.snapshot().resolveCalls)).toBe(0);
   await opponent.close();
 });
+
+for (const width of [375, 390]) {
+  test("private summary survives bell dismissal, clears only on genuine read, and returns at " + width + "px", async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.clock.install();
+    await page.goto("/tests/browser/match-room/?scenario=unread");
+    const summary = page.getByTestId("unread-summary");
+    await expect(summary).toHaveText("generic");
+    expect(await page.evaluate(() => window.matchRoomFixture.snapshot().readCalls)).toBe(0);
+    await page.evaluate(() => { window.matchRoomFixture.dismissNotification(); window.dispatchEvent(new Event("focus")); });
+    await page.clock.runFor(10_000);
+    await expect(summary).toHaveText("generic");
+
+    await page.getByRole("button", { name: "Open fixture room", exact: true }).click();
+    await expect(page.getByText("Opponent ready for the Match.", { exact: true })).toBeInViewport();
+    await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().lastRead)).toBe(2);
+    // The fake clock has not advanced ten seconds: this must use the genuine
+    // successful read acknowledgement event, then authoritative re-projection.
+    await expect(summary).toHaveText("none");
+    await page.getByRole("button", { name: "Close fixture room", exact: true }).click();
+    await page.evaluate(() => window.matchRoomFixture.incoming("A new private opponent response"));
+    await page.clock.runFor(10_000);
+    await expect(summary).toHaveText("opponent");
+    await page.evaluate(() => { window.matchRoomFixture.incomingAdmin("Private administrator instruction"); window.dispatchEvent(new Event("focus")); });
+    await page.clock.runFor(10_000);
+    await expect(summary).toHaveText("generic");
+    await expect(summary).not.toContainText("Private administrator instruction");
+    await expect(summary).not.toContainText("A new private opponent response");
+    await expect(page.getByRole("region", { name: "Match Room", exact: true })).toHaveCount(0);
+  });
+}
+
+test("a message arriving during a read acknowledgement remains unread until its transcript is viewed", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/tests/browser/match-room/?scenario=unread");
+  const summary = page.getByTestId("unread-summary");
+  await expect(summary).toHaveText("generic");
+  await page.evaluate(() => window.matchRoomFixture.raceNextRead("Unread message that arrived during acknowledgement"));
+  await page.getByRole("button", { name: "Open fixture room", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().lastRead)).toBe(2);
+  expect(await page.evaluate(() => window.matchRoomFixture.snapshot().count)).toBe(3);
+  await expect(summary).toHaveText("opponent");
+  await expect(page.getByText("Unread message that arrived during acknowledgement", { exact: true })).toHaveCount(0);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByText("Unread message that arrived during acknowledgement", { exact: true })).toBeInViewport();
+  await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().lastRead)).toBe(3);
+  await expect(summary).toHaveText("none");
+});
+
+test("hidden documents pause private summary polling and the disabled feature clears attention safely", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/tests/browser/match-room/?scenario=unread");
+  await expect(page.getByTestId("unread-summary")).toHaveText("generic");
+  const before = await page.evaluate(() => window.matchRoomFixture.snapshot().summaryCalls);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.clock.runFor(30_000);
+  expect(await page.evaluate(() => window.matchRoomFixture.snapshot().summaryCalls)).toBe(before);
+  await page.evaluate(() => {
+    window.matchRoomFixture.setEnabled(false);
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect(page.getByTestId("unread-summary")).toHaveText("none");
+  expect(await page.evaluate(() => window.matchRoomFixture.snapshot().readCalls)).toBe(0);
+});

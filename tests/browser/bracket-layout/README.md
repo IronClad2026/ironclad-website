@@ -28,3 +28,17 @@ Assertions compare actual core rectangles, feeder centroids, SVG path endpoints
 transformed into screen coordinates, round baselines, card separation, and
 horizontal scroll containment. They do not infer alignment from CSS class names.
 Screenshots and failure traces are written beneath `.playwright/bracket-layout`.
+
+The private unread-card extension mounts the real single-elimination and both
+round-robin components with synthetic private projection props. It toggles
+opponent/admin/generic attention on the same mounted bracket and compares exact
+before/after card rectangles and connector paths for 8/16 players at
+1440/375/390 px. It checks all eight locales at 375 px with long names and reduced
+motion, current-player scoping, completed-card suppression, pending-review status,
+keyboard selection, and round-robin control containment. `?unread=1` starts with
+attention; `?format=round_robin` selects the appropriate real round-robin layout.
+
+These checks validate presentation, not database authorization. The Match Room
+fixture separately uses the real unread hook and read-acknowledgement event with a
+synthetic authoritative transport; PostgreSQL and action tests validate the
+private projection and current pairing ownership independently.

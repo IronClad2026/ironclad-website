@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MatchRoom from "@/components/MatchRoom";
 import * as actions from "@/app/tournaments/room-actions";
 import { getMatchRoomCopy } from "@/lib/i18n/match-room";
+import { MATCH_ROOM_READ_ACKNOWLEDGED_EVENT } from "@/lib/match-room-unread-events";
 import type { MatchRoom as Room, MatchRoomHistory, MatchRoomMessage } from "@/lib/match-room";
 
 vi.mock("@/app/tournaments/room-actions", () => ({
@@ -89,6 +90,38 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("Match Room", () => {
+  it("invalidates private card attention only after a successful genuine read acknowledgment", async () => {
+    const acknowledged = vi.fn();
+    const pending = deferred<Awaited<ReturnType<typeof actions.markMatchRoomRead>>>();
+    vi.mocked(actions.markMatchRoomRead).mockReturnValueOnce(pending.promise);
+    window.addEventListener(MATCH_ROOM_READ_ACKNOWLEDGED_EVENT, acknowledged);
+    try {
+      renderRoom();
+      await ready();
+      await waitFor(() => expect(actions.markMatchRoomRead).toHaveBeenCalled());
+      expect(acknowledged).not.toHaveBeenCalled();
+      await act(async () => pending.resolve(ok({ roomId: id(100), lastReadSequence: 1 })));
+      expect(acknowledged).toHaveBeenCalledTimes(1);
+      expect(acknowledged.mock.calls[0][0].detail).toEqual({ matchId: id(300), roomId: id(100), lastReadSequence: 1 });
+    } finally {
+      window.removeEventListener(MATCH_ROOM_READ_ACKNOWLEDGED_EVENT, acknowledged);
+    }
+  });
+
+  it("does not announce a failed room acknowledgment as a private card read", async () => {
+    const acknowledged = vi.fn();
+    vi.mocked(actions.markMatchRoomRead).mockResolvedValue({ ok: false, code: "unavailable" });
+    window.addEventListener(MATCH_ROOM_READ_ACKNOWLEDGED_EVENT, acknowledged);
+    try {
+      renderRoom();
+      await ready();
+      await waitFor(() => expect(actions.markMatchRoomRead).toHaveBeenCalled());
+      expect(acknowledged).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(MATCH_ROOM_READ_ACKNOWLEDGED_EVENT, acknowledged);
+    }
+  });
+
   it("loads the authorized operational log, fixed author label, disclosure and private read cursor", async () => {
     renderRoom();
     await ready();

@@ -1,6 +1,12 @@
 import type { CompetitionDictionary } from "@/lib/i18n/dictionaries/en/competition";
 
 const dictionary = {
+  matchRoomAttention: {
+    opponent: "Nouveau message adverse",
+    admin: "Nouveau message admin IronClad",
+    generic: "Nouveau message du salon de match",
+    unreadDescription: "Message non lu dans le salon de match. Ouvrez le match et lisez les nouveaux messages pour effacer l’alerte.",
+  },
   resultUx: {
     won: "Gagné",
     lost: "Perdu",

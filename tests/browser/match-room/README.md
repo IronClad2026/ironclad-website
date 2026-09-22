@@ -13,6 +13,17 @@ Scenarios: default player, `?scenario=admin`, `closed`, `unavailable`, `outsider
 
 The `visibility` scenario mounts two real MatchRoom components with independent synthetic unread episodes and pending push state, separated by a page-length gap. Tests exercise actual viewport intersections and scrolling at 375/390 px. Hidden-document checks deterministically override `document.visibilityState` and dispatch its event; they do not claim native tab or mobile OS lifecycle verification.
 
+The `unread` scenario mounts the real private-summary hook beside the real
+MatchRoom. A test-only output displays its result while the synthetic server
+transport derives unread source from message authors and private read cursors.
+The room begins closed, making it possible to verify that bell dismissal does
+not change card attention, genuine viewport acknowledgement immediately
+reprojects it without waiting ten seconds, subsequent messages restore it, and
+a message arriving during acknowledgement remains unread until viewed. The
+scenario also checks hidden-document polling and disabled-feature empty results.
+It does not claim that its synthetic projection proves PostgreSQL authorization
+or actual hosted kill-switch behavior.
+
 Coverage:
 
 - 375/390 px layout, 44 px assistance controls, wrapping author names, long Unicode text and plain-text rendering.
