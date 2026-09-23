@@ -3,7 +3,8 @@
 `node scripts/p03-release/cli.mjs --help` lists the main commands. Run from the
 clean candidate checkout. These tools never release anything automatically.
 Only the separate `restore` command writes to a database, and it accepts an
-empty, loopback database named `p03_restore_*` only. The separately owned
+empty database named `p03_restore_*` on loopback or a positively attested isolated
+container on the local Linux Docker daemon only. The separately owned
 `scripts/p03-db/execute.mjs` is the approved future Production executor.
 
 ## Connections and private artifacts
@@ -14,6 +15,9 @@ Supabase connection or session pooler on 5432, with certificate verification;
 parsed into child process environment variables, never process arguments or
 logs. `P03_PG_BIN` identifies the directory containing PostgreSQL 17 `psql`,
 `pg_dump`, and `pg_restore`. Do not place secrets in examples, Git, or transcripts.
+The synthetic Docker source additionally sets `P03_LOCAL_CONTAINER`; restore
+sets `P03_RESTORE_CONTAINER`. These enable positive local-container attestation,
+never an arbitrary private-host exception or a Production endpoint override.
 
 Use a new private output directory outside every repository. On Windows verify
 its inherited ACL is limited to the current operator, SYSTEM, and administrators;
@@ -27,29 +31,49 @@ backup policy. Never upload the dump as a CI/PR artifact.
 Native fixture rehearsal does **not** prove that hosted Supabase extensions can
 be restored into ordinary PostgreSQL. The observed hosted extension versions are
 in `production-extensions.json`. Prepare a dedicated compatible runtime first.
-The supplied Compose file pins `supabase/postgres:17.6.1.127`, binds only loopback,
+The supplied Compose file pins `supabase/postgres:17.6.1.127`, publishes no ports,
 uses an internal network with no outbound access, and disables cron execution.
 The current preparation host has no Docker/Podman engine; this Compose runtime
 has **not** been rehearsed. Missing runtime/extension readiness is a release
 blocker, not a waived check. Do not omit managed schemas or extension data to
 make restoration pass.
 
-On a Docker-enabled machine, set a new **local-only** `P03_RESTORE_PASSWORD`, then:
+On a Linux Docker host, set a new **local-only** `P03_RESTORE_PASSWORD`, then:
 
 ```powershell
 docker compose -f scripts/p03-release/restore-runtime.compose.yml up -d
-docker exec p03-restore-release createdb -U postgres --template=template0 p03_restore_release
+docker exec p03-restore-release pg_isready -h /tmp -U postgres -d postgres
+docker exec p03-restore-release createdb -h /tmp -U postgres --template=template0 p03_restore_release
 ```
 
-Set `P03_RESTORE_DATABASE_URL` privately to the local database on port 56624 and
-`P03_RESTORE_CONTAINER=p03-restore-release`. Run the read-only readiness check:
+Wait for `pg_isready` to report accepting connections before the single
+`createdb` invocation. The container deliberately bypasses hosted project-init
+scripts, creates a fresh cluster under `/tmp`, preloads pg_cron, pg_net and
+pg_stat_statements, and binds cron metadata to `p03_restore_release`, matching
+the CI initialization path. Host access uses SCRAM with the new local password;
+CI uses trust only for its disposable synthetic fixture. The pg_net worker is
+deliberately bound to the empty `postgres` database, so it cannot process queues
+copied into `p03_restore_release`; runtime preflight verifies this setting.
+There is no persistent
+host volume or automatic restart. Startup refuses an existing data directory;
+use a fresh reviewed disposable container for each attempt, preserving failed
+restore evidence before any separately authorized cleanup. Never run
+`docker compose config` into a transcript: it expands the private password.
+
+Read the exact container IP with `docker inspect`, then set
+`P03_RESTORE_DATABASE_URL` privately to that IP on port 5432 and
+`P03_RESTORE_CONTAINER=p03-restore-release`. This requires a local Unix Docker
+daemon. The connection helper verifies the exact running container name/IP and
+every attached network is internal; arbitrary private-network addresses are
+rejected. Native local PostgreSQL without network extensions may still use
+loopback. Run the read-only readiness check:
 
 ```powershell
 node scripts/p03-release/cli.mjs restore-runtime --config scripts/p03-release/production-extensions.json
 ```
 
 It verifies exact extension default versions, an empty restore target, cron OFF,
-the matching Docker loopback port, and internal-only container networks. This
+the attested Docker IP and port, and internal-only container networks. This
 prevents copied cron jobs or pg_net requests reaching live services. Extension
 permissions, preload requirements, Vault encryption-key compatibility, and full
 schema creation still must pass the actual restore; startup alone is not PASS.
@@ -92,37 +116,20 @@ replays the 146 original baseline migrations without suppressing extension SQL,
 and seeds the representative tournament. Only Auth/Storage metadata is synthetic;
 cron, pg_net, Vault, pgcrypto and other extension objects are genuine. The exact
 backup/restore functions then compare the full schema, extension inventory and
-22 competition tables. Neither container can access external networks and cron
-execution is disabled. It cleans up only its uniquely named containers/network.
+22 competition tables. The runner reaches their attested private container IPs;
+no ports are published. Neither container can access external networks, cron
+execution is disabled, and pg_net workers target the empty `postgres` database
+rather than either synthetic source/restore database. It cleans up only its
+uniquely named containers/network.
 
 This can verify the runtime on CI even when the workstation lacks Docker. Its
 status remains unverified until the job passes. It does not substitute for the
 actual release-day Production dump/restore or external encryption-key recovery.
 Only the small evidence JSON may be uploaded; never upload the logical archive.
-The recommended independent CI job is:
-
-```yaml
-p03-hosted-backup:
-  runs-on: ubuntu-latest
-  timeout-minutes: 20
-  steps:
-    - uses: actions/checkout@v6
-    - uses: actions/setup-node@v4
-      with:
-        node-version: 22.12.0
-    - name: Install PostgreSQL 17 client
-      run: sudo apt-get update && sudo apt-get install -y postgresql-client-17
-    - name: Rehearse full logical backup with real Supabase extensions
-      env:
-        P03_PG_BIN: /usr/lib/postgresql/17/bin
-      run: node scripts/p03-release/rehearse-hosted-runtime.mjs
-    - name: Save non-sensitive synthetic rehearsal evidence
-      uses: actions/upload-artifact@v4
-      with:
-        name: p03-hosted-backup-evidence
-        path: test-results/p03-hosted-backup-evidence.json
-        if-no-files-found: error
-```
+The authoritative job is `p03-hosted-backup` in
+[the CI workflow](../../.github/workflows/ci.yml). It checks out the exact PR head
+and installs PostgreSQL 17 from the official PGDG repository on Ubuntu 24.04.
+Use that maintained job rather than a separately copied workflow example.
 
 ## Fingerprints
 

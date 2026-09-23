@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  parseOptions, validateDedicatedAdmin, validateOutboundProof, validateFinalLayout,
+  parseOptions, validateDedicatedAdmin, validateAdminAccountState, validateOutboundProof, validateFinalLayout,
 } from "../../scripts/p03-preview/create-fixture.mjs";
 
 // These tests never invoke main(), load environment files, or make requests.
@@ -98,4 +98,54 @@ test("a completed semifinal cannot stand in for the current active match", () =>
 test("premature activation of the one-player match is rejected", () => {
   const activated = matches.map((row, i) => i === 5 ? { ...row, activated_at: "2026-09-23T12:00:00Z" } : row);
   assert.throws(() => validateFinalLayout(activated, rounds, registrations));
+});
+
+const legalAt = "2026-09-23T11:00:00.000Z";
+function adminAccount() {
+  return {
+    profiles: [{ id: uuid(200), clerk_user_id: admin.id, account_closed_at: null }],
+    documents: [
+      { id: uuid(201), document_kind: "terms", status: "effective", published_at: legalAt, effective_at: legalAt, sha256: "a".repeat(64) },
+      { id: uuid(202), document_kind: "privacy", status: "effective", published_at: legalAt, effective_at: legalAt, sha256: "b".repeat(64) },
+    ],
+    acceptances: [{
+      clerk_user_id: admin.id, terms_document_id: uuid(201), privacy_document_id: uuid(202),
+      terms_sha256: "a".repeat(64), privacy_sha256: "b".repeat(64),
+      terms_accepted: true, privacy_acknowledged: true, accepted_at: "2026-09-23T11:30:00.000Z",
+    }],
+  };
+}
+test("existing active admin profile and genuine current legal evidence pass", () => {
+  assert.doesNotThrow(() => validateAdminAccountState(adminAccount(), admin.id, now));
+});
+test("Clerk admin role alone cannot replace an IronClad profile", () => {
+  assert.throws(() => validateAdminAccountState({ ...adminAccount(), profiles: [] }, admin.id, now), /admin_active_profile_required/);
+});
+test("a closed admin account cannot create the fixture", () => {
+  const state = adminAccount();
+  state.profiles[0].account_closed_at = legalAt;
+  assert.throws(() => validateAdminAccountState(state, admin.id, now), /admin_active_profile_required/);
+});
+test("missing acceptance fails without creating or accepting anything", () => {
+  assert.throws(() => validateAdminAccountState({ ...adminAccount(), acceptances: [] }, admin.id, now), /admin_current_legal_acceptance_required/);
+});
+test("acceptance by a different account cannot satisfy the admin guard", () => {
+  const state = adminAccount();
+  state.acceptances[0].clerk_user_id = "user_unrelated";
+  assert.throws(() => validateAdminAccountState(state, admin.id, now), /admin_current_legal_acceptance_required/);
+});
+test("old document evidence cannot satisfy the current pair", () => {
+  const state = adminAccount();
+  state.acceptances[0].terms_document_id = uuid(203);
+  assert.throws(() => validateAdminAccountState(state, admin.id, now), /admin_current_legal_acceptance_required/);
+});
+test("mismatched immutable document hashes reject copied acceptance evidence", () => {
+  const state = adminAccount();
+  state.acceptances[0].terms_sha256 = "c".repeat(64);
+  assert.throws(() => validateAdminAccountState(state, admin.id, now), /admin_current_legal_acceptance_required/);
+});
+test("future-effective legal documents cannot authorize a current mutation", () => {
+  const state = adminAccount();
+  state.documents[0].effective_at = "2026-09-24T11:00:00.000Z";
+  assert.throws(() => validateAdminAccountState(state, admin.id, now), /admin_current_legal_documents_unavailable/);
 });

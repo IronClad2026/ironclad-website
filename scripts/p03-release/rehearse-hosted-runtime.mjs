@@ -39,9 +39,15 @@ function localEnvironment(hostname, database, container) {
 
 function sql(db, input) {
   assert.equal(db.local, true, "Hosted-runtime rehearsal cannot use a remote database");
-  return run(db.bin("psql"), ["-X", "--no-password", "-qAt", "-v", "ON_ERROR_STOP=1"], {
-    input, env: { ...db.env, PGOPTIONS: "-c statement_timeout=60000 -c lock_timeout=2000" }, timeout: 90000,
+  assert(process.platform === "linux" && process.env.GITHUB_ACTIONS === "true" && db.containerAttestation?.name === sourceName, "SQL diagnostics are restricted to this synthetic source container");
+  const result = spawnSync(db.bin("psql"), ["-X", "--no-password", "-qAt", "-v", "ON_ERROR_STOP=1"], {
+    input, env: { ...db.env, PGOPTIONS: "-c statement_timeout=60000 -c lock_timeout=2000" }, timeout: 90000, encoding: "utf8", maxBuffer: 1024 * 1024,
   });
+  // This dedicated container contains only committed synthetic fixture data.
+  // Production/restore commands retain core.run's suppression of all stderr.
+  if (result.error || result.status !== 0) console.error(`Synthetic source SQL diagnostic: ${(result.stderr ?? result.error?.code ?? "unavailable").slice(-4096)}`);
+  assert(!result.error && result.status === 0, "Synthetic source SQL failed");
+  return result.stdout.trim();
 }
 
 async function startContainer(name, database) {
@@ -54,7 +60,7 @@ async function startContainer(name, database) {
   const shell = `set -eu
 initdb -D /tmp/p03-data -U postgres --auth-local=trust --auth-host=trust --encoding=UTF8 --no-locale >/dev/null
 echo 'host all postgres ${subnet} trust' >> /tmp/p03-data/pg_hba.conf
-exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directories=/tmp -c shared_preload_libraries=pg_cron,pg_stat_statements -c cron.database_name=${database} -c cron.launch_active_jobs=off -c max_connections=30`;
+exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directories=/tmp -c shared_preload_libraries=pg_cron,pg_net,pg_stat_statements -c cron.database_name=${database} -c cron.launch_active_jobs=off -c pg_net.database_name=postgres -c max_connections=30`;
   run("docker", ["run", "--detach", "--name", name, "--network", network, "--user", "postgres", "--entrypoint", "sh", image, "-c", shell]);
   created.push(name);
   const containerIp = JSON.parse(run("docker", ["inspect", name]))[0].NetworkSettings.Networks[network].IPAddress;
@@ -97,6 +103,7 @@ function installRealExtensions(db) {
     assert(/^[a-z_][a-z0-9_-]*$/.test(extension.name));
     assert(/^[a-z_][a-z0-9_]*$/.test(extension.schema));
     if (extension.name === "plpgsql") continue;
+    console.log(`Installing observed extension ${extension.name}@${extension.version}`);
     sql(db, `create extension "${extension.name}" with schema "${extension.schema}" version ${literal(extension.version)};`);
   }
   const installed = JSON.parse(readOnlySql(db, "select jsonb_agg(jsonb_build_object('name',e.extname,'version',e.extversion,'schema',n.nspname) order by e.extname) from pg_extension e join pg_namespace n on n.oid=e.extnamespace;"));

@@ -54,6 +54,7 @@ export function checkRestoreRuntime(extensions, env = process.env) {
   if (extensions.some((item) => ["pg_net", "http"].includes(item.name))) {
     invariant(db.containerAttestation?.name === env.P03_RESTORE_CONTAINER, "Hosted backup requires a positively attested dedicated local Docker runtime with no outbound network.");
   }
+  if (extensions.some((item) => item.name === "pg_net")) invariant(readOnlySql(db, "select current_setting('pg_net.database_name',true);") === "postgres", "Restore runtime must bind the preloaded pg_net worker to its empty postgres database, never the p03_restore_* database containing copied queues.");
   const count = Number(readOnlySql(db, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname not in ('pg_catalog','information_schema') and n.nspname !~ '^pg_toast' and c.relkind in ('r','p','v','m');"));
   invariant(count === 0, "Restore target is not empty; create a new disposable local database.");
   return db;
@@ -112,7 +113,8 @@ export function restore({ directory, env = process.env }) {
   const roleSql = roles.filter((role) => !existing.includes(role)).map((role) => `create role "${role}" nologin;`).join("\n");
   if (roleSql) run(db.bin("psql"), ["-X", "--no-password", "-q", "-v", "ON_ERROR_STOP=1"], { env: writeEnv, input: `begin;\n${roleSql}\ncommit;` });
   // The only mutation path in release tooling is this separately invoked,
-  // loopback-only empty disposable restore. Gate never calls this function.
+  // empty disposable restore on loopback or an attested isolated local Docker
+  // endpoint. Gate never calls this function.
   run(db.bin("pg_restore"), ["--no-password", "--exit-on-error", "--single-transaction", "--no-owner", "--no-privileges", "--dbname", db.database, path.join(directory, "database.dump")], { env: writeEnv, timeout: 300000 });
   const restored = capture(db, manifest.tournamentIds, { candidateSha: manifest.candidateSha });
   const comparison = compare(readJson(path.join(directory, "critical-before.json")), restored);

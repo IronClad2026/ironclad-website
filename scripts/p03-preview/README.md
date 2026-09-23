@@ -10,6 +10,12 @@ settings or migrations, invokes an outbound worker, or calls a Production API.
 Do not run creation until the separately reviewed dedicated Development Clerk
 admin exists and a fresh browser session proves `metadata.role === "admin"`.
 The script independently verifies its exact Clerk backend identity contract.
+It also requires an existing, nonclosed IronClad profile and genuine immutable
+acceptance of the current published/effective Terms and Privacy pair by that
+admin account. Planning and creation fail read-only if this evidence is absent.
+The helper never creates a profile, accepts terms, or copies acceptance records;
+use the normal authenticated UI and the actual consent flow for those actions.
+It repeats the account check immediately before the first fixture write.
 Creating privileged test access is currently waiting for explicit user approval
 following an automatic approval-review rejection.
 
@@ -110,6 +116,6 @@ node --test tests/p03-preview/fixture-guards.mjs
 npx eslint scripts/p03-preview/create-fixture.mjs tests/p03-preview/fixture-guards.mjs
 ```
 
-The twenty guard/layout tests do not load environment files or make network
+The twenty-eight guard/layout tests do not load environment files or make network
 requests. Live planning and creation remain unrun while the approvals are
 pending.

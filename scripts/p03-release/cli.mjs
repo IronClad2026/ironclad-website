@@ -14,7 +14,7 @@ export async function main(args = process.argv.slice(2)) {
   const command = positionals[0];
   const repository = fileURLToPath(new URL("../../", import.meta.url));
   if (values.help || !command) {
-    console.log("P03 release tools (no database mutations except explicit loopback-only restore)\nCommands: fingerprint --tournaments UUID[,UUID] --candidate-sha SHA --project-ref REF --out FILE; compare --before FILE --after FILE; backup --tournaments UUID --candidate-sha SHA --project-ref REF --out PRIVATE_NEW_DIRECTORY; verify-backup --backup-dir DIRECTORY; restore --backup-dir DIRECTORY; seal --config FILE --out FILE; gate --seal FILE --backup-dir DIRECTORY --out FILE\nConnection: P03_DATABASE_URL; restore only: P03_RESTORE_DATABASE_URL; binaries: P03_PG_BIN; TLS: P03_SSL_ROOT_CERT. Gate also uses gh authentication and VERCEL_TOKEN. Never put credentials in arguments.");
+    console.log("P03 release tools (no database mutations except explicit restore to loopback or positively attested isolated local Docker)\nCommands: fingerprint --tournaments UUID[,UUID] --candidate-sha SHA --project-ref REF --out FILE; compare --before FILE --after FILE; backup --tournaments UUID --candidate-sha SHA --project-ref REF --out PRIVATE_NEW_DIRECTORY; verify-backup --backup-dir DIRECTORY; restore-runtime --config FILE; restore-preflight --backup-dir DIRECTORY; restore --backup-dir DIRECTORY; seal --config FILE --out FILE; gate --seal FILE --backup-dir DIRECTORY --out FILE\nConnection: P03_DATABASE_URL; restore only: P03_RESTORE_DATABASE_URL, P03_RESTORE_CONTAINER for Docker; binaries: P03_PG_BIN; TLS: P03_SSL_ROOT_CERT. Gate also uses gh authentication and VERCEL_TOKEN. Never put credentials in arguments.");
     return;
   }
   try {

@@ -62,6 +62,8 @@ aborts the whole package. It never repairs competition data. See
 5. Private connection configuration and read-only GitHub/Vercel metadata access
    are available. Required operator keys: `P03_DATABASE_URL`, `P03_PG_BIN`,
    `P03_RESTORE_DATABASE_URL`, `VERCEL_TOKEN`, and `P03_SSL_ROOT_CERT` if required.
+   The isolated Linux Docker restore also requires `P03_RESTORE_CONTAINER` and a
+   new local-only `P03_RESTORE_PASSWORD`; follow the release tooling README.
    Keep values out of arguments, source, transcripts and PRs. The hosted connection
    must be direct PostgreSQL or session pooler on 5432 with verified TLS.
 6. Final clean candidate sealed with browser report, privacy decision, runbook,
@@ -101,7 +103,10 @@ retry around the guard. Re-establish a quiet window, backup and gate.
 Work from the isolated candidate checkout. Store private artifacts outside Git
 in a new access-restricted directory. The examples use `$releaseDir`, which the
 operator sets to that directory; it must contain no pre-existing output files.
-Load connection credentials securely before running commands.
+Load connection credentials securely before running commands. Before release day,
+create the final seal using the exact config and `seal` command in
+[release tools](../scripts/p03-release/README.md#seal-and-final-read-only-gate),
+and place that approved seal at `$releaseDir/release-seal.json`.
 
 ```powershell
 git fetch origin
@@ -114,14 +119,18 @@ node scripts/p03-release/cli.mjs verify-backup --backup-dir "$releaseDir/backup"
 node scripts/p03-release/cli.mjs restore-preflight --backup-dir "$releaseDir/backup"
 node scripts/p03-release/cli.mjs restore --backup-dir "$releaseDir/backup"
 node scripts/p03-release/cli.mjs fingerprint --tournaments $tournamentIds --candidate-sha $candidateSha --project-ref nsyjtqpvyxlzyujlbzos --out "$releaseDir/pre.json"
-node scripts/p03-release/cli.mjs gate --seal "$releaseDir/release-seal.json" --backup-dir "$releaseDir/backup" --out "$releaseDir/gate.json"
+$gateFile = Join-Path $releaseDir ("gate-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".json")
+node scripts/p03-release/cli.mjs gate --seal "$releaseDir/release-seal.json" --backup-dir "$releaseDir/backup" --out $gateFile
 ```
 
 The tournament UUID above was verified during preparation. A different current
 tournament requires explicit reviewed scope in a new seal. The backup command
 performs read-only logical/custom and schema dumps, file checksums, an extension
 inventory and bounded competition exports. Restore is an explicitly separate
-operation that accepts only an empty loopback database named `p03_restore_*`.
+operation accepting an empty database named `p03_restore_*` on loopback or the
+exact IP/port of a positively attested `p03-restore-*` container on the local
+Linux Docker daemon. Hosted network extensions require that container, every
+attached network must be internal, and cron must be disabled before restore.
 It validates the archive, schema/extensions and restored facts. It never restores
 to Production and never drops an existing target.
 
@@ -139,11 +148,13 @@ performed by the gate. Do not run the next section until the user explicitly say
 
 ## After that explicit approval only
 
-If the gate expires while waiting, run a new gate; refresh the backup if required.
-Never edit a receipt or bypass a failed check.
+If the gate expires while waiting, choose a new `$gateFile` and run the gate
+again; refresh the backup in a new directory if required. Gate and fingerprint
+outputs are exclusive-create and cannot overwrite earlier evidence. Pass the
+exact newest PASS filename below. Never edit a receipt or bypass a failed check.
 
 ```powershell
-node scripts/p03-db/execute.mjs apply --gate "$releaseDir/gate.json" --seal "$releaseDir/release-seal.json" --output "$releaseDir/apply.json" --approval "PROCEED WITH P03 PRODUCTION RELEASE"
+node scripts/p03-db/execute.mjs apply --gate $gateFile --seal "$releaseDir/release-seal.json" --output "$releaseDir/apply.json" --approval "PROCEED WITH P03 PRODUCTION RELEASE"
 node scripts/p03-release/cli.mjs fingerprint --tournaments $tournamentIds --candidate-sha $candidateSha --project-ref nsyjtqpvyxlzyujlbzos --out "$releaseDir/post.json"
 node scripts/p03-release/cli.mjs compare --before "$releaseDir/pre.json" --after "$releaseDir/post.json" --out "$releaseDir/comparison.json"
 ```

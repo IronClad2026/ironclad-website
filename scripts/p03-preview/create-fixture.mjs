@@ -18,6 +18,7 @@ const READ_TABLES = new Set([
   "tournaments", "tournament_brackets", "players", "coh3_maps",
   "registrations", "generated_brackets", "bracket_rounds",
   "tournament_matches", "match_rooms", "push_subscriptions", "notifications",
+  "legal_documents", "account_legal_acceptances",
 ]);
 const WRITE_RPCS = new Set([
   "save_tournament", "enrol_staging_synthetic_uat_player",
@@ -66,6 +67,31 @@ export function validateDedicatedAdmin(user, email) {
     && [user.phone_numbers, user.external_accounts, user.web3_wallets].every((items) => Array.isArray(items) && items.length === 0)
     && (!user.unsafe_metadata || Object.keys(user.unsafe_metadata).length === 0), "dedicated_admin_contract_rejected");
   return user;
+}
+export function validateAdminAccountState({ profiles, documents, acceptances }, clerkId, now = Date.now()) {
+  requireThat(Array.isArray(profiles) && profiles.length === 1, "admin_active_profile_required");
+  const profile = profiles[0];
+  requireThat(UUID.test(profile.id ?? "") && profile.clerk_user_id === clerkId
+    && profile.account_closed_at === null, "admin_active_profile_required");
+  requireThat(Array.isArray(documents) && documents.length === 2, "admin_current_legal_documents_unavailable");
+  const terms = documents.find((document) => document.document_kind === "terms");
+  const privacy = documents.find((document) => document.document_kind === "privacy");
+  requireThat(terms && privacy && documents.every((document) => UUID.test(document.id ?? "")
+    && document.status === "effective" && /^[a-f0-9]{64}$/.test(document.sha256 ?? "")
+    && Number.isFinite(Date.parse(document.published_at)) && Date.parse(document.published_at) <= now
+    && Number.isFinite(Date.parse(document.effective_at)) && Date.parse(document.effective_at) <= now),
+  "admin_current_legal_documents_unavailable");
+  requireThat(Array.isArray(acceptances) && acceptances.length === 1, "admin_current_legal_acceptance_required");
+  const acceptance = acceptances[0];
+  requireThat(acceptance.clerk_user_id === clerkId
+    && acceptance.terms_document_id === terms.id && acceptance.privacy_document_id === privacy.id
+    && acceptance.terms_accepted === true && acceptance.privacy_acknowledged === true
+    && acceptance.terms_sha256 === terms.sha256 && acceptance.privacy_sha256 === privacy.sha256
+    && Number.isFinite(Date.parse(acceptance.accepted_at))
+    && Date.parse(acceptance.accepted_at) <= now
+    && Date.parse(acceptance.accepted_at) >= Math.max(...documents.flatMap((document) => [
+      Date.parse(document.published_at), Date.parse(document.effective_at),
+    ])), "admin_current_legal_acceptance_required");
 }
 export function validateOutboundProof(proof, actorIds, now = Date.now()) {
   const checked = Date.parse(proof.checkedAt);
@@ -159,6 +185,25 @@ export async function main(args = process.argv.slice(2)) {
   }
   try {
     const admin = validateDedicatedAdmin(await clerkUser(adminEnv.P03_ADMIN_EMAIL), adminEnv.P03_ADMIN_EMAIL);
+    async function verifyAdminAccount() {
+      const profiles = await read("players", {
+        clerk_user_id: `eq.${admin.id}`, select: "id,clerk_user_id,account_closed_at",
+      });
+      const documents = await read("legal_documents", {
+        status: "eq.effective", document_kind: "in.(terms,privacy)",
+        select: "id,document_kind,status,published_at,effective_at,sha256",
+      });
+      const terms = documents.find((document) => document.document_kind === "terms");
+      const privacy = documents.find((document) => document.document_kind === "privacy");
+      requireThat(terms && privacy, "admin_current_legal_documents_unavailable");
+      const acceptances = await read("account_legal_acceptances", {
+        clerk_user_id: `eq.${admin.id}`, terms_document_id: `eq.${id(terms.id)}`,
+        privacy_document_id: `eq.${id(privacy.id)}`,
+        select: "clerk_user_id,terms_document_id,privacy_document_id,terms_sha256,privacy_sha256,terms_accepted,privacy_acknowledged,accepted_at",
+      });
+      validateAdminAccountState({ profiles, documents, acceptances }, admin.id);
+    }
+    await verifyAdminAccount();
     const actors = [];
     for (const actorConfig of configs) {
       const actor = validateClerkFixtureUser(await clerkUser(actorConfig.email), actorConfig);
@@ -190,6 +235,7 @@ export async function main(args = process.argv.slice(2)) {
     ];
     if (!options.create) return receipt;
     validateOutboundProof(outboundProof, actors.map((actor) => actor.clerkId));
+    await verifyAdminAccount();
     await mkdir(resolve(ROOT, "p03-artifacts"), { recursive: true });
     const journalPath = resolve(ROOT, "p03-artifacts", `fixture-${options["run-id"]}.jsonl`);
     journal = await open(journalPath, "wx", 0o600);
