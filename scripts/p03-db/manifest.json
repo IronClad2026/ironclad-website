@@ -1,0 +1,47 @@
+{
+  "policy": "atomic-p03-v1",
+  "migrations": [
+    {
+      "file": "20260923040206_match_room_production_bootstrap.sql",
+      "version": "20260923040206",
+      "name": "match_room_production_bootstrap",
+      "sha256": "0fe7e3da5e819bb433f9018b3d78f01fb2a13b394eded4c7677d6a2d367856cf"
+    },
+    {
+      "file": "20260919011425_match_room_phase_one.sql",
+      "version": "20260919011425",
+      "name": "match_room_phase_one",
+      "sha256": "eed2aec0caa5f7ca07a48de76b11209e7b1aa337cc9cca7b1f958e32d6ad7753"
+    },
+    {
+      "file": "20260919235836_match_room_phase_three.sql",
+      "version": "20260919235836",
+      "name": "match_room_phase_three",
+      "sha256": "afafc5b80f7baecff212cb368af4c3dbedb785159888b06744bd21c420638720"
+    },
+    {
+      "file": "20260920014644_match_room_production_hardening.sql",
+      "version": "20260920014644",
+      "name": "match_room_production_hardening",
+      "sha256": "a03c4a3492ab54124c35ff9a487d7cd20441c5014b880747187e1e5b6643c725"
+    },
+    {
+      "file": "20260922054205_match_room_unread_summary.sql",
+      "version": "20260922054205",
+      "name": "match_room_unread_summary",
+      "sha256": "42efbf9b372b57e1007ba74fc282fad3bf96535be2b60f6c8578504f8e0618ef"
+    },
+    {
+      "file": "20260923040754_match_room_disabled_assistance_gate.sql",
+      "version": "20260923040754",
+      "name": "match_room_disabled_assistance_gate",
+      "sha256": "e832709b6fead11abda0287a7fdaa38f1ed910527accdb70f1d5819286023565"
+    },
+    {
+      "file": "20260923062127_match_room_retention_and_privacy.sql",
+      "version": "20260923062127",
+      "name": "match_room_retention_and_privacy",
+      "sha256": "0cd225d191adbf1cda83023b10b3f023e9c7886bffa30dd0ca44f501a0bf004b"
+    }
+  ]
+}

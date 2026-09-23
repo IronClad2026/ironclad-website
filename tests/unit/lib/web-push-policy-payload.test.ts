@@ -10,6 +10,20 @@ import {
 const ID = "00000000-0000-4000-8000-000000000001";
 
 describe("Web Push eligibility and payload privacy", () => {
+
+  it("allows message episodes only for a specific participant and a pinned room", () => {
+    const input = {
+      recipientRole: "player", recipientClerkUserId: "user_original",
+      type: "match.message_received", eventKey: "room:episode:fixture",
+      metadata: { roomId: ID },
+    };
+    expect(isWebPushEligible(input)).toBe(true);
+    expect(isWebPushEligible({ ...input, metadata: {} })).toBe(false);
+    expect(isWebPushEligible({ ...input, metadata: { roomId: "invalid" } })).toBe(false);
+    expect(isWebPushEligible({ ...input, recipientClerkUserId: null })).toBe(false);
+    expect(isWebPushEligible({ ...input, recipientRole: "admin", recipientClerkUserId: null })).toBe(false);
+  });
+
   it("locks Admin Push to exactly the three approved operational types", () => {
     expect(ADMIN_WEB_PUSH_TYPES).toEqual([
       "match.dispute_opened",

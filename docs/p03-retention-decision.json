@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "Owner approved",
+  "approvedOn": "2026-09-23",
+  "source": "Owner instruction: P03 Match Room close final Production-readiness blockers",
+  "routine": {
+    "days": 40,
+    "anchor": "authoritative-current-tournament-closure",
+    "individualMatchCompletionIsAnchor": false,
+    "missingClosure": "fail-closed",
+    "reopen": "re-evaluate-current-authority"
+  },
+  "formalCases": {
+    "association": "authoritative-system-state-or-reviewed-case-link",
+    "messageTextClassification": false,
+    "supportCaseMonths": 24,
+    "supportAnchor": "case-closure",
+    "resultIntegrityMonths": 24,
+    "resultAnchor": "current-official-result-finalization",
+    "policySource": "content/legal-corpus.json",
+    "policyDocument": "privacy",
+    "policyVersion": "1.2",
+    "policySection": "18"
+  },
+  "holds": {
+    "scope": "affected-room-or-explicit-message-ids",
+    "purposes": [
+      "legal",
+      "security",
+      "abuse_safety",
+      "competition_integrity"
+    ],
+    "reviewRequired": true,
+    "normalEligibilityResumesAfterRelease": true
+  },
+  "accountClosure": {
+    "futureAccessRevoked": true,
+    "directPrivateAttributionScrubbed": true,
+    "messageBodiesAutomaticallyAnonymized": false,
+    "validTemporaryEvidenceRetentionPreserved": true
+  },
+  "publication": {
+    "reviewDraftOnly": true,
+    "productionActivationAuthorized": false
+  },
+  "productionMutationsAuthorized": false
+}

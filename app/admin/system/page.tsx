@@ -4,6 +4,9 @@ import { ChevronLeft, ShieldAlert, Wrench } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { getRequestLocale } from "@/lib/i18n/request";
+import AdminMatchRoomControl from "@/components/AdminMatchRoomControl";
+import { getAdminMatchRoomSetting } from "@/lib/match-room-settings";
 import AdminEloVerificationChecker from "@/components/AdminEloVerificationChecker";
 import AdminLeaderboardControls from "@/components/AdminLeaderboardControls";
 import {
@@ -34,12 +37,15 @@ export default async function AdminSystemPage() {
     redirect("/");
   }
 
+  const locale = await getRequestLocale();
   const [
+    matchRoomSetting,
     completedLeaderboardTournaments,
     leaderboardRecalculationRuns,
     eloVerificationSetting,
     eloVerificationSupportLinkSetting,
   ] = await Promise.all([
+    getAdminMatchRoomSetting(),
     getCompletedLeaderboardTournaments(),
     getRecentLeaderboardRecalculationRuns(8),
     getEloVerificationSetting(),
@@ -75,6 +81,8 @@ export default async function AdminSystemPage() {
             </Link>
           </div>
         </header>
+
+        <AdminMatchRoomControl setting={matchRoomSetting} locale={locale} />
 
         <section
           aria-labelledby="leaderboard-recovery-heading"

@@ -29,8 +29,10 @@ type LegalCorpus = {
 };
 
 const root = process.cwd();
+// Version-specific publication contracts stay bound to the immutable predecessor snapshot.
+const archive = join(root, "docs", "legal-drafts", "p03-privacy-v1.3");
 const corpus = JSON.parse(
-  readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
+  readFileSync(join(archive, "predecessor-corpus.json"), "utf8")
 ) as LegalCorpus;
 
 function document(kind: "rulebook" | "ppa" | "terms" | "privacy") {

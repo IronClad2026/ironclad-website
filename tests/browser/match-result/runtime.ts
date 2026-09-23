@@ -93,3 +93,24 @@ export const reviewMatchResultReportGroup = submitNoShowReport;
 export const saveAdminMatchResult = submitNoShowReport;
 export const resetAdminMatch = submitNoShowReport;
 export const fixtureMatch = uxMatch;
+
+
+let assistanceVersion = 0;
+let assistanceRequestedAt: string | null = null;
+export async function getMatchRoomAssistance(input: { roomId: string }) {
+  return { ok: true as const, data: {
+    roomId: input.roomId, status: assistanceVersion ? "requested" as const : "none" as const,
+    requestVersion: assistanceVersion, requestedAt: assistanceRequestedAt, resolvedAt: null, canResolve: false,
+  } };
+}
+export async function requestMatchAdminAssistance(input: { roomId: string; expectedRequestVersion: number }) {
+  if (input.expectedRequestVersion !== assistanceVersion) return { ok: false as const, code: "stale_room" as const };
+  if (!assistanceVersion) { assistanceVersion = 1; assistanceRequestedAt = new Date().toISOString(); }
+  return getMatchRoomAssistance(input);
+}
+export async function resolveMatchAdminAssistance() {
+  return { ok: false as const, code: "forbidden" as const };
+}
+export async function getMatchRoomOpponentDiscord() {
+  return { discordUsername: null };
+}

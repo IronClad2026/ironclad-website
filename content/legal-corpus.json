@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "effectiveDate": "2026-08-22",
-  "effectiveDateDisplay": "22 August 2026",
-  "activationDatePolicy": "The current document set may contain different Effective dates. Rulebook v3.1 and PPA v3.1 use 22 August 2026, Terms v1.1 retains 20 August 2026, and Privacy v1.2 uses its actual controlled Production publication date.",
+  "effectiveDate": "2026-09-23",
+  "effectiveDateDisplay": "23 September 2026",
+  "activationDatePolicy": "Every unchanged document keeps its existing Effective date. Privacy v1.3 uses its actual controlled Australia/Sydney publication date.",
   "documents": [
     {
       "kind": "rulebook",
@@ -3222,11 +3222,11 @@
       "title": "PRIVACY POLICY",
       "shortTitle": "Privacy Policy",
       "subtitle": "IronClad Tournaments Privacy Notice",
-      "version": "1.2",
+      "version": "1.3",
       "status": "Effective",
-      "effectiveDate": "2026-08-22",
-      "filename": "ironclad-privacy-policy-v1.2.pdf",
-      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf",
+      "effectiveDate": "2026-09-23",
+      "filename": "ironclad-privacy-policy-v1.3.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.3.pdf",
       "operatorStatement": "Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy, are the responsible operators of the Service.",
       "introBlocks": [
         {
@@ -3275,7 +3275,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, rankings, Polls, in-app notifications, deliberately enabled Web Push, installed-app notification badges, support, account closure, optional analytics preference, optional consent-gated public-site analytics and prize administration where applicable."
+              "text": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, private Match Room communication, rankings, Polls, in-app notifications, deliberately enabled Web Push, installed-app notification badges, support, account closure, optional analytics preference, optional consent-gated public-site analytics and prize administration where applicable."
             },
             {
               "type": "paragraph",
@@ -3443,6 +3443,10 @@
             {
               "type": "paragraph",
               "text": "Notifications and correspondence:"
+            },
+            {
+              "type": "paragraph",
+              "text": "Match Room information includes message content, sender and room-participant provenance, message order and timestamps, private read positions, unread-notification episodes, Admin Assistance case state, and the minimum audit and retention-control metadata needed to operate and secure that communication."
             },
             {
               "type": "bullets",
@@ -3707,6 +3711,18 @@
             {
               "type": "paragraph",
               "text": "Scores and official results may become public. Private evidence does not become promotional content."
+            },
+            {
+              "type": "paragraph",
+              "text": "Match Room messages are private communication between the two authorized room participants. Authorized IronClad tournament administrators may access retained messages for tournament operations, Admin Assistance, disputes, moderation, competition integrity and safety. Public visitors and unrelated players cannot access the private transcript or another participant's read state."
+            },
+            {
+              "type": "paragraph",
+              "text": "Access follows the current authoritative Match, room membership, Account and administrator permissions. A reset, reassignment, completed Match, closed Account or disabled communication feature may restrict access or make a room read-only; these changes do not turn the transcript into public content."
+            },
+            {
+              "type": "paragraph",
+              "text": "Users may place personal information in free text. Removing or pseudonymising an Account identifier does not automatically anonymise message bodies. Users should avoid unnecessary personal information about themselves or others."
             },
             {
               "type": "paragraph",
@@ -3978,6 +3994,14 @@
                   "12 months after becoming non-actionable, then delete or deidentify unless part of another retained case record."
                 ],
                 [
+                  "Routine private Match Room communication",
+                  "Retain message content for 40 days after the Tournament officially closes, using its authoritative current completed, cancelled or voided state and trustworthy closure time. This period does not start when an individual Match ends. Expired routine content and unnecessary communication-only attribution are removed through bounded, documented maintenance; a minimal non-content room identity and necessary competitive provenance may remain."
+                ],
+                [
+                  "Match Room material linked to a formal case or investigation",
+                  "Apply the existing relevant longer period: 24 months after support, complaint, privacy or Admin Assistance case closure; or 24 months after the result becomes final for dispute, no-show or supplemental competition-integrity material. An active case or applicable narrow hold prevents deletion of affected material. Association is determined by authoritative case or system records, never by classifying message text."
+                ],
+                [
                   "Web Push subscriptions",
                   "For the life of the deliberate Push opt-in. Delete when the user disables Push in IronClad, on completed Account closure, or when a Push Service reports an expired or invalid endpoint, including HTTP 404 or 410. If permission is revoked only in the browser or operating system, delete when IronClad next detects the revocation or delivery failure. Provider copies follow the provider's lawful schedule."
                 ],
@@ -4014,6 +4038,18 @@
             {
               "type": "paragraph",
               "text": "A legal, security or integrity hold suspends deletion only for affected information and only for as long as reasonably necessary. After a hold ends, overdue deletion should occur within 30 days."
+            },
+            {
+              "type": "paragraph",
+              "text": "A Match Room hold must identify affected material and a documented legal obligation, security, abuse/safety or competition-integrity purpose. Holds are reviewed and released when the purpose ends. Routine conversation is not retained indefinitely by default; after release, normal purge eligibility resumes."
+            },
+            {
+              "type": "paragraph",
+              "text": "Retention is evaluated against current authoritative state. If a Tournament legitimately reopens, a stale closure date is not used for deletion. If no trustworthy closure timestamp exists, maintenance stops for that material and requires an authority review rather than inventing a date or treating unrelated timestamps as closure."
+            },
+            {
+              "type": "paragraph",
+              "text": "Communication cleanup does not delete Tournament results, brackets, registrations, standings or required immutable competitive history. Minimal non-content tombstones and audit counts support safe retries, prevent transcript recreation and record the class of data removed without logging message bodies."
             },
             {
               "type": "paragraph",
@@ -4071,6 +4107,14 @@
             },
             {
               "type": "paragraph",
+              "text": "Completed Account closure immediately revokes future Match Room access and messaging through the existing closure authority, removes private read state and clears direct Account-linked communication and notification attribution as supported by that architecture. Retained free-text messages are not represented as anonymised."
+            },
+            {
+              "type": "paragraph",
+              "text": "Routine retained messages remain subject to 40 days after Tournament closure. Account closure does not automatically override a valid temporary formal-case, integrity, security or legal retention requirement; affected material follows the applicable longer schedule and hold review."
+            },
+            {
+              "type": "paragraph",
               "text": "Free-text or replay content may contain information not automatically discoverable by structured closure. IronClad will review specifically identified material where a substantiated request or legal obligation requires it."
             },
             {
@@ -4094,6 +4138,14 @@
             {
               "type": "paragraph",
               "text": "IronClad may verify identity proportionately. It will not request a password or authentication code. Additional evidence should be requested only where reasonably necessary."
+            },
+            {
+              "type": "paragraph",
+              "text": "For a substantiated Match Room access, export or erasure request, an authorized operator can locate retained records using verified Account or historical player provenance. Any export is limited to the requester's own rooms and reviewed for another person's rights before secure delivery. Authorized targeted deletion or redaction is assessed against active cases, lawful holds and the retention schedule; it does not erase unrelated rooms or competitive history."
+            },
+            {
+              "type": "paragraph",
+              "text": "A retained export is handled as private case material. Live-system deletion does not instantly erase older backup copies: the existing maximum rolling 90-day backup window applies, expired copies are excluded from ordinary access, and completed deletion or pseudonymisation obligations must be reapplied after restoration."
             },
             {
               "type": "paragraph",

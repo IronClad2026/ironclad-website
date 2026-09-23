@@ -11,8 +11,10 @@ import {
 } from "../../scripts/legal-successor/rulebook-ppa-v3.1-publication.mjs";
 
 const root = process.cwd();
+// Version-specific publication contracts stay bound to the immutable predecessor snapshot.
+const archive = join(root, "docs", "legal-drafts", "p03-privacy-v1.3");
 const corpus = JSON.parse(
-  readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
+  readFileSync(join(archive, "predecessor-corpus.json"), "utf8")
 );
 const expectedArtifacts = new Map([
   [
@@ -60,12 +62,12 @@ function hashPublishedArtifacts() {
   );
 }
 
-function runtimeDocument(kind: string) {
+function historicalDocument(kind: string) {
   const document = corpus.documents.find(
     (candidate: { kind: string }) => candidate.kind === kind
   );
   if (!document) {
-    throw new Error(`Missing runtime document: ${kind}`);
+    throw new Error(`Missing historical document: ${kind}`);
   }
   return document;
 }
@@ -101,13 +103,13 @@ describe("Rulebook v3.1 and PPA v3.1 publication source", () => {
         },
       ],
     });
-    expect(runtimeDocument("terms")).toMatchObject({
+    expect(historicalDocument("terms")).toMatchObject({
       effectiveDate: "2026-08-20",
       filename: "ironclad-terms-of-service-v1.1.pdf",
       status: "Effective",
       version: "1.1",
     });
-    expect(runtimeDocument("privacy")).toMatchObject({
+    expect(historicalDocument("privacy")).toMatchObject({
       effectiveDate: "2026-08-22",
       filename: "ironclad-privacy-policy-v1.2.pdf",
       status: "Effective",

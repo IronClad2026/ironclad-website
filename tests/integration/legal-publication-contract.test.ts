@@ -4,6 +4,11 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  assertPdfEffectiveDate,
+  formatActivationDateDisplay,
+} from "../../scripts/phase15c/release-artifact-contract.mjs";
+
 type CorpusDocument = {
   effectiveDate: string;
   filename: string;
@@ -59,9 +64,9 @@ const draft = JSON.parse(readFileSync(draftPath, "utf8")) as {
   schemaVersion: number;
   status: string;
 };
-const manifest = existsSync(manifestPath)
-  ? (JSON.parse(readFileSync(manifestPath, "utf8")) as SuccessorManifest)
-  : null;
+const manifest = JSON.parse(
+  readFileSync(manifestPath, "utf8")
+) as SuccessorManifest;
 
 const historicalDocuments = {
   ppa: {
@@ -113,79 +118,127 @@ const publishedCompetitionV31Artifacts = new Map([
 ]);
 
 describe("versioned legal publication contract", () => {
-  it("publishes the exact finalized mixed-date Privacy v1.2 successor", () => {
+  it("publishes the exact active document identities from the Final manifest", () => {
     expect(corpus.schemaVersion).toBe(1);
     expect(corpus.documents).toHaveLength(4);
     expect(corpus.documents.map((document) => document.kind).sort()).toEqual(
       Object.keys(historicalDocuments).sort()
     );
-
-    expect(manifest).not.toBeNull();
+    const displayDate = formatActivationDateDisplay(manifest.effectiveDate);
     expect(manifest).toMatchObject({
-      effectiveDate: "2026-08-22",
-      effectiveDateDisplay: "22 August 2026",
+      effectiveDateDisplay: displayDate,
       schemaVersion: 1,
       status: "Final",
     });
-    expect(manifest?.documents).toEqual([
-      expect.objectContaining({
-        effectiveDate: "2026-08-22",
-        kind: "privacy",
-        version: "1.2",
-      }),
-    ]);
-    expect(manifest?.predecessorDocuments).toEqual([
-      expect.objectContaining({
-        kind: "terms",
-        sha256:
-          "59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1",
-        version: "1.1",
-      }),
-      expect.objectContaining({
-        kind: "privacy",
-        sha256:
-          "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91",
-        version: "1.1",
-      }),
-    ]);
+    expect(corpus.effectiveDate).toBe(manifest.effectiveDate);
+    expect(corpus.effectiveDateDisplay).toBe(displayDate);
+    expect(manifest.documents).toHaveLength(1);
+    expect(manifest.documents[0].kind).toBe("privacy");
+    expect(manifest.documents[0].effectiveDate).toBe(manifest.effectiveDate);
+    expect(manifest.predecessorDocuments.map((document) => document.kind).sort())
+      .toEqual(["privacy", "terms"]);
+
+    for (const document of [...manifest.predecessorDocuments, ...manifest.documents]) {
+      expect(document.version).toMatch(/^\d+\.\d+$/);
+      const title = document.kind === "terms" ? "terms-of-service" : "privacy-policy";
+      expect(document.filename).toBe("ironclad-" + title + "-v" + document.version + ".pdf");
+      expect(document.publicPath).toBe("/documents-rules-ppa/" + document.filename);
+      expect(document.sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(formatActivationDateDisplay(document.effectiveDate)).toBeTruthy();
+      expect(document.effectiveDate <= manifest.effectiveDate).toBe(true);
+    }
+    const priorPrivacy = manifest.predecessorDocuments.find(
+      (document) => document.kind === "privacy"
+    )!;
+    const priorVersion = priorPrivacy.version.split(".").map(Number);
+    const nextVersion = manifest.documents[0].version.split(".").map(Number);
+    expect(
+      nextVersion[0] > priorVersion[0] ||
+      (nextVersion[0] === priorVersion[0] && nextVersion[1] > priorVersion[1])
+    ).toBe(true);
+
+    const activeAccountDocuments = new Map(
+      [...manifest.predecessorDocuments, ...manifest.documents].map((document) => [
+        document.kind,
+        document,
+      ])
+    );
+    expect(activeAccountDocuments.get("terms")).toEqual({
+      effectiveDate: "2026-08-20",
+      filename: "ironclad-terms-of-service-v1.1.pdf",
+      kind: "terms",
+      publicPath: "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+      sha256: publishedV11Artifacts.get("ironclad-terms-of-service-v1.1.pdf"),
+      version: "1.1",
+    });
     expect(
       corpus.documents.map((document) => ({
         effectiveDate: document.effectiveDate,
+        filename: document.filename,
         kind: document.kind,
+        publicPath: document.publicPath,
         status: document.status,
         version: document.version,
       }))
     ).toEqual([
-      { effectiveDate: "2026-08-22", kind: "rulebook", status: "Effective", version: "3.1" },
-      { effectiveDate: "2026-08-22", kind: "ppa", status: "Effective", version: "3.1" },
-      { effectiveDate: "2026-08-20", kind: "terms", status: "Effective", version: "1.1" },
-      { effectiveDate: "2026-08-22", kind: "privacy", status: "Effective", version: "1.2" },
+      {
+        effectiveDate: "2026-08-22",
+        filename: "ironclad-official-tournament-rulebook-v3.1.pdf",
+        kind: "rulebook",
+        publicPath: "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.1.pdf",
+        status: "Effective",
+        version: "3.1",
+      },
+      {
+        effectiveDate: "2026-08-22",
+        filename: "ironclad-player-participation-agreement-v3.1.pdf",
+        kind: "ppa",
+        publicPath: "/documents-rules-ppa/ironclad-player-participation-agreement-v3.1.pdf",
+        status: "Effective",
+        version: "3.1",
+      },
+      ...(["terms", "privacy"] as const).map((kind) => {
+        const document = activeAccountDocuments.get(kind)!;
+        return {
+          effectiveDate: document.effectiveDate,
+          filename: document.filename,
+          kind,
+          publicPath: document.publicPath,
+          status: "Effective",
+          version: document.version,
+        };
+      }),
     ]);
 
-    const serialized = JSON.stringify(corpus);
-    expect(serialized).not.toMatch(
+    expect(JSON.stringify([corpus, manifest])).not.toMatch(
       /Review Draft|Not Effective|Actual Production activation date|\{\{PRODUCTION_EFFECTIVE_DATE\}\}/
     );
   });
 
-  it("preserves historical PDFs and binds the finalized v1.2 successor", () => {
-    const expectedArtifacts = new Map<string, string>(
-      Object.values(historicalDocuments).map((document) => [
+  it("preserves every historical PDF and binds the active Final manifest to current bytes", () => {
+    const expectedArtifacts = new Map<string, string>([
+      ...Object.values(historicalDocuments).map((document): [string, string] => [
         document.filename,
         document.sha256,
-      ])
-    );
-    for (const [filename, sha256] of publishedV11Artifacts) {
-      expectedArtifacts.set(filename, sha256);
-    }
-    for (const [filename, sha256] of publishedCompetitionV31Artifacts) {
-      expectedArtifacts.set(filename, sha256);
-    }
-    for (const document of manifest?.documents ?? []) {
-      expect(document.version).toBe("1.2");
-      expect(document.effectiveDate).toBe(manifest?.effectiveDate);
-      expect(document.sha256).toMatch(/^[0-9a-f]{64}$/);
+      ]),
+      ...publishedV11Artifacts,
+      ...publishedCompetitionV31Artifacts,
+      [
+        "ironclad-privacy-policy-v1.2.pdf",
+        "aa0f7af02b69194172dd6333e1d8b7271152aad0bfdab7a935686071c784bfd6",
+      ],
+    ]);
+    for (const document of [...manifest.predecessorDocuments, ...manifest.documents]) {
+      const historicalHash = expectedArtifacts.get(document.filename);
+      if (historicalHash !== undefined) {
+        expect(document.sha256).toBe(historicalHash);
+      }
       expectedArtifacts.set(document.filename, document.sha256);
+      assertPdfEffectiveDate(
+        readFileSync(join(publicDirectory, document.filename)),
+        formatActivationDateDisplay(document.effectiveDate),
+        document.kind
+      );
     }
 
     const pdfNames = readdirSync(publicDirectory)
@@ -221,16 +274,6 @@ describe("versioned legal publication contract", () => {
       ])
     );
 
-    if (manifest === null) {
-      expect(
-        existsSync(
-          join(publicDirectory, "ironclad-terms-of-service-v1.1.pdf")
-        )
-      ).toBe(false);
-      expect(
-        existsSync(join(publicDirectory, "ironclad-privacy-policy-v1.1.pdf"))
-      ).toBe(false);
-    }
   });
 
   it("preserves the approved PPA definition numbering", () => {

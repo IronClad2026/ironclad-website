@@ -53,3 +53,7 @@ supabase.temp/
 _recovery_backup/
 
 _recovery_backup_*/
+
+# Local P03 verification logs and private release-day backup/evidence files.
+/test-results-initial.log
+/p03-artifacts/

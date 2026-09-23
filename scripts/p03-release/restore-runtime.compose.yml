@@ -1,0 +1,27 @@
+# Future LOCAL disposable runtime only. The exact image matches the observed
+# Production engine; extension preflight still verifies every version. This
+# host has no Docker engine: actual runtime/restore preflight is still required.
+services:
+  postgres:
+    image: supabase/postgres:17.6.1.127
+    container_name: ${P03_RESTORE_CONTAINER_NAME:-p03-restore-release}
+    user: postgres
+    entrypoint: ["sh", "-ec"]
+    environment:
+      P03_RESTORE_PASSWORD: ${P03_RESTORE_PASSWORD:?Set a fresh local-only password}
+    command:
+      - |
+        umask 077
+        test ! -e /tmp/p03-data
+        printf '%s\n' "$$P03_RESTORE_PASSWORD" > /tmp/p03-password
+        initdb -D /tmp/p03-data -U postgres --auth-local=trust --auth-host=scram-sha-256 --pwfile=/tmp/p03-password --encoding=UTF8 --no-locale >/dev/null
+        rm /tmp/p03-password
+        unset P03_RESTORE_PASSWORD
+        printf '%s\n' 'host all postgres 0.0.0.0/0 scram-sha-256' 'host all postgres ::/0 scram-sha-256' >> /tmp/p03-data/pg_hba.conf
+        exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directories=/tmp -c shared_preload_libraries=pg_cron,pg_net,pg_stat_statements -c cron.database_name=p03_restore_release -c cron.launch_active_jobs=off -c pg_net.database_name=postgres -c max_connections=30
+    networks:
+      - isolated
+networks:
+  isolated:
+    name: ${P03_RESTORE_NETWORK_NAME:-p03-restore-isolated}
+    internal: true

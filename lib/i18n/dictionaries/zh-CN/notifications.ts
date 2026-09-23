@@ -177,6 +177,8 @@ const dictionary = {
     opponentSubmittedMessage: "报告的赛果正在由管理员审核。打开此消息可查看报告。",
   },
   server: {
+    matchMessageReceivedTitle: "对局聊天室有新消息",
+    matchMessageReceivedMessage: "您的对局聊天室中有新消息。",
     loadError: "无法加载通知。",
     badgeUnlockedTitle: "徽章已解锁",
     badgeUnlockedMessage: "你已解锁“{badgeName}”徽章。",

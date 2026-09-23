@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "routineDays": 40,
+    "anchor": "authoritative-current-tournament-closure",
+    "supportCaseMonths": 24,
+    "resultIntegrityMonths": 24,
+    "bodyClassification": false
+  },
+  "publication": {
+    "status": "Review Draft",
+    "runtimeActivated": false,
+    "effectiveDate": null
+  },
+  "retentionMigration": "20260923062127_match_room_retention_and_privacy.sql",
+  "privacyOperations": "scripts/p03-release/privacy.mjs",
+  "artifacts": [
+    {
+      "path": "content/legal-privacy-successor-v1.3.json",
+      "sha256": "fd1f06308d8ff9263803fd8528018c557c7764676d5b8daaf0d9e9887c76d17c",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "docs/legal-drafts/p03-privacy-v1.3/ironclad-privacy-policy-v1.3.pdf",
+      "sha256": "1f08b3e2d3758e0ecd5b5c3c984f8ba6c07d65852d90f8c7f00948e0072a0175",
+      "encoding": "binary"
+    },
+    {
+      "path": "docs/legal-drafts/p03-privacy-v1.3/legal-corpus.json",
+      "sha256": "f532c717849b06ef92994d199747f4986b5d6be7c007d582bec807a0a9d8818e",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "docs/legal-drafts/p03-privacy-v1.3/predecessor-corpus.json",
+      "sha256": "63ba27ca69ba0adb7c72cb8fee95130853023f8d2441e4d95d7488f5660c7f7e",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "docs/legal-drafts/p03-privacy-v1.3/predecessor-release.json",
+      "sha256": "3cd84f49962d7803193e2ee68337add81d68c2033719dcfe43f9931a32483f92",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "docs/legal-drafts/p03-privacy-v1.3/review-manifest.json",
+      "sha256": "8216272bab70d3b2cd14d70245e57eac033637a94a39c2ffa6769b50c71f0659",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "docs/p03-privacy-successor-runbook.md",
+      "sha256": "dbd378892e46e76aca6b07b9a8170241d0e9b5ac28d9435467ec8d94841fa6e0",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "docs/p03-release-runbook.md",
+      "sha256": "b44e6933740a82a4fcd46170f8241e383f98da4902648c66f3a27fa1b44bd627",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "docs/p03-retention-decision.json",
+      "sha256": "43fff2be1761d85ba9df020c34a0548068d7df651875161d33a425269c5694c1",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/generate-legal-pdfs.py",
+      "sha256": "9261caa058056af8a415bd8a63cbe3547560a4bb868e4d9ea27fc5e8db722611",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/legal-successor/p03-legal-runtime.mjs",
+      "sha256": "a6d2f769833536943fcf0d2299dc3ea2b3e18bc77f7946da253d15834c24f819",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/legal-successor/p03-privacy-publication.mjs",
+      "sha256": "99e33879dbb94b25520347f44075e0e592a305ffaf3943127a19c3458ea3c39e",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/legal-successor/prepare-p03-privacy.mjs",
+      "sha256": "6f74aa381b113a201ef13c21c7dbccb71380c3c5943d9df015111c19a659ce34",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/legal-successor/rehearse-p03-privacy.mjs",
+      "sha256": "cabf19c60b1763422dd161c528b8b9d972bd4649f464590af20c530b4a7e5e73",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/legal-successor/stage-p03-privacy.mjs",
+      "sha256": "6c41051a5cddaba785f68adcf03836e1f687fb6777d7e99e27f286432124d8ff",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/p03-db/retention-concurrency.mjs",
+      "sha256": "11bfbea7b96b07169eefd5ff0bfc120497d2b7b3be3726ea43d4dcaa35a5941d",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/p03-release/privacy-operations.md",
+      "sha256": "4dfc24833ffc9f2477faf377a7245ab0f4a359b4b847cf08b787ab7d0ac71c51",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/p03-release/privacy-readiness.mjs",
+      "sha256": "55fc7b36f6079d139b42f89b3516608b89b44f9defe943c1429839b5a69da2e3",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "scripts/p03-release/privacy.mjs",
+      "sha256": "aa41c71e787c9dae20b41c7696efb07e08e248ce822b9c7d172f62db6ad90fdd",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "supabase/migrations/20260923062127_match_room_retention_and_privacy.sql",
+      "sha256": "0cd225d191adbf1cda83023b10b3f023e9c7886bffa30dd0ca44f501a0bf004b",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "tests/p03-db/retention.sql",
+      "sha256": "246d4034e8da9e0d0a687c1b797ffe674c369ff4026766ba0e83a74ec29d1421",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "tests/unit/legal-p03-privacy-readiness.test.ts",
+      "sha256": "4c01be3c836f52d40eb0ccb319ce3ae615e4e334da60747decd7da84f3a676db",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "tests/unit/legal-p03-staging.test.ts",
+      "sha256": "f7eef31fdf5783f592dfaba717a3bf21da7dc1cf5a8eb7e43c75317bd1a3a5fa",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "tests/unit/p03-release/privacy-readiness.test.ts",
+      "sha256": "1b035a0cf4879c29963271c8b4bec75bac64118e5a7a887d173ee9c45ddd2376",
+      "encoding": "utf8-lf"
+    },
+    {
+      "path": "tests/unit/p03-release/privacy.test.ts",
+      "sha256": "d7e30fbbd8521b011515c7dac84f1a4f40c7817fb7c37d691c4bfd3c809ae8ed",
+      "encoding": "utf8-lf"
+    }
+  ]
+}

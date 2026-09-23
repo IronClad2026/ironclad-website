@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "appliedAt": "2026-09-23T06:56:16.922Z",
+  "mode": "local-rehearsal",
+  "candidateSha": "97bee422ef5d37c5c02fab68829e224ea5c2273e",
+  "masterSha": "0f23d7d906c8588de3051fd9a7cdcf218a576ab3",
+  "projectRef": "local",
+  "gateSha256": "750d288366193952ddcd3efe2772adeb9699887fb9a6d79a05ad290d0b076fb9",
+  "sealSha256": "4fa69a23b7d7f2bb6eb9c39c0292e0fbe7f2abe347a316b666fa2a5d63818d65",
+  "packageSqlSha256": "40ad016e6ff05960733f4e61e0de5b949eefb3466b4978abe5990f0e4bbf318f",
+  "guardedSqlSha256": "0d03fc56dc7a8b332458738f8a6bff161c16708d9f28c6b30625cc65fcd6fb3f",
+  "competitionSha256": "6da124f1bb18e009066344577d511875f609bcf4f5e63747f52ce06ae0001483",
+  "packageApplied": true,
+  "matchRoomEnabled": false,
+  "competitionUnchanged": true,
+  "checks": [
+    "Injected competition mutation aborts and rolls back the entire package",
+    "Production mode rejects a loopback endpoint",
+    "Missing exact local approval blocks apply",
+    "Exact production executor transaction applied to loopback fixture",
+    "Before and after competition guards passed inside the migration transaction",
+    "All migrations and ledger committed together with Match Room OFF"
+  ],
+  "status": "PASS"
+}

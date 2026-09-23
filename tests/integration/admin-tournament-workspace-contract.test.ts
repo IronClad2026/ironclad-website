@@ -1051,6 +1051,13 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260903210000_registration_open_state_consistency.sql",
       "20260904120000_canonical_division_launch_ordering.sql",
       "20260908052210_member_rpc_current_account_acceptance.sql",
+      "20260919011425_match_room_phase_one.sql",
+      "20260919235836_match_room_phase_three.sql",
+      "20260920014644_match_room_production_hardening.sql",
+      "20260922054205_match_room_unread_summary.sql",
+      "20260923040206_match_room_production_bootstrap.sql",
+      "20260923040754_match_room_disabled_assistance_gate.sql",
+      "20260923062127_match_room_retention_and_privacy.sql",
     ]);
     const platformMigrationNames = migrationNames.filter(
       (name) =>
@@ -1076,39 +1083,26 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.at(-11)).toBe(
-      "20260831133000_staging_badge_cross_division_acceptance.sql"
-    );
-    expect(migrationNames.at(-10)).toBe(
-      "20260831134000_staging_badge_fixture_eligibility_compatibility.sql"
-    );
-    expect(migrationNames.at(-9)).toBe(
-      "20260902100000_unlaunched_event_void_authority.sql"
-    );
-    expect(migrationNames.at(-8)).toBe(
-      "20260902130000_event_based_tournament_scheduling.sql"
-    );
-    expect(migrationNames.at(-7)).toBe(
-      "20260903100000_division_settlement_shadow_foundation.sql"
-    );
-    expect(migrationNames.at(-6)).toBe(
-      "20260903130000_not_held_division_closure.sql"
-    );
-    expect(migrationNames.at(-5)).toBe(
-      "20260903160000_division_accounting_cutover.sql"
-    );
-    expect(migrationNames.at(-4)).toBe(
-      "20260903190000_not_held_next_event_invitations.sql"
-    );
-    expect(migrationNames.at(-3)).toBe(
-      "20260903210000_registration_open_state_consistency.sql"
-    );
-    expect(migrationNames.at(-2)).toBe(
-      "20260904120000_canonical_division_launch_ordering.sql"
-    );
-    expect(migrationNames.at(-1)).toBe(
-      "20260908052210_member_rpc_current_account_acceptance.sql"
-    );
+    expect(migrationNames.slice(-18)).toEqual([
+      "20260831133000_staging_badge_cross_division_acceptance.sql",
+      "20260831134000_staging_badge_fixture_eligibility_compatibility.sql",
+      "20260902100000_unlaunched_event_void_authority.sql",
+      "20260902130000_event_based_tournament_scheduling.sql",
+      "20260903100000_division_settlement_shadow_foundation.sql",
+      "20260903130000_not_held_division_closure.sql",
+      "20260903160000_division_accounting_cutover.sql",
+      "20260903190000_not_held_next_event_invitations.sql",
+      "20260903210000_registration_open_state_consistency.sql",
+      "20260904120000_canonical_division_launch_ordering.sql",
+      "20260908052210_member_rpc_current_account_acceptance.sql",
+      "20260919011425_match_room_phase_one.sql",
+      "20260919235836_match_room_phase_three.sql",
+      "20260920014644_match_room_production_hardening.sql",
+      "20260922054205_match_room_unread_summary.sql",
+      "20260923040206_match_room_production_bootstrap.sql",
+      "20260923040754_match_room_disabled_assistance_gate.sql",
+      "20260923062127_match_room_retention_and_privacy.sql",
+    ]);
     expect(
       normalizedSha256(
         read(
