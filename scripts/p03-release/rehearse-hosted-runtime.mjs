@@ -2,6 +2,7 @@
 // binaries, with no Production credentials and no externally reachable server.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,15 +47,27 @@ async function startContainer(name, port, database) {
   // Skip the image's project-init scripts, creating a clean PostgreSQL cluster
   // with the image's real extension binaries. Source/target must be separate
   // clusters because pg_cron pins its metadata to cron.database_name.
+  const networkState = JSON.parse(run("docker", ["network", "inspect", network]))[0];
+  const subnet = networkState.IPAM?.Config?.find((entry) => /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(entry.Subnet ?? ""))?.Subnet;
+  assert(networkState.Internal === true && subnet, "Rehearsal requires its isolated IPv4 bridge subnet");
   const shell = `set -eu
 initdb -D /tmp/p03-data -U postgres --auth-local=trust --auth-host=trust --encoding=UTF8 --no-locale >/dev/null
-exec postgres -D /tmp/p03-data -c listen_addresses='*' -c shared_preload_libraries=pg_cron,pg_stat_statements -c cron.database_name=${database} -c cron.launch_active_jobs=off -c max_connections=30`;
+echo 'host all postgres ${subnet} trust' >> /tmp/p03-data/pg_hba.conf
+exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directories=/tmp -c shared_preload_libraries=pg_cron,pg_stat_statements -c cron.database_name=${database} -c cron.launch_active_jobs=off -c max_connections=30`;
   run("docker", ["run", "--detach", "--name", name, "--network", network, "--publish", `127.0.0.1:${port}:5432`, "--user", "postgres", "--entrypoint", "sh", image, "-c", shell]);
   created.push(name);
   const admin = connection(localEnvironment(port, "postgres", name));
   let ready = false;
   for (let attempt = 0; attempt < 40; attempt++) {
     try { readOnlySql(admin, "select 1;"); ready = true; break; } catch { await sleep(1000); }
+  }
+  if (!ready) {
+    const state = JSON.parse(run("docker", ["inspect", name]))[0].State;
+    console.error(JSON.stringify({ syntheticContainer: name, status: state.Status, exitCode: state.ExitCode }));
+    // This container is still empty and has never received application data or
+    // credentials. Bounded startup diagnostics are safe to expose in CI logs.
+    const logs = spawnSync("docker", ["logs", "--tail", "35", name], { encoding: "utf8", timeout: 10000, maxBuffer: 16384 });
+    console.error(`${logs.stdout ?? ""}${logs.stderr ?? ""}`.slice(-4096));
   }
   assert(ready, "Disposable container did not become ready within the startup bound");
   sql(admin, `create database ${database} template template0;`);

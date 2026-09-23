@@ -84,7 +84,7 @@ jobs:
       - name: Start disposable loopback-only PostgreSQL
         run: |
           /usr/lib/postgresql/17/bin/initdb -D "$RUNNER_TEMP/p03-postgres" -U postgres -A trust --no-locale --encoding=UTF8
-          /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-postgres" -l "$RUNNER_TEMP/p03-postgres.log" -o "-h 127.0.0.1 -p 56623" -w start
+          /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-postgres" -l "$RUNNER_TEMP/p03-postgres.log" -o "-h 127.0.0.1 -p 56623 -k $RUNNER_TEMP" -w start || { cat "$RUNNER_TEMP/p03-postgres.log"; exit 1; }
           /usr/lib/postgresql/17/bin/createdb -h 127.0.0.1 -p 56623 -U postgres p03_rehearsal
       - name: Replay exact reviewed Production baseline locally
         run: node scripts/p03-db/replay-baseline.mjs /usr/lib/postgresql/17/bin/psql

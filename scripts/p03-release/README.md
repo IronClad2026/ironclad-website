@@ -173,7 +173,7 @@ node scripts/p03-release/cli.mjs gate --seal C:/Private/P03/seal.json --backup-d
 
 Gate requires authenticated `gh` and `VERCEL_TOKEN` for GET requests. It checks
 live origin/master, clean exact candidate, migration order/checksums/ledger,
-both latest CI jobs, exact READY Preview/source/branch, build-isolation guard,
+all three latest CI jobs (`validate`, `p03-database`, `p03-hosted-backup`), exact READY Preview/source/branch, build-isolation guard,
 runbook/privacy/browser evidence hashes, fresh backup and successful actual
 restore, Production identity/OFF state, competition facts, locks, and upcoming
 cron deadlines/activations. Missing data is STOP. Gate itself only reads remote

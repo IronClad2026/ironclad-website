@@ -49,7 +49,7 @@ aborts the whole package. It never repairs competition data. See
 
 ## Preparation requirements that must be complete before release day
 
-1. Both exact-SHA CI jobs (`validate`, `p03-database`) green.
+1. All three exact-SHA CI jobs (`validate`, `p03-database`, `p03-hosted-backup`) green.
 2. Exact-SHA Preview READY, build isolation guard passed, and the hosted browser
    report contains every required successful scenario with no skipped/flaky tests.
 3. Approved message-body retention, purge, access/export and account-closure

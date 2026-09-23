@@ -76,7 +76,7 @@ Logical backup is not PITR and excludes Storage object bytes and Clerk state.
 
 Nineteen focused release-tool unit tests passed, including fail-closed gate
 receipts. The final gate binds clean Git state, live master, ledger/dependencies,
-exact package, both CI jobs, immutable READY Preview, hosted browser coverage,
+exact package, all three CI jobs, immutable READY Preview, hosted browser coverage,
 privacy decision, fresh backup/restore evidence and stable competition facts.
 It is read-only and stops even after PASS. The separate executor requires the
 exact later instruction `PROCEED WITH P03 PRODUCTION RELEASE`.

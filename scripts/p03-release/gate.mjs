@@ -60,7 +60,7 @@ function ci(config, repository) {
   const runs = response.workflow_runs.filter((item) => item.name === "CI" && item.head_sha === config.candidateSha).sort((a, b) => b.id - a.id);
   invariant(runs.length > 0 && runs[0].status === "completed" && runs[0].conclusion === "success", "Latest exact-candidate CI run is not green.");
   const jobs = JSON.parse(run("gh", ["api", `repos/${config.githubRepository}/actions/runs/${runs[0].id}/jobs?per_page=100`], { cwd: repository })).jobs;
-  for (const name of ["validate", "p03-database"]) invariant(jobs.some((job) => job.name === name && job.conclusion === "success"), `CI ${name} job has not passed.`);
+  for (const name of ["validate", "p03-database", "p03-hosted-backup"]) invariant(jobs.some((job) => job.name === name && job.conclusion === "success"), `CI ${name} job has not passed.`);
   invariant(jobs.every((job) => job.conclusion === "success"), "A CI job did not pass.");
   return { runId: runs[0].id, candidateSha: runs[0].head_sha, conclusion: runs[0].conclusion };
 }
