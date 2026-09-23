@@ -52,12 +52,7 @@ export function checkRestoreRuntime(extensions, env = process.env) {
   validateExtensionRuntime(extensions, available);
   if (extensions.some((item) => item.name === "pg_cron")) invariant(readOnlySql(db, "select current_setting('cron.launch_active_jobs',true);") === "off", "Restore runtime must set cron.launch_active_jobs=off before restoring copied jobs.");
   if (extensions.some((item) => ["pg_net", "http"].includes(item.name))) {
-    invariant(/^p03-restore-[a-z0-9-]+$/.test(env.P03_RESTORE_CONTAINER ?? ""), "Hosted backup requires P03_RESTORE_CONTAINER identifying a dedicated Docker runtime with no outbound network.");
-    const container = JSON.parse(run("docker", ["inspect", env.P03_RESTORE_CONTAINER]))[0];
-    const networks = Object.keys(container.NetworkSettings?.Networks ?? {});
-    const port = container.NetworkSettings?.Ports?.["5432/tcp"] ?? [];
-    invariant(container.State?.Running && networks.length > 0 && port.length === 1 && port[0].HostIp === "127.0.0.1" && port[0].HostPort === db.env.PGPORT, "Restore endpoint is not bound to the isolated Docker runtime on loopback.");
-    for (const network of networks) invariant(JSON.parse(run("docker", ["network", "inspect", network]))[0].Internal === true, "Restore container network permits outbound access; copied pg_net requests must not reach live services.");
+    invariant(db.containerAttestation?.name === env.P03_RESTORE_CONTAINER, "Hosted backup requires a positively attested dedicated local Docker runtime with no outbound network.");
   }
   const count = Number(readOnlySql(db, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname not in ('pg_catalog','information_schema') and n.nspname !~ '^pg_toast' and c.relkind in ('r','p','v','m');"));
   invariant(count === 0, "Restore target is not empty; create a new disposable local database.");

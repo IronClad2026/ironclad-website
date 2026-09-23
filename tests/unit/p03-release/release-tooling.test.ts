@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 // Native operational scripts intentionally have no application dependency graph.
-import { assessQuietWindow, canonical, compare, connection, digest, matchRoomIsOff, PRODUCTION_REF, run } from "../../../scripts/p03-release/core.mjs";
+import { assessQuietWindow, attestLocalContainer, canonical, compare, connection, digest, matchRoomIsOff, PRODUCTION_REF, run } from "../../../scripts/p03-release/core.mjs";
 import { FACTS, competitionSql, validateTournamentIds } from "../../../scripts/p03-release/facts.mjs";
 import { canonicalCheck, normalizeSchema, validateExtensionRuntime } from "../../../scripts/p03-release/backup.mjs";
 import { BROWSER_CASES, gate, validateBrowserReport } from "../../../scripts/p03-release/gate.mjs";
@@ -14,6 +14,24 @@ type FactRow = Record<string, string | number | null>;
 const snapshot = () => ({ tournamentIds: [id], competitionSha256: "test", state: { serverNow: "2026-09-23T04:00:00Z" }, tables: Object.fromEntries(Object.keys(FACTS).map((name) => [name, { rows: [] as FactRow[], count: 0 }])) });
 
 describe("P03 operational read-only boundary", () => {
+  const dockerFacts = () => ({ context: [{ Endpoints: { docker: { Host: "unix:///var/run/docker.sock" } } }], container: [{ Name: "/p03-restore-test", Id: "synthetic-container-id", State: { Running: true }, NetworkSettings: { Networks: { isolated: { IPAddress: "172.20.0.2", GlobalIPv6Address: "" } } } }], network: [{ Internal: true }] });
+  const dockerRunner = (facts: ReturnType<typeof dockerFacts>) => (_command: string, args: string[]) => JSON.stringify(args[0] === "context" ? facts.context : args[0] === "network" ? facts.network : facts.container);
+  const attestationRequest = { hostname: "172.20.0.2", port: "5432", container: "p03-restore-test", env: { NODE_ENV: "test" as const } };
+  it("accepts only the exact running local Docker container IP on internal networks", () => {
+    expect(attestLocalContainer(attestationRequest, dockerRunner(dockerFacts())).ip).toBe("172.20.0.2");
+    expect(() => attestLocalContainer({ ...attestationRequest, hostname: "172.20.0.3" }, dockerRunner(dockerFacts()))).toThrow("exact attested");
+    expect(() => attestLocalContainer({ ...attestationRequest, port: "56624" }, dockerRunner(dockerFacts()))).toThrow("exact attested");
+  });
+  it("rejects a remote Docker daemon, wrong container, or any external network", () => {
+    const remote = dockerFacts(); remote.context[0].Endpoints.docker.Host = "ssh://remote.example";
+    expect(() => attestLocalContainer(attestationRequest, dockerRunner(remote))).toThrow("local Unix");
+    expect(() => attestLocalContainer({ ...attestationRequest, env: { NODE_ENV: "test", DOCKER_HOST: "tcp://remote.example:2375" } }, dockerRunner(dockerFacts()))).toThrow("Remote Docker");
+    const wrong = dockerFacts(); wrong.container[0].Name = "/production-database";
+    expect(() => attestLocalContainer(attestationRequest, dockerRunner(wrong))).toThrow("name or running");
+    const exposed = dockerFacts(); exposed.network[0].Internal = false;
+    expect(() => attestLocalContainer(attestationRequest, dockerRunner(exposed))).toThrow("external access");
+    expect(() => attestLocalContainer({ ...attestationRequest, container: "production-database" }, dockerRunner(dockerFacts()))).toThrow("dedicated");
+  });
   it("requires an explicit connection and rejects arbitrary remote hosts", () => {
     expect(() => connection({})).toThrow("required");
     expect(() => connection({ P03_DATABASE_URL: "postgresql://postgres@example.com/postgres" })).toThrow("not approved");

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import {
   closeViewers, createViewer, findOnePlayerFixture, fixture, getValidationPhase, gotoBracket,
@@ -10,7 +12,9 @@ test.afterEach(async () => { await closeViewers(); });
 
 const room = (page: Page) => page.locator('section[aria-label="Match Room"]:visible').first();
 const card = (page: Page, id = fixture.currentMatchId) => page.locator(`[data-match-room-card="${id}"]:visible`).first();
+function stopPath() { return resolve("test-results", `p03-preview-STOP-${loadTarget().candidateSha}.json`); }
 function communicationAuthorized() {
+  if (existsSync(stopPath())) throw new Error("BLOCKED: this candidate run has a competition-invariant STOP marker; inspect before any further fixture operations.");
   if (process.env.P03_ALLOW_FIXTURE_COMMUNICATION !== loadTarget().candidateSha) {
     throw new Error("BLOCKED: exact-candidate fixture communication authorization is missing.");
   }
@@ -33,6 +37,7 @@ function hostedCase(id: string, check: (browser: Browser) => Promise<void>) {
       try { await verifyCompetitionUnchanged(); } catch {
         failed = true;
         blocked = "BLOCKED: competition facts changed or could not be rechecked; STOP.";
+        writeFileSync(stopPath(), JSON.stringify({candidateSha: loadTarget().candidateSha, stop: true}));
       }
       // Close before reporting any failure: no DOM snapshots, credentials,
       // session cookies, message text or private proof links may reach artifacts.
@@ -114,7 +119,7 @@ hostedCase("match-room", async (browser) => {
 
 hostedCase("unread-card", async (browser) => {
   const { recipient } = await sendForUnread(browser);
-  await expect(card(recipient)).toHaveClass(/outline-amber/);
+  await expect(card(recipient).locator('[class*="outline-amber"]').first()).toBeVisible();
   await expect(card(recipient).locator("[data-match-room-action]")).toContainText(/opponent/i);
 });
 

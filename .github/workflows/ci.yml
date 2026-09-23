@@ -90,6 +90,8 @@ jobs:
         run: node scripts/p03-db/replay-baseline.mjs /usr/lib/postgresql/17/bin/psql
       - name: Release package and receipt safety tests
         run: node --test tests/p03-db/package-checks.mjs
+      - name: Staging fixture scope safety tests
+        run: node --test tests/p03-preview/fixture-guards.mjs
       - name: Seed partially completed tournament fixtures
         run: node scripts/p03-db/seed-rehearsal.mjs /usr/lib/postgresql/17/bin/psql
       - name: Atomic migration, first-write barrier and lifecycle rehearsal

@@ -26,6 +26,19 @@ export function run(command, args, options = {}) {
   invariant(!result.error && result.status === 0, `${path.basename(command)} failed (exit ${result.status ?? "unavailable"}); inspect locally with secrets redacted.`);
   return result.stdout.trim();
 }
+export function attestLocalContainer({ hostname, port, container, env = process.env }, runCommand = run) {
+  invariant(/^p03-restore-[a-z0-9-]+$/.test(container ?? ""), "Local Docker container must use the dedicated p03-restore- name prefix.");
+  invariant(!env.DOCKER_HOST || env.DOCKER_HOST === "unix:///var/run/docker.sock", "Remote Docker daemons are forbidden for local database attestation.");
+  const context = JSON.parse(runCommand("docker", ["context", "inspect"], { env }))[0];
+  invariant(context.Endpoints?.docker?.Host === "unix:///var/run/docker.sock", "Docker context must use the local Unix daemon.");
+  const instance = JSON.parse(runCommand("docker", ["inspect", container], { env }))[0];
+  invariant(instance.Name === `/${container}` && instance.State?.Running === true, "Attested Docker container name or running state differs.");
+  const networks = Object.entries(instance.NetworkSettings?.Networks ?? {});
+  invariant(String(port) === "5432" && networks.some(([, value]) => value.IPAddress === hostname || value.GlobalIPv6Address === hostname), "Database endpoint does not match the exact attested container IP and PostgreSQL port.");
+  invariant(networks.length > 0, "Attested container has no isolated network.");
+  for (const [name] of networks) invariant(JSON.parse(runCommand("docker", ["network", "inspect", name], { env }))[0].Internal === true, "Attested Docker container has a network permitting external access.");
+  return { name: container, id: instance.Id, ip: hostname, port: "5432", networks: networks.map(([name]) => name) };
+}
 /** @param {Record<string, string | undefined>} env */
 export function connection(env = process.env, key = "P03_DATABASE_URL", { localOnly = false } = {}) {
   invariant(env[key], `${key} is required; no implicit database is allowed.`);
@@ -36,8 +49,14 @@ export function connection(env = process.env, key = "P03_DATABASE_URL", { localO
   const hostname = url.hostname.replace(/^\[|\]$/g, "");
   const username = decodeURIComponent(url.username);
   const database = decodeURIComponent(url.pathname.slice(1));
-  const local = ["127.0.0.1", "::1", "localhost"].includes(hostname);
-  invariant(!localOnly || local, "Restore target must be explicit loopback PostgreSQL.");
+  let local = ["127.0.0.1", "::1", "localhost"].includes(hostname);
+  const container = key === "P03_RESTORE_DATABASE_URL" ? env.P03_RESTORE_CONTAINER : env.P03_LOCAL_CONTAINER;
+  let containerAttestation = null;
+  if (container) {
+    containerAttestation = attestLocalContainer({ hostname, port: url.port || "5432", container, env });
+    local = true;
+  }
+  invariant(!localOnly || local, "Restore target must be explicit loopback or positively attested isolated local Docker PostgreSQL.");
   invariant(!localOnly || /^p03_restore_[a-z0-9_]+$/.test(database), "Restore target name must start p03_restore_.");
   let projectRef = local ? "local" : null;
   const direct = hostname.match(/^db\.([a-z]{20})\.supabase\.co$/);
@@ -51,7 +70,7 @@ export function connection(env = process.env, key = "P03_DATABASE_URL", { localO
   Object.assign(childEnv, { PGHOST: hostname, PGPORT: url.port || "5432", PGUSER: username, PGPASSWORD: decodeURIComponent(url.password), PGDATABASE: database, PGCONNECT_TIMEOUT: "10", PGAPPNAME: "ironclad-p03-release-readonly", PGSSLMODE: local ? "disable" : "verify-full", PGOPTIONS: "-c default_transaction_read_only=on -c statement_timeout=15000 -c lock_timeout=2000 -c idle_in_transaction_session_timeout=30000" });
   if (!local && env.P03_SSL_ROOT_CERT) childEnv.PGSSLROOTCERT = env.P03_SSL_ROOT_CERT;
   const bin = (name) => env.P03_PG_BIN ? path.join(env.P03_PG_BIN, `${name}${process.platform === "win32" ? ".exe" : ""}`) : name;
-  return { env: childEnv, projectRef, local, database, bin };
+  return { env: childEnv, projectRef, local, database, bin, containerAttestation };
 }
 export function readOnlySql(db, sql, timeout = 60000) {
   return run(db.bin("psql"), ["-X", "--no-password", "-qAt", "-v", "ON_ERROR_STOP=1"], { env: db.env, timeout, input: `begin isolation level repeatable read read only;\nset local timezone = 'UTC';\nset local statement_timeout = '15s';\nset local lock_timeout = '2s';\n${sql}\nrollback;\n` });

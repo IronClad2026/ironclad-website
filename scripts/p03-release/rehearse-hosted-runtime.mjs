@@ -26,11 +26,12 @@ const passed = (step) => { steps.push(step); console.log(`PASS ${step}`); };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const literal = (value) => `'${value.replaceAll("'", "''")}'`;
 
-function localEnvironment(port, database, container) {
+function localEnvironment(hostname, database, container) {
   return {
     ...process.env,
-    P03_DATABASE_URL: `postgresql://postgres@127.0.0.1:${port}/${database}`,
-    P03_RESTORE_DATABASE_URL: `postgresql://postgres@127.0.0.1:${port}/${database}`,
+    P03_DATABASE_URL: `postgresql://postgres@${hostname}:5432/${database}`,
+    P03_RESTORE_DATABASE_URL: `postgresql://postgres@${hostname}:5432/${database}`,
+    P03_LOCAL_CONTAINER: container,
     P03_RESTORE_CONTAINER: container,
     P03_PG_BIN: process.env.P03_PG_BIN || "/usr/lib/postgresql/17/bin",
   };
@@ -43,7 +44,7 @@ function sql(db, input) {
   });
 }
 
-async function startContainer(name, port, database) {
+async function startContainer(name, database) {
   // Skip the image's project-init scripts, creating a clean PostgreSQL cluster
   // with the image's real extension binaries. Source/target must be separate
   // clusters because pg_cron pins its metadata to cron.database_name.
@@ -54,21 +55,25 @@ async function startContainer(name, port, database) {
 initdb -D /tmp/p03-data -U postgres --auth-local=trust --auth-host=trust --encoding=UTF8 --no-locale >/dev/null
 echo 'host all postgres ${subnet} trust' >> /tmp/p03-data/pg_hba.conf
 exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directories=/tmp -c shared_preload_libraries=pg_cron,pg_stat_statements -c cron.database_name=${database} -c cron.launch_active_jobs=off -c max_connections=30`;
-  run("docker", ["run", "--detach", "--name", name, "--network", network, "--publish", `127.0.0.1:${port}:5432`, "--user", "postgres", "--entrypoint", "sh", image, "-c", shell]);
+  run("docker", ["run", "--detach", "--name", name, "--network", network, "--user", "postgres", "--entrypoint", "sh", image, "-c", shell]);
   created.push(name);
-  const admin = connection(localEnvironment(port, "postgres", name));
-  let initialized = false;
-  for (let attempt = 0; attempt < 40; attempt++) {
+  const containerIp = JSON.parse(run("docker", ["inspect", name]))[0].NetworkSettings.Networks[network].IPAddress;
+  const admin = connection(localEnvironment(containerIp, "postgres", name));
+  admin.env.PGCONNECT_TIMEOUT = "2";
+  let socketReady = false;
+  for (let attempt = 0; attempt < 15; attempt++) {
     try {
-      run("docker", ["exec", name, "psql", "-X", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", "select 1;"]);
-      run("docker", ["exec", name, "createdb", "-h", "/tmp", "-U", "postgres", "--template=template0", database]);
-      initialized = true;
+      run("docker", ["exec", name, "psql", "-X", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", "select 1;"], { timeout: 2000 });
+      socketReady = true;
       break;
     } catch { await sleep(1000); }
   }
+  assert(socketReady, "Disposable container local socket did not become ready within 45 seconds");
+  // Create exactly once: an uncertain result must fail, never retry a mutation.
+  run("docker", ["exec", name, "createdb", "-h", "/tmp", "-U", "postgres", "--template=template0", database], { timeout: 5000 });
   let ready = false;
-  for (let attempt = 0; attempt < 40; attempt++) {
-    try { readOnlySql(admin, "select 1;"); ready = true; break; } catch { await sleep(1000); }
+  for (let attempt = 0; attempt < 15; attempt++) {
+    try { readOnlySql(admin, "select 1;", 2000); ready = true; break; } catch { await sleep(1000); }
   }
   if (!ready) {
     const state = JSON.parse(run("docker", ["inspect", name]))[0].State;
@@ -78,11 +83,10 @@ exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directorie
     const logs = spawnSync("docker", ["logs", "--tail", "35", name], { encoding: "utf8", timeout: 10000, maxBuffer: 16384 });
     console.error(`${logs.stdout ?? ""}${logs.stderr ?? ""}`.slice(-4096));
     const probe = spawnSync(admin.bin("psql"), ["-X", "--no-password", "-qAt", "-c", "select 1;"], { env: admin.env, encoding: "utf8", timeout: 10000, maxBuffer: 4096 });
-    console.error(JSON.stringify({ initializedThroughLocalSocket: initialized, clientError: probe.error?.code, clientStatus: probe.status, clientDiagnostic: probe.stderr?.slice(-2048) }));
+    console.error(JSON.stringify({ initializedThroughLocalSocket: true, clientError: probe.error?.code, clientStatus: probe.status, clientDiagnostic: probe.stderr?.slice(-2048) }));
   }
   assert(ready, "Disposable container did not become ready within the startup bound");
-  assert(initialized, "Dedicated database was not created through the container-local socket");
-  return connection(localEnvironment(port, database, name));
+  return connection(localEnvironment(containerIp, database, name));
 }
 
 function installRealExtensions(db) {
@@ -135,9 +139,9 @@ try {
   run("docker", ["pull", image], { timeout: 300000 });
   const imageMetadata = JSON.parse(run("docker", ["image", "inspect", image]))[0];
   run("docker", ["network", "create", "--internal", network]); networkCreated = true;
-  const source = await startContainer(sourceName, 56624, sourceDatabase);
-  await startContainer(restoreName, 56625, targetDatabase);
-  passed("Two disposable PostgreSQL clusters use loopback ports and an internal Docker network; cron execution is OFF");
+  const source = await startContainer(sourceName, sourceDatabase);
+  const target = await startContainer(restoreName, targetDatabase);
+  passed("Two positively attested local PostgreSQL containers use an internal Docker network with no published ports; cron execution is OFF");
   installRealExtensions(source);
   passed("All seven observed Production extension names, versions and schemas are installed from real Supabase binaries");
   seedSource(source);
@@ -145,10 +149,10 @@ try {
   const ids = [1, 2, 3, 4].map((n) => `d23a0000-0000-4000-8000-${String(n).padStart(12, "0")}`);
   const candidateSha = run("git", ["rev-parse", "HEAD"], { cwd: root });
   const before = capture(source, ids, { candidateSha });
-  const manifest = backup({ repository: root, directory: outputRoot, tournamentIds: ids, candidateSha, expectedProjectRef: "local", env: localEnvironment(56624, sourceDatabase, sourceName) });
+  const manifest = backup({ repository: root, directory: outputRoot, tournamentIds: ids, candidateSha, expectedProjectRef: "local", env: localEnvironment(source.env.PGHOST, sourceDatabase, sourceName) });
   passed("Exact release-day backup command created a complete logical archive, schema, critical export and checksums");
-  const validation = restore({ directory: outputRoot, env: localEnvironment(56625, targetDatabase, restoreName) });
-  passed("Exact loopback restore command restored the complete archive; 22 competition tables, schema and seven extension versions match");
+  const validation = restore({ directory: outputRoot, env: localEnvironment(target.env.PGHOST, targetDatabase, restoreName) });
+  passed("Exact attested-local restore command restored the complete archive; 22 competition tables, schema and seven extension versions match");
   const report = {
     schemaVersion: 1, checkedAt: new Date().toISOString(), candidateSha,
     mode: "github-actions-synthetic-supabase-runtime", image, imageId: imageMetadata.Id, imageDigests: imageMetadata.RepoDigests,

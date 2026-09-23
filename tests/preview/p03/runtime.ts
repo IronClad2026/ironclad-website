@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Buffer } from "node:buffer";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
@@ -6,8 +7,13 @@ import {
   loadFixtureEnvironment, validateRuntimeGuards, validateClerkFixtureUser, parseDotEnv,
 } from "../../../scripts/lib/staging-synthetic-uat.mjs";
 import { loadTarget, stagingRef } from "./target";
+import { parseFixtureReceipt } from "./fixture";
+import { verifyReceiptScope } from "./receipt-scope";
+import { validateDedicatedAdmin } from "../../../scripts/p03-preview/create-fixture.mjs";
 
-export const fixture = {
+const fixtureReceipt = process.env.P03_FIXTURE_FILE
+  ? parseFixtureReceipt(JSON.parse(readFileSync(resolve(process.env.P03_FIXTURE_FILE), "utf8"))) : null;
+export const fixture = fixtureReceipt ?? {
   tournamentId: "b1230000-2026-4908-8000-000000001101",
   currentMatchId: "528069ef-3ba1-4451-a5ac-c54d6b8b5d62",
   completedTournamentId: "38235d4b-eba7-4ff8-9ee4-11ba085fa5de",
@@ -32,7 +38,7 @@ async function environment() {
 }
 
 export async function stagingRead(table: string, query: string) {
-  if (!["tournament_matches", "generated_brackets", "registrations", "match_rooms", "match_messages", "match_room_reads", "match_room_assistance", "legal_documents", "platform_settings"].includes(table)) {
+  if (!["tournaments", "tournament_brackets", "tournament_matches", "generated_brackets", "registrations", "match_rooms", "match_messages", "match_room_reads", "match_room_assistance", "legal_documents", "platform_settings"].includes(table)) {
     throw new Error("Hosted validation table is outside the bounded read scope.");
   }
   const env = await environment();
@@ -55,6 +61,7 @@ export async function matchFacts(matchId: string) {
 }
 
 export async function verifyPairing() {
+  if (fixtureReceipt) await verifyReceiptScope(fixtureReceipt, stagingRead);
   const env = await environment();
   const identities: string[] = [];
   for (const alias of [fixture.firstAlias, fixture.secondAlias]) {
@@ -76,6 +83,11 @@ export async function verifyPairing() {
     throw new Error("Current pairing is no longer the reserved synthetic fixture.");
   }
   if (!safeStates.has(fixture.currentMatchId)) safeStates.set(fixture.currentMatchId, facts);
+  if (fixtureReceipt) {
+    for (const id of [fixtureReceipt.completedMatchId, fixtureReceipt.onePlayerMatchId, fixtureReceipt.emptyFinalMatchId]) {
+      if (!safeStates.has(id)) safeStates.set(id, await matchFacts(id));
+    }
+  }
   return facts;
 }
 
@@ -90,7 +102,8 @@ export async function verifyCompetitionUnchanged() {
 export async function findOnePlayerFixture() {
   const facts = await verifyPairing();
   const matches = await stagingRead("tournament_matches", `generated_bracket_id=eq.${facts.generated_bracket_id}&select=id,player_one_registration_id,player_two_registration_id,status&limit=50`);
-  const candidate = matches.find((row) => Number(Boolean(row.player_one_registration_id)) + Number(Boolean(row.player_two_registration_id)) === 1);
+  const candidate = matches.find((row) => (!fixtureReceipt || row.id === fixtureReceipt.onePlayerMatchId) &&
+    Number(Boolean(row.player_one_registration_id)) + Number(Boolean(row.player_two_registration_id)) === 1);
   if (!candidate) throw new Error("BLOCKED: approved fixture has no one-player/TBD match; zero-player matches do not satisfy this case.");
   const id = String(candidate.id);
   if (!safeStates.has(id)) safeStates.set(id, await matchFacts(id));
@@ -185,9 +198,7 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
   if (!Array.isArray(users) || users.length !== 1) throw new Error("Clerk test identity is ambiguous.");
   const user = users[0];
   if (alias === "admin") {
-    if (user.public_metadata?.role !== "admin" || user.banned || user.locked || !user.email_addresses?.some((item: {email_address: string}) => item.email_address === email)) {
-      throw new Error("The supplied test identity is not an active authorized administrator.");
-    }
+    validateDedicatedAdmin(user, email);
   } else validateClerkFixtureUser(user, config);
   const clerkHost = Buffer.from(config.clerkPublishableKey.slice("pk_test_".length), "base64").toString("utf8").replace(/\$$/, "");
   if (!clerkHost.endsWith(".clerk.accounts.dev")) throw new Error("Unexpected Clerk Development frontend host.");
@@ -225,13 +236,43 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
       const otp = document.querySelector<HTMLInputElement>('input[autocomplete="one-time-code"]');
       return signedIn || Boolean(otp && otp.getClientRects().length);
     }, undefined, { timeout: 10_000 }).catch(() => {});
-    const otp = page.locator('input[autocomplete="one-time-code"]:visible').first();
+    const otpFields = page.locator('input[autocomplete="one-time-code"]:visible');
+    const otp = otpFields.first();
     if (await otp.isVisible()) {
       validationPhase = "Clerk Development test verification code";
+      // The field can mount before Clerk finishes preparing Device Trust.
+      await page.waitForFunction(() => {
+        const signIn = (window as Window & {Clerk?: {client?: {signIn?: {secondFactorVerification?: {status?: string;strategy?: string}}}}}).Clerk?.client?.signIn;
+        return signIn?.secondFactorVerification?.strategy === "email_code" && signIn.secondFactorVerification.status === "unverified";
+      }, undefined, { timeout: 15_000 });
       // Clerk's documented reserved test-email flow sends no OTP email.
-      await otp.fill("424242");
+      const count = await otpFields.count();
+      const maxLength = await otp.getAttribute("maxlength");
+
+      if (count === 6 && maxLength === "1") {
+        for (const [index, digit] of [..."424242"].entries()) await otpFields.nth(index).fill(digit);
+      } else {
+        await otp.fill("");
+        await otp.pressSequentially("424242");
+      }
+      const verify = page.getByRole("button", { name: /^(continue|verify)$/i }).last();
+      if (await otp.isVisible() && await verify.isVisible() && await verify.isEnabled()) await verify.click();
     }
-    await page.waitForFunction(() => Boolean((window as Window & {Clerk?: {user?: {id?: string}}}).Clerk?.user?.id));
+    await page.waitForFunction(() => Boolean((window as Window & {Clerk?: {user?: {id?: string}}}).Clerk?.user?.id)).catch(async () => {
+      const signals = await page.evaluate(() => {
+        const clerk = (window as Window & {Clerk?: {client?: {signIn?: {status?: string}}}}).Clerk;
+        const status = clerk?.client?.signIn?.status;
+        const allowed = ["complete", "needs_identifier", "needs_first_factor", "needs_second_factor"];
+        const code = document.querySelector<HTMLInputElement>('input[autocomplete="one-time-code"]');
+        const text = document.body.innerText;
+        return {status: status && allowed.includes(status) ? status : "unavailable", codeVisible: Boolean(code?.getClientRects().length), codeLength: code?.value.length ?? 0,
+          incorrectCode: /incorrect code|invalid code|code is incorrect|code is invalid/i.test(text),
+          verifyButton: [...document.querySelectorAll("button")].some((button) => /^(continue|verify)$/i.test(button.innerText.trim()) && !button.disabled),
+          botPrompt: /unusual traffic|verify you are human|verification failed/i.test(text)};
+      });
+      throw new Error("BLOCKED: Clerk test verification did not complete: " + JSON.stringify(signals));
+    });
+    validationPhase = "Clerk session identity validation";
     const verified = await page.evaluate(async () => {
       const clerk = (window as Window & {Clerk?: {
         user?: {id?: string;publicMetadata?: {role?: string}};
