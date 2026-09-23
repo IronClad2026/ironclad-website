@@ -12,6 +12,7 @@ export const migrationFiles = Object.freeze([
   "20260920014644_match_room_production_hardening.sql",
   "20260922054205_match_room_unread_summary.sql",
   "20260923040754_match_room_disabled_assistance_gate.sql",
+  "20260923062127_match_room_retention_and_privacy.sql",
 ]);
 export const LOCK_TIMEOUT_MS = 2000;
 export const STATEMENT_TIMEOUT_MS = 60000;
@@ -31,7 +32,7 @@ export function readMigrationPackage(root = repositoryRoot) {
 }
 
 // This policy is intentionally NOT a general SQL migration parser. Only the
-// checksummed six-file package is accepted. The immutable original SQL remains
+// checksummed seven-file package is accepted. The immutable original SQL remains
 // in the repository and ledger. Its transaction envelopes become ONE envelope.
 export function migrationBody(source) {
   assert.match(source, /^begin;\s/i, "Expected migration BEGIN envelope");

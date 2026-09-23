@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import path from "node:path";
 import { backup, checkRestoreRuntime, restore, restorePreflight, verifyBackup } from "./backup.mjs";
-import { capture, compare, connection, invariant, readJson, saveJson } from "./core.mjs";
+import { capture, captureDigest, compare, connection, invariant, readJson, saveJson } from "./core.mjs";
 import { gate, seal } from "./gate.mjs";
 
 export async function main(args = process.argv.slice(2)) {
@@ -14,17 +14,18 @@ export async function main(args = process.argv.slice(2)) {
   const command = positionals[0];
   const repository = fileURLToPath(new URL("../../", import.meta.url));
   if (values.help || !command) {
+    console.log("Preparation-only digest: use the fingerprint options with command digest to return only PostgreSQL counts and SHA-256 values.");
     console.log("P03 release tools (no database mutations except explicit restore to loopback or positively attested isolated local Docker)\nCommands: fingerprint --tournaments UUID[,UUID] --candidate-sha SHA --project-ref REF --out FILE; compare --before FILE --after FILE; backup --tournaments UUID --candidate-sha SHA --project-ref REF --out PRIVATE_NEW_DIRECTORY; verify-backup --backup-dir DIRECTORY; restore-runtime --config FILE; restore-preflight --backup-dir DIRECTORY; restore --backup-dir DIRECTORY; seal --config FILE --out FILE; gate --seal FILE --backup-dir DIRECTORY --out FILE\nConnection: P03_DATABASE_URL; restore only: P03_RESTORE_DATABASE_URL, P03_RESTORE_CONTAINER for Docker; binaries: P03_PG_BIN; TLS: P03_SSL_ROOT_CERT. Gate also uses gh authentication and VERCEL_TOKEN. Never put credentials in arguments.");
     return;
   }
   try {
-    if (command === "fingerprint") {
+    if (command === "fingerprint" || command === "digest") {
       invariant(values.out && values["project-ref"], "--out and --project-ref required.");
       const db = connection();
       invariant(db.projectRef === values["project-ref"], "Fingerprint project mismatch.");
-      const result = capture(db, values.tournaments?.split(","), { candidateSha: values["candidate-sha"] });
+      const result = (command === "digest" ? captureDigest : capture)(db, values.tournaments?.split(","), { candidateSha: values["candidate-sha"] });
       saveJson(values.out, result);
-      console.log(`FINGERPRINT: PASS ${result.competitionSha256}`);
+      console.log(`${command === "digest" ? "PREPARATION DIGEST" : "FINGERPRINT"}: PASS ${result.competitionSha256 ?? result.tablesSha256}`);
     } else if (command === "compare") {
       const result = compare(readJson(values.before), readJson(values.after));
       if (values.out) saveJson(values.out, result);

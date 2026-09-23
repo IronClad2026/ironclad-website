@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "status": "Review Draft",
+  "effectiveDate": null,
+  "source": {
+    "path": "content/legal-privacy-successor-v1.3.json",
+    "sha256": "fd1f06308d8ff9263803fd8528018c557c7764676d5b8daaf0d9e9887c76d17c",
+    "encoding": "utf8-lf"
+  },
+  "corpusSha256": "f532c717849b06ef92994d199747f4986b5d6be7c007d582bec807a0a9d8818e",
+  "pdfSha256": "1f08b3e2d3758e0ecd5b5c3c984f8ba6c07d65852d90f8c7f00948e0072a0175",
+  "textHashEncoding": "utf8-lf",
+  "predecessorCorpusSha256": "63ba27ca69ba0adb7c72cb8fee95130853023f8d2441e4d95d7488f5660c7f7e",
+  "predecessorReleaseSha256": "3cd84f49962d7803193e2ee68337add81d68c2033719dcfe43f9931a32483f92",
+  "publicationRule": "Privacy v1.3 is a REVIEW DRAFT - NOT EFFECTIVE. This preparation does not change the runtime legal corpus, Final transition manifest, public policy, database legal register or acceptance evidence. Controlled publication must use the actual Australia/Sydney publication date and the existing forward-successor process before Match Room activation."
+}

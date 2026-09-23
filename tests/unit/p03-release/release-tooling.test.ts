@@ -3,8 +3,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 // Native operational scripts intentionally have no application dependency graph.
-import { assessQuietWindow, attestLocalContainer, canonical, compare, connection, digest, matchRoomIsOff, PRODUCTION_REF, run } from "../../../scripts/p03-release/core.mjs";
-import { FACTS, competitionSql, validateTournamentIds } from "../../../scripts/p03-release/facts.mjs";
+import { assessQuietWindow, attestLocalContainer, canonical, compare, connection, digest, matchRoomIsOff, PRODUCTION_REF, run, validateDigestEvidence } from "../../../scripts/p03-release/core.mjs";
+import { FACTS, competitionDigestSql, competitionSql, validateTournamentIds } from "../../../scripts/p03-release/facts.mjs";
 import { canonicalCheck, normalizeSchema, validateExtensionRuntime } from "../../../scripts/p03-release/backup.mjs";
 import { BROWSER_CASES, gate, validateBrowserReport } from "../../../scripts/p03-release/gate.mjs";
 
@@ -72,6 +72,17 @@ describe("P03 operational read-only boundary", () => {
 });
 
 describe("P03 competition evidence", () => {
+  it("keeps digest projection in PostgreSQL and returns only counts and SHA-256", () => {
+    const sql = competitionDigestSql([id]);
+    expect(sql).toContain("with projected(facts)");
+    expect(sql).toContain("jsonb_array_length(rows)");
+    expect(sql).toContain("sha256(convert_to(rows::text");
+    const evidence = Object.fromEntries(Object.keys(FACTS).map((name) => [name, { count: name === "tournaments" ? 1 : 0, sha256: "a".repeat(64) }]));
+    expect(validateDigestEvidence(evidence, [id]).totalRows).toBe(1);
+    expect(() => validateDigestEvidence({ ...evidence, tournaments: { ...evidence.tournaments, rows: [] } }, [id])).toThrow("unexpected fields");
+    expect(() => validateDigestEvidence({ ...evidence, registrations: { count: 10001, sha256: "a".repeat(64) } }, [id])).toThrow("bound");
+    expect(() => validateDigestEvidence({ ...evidence, tournaments: { count: 0, sha256: "a".repeat(64) } }, [id])).toThrow("scope");
+  });
   it("rejects unbounded scopes and injection", () => {
     expect(() => validateTournamentIds([])).toThrow();
     expect(() => validateTournamentIds([id, id])).toThrow();

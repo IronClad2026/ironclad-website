@@ -1,36 +1,23 @@
 # P03 candidate file inventory
 
-This is a path-level snapshot of the candidate preparation on 2026-09-23,
-relative to Production baseline `0f23d7d906c8588de3051fd9a7cdcf218a576ab3`.
-The selectively imported Staging source is
-`4900d00c81a2c3f1ea0c126444f44499f3726aa4`; candidate branch is
-`codex/p03-production-ready`. This document does not embed its own future commit
-SHA. The final clean candidate, CI, Preview and release seal must bind the final
-full SHA separately.
+Final preparation snapshot relative to Production baseline `0f23d7d906c8588de3051fd9a7cdcf218a576ab3`. Staging source is `4900d00c81a2c3f1ea0c126444f44499f3726aa4`; branch is `codex/p03-production-ready`. The PR and final seal separately bind the resulting commit SHA.
 
 ## Method and totals
 
-The inventory combines `git diff --name-status <baseline>` with
-`git ls-files --others --exclude-standard`, then includes this new inventory
-document itself. Ignored private evidence, credentials, local backup archives,
-generated build output and recovery directories are excluded.
+Combines `git diff --name-status <baseline>` and non-ignored untracked paths. Ignored private evidence, credentials, archives, build output and recovery directories are excluded. `M` means modified baseline; `A` means added candidate path, regardless of staging state.
 
-- **163 candidate paths:** 109 selected P03 source paths and 54 preparation paths.
-- **56 modified baseline files; 107 added files; no deleted or renamed baseline files.**
-- **Six new migrations:** four unchanged P03 originals plus two new safety migrations.
-- The imported set was independently rebuilt from the nine non-merge commits in
-  [the scope audit](p03-scope-audit.md). Their 110-path union excludes only the
-  unrelated `docs/production-release-queue.md`, leaving exactly 109 imported paths.
-- `M` = modified relative to baseline; `A` = added and already tracked;
-  `A*` = new prepared file untracked at inspection (including this document).
-  These markers describe the snapshot, not whether a later reviewed commit has
-  added the file.
-
-“Imported” describes provenance, not blind Staging replacement. Overlapping
-Production behavior was reconciled, and final preparation may extend the selected
-P03 files. [The scope audit](p03-scope-audit.md) records those integration decisions.
+- **198 paths:** 109 selected P03 source paths and 89 preparation paths.
+- **64 modified, 134 added; no deletions or renames.
+- **Seven new migrations:** four historical P03 originals, two prior safety migrations, one additive retention/privacy migration.
+- Imported provenance is independently rebuilt from the nine non-merge commits in the scope audit. Its 110-path union excludes only the unrelated P04 release queue. Integration preserves relevant master behavior.
 
 ## Exact categorized candidate paths
+
+### Review PDF binary preservation (1)
+
+| Change | Path |
+| --- | --- |
+| M | `.gitattributes` |
 
 ### Imported CI integration, extended for final P03 preparation (1)
 
@@ -57,16 +44,16 @@ P03 files. [The scope audit](p03-scope-audit.md) records those integration decis
 | A | `app/tournaments/room-actions.ts` |
 | A | `app/tournaments/room-unread-actions.ts` |
 | M | `app/tournaments/support-actions.ts` |
-| M | `components/admin/tournaments/AdminTournamentMatches.tsx` |
 | M | `components/AdminMatchManagementDialog.tsx` |
 | A | `components/AdminMatchRoomControl.tsx` |
 | M | `components/AdminMatchWorkspace.tsx` |
 | A | `components/MatchRoom.tsx` |
 | A | `components/MatchRoomAssistanceControls.tsx` |
 | M | `components/RequestAdminAssistanceButton.tsx` |
+| M | `components/TournamentsExperience.tsx` |
+| M | `components/admin/tournaments/AdminTournamentMatches.tsx` |
 | A | `components/tournaments/MatchRoomAttentionAction.tsx` |
 | A | `components/tournaments/useMatchRoomUnread.ts` |
-| M | `components/TournamentsExperience.tsx` |
 | M | `lib/admin-operations.ts` |
 | M | `lib/i18n/dictionaries/en/competition.ts` |
 | M | `lib/i18n/dictionaries/en/notifications.ts` |
@@ -96,6 +83,34 @@ P03 files. [The scope audit](p03-scope-audit.md) records those integration decis
 | M | `lib/web-push/policy.ts` |
 | M | `lib/web-push/worker.ts` |
 
+### Legal successor, privacy readiness and historical contract compatibility (23)
+
+| Change | Path |
+| --- | --- |
+| A | `content/legal-privacy-successor-v1.3.json` |
+| A | `docs/legal-drafts/p03-privacy-v1.3/ironclad-privacy-policy-v1.3.pdf` |
+| A | `docs/legal-drafts/p03-privacy-v1.3/legal-corpus.json` |
+| A | `docs/legal-drafts/p03-privacy-v1.3/predecessor-corpus.json` |
+| A | `docs/legal-drafts/p03-privacy-v1.3/predecessor-release.json` |
+| A | `docs/legal-drafts/p03-privacy-v1.3/review-manifest.json` |
+| A | `docs/p03-privacy-readiness.json` |
+| A | `docs/p03-privacy-successor-runbook.md` |
+| A | `docs/p03-retention-decision.json` |
+| M | `scripts/generate-legal-pdfs.py` |
+| A | `scripts/legal-successor/p03-legal-runtime.mjs` |
+| A | `scripts/legal-successor/p03-privacy-publication.mjs` |
+| A | `scripts/legal-successor/prepare-p03-privacy.mjs` |
+| A | `scripts/legal-successor/rehearse-p03-privacy.mjs` |
+| A | `scripts/legal-successor/stage-p03-privacy.mjs` |
+| M | `tests/integration/legal-privacy-successor-v1.2-publication.test.ts` |
+| M | `tests/integration/legal-publication-contract.test.ts` |
+| M | `tests/unit/legal-gate-stability-wording.test.ts` |
+| A | `tests/unit/legal-p03-privacy-readiness.test.ts` |
+| A | `tests/unit/legal-p03-staging.test.ts` |
+| M | `tests/unit/legal-privacy-successor-v1.2-contract.test.ts` |
+| M | `tests/unit/legal-rulebook-ppa-v3.1-publication.test.ts` |
+| M | `tests/unit/legal-successor-contract.test.ts` |
+
 ### Imported P03 design and checkpoint evidence (7)
 
 | Change | Path |
@@ -112,7 +127,7 @@ P03 files. [The scope audit](p03-scope-audit.md) records those integration decis
 
 | Change | Path |
 | --- | --- |
-| A* | `docs/p03-candidate-file-inventory.md` |
+| A | `docs/p03-candidate-file-inventory.md` |
 | A | `docs/p03-preview-validation.md` |
 | A | `docs/p03-production-inspection.json` |
 | A | `docs/p03-production-ledger.json` |
@@ -120,10 +135,11 @@ P03 files. [The scope audit](p03-scope-audit.md) records those integration decis
 | A | `docs/p03-release-runbook.md` |
 | A | `docs/p03-scope-audit.md` |
 
-### Database package, disposable rehearsal, and concurrency evidence (18)
+### Database package, disposable rehearsal, and concurrency evidence (23)
 
 | Change | Path |
 | --- | --- |
+| A | `scripts/p03-db/README.md` |
 | A | `scripts/p03-db/attention-concurrency.mjs` |
 | A | `scripts/p03-db/concurrency.mjs` |
 | A | `scripts/p03-db/dependencies.json` |
@@ -131,10 +147,11 @@ P03 files. [The scope audit](p03-scope-audit.md) records those integration decis
 | A | `scripts/p03-db/local-pg.mjs` |
 | A | `scripts/p03-db/manifest.json` |
 | A | `scripts/p03-db/package.mjs` |
-| A | `scripts/p03-db/README.md` |
 | A | `scripts/p03-db/rehearse-executor.mjs` |
 | A | `scripts/p03-db/rehearse.mjs` |
 | A | `scripts/p03-db/replay-baseline.mjs` |
+| A | `scripts/p03-db/retention-concurrency.mjs` |
+| A | `scripts/p03-db/retention.mjs` |
 | A | `scripts/p03-db/seed-rehearsal.mjs` |
 | A | `tests/p03-db/attention-concurrency-evidence.json` |
 | A | `tests/p03-db/concurrency-evidence.json` |
@@ -142,38 +159,46 @@ P03 files. [The scope audit](p03-scope-audit.md) records those integration decis
 | A | `tests/p03-db/package-checks.mjs` |
 | A | `tests/p03-db/partial-tournament.sql` |
 | A | `tests/p03-db/rehearsal-evidence.json` |
+| A | `tests/p03-db/retention-concurrency-evidence.json` |
+| A | `tests/p03-db/retention-evidence.json` |
+| A | `tests/p03-db/retention.sql` |
 
 ### Safe hosted Preview validation and prepared synthetic fixtures (12)
 
 | Change | Path |
 | --- | --- |
-| A | `scripts/p03-preview/create-fixture.mjs` |
 | A | `scripts/p03-preview/README.md` |
+| A | `scripts/p03-preview/create-fixture.mjs` |
 | A | `tests/p03-preview/fixture-guards.mjs` |
-| A* | `tests/preview/p03/admin-identity.ts` |
+| A | `tests/preview/p03/admin-identity.ts` |
 | A | `tests/preview/p03/fixture.ts` |
 | A | `tests/preview/p03/hosted.spec.ts` |
 | A | `tests/preview/p03/playwright.config.ts` |
 | A | `tests/preview/p03/receipt-scope.ts` |
 | A | `tests/preview/p03/runtime.ts` |
 | A | `tests/preview/p03/target.ts` |
-| A* | `tests/unit/p03-preview/admin-identity.test.ts` |
+| A | `tests/unit/p03-preview/admin-identity.test.ts` |
 | A | `tests/unit/p03-preview/fixture.test.ts` |
 
-### Backup, restore, fingerprint, and release gate tooling (11)
+### Backup, restore, fingerprint, release gate and privacy tooling (16)
 
 | Change | Path |
 | --- | --- |
+| A | `scripts/p03-release/README.md` |
 | A | `scripts/p03-release/backup.mjs` |
 | A | `scripts/p03-release/cli.mjs` |
 | A | `scripts/p03-release/core.mjs` |
 | A | `scripts/p03-release/facts.mjs` |
 | A | `scripts/p03-release/gate.mjs` |
+| A | `scripts/p03-release/privacy-operations.md` |
+| A | `scripts/p03-release/privacy-readiness.mjs` |
+| A | `scripts/p03-release/privacy.mjs` |
 | A | `scripts/p03-release/production-extensions.json` |
-| A | `scripts/p03-release/README.md` |
 | A | `scripts/p03-release/rehearsal-evidence.json` |
 | A | `scripts/p03-release/rehearse-hosted-runtime.mjs` |
 | A | `scripts/p03-release/restore-runtime.compose.yml` |
+| A | `tests/unit/p03-release/privacy-readiness.test.ts` |
+| A | `tests/unit/p03-release/privacy.test.ts` |
 | A | `tests/unit/p03-release/release-tooling.test.ts` |
 
 ### Imported P03 migrations (4)
@@ -185,30 +210,31 @@ P03 files. [The scope audit](p03-scope-audit.md) records those integration decis
 | A | `supabase/migrations/20260920014644_match_room_production_hardening.sql` |
 | A | `supabase/migrations/20260922054205_match_room_unread_summary.sql` |
 
-### New atomic-release safety migrations (2)
+### New atomic-release safety and retention migrations (3)
 
 | Change | Path |
 | --- | --- |
 | A | `supabase/migrations/20260923040206_match_room_production_bootstrap.sql` |
 | A | `supabase/migrations/20260923040754_match_room_disabled_assistance_gate.sql` |
+| A | `supabase/migrations/20260923062127_match_room_retention_and_privacy.sql` |
 
 ### Imported P03 regression and browser coverage (53)
 
 | Change | Path |
 | --- | --- |
+| M | `tests/browser/bracket-layout/README.md` |
 | M | `tests/browser/bracket-layout/bracket.spec.ts` |
 | M | `tests/browser/bracket-layout/main.tsx` |
-| M | `tests/browser/bracket-layout/README.md` |
 | M | `tests/browser/match-result/flow.spec.ts` |
 | M | `tests/browser/match-result/main.tsx` |
 | M | `tests/browser/match-result/playwright.config.ts` |
 | M | `tests/browser/match-result/runtime.ts` |
 | M | `tests/browser/match-result/vite.config.ts` |
+| A | `tests/browser/match-room/README.md` |
 | A | `tests/browser/match-room/flow.spec.ts` |
 | A | `tests/browser/match-room/index.html` |
 | A | `tests/browser/match-room/main.tsx` |
 | A | `tests/browser/match-room/playwright.config.ts` |
-| A | `tests/browser/match-room/README.md` |
 | A | `tests/browser/match-room/runtime.ts` |
 | A | `tests/browser/match-room/visibility-runtime.ts` |
 | A | `tests/browser/match-room/vite.config.ts` |
@@ -289,7 +315,7 @@ Overlapping files intentionally changed by P03 retain their Production behavior:
 `competition.ts` dictionaries keep missing/closed-player poll copy;
 `app/admin/system/page.tsx` adds only Match Room administration;
 `tests/integration/admin-tournament-workspace-contract.test.ts` preserves the
-historical boundary while classifying the two new safety migrations.
+historical boundary while classifying the separate P03 safety and retention migrations.
 These overlaps are changed paths, so they are not claimed byte-identical.
 
 ## Explicit excluded packages
@@ -317,10 +343,9 @@ The baseline achievement/badge platform is preserved. It is not the excluded P01
 Showcase feature. `package.json`, `package-lock.json` and `.env.example` remain
 identical to the Production baseline.
 
-## Final atomic-package read-only audit
+## Final atomic package
 
-The manifest, actual canonical LF sources, runbook and package builder agree on
-this exact execution order and checksum:
+Manifest, canonical LF sources and package builder agree on this sequence. The four historical files also match the Staging source; the previous two safety files remain unchanged.
 
 | Order | Migration | Canonical SHA-256 |
 | --- | --- | --- |
@@ -330,34 +355,10 @@ this exact execution order and checksum:
 | 4 | `20260920014644_match_room_production_hardening.sql` | `a03c4a3492ab54124c35ff9a487d7cd20441c5014b880747187e1e5b6643c725` |
 | 5 | `20260922054205_match_room_unread_summary.sql` | `42efbf9b372b57e1007ba74fc282fad3bf96535be2b60f6c8578504f8e0618ef` |
 | 6 | `20260923040754_match_room_disabled_assistance_gate.sql` | `e832709b6fead11abda0287a7fdaa38f1ed910527accdb70f1d5819286023565` |
+| 7 | `20260923062127_match_room_retention_and_privacy.sql` | `0cd225d191adbf1cda83023b10b3f023e9c7886bffa30dd0ca44f501a0bf004b` |
 
-Built atomic SQL SHA-256:
-`fa6f011102211889ac1ec478231865157f10220913ebf17a1447371dcdabcc93`.
+Atomic package SHA-256: `40ad016e6ff05960733f4e61e0de5b949eefb3466b4978abe5990f0e4bbf318f`.
 
-The four original sources also match the Staging commit after CRLF-to-LF
-normalization. The two existing database rehearsal evidence files record the
-same package hash. No migration or executor source was changed during this audit.
+One transaction covers all seven schema/ledger steps, with OFF before visibility, 2-second lock and 60-second statement timeouts, dependency hashes and unchanged competition fingerprints. The executor requires an exact clean sealed candidate and fresh read-only PASS receipt plus the later explicit Production instruction. Unknown commit outcomes require inspection, never automatic retry.
 
-Read-only code review confirmed one transaction for schema and all six ledger
-entries; 2-second lock / 60-second statement limits; checksummed envelope handling;
-bootstrap OFF before capability installation; final no-history assertions;
-three normalized dependency-definition checks; and competition comparison under
-bounded table locks in the same transaction. The executor separately requires
-the exact approval phrase, a fresh PASS receipt, clean sealed HEAD, unchanged
-remote master, correct endpoint identity and fingerprint bindings. Unknown commit
-outcomes require read-only inspection rather than automatic retry.
-
-`node --test tests/p03-db/package-checks.mjs` passed all nine checks during this
-audit. No database connection, migration application, live gate, deployment,
-setting mutation or fixture creation was performed for the audit. Prior database
-rehearsal evidence is historical proof of the same package, not a fresh final-SHA
-hosted release gate.
-
-No unresolved atomic-package defect was identified. Release readiness still
-requires the final exact-SHA CI and hosted validation, successful compatible
-backup/restore evidence, the approved privacy decision, and the fresh release-day
-gate. Prepared fixture source is included above; it does not mean the new admin
-or tournament exists. Privileged-admin and actual Staging-worker verification
-holds remain documented in the fixture preparation README. Fixture planning also
-requires an already active IronClad admin profile and genuine acceptance of the
-current Terms/Privacy pair; it never creates profiles or acceptance evidence.
+The authorized Development admin, new synthetic Staging fixture and preliminary 14-case run now exist; the old approval holds are resolved. Final exact-SHA CI and Preview evidence belongs to the draft PR. Production fingerprint validation was read-only; all remaining release-day requirements are in the current readiness and release runbooks.

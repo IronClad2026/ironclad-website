@@ -2,6 +2,7 @@ import path from "node:path";
 import { verifyPackage } from "../p03-db/package.mjs";
 import { assessCompetition, assessQuietWindow, canonical, capture, compare, connection, digest, fileHash, invariant, matchRoomIsOff, PRODUCTION_REF, readJson, run, saveJson, STAGING_REF } from "./core.mjs";
 import { verifyRestoredBackup } from "./backup.mjs";
+import { validatePrivacyReadiness } from "./privacy-readiness.mjs";
 
 export const PRODUCTION_VERCEL_PROJECT = "prj_5os8tdLLkgGUSWnrxpiYj6OI6YEB";
 const SHA = /^[0-9a-f]{40}$/;
@@ -35,7 +36,10 @@ export function seal({ repository, config, output }) {
   const ledger = readJson(path.join(repository, "docs/p03-production-ledger.json"));
   invariant(ledger.master === config.masterSha && ledger.projectId === PRODUCTION_REF, "Reviewed ledger baseline does not match release configuration.");
   invariant(config.privacyDecision, "Reviewed transcript retention/purge/account-closure decision artifact required.");
-  const result = { schemaVersion: 1, createdAt: new Date().toISOString(), ...config, candidateSha, migrations: packageSummary(repository), expectedLedger: ledger.migrations, dependencyManifestSha256: fileHash(path.join(repository, "scripts/p03-db/dependencies.json")), browserReportSha256: fileHash(config.browserReport), runbookSha256: fileHash(path.join(repository, config.runbook)), privacyDecisionSha256: fileHash(config.privacyDecision), previewGuard: ["lib/p03-preview-safety.ts", "next.config.ts"].map((file) => ({ file, sha256: fileHash(path.join(repository, file)) })) };
+  const privacyReadiness = "docs/p03-privacy-readiness.json";
+  const migrations = packageSummary(repository);
+  const readiness = validatePrivacyReadiness(repository, path.join(repository, privacyReadiness), migrations);
+  const result = { schemaVersion: 1, createdAt: new Date().toISOString(), ...config, candidateSha, migrations, expectedLedger: ledger.migrations, dependencyManifestSha256: fileHash(path.join(repository, "scripts/p03-db/dependencies.json")), browserReportSha256: fileHash(config.browserReport), runbookSha256: fileHash(path.join(repository, config.runbook)), privacyDecisionSha256: fileHash(config.privacyDecision), privacyReadiness, privacyReadinessSha256: fileHash(path.join(repository, privacyReadiness)), privacyArtifactsSha256: readiness.artifactsSha256, previewGuard: ["lib/p03-preview-safety.ts", "next.config.ts"].map((file) => ({ file, sha256: fileHash(path.join(repository, file)) })) };
   validateBrowserReport(readJson(config.browserReport), result);
   saveJson(output, result);
   return result;
@@ -89,6 +93,12 @@ export async function gate({ repository, sealFile, backupDirectory, output, env 
     await check("package", () => { const actual = packageSummary(repository); invariant(canonical(actual) === canonical(config.migrations), "Migration checksums/order changed."); return actual; });
     await check("runbook", () => { invariant(fileHash(path.join(repository, config.runbook)) === config.runbookSha256, "Reviewed runbook changed."); return config.runbookSha256; });
     await check("privacy", () => { invariant(config.privacyDecision && config.privacyDecisionSha256 && fileHash(config.privacyDecision) === config.privacyDecisionSha256, "Reviewed privacy/retention decision artifact is absent or changed."); return config.privacyDecisionSha256; });
+    await check("privacyReadiness", () => {
+      invariant(config.privacyReadiness === "docs/p03-privacy-readiness.json" && fileHash(path.join(repository, config.privacyReadiness)) === config.privacyReadinessSha256, "Prepared privacy/retention readiness manifest changed or is absent.");
+      const result = validatePrivacyReadiness(repository, path.join(repository, config.privacyReadiness), packageSummary(repository), { live: true });
+      invariant(result.artifactsSha256 === config.privacyArtifactsSha256, "Retention implementation or legal preparation artifacts changed.");
+      return result;
+    });
     await check("previewGuard", () => {
       invariant(Array.isArray(config.previewGuard) && config.previewGuard.length === 2 && ["lib/p03-preview-safety.ts", "next.config.ts"].every((file) => config.previewGuard.some((item) => item.file === file && item.sha256 === fileHash(path.join(repository, file)))), "Candidate Preview build-isolation guard differs from the reviewed seal.");
       return config.previewGuard;

@@ -177,6 +177,37 @@ export async function verifyPreviewReachability(browser: Browser) {
   if (response.status >= 400) throw new Error("The candidate Preview sign-in route is unavailable.");
 }
 
+async function restrictedContext(browser: Browser, clerkHost: string, width: number, storageState?: Awaited<ReturnType<BrowserContext["storageState"]>>) {
+  const target = loadTarget();
+  const context = await browser.newContext({ viewport: { width, height: 844 }, locale: "en-US", storageState });
+  contexts.add(context);
+  context.setDefaultTimeout(20_000);
+  context.setDefaultNavigationTimeout(25_000);
+  await context.route("**/*", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const localPreview = url.origin === target.previewUrl;
+    const auth = url.hostname === clerkHost;
+    const publicAsset = request.method() === "GET" && ["cdn.jsdelivr.net", "challenges.cloudflare.com"].includes(url.hostname);
+    const staging = request.method() === "GET" && url.hostname === `${stagingRef}.supabase.co`;
+    if (url.protocol !== "https:" || !(localPreview || auth || publicAsset || staging)) return route.abort();
+    const bypass = process.env.P03_VERCEL_BYPASS_SECRET;
+    if (localPreview && bypass) return route.continue({ headers: { ...request.headers(), "x-vercel-protection-bypass": bypass } });
+    return route.continue();
+  });
+  return context;
+}
+
+export async function createPublicViewer(browser: Browser, width = 1280) {
+  const config = validateRuntimeGuards(await environment(), fixture.firstAlias);
+  const clerkHost = Buffer.from(config.clerkPublishableKey.slice("pk_test_".length), "base64").toString("utf8").replace(/\$/, "");
+  if (!clerkHost.endsWith(".clerk.accounts.dev")) throw new Error("Unexpected Clerk Development frontend host.");
+  const context = await restrictedContext(browser, clerkHost, width, previewAccessState);
+  return context.newPage();
+}
+
+export const unrelatedFixtureAlias = fixtureReceipt ? "TestMain2" : "TestChallenge2";
+
 export async function createViewer(browser: Browser, alias: string, width = 1280) {
   const target = loadTarget();
   const env = await environment();
@@ -203,22 +234,7 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
   } else validateClerkFixtureUser(user, config);
   const clerkHost = Buffer.from(config.clerkPublishableKey.slice("pk_test_".length), "base64").toString("utf8").replace(/\$$/, "");
   if (!clerkHost.endsWith(".clerk.accounts.dev")) throw new Error("Unexpected Clerk Development frontend host.");
-  const context = await browser.newContext({ viewport: { width, height: 844 }, locale: "en-US", storageState: sessions.get(alias) ?? previewAccessState });
-  contexts.add(context);
-  context.setDefaultTimeout(20_000);
-  context.setDefaultNavigationTimeout(25_000);
-  await context.route("**/*", async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const localPreview = url.origin === target.previewUrl;
-    const auth = url.hostname === clerkHost;
-    const publicAsset = request.method() === "GET" && ["cdn.jsdelivr.net", "challenges.cloudflare.com"].includes(url.hostname);
-    const staging = request.method() === "GET" && url.hostname === `${stagingRef}.supabase.co`;
-    if (url.protocol !== "https:" || !(localPreview || auth || publicAsset || staging)) return route.abort();
-    const bypass = process.env.P03_VERCEL_BYPASS_SECRET;
-    if (localPreview && bypass) return route.continue({ headers: { ...request.headers(), "x-vercel-protection-bypass": bypass } });
-    return route.continue();
-  });
+  const context = await restrictedContext(browser, clerkHost, width, sessions.get(alias) ?? previewAccessState);
   const page = await context.newPage();
   if (!sessions.has(alias)) {
     validationPhase = "Preview sign-in navigation";

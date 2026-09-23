@@ -5,7 +5,7 @@ existing immutable `TestMain1`–`TestMain8` player fixtures. Default execution 
 read-only planning. It never reprovisions players, edits an old event, changes
 settings or migrations, invokes an outbound worker, or calls a Production API.
 
-## Execution hold
+## Authorization and current evidence
 
 Do not run creation until the separately reviewed dedicated Development Clerk
 admin exists and a fresh browser session proves `metadata.role === "admin"`.
@@ -16,16 +16,22 @@ admin account. Planning and creation fail read-only if this evidence is absent.
 The helper never creates a profile, accepts terms, or copies acceptance records;
 use the normal authenticated UI and the actual consent flow for those actions.
 It repeats the account check immediately before the first fixture write.
-Creating privileged test access is currently waiting for explicit user approval
-following an automatic approval-review rejection.
+The user explicitly authorized exactly one dedicated Development admin on
+2026-09-23. It was created once and completed a real UI login, admin session
+claim check, current Terms 1.1 / Privacy 1.2 acknowledgement and synthetic
+profile setup. Credentials stay in the ignored current-user-protected file.
 
 The existing Staging email cron is active. Its current worker must be verified
 through the authorized read-only review; a candidate Preview with email disabled
-does not by itself establish the cron worker's configuration. Reviewing the
-Vault-derived worker identity is also waiting for explicit user approval.
-Do not retry that blocked inspection through another mechanism.
+does not by itself establish the cron worker's configuration. The newly authorized
+Vault read exposed only the staging alias hostname and expected-path boolean.
+That alias resolved to a READY staging deployment, and a fresh Vercel UI check
+confirmed TRANSACTIONAL_EMAIL_MODE=disabled for Preview/staging.
 
-No external mutations have been performed by this script.
+The reviewed script created only `P03 Preview Validation 20260923-p03-ready`
+on Staging, with all 24 RPCs journaled. It preserved earlier fixtures, used
+only TestMain1–8 and verified all generated notification recipients. The
+ignored receipt is `p03-artifacts/fixture-20260923-p03-ready.json`.
 
 ## Preparation and commands
 
@@ -54,7 +60,7 @@ the twelve remaining read tables, including `account_legal_acceptances`,
 The authoritative `save_tournament` RPC checks Main ranked-cycle
 availability under its advisory lock at creation time.
 
-After the holds are resolved, a reviewer records fresh worker evidence in a
+Before any new fixture operation, record fresh worker evidence in a
 private JSON file. The evidence must identify the **actual Staging cron worker**,
 not merely the candidate Preview:
 
@@ -126,5 +132,23 @@ npx eslint scripts/p03-preview/create-fixture.mjs tests/p03-preview/fixture-guar
 ```
 
 The twenty-eight guard/layout tests do not load environment files or make network
-requests. Live planning and creation remain unrun while the approvals are
-pending.
+requests. Live planning and creation passed after explicit authorization and actual
+admin onboarding. Final hosted evidence must bind the completed candidate SHA.
+
+## Dedicated administrator lifecycle
+
+The fixed external ID is `ironclad:p03-preview-admin:v1`; creation must never
+be repeated to bypass an uncertain outcome. The ignored
+`test-results/p03-admin-lifecycle.json` records exact identity, current legal
+document IDs/hashes, UI onboarding and cleanup state without credentials.
+Retain the sole Development identity for final hosted validation and the future
+actual-date Privacy publication candidate's rerun. Its private credentials grant
+no Production permissions. Reassess or retire it by 2026-10-07 (14 days after
+creation); longer retention needs an explicit new purpose and deadline. Cleanup
+has not occurred and must wait for the coordinator's final lifecycle decision.
+After final evidence is ready and future fixture creation remains available,
+refresh actual-worker proof and void only the receipt tournament through its
+authoritative operation. A release-date rerun may require a fresh valid-deadline
+synthetic event. Preserve competitive/audit history, and close only this dedicated
+account through its ordinary account-closure flow when the coordinator authorizes
+retirement. Never delete older fixtures or claim unperformed cleanup.

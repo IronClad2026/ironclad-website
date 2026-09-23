@@ -3,8 +3,8 @@ import { existsSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import {
-  closeViewers, createViewer, findOnePlayerFixture, fixture, getValidationPhase, gotoBracket,
-  matchFacts, setValidationPhase, verifyCompetitionUnchanged, verifyLegalOrigins, verifyPairing, verifyPreviewReachability,
+  closeViewers, createPublicViewer, createViewer, findOnePlayerFixture, fixture, getValidationPhase, gotoBracket,
+  matchFacts, setValidationPhase, unrelatedFixtureAlias, verifyCompetitionUnchanged, verifyLegalOrigins, verifyPairing, verifyPreviewReachability,
 } from "./runtime";
 import { loadTarget } from "./target";
 
@@ -66,6 +66,7 @@ async function sendForUnread(browser: Browser) {
   await expect(room(sender).getByRole("textbox", { name: "Message", exact: true })).toHaveValue("");
   setValidationPhase("recipient unread fixture card");
   await expect(card(recipient)).toHaveAttribute("data-match-room-unread", "opponent", { timeout: 30_000 });
+  await expect(card(sender)).not.toHaveAttribute("data-match-room-unread", "opponent");
   return { sender, recipient, body };
 }
 
@@ -123,6 +124,16 @@ hostedCase("match-room", async (browser) => {
   const page = await currentViewer(browser);
   await expect(room(page).getByRole("log")).toBeVisible();
   await expect(room(page).getByText(/visible to its two participants/)).toBeVisible();
+  setValidationPhase("public and unrelated viewer privacy isolation");
+  const unrelated = await createViewer(browser, unrelatedFixtureAlias);
+  const anonymous = await createPublicViewer(browser);
+  for (const outsider of [unrelated, anonymous]) {
+    await gotoBracket(outsider, fixture.currentMatchId);
+    await expect(card(outsider)).toBeVisible();
+    await expect(room(outsider)).toHaveCount(0);
+    await expect(outsider.getByRole("textbox", { name: "Message", exact: true })).toHaveCount(0);
+    await expect(card(outsider)).not.toHaveAttribute("data-match-room-unread", /.+/);
+  }
 });
 
 hostedCase("unread-card", async (browser) => {
@@ -172,6 +183,7 @@ hostedCase("assistance", async (browser) => {
   await room(participant).getByRole("button", { name: /^(Request Admin Assistance|Request assistance again)$/ }).click();
   await expect(room(participant).getByText("Assistance requested", { exact: true })).toBeVisible();
   await gotoBracket(admin, fixture.currentMatchId);
+  await expect(room(admin).getByText("Assistance requested", { exact: true })).toBeVisible();
   await room(admin).getByRole("button", { name: "Resolve assistance", exact: true }).click();
   await expect(room(admin).getByText("Assistance resolved", { exact: true })).toBeVisible();
   await room(admin).getByRole("button", { name: "Reopen assistance", exact: true }).click();
@@ -210,6 +222,8 @@ hostedCase("admin-workspace", async (browser) => {
   await expect(page.getByRole("main")).toBeVisible();
   await gotoBracket(page, fixture.currentMatchId);
   await expect(room(page).getByRole("textbox", { name: "Message", exact: true })).toBeEditable();
+  await expect(room(page).getByRole("log")).toBeVisible();
+  await expect(room(page).getByText(/^P03 isolated Preview validation /).first()).toBeVisible();
 });
 
 for (const width of [375, 390]) {

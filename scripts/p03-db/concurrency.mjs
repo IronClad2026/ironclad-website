@@ -9,7 +9,7 @@ import { localClient, localPsqlArgument } from "./local-pg.mjs";
 
 const psql = localPsqlArgument();
 const client = localClient(psql, { database: "p03_candidate" });
-assert.equal(await client.run("select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=56623 and (select count(*) from public.players)=0 and (select count(*) from supabase_migrations.schema_migrations)=152;"), "t");
+assert.equal(await client.run("select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=56623 and (select count(*) from public.players)=0 and (select count(*) from supabase_migrations.schema_migrations)=153;"), "t");
 const temporaryDirectory = mkdtempSync(path.join(tmpdir(), "p03-concurrency-"));
 const evidence = [];
 for (const [name, legacyDatabase, legacySource, legacyRole] of [

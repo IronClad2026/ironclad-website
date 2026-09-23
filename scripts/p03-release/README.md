@@ -1,11 +1,14 @@
 # P03 release tools
 
 `node scripts/p03-release/cli.mjs --help` lists the main commands. Run from the
-clean candidate checkout. These tools never release anything automatically.
-Only the separate `restore` command writes to a database, and it accepts an
+clean candidate checkout. `cli.mjs` never releases anything automatically.
+Its separate `restore` command writes to a database, and it accepts an
 empty database named `p03_restore_*` on loopback or a positively attested isolated
 container on the local Linux Docker daemon only. The separately owned
 `scripts/p03-db/execute.mjs` is the approved future Production executor.
+The separate [privacy operator command](privacy-operations.md) verifies a live
+Clerk administrator and uses service-only bounded RPCs; body export and every
+mutation require explicit scope. It is never invoked by the release gate.
 
 ## Connections and private artifacts
 
@@ -33,10 +36,12 @@ be restored into ordinary PostgreSQL. The observed hosted extension versions are
 in `production-extensions.json`. Prepare a dedicated compatible runtime first.
 The supplied Compose file pins `supabase/postgres:17.6.1.127`, publishes no ports,
 uses an internal network with no outbound access, and disables cron execution.
-The current preparation host has no Docker/Podman engine. The equivalent
-synthetic runtime passed on GitHub CI as recorded below; this Compose variant
-with SCRAM authentication still requires its own runtime preflight and actual
-release-day restore. Missing runtime/extension readiness is a release blocker,
+The current preparation host has no Docker/Podman engine. The earlier equivalent
+synthetic runtime passed on GitHub CI as recorded below. The updated CI job now
+uses this exact tracked Compose file as its restore target, authenticates with a
+generated private password and checks wrong-password rejection. That updated
+path still awaits exact-candidate CI evidence. Release day requires a fresh runtime
+preflight and actual Production archive restore. Missing runtime/extension readiness is a release blocker,
 not a waived check. Do not omit managed schemas or extension data to make
 restoration pass.
 
@@ -52,8 +57,9 @@ Wait for `pg_isready` to report accepting connections before the single
 `createdb` invocation. The container deliberately bypasses hosted project-init
 scripts, creates a fresh cluster under `/tmp`, preloads pg_cron, pg_net and
 pg_stat_statements, and binds cron metadata to `p03_restore_release`, matching
-the CI initialization path. Host access uses SCRAM with the new local password;
-CI uses trust only for its disposable synthetic fixture. The pg_net worker is
+the CI restore initialization path. Host access uses SCRAM with the new local
+password, including the actual Compose target in CI. Only CI's separate synthetic
+source fixture uses trust. The pg_net worker is
 deliberately bound to the empty `postgres` database, so it cannot process queues
 copied into `p03_restore_release`; runtime preflight verifies this setting.
 There is no persistent
@@ -79,6 +85,19 @@ the attested Docker IP and port, and internal-only container networks. This
 prevents copied cron jobs or pg_net requests reaching live services. Extension
 permissions, preload requirements, Vault encryption-key compatibility, and full
 schema creation still must pass the actual restore; startup alone is not PASS.
+
+The owner explicitly deferred the actual release host and private configuration
+until before Production release. This Windows preparation host has PostgreSQL 17
+client binaries but no Docker engine, configured native Production DB/TLS
+connection, Vercel API token or dedicated Linux restore host. No host is guessed
+or provisioned. Supply the nominated Linux Docker host, its PostgreSQL 17 clients,
+`P03_DATABASE_URL`, verified TLS trust (`P03_SSL_ROOT_CERT` when needed),
+`P03_PG_BIN`, `P03_RESTORE_DATABASE_URL`, `P03_RESTORE_CONTAINER` and
+`VERCEL_TOKEN` securely before the live gate. The existing app service key and
+read-only SQL connector do not replace native `pg_dump` credentials. Required
+privacy operator names are in the linked procedure. This acknowledged operator
+setup is separate from completed preparation engineering; the live gate still
+fails closed if any required configuration or fresh evidence is absent.
 
 ## Release-day backup and restore
 
@@ -124,6 +143,14 @@ execution is disabled, and pg_net workers target the empty `postgres` database
 rather than either synthetic source/restore database. It cleans up only its
 uniquely named containers/network.
 
+The updated rehearsal invokes the actual tracked Compose file for the restore
+target, with only unique container/network names and a generated local password
+overridden. It verifies that SCRAM accepts the correct password and rejects a
+wrong one, then performs the complete archive restore. No synthetic password is
+logged, committed, passed in arguments or saved in the evidence artifact. The
+next exact-candidate hosted job must pass this updated Compose path before that
+additional coverage is claimed.
+
 This runtime rehearsal **passed** in
 [CI run 35821984251](https://github.com/IronClad2026/ironclad-website/actions/runs/35821984251/job/107055600738)
 at candidate `a03b2f5b6fcd60cc7810d780455ba98646eac956` on 2026-09-23.
@@ -155,6 +182,16 @@ deadlines/holds, replay authority, standings, settlement and championship facts.
 Actual column references fail closed on schema drift. Differences identify the
 table, row UUID and changed field, never the private value. No automatic repair.
 
+For explicitly authorized preparation validation, `digest` accepts the same
+scope/project/SHA/output options as `fingerprint`, but PostgreSQL returns only
+per-relation counts and SHA-256 digests. All row projection stays in PostgreSQL.
+It validates the exact 22-relation inventory and row bounds and marks its output
+`preparationOnly`. PostgreSQL JSONB text digests have their own declared format;
+they are not substituted for full release-day comparison evidence. The authorized
+2026-09-23 Production validation covered 222 rows across the agreed 22 relations
+and saved only those counts/digests to ignored current-user-only local artifacts.
+No Production rows or settings changed.
+
 ## Seal and final read-only gate
 
 After the **final commit**, actual hosted browser tests, CI and Preview are
@@ -171,13 +208,27 @@ green, write an external JSON config with:
   "previewUrl": "https://exact-final-deployment.vercel.app",
   "tournamentIds": ["1cb06045-0ffc-4745-a8cd-1a16b71baffc"],
   "browserReport": "C:/Private/P03/hosted-playwright-report.json",
-  "privacyDecision": "C:/Private/P03/approved-transcript-retention-decision.md",
+  "privacyDecision": "docs/p03-retention-decision.json",
   "runbook": "docs/p03-release-runbook.md"
 }
 ```
 
-The privacy artifact must contain the actual reviewed retention/purge/account
-closure decision, not a placeholder or self-authored claim of approval.
+The privacy artifact records the owner's approved retention/purge/account
+closure decision. Seal additionally verifies `docs/p03-privacy-readiness.json`:
+the actual additive migration/package, bounded privacy operations, retention
+tests, archived predecessor legal sources and reviewed Privacy 1.3 draft/PDF
+must all match their explicit hashes. Text artifacts use canonical UTF-8 LF;
+PDFs use binary hashes. Runtime legal files must be either the exact archived
+predecessor or the exact deterministically finalized Privacy 1.3 corpus,
+transition manifest and PDF, with every other document unchanged. The live gate
+requires the finalized successor; a review draft can pass only preparation and
+seal validation. A finalized candidate requires a new SHA, CI, Preview and seal;
+at the live gate its effective
+date must equal that day's Australia/Sydney date. Mixed or independently edited
+legal runtime states are rejected. This is preparation readiness, not database
+legal activation.
+Controlled publication and current-account acceptance must complete while Match
+Room remains OFF, before feature activation; no draft becomes effective here.
 Native Playwright JSON must carry `config.metadata.candidateSha`,
 `config.metadata.previewUrl`, `config.metadata.supabaseProjectRef`, and all
 `[p03:...]` scenario markers from

@@ -1,7 +1,7 @@
 // GitHub-hosted Linux CI only. Synthetic data + actual Supabase extension
 // binaries, with no Production credentials and no externally reachable server.
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -18,19 +18,23 @@ const network = `p03-restore-ci-${suffix}`;
 const sourceName = `p03-restore-source-${suffix}`;
 const restoreName = `p03-restore-target-${suffix}`;
 const sourceDatabase = "p03_hosted_source";
-const targetDatabase = "p03_restore_hosted";
 const created = [];
 let networkCreated = false;
+let composeAttempted = false;
+const restorePassword = randomBytes(32).toString("base64url");
+const composeEnvironment = { ...process.env, P03_RESTORE_PASSWORD: restorePassword, P03_RESTORE_CONTAINER_NAME: restoreName, P03_RESTORE_NETWORK_NAME: `${network}-restore` };
+const composeArgs = ["compose", "--project-name", `p03-restore-${suffix}`, "--file", path.join(root, "scripts/p03-release/restore-runtime.compose.yml")];
 const steps = [];
 const passed = (step) => { steps.push(step); console.log(`PASS ${step}`); };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const literal = (value) => `'${value.replaceAll("'", "''")}'`;
 
 function localEnvironment(hostname, database, container) {
+  const password = container === restoreName ? `:${encodeURIComponent(restorePassword)}` : "";
   return {
     ...process.env,
-    P03_DATABASE_URL: `postgresql://postgres@${hostname}:5432/${database}`,
-    P03_RESTORE_DATABASE_URL: `postgresql://postgres@${hostname}:5432/${database}`,
+    P03_DATABASE_URL: `postgresql://postgres${password}@${hostname}:5432/${database}`,
+    P03_RESTORE_DATABASE_URL: `postgresql://postgres${password}@${hostname}:5432/${database}`,
     P03_LOCAL_CONTAINER: container,
     P03_RESTORE_CONTAINER: container,
     P03_PG_BIN: process.env.P03_PG_BIN || "/usr/lib/postgresql/17/bin",
@@ -95,6 +99,32 @@ exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directorie
   return connection(localEnvironment(containerIp, database, name));
 }
 
+async function startComposeRestore() {
+  // Exercise the actual release-day Compose/SCRAM configuration, not a parallel
+  // approximation. Only unique resource names and a generated local password
+  // differ. Compose never prints its interpolated configuration.
+  composeAttempted = true;
+  run("docker", [...composeArgs, "up", "--detach", "--no-build"], { env: composeEnvironment, timeout: 60000 });
+  let socketReady = false;
+  for (let attempt = 0; attempt < 15; attempt++) {
+    try {
+      run("docker", ["exec", restoreName, "psql", "-X", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "-qAt", "-c", "select 1;"], { timeout: 2000 });
+      socketReady = true; break;
+    } catch { await sleep(1000); }
+  }
+  assert(socketReady, "Actual Compose restore target did not become ready within 45 seconds");
+  // Compose deliberately pins pg_cron to this exact release-day target name.
+  const database = "p03_restore_release";
+  run("docker", ["exec", restoreName, "createdb", "-h", "/tmp", "-U", "postgres", "--template=template0", database], { timeout: 5000 });
+  const containerIp = JSON.parse(run("docker", ["inspect", restoreName]))[0].NetworkSettings.Networks[`${network}-restore`].IPAddress;
+  const target = connection(localEnvironment(containerIp, database, restoreName));
+  target.env.PGCONNECT_TIMEOUT = "2";
+  assert.equal(readOnlySql(target, "select 1;", 5000), "1", "SCRAM-authenticated native client cannot access the Compose target");
+  const rejected = spawnSync(target.bin("psql"), ["-X", "--no-password", "-qAt", "-c", "select 1;"], { env: { ...target.env, PGPASSWORD: "deliberately-wrong-synthetic-password" }, encoding: "utf8", timeout: 5000 });
+  assert(rejected.status !== 0 && !rejected.error, "Compose target did not reject the wrong password");
+  return target;
+}
+
 function installRealExtensions(db) {
   const available = JSON.parse(readOnlySql(db, "select jsonb_agg(jsonb_build_object('name',name,'default_version',default_version)) from pg_available_extensions;"));
   validateExtensionRuntime(extensions, available);
@@ -147,8 +177,8 @@ try {
   const imageMetadata = JSON.parse(run("docker", ["image", "inspect", image]))[0];
   run("docker", ["network", "create", "--internal", network]); networkCreated = true;
   const source = await startContainer(sourceName, sourceDatabase);
-  const target = await startContainer(restoreName, targetDatabase);
-  passed("Two positively attested local PostgreSQL containers use an internal Docker network with no published ports; cron execution is OFF");
+  const target = await startComposeRestore();
+  passed("Synthetic source and actual tracked Compose restore target use attested internal networks with no published ports; SCRAM accepts only the correct generated password; cron execution is OFF");
   installRealExtensions(source);
   passed("All seven observed Production extension names, versions and schemas are installed from real Supabase binaries");
   seedSource(source);
@@ -158,7 +188,7 @@ try {
   const before = capture(source, ids, { candidateSha });
   const manifest = backup({ repository: root, directory: outputRoot, tournamentIds: ids, candidateSha, expectedProjectRef: "local", env: localEnvironment(source.env.PGHOST, sourceDatabase, sourceName) });
   passed("Exact release-day backup command created a complete logical archive, schema, critical export and checksums");
-  const validation = restore({ directory: outputRoot, env: localEnvironment(target.env.PGHOST, targetDatabase, restoreName) });
+  const validation = restore({ directory: outputRoot, env: localEnvironment(target.env.PGHOST, target.database, restoreName) });
   passed("Exact attested-local restore command restored the complete archive; 22 competition tables, schema and seven extension versions match");
   const report = {
     schemaVersion: 1, checkedAt: new Date().toISOString(), candidateSha,
@@ -174,5 +204,6 @@ try {
 } finally {
   // Only exact, random, disposable resources successfully created in this run.
   for (const container of created.reverse()) { try { run("docker", ["rm", "--force", container]); } catch { console.error("Disposable container cleanup needs attention."); } }
+  if (composeAttempted) { try { run("docker", [...composeArgs, "down"], { env: composeEnvironment }); } catch { console.error("Unique disposable Compose resources need cleanup attention."); } }
   if (networkCreated) { try { run("docker", ["network", "rm", network]); } catch { console.error("Disposable network cleanup needs attention."); } }
 }

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { FACTS, competitionSql, validateTournamentIds } from "./facts.mjs";
+import { FACTS, competitionDigestSql, competitionSql, validateTournamentIds } from "./facts.mjs";
 
 export const PRODUCTION_REF = "nsyjtqpvyxlzyujlbzos";
 export const STAGING_REF = "zzbnneprhjicmajpjkdg";
@@ -106,6 +106,24 @@ export function capture(db, tournamentIds, { candidateSha = null, maxRows = 1000
   invariant(tables.tournaments.count === ids.length, "A selected tournament is missing or unreadable.");
   const competitionSha256 = digest(Object.fromEntries(Object.entries(tables).map(([name, table]) => [name, table.sha256])));
   return { schemaVersion: 1, capturedAt: new Date().toISOString(), projectRef: db.projectRef, candidateSha, tournamentIds: ids, competitionSha256, tables, state };
+}
+export function validateDigestEvidence(tables, tournamentIds, maxRows = 10000) {
+  const ids = validateTournamentIds(tournamentIds);
+  invariant(tables && canonical(Object.keys(tables).sort()) === canonical(Object.keys(FACTS).sort()), "Digest relation inventory differs from the agreed 22 relations.");
+  let totalRows = 0;
+  for (const [name, value] of Object.entries(tables)) {
+    invariant(value && canonical(Object.keys(value).sort()) === canonical(["count", "sha256"]), `Digest contains unexpected fields: ${name}.`);
+    invariant(Number.isInteger(value.count) && value.count >= 0 && value.count <= maxRows && /^[0-9a-f]{64}$/.test(value.sha256), `Digest row bound or SHA-256 is invalid: ${name}.`);
+    totalRows += value.count;
+  }
+  invariant(totalRows <= 50000 && tables.tournaments.count === ids.length, "Digest scope is missing a tournament or exceeds the total row bound.");
+  return { totalRows, tablesSha256: digest(tables) };
+}
+export function captureDigest(db, tournamentIds, { candidateSha = null, maxRows = 10000 } = {}) {
+  const ids = validateTournamentIds(tournamentIds);
+  const tables = JSON.parse(readOnlySql(db, competitionDigestSql(ids, maxRows), 90000));
+  const summary = validateDigestEvidence(tables, ids, maxRows);
+  return { schemaVersion: 1, capturedAt: new Date().toISOString(), projectRef: db.projectRef, candidateSha, tournamentIds: ids, format: "postgresql-jsonb-text-sha256", preparationOnly: true, ...summary, tables };
 }
 export function compare(before, after) {
   invariant(canonical(before.tournamentIds) === canonical(after.tournamentIds), "Fingerprint tournament scope differs.");

@@ -13,12 +13,12 @@ function fixture(local = false) {
     ...(local ? { mode: "local-rehearsal" } : {}) };
   return { seal, receipt, options: { now, local, approval: local ? "LOCAL P03 REHEARSAL" : RELEASE_APPROVAL } };
 }
-test("package accepts exactly pinned original migrations plus bootstrap and final OFF gate", () => {
-  assert.equal(verifyPackage().length, 6);
+test("package accepts exactly pinned original migrations plus bootstrap, OFF gate and additive retention", () => {
+  assert.equal(verifyPackage().length, 7);
   const sql = buildAtomicMigrationSql();
   assert(sql.startsWith("begin;\n"));
   assert(sql.endsWith("commit;\n"));
-  assert.equal((sql.match(/^-- P03 PACKAGE STEP /gm) ?? []).length, 6);
+  assert.equal((sql.match(/^-- P03 PACKAGE STEP /gm) ?? []).length, 7);
   assert(!/^set local lock_timeout = '10s';$/m.test(sql));
 });
 test("live gate dependency manifest agrees with atomic bootstrap contract", () => {

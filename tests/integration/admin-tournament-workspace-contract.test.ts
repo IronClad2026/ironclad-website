@@ -1057,6 +1057,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260922054205_match_room_unread_summary.sql",
       "20260923040206_match_room_production_bootstrap.sql",
       "20260923040754_match_room_disabled_assistance_gate.sql",
+      "20260923062127_match_room_retention_and_privacy.sql",
     ]);
     const platformMigrationNames = migrationNames.filter(
       (name) =>
@@ -1082,7 +1083,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.slice(-17)).toEqual([
+    expect(migrationNames.slice(-18)).toEqual([
       "20260831133000_staging_badge_cross_division_acceptance.sql",
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql",
       "20260902100000_unlaunched_event_void_authority.sql",
@@ -1100,6 +1101,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260922054205_match_room_unread_summary.sql",
       "20260923040206_match_room_production_bootstrap.sql",
       "20260923040754_match_room_disabled_assistance_gate.sql",
+      "20260923062127_match_room_retention_and_privacy.sql",
     ]);
     expect(
       normalizedSha256(

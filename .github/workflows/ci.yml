@@ -102,6 +102,12 @@ jobs:
         run: node scripts/p03-db/attention-concurrency.mjs /usr/lib/postgresql/17/bin/psql
       - name: Rehearse gated release executor locally
         run: node scripts/p03-db/rehearse-executor.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Retention privacy and case-hold SQL and concurrency
+        run: |
+          node scripts/p03-db/retention.mjs /usr/lib/postgresql/17/bin/psql
+          node scripts/p03-db/retention-concurrency.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Rehearse prepared privacy publication transaction
+        run: node scripts/legal-successor/rehearse-p03-privacy.mjs /usr/lib/postgresql/17/bin/psql
       - name: Stop disposable PostgreSQL
         if: always()
         run: |

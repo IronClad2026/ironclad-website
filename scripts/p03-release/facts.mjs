@@ -51,3 +51,13 @@ selected_matches as (select id from public.tournament_matches where generated_br
 selected_registrations as (select id, profile_id from public.registrations where tournament_bracket_id in (select id from selected_brackets))
 select jsonb_object_agg(table_name, rows) from (${tables.join("\nunion all\n")}) facts;`;
 }
+
+// Preparation validation returns counts and digests only. All fact projection,
+// including the private-field hashing above, remains inside PostgreSQL.
+export function competitionDigestSql(ids, maxRows = 10000) {
+  const projection = competitionSql(ids, maxRows).replace(/;\s*$/, "");
+  return `with projected(facts) as (${projection})
+select jsonb_object_agg(table_name, jsonb_build_object('count', jsonb_array_length(rows),
+ 'sha256', encode(sha256(convert_to(rows::text, 'UTF8')), 'hex')))
+from projected, lateral jsonb_each(facts) as relation(table_name, rows);`;
+}

@@ -23,7 +23,7 @@ and independent per-file transactions are **not** the release procedure.
 `package.mjs` verifies checksums, removes only the verified outer BEGIN/COMMIT
 envelopes, and tightens the original exact ten-second lock-timeout directives to
 two seconds. Statement timeout is sixty seconds. Original canonical SQL is stored
-in the migration ledger, and all six entries commit with all schema changes.
+in the migration ledger, and all seven entries commit with all schema changes.
 
 The package is one transaction. No external session can see the newly installed
 RPCs or tables between the old migrations. At the first externally visible moment,
@@ -115,7 +115,7 @@ BYE, pending/disputed result reports, replay authority, holds and legacy notices
 All triggers are restored before any tested operation. Existing SQL tests add
 real result/reset/account-closure/dice/deadline and privacy behavior.
 
-The six-boundary visibility test uses separate authenticated and service-role
+The seven-boundary visibility test uses separate authenticated and service-role
 connections. An injected final failure proves complete schema/settings/ledger
 rollback. A held live-style Match transaction proves bounded DDL abort. The
 controlled original concurrency suites execute against the final package in
@@ -131,3 +131,29 @@ Generated evidence records PostgreSQL version, checks, hashes and assertions;
 it contains no messages, credentials or private proof paths. Production currently
 runs PostgreSQL 17.6; the local preparation used PostgreSQL 17.11. Both use the
 same major engine; the exact target must still pass the final live gate.
+
+
+## Retention and privacy maintenance
+
+The seventh additive migration is `20260923062127_match_room_retention_and_privacy.sql`. The preceding six canonical files are unchanged. It adds no historical room, message, read, episode or assistance request, changes no competitive row, and leaves the communication switch OFF.
+
+Routine bodies become eligible 40 days after the tournament's current authoritative terminal closure. Cancellation/void use `tournaments.terminal_at`; completion is observed by a private AFTER status trigger. Reopening removes that observation and a later completion starts a fresh clock. `first_completed_at`, room closure, match completion and generic `updated_at` are never substitutes. Already-completed tournaments without a trustworthy current observation fail closed. Production has no pre-install P03 conversations, so no invented historical closure backfill is necessary.
+
+Canonical Admin Assistance and explicit external support/complaint/privacy/abuse-security cases retain affected room content until 24 months after case closure. Dispute/no-show/integrity links retain it until 24 months after the authoritative final result; missing/reset results and replacement participant pairs fail closed; another pairing cannot supply an old room's clock. A minimal report-case link survives a formal report reset/deletion, preventing downgrade to routine chat. Links depend on explicit case IDs, report state and immutable room membership; no message-text classification is performed. A later external case must be linked explicitly by an authorized operator.
+
+Finite holds require an explicit affected room or message subset, a case UUID, a controlled reason and an expiry no more than 366 days away. Unheld messages remain eligible. Hold expiry or release immediately restores ordinary eligibility; the documented daily maintenance procedure must clear overdue material within 30 days. No hosted cron, paid service or shared configuration is added.
+
+The service-only APIs are implemented in the new SQL. The operator tool independently verifies the live Clerk admin claim, while SQL requires an active actor profile. Browser execution and raw service-table access are revoked. Preview inspects at most 100 candidate rooms before computing state and returns `nextRoomId`; blocked/tombstoned pages must be traversed. Purge takes explicit reviewed room IDs (maximum 100) and deletes at most 1,000 rows per private row category per room per call. Counts-only audits are attached to each changed room. Repeating a partial batch resumes it; a completed batch performs no body deletion or audit churn.
+
+Purge removes expired bodies, read cursors, notification episodes, resolved assistance and exact room notifications, with minimal immutable room/generation/sequence tombstones. Fresh cursors, assistance and episodes cannot be written to a purged tombstone. The original message projection remains fixed and does not expose the internal author-player UUID. Account closure still revokes access and removes direct Clerk/read/notification attribution immediately; legitimately retained free-text bodies are not claimed to be anonymized. Stable internal subject provenance allows a bounded privacy search after Clerk removal. Subject export never includes unrelated rooms and nonparticipant administrator authors receive only their own messages. Redaction requires exact subject-authored IDs, rejects live retained cases/holds, and keeps idempotency provenance so retrying a removed message cannot restore its text.
+
+Privacy mutations share the account-closure outer lock, then lock match and room authority. Match, room and tournament SHARE acquisition use NOWAIT to avoid the existing tournament-first lifecycle lock inversion. Formal report transitions take their match lock; concurrent case/hold/reopen work either serializes or fails with bounded 55P03 and can be reviewed/retried. Audit and expired case/hold metadata cleanup is itself bounded. Privacy receipts and redaction/purge tombstones must be reapplied after restoring a backup; see the operational privacy runbook for the rolling 90-day backup limit and restore procedure.
+
+Local checks, after baseline replay and seed:
+
+```text
+node scripts/p03-db/retention.mjs <local-psql-path>
+node scripts/p03-db/retention-concurrency.mjs <local-psql-path>
+```
+
+They create new `p03_retention_*` databases only on the pinned loopback cluster. SQL fixtures roll back; evidence contains names/counts/hashes, not bodies. The native runtime is PostgreSQL 17.11; the hosted extension rehearsal separately uses the reviewed Supabase 17.6 image. No production maintenance operation has been executed.

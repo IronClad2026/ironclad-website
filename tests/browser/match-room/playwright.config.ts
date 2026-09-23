@@ -10,4 +10,3 @@ export default defineConfig({
     url: "http://127.0.0.1:3137/tests/browser/match-room/", reuseExistingServer: false, timeout: 60_000,
   },
 });
-

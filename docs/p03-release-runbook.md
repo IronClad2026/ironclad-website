@@ -32,12 +32,13 @@ Execute only `scripts/p03-db/execute.mjs`, in this explicit order:
 4. `20260920014644_match_room_production_hardening.sql` (unchanged original).
 5. `20260922054205_match_room_unread_summary.sql` (unchanged original).
 6. `20260923040754_match_room_disabled_assistance_gate.sql` (new).
+7. `20260923062127_match_room_retention_and_privacy.sql` (new additive retention/privacy).
 
 `scripts/p03-db/manifest.json` pins canonical LF checksums. The bootstrap uses its
 real creation timestamp; explicit execution order does not rewrite old history.
 Do not use generic `supabase db push` or run individual files. The executor folds
 the verified outer transaction envelopes into ONE transaction, uses 2-second
-lock and 60-second statement limits, and records all six ledger entries atomically.
+lock and 60-second statement limits, and records all seven ledger entries atomically.
 External sessions cannot see an early RPC before the final OFF gates exist.
 The package must finish with `platform_settings.match_room = {"enabled":false}`
 and no new room, message, cursor, assistance or unread episode.
@@ -47,31 +48,45 @@ that same transaction under SHARE locks. Failure, contention or changed facts
 aborts the whole package. It never repairs competition data. See
 `scripts/p03-db/README.md` for lock inventory, race tests and unknown-commit handling.
 
-## Preparation requirements that must be complete before release day
+## Prepared requirements and release-day prerequisites
 
-1. All three exact-SHA CI jobs (`validate`, `p03-database`, `p03-hosted-backup`) green.
-2. Exact-SHA Preview READY, build isolation guard passed, and the hosted browser
-   report contains every required successful scenario with no skipped/flaky tests.
-3. Approved message-body retention, purge, access/export and account-closure
-   decision recorded. Existing historical P03 documents defer this decision;
-   do not invent approval or publish new legal terms as a routine code change.
-4. A disposable Supabase-compatible PostgreSQL 17 restore runtime is available,
-   with the Production extension inventory supported, cron disabled and outbound
-   networking isolated. Native PostgreSQL fixture restore alone does not prove
-   restoration of hosted `pg_net`, `pg_cron` or `supabase_vault`.
-5. Private connection configuration and read-only GitHub/Vercel metadata access
-   are available. Required operator keys: `P03_DATABASE_URL`, `P03_PG_BIN`,
-   `P03_RESTORE_DATABASE_URL`, `VERCEL_TOKEN`, and `P03_SSL_ROOT_CERT` if required.
-   The isolated Linux Docker restore also requires `P03_RESTORE_CONTAINER` and a
-   new local-only `P03_RESTORE_PASSWORD`; follow the release tooling README.
-   Keep values out of arguments, source, transcripts and PRs. The hosted connection
-   must be direct PostgreSQL or session pooler on 5432 with verified TLS.
-6. Final clean candidate sealed with browser report, privacy decision, runbook,
-   migration checksums, project IDs and Git SHAs. A changed artifact requires a new
-   seal and validation; an unsealed candidate is not release-ready.
+Preparation binds the owner-approved 40-day policy, seven-step database package,
+bounded privacy operations, Privacy 1.3 review artifacts, exact-SHA CI and all 14
+protected Preview cases. See [readiness evidence](p03-production-readiness.md),
+[privacy maintenance](../scripts/p03-release/privacy-operations.md), and the
+[legal successor procedure](p03-privacy-successor-runbook.md).
 
-The existing staging legal origins may be configured only in the candidate's
-Preview branch scope. Production origin/Clerk/database settings are untouched.
+The owner explicitly deferred the actual Linux/Docker operator host and private
+configuration until before Production release. No host or credential path is
+invented, no paid infrastructure is created, and GitHub Actions supplies the
+isolated preparation restore rehearsal. Before the live gate, supply PostgreSQL
+17 clients, a local Docker daemon with the reviewed isolated Compose runtime,
+and private connection/TLS and read-only GitHub/Vercel access. Required keys are
+`P03_DATABASE_URL`, `P03_PG_BIN`, `P03_RESTORE_DATABASE_URL`, `VERCEL_TOKEN`,
+`P03_SSL_ROOT_CERT` when needed, `P03_RESTORE_CONTAINER` and a new local-only
+`P03_RESTORE_PASSWORD`. Values remain outside arguments, source and reports.
+The Production connection must use direct PostgreSQL or session pooler port 5432
+and verified TLS. The live gate stops if these prerequisites are absent.
+
+The actual legal publication date is also release-day input. Before the final
+Production approval, generate the approved Privacy 1.3 artifacts for that day's
+Australia/Sydney date, stage only the new immutable PDF and two runtime JSON
+files using the prepared helper, commit/push the same candidate, and obtain new
+exact-SHA green CI and protected Preview evidence. This is a mechanical dated
+artifact refresh; no new retention design or wording is required. The legal
+runbook contains exact commands and the forward publication transaction. The
+Review Draft stays non-effective during preparation. Mixed legal runtime states,
+changed unrelated documents and stale dates are rejected.
+
+Seal the final clean dated candidate with its successful browser report, privacy
+readiness manifest, runbook, migration checksums, project IDs and Git SHAs. A
+changed artifact requires a new seal and evidence. All three CI jobs
+(`validate`, `p03-database`, `p03-hosted-backup`) must pass. The backup job uses
+real Supabase extensions and the tracked isolated Compose restore with SCRAM;
+its synthetic data cannot replace the actual release-day backup/restore.
+
+Only this branch's Preview uses the approved existing Staging legal origins.
+Production origin/Clerk/database settings remain unchanged during preparation.
 
 ## Quiet window
 
@@ -103,8 +118,8 @@ retry around the guard. Re-establish a quiet window, backup and gate.
 Work from the isolated candidate checkout. Store private artifacts outside Git
 in a new access-restricted directory. The examples use `$releaseDir`, which the
 operator sets to that directory; it must contain no pre-existing output files.
-Load connection credentials securely before running commands. Before release day,
-create the final seal using the exact config and `seal` command in
+Load connection credentials securely before running commands. After the dated
+candidate has fresh CI and Preview evidence, create the final seal using the exact config and `seal` command in
 [release tools](../scripts/p03-release/README.md#seal-and-final-read-only-gate),
 and place that approved seal at `$releaseDir/release-seal.json`.
 
@@ -182,8 +197,14 @@ current pairing, TBD slots, result/replay controls, dice, admin workspace and
 deadlines while Match Room remains OFF. Read-only queries must confirm OFF and no
 manufactured historical room. Stop if auth or any tournament flow is broken.
 
-Only after all checks and the approved privacy decision, an authenticated admin
-opens `/admin/system`, finds **Match Room activity**, and selects **Enable Match
+While Match Room remains OFF, execute the separately reviewed Privacy 1.3
+forward publication transaction using the [legal successor procedure](p03-privacy-successor-runbook.md).
+Verify the effective document identity/hash, genuine current-account acceptance,
+unchanged historical acceptances, and the exact date-bound compatible deployment.
+The schema package itself does not activate legal documents. A current Privacy
+1.2 register is insufficient for the ON checkpoint.
+
+Only after all those checks, an authenticated admin opens `/admin/system`, finds **Match Room activity**, and selects **Enable Match
 Room activity**. Confirm the saved Enabled state. Test two consenting actual
 participants in their current eligible pairing: send/read, exact-room notification,
 orange unread Match card, assistance and admin access. Completed historical

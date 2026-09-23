@@ -77,10 +77,10 @@ try {
   }
   migrating.child.stdin.end("commit;\n");
   assert.equal((await migrating.done).code, 0, migrating.stderr);
-  pass("six migration boundaries expose no RPC/table/setting to external authenticated or service-role callers before atomic commit");
+  pass("seven migration boundaries expose no RPC/table/setting to external authenticated or service-role callers before atomic commit");
   assert.equal(await client.run(fingerprint), before);
   pass("partial-tournament competition fingerprint identical before and after exact package");
-  assert.equal(await client.run("select public.get_match_room_enabled()=false and (select count(*) from supabase_migrations.schema_migrations)=152 and (select count(*) from public.match_rooms)=0 and (select count(*) from public.match_room_assistance)=0;"), "t");
+  assert.equal(await client.run("select public.get_match_room_enabled()=false and (select count(*) from supabase_migrations.schema_migrations)=153 and (select count(*) from public.match_rooms)=0 and (select count(*) from public.match_room_assistance)=0;"), "t");
   pass("full package remains OFF and manufactures no historical room, conversation or assistance");
   assert.equal(project(await client.run(auth(`select public.resolve_match_room('${id(301)}');`))).room, null);
   await denied(auth(`select public.send_match_room_message('${id(301)}','${id(999)}','${id(998)}','blocked');`), "P0001");
