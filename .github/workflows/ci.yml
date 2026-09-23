@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Use Node.js 22.12.0
         uses: actions/setup-node@v4
@@ -61,17 +63,24 @@ jobs:
         run: npm run build
 
   p03-database:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Use Node.js 22.12.0
         uses: actions/setup-node@v4
         with:
           node-version: 22.12.0
       - name: Install PostgreSQL 17
-        run: sudo apt-get update && sudo apt-get install -y postgresql-17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17
       - name: Start disposable loopback-only PostgreSQL
         run: |
           /usr/lib/postgresql/17/bin/initdb -D "$RUNNER_TEMP/p03-postgres" -U postgres -A trust --no-locale --encoding=UTF8
@@ -93,4 +102,36 @@ jobs:
         run: node scripts/p03-db/rehearse-executor.mjs /usr/lib/postgresql/17/bin/psql
       - name: Stop disposable PostgreSQL
         if: always()
-        run: /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-postgres" -m fast -w stop
+        run: |
+          if [ -f "$RUNNER_TEMP/p03-postgres/postmaster.pid" ]; then
+            /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-postgres" -m fast -w stop
+          fi
+
+  p03-hosted-backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use Node.js 22.12.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+      - name: Rehearse full backup with real Supabase extensions
+        run: node scripts/p03-release/rehearse-hosted-runtime.mjs
+      - name: Save non-sensitive synthetic rehearsal evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: p03-hosted-backup-evidence
+          path: test-results/p03-hosted-backup-evidence.json
+          if-no-files-found: error
+          retention-days: 14

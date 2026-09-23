@@ -83,6 +83,47 @@ Application rollback does not revert the database. Normal containment is Match
 Room OFF and a forward repair; destructive restoration is an independently
 approved recovery operation.
 
+## GitHub CI rehearsal with real Supabase extensions
+
+`rehearse-hosted-runtime.mjs` runs only on a GitHub Actions Linux runner using
+that runner's local Docker daemon. It creates two fresh clusters from the
+observed Supabase PostgreSQL image, installs all seven actual extension versions,
+replays the 146 original baseline migrations without suppressing extension SQL,
+and seeds the representative tournament. Only Auth/Storage metadata is synthetic;
+cron, pg_net, Vault, pgcrypto and other extension objects are genuine. The exact
+backup/restore functions then compare the full schema, extension inventory and
+22 competition tables. Neither container can access external networks and cron
+execution is disabled. It cleans up only its uniquely named containers/network.
+
+This can verify the runtime on CI even when the workstation lacks Docker. Its
+status remains unverified until the job passes. It does not substitute for the
+actual release-day Production dump/restore or external encryption-key recovery.
+Only the small evidence JSON may be uploaded; never upload the logical archive.
+The recommended independent CI job is:
+
+```yaml
+p03-hosted-backup:
+  runs-on: ubuntu-latest
+  timeout-minutes: 20
+  steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22.12.0
+    - name: Install PostgreSQL 17 client
+      run: sudo apt-get update && sudo apt-get install -y postgresql-client-17
+    - name: Rehearse full logical backup with real Supabase extensions
+      env:
+        P03_PG_BIN: /usr/lib/postgresql/17/bin
+      run: node scripts/p03-release/rehearse-hosted-runtime.mjs
+    - name: Save non-sensitive synthetic rehearsal evidence
+      uses: actions/upload-artifact@v4
+      with:
+        name: p03-hosted-backup-evidence
+        path: test-results/p03-hosted-backup-evidence.json
+        if-no-files-found: error
+```
+
 ## Fingerprints
 
 ```powershell

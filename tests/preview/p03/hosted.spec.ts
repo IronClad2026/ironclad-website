@@ -25,11 +25,14 @@ function hostedCase(id: string, check: (browser: Browser) => Promise<void>) {
       await verifyLegalOrigins();
       await verifyPairing();
       await check(browser);
-      await verifyCompetitionUnchanged();
     } catch (error) {
       failed = true;
       if (error instanceof Error && error.message.startsWith("BLOCKED:")) blocked = error.message;
     } finally {
+      try { await verifyCompetitionUnchanged(); } catch {
+        failed = true;
+        blocked = "BLOCKED: competition facts changed or could not be rechecked; STOP.";
+      }
       // Close before reporting any failure: no DOM snapshots, credentials,
       // session cookies, message text or private proof links may reach artifacts.
       await closeViewers();
@@ -124,12 +127,14 @@ hostedCase("send-read", async (browser) => {
 });
 
 hostedCase("notification", async (browser) => {
-  const { recipient } = await sendForUnread(browser);
+  const { recipient, body } = await sendForUnread(browser);
   await recipient.goto(`${loadTarget().previewUrl}/dashboard`, { waitUntil: "domcontentloaded" });
-  await expect(recipient.getByText("New Match Room message", { exact: true }).first()).toBeVisible();
-  // The room-return link must select this match; no raw message preview is used.
-  const destination = recipient.locator(`a[href*="match=${fixture.currentMatchId}"]`).first();
-  await expect(destination).toHaveAttribute("href", /room=/);
+  // Player notifications navigate through a button to the resolved room.
+  const notification = recipient.getByRole("button", { name: /New Match Room message/ }).first();
+  await expect(notification).toBeVisible();
+  await notification.click();
+  await expect(recipient).toHaveURL((url) => url.searchParams.get("match") === fixture.currentMatchId && Boolean(url.searchParams.get("room")));
+  await expect(room(recipient).getByText(body, { exact: true })).toBeVisible();
 });
 
 hostedCase("assistance", async (browser) => {
@@ -152,8 +157,16 @@ hostedCase("assistance", async (browser) => {
 });
 
 hostedCase("result-replay", async (browser) => {
+  const facts = await verifyPairing();
   const page = await currentViewer(browser);
   const dialog = page.getByRole("dialog");
+  if (!facts.deadline_at || Date.parse(String(facts.deadline_at)) <= Date.now()) {
+    await expect(dialog.getByRole("button", { name: "Won", exact: true })).toHaveCount(0);
+    throw new Error("BLOCKED: reserved fixture result deadline is expired; result/replay draft coverage requires an approved open-deadline fixture.");
+  }
+  if (facts.hold_started_at && !facts.hold_released_at) {
+    throw new Error("BLOCKED: reserved fixture is on hold; result/replay draft coverage is unavailable.");
+  }
   await dialog.getByRole("button", { name: "Won", exact: true }).click();
   await dialog.getByRole("combobox", { name: "Score", exact: true }).selectOption("2-1");
   await expect(dialog.getByLabel("Game 1 replay", { exact: true })).toBeAttached();
