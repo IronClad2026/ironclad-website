@@ -33,10 +33,12 @@ be restored into ordinary PostgreSQL. The observed hosted extension versions are
 in `production-extensions.json`. Prepare a dedicated compatible runtime first.
 The supplied Compose file pins `supabase/postgres:17.6.1.127`, publishes no ports,
 uses an internal network with no outbound access, and disables cron execution.
-The current preparation host has no Docker/Podman engine; this Compose runtime
-has **not** been rehearsed. Missing runtime/extension readiness is a release
-blocker, not a waived check. Do not omit managed schemas or extension data to
-make restoration pass.
+The current preparation host has no Docker/Podman engine. The equivalent
+synthetic runtime passed on GitHub CI as recorded below; this Compose variant
+with SCRAM authentication still requires its own runtime preflight and actual
+release-day restore. Missing runtime/extension readiness is a release blocker,
+not a waived check. Do not omit managed schemas or extension data to make
+restoration pass.
 
 On a Linux Docker host, set a new **local-only** `P03_RESTORE_PASSWORD`, then:
 
@@ -122,9 +124,16 @@ execution is disabled, and pg_net workers target the empty `postgres` database
 rather than either synthetic source/restore database. It cleans up only its
 uniquely named containers/network.
 
-This can verify the runtime on CI even when the workstation lacks Docker. Its
-status remains unverified until the job passes. It does not substitute for the
-actual release-day Production dump/restore or external encryption-key recovery.
+This runtime rehearsal **passed** in
+[CI run 35821984251](https://github.com/IronClad2026/ironclad-website/actions/runs/35821984251/job/107055600738)
+at candidate `a03b2f5b6fcd60cc7810d780455ba98646eac956` on 2026-09-23.
+All seven exact extension versions, 146 raw migrations, complete archive restore,
+normalized schema and 22-table competition comparison passed. The small evidence
+JSON SHA-256 is
+`e0fba09deadb9cdbed515985b1bc9236e78e9537f1f0d9857e4189230dc26633`.
+The final candidate must independently pass this job again. This evidence does
+not substitute for the actual release-day Production dump/restore or external
+encryption-key recovery.
 Only the small evidence JSON may be uploaded; never upload the logical archive.
 The authoritative job is `p03-hosted-backup` in
 [the CI workflow](../../.github/workflows/ci.yml). It checks out the exact PR head

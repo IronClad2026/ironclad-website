@@ -9,7 +9,7 @@ import {
 import { loadTarget, stagingRef } from "./target";
 import { parseFixtureReceipt } from "./fixture";
 import { verifyReceiptScope } from "./receipt-scope";
-import { validateDedicatedAdmin } from "../../../scripts/p03-preview/create-fixture.mjs";
+import { validateHostedAdmin } from "./admin-identity";
 
 const fixtureReceipt = process.env.P03_FIXTURE_FILE
   ? parseFixtureReceipt(JSON.parse(readFileSync(resolve(process.env.P03_FIXTURE_FILE), "utf8"))) : null;
@@ -198,7 +198,7 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
   if (!Array.isArray(users) || users.length !== 1) throw new Error("Clerk test identity is ambiguous.");
   const user = users[0];
   if (alias === "admin") {
-    validateDedicatedAdmin(user, email);
+    validateHostedAdmin(user, email);
   } else validateClerkFixtureUser(user, config);
   const clerkHost = Buffer.from(config.clerkPublishableKey.slice("pk_test_".length), "base64").toString("utf8").replace(/\$$/, "");
   if (!clerkHost.endsWith(".clerk.accounts.dev")) throw new Error("Unexpected Clerk Development frontend host.");
@@ -239,12 +239,13 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
     const otpFields = page.locator('input[autocomplete="one-time-code"]:visible');
     const otp = otpFields.first();
     if (await otp.isVisible()) {
-      validationPhase = "Clerk Development test verification code";
+      validationPhase = "Clerk email-code challenge preparation";
       // The field can mount before Clerk finishes preparing Device Trust.
       await page.waitForFunction(() => {
         const signIn = (window as Window & {Clerk?: {client?: {signIn?: {secondFactorVerification?: {status?: string;strategy?: string}}}}}).Clerk?.client?.signIn;
         return signIn?.secondFactorVerification?.strategy === "email_code" && signIn.secondFactorVerification.status === "unverified";
       }, undefined, { timeout: 15_000 });
+      validationPhase = "Clerk Development code input";
       // Clerk's documented reserved test-email flow sends no OTP email.
       const count = await otpFields.count();
       const maxLength = await otp.getAttribute("maxlength");
@@ -256,8 +257,18 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
         await otp.pressSequentially("424242");
       }
       const verify = page.getByRole("button", { name: /^(continue|verify)$/i }).last();
-      if (await otp.isVisible() && await verify.isVisible() && await verify.isEnabled()) await verify.click();
+      if (await otp.isVisible() && await verify.isVisible() && await verify.isEnabled()) {
+        validationPhase = "Clerk verification form submit";
+        try { await verify.click({ timeout: 3_000 }); } catch {
+          // Clerk can auto-submit the last digit and unmount Continue before
+          // the click resolves. Tolerate that race only for this verified user.
+          await page.waitForFunction((expected) =>
+            (window as Window & {Clerk?: {user?: {id?: string}}}).Clerk?.user?.id === expected,
+          user.id, { timeout: 10_000 });
+        }
+      }
     }
+    validationPhase = "Clerk authenticated session";
     await page.waitForFunction(() => Boolean((window as Window & {Clerk?: {user?: {id?: string}}}).Clerk?.user?.id)).catch(async () => {
       const signals = await page.evaluate(() => {
         const clerk = (window as Window & {Clerk?: {client?: {signIn?: {status?: string}}}}).Clerk;
