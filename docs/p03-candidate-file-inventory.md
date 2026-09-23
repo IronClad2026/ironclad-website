@@ -280,7 +280,7 @@ Combines `git diff --name-status <baseline>` and non-ignored untracked paths. Ig
 
 Every tracked baseline path outside the candidate inventory remains inherited.
 All 146 baseline migration files are untouched; the migration delta contains
-only the six additions above. The following specifically audited baseline paths
+only the seven additions above. The following specifically audited baseline paths
 have **no diff** against `0f23d7d906c8588de3051fd9a7cdcf218a576ab3`:
 
 - `app/api/polls/route.ts`
