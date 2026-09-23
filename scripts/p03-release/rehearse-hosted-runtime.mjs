@@ -57,6 +57,15 @@ exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directorie
   run("docker", ["run", "--detach", "--name", name, "--network", network, "--publish", `127.0.0.1:${port}:5432`, "--user", "postgres", "--entrypoint", "sh", image, "-c", shell]);
   created.push(name);
   const admin = connection(localEnvironment(port, "postgres", name));
+  let initialized = false;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    try {
+      run("docker", ["exec", name, "psql", "-X", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", "select 1;"]);
+      run("docker", ["exec", name, "createdb", "-h", "/tmp", "-U", "postgres", "--template=template0", database]);
+      initialized = true;
+      break;
+    } catch { await sleep(1000); }
+  }
   let ready = false;
   for (let attempt = 0; attempt < 40; attempt++) {
     try { readOnlySql(admin, "select 1;"); ready = true; break; } catch { await sleep(1000); }
@@ -68,9 +77,11 @@ exec postgres -D /tmp/p03-data -c listen_addresses='*' -c unix_socket_directorie
     // credentials. Bounded startup diagnostics are safe to expose in CI logs.
     const logs = spawnSync("docker", ["logs", "--tail", "35", name], { encoding: "utf8", timeout: 10000, maxBuffer: 16384 });
     console.error(`${logs.stdout ?? ""}${logs.stderr ?? ""}`.slice(-4096));
+    const probe = spawnSync(admin.bin("psql"), ["-X", "--no-password", "-qAt", "-c", "select 1;"], { env: admin.env, encoding: "utf8", timeout: 10000, maxBuffer: 4096 });
+    console.error(JSON.stringify({ initializedThroughLocalSocket: initialized, clientError: probe.error?.code, clientStatus: probe.status, clientDiagnostic: probe.stderr?.slice(-2048) }));
   }
   assert(ready, "Disposable container did not become ready within the startup bound");
-  sql(admin, `create database ${database} template template0;`);
+  assert(initialized, "Dedicated database was not created through the container-local socket");
   return connection(localEnvironment(port, database, name));
 }
 

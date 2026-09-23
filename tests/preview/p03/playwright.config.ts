@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { resolve } from "node:path";
 import { loadTarget } from "./target";
 
 // Avoid Playwright copying private authenticated DOM into error-context.md.
@@ -14,6 +15,6 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   metadata: target,
   outputDir: "../../../test-results/p03-preview",
-  reporter: [["json", { outputFile: "test-results/p03-preview-report.json" }]],
+  reporter: [["json", { outputFile: resolve("test-results/p03-preview-report.json") }]],
   use: { baseURL: target.previewUrl, locale: "en-US", trace: "off", screenshot: "off", video: "off" },
 });

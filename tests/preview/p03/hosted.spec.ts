@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import {
-  closeViewers, createViewer, findOnePlayerFixture, fixture, gotoBracket,
-  matchFacts, stagingRead, verifyCompetitionUnchanged, verifyLegalOrigins, verifyPairing,
+  closeViewers, createViewer, findOnePlayerFixture, fixture, getValidationPhase, gotoBracket,
+  matchFacts, stagingRead, verifyCompetitionUnchanged, verifyLegalOrigins, verifyPairing, verifyPreviewReachability,
 } from "./runtime";
 import { loadTarget } from "./target";
 
@@ -21,6 +21,7 @@ function hostedCase(id: string, check: (browser: Browser) => Promise<void>) {
     let blocked = "";
     try {
       // Viewing a current room can itself resolve a room or acknowledge reads.
+      await verifyPreviewReachability(browser);
       communicationAuthorized();
       await verifyLegalOrigins();
       await verifyPairing();
@@ -37,7 +38,7 @@ function hostedCase(id: string, check: (browser: Browser) => Promise<void>) {
       // session cookies, message text or private proof links may reach artifacts.
       await closeViewers();
     }
-    if (failed) throw new Error(blocked || `Hosted P03 ${id} verification failed. Inspect interactively without exporting private session data.`);
+    if (failed) throw new Error(blocked || `Hosted P03 ${id} verification failed at ${getValidationPhase()}. Inspect interactively without exporting private session data.`);
   });
 }
 

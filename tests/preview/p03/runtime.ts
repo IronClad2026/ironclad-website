@@ -16,8 +16,11 @@ export const fixture = {
   secondAlias: "TestChallenge3",
 };
 export const contexts = new Set<BrowserContext>();
+let validationPhase = "preflight";
+export const getValidationPhase = () => validationPhase;
 const sessions = new Map<string, Awaited<ReturnType<BrowserContext["storageState"]>>>();
 const safeStates = new Map<string, Record<string, unknown>>();
+let previewAccessState: Awaited<ReturnType<BrowserContext["storageState"]>> | undefined;
 let environmentPromise: Promise<Record<string, string | undefined>> | undefined;
 
 async function environment() {
@@ -106,6 +109,60 @@ export async function verifyLegalOrigins() {
   }
 }
 
+export async function verifyPreviewReachability(browser: Browser) {
+  const target = loadTarget();
+  if (process.env.P03_PREVIEW_ACCESS_URL_FILE && !previewAccessState) {
+    const access = JSON.parse(await readFile(resolve(process.env.P03_PREVIEW_ACCESS_URL_FILE), "utf8"));
+    const url = new URL(access.url);
+    const issued = Date.parse(access.issuedAt);
+    const expires = Date.parse(access.expiresAt);
+    if (access.previewUrl !== target.previewUrl || url.origin !== target.previewUrl ||
+      url.pathname !== "/" || url.username || url.password || url.hash ||
+      [...url.searchParams.keys()].some((key) => key !== "_vercel_share") ||
+      !url.searchParams.get("_vercel_share") || !Number.isFinite(issued) || !Number.isFinite(expires) ||
+      issued > Date.now() || expires <= Date.now() || expires - issued > 23 * 60 * 60 * 1000 + 1000) {
+      throw new Error("BLOCKED: temporary Preview access does not match this deployment or has expired.");
+    }
+    const bootstrap = await browser.newContext();
+    try {
+      let destination = url.toString();
+      let reached = false;
+      for (let redirect = 0; redirect < 5; redirect++) {
+        const response = await bootstrap.request.get(destination, { maxRedirects: 0, timeout: 15_000 });
+        const next = response.headers().location;
+        if (next && response.status() >= 300 && response.status() < 400) {
+          const nextUrl = new URL(next, target.previewUrl);
+          if (nextUrl.origin !== target.previewUrl) throw new Error("Temporary Preview access was rejected.");
+          destination = nextUrl.toString();
+          continue;
+        }
+        reached = response.ok();
+        break;
+      }
+      if (!reached) throw new Error("Temporary Preview access was rejected.");
+      const state = await bootstrap.storageState();
+      if (!state.cookies.length || state.cookies.some((cookie) => cookie.domain.replace(/^\./, "") !== new URL(target.previewUrl).hostname)) {
+        throw new Error("Temporary Preview access cookie scope is invalid.");
+      }
+      previewAccessState = state;
+    } catch {
+      throw new Error("BLOCKED: temporary exact-Preview access could not establish a protected browser session.");
+    } finally { await bootstrap.close(); }
+  }
+  if (previewAccessState) return;
+  const bypass = process.env.P03_VERCEL_BYPASS_SECRET;
+  const response = await fetch(target.previewUrl + "/sign-in", {
+    redirect: "manual", signal: AbortSignal.timeout(20_000),
+    headers: bypass ? { "x-vercel-protection-bypass": bypass } : {},
+  });
+  const location = response.headers.get("location");
+  const redirected = location ? new URL(location, target.previewUrl) : null;
+  if ([401, 403].includes(response.status) || (redirected && redirected.origin !== target.previewUrl)) {
+    throw new Error("BLOCKED: Vercel Preview protection prevents reaching Clerk; supply an approved Preview-only automation bypass.");
+  }
+  if (response.status >= 400) throw new Error("The candidate Preview sign-in route is unavailable.");
+}
+
 export async function createViewer(browser: Browser, alias: string, width = 1280) {
   const target = loadTarget();
   const env = await environment();
@@ -119,6 +176,7 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
     password = credentials.P03_ADMIN_PASSWORD;
     if (!email || !password || !email.includes("+clerk_test")) throw new Error("Admin credentials must identify an approved Clerk test account.");
   }
+  validationPhase = "Clerk test identity lookup";
   const usersResponse = await fetch(`https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email)}`, {
     headers: { Authorization: `Bearer ${config.clerkSecretKey}` }, signal: AbortSignal.timeout(20_000),
   });
@@ -133,8 +191,10 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
   } else validateClerkFixtureUser(user, config);
   const clerkHost = Buffer.from(config.clerkPublishableKey.slice("pk_test_".length), "base64").toString("utf8").replace(/\$$/, "");
   if (!clerkHost.endsWith(".clerk.accounts.dev")) throw new Error("Unexpected Clerk Development frontend host.");
-  const context = await browser.newContext({ viewport: { width, height: 844 }, locale: "en-US", storageState: sessions.get(alias) });
+  const context = await browser.newContext({ viewport: { width, height: 844 }, locale: "en-US", storageState: sessions.get(alias) ?? previewAccessState });
   contexts.add(context);
+  context.setDefaultTimeout(20_000);
+  context.setDefaultNavigationTimeout(25_000);
   await context.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -149,20 +209,41 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
   });
   const page = await context.newPage();
   if (!sessions.has(alias)) {
+    validationPhase = "Preview sign-in navigation";
     await page.goto(`${target.previewUrl}/sign-in`, { waitUntil: "domcontentloaded" });
     const identifier = page.locator('input[name="identifier"], input[type="email"]').first();
+    validationPhase = "Clerk identifier form";
     await identifier.fill(email);
     const passwordField = page.locator('input[type="password"]').first();
     if (!(await passwordField.isVisible())) await page.getByRole("button", { name: /^continue$/i }).click();
+    validationPhase = "Clerk password form";
     await passwordField.fill(password);
     await page.getByRole("button", { name: /^continue$|^sign in$/i }).last().click();
+    validationPhase = "Clerk authenticated session";
+    await page.waitForFunction(() => {
+      const signedIn = Boolean((window as Window & {Clerk?: {user?: {id?: string}}}).Clerk?.user?.id);
+      const otp = document.querySelector<HTMLInputElement>('input[autocomplete="one-time-code"]');
+      return signedIn || Boolean(otp && otp.getClientRects().length);
+    }, undefined, { timeout: 10_000 }).catch(() => {});
+    const otp = page.locator('input[autocomplete="one-time-code"]:visible').first();
+    if (await otp.isVisible()) {
+      validationPhase = "Clerk Development test verification code";
+      // Clerk's documented reserved test-email flow sends no OTP email.
+      await otp.fill("424242");
+    }
     await page.waitForFunction(() => Boolean((window as Window & {Clerk?: {user?: {id?: string}}}).Clerk?.user?.id));
-    const verified = await page.evaluate(() => {
-      const clerk = (window as Window & {Clerk?: {user?: {id?: string;publicMetadata?: {role?: string}}}}).Clerk;
-      return { id: clerk?.user?.id, role: clerk?.user?.publicMetadata?.role };
+    const verified = await page.evaluate(async () => {
+      const clerk = (window as Window & {Clerk?: {
+        user?: {id?: string;publicMetadata?: {role?: string}};
+        session?: {getToken: () => Promise<string | null>};
+      }}).Clerk;
+      const token = await clerk?.session?.getToken();
+      const payload = token ? JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))) : {};
+      return { id: clerk?.user?.id, role: clerk?.user?.publicMetadata?.role, claimRole: payload.metadata?.role };
     });
-    if (verified.id !== user.id || (alias === "admin" && verified.role !== "admin")) throw new Error("The browser authenticated the wrong test identity.");
+    if (verified.id !== user.id || (alias === "admin" && (verified.role !== "admin" || verified.claimRole !== "admin"))) throw new Error("The browser authenticated the wrong test identity.");
     sessions.set(alias, await context.storageState());
+    validationPhase = "authenticated Preview application";
   }
   return page;
 }
