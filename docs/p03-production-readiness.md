@@ -87,7 +87,7 @@ Logical backup is not PITR and excludes Storage object bytes, Clerk state and
 external encryption roots. Actual Production archive restoration and the
 release-day disposable runtime still must pass immediately before release.
 
-Twenty-one focused release-tool unit tests passed, including fail-closed gate
+Twenty-three focused release-tool unit tests passed, including fail-closed gate
 receipts. The final gate binds clean Git state, live master, ledger/dependencies,
 exact package, all three CI jobs, immutable READY Preview, hosted browser coverage,
 privacy decision, fresh backup/restore evidence and stable competition facts.
@@ -131,7 +131,7 @@ Executed locally: `npm ci`, `npm run lint`, `npx tsc --noEmit --incremental fals
 `tests/browser/match-result`. Their completed baseline counts were 3,526 unit
 and integration tests, 60 bracket browser cases, 15 Match Room cases, and seven
 result/replay cases. New preparation coverage adds 29 receipt parser tests, nine dedicated-admin
-identity tests, and two Docker attestation tests, plus 28 standalone fixture
+identity tests, two Docker attestation tests, and two native Playwright-report format tests, plus 28 standalone fixture
 guard tests. The PR
 records the final exact-SHA CI results, including any subsequently added tests.
 

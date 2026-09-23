@@ -48,7 +48,10 @@ node scripts/p03-preview/create-fixture.mjs --run-id 20260923-reviewed-unique
 
 All eight Clerk identities, their private Staging provenance, database identity
 links, five active 1v1 maps, absent run slug, and zero push subscriptions must
-pass. The authoritative `save_tournament` RPC checks Main ranked-cycle
+pass. Read-only Staging metadata inspection confirmed service-role SELECT on
+the twelve remaining read tables, including `account_legal_acceptances`,
+`push_subscriptions` and `notifications`; no table grants were added.
+The authoritative `save_tournament` RPC checks Main ranked-cycle
 availability under its advisory lock at creation time.
 
 After the holds are resolved, a reviewer records fresh worker evidence in a
@@ -86,7 +89,13 @@ bracket, launches it, and finalizes quarterfinals 1–3 through the existing
 official-result RPC. The scores, selected from each match's actual best-of
 format, are explicitly synthetic test outcomes. This leaves a current
 TestMain1/TestMain3 semifinal, a one-player/TBD semifinal, completed
-quarterfinals, and an empty final. No room history is manufactured.
+quarterfinals, and an empty final. The creator invokes no Match Room RPC and
+performs no direct read of private communication tables. Service-role SELECT
+on those tables is intentionally revoked; grants and schema remain unchanged.
+The receipt proves the new tournament layout, not room absence. The isolated
+database rehearsal verifies no manufactured historical rooms, while hosted UI
+validation checks that completed and one-player/TBD matches expose no writable
+room controls. Never resolve or create a room merely to inspect its absence.
 
 ## Receipt, failure, and cleanup
 

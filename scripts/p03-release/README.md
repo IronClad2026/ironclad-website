@@ -178,9 +178,12 @@ green, write an external JSON config with:
 
 The privacy artifact must contain the actual reviewed retention/purge/account
 closure decision, not a placeholder or self-authored claim of approval.
-Playwright JSON must carry `metadata.candidateSha`, `metadata.previewUrl`,
-`metadata.supabaseProjectRef`, and all `[p03:...]` scenario markers from
+Native Playwright JSON must carry `config.metadata.candidateSha`,
+`config.metadata.previewUrl`, `config.metadata.supabaseProjectRef`, and all
+`[p03:...]` scenario markers from
 `BROWSER_CASES` in `gate.mjs`, with no skipped, flaky or failed checks.
+Playwright's additional `config.metadata.actualWorkers` is allowed. Alternate
+top-level `metadata` is rejected rather than used as a fallback.
 
 ```powershell
 node scripts/p03-release/cli.mjs seal --config C:/Private/P03/config.json --out C:/Private/P03/seal.json

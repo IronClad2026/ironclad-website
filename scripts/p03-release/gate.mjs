@@ -9,7 +9,9 @@ const packageSummary = (root) => verifyPackage(root).map(({ file, version, name,
 export const BROWSER_CASES = ["login", "bracket", "completed-match", "current-match", "one-player-tbd", "match-room", "unread-card", "send-read", "notification", "assistance", "result-replay", "admin-workspace", "mobile-375", "mobile-390"];
 
 export function validateBrowserReport(report, config) {
-  invariant(report.metadata?.candidateSha === config.candidateSha && report.metadata?.previewUrl === config.previewUrl && report.metadata?.supabaseProjectRef === STAGING_REF, "Browser report candidate/Preview/test database binding differs.");
+  invariant(!Object.hasOwn(report, "metadata"), "Browser report must use native config.metadata; alternate top-level metadata is forbidden.");
+  const metadata = report.config?.metadata;
+  invariant(metadata?.candidateSha === config.candidateSha && metadata?.previewUrl === config.previewUrl && metadata?.supabaseProjectRef === STAGING_REF, "Browser report candidate/Preview/test database binding differs.");
   invariant(report.stats?.unexpected === 0 && report.stats?.skipped === 0 && report.stats?.flaky === 0 && report.stats?.expected >= BROWSER_CASES.length && report.errors?.length === 0, "Browser report has missing, failed, skipped, or flaky tests.");
   const specs = [];
   function visit(suite) { specs.push(...(suite.specs ?? [])); for (const child of suite.suites ?? []) visit(child); }

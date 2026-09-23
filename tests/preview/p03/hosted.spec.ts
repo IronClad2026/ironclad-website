@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import {
   closeViewers, createViewer, findOnePlayerFixture, fixture, getValidationPhase, gotoBracket,
-  matchFacts, stagingRead, verifyCompetitionUnchanged, verifyLegalOrigins, verifyPairing, verifyPreviewReachability,
+  matchFacts, setValidationPhase, verifyCompetitionUnchanged, verifyLegalOrigins, verifyPairing, verifyPreviewReachability,
 } from "./runtime";
 import { loadTarget } from "./target";
 
@@ -60,9 +60,11 @@ async function sendForUnread(browser: Browser) {
   await gotoBracket(recipient);
   await expect(card(recipient)).toBeVisible();
   const body = `P03 isolated Preview validation ${randomUUID()}`;
+  setValidationPhase("synthetic fixture message send");
   await room(sender).getByRole("textbox", { name: "Message", exact: true }).fill(body);
   await room(sender).getByRole("button", { name: "Send", exact: true }).click();
   await expect(room(sender).getByRole("textbox", { name: "Message", exact: true })).toHaveValue("");
+  setValidationPhase("recipient unread fixture card");
   await expect(card(recipient)).toHaveAttribute("data-match-room-unread", "opponent", { timeout: 30_000 });
   return { sender, recipient, body };
 }
@@ -87,10 +89,14 @@ hostedCase("completed-match", async (browser) => {
   expect(before.status).toBe("completed");
   const page = await createViewer(browser, fixture.firstAlias);
   await gotoBracket(page, fixture.completedMatchId, fixture.completedTournamentId);
+  setValidationPhase("completed match read-only workspace");
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send", exact: true })).toHaveCount(0);
+  const composer = page.getByRole("textbox", { name: "Message", exact: true });
+  if (await composer.count()) await expect(composer).not.toBeEditable();
   expect(await matchFacts(fixture.completedMatchId)).toEqual(before);
-  expect(await stagingRead("match_rooms", `match_id=eq.${fixture.completedMatchId}&select=id&limit=10`)).toHaveLength(0);
+  // Existing historical rooms may be read-only. Database rehearsal separately
+  // proves that viewing history cannot manufacture a writable room.
 });
 
 hostedCase("current-match", async (browser) => {
@@ -108,7 +114,9 @@ hostedCase("one-player-tbd", async (browser) => {
   await gotoBracket(page);
   await expect(card(page, matchId)).toBeVisible();
   await expect(card(page, matchId)).toContainText(/TBD|to be determined/i);
-  expect(await stagingRead("match_rooms", `match_id=eq.${matchId}&select=id&limit=10`)).toHaveLength(0);
+  setValidationPhase("one-player TBD has no writable room UI");
+  await expect(card(page, matchId).locator("[data-match-room-action]")).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toHaveCount(0);
 });
 
 hostedCase("match-room", async (browser) => {
@@ -135,11 +143,21 @@ hostedCase("send-read", async (browser) => {
 hostedCase("notification", async (browser) => {
   const { recipient, body } = await sendForUnread(browser);
   await recipient.goto(`${loadTarget().previewUrl}/dashboard`, { waitUntil: "domcontentloaded" });
-  // Player notifications navigate through a button to the resolved room.
+  setValidationPhase("dashboard notification center");
+  const center = recipient.locator("aside").filter({ has: recipient.locator("button[aria-expanded]") }).first();
+  await expect(center).toBeVisible();
+  // Not now only dismisses this render; Continue would persist badge acknowledgement.
+  const notNow = recipient.locator("[data-reveal-phase]").getByRole("button", { name: "Not now", exact: true });
+  if (await notNow.isVisible()) await notNow.click();
+  const expand = center.locator("button[aria-expanded]").first();
+  if (await expand.getAttribute("aria-expanded") === "false") await expand.click();
+  // The complete list includes older coalesced room notifications.
   const notification = recipient.getByRole("button", { name: /New Match Room message/ }).first();
   await expect(notification).toBeVisible();
+  setValidationPhase("fixture notification room navigation");
   await notification.click();
   await expect(recipient).toHaveURL((url) => url.searchParams.get("match") === fixture.currentMatchId && Boolean(url.searchParams.get("room")));
+  setValidationPhase("fixture notification message context");
   await expect(room(recipient).getByText(body, { exact: true })).toBeVisible();
 });
 
@@ -147,10 +165,10 @@ hostedCase("assistance", async (browser) => {
   // Verify admin access before creating an assistance request that needs cleanup.
   const admin = await createViewer(browser, "admin");
   const participant = await currentViewer(browser);
-  const existing = await stagingRead("match_rooms", `match_id=eq.${fixture.currentMatchId}&closed_at=is.null&select=id&limit=2`);
-  expect(existing).toHaveLength(1);
-  const state = await stagingRead("match_room_assistance", `room_id=eq.${existing[0].id}&select=status&limit=1`);
-  if (state[0]?.status === "requested") throw new Error("BLOCKED: an existing fixture assistance request must be preserved.");
+  setValidationPhase("existing fixture assistance state");
+  if (await room(participant).getByText("Assistance requested", { exact: true }).isVisible()) {
+    throw new Error("BLOCKED: an existing fixture assistance request must be preserved.");
+  }
   await room(participant).getByRole("button", { name: /^(Request Admin Assistance|Request assistance again)$/ }).click();
   await expect(room(participant).getByText("Assistance requested", { exact: true })).toBeVisible();
   await gotoBracket(admin, fixture.currentMatchId);

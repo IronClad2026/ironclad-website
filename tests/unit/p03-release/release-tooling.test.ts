@@ -143,10 +143,23 @@ describe("restore schema verification", () => {
 
 describe("Preview evidence", () => {
   const config = { candidateSha: "a".repeat(40), previewUrl: "https://candidate.vercel.app" };
-  const report = () => ({ metadata: { ...config, supabaseProjectRef: "zzbnneprhjicmajpjkdg" }, stats: { unexpected: 0, skipped: 0, flaky: 0, expected: 14 }, errors: [], suites: [{ specs: BROWSER_CASES.map((name: string) => ({ title: `[p03:${name}]`, ok: true, tests: [{ status: "expected", results: [{ status: "passed" }] }] })) }] });
-  it("requires real successful results for every named browser scenario", () => { expect(() => validateBrowserReport(report(), config)).not.toThrow(); });
+  // Native Playwright JSON places user metadata and actualWorkers in config.
+  const report = () => ({ config: { metadata: { ...config, supabaseProjectRef: "zzbnneprhjicmajpjkdg", actualWorkers: 1 }, workers: 1 }, stats: { startTime: "2026-09-23T05:27:00.512Z", duration: 261085, unexpected: 0, skipped: 0, flaky: 0, expected: 14 }, errors: [], suites: [{ title: "hosted.spec.ts", specs: BROWSER_CASES.map((name: string) => ({ title: `[p03:${name}]`, ok: true, tests: [{ status: "expected", results: [{ status: "passed" }] }] })) }] });
+  it("accepts native Playwright config.metadata and successful results for every scenario", () => { expect(() => validateBrowserReport(report(), config)).not.toThrow(); });
+  it("rejects alternate top-level metadata, including conflicting candidate evidence", () => {
+    const native = report();
+    expect(() => validateBrowserReport({ ...native, config: {}, metadata: native.config.metadata }, config)).toThrow("top-level");
+    expect(() => validateBrowserReport({ ...native, metadata: { ...native.config.metadata, candidateSha: "b".repeat(40) } }, config)).toThrow("top-level");
+    expect(() => validateBrowserReport({ ...native, config: {} }, config)).toThrow("binding");
+  });
+  it("preserves STOP for a correctly bound native report with actual failed scenarios", () => {
+    const failedRun = report();
+    failedRun.stats.expected = 8;
+    failedRun.stats.unexpected = 6;
+    expect(() => validateBrowserReport(failedRun, config)).toThrow("failed");
+  });
   it("rejects mismatched commits, missing scenarios, skipped or failed results", () => {
-    const wrong = report(); wrong.metadata.candidateSha = "b".repeat(40);
+    const wrong = report(); wrong.config.metadata.candidateSha = "b".repeat(40);
     expect(() => validateBrowserReport(wrong, config)).toThrow("binding");
     const missing = report(); missing.suites[0].specs.pop();
     expect(() => validateBrowserReport(missing, config)).toThrow("scenario");

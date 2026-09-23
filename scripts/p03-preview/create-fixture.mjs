@@ -17,7 +17,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const READ_TABLES = new Set([
   "tournaments", "tournament_brackets", "players", "coh3_maps",
   "registrations", "generated_brackets", "bracket_rounds",
-  "tournament_matches", "match_rooms", "push_subscriptions", "notifications",
+  "tournament_matches", "push_subscriptions", "notifications",
   "legal_documents", "account_legal_acceptances",
 ]);
 const WRITE_RPCS = new Set([
@@ -321,8 +321,10 @@ export async function main(args = process.argv.slice(2)) {
     Object.assign(receipt, validateFinalLayout(finalMatches, rounds, registrations));
     receipt.completedTournamentId = receipt.tournamentId;
     requireThat(receipt.firstAlias === "TestMain1" && receipt.secondAlias === "TestMain3", "current_pair_alias_mismatch");
-    requireThat((await read("match_rooms", { match_id: `in.(${finalMatches.map((row) => id(row.id)).join(",")})`, select: "id" })).length === 0,
-      "fixture_must_not_manufacture_room_history");
+    // P03 communication tables deliberately revoke service-role SELECT. Never
+    // inspect them through REST or resolve a room merely to test its absence.
+    // Database rehearsal proves absent historical rooms; hosted UI validation
+    // separately proves completed/TBD matches expose no writable room controls.
     const notifications = await read("notifications", { tournament_id: `eq.${receipt.tournamentId}`, select: "recipient_clerk_user_id,recipient_role" });
     requireThat(notifications.every((row) => row.recipient_role === "player" && actors.some((actor) => actor.clerkId === row.recipient_clerk_user_id)),
       "notification_recipient_outside_test_cohort");

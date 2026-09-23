@@ -24,6 +24,7 @@ export const fixture = fixtureReceipt ?? {
 export const contexts = new Set<BrowserContext>();
 let validationPhase = "preflight";
 export const getValidationPhase = () => validationPhase;
+export const setValidationPhase = (phase: string) => { validationPhase = phase; };
 const sessions = new Map<string, Awaited<ReturnType<BrowserContext["storageState"]>>>();
 const safeStates = new Map<string, Record<string, unknown>>();
 let previewAccessState: Awaited<ReturnType<BrowserContext["storageState"]>> | undefined;
@@ -38,7 +39,7 @@ async function environment() {
 }
 
 export async function stagingRead(table: string, query: string) {
-  if (!["tournaments", "tournament_brackets", "tournament_matches", "generated_brackets", "registrations", "match_rooms", "match_messages", "match_room_reads", "match_room_assistance", "legal_documents", "platform_settings"].includes(table)) {
+  if (!["tournaments", "tournament_brackets", "tournament_matches", "generated_brackets", "registrations", "legal_documents", "platform_settings"].includes(table)) {
     throw new Error("Hosted validation table is outside the bounded read scope.");
   }
   const env = await environment();
@@ -257,15 +258,17 @@ export async function createViewer(browser: Browser, alias: string, width = 1280
         await otp.pressSequentially("424242");
       }
       const verify = page.getByRole("button", { name: /^(continue|verify)$/i }).last();
-      if (await otp.isVisible() && await verify.isVisible() && await verify.isEnabled()) {
-        validationPhase = "Clerk verification form submit";
-        try { await verify.click({ timeout: 3_000 }); } catch {
-          // Clerk can auto-submit the last digit and unmount Continue before
-          // the click resolves. Tolerate that race only for this verified user.
-          await page.waitForFunction((expected) =>
-            (window as Window & {Clerk?: {user?: {id?: string}}}).Clerk?.user?.id === expected,
-          user.id, { timeout: 10_000 });
+      validationPhase = "Clerk verification form submit";
+      try {
+        if (await otp.isVisible() && await verify.isVisible() && await verify.isEnabled({ timeout: 3_000 })) {
+          await verify.click({ timeout: 3_000 });
         }
+      } catch {
+        // Auto-submit may unmount the form during either enabled or click checks.
+        // Accept the race only after this verified user's real session exists.
+        await page.waitForFunction((expected) =>
+          (window as Window & {Clerk?: {user?: {id?: string}}}).Clerk?.user?.id === expected,
+        user.id, { timeout: 10_000 });
       }
     }
     validationPhase = "Clerk authenticated session";
