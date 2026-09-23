@@ -99,12 +99,19 @@ type LegacySubmissionRow = {
   report_group_id: string | null;
 };
 type AssistanceRow = {
+  source: "room" | "legacy";
   id: string;
   actor_display_name: string | null;
   tournament_id: string | null;
   tournament_title: string | null;
   match_id: string | null;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
+};
+
+type LegacyAssistanceRow = Omit<AssistanceRow, "source"> & {
+  event_key: string | null;
+  in_app_hidden_at: string | null;
 };
 
 type QueryResult = {
@@ -183,15 +190,20 @@ export async function loadAdminOperationsMetrics(
         .eq("status", "pending")
         .is("report_group_id", null)
         .limit(MAX_NARROW_ROWS + 1),
+      supabase.rpc("list_match_room_assistance_requests", { p_limit: MAX_NARROW_ROWS })
+        .then(({ data, error }) => assistanceQueueResult(data, error)),
+      // Pre-room requests use notification dismissal as their queue state.
+      // Filter exact room metadata below, including Phase 2 backfill notices.
       supabase
         .from("notifications")
         .select(
-          "id, actor_display_name, tournament_id, tournament_title, match_id, created_at",
+          "id, actor_display_name, tournament_id, tournament_title, match_id, created_at, metadata, event_key, in_app_hidden_at",
           { count: "exact" }
         )
         .eq("recipient_role", "admin")
         .eq("type", "match.admin_assistance_requested")
         .is("in_app_hidden_at", null)
+        .or("event_key.is.null,event_key.not.like.match-room:%")
         .limit(MAX_NARROW_ROWS + 1),
     ]);
 
@@ -204,7 +216,12 @@ export async function loadAdminOperationsMetrics(
     const allMatches = exactRows<MatchRow>(results[6]);
     const allReportGroups = exactRows<ReportGroupRow>(results[7]);
     const legacySubmissions = exactRows<LegacySubmissionRow>(results[8]);
-    const assistance = exactRows<AssistanceRow>(results[9]);
+    const assistance: AssistanceRow[] = [
+      ...exactRows<AssistanceRow>(results[9]),
+      ...exactRows<LegacyAssistanceRow>(results[10])
+        .filter(isUnscopedLegacyAssistance)
+        .map((row) => ({ ...row, source: "legacy" as const })),
+    ];
 
     return buildMetrics({
       period,
@@ -299,9 +316,9 @@ function buildMetrics(input: {
       .map((row) => row.match_id)
   );
   const matchById = new Map(matches.map((row) => [row.id, row]));
-  const launchedAssistance = assistance.filter(
-    (row) => row.match_id !== null && launchedMatchIds.has(row.match_id)
-  );
+  const allMatchById = new Map(allMatches.map((row) => [row.id, row]));
+  // Neither a reset nor unavailable Match context resolves an assistance request.
+  const activeAssistance = assistance;
   const matchTournamentId = (match: MatchRow): string | null => {
     const generated = generatedById.get(match.generated_bracket_id);
     const bracket = generated ? bracketById.get(generated.tournament_bracket_id) : null;
@@ -399,7 +416,7 @@ function buildMetrics(input: {
   const attention = buildAdminOperationsAttention({
     openDisputes: new Set(openDisputes.map((row) => row.match_id)).size,
     underAdminReview: underReviewMatchIds.size,
-    pendingAdminAssistance: launchedAssistance.length,
+    pendingAdminAssistance: activeAssistance.length,
     overdueMatchActions: overdueMatches.length,
     expiredConfirmationActions: new Set(expiredConfirmations.map((row) => row.match_id)).size,
     expiredWaitlistOffers: expiredOffers.length,
@@ -675,7 +692,7 @@ function buildMetrics(input: {
         ).size,
         openDisputes: new Set(openDisputes.map((row) => row.match_id)).size,
         underAdminReview: underReviewMatchIds.size,
-        pendingAdminAssistance: launchedAssistance.length,
+        pendingAdminAssistance: activeAssistance.length,
         overdueMatchActions: overdueMatches.length,
         activeAdminHolds: activeHolds.length,
         expiredConfirmationActions: new Set(expiredConfirmations.map((row) => row.match_id)).size,
@@ -699,8 +716,39 @@ function buildMetrics(input: {
           factualNoShowGroups.map((row) => matchWho(row.match_id, row.finalized_at as string, "Confirmed no-show"))
         ),
         adminAssistance: recentRows(
-          launchedAssistance
-            .map((row) => matchWho(row.match_id as string, row.created_at, `Admin Assistance · ${row.actor_display_name?.trim() || "Player"}`))
+          activeAssistance
+            .map((row) => {
+              if (row.source === "legacy") {
+                const match = row.match_id ? allMatchById.get(row.match_id) : undefined;
+                const tournamentId = match ? matchTournamentId(match) : null;
+                const tournament = tournamentId ? tournamentById.get(tournamentId) : undefined;
+                const params = match && tournament ? new URLSearchParams({
+                  section: "matches", match: match.id,
+                }) : null;
+                return {
+                  id: row.id,
+                  primary: "Legacy assistance request",
+                  secondary: tournament?.title ?? "Match unavailable",
+                  meta: "Requested by " + (row.actor_display_name?.trim() || "Player") +
+                    (params ? " · Review this Match, then dismiss the legacy notification in Notifications."
+                      : " · Review and dismiss the legacy notification in the Admin Notification Center."),
+                  timestamp: row.created_at,
+                  href: params && tournamentId
+                    ? "/admin/tournaments/" + encodeURIComponent(tournamentId) + "?" + params.toString()
+                    : "/admin",
+                };
+              }
+              const item = matchWho(row.match_id as string, row.created_at, "Admin Assistance · " + (row.actor_display_name?.trim() || "Player"));
+              const roomId = row.metadata?.roomId;
+              if (typeof roomId !== "string" || !row.tournament_id) return item;
+              const params = new URLSearchParams({ section: "matches", match: row.match_id as string, room: roomId });
+              return {
+                ...item,
+                id: row.id,
+                primary: "Match Room assistance",
+                href: "/admin/tournaments/" + encodeURIComponent(row.tournament_id) + "?" + params.toString(),
+              };
+            })
         ),
       },
     },
@@ -800,4 +848,41 @@ function sentenceCase(value: string): string {
 
 function roundRate(numerator: number, denominator: number): number {
   return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+/** A malformed old hint cannot identify a room; retain its safe Match-only path. */
+function isUnscopedLegacyAssistance(row: LegacyAssistanceRow): boolean {
+  const roomId = row.metadata?.roomId;
+  const hasRoomId = typeof roomId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(roomId);
+  return row.in_app_hidden_at === null &&
+    !row.event_key?.startsWith("match-room:") && !hasRoomId;
+}
+
+/** Canonical operational state; notification read/dismissal never resolves a request. */
+function assistanceQueueResult(data: unknown, error: unknown): QueryResult {
+  if (error || !data || typeof data !== "object" || Array.isArray(data)) {
+    return { data: null, count: null, error: error ?? new Error("Invalid assistance queue") };
+  }
+  const result = data as { requests?: unknown; totalCount?: unknown };
+  if (!Array.isArray(result.requests) || !Number.isSafeInteger(result.totalCount) ||
+    (result.totalCount as number) < 0 || result.requests.length !== result.totalCount) {
+    return { data: null, count: null, error: new Error("Incomplete assistance queue") };
+  }
+  const rows: AssistanceRow[] = [];
+  for (const value of result.requests) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return { data: null, count: null, error: new Error("Invalid assistance request") };
+    const row = value as Record<string, unknown>;
+    if (typeof row.roomId !== "string" || typeof row.matchId !== "string" ||
+      typeof row.tournamentId !== "string" || typeof row.tournamentTitle !== "string" ||
+      row.status !== "requested" || !Number.isSafeInteger(row.requestVersion) ||
+      (row.requestVersion as number) < 1 || typeof row.requestedAt !== "string") {
+      return { data: null, count: null, error: new Error("Invalid assistance request") };
+    }
+    rows.push({ source: "room", id: row.roomId + ":" + row.requestVersion, actor_display_name: null,
+      tournament_id: row.tournamentId, tournament_title: row.tournamentTitle,
+      match_id: row.matchId, created_at: row.requestedAt,
+      metadata: { roomId: row.roomId, requestVersion: row.requestVersion } });
+  }
+  return { data: rows, count: result.totalCount as number, error: null };
 }

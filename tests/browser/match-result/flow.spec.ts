@@ -54,9 +54,11 @@ for (const width of [360, 390, 412, 430, 1280])
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
     await expect(page.getByText(/opponent has 30 minutes/)).toBeVisible();
     await expect(page.getByText(/remaining$/)).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Open Discord Support Ticket" })
-    ).toHaveAttribute("target", "_blank");
+    const assistance = page.getByRole("button", { name: "Request Admin Assistance" });
+    await expect(assistance).toBeVisible();
+    await assistance.click();
+    await expect(page.getByText("Assistance requested", { exact: true })).toBeVisible();
+    await expect(assistance).toHaveCount(0);
     await page.screenshot({
       path: testInfo.outputPath("waiting-" + width + ".png"),
       fullPage: true,

@@ -45,5 +45,17 @@ jobs:
       - name: Unit and integration tests
         run: npm run test
 
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Match result and replay browser regression tests
+        run: npx playwright test --config tests/browser/match-result/playwright.config.ts
+
+      - name: Bracket geometry and private unread attention browser tests
+        run: npx playwright test --config tests/browser/bracket-layout/playwright.config.ts
+
+      - name: Match Room browser regression tests
+        run: npx playwright test --config tests/browser/match-room/playwright.config.ts
+
       - name: Build
         run: npm run build

@@ -14,17 +14,20 @@ vi.mock("@/components/TournamentsExperience", () => ({
   AdminMatchManagementModal: ({
     match,
     readOnly,
+    roomId,
     submissions,
     onClose,
   }: {
     match: { id: string };
     readOnly?: boolean;
+    roomId?: string | null;
     submissions: unknown[];
     onClose: () => void;
   }) => (
     <div
       role="dialog"
       data-match-id={match.id}
+      data-room-id={roomId}
       data-read-only={String(Boolean(readOnly))}
       data-submission-count={String(submissions.length)}
     >
@@ -45,6 +48,12 @@ const viewer = {
 
 describe("AdminTournamentMatches", () => {
   afterEach(cleanup);
+  it("opens a historical room link with its exact room ID", () => {
+    render(<AdminTournamentMatches tournament={makeTournament()} viewer={viewer} initialMatchId="match-1" initialRoomId="historical-room" />);
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-room-id", "historical-room");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
 
   it("renders every generated bracket match and opens the existing management modal with match-scoped results", () => {
     render(

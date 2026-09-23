@@ -1,6 +1,12 @@
 import type { CompetitionDictionary } from "@/lib/i18n/dictionaries/en/competition";
 
 const dictionary = {
+  matchRoomAttention: {
+    opponent: "상대의 새 메시지",
+    admin: "IronClad 관리자의 새 메시지",
+    generic: "매치룸 새 메시지",
+    unreadDescription: "매치룸에 읽지 않은 메시지가 있습니다. 매치를 열고 새 메시지를 읽으면 알림이 사라집니다.",
+  },
   resultUx: {
     won: "승리",
     lost: "패배",

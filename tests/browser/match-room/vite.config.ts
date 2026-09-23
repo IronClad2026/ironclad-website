@@ -1,0 +1,19 @@
+import { resolve } from "node:path";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+const root = resolve(import.meta.dirname, "../../..");
+const runtime = resolve(import.meta.dirname, "runtime.ts");
+const resultRuntime = resolve(root, "tests/browser/match-result/runtime.ts");
+export default defineConfig({
+  root, plugins: [react()],
+  resolve: { alias: [
+    { find: "@/app/tournaments/room-actions", replacement: runtime },
+    { find: "@/app/tournaments/room-unread-actions", replacement: runtime },
+    { find: "@/app/tournaments/support-actions", replacement: runtime },
+    ...["@/app/tournaments/match-actions", "@/lib/supabase-browser", "@clerk/nextjs", "next/navigation"]
+      .map((find) => ({ find, replacement: resultRuntime })),
+    { find: "@", replacement: root },
+  ] },
+  server: { host: "127.0.0.1", port: 3137, strictPort: true },
+});
+

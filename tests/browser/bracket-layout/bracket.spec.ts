@@ -23,8 +23,10 @@ async function openFixture(page: Page, size: 8 | 16, mode: BracketMode, width: n
   await page.setViewportSize({ width, height: 1000 });
   await page.goto("/tests/browser/bracket-layout/?size=" + size + "&mode=" + mode + extra);
   await expect(page.locator("html")).toHaveAttribute("data-bracket-fixture-ready", "true");
-  await expect(page.locator("[data-bracket-match]")).toHaveCount(size - 1);
-  await expect(page.locator("[data-bracket-connector]")).toHaveCount(size - 2);
+  if (!extra.includes("format=round_robin")) {
+    await expect(page.locator("[data-bracket-match]")).toHaveCount(size - 1);
+    await expect(page.locator("[data-bracket-connector]")).toHaveCount(size - 2);
+  }
   await expect(page.locator("vite-error-overlay")).toHaveCount(0);
   return async () => {
     expect(errors, "browser errors").toEqual([]);
@@ -218,3 +220,106 @@ test("resizing the same mounted bracket remeasures without replacing matches", a
   await expect(page.locator('[data-bracket-match="fixture-match-1"]').getByText("Inspect", { exact: true })).toBeVisible();
   await checkIsolation();
 });
+
+async function geometrySnapshot(page: Page) {
+  return page.evaluate(() => ({
+    cards: Array.from(document.querySelectorAll<HTMLElement>("[data-bracket-match], [data-bracket-core], [data-match-room-card]"), (element) => {
+      const rect = element.getBoundingClientRect();
+      // Keyboard focus may scroll the page to keep the action visible. Compare
+      // document-space positions so ordinary scrolling is not a layout shift.
+      return { x: rect.x + scrollX, y: rect.y + scrollY, width: rect.width, height: rect.height };
+    }),
+    paths: Array.from(document.querySelectorAll("[data-bracket-connector]"), (element) => element.getAttribute("d")),
+    pageWidth: document.documentElement.scrollWidth,
+  }));
+}
+
+async function expectUnreadActionFits(page: Page) {
+  expect(await page.locator("[data-match-room-action]").evaluateAll((actions) => actions.flatMap((element) => {
+    const box = element.getBoundingClientRect();
+    const card = element.closest("[data-match-room-card]")!;
+    const cardBox = card.getBoundingClientRect();
+    return element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1 ||
+      box.left < cardBox.left - 1 || box.right > cardBox.right + 1 ? [element.textContent] : [];
+  })), "unread action text stays inside its fixed control").toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual((await page.viewportSize())!.width);
+}
+
+for (const size of [8, 16] as const) {
+  for (const width of [1440, 375, 390]) {
+    test(size + " players unread state preserves every card and connector at " + width + "px", async ({ page }, testInfo) => {
+      const checkIsolation = await openFixture(page, size, "player", width, "&focused=1");
+      await expectGeometry(page);
+      await expect.poll(() => page.locator("[data-bracket-round]").last().evaluate((element) => Number(getComputedStyle(element.parentElement!).opacity))).toBe(1);
+      const before = await geometrySnapshot(page);
+      const own = page.locator('[data-match-room-card="fixture-match-2"]');
+      const completed = page.locator('[data-match-room-card="fixture-match-1"]');
+      for (const [source, text] of [["opponent", "New message from opponent"], ["admin", "New IronClad admin message"], ["generic", "New Match Room message"]] as const) {
+        await page.evaluate((value) => window.__bracketFixture.setUnread!(value), source);
+        await expect(own).toHaveAttribute("data-match-room-unread", source);
+        await expect(own.locator("[data-match-room-action]")).toContainText(text, { ignoreCase: true });
+        await expect(completed).not.toHaveAttribute("data-match-room-unread");
+        await expect(own.getByText("In Progress", { exact: true })).toBeVisible();
+        if (size === 16) await expect(page.locator('[data-match-room-card="fixture-match-5"]').getByText("Pending review", { exact: true })).toBeVisible();
+        await expectUnreadActionFits(page);
+        await expectGeometry(page);
+        expect(await geometrySnapshot(page), "attention styling must not move cards or connectors").toEqual(before);
+      }
+      await own.getByRole("button").first().focus();
+      await page.keyboard.press("Enter");
+      expect(await page.evaluate(() => window.__bracketFixture.selections)).toEqual(["player:fixture-match-2"]);
+      await page.screenshot({ path: testInfo.outputPath("unread-" + size + "-" + width + ".png"), fullPage: true });
+      await page.evaluate(() => window.__bracketFixture.setUnread!(null));
+      await expect(page.locator("[data-match-room-unread]")).toHaveCount(0);
+      expect(await geometrySnapshot(page)).toEqual(before);
+      await checkIsolation();
+    });
+  }
+}
+
+for (const locale of ["en", "it", "zh-CN", "ru", "es", "pt-BR", "ko", "fr"]) {
+  test(locale + " unread translations fit at 375px with long player names and reduced motion", async ({ page }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const checkIsolation = await openFixture(page, 16, "player", 375, "&unread=1&locale=" + locale);
+    await expectGeometry(page);
+    for (const source of ["opponent", "admin", "generic"] as const) {
+      await page.evaluate((value) => window.__bracketFixture.setUnread!(value), source);
+      const own = page.locator('[data-match-room-card="fixture-match-2"]');
+      await expect(own).toHaveAttribute("data-match-room-unread", source);
+      await expect(own.locator("[data-match-room-action]")).not.toBeEmpty();
+      await expectUnreadActionFits(page);
+      expect(await own.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
+      await expectGeometry(page);
+    }
+    await page.screenshot({ path: testInfo.outputPath("unread-locale-" + locale + "-375.png"), fullPage: true });
+    await checkIsolation();
+  });
+}
+
+for (const mode of ["public", "admin", "player"] as const) {
+  test(mode + " has no attention without current player participation", async ({ page }) => {
+    const checkIsolation = await openFixture(page, 8, mode, 390, "&unread=1&outsider=1");
+    await expect(page.locator("[data-match-room-unread]")).toHaveCount(0);
+    await expectGeometry(page);
+    await checkIsolation();
+  });
+}
+
+for (const width of [1440, 375, 390]) {
+  test("round robin private attention preserves card geometry and keyboard actions at " + width + "px", async ({ page }, testInfo) => {
+    const checkIsolation = await openFixture(page, 16, "player", width, "&format=round_robin");
+    await expect(page.locator("[data-match-room-card]")).toHaveCount(15);
+    const before = await geometrySnapshot(page);
+    await page.evaluate(() => window.__bracketFixture.setUnread!("opponent"));
+    const own = page.locator('[data-match-room-card="fixture-match-2"]');
+    await expect(own).toHaveAttribute("data-match-room-unread", "opponent");
+    await expect(page.locator('[data-match-room-card="fixture-match-1"]')).not.toHaveAttribute("data-match-room-unread");
+    await expectUnreadActionFits(page);
+    expect(await geometrySnapshot(page)).toEqual(before);
+    await own.getByRole("button").first().focus();
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => window.__bracketFixture.selections)).toEqual(["player:fixture-match-2"]);
+    await page.screenshot({ path: testInfo.outputPath("unread-round-robin-" + width + ".png"), fullPage: true });
+    await checkIsolation();
+  });
+}
