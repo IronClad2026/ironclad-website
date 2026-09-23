@@ -210,7 +210,8 @@ select pg_temp.mr_error(format('select public.get_match_room_history(%L,0,50)',p
 select pg_temp.mr_actor('match-room-test-4',true);
 select pg_temp.mr_error(format('select public.send_admin_match_room_message(%L,%L,%L,%L)',pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(903),'blocked'),'P0001','admin send blocked while disabled');
 select pg_temp.mr_assert(public.get_match_room_assistance(pg_temp.mr_room('ab'))->>'status'='requested','assistance evidence readable while disabled');
-select pg_temp.mr_assert(public.resolve_match_room_assistance(pg_temp.mr_room('ab'),1)->>'status'='resolved','admin can resolve existing assistance while disabled');
+select pg_temp.mr_assert((public.get_match_room_assistance(pg_temp.mr_room('ab'))->>'canResolve')::boolean=false,'admin projection disables resolution while OFF');
+select pg_temp.mr_error(format('select public.resolve_match_room_assistance(%L,1)',pg_temp.mr_room('ab')),'P0001','admin resolution blocked while disabled');
 select pg_temp.mr_error(format('select public.request_match_room_assistance(%L,1)',pg_temp.mr_room('ab')),'P0001','assistance reopening blocked while disabled');
 reset role;
 select pg_temp.mr_assert((select count(*)=1 from public.match_messages where room_id=pg_temp.mr_room('ab')),'blocked sends create no messages');
@@ -226,6 +227,8 @@ select pg_temp.mr_assert(not public.get_match_room_enabled(),'missing setting fa
 select pg_temp.mr_error('select public.set_match_room_enabled(null,''admin'')','22023','null enabled rejected');
 select pg_temp.mr_error('select public.set_match_room_enabled(true,'' '')','22023','empty setting actor rejected');
 select public.set_match_room_enabled(true,'match-room-test-4');
+set local role authenticated; select pg_temp.mr_actor('match-room-test-4',true);
+select pg_temp.mr_assert(public.resolve_match_room_assistance(pg_temp.mr_room('ab'),1)->>'status'='resolved','admin can resolve existing assistance after enable');
 set local role authenticated; select pg_temp.mr_actor('match-room-test-2');
 select pg_temp.mr_assert((public.get_match_room_history(pg_temp.mr_room('ab'),0,50)->'room'->>'writable')::boolean,'reenable restores same room writable');
 select public.mark_match_room_read(pg_temp.mr_room('ab'),1);

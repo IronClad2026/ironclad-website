@@ -1,0 +1,27 @@
+# Future LOCAL disposable runtime only. The exact image matches the observed
+# Production engine; extension preflight still verifies every version. This
+# host has no Docker engine: this runtime is prepared, not yet rehearsed.
+services:
+  postgres:
+    image: supabase/postgres:17.6.1.127
+    container_name: p03-restore-release
+    environment:
+      POSTGRES_PASSWORD: ${P03_RESTORE_PASSWORD:?Set a fresh local-only password}
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:56624:5432"
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_cron,pg_stat_statements
+      - -c
+      - cron.database_name=p03_restore_release
+      - -c
+      - cron.launch_active_jobs=off
+      - -c
+      - listen_addresses=*
+    networks:
+      - isolated
+networks:
+  isolated:
+    internal: true

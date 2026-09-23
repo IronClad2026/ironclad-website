@@ -1,0 +1,57 @@
+{
+  "recordedAt": "2026-09-23T04:36:41.249Z",
+  "postgres": "17.11",
+  "status": "PASS",
+  "suites": [
+    {
+      "name": "match-room-phase-1-concurrency",
+      "assertions": [
+        "PASS actual non-owner member sessions and explicit trusted-service session",
+        "PASS concurrent room creation yields exactly one fixed-membership room",
+        "PASS same sender and client key insert once across concurrent sessions",
+        "PASS conflicting payloads sharing a client key cannot overwrite the winning message",
+        "PASS two participants allocate distinct, contiguous room sequences",
+        "PASS twenty simultaneous sends respect the per-actor limit without blocking the other participant",
+        "PASS reading a displayed cursor while a new message arrives leaves the new message unread",
+        "PASS concurrent stale read requests never move the cursor backwards",
+        "PASS account closure waits for an in-flight send and then removes its direct actor attribution",
+        "PASS closure queued first denies the stale-session send and prevents read-state recreation",
+        "PASS rejected second migration application preserves schema, ACLs and every public/private table row"
+      ],
+      "summary": "Passed 11 controlled PostgreSQL concurrency assertions."
+    },
+    {
+      "name": "match-room-phase-3-concurrency",
+      "assertions": [
+        "PASS opposite senders serialize without actor-lock deadlock and create one episode each",
+        "PASS concurrent same-key retry creates one message and no new episode",
+        "PASS catchup-before-send resolves prior episode and creates exactly one successor",
+        "PASS send-before-partial-cursor preserves the existing unread episode",
+        "PASS both participants requesting help create one operational request",
+        "PASS recipient closure after send removes notifications and resolves recipient episode without deadlock",
+        "PASS recipient closure before send prevents stale-identity notifications without deadlock",
+        "PASS rejected migration reapplication preserves existing authority definitions"
+      ],
+      "summary": "Passed 8 controlled Phase 3 PostgreSQL concurrency assertions."
+    },
+    {
+      "name": "match-room-production-hardening-concurrency",
+      "assertions": [
+        "PASS full forward migration defaults off and leaves every competitive/reset/closure authority body unchanged",
+        "PASS opposite senders retain serialized normal operation without busy errors",
+        "PASS same-key retries still create exactly one message",
+        "PASS real Not Held vs room resolution settles without deadlock and no partial room or partial closure",
+        "PASS all nine communication entry points fail55P03 atomically while tournament busy; same message key retries normally",
+        "PASS disable waits for admitted send; after disable completes no new message or alert can be admitted",
+        "PASS disable-first rejects a queued sender after the setting transaction commits",
+        "PASS disable serializes assistance creation and denies later requests/reopens",
+        "PASS real final-result deferred settlement and room read complete without reversed-order deadlock",
+        "PASS real RR reset and historical read retain generation privacy without extra authority locks",
+        "PASS send and existing account closure still serialize without notification or identity residue",
+        "PASS all real concurrency scenarios leave competitive/reset/closure function definitions unchanged",
+        "PASS reapplication fails atomically and preserves current flag and room definitions"
+      ],
+      "summary": "Passed 13 controlled hardening concurrency assertions."
+    }
+  ]
+}

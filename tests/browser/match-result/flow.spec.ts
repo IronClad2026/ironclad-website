@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
   );
   await page.clock.install({ time: new Date("2026-09-04T14:00:00Z") });
 });
-for (const width of [360, 390, 412, 430, 1280])
+for (const width of [360, 375, 390, 412, 430, 1280])
   test("result flow at " + width + "px", async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/tests/browser/match-result/");

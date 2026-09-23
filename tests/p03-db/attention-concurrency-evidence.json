@@ -1,0 +1,12 @@
+{
+  "recordedAt": "2026-09-23T04:36:48.535Z",
+  "postgres": "17.11",
+  "checks": [
+    "unread summary sees only committed messages and never acknowledges an in-flight message",
+    "new message queued during read remains unread in the card summary after both commit",
+    "reassignment atomically removes old-pair unread attention and exposes no old-room state to the replacement",
+    "disable waits for an admitted admin resolution and OFF projects canResolve false",
+    "disable-first rejects queued admin resolution without changing assistance state"
+  ],
+  "status": "PASS"
+}

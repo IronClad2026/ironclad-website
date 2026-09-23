@@ -59,3 +59,38 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  p03-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Use Node.js 22.12.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+      - name: Install PostgreSQL 17
+        run: sudo apt-get update && sudo apt-get install -y postgresql-17
+      - name: Start disposable loopback-only PostgreSQL
+        run: |
+          /usr/lib/postgresql/17/bin/initdb -D "$RUNNER_TEMP/p03-postgres" -U postgres -A trust --no-locale --encoding=UTF8
+          /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-postgres" -l "$RUNNER_TEMP/p03-postgres.log" -o "-h 127.0.0.1 -p 56623" -w start
+          /usr/lib/postgresql/17/bin/createdb -h 127.0.0.1 -p 56623 -U postgres p03_rehearsal
+      - name: Replay exact reviewed Production baseline locally
+        run: node scripts/p03-db/replay-baseline.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Release package and receipt safety tests
+        run: node --test tests/p03-db/package-checks.mjs
+      - name: Seed partially completed tournament fixtures
+        run: node scripts/p03-db/seed-rehearsal.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Atomic migration, first-write barrier and lifecycle rehearsal
+        run: node scripts/p03-db/rehearse.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Match Room SQL and concurrency regressions
+        run: node scripts/p03-db/concurrency.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Unread summary and assistance kill-switch concurrency
+        run: node scripts/p03-db/attention-concurrency.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Rehearse gated release executor locally
+        run: node scripts/p03-db/rehearse-executor.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Stop disposable PostgreSQL
+        if: always()
+        run: /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-postgres" -m fast -w stop
