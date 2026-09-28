@@ -1,5 +1,8 @@
 "use client";
 
+import MatchRoom from "@/components/MatchRoom";
+import MatchRoomAssistanceControls from "@/components/MatchRoomAssistanceControls";
+
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import {
@@ -31,6 +34,7 @@ export default function AdminMatchWorkspace({
   canEnterOfficialResult,
   onPendingChange,
   diceHistory,
+  roomId,
 }: {
   match: GeneratedTournamentMatch;
   participantsById: Map<string, TournamentParticipant>;
@@ -42,6 +46,7 @@ export default function AdminMatchWorkspace({
   canEnterOfficialResult: boolean;
   onPendingChange: (key: string, pending: boolean) => void;
   diceHistory?: ReactNode;
+  roomId?: string | null;
 }) {
   const active = reportGroups.find(
     (report) =>
@@ -183,6 +188,16 @@ export default function AdminMatchWorkspace({
         )}
       </section>
 
+      <MatchRoom
+        matchId={match.id}
+        roomId={roomId}
+        participants={Array.from(participantsById.values(), (participant) => ({
+          registrationId: participant.registrationId,
+          name: participant.name,
+        }))}
+        admin
+        footer={(room) => room ? <MatchRoomAssistanceControls key={room.id} roomId={room.id} admin /> : null}
+      />
       <section
         aria-label="Result & Replay Evidence"
         className="border-t border-white/10 py-6"

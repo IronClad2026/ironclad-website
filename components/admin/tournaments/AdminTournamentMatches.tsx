@@ -29,6 +29,8 @@ export type AdminTournamentMatchesProps = {
   submissions?: MatchResultSubmission[];
   reportGroups?: MatchResultReportGroup[];
   loadError?: boolean;
+  initialMatchId?: string | null;
+  initialRoomId?: string | null;
 };
 
 type SelectedMatch = {
@@ -42,8 +44,10 @@ export default function AdminTournamentMatches({
   submissions = [],
   reportGroups = [],
   loadError = false,
+  initialMatchId = null,
+  initialRoomId = null,
 }: AdminTournamentMatchesProps) {
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(initialMatchId);
   const participantsById = useMemo(
     () => buildParticipantsById(tournament),
     [tournament]
@@ -195,6 +199,7 @@ export default function AdminTournamentMatches({
           reportGroups={reportGroups.filter(
             (reportGroup) => reportGroup.matchId === selectedMatch.match.id
           )}
+          roomId={selectedMatch.match.id === initialMatchId ? initialRoomId : null}
           readOnly={readOnly}
           onClose={() => setSelectedMatchId(null)}
         />

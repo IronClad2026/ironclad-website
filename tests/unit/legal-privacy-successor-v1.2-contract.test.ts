@@ -11,12 +11,14 @@ import {
 } from "../../scripts/legal-successor/privacy-document-successor-v1.2.mjs";
 
 const root = process.cwd();
+// Version-specific publication contracts stay bound to the immutable predecessor snapshot.
+const archive = join(root, "docs", "legal-drafts", "p03-privacy-v1.3");
 const activationDate = "2026-08-22";
 const corpus = JSON.parse(
-  readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
+  readFileSync(join(archive, "predecessor-corpus.json"), "utf8")
 );
 const release = JSON.parse(
-  readFileSync(join(root, "content", "legal-successor-release.json"), "utf8")
+  readFileSync(join(archive, "predecessor-release.json"), "utf8")
 );
 const source = JSON.parse(
   readFileSync(

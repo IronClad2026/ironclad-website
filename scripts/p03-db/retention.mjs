@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { localClient, localPsqlArgument } from "./local-pg.mjs";
+import { buildAtomicMigrationSql, repositoryRoot, sha256 } from "./package.mjs";
+const client=localClient(localPsqlArgument());
+const db="p03_retention_"+Date.now();
+assert.equal(await client.run("select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=56623;"),"t");
+await client.run(`create database ${db} template p03_empty;`,{db:"postgres"});
+const packageSql=buildAtomicMigrationSql();
+await client.run(packageSql,{db});
+const fixture=readFileSync(path.join(repositoryRoot,"tests/database/match-room-phase-1.sql"),"utf8");
+const prefix=fixture.slice(fixture.indexOf("begin;"),fixture.indexOf("-- Physical boundary:"));
+const output=await client.run(prefix+readFileSync(path.join(repositoryRoot,"tests/p03-db/retention.sql"),"utf8"),{db});
+const result=JSON.parse(output.split(/\r?\n/).findLast(line=>line.startsWith('{"suite"')));
+writeFileSync(path.join(repositoryRoot,"tests/p03-db/retention-evidence.json"),JSON.stringify({testedAt:new Date().toISOString(),runtime:"PostgreSQL17 native isolated loopback",packageSqlSha256:sha256(packageSql),...result},null,2)+"\n");
+console.log(JSON.stringify(result,null,2));

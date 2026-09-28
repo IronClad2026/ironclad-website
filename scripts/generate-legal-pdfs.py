@@ -67,6 +67,7 @@ APPROVED_FILENAMES = {
         "1.0": "ironclad-privacy-policy-v1.0.pdf",
         "1.1": "ironclad-privacy-policy-v1.1.pdf",
         "1.2": "ironclad-privacy-policy-v1.2.pdf",
+        "1.3": "ironclad-privacy-policy-v1.3.pdf",
     },
 }
 
@@ -107,7 +108,7 @@ def parse_args() -> argparse.Namespace:
         "--review-draft",
         action="store_true",
         help=(
-            "Generate only the approved Privacy v1.2 REVIEW DRAFT - NOT "
+            "Generate only the approved Privacy v1.2/v1.3 REVIEW DRAFT - NOT "
             "EFFECTIVE artifact with an Effective date of TBD."
         ),
     )
@@ -152,7 +153,7 @@ def load_corpus(
                 document,
                 review_draft=(
                     document.get("kind") == "privacy"
-                    and document.get("version") == "1.2"
+                    and document.get("version") in {"1.2", "1.3"}
                     and document.get("status") == "Review Draft"
                 ),
             )
@@ -245,7 +246,7 @@ def validate_corpus(
             review_draft
             and selected_kinds == ("privacy",)
             and kind == "privacy"
-            and version == "1.2"
+            and version in {"1.2", "1.3"}
             and document.get("status") == "Review Draft"
         )
         if document.get("status") != "Effective" and not is_approved_review_draft:
@@ -256,7 +257,7 @@ def validate_corpus(
         if isinstance(effective_date, str):
             format_date(effective_date)
         elif is_approved_review_draft and effective_date is not None:
-            raise ValueError("The Privacy v1.2 Review Draft effectiveDate must be null")
+            raise ValueError("The Privacy Review Draft effectiveDate must be null")
         expected_path = f"/documents-rules-ppa/{expected_filename}"
         if document.get("publicPath") != expected_path:
             raise ValueError(f"Incorrect publicPath for {kind}")

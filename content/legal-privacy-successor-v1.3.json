@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "status": "Review Draft",
+  "effectiveDateToken": "{{PRODUCTION_EFFECTIVE_DATE}}",
+  "publicationRule": "Privacy v1.3 is a REVIEW DRAFT - NOT EFFECTIVE. This preparation does not change the runtime legal corpus, Final transition manifest, public policy, database legal register or acceptance evidence. Controlled publication must use the actual Australia/Sydney publication date and the existing forward-successor process before Match Room activation.",
+  "documents": [
+    {
+      "kind": "privacy",
+      "fromVersion": "1.2",
+      "version": "1.3",
+      "filename": "ironclad-privacy-policy-v1.3.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.3.pdf",
+      "operations": [
+        {
+          "op": "replace-paragraph",
+          "sectionNumber": "2",
+          "expected": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, rankings, Polls, in-app notifications, deliberately enabled Web Push, installed-app notification badges, support, account closure, optional analytics preference, optional consent-gated public-site analytics and prize administration where applicable.",
+          "replacement": "This Policy applies to the IronClad website, Accounts, profiles, Steam linking, Relic verification, Tournament registration and administration, brackets, Matches, private Match Room communication, rankings, Polls, in-app notifications, deliberately enabled Web Push, installed-app notification badges, support, account closure, optional analytics preference, optional consent-gated public-site analytics and prize administration where applicable."
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "3",
+          "expected": "Notifications and correspondence:",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Match Room information includes message content, sender and room-participant provenance, message order and timestamps, private read positions, unread-notification episodes, Admin Assistance case state, and the minimum audit and retention-control metadata needed to operate and secure that communication."
+            }
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "11",
+          "expected": "Scores and official results may become public. Private evidence does not become promotional content.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Match Room messages are private communication between the two authorized room participants. Authorized IronClad tournament administrators may access retained messages for tournament operations, Admin Assistance, disputes, moderation, competition integrity and safety. Public visitors and unrelated players cannot access the private transcript or another participant's read state."
+            },
+            {
+              "type": "paragraph",
+              "text": "Access follows the current authoritative Match, room membership, Account and administrator permissions. A reset, reassignment, completed Match, closed Account or disabled communication feature may restrict access or make a room read-only; these changes do not turn the transcript into public content."
+            },
+            {
+              "type": "paragraph",
+              "text": "Users may place personal information in free text. Removing or pseudonymising an Account identifier does not automatically anonymise message bodies. Users should avoid unnecessary personal information about themselves or others."
+            }
+          ]
+        },
+        {
+          "op": "insert-table-row-after",
+          "sectionNumber": "18",
+          "expectedFirstCell": "In-app notifications",
+          "row": [
+            "Routine private Match Room communication",
+            "Retain message content for 40 days after the Tournament officially closes, using its authoritative current completed, cancelled or voided state and trustworthy closure time. This period does not start when an individual Match ends. Expired routine content and unnecessary communication-only attribution are removed through bounded, documented maintenance; a minimal non-content room identity and necessary competitive provenance may remain."
+          ]
+        },
+        {
+          "op": "insert-table-row-after",
+          "sectionNumber": "18",
+          "expectedFirstCell": "Routine private Match Room communication",
+          "row": [
+            "Match Room material linked to a formal case or investigation",
+            "Apply the existing relevant longer period: 24 months after support, complaint, privacy or Admin Assistance case closure; or 24 months after the result becomes final for dispute, no-show or supplemental competition-integrity material. An active case or applicable narrow hold prevents deletion of affected material. Association is determined by authoritative case or system records, never by classifying message text."
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "18",
+          "expected": "A legal, security or integrity hold suspends deletion only for affected information and only for as long as reasonably necessary. After a hold ends, overdue deletion should occur within 30 days.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A Match Room hold must identify affected material and a documented legal obligation, security, abuse/safety or competition-integrity purpose. Holds are reviewed and released when the purpose ends. Routine conversation is not retained indefinitely by default; after release, normal purge eligibility resumes."
+            },
+            {
+              "type": "paragraph",
+              "text": "Retention is evaluated against current authoritative state. If a Tournament legitimately reopens, a stale closure date is not used for deletion. If no trustworthy closure timestamp exists, maintenance stops for that material and requires an authority review rather than inventing a date or treating unrelated timestamps as closure."
+            },
+            {
+              "type": "paragraph",
+              "text": "Communication cleanup does not delete Tournament results, brackets, registrations, standings or required immutable competitive history. Minimal non-content tombstones and audit counts support safe retries, prevent transcript recreation and record the class of data removed without logging message bodies."
+            }
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "19",
+          "expected": "Private replay, integrity, Dice, Poll and correspondence material follows the retention schedule.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Completed Account closure immediately revokes future Match Room access and messaging through the existing closure authority, removes private read state and clears direct Account-linked communication and notification attribution as supported by that architecture. Retained free-text messages are not represented as anonymised."
+            },
+            {
+              "type": "paragraph",
+              "text": "Routine retained messages remain subject to 40 days after Tournament closure. Account closure does not automatically override a valid temporary formal-case, integrity, security or legal retention requirement; affected material follows the applicable longer schedule and hold review."
+            }
+          ]
+        },
+        {
+          "op": "insert-after-paragraph",
+          "sectionNumber": "20",
+          "expected": "IronClad may verify identity proportionately. It will not request a password or authentication code. Additional evidence should be requested only where reasonably necessary.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "For a substantiated Match Room access, export or erasure request, an authorized operator can locate retained records using verified Account or historical player provenance. Any export is limited to the requester's own rooms and reviewed for another person's rights before secure delivery. Authorized targeted deletion or redaction is assessed against active cases, lawful holds and the retention schedule; it does not erase unrelated rooms or competitive history."
+            },
+            {
+              "type": "paragraph",
+              "text": "A retained export is handled as private case material. Live-system deletion does not instantly erase older backup copies: the existing maximum rolling 90-day backup window applies, expired copies are excluded from ordinary access, and completed deletion or pseudonymisation obligations must be reapplied after restoration."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

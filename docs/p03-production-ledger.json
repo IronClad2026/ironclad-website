@@ -1,0 +1,592 @@
+{
+  "capturedAt": "2026-09-23T03:59:28.409Z",
+  "projectId": "nsyjtqpvyxlzyujlbzos",
+  "projectName": "ironclad-v2",
+  "master": "0f23d7d906c8588de3051fd9a7cdcf218a576ab3",
+  "migrations": [
+    {
+      "version": "20260611080000",
+      "name": "base_schema"
+    },
+    {
+      "version": "20260611090000",
+      "name": "admin_tournament_creation"
+    },
+    {
+      "version": "20260611091000",
+      "name": "fix_tournament_persistence_and_availability"
+    },
+    {
+      "version": "20260611092000",
+      "name": "live_tournament_brackets"
+    },
+    {
+      "version": "20260611093000",
+      "name": "status_source_of_truth"
+    },
+    {
+      "version": "20260611094000",
+      "name": "empty_bracket_structures"
+    },
+    {
+      "version": "20260611095000",
+      "name": "approved_count_bracket_format"
+    },
+    {
+      "version": "20260611100000",
+      "name": "registrations_profile_players_fk"
+    },
+    {
+      "version": "20260611101000",
+      "name": "manual_bracket_population"
+    },
+    {
+      "version": "20260611102000",
+      "name": "match_results_and_progression"
+    },
+    {
+      "version": "20260611103000",
+      "name": "result_review_workflow"
+    },
+    {
+      "version": "20260612090000",
+      "name": "match_proof_audit_and_official_results"
+    },
+    {
+      "version": "20260612091000",
+      "name": "match_submission_numbering_and_reporting"
+    },
+    {
+      "version": "20260612092000",
+      "name": "optional_tournament_dates"
+    },
+    {
+      "version": "20260612093000",
+      "name": "pending_results_are_per_match"
+    },
+    {
+      "version": "20260612094000",
+      "name": "repair_bracket_match_synchronization"
+    },
+    {
+      "version": "20260612095000",
+      "name": "tournament_banner_storage"
+    },
+    {
+      "version": "20260612100000",
+      "name": "tournament_deletion_system"
+    },
+    {
+      "version": "20260612101000",
+      "name": "game_level_match_reporting"
+    },
+    {
+      "version": "20260612102000",
+      "name": "grand_final_series_format"
+    },
+    {
+      "version": "20260612103000",
+      "name": "player_notification_dismissals"
+    },
+    {
+      "version": "20260612104000",
+      "name": "bracket_safety_and_round_robin_ranks"
+    },
+    {
+      "version": "20260612105000",
+      "name": "tournament_edit_guards"
+    },
+    {
+      "version": "20260612110000",
+      "name": "review_integrity_fixes"
+    },
+    {
+      "version": "20260613090000",
+      "name": "registration_elo_status_transitions"
+    },
+    {
+      "version": "20260613091000",
+      "name": "tournament_bracket_roster_guards"
+    },
+    {
+      "version": "20260613092000",
+      "name": "registration_status_capacity_guard"
+    },
+    {
+      "version": "20260613093000",
+      "name": "service_role_api_grants"
+    },
+    {
+      "version": "20260613094000",
+      "name": "tournament_format_and_round_robin_repair_safety"
+    },
+    {
+      "version": "20260613095000",
+      "name": "registration_opening_time_guard"
+    },
+    {
+      "version": "20260613100000",
+      "name": "registration_security_guards"
+    },
+    {
+      "version": "20260613101000",
+      "name": "registration_identity_integrity"
+    },
+    {
+      "version": "20260613102000",
+      "name": "tournament_phase_one_settings_waitlist"
+    },
+    {
+      "version": "20260613103000",
+      "name": "waitlist_fifo_guard"
+    },
+    {
+      "version": "20260613104000",
+      "name": "grand_final_start_date_backfill"
+    },
+    {
+      "version": "20260613105000",
+      "name": "match_result_confirmation_groups"
+    },
+    {
+      "version": "20260613106000",
+      "name": "match_result_group_replay_guard"
+    },
+    {
+      "version": "20260613107000",
+      "name": "legacy_review_ignores_report_groups"
+    },
+    {
+      "version": "20260613108000",
+      "name": "deletion_tracks_report_group_replays"
+    },
+    {
+      "version": "20260613109000",
+      "name": "match_result_confirmation_submission_flow"
+    },
+    {
+      "version": "20260613110000",
+      "name": "match_result_replay_count_enforcement"
+    },
+    {
+      "version": "20260613111000",
+      "name": "replay_hash_and_finalization_guards"
+    },
+    {
+      "version": "20260613112000",
+      "name": "grandfather_legacy_report_group_replays"
+    },
+    {
+      "version": "20260613113000",
+      "name": "admin_direct_match_management"
+    },
+    {
+      "version": "20260613114000",
+      "name": "round_robin_reset_recalculates_standings"
+    },
+    {
+      "version": "20260613115000",
+      "name": "tournament_lifecycle_automation"
+    },
+    {
+      "version": "20260613116000",
+      "name": "lifecycle_assignment_lock_and_multi_bracket_ready"
+    },
+    {
+      "version": "20260613117000",
+      "name": "lifecycle_requires_all_active_brackets"
+    },
+    {
+      "version": "20260613118000",
+      "name": "lifecycle_recomputes_after_match_reset"
+    },
+    {
+      "version": "20260613119000",
+      "name": "waitlist_promotion_pre_bracket_lock"
+    },
+    {
+      "version": "20260613120000",
+      "name": "waitlist_promotion_lock_corrections"
+    },
+    {
+      "version": "20260613121000",
+      "name": "waitlist_roster_lock_uses_competition_state"
+    },
+    {
+      "version": "20260613122000",
+      "name": "waitlist_roster_lock_review_fixes"
+    },
+    {
+      "version": "20260613123000",
+      "name": "waitlist_admin_insert_pre_lock_bypass"
+    },
+    {
+      "version": "20260613124000",
+      "name": "waitlist_admin_insert_close_window_fifo"
+    },
+    {
+      "version": "20260613125000",
+      "name": "waitlist_admin_update_bypass_open_window"
+    },
+    {
+      "version": "20260613126000",
+      "name": "waitlist_promotion_open_and_rejected_lock_guards"
+    },
+    {
+      "version": "20260613127000",
+      "name": "platform_notifications"
+    },
+    {
+      "version": "20260613128000",
+      "name": "public_player_profiles"
+    },
+    {
+      "version": "20260613129000",
+      "name": "public_player_profile_avatar_presence"
+    },
+    {
+      "version": "20260624090000",
+      "name": "leaderboard_foundation"
+    },
+    {
+      "version": "20260624091000",
+      "name": "leaderboard_calculation_functions"
+    },
+    {
+      "version": "20260624092000",
+      "name": "fix_leaderboard_uuid_min"
+    },
+    {
+      "version": "20260624093000",
+      "name": "fix_leaderboard_all_time_delete_where"
+    },
+    {
+      "version": "20260624094000",
+      "name": "fix_leaderboard_season_error_reporting"
+    },
+    {
+      "version": "20260624100000",
+      "name": "match_no_show_reports"
+    },
+    {
+      "version": "20260625100000",
+      "name": "increase_player_avatar_upload_limit"
+    },
+    {
+      "version": "20260627100000",
+      "name": "platform_settings_elo_verification"
+    },
+    {
+      "version": "20260627110000",
+      "name": "registration_elo_verification_results"
+    },
+    {
+      "version": "20260628090000",
+      "name": "add_missing_elo_identity_columns"
+    },
+    {
+      "version": "20260629090000",
+      "name": "coh3_profile_ownership"
+    },
+    {
+      "version": "20260702090000",
+      "name": "allow_academy_tournament_brackets"
+    },
+    {
+      "version": "20260702100000",
+      "name": "leaderboard_academy_rewards"
+    },
+    {
+      "version": "20260723120000",
+      "name": "make_player_avatars_private"
+    },
+    {
+      "version": "20260724090000",
+      "name": "supabase_security_hardening"
+    },
+    {
+      "version": "20260725090000",
+      "name": "match_result_privacy_hardening"
+    },
+    {
+      "version": "20260730090000",
+      "name": "secure_steam_identity"
+    },
+    {
+      "version": "20260804090000",
+      "name": "relic_profile_verification"
+    },
+    {
+      "version": "20260804100000",
+      "name": "relic_registration_snapshot"
+    },
+    {
+      "version": "20260805124000",
+      "name": "drop_obsolete_registration_rpc"
+    },
+    {
+      "version": "20260805140000",
+      "name": "relic_profile_cutover"
+    },
+    {
+      "version": "20260805150000",
+      "name": "eight_player_registration_cohort"
+    },
+    {
+      "version": "20260806120000",
+      "name": "private_registration_admin_notes"
+    },
+    {
+      "version": "20260806130000",
+      "name": "phase4_withdrawal_waitlist_division_launch"
+    },
+    {
+      "version": "20260807100000",
+      "name": "protect_steam_display_name"
+    },
+    {
+      "version": "20260808100000",
+      "name": "matchup_deadlines_double_forfeit"
+    },
+    {
+      "version": "20260810100000",
+      "name": "harden_matchup_core_search_paths"
+    },
+    {
+      "version": "20260810162000",
+      "name": "transactional_email_notifications"
+    },
+    {
+      "version": "20260811100000",
+      "name": "transactional_email_vercel_protection_bypass"
+    },
+    {
+      "version": "20260812100000",
+      "name": "tournament_hard_delete_guard"
+    },
+    {
+      "version": "20260812110000",
+      "name": "leaderboard_scoring_correctness_concurrency"
+    },
+    {
+      "version": "20260812120000",
+      "name": "six_event_main_seasons_late_entry_bonus"
+    },
+    {
+      "version": "20260812121000",
+      "name": "late_entry_bonus_non_played_progression"
+    },
+    {
+      "version": "20260813100000",
+      "name": "tournament_terminal_recovery"
+    },
+    {
+      "version": "20260813101000",
+      "name": "competition_history_safe_account_closure"
+    },
+    {
+      "version": "20260813102000",
+      "name": "phase7_public_leaderboard_integration"
+    },
+    {
+      "version": "20260814100000",
+      "name": "replay_attempt_integrity"
+    },
+    {
+      "version": "20260814110000",
+      "name": "phase7_authority_archive_privacy"
+    },
+    {
+      "version": "20260814111000",
+      "name": "phase7_raw_leaderboard_read_privacy"
+    },
+    {
+      "version": "20260814120000",
+      "name": "phase7_residual_database_hardening"
+    },
+    {
+      "version": "20260814121000",
+      "name": "phase7_counterpart_notification_privacy"
+    },
+    {
+      "version": "20260815100000",
+      "name": "coh3_map_catalogue_division_pools"
+    },
+    {
+      "version": "20260817100000",
+      "name": "authenticated_match_dice_rolloff"
+    },
+    {
+      "version": "20260817120000",
+      "name": "polls_decisions"
+    },
+    {
+      "version": "20260818100000",
+      "name": "phase15a_versioned_consent_discord"
+    },
+    {
+      "version": "20260819100000",
+      "name": "account_legal_acceptance"
+    },
+    {
+      "version": "20260820130000",
+      "name": "notification_truth_reliability"
+    },
+    {
+      "version": "20260820131000",
+      "name": "fix_notification_truth_nullif"
+    },
+    {
+      "version": "20260821000000",
+      "name": "badge_award_foundation"
+    },
+    {
+      "version": "20260821001000",
+      "name": "badge_batch_2_authority"
+    },
+    {
+      "version": "20260821002000",
+      "name": "badge_progression_championship_authority"
+    },
+    {
+      "version": "20260821003000",
+      "name": "badge_streak_clean_upset_authority"
+    },
+    {
+      "version": "20260821004000",
+      "name": "badge_season_authority"
+    },
+    {
+      "version": "20260821005000",
+      "name": "badge_bracket_progression_authority"
+    },
+    {
+      "version": "20260821006000",
+      "name": "match_authority_foundation"
+    },
+    {
+      "version": "20260821007000",
+      "name": "badge_reliable_competitor_authority"
+    },
+    {
+      "version": "20260821008000",
+      "name": "badge_comeback_commander_authority"
+    },
+    {
+      "version": "20260821009000",
+      "name": "tournament_championship_path_authority"
+    },
+    {
+      "version": "20260821010000",
+      "name": "badge_flawless_campaign_authority"
+    },
+    {
+      "version": "20260821110000",
+      "name": "account_legal_privacy_v1_2_compatibility"
+    },
+    {
+      "version": "20260821120000",
+      "name": "web_push_notifications"
+    },
+    {
+      "version": "20260821121000",
+      "name": "fix_web_push_greatest"
+    },
+    {
+      "version": "20260822160000",
+      "name": "account_legal_future_gate_stability"
+    },
+    {
+      "version": "20260823100000",
+      "name": "match_result_transactional_trust"
+    },
+    {
+      "version": "20260823110000",
+      "name": "match_result_conflict_transport"
+    },
+    {
+      "version": "20260823120000",
+      "name": "private_by_default_player_profiles"
+    },
+    {
+      "version": "20260824100000",
+      "name": "staging_synthetic_uat_fixtures"
+    },
+    {
+      "version": "20260826100000",
+      "name": "official_announcements"
+    },
+    {
+      "version": "20260827100000",
+      "name": "announcement_tournament_link"
+    },
+    {
+      "version": "20260830090000",
+      "name": "player_badge_reveals"
+    },
+    {
+      "version": "20260831090000",
+      "name": "service_role_badge_e2e_season_read"
+    },
+    {
+      "version": "20260831123000",
+      "name": "tournament_media_links"
+    },
+    {
+      "version": "20260831130000",
+      "name": "badge_authority_forward_repairs"
+    },
+    {
+      "version": "20260831131000",
+      "name": "badge_reconciliation_targets"
+    },
+    {
+      "version": "20260831132000",
+      "name": "match_game_winner_authority"
+    },
+    {
+      "version": "20260831133000",
+      "name": "staging_badge_cross_division_acceptance"
+    },
+    {
+      "version": "20260831134000",
+      "name": "staging_badge_fixture_eligibility_compatibility"
+    },
+    {
+      "version": "20260902100000",
+      "name": "unlaunched_event_void_authority"
+    },
+    {
+      "version": "20260902130000",
+      "name": "event_based_tournament_scheduling"
+    },
+    {
+      "version": "20260903100000",
+      "name": "division_settlement_shadow_foundation"
+    },
+    {
+      "version": "20260903130000",
+      "name": "not_held_division_closure"
+    },
+    {
+      "version": "20260903160000",
+      "name": "division_accounting_cutover"
+    },
+    {
+      "version": "20260903190000",
+      "name": "not_held_next_event_invitations"
+    },
+    {
+      "version": "20260903210000",
+      "name": "registration_open_state_consistency"
+    },
+    {
+      "version": "20260904120000",
+      "name": "canonical_division_launch_ordering"
+    },
+    {
+      "version": "20260908052210",
+      "name": "member_rpc_current_account_acceptance"
+    }
+  ]
+}

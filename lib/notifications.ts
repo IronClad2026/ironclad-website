@@ -2,7 +2,9 @@ import "server-only";
 
 import type { Locale } from "@/lib/i18n/config";
 import type { BadgesDictionary } from "@/lib/i18n/dictionaries/en/badges";
-import type { NotificationsDictionary } from "@/lib/i18n/dictionaries/en/notifications";
+import notificationsEnglish, {
+  type NotificationsDictionary,
+} from "@/lib/i18n/dictionaries/en/notifications";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { localizePlayerNotificationCopy } from "@/lib/i18n/notification-copy";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -520,14 +522,14 @@ function mapNotification(
   badgesDictionary?: BadgesDictionary
 ): InAppNotification {
   const localizedCopy =
-    scope === "player" && dictionary
+    (scope === "player" && dictionary) || row.type === "match.message_received"
       ? localizePlayerNotificationCopy(
           {
             type: row.type,
             tournamentTitle: row.tournament_title,
             metadata: row.metadata,
           },
-          dictionary,
+          dictionary ?? notificationsEnglish,
           badgesDictionary
         )
       : null;
@@ -538,7 +540,8 @@ function mapNotification(
     type: row.type,
     title: localizedCopy?.title ?? row.title,
     message: localizedCopy?.message ?? row.message,
-    actorDisplayName: row.actor_display_name,
+    actorDisplayName:
+      row.type === "match.message_received" ? null : row.actor_display_name,
     tournamentId: row.tournament_id,
     tournamentTitle: row.tournament_title,
     registrationId: row.registration_id,
@@ -613,12 +616,41 @@ function buildNotificationHref(
   row: NotificationRow,
   scope: NotificationScope
 ): string | null {
+  if (row.type === "match.message_received") {
+    const roomId = row.metadata?.roomId;
+    // Missing or malformed immutable context must never open a replacement room.
+    if (
+      !row.match_id || !isUuid(row.match_id) ||
+      typeof roomId !== "string" || !isUuid(roomId)
+    ) {
+      return null;
+    }
+    const params = new URLSearchParams();
+    if (row.tournament_id && isUuid(row.tournament_id)) {
+      params.set("tournament", row.tournament_id);
+    }
+    params.set("tab", "brackets");
+    params.set("match", row.match_id);
+    params.set("room", roomId);
+    return "/tournaments?" + params.toString();
+  }
+
   const pollHref = buildPollNotificationHref(row);
   if (pollHref) {
     return pollHref;
   }
 
   if (scope === "admin") {
+    if (row.type === "match.admin_assistance_requested" && row.match_id && row.tournament_id) {
+      const params = new URLSearchParams({ section: "matches", match: row.match_id });
+      // An explicitly room-scoped request must retain its exact room target.
+      if (row.metadata && Object.hasOwn(row.metadata, "roomId")) {
+        const roomId = row.metadata.roomId;
+        if (typeof roomId !== "string" || !isUuid(roomId)) return null;
+        params.set("room", roomId);
+      }
+      return "/admin/tournaments/" + encodeURIComponent(row.tournament_id) + "?" + params.toString();
+    }
     if (row.match_id) {
       return buildMatchHref(row);
     }

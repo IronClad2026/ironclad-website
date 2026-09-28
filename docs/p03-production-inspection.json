@@ -1,0 +1,78 @@
+{
+  "capturedAt": "2026-09-23T04:09:39.961Z",
+  "readOnly": true,
+  "projectId": "nsyjtqpvyxlzyujlbzos",
+  "projectName": "ironclad-v2",
+  "matchRoomFunctions": 0,
+  "matchRoomsTableExists": false,
+  "matchRoomSetting": null,
+  "legacyAssistanceNoticeCount": 0,
+  "rounds": [
+    {
+      "id": "1cb06045-0ffc-4745-a8cd-1a16b71baffc",
+      "status": "in_progress",
+      "round_number": 1,
+      "match_status": "completed",
+      "matches": 6,
+      "two_players": 6,
+      "one_player_tbd": 0,
+      "empty_tbd": 0,
+      "activated": 6
+    },
+    {
+      "id": "1cb06045-0ffc-4745-a8cd-1a16b71baffc",
+      "status": "in_progress",
+      "round_number": 1,
+      "match_status": "in_progress",
+      "matches": 6,
+      "two_players": 6,
+      "one_player_tbd": 0,
+      "empty_tbd": 0,
+      "activated": 6
+    },
+    {
+      "id": "1cb06045-0ffc-4745-a8cd-1a16b71baffc",
+      "status": "in_progress",
+      "round_number": 2,
+      "match_status": "completed",
+      "matches": 1,
+      "two_players": 1,
+      "one_player_tbd": 0,
+      "empty_tbd": 0,
+      "activated": 1
+    },
+    {
+      "id": "1cb06045-0ffc-4745-a8cd-1a16b71baffc",
+      "status": "in_progress",
+      "round_number": 2,
+      "match_status": "in_progress",
+      "matches": 1,
+      "two_players": 1,
+      "one_player_tbd": 0,
+      "empty_tbd": 0,
+      "activated": 1
+    },
+    {
+      "id": "1cb06045-0ffc-4745-a8cd-1a16b71baffc",
+      "status": "in_progress",
+      "round_number": 2,
+      "match_status": "scheduled",
+      "matches": 4,
+      "two_players": 0,
+      "one_player_tbd": 2,
+      "empty_tbd": 2,
+      "activated": 0
+    },
+    {
+      "id": "1cb06045-0ffc-4745-a8cd-1a16b71baffc",
+      "status": "in_progress",
+      "round_number": 3,
+      "match_status": "scheduled",
+      "matches": 3,
+      "two_players": 0,
+      "one_player_tbd": 1,
+      "empty_tbd": 2,
+      "activated": 0
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "signature": "ironclad_private.require_current_account_legal_acceptance()",
+    "md5": "1d9f27ea057eb83dfb54addd8ecd7b29"
+  },
+  {
+    "signature": "public.admin_reset_tournament_match(uuid,text)",
+    "md5": "5bd3f4cef0a46706f9233e8c98730f0b"
+  },
+  {
+    "signature": "public.close_ironclad_player_account(text)",
+    "md5": "c0b07afe3c577a5d2cf257dd13f85c0f"
+  }
+]

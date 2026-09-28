@@ -51,6 +51,8 @@ type TournamentWorkspacePageProps = {
     notice?: string;
     section?: string;
     selected?: string;
+    match?: string;
+    room?: string;
   }>;
 };
 
@@ -174,6 +176,8 @@ async function renderWorkspaceSection({
         focus?: string;
         notice?: string;
         selected?: string;
+      match?: string;
+      room?: string;
       }
     | undefined;
   section: TournamentManagementSection;
@@ -279,11 +283,13 @@ async function renderWorkspaceSection({
     return matchWorkspace.ok ? (
       <div className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
         <AdminTournamentMatches
-          key={tournament.id}
+          key={[tournament.id, query?.match ?? "", query?.room ?? ""].join(":")}
           tournament={matchWorkspace.tournament}
           viewer={matchWorkspace.viewer}
           submissions={matchWorkspace.submissions}
           reportGroups={matchWorkspace.reportGroups}
+          initialMatchId={typeof query?.match === "string" ? query.match : null}
+          initialRoomId={typeof query?.room === "string" ? query.room : null}
         />
       </div>
     ) : (

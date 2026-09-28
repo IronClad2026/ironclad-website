@@ -186,6 +186,8 @@ const dictionary = {
       "Указанный результат рассматривает администратор. Откройте это сообщение, чтобы проверить отчёт.",
   },
   server: {
+    matchMessageReceivedTitle: "Новое сообщение в комнате матча",
+    matchMessageReceivedMessage: "В вашей комнате матча есть новые сообщения.",
     loadError: "Не удалось загрузить уведомления.",
     badgeUnlockedTitle: "Значок открыт",
     badgeUnlockedMessage: "Вы открыли значок «{badgeName}».",

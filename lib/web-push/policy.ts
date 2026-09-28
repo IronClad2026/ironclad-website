@@ -14,6 +14,7 @@ export const PLAYER_WEB_PUSH_TYPES = [
   "tournament.cancelled",
   "tournament.voided",
   "match.ready",
+  "match.message_received",
   "match.automatic_advance",
   "match.deadline_updated",
   "match.deadline_reminder",
@@ -60,6 +61,11 @@ export function isWebPushEligible(
     !PLAYER_TYPE_SET.has(input.type)
   ) {
     return false;
+  }
+
+  if (input.type === "match.message_received") {
+    return typeof input.metadata.roomId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.metadata.roomId);
   }
 
   return (

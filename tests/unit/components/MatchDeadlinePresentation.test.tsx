@@ -595,10 +595,10 @@ describe("matchup deadline player and administrator presentation", () => {
     ).filter((element) => element.tabIndex >= 0);
     expect(pendingFocusable).not.toContain(applyExtension);
     expect(pendingFocusable[0]).toBe(
-      within(dialog).getByLabelText("Extension minutes")
+      within(dialog).getByRole("button", { name: /^Refresh$/ })
     );
     expect(fireEvent.keyDown(window, { key: "Tab" })).toBe(false);
-    expect(within(dialog).getByText("Deadline & Scheduling")).toHaveFocus();
+    expect(pendingFocusable[0]).toHaveFocus();
     fireEvent.click(closeButton);
     fireEvent.keyDown(window, { key: "Escape" });
     fireEvent.mouseDown(backdrop as HTMLElement);

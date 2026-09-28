@@ -86,7 +86,7 @@ const ALWAYS_GUARDED_ACTIONS = {
     "resetAdminMatch",
     "reviewMatchResult",
   ],
-  "app/tournaments/support-actions.ts": ["requestMatchAdminAssistance"],
+  "app/tournaments/support-actions.ts": ["requestMatchAdminAssistance", "resolveMatchAdminAssistance"],
 } as const;
 
 const DELEGATED_GUARDED_ACTIONS = [
@@ -153,6 +153,7 @@ const LEGAL_AND_PRIVACY_EXEMPTIONS = {
 } as const;
 
 const READ_ONLY_ACTIONS = {
+  "app/tournaments/support-actions.ts": ["getMatchRoomOpponentDiscord", "getMatchRoomAssistance"],
   "app/admin/polls/actions.ts": [
     "loadAdminPollSnapshot",
     "previewPollEligibility",
@@ -326,15 +327,15 @@ describe("account legal mutation boundary architecture", () => {
       )
     );
 
-    expect(new Set(expected).size).toBe(80);
-    expect(expected).toHaveLength(80);
+    expect(new Set(expected).size).toBe(83);
+    expect(expected).toHaveLength(83);
     expect(actual.sort()).toEqual(expected.sort());
   });
 
-  it("guards all 58 ordinary authenticated mutations", () => {
+  it("guards all 59 ordinary authenticated mutations", () => {
     const directlyGuarded = flattenedInventory(ALWAYS_GUARDED_ACTIONS);
 
-    expect(directlyGuarded).toHaveLength(56);
+    expect(directlyGuarded).toHaveLength(57);
     expect(DELEGATED_GUARDED_ACTIONS).toHaveLength(2);
 
     for (const [path, actions] of Object.entries(ALWAYS_GUARDED_ACTIONS)) {
@@ -386,7 +387,7 @@ describe("account legal mutation boundary architecture", () => {
   it("keeps cleanup, legal, privacy, language, and read-only exemptions unguarded", () => {
     expect(flattenedInventory(FULL_MUTATION_EXEMPTIONS)).toHaveLength(7);
     expect(flattenedInventory(LEGAL_AND_PRIVACY_EXEMPTIONS)).toHaveLength(4);
-    expect(flattenedInventory(READ_ONLY_ACTIONS)).toHaveLength(7);
+    expect(flattenedInventory(READ_ONLY_ACTIONS)).toHaveLength(9);
 
     for (const inventory of [
       FULL_MUTATION_EXEMPTIONS,

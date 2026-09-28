@@ -3,7 +3,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import {
+  AccountLegalMutationBlockedError,
+  requireCurrentAccountLegalAcceptance,
+} from "@/lib/account-legal-mutation-guard";
+import { isAccountLegalAcceptanceRpcError } from "@/lib/account-legal-rpc-error";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
@@ -113,7 +117,13 @@ export async function respondToWaitlistOfferAction(
   }
 
   if (response === "accept") {
-    await requireCurrentAccountLegalAcceptance();
+    try {
+      await requireCurrentAccountLegalAcceptance();
+    } catch (error) {
+      if (!(error instanceof AccountLegalMutationBlockedError)) throw error;
+      revalidatePath("/", "layout");
+      return errorState("The waitlist offer could not be updated.", "mutation_failed");
+    }
   }
 
   const supabase = await createAuthenticatedSupabaseClient();
@@ -127,13 +137,24 @@ export async function respondToWaitlistOfferAction(
     return errorState("The waitlist offer is not available.", "offer_unavailable");
   }
 
-  const { data, error } = await supabase.rpc("respond_to_waitlist_offer", {
-    p_registration_id: registrationId,
-    p_response: response,
-  });
+  let rpcResult: { data: unknown; error: unknown };
+  try {
+    rpcResult = await supabase.rpc("respond_to_waitlist_offer", {
+      p_registration_id: registrationId,
+      p_response: response,
+    });
+  } catch (error) {
+    // Decline remains an exit path with its existing behavior.
+    if (response !== "accept") throw error;
+    if (isAccountLegalAcceptanceRpcError(error)) revalidatePath("/", "layout");
+    else logPlayerRegistrationFailure("offer-accept");
+    return errorState("The waitlist offer could not be updated.", "mutation_failed");
+  }
+  const { data, error } = rpcResult;
 
   if (error) {
-    logPlayerRegistrationFailure(`offer-${response}`, error);
+    if (response === "accept" && isAccountLegalAcceptanceRpcError(error)) revalidatePath("/", "layout");
+    else logPlayerRegistrationFailure(`offer-${response}`, response === "accept" ? undefined : error);
     return errorState(
       "The waitlist offer could not be updated.",
       "mutation_failed"

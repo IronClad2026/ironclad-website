@@ -68,7 +68,7 @@ function Fixture() {
           reportGroups={current ? [current] : []}
           submissions={[]}
         />
-        <DiscordSupportLink />
+        <DiscordSupportLink matchId={uxMatch.id} roomId="22222222-2222-4222-8222-222222222222" roomRevision={1} />
       </article>
     </main>
   );

@@ -18,8 +18,10 @@ import {
 } from "../../scripts/legal-successor/legal-document-successor.mjs";
 
 const root = process.cwd();
+// Version-specific publication contracts stay bound to the immutable predecessor snapshot.
+const archive = join(root, "docs", "legal-drafts", "p03-privacy-v1.3");
 const currentCorpus = JSON.parse(
-  readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
+  readFileSync(join(archive, "predecessor-corpus.json"), "utf8")
 );
 const reviewDraft = JSON.parse(
   readFileSync(join(root, "content", "legal-successors-v1.1.json"), "utf8")

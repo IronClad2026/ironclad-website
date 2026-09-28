@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 import { resolve } from "node:path";
 export default defineConfig({
+  outputDir: resolve(__dirname, "../../../test-results/match-result"),
   testDir: ".",
   testMatch: "*.spec.ts",
   fullyParallel: false,

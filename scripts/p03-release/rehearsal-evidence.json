@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic-native-postgresql-backup-restore-rehearsal",
+  "checkedAt": "2026-09-23T04:26:16.491Z",
+  "masterBaseline": "0f23d7d906c8588de3051fd9a7cdcf218a576ab3",
+  "candidateHeadAtRehearsal": "76d9dd3ec689ed713819f652782f771c9e9d8579",
+  "workingToolingChangesPresent": true,
+  "sourceProjectRef": "local",
+  "targetProjectRef": "local",
+  "postgresqlVersion": "17.11",
+  "archiveSha256": "8ebee522fdf725e2f9df6810f34c85c00b5647c62fdf1104e94db2a74d4dc22b",
+  "backupManifestSha256": "56d56f0516d3a22e0112492f840a5231ca4ac9a588e119878ca3144080dc8cc5",
+  "preCompetitionSha256": "6da124f1bb18e009066344577d511875f609bcf4f5e63747f52ce06ae0001483",
+  "postCompetitionSha256": "6da124f1bb18e009066344577d511875f609bcf4f5e63747f52ce06ae0001483",
+  "normalizedSchemaSha256": "15430086976599cf1b188118934b50621c8267990ca5ec93b10a51dc2aaa17eb",
+  "competitionMatches": true,
+  "schemaMatches": true,
+  "extensionsMatch": true,
+  "fullLogicalArchiveRestored": true,
+  "productionBackupTaken": false,
+  "hostedSupabaseRestoreRehearsed": false,
+  "limitations": [
+    "Synthetic baseline fixtures use native PostgreSQL and stubs for hosted-only services.",
+    "No Docker or Podman runtime is installed on the preparation host; WSL distribution inspection returned access denied.",
+    "Hosted runtime with all observed Production extensions must pass restore-runtime and an actual release-day full restore before release gate can pass.",
+    "Logical backup is not PITR and does not copy Storage object bytes, Clerk state or external encryption roots.",
+    "This preparation rehearsal is not a release-day gate receipt and cannot authorize Production."
+  ]
+}

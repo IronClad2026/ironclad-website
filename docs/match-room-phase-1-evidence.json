@@ -1,0 +1,108 @@
+{
+  "project": {
+    "name": "ironclad-staging",
+    "ref": "zzbnneprhjicmajpjkdg"
+  },
+  "startingStagingSha": "26f351806691713de4a28c851081a8444063c29b",
+  "migration": {
+    "version": "20260919011425",
+    "name": "match_room_phase_one",
+    "sha256": "eed2aec0caa5f7ca07a48de76b11209e7b1aa337cc9cca7b1f958e32d6ad7753",
+    "hashBasis": "UTF-8 source normalized CRLF to LF; exact hosted statements[1] hash matches"
+  },
+  "preservation": {
+    "tablesUnchanged": true,
+    "changedOriginalFunctions": [
+      "close_ironclad_player_account(text)",
+      "admin_reset_tournament_match(uuid,text)"
+    ],
+    "resetCorePreserved": true,
+    "closureCorePreserved": true,
+    "unchangedOriginalFunctionCount": 284,
+    "tables": [
+      {
+        "name": "bracket_rounds",
+        "rows": 48,
+        "fingerprint": "954718585e2d6435fb0cb2659a313cee"
+      },
+      {
+        "name": "generated_brackets",
+        "rows": 16,
+        "fingerprint": "b1765ee28c52d17890d2be632f641f95"
+      },
+      {
+        "name": "match_game_result_authority",
+        "rows": 15,
+        "fingerprint": "fe66c3d13cea77306af1782b8463b6eb"
+      },
+      {
+        "name": "match_participant_outcome_authority",
+        "rows": 238,
+        "fingerprint": "55af749cf2adf3bce90dbdf882ca4194"
+      },
+      {
+        "name": "match_replay_upload_attempts",
+        "rows": 14,
+        "fingerprint": "92ed5f23e28f41cc88bde58067dd6a0f"
+      },
+      {
+        "name": "match_result_report_groups",
+        "rows": 14,
+        "fingerprint": "a9a40421f1e50a8617b0434e67afb581"
+      },
+      {
+        "name": "match_result_submissions",
+        "rows": 29,
+        "fingerprint": "4501bd30dd1f81a00347e1bb9e424a1a"
+      },
+      {
+        "name": "registrations",
+        "rows": 153,
+        "fingerprint": "ae826f8091fe45dc5753040e46f0b70b"
+      },
+      {
+        "name": "tournament_brackets",
+        "rows": 21,
+        "fingerprint": "476b0a2af09c1fffa8a1086a088a5865"
+      },
+      {
+        "name": "tournament_matches",
+        "rows": 112,
+        "fingerprint": "ba9a05293d56ee97b261efb8b9439217"
+      },
+      {
+        "name": "tournaments",
+        "rows": 21,
+        "fingerprint": "d798481b41edb58be658d37211bd218c"
+      }
+    ]
+  },
+  "verification": {
+    "localHistoricalMigrations": 150,
+    "localDatabaseAssertions": 155,
+    "hostedRollbackAssertions": 155,
+    "localConcurrencyChecks": 11,
+    "focusedNewActionTests": 67,
+    "migrationTests": 3,
+    "relevantExistingTests": 89,
+    "lint": "passed (targeted)",
+    "typescript": "passed",
+    "build": "passed (fake local CI credentials)",
+    "hostedNewTablesEmptyAfterRollback": true,
+    "existingMatches": 112,
+    "existingCommunicationGeneration": 1,
+    "productionQueried": false,
+    "productionModified": false
+  },
+  "delivery": {
+    "status": "Staging migration and security verification complete; live CI and merge status are recorded on the PR",
+    "pullRequest": "https://github.com/IronClad2026/ironclad-website/pull/130",
+    "initialCiRun": "https://github.com/IronClad2026/ironclad-website/actions/runs/35412187262",
+    "initialCiResult": "3502 passed; 1 historical migration-count assertion required Match Room classification",
+    "applicationCommit": "1b2ed913a8215206b6fe3f162e36dda16735b90d",
+    "previewDeployment": "dpl_6kBF4sQ9Eqd92mAKLnWeKXE9rDLP",
+    "previewState": "READY",
+    "previewTarget": "nonproduction",
+    "previewUrl": "https://ironclad-website-48vn85pr3-ironclad-tournaments.vercel.app"
+  }
+}

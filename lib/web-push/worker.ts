@@ -16,6 +16,8 @@ import { createWebPushPayload } from "@/lib/web-push/payload";
 import { isWebPushEligible } from "@/lib/web-push/policy";
 import { parseWebPushSubscription } from "@/lib/web-push/validation";
 
+// SQL claims existing tournament-critical types before Match Room episodes.
+// Keep the established batch cap and provider concurrency unchanged.
 const CLAIM_LIMIT = 10;
 const MAX_CONCURRENCY = 3;
 const CLERK_PAGE_SIZE = 100;
@@ -367,6 +369,24 @@ async function processClaim(
       "PAYLOAD_INVALID"
     );
     return "permanent_failure";
+  }
+
+  // A room may be caught up, or assistance resolved, while delivery lookups run.
+  // Recheck durable operational state immediately before external delivery.
+  if (
+    claim.type === "match.message_received" ||
+    claim.type === "match.admin_assistance_requested"
+  ) {
+    const latestState = await loadClaimState(supabase, claim);
+    if (latestState === "unavailable") {
+      return completeFailure(
+        supabase, claim, "retryable_failure", "NOTIFICATION_RECHECK_FAILED"
+      );
+    }
+    if (latestState === "stale") {
+      await completeNotification(supabase, claim, "skipped", "NO_LONGER_UNREAD");
+      return "skipped";
+    }
   }
 
   const deliveries = await Promise.all(

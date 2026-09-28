@@ -113,6 +113,11 @@ export function localizePlayerNotificationCopy(
         "registrationReviewMessage",
         tournamentName
       );
+    case "match.message_received":
+      return {
+        title: dictionary.server.matchMessageReceivedTitle,
+        message: dictionary.server.matchMessageReceivedMessage,
+      };
     case "match.ready":
       return template(
         dictionary,

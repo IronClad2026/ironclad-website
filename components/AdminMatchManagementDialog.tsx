@@ -31,6 +31,7 @@ export default function AdminMatchManagementDialog({
   readOnly = false,
   onClose,
   diceHistory,
+  roomId,
 }: {
   tournament: TournamentCard;
   match: GeneratedTournamentMatch;
@@ -38,6 +39,7 @@ export default function AdminMatchManagementDialog({
   participantsById: Map<string, TournamentParticipant>;
   viewer: { isAdmin: boolean };
   diceHistory?: ReactNode;
+  roomId?: string | null;
   submissions: MatchResultSubmission[];
   reportGroups: MatchResultReportGroup[];
   readOnly?: boolean;
@@ -261,6 +263,7 @@ export default function AdminMatchManagementDialog({
               canEnterOfficialResult={canEnterOfficialResult}
               onPendingChange={handlePendingChange}
               diceHistory={diceHistory}
+              roomId={roomId}
             />
           </div>
         </motion.section>

@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import { assertP03PreviewSafety } from "./lib/p03-preview-safety";
+
+assertP03PreviewSafety();
 
 const nextConfig: NextConfig = {
   async headers() {

@@ -1,0 +1,33 @@
+{
+  "recordedAt": "2026-09-23T06:55:33.285Z",
+  "postgres": "17.11",
+  "baselineMigrations": 146,
+  "packageMigrations": [
+    "20260923040206_match_room_production_bootstrap.sql",
+    "20260919011425_match_room_phase_one.sql",
+    "20260919235836_match_room_phase_three.sql",
+    "20260920014644_match_room_production_hardening.sql",
+    "20260922054205_match_room_unread_summary.sql",
+    "20260923040754_match_room_disabled_assistance_gate.sql",
+    "20260923062127_match_room_retention_and_privacy.sql"
+  ],
+  "packageSqlSha256": "40ad016e6ff05960733f4e61e0de5b949eefb3466b4978abe5990f0e4bbf318f",
+  "competitionFingerprintSha256": "365d4e771dec6bb9bab35340a14bdf51b98b0f6e23ae27f782ad5a44058b6dfe",
+  "checks": [
+    "changed existing authority definition aborts before Match Room capability installation",
+    "injected final-step failure rolls back all schema, setting, ledger and competition facts",
+    "active match transaction aborts migration within bounded lock timeout and leaves no partial install",
+    "seven migration boundaries expose no RPC/table/setting to external authenticated or service-role callers before atomic commit",
+    "partial-tournament competition fingerprint identical before and after exact package",
+    "full package remains OFF and manufactures no historical room, conversation or assistance",
+    "OFF rejects create/send/read/request/reopen/admin resolution from first externally visible write capability",
+    "completed early round and semifinal, one-player/TBD, empty final, BYE and unactivated future pair create no room after enable",
+    "active two-player, pending review and disputed-result matches retain authoritative room eligibility",
+    "package reapplication aborts cleanly against an unexpected ledger",
+    "match-room-phase-1.sql 155",
+    "match-room-phase-3.sql MATCH_ROOM_PHASE_3_ASSERTIONS=89",
+    "match-room-production-hardening.sql HARDENING_ASSERTIONS=45",
+    "match-room-unread-summary.sql UNREAD_SUMMARY_ASSERTIONS=34"
+  ],
+  "status": "PASS"
+}

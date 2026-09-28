@@ -1,6 +1,12 @@
 import type { DictionaryShape } from "@/lib/i18n/types";
 
 const dictionary = {
+  matchRoomAttention: {
+    opponent: "New message from opponent",
+    admin: "New IronClad admin message",
+    generic: "New Match Room message",
+    unreadDescription: "Unread Match Room message. Open the match and catch up to clear this alert.",
+  },
   resultUx: {
     won: "Won",
     lost: "Lost",

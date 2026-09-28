@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   dispute: vi.fn(),
   support: vi.fn(),
+  supportState: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: mocks.refresh }),
@@ -36,12 +37,14 @@ vi.mock("@/lib/supabase-browser", () => ({
 }));
 vi.mock("@/app/tournaments/support-actions", () => ({
   requestMatchAdminAssistance: mocks.support,
+  getMatchRoomAssistance: mocks.supportState,
+  resolveMatchAdminAssistance: vi.fn(),
+  getMatchRoomOpponentDiscord: vi.fn(async () => ({ discordUsername: null })),
 }));
 import MatchConfirmationCountdown from "@/components/MatchConfirmationCountdown";
 import PlayerMatchResultStatus from "@/components/PlayerMatchResultStatus";
 import MatchResultControls from "@/components/MatchResultControls";
-import DiscordSupportLink from "@/components/RequestAdminAssistanceButton";
-import { OFFICIAL_DISCORD_SUPPORT_CHANNEL_URL } from "@/lib/support";
+import DiscordSupportLink, { MatchRoomSupportFooter } from "@/components/RequestAdminAssistanceButton";
 import {
   uxMatch,
   uxParticipants,
@@ -49,6 +52,7 @@ import {
 } from "@/tests/fixtures/match-result-ux";
 
 beforeEach(() => {
+  mocks.supportState.mockResolvedValue({ ok: true, data: { roomId: "22222222-2222-4222-8222-222222222222", status: "none", requestVersion: 0, requestedAt: null, resolvedAt: null, canResolve: false } });
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-09-04T14:00:00Z"));
 });
@@ -347,14 +351,22 @@ describe("existing public match projections", () => {
   });
 });
 
-it("links directly to the central owner-verified ticket channel without creating an internal request", () => {
-  render(<DiscordSupportLink />);
-  const link = screen.getByRole("link", {
-    name: "Open Discord Support Ticket",
+it("requests in-app assistance for the exact room instead of opening an external channel", async () => {
+  mocks.support.mockResolvedValue({ ok: true, data: { roomId: "22222222-2222-4222-8222-222222222222", status: "requested", requestVersion: 1, requestedAt: "2026-09-20T01:00:00Z", resolvedAt: null, canResolve: false } });
+  render(<DiscordSupportLink matchId={uxMatch.id} roomId="22222222-2222-4222-8222-222222222222" roomRevision={1} />);
+  await tick();
+  fireEvent.click(screen.getByRole("button", { name: "Request Admin Assistance" }));
+  await tick();
+  expect(mocks.support).toHaveBeenCalledWith({
+    roomId: "22222222-2222-4222-8222-222222222222",
+    expectedRequestVersion: 0,
   });
-  expect(link).toHaveAttribute("href", OFFICIAL_DISCORD_SUPPORT_CHANNEL_URL);
-  expect(link).toHaveAttribute("target", "_blank");
-  expect(link).toHaveAttribute("rel", "noopener noreferrer");
-  fireEvent.click(link);
-  expect(mocks.support).not.toHaveBeenCalled();
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+});
+
+it("shows not-shared contact without a Discord copy control when the live projection is private", async () => {
+  render(<MatchRoomSupportFooter matchId={uxMatch.id} roomId="22222222-2222-4222-8222-222222222222" roomRevision={1} />);
+  await tick();
+  expect(screen.getByText("Discord contact not shared.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Copy.*Discord/i })).not.toBeInTheDocument();
 });

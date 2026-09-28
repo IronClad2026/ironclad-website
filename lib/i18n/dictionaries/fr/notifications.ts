@@ -189,6 +189,8 @@ const dictionary = {
       "Le résultat déclaré est examiné par l’administration. Ouvrez ce message pour consulter le rapport.",
   },
   server: {
+    matchMessageReceivedTitle: "Nouveau message dans le salon du match",
+    matchMessageReceivedMessage: "Vous avez de nouveaux messages dans votre salon de match.",
     loadError: "Impossible de charger les notifications.",
     badgeUnlockedTitle: "Badge débloqué",
     badgeUnlockedMessage: "Vous avez débloqué le badge {badgeName}.",

@@ -1,7 +1,12 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import { revalidatePath } from "next/cache";
+import {
+  AccountLegalMutationBlockedError,
+  requireCurrentAccountLegalAcceptance,
+} from "@/lib/account-legal-mutation-guard";
+import { isAccountLegalAcceptanceRpcError } from "@/lib/account-legal-rpc-error";
 import {
   isRollMatchDiceInput,
   parseMatchDiceRollRpcResult,
@@ -29,7 +34,13 @@ export async function rollMatchDice(
     return { ok: false, error: "Sign in before using the Dice Roll-Off.", code: "auth_required" };
   }
 
-  await requireCurrentAccountLegalAcceptance();
+  try {
+    await requireCurrentAccountLegalAcceptance();
+  } catch (error) {
+    if (!(error instanceof AccountLegalMutationBlockedError)) throw error;
+    revalidatePath("/", "layout");
+    return { ok: false, error: GENERIC_ROLL_ERROR, code: "roll_failed" };
+  }
 
   if (!isRollMatchDiceInput(input)) {
     return { ok: false, error: "The Dice Roll-Off request is invalid.", code: "invalid_request" };
@@ -53,13 +64,15 @@ export async function rollMatchDice(
       p_game_number: input.gameNumber,
       p_expected_tie_round: input.expectedTieRound,
     });
-  } catch {
-    console.error("Match dice roll RPC failed unexpectedly.");
+  } catch (error) {
+    if (isAccountLegalAcceptanceRpcError(error)) revalidatePath("/", "layout");
+    else console.error("Match dice roll RPC failed unexpectedly.");
     return { ok: false, error: GENERIC_ROLL_ERROR, code: "roll_failed" };
   }
 
   if (result.error) {
-    console.error("Match dice roll RPC rejected the request.");
+    if (isAccountLegalAcceptanceRpcError(result.error)) revalidatePath("/", "layout");
+    else console.error("Match dice roll RPC rejected the request.");
     return { ok: false, error: GENERIC_ROLL_ERROR, code: "roll_failed" };
   }
 
