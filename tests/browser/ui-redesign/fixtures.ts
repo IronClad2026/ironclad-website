@@ -187,6 +187,8 @@ export function registrationFixtures() {
 
 export function careerFixture(): PlayerCareerDashboard {
   const empty = parameters().has("empty");
+  const careerBanner = parameters().has("noCareerBanner") ? null : "/images/tournaments/1v1-operation-skyfall.jpeg";
+  const careerName = parameters().has("long") ? `Previous IronClad ${"InternationalChampionship".repeat(4)}` : "Previous IronClad Cup";
   return {
     error: parameters().has("careerError") ? "load-failed" : null,
     statistics: { matchesPlayed: empty ? 0 : 18, matchesWon: empty ? 0 : 12, matchesLost: empty ? 0 : 6, winRate: empty ? 0 : 66.7, tournamentsParticipated: empty ? 0 : 4, tournamentsWon: empty ? 0 : 1 },
@@ -199,11 +201,13 @@ export function careerFixture(): PlayerCareerDashboard {
       reviewedAt: null, submittedByViewer: false, confirmationDeadlineAt: fixtureDeadline, finalizedAt: null,
       canConfirm: true, canDispute: true,
     }],
-    champions: empty ? [] : [{ id: "fixture-champion", winnerName: "Steel Vanguard", tournamentName: "Previous IronClad Cup", bracketName: "Academy", bannerImageUrl: "/images/tournaments/1v1-operation-skyfall.jpeg", wonAt: fixtureDate }],
+    champions: empty ? [] : [{ id: "fixture-champion", tournamentId: "career-event-0", tournamentBracketId: "career-division-0", generatedBracketId: "career-generation-0", winnerName: "Steel Vanguard", tournamentName: careerName, bracketName: "Academy", bannerImageUrl: careerBanner, wonAt: "2026-09-02T12:00:00.000Z" }],
     matchHistory: empty ? [] : Array.from({ length: 6 }, (_, index) => ({
-      id: `fixture-match-${index}`, tournamentName: "Previous IronClad Cup", bracketName: "Academy",
-      opponentName: `Opponent ${index + 1}`, result: index % 2 === 0 ? "win" : "loss", score: index % 2 === 0 ? "2–1" : "0–2",
-      playedAt: fixtureDate, roundName: "Semifinal", matchNumber: index + 1, seriesBestOf: 3,
+      id: `fixture-match-${index}`, tournamentName: careerName, bracketName: "Academy",
+      tournamentId: `career-event-${Math.floor(index / 2)}`, tournamentBracketId: `career-division-${Math.floor(index / 2)}`,
+      generatedBracketId: `career-generation-${Math.floor(index / 2)}`, tournamentBannerImageUrl: careerBanner,
+      opponentName: `Opponent ${index + 1}`, result: index < 3 ? "win" : "loss", score: index < 3 ? "2–1" : "0–2",
+      playedAt: `2026-0${9 - Math.floor(index / 2)}-0${index % 2 + 1}T12:00:00.000Z`, roundName: index % 2 === 0 ? "Semifinal" : "Final", roundNumber: index % 2 + 1, matchNumber: index + 1, seriesBestOf: 3,
       replayAvailable: false, screenshotAvailable: false,
     })),
   };

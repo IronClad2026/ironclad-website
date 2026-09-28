@@ -361,6 +361,8 @@ const dictionary = {
     },
     career: {
       title: "Storico competitivo",
+      tournaments: "Tornei",
+      championships: "Titoli",
       matches: "Partite",
       champions: "Campioni",
       registrations: "Iscrizioni precedenti",
@@ -368,6 +370,22 @@ const dictionary = {
       loadError: "Impossibile caricare il tuo storico competitivo.",
       partialError:
         "Non è stato possibile caricare alcuni dettagli di presentazione dei Tornei.",
+    },
+    tournamentHistory: {
+      title: "Storico dei Tornei",
+      empty: "Le partecipazioni ai Tornei completati appariranno qui.",
+      record: "Bilancio del Torneo",
+      recordValue: "{wins}–{losses}",
+      wins: "Vittorie",
+      losses: "Sconfitte",
+      showMatches: "Visualizza partite",
+      hideMatches: "Nascondi partite",
+    },
+    registrationArchive: {
+      title: "Archivio delle Iscrizioni",
+      show: "Visualizza archivio",
+      hide: "Nascondi archivio",
+      empty: "Nessuna iscrizione precedente.",
     },
     statistics: {
       eyebrow: "Record competitivo",
@@ -381,7 +399,7 @@ const dictionary = {
     },
     champions: {
       eyebrow: "Archivio vittorie",
-      title: "Campioni dei Tornei",
+      title: "Titoli nei Tornei",
       empty: "Le vittorie nei Tornei verranno mostrate qui in modo permanente.",
       champion: "Campione del Torneo",
       bracket: "Tabellone {name}",

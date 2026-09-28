@@ -27,6 +27,7 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 import type { TournamentStatus } from "@/lib/tournaments";
 import DashboardIdentity from "@/components/dashboard/DashboardIdentity";
 import DashboardCareerHistory from "@/components/dashboard/DashboardCareerHistory";
+import DashboardRegistrationArchive from "@/components/dashboard/DashboardRegistrationArchive";
 import DashboardPerformance from "@/components/dashboard/DashboardPerformance";
 import { EmptyRegistrations, HistoricalRegistrationRecord, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
 import { groupDashboardRegistrations, type PlayerRegistration } from "@/components/dashboard/registration-presentation";
@@ -266,15 +267,18 @@ export default async function PlayerDashboardPage() {
         <DashboardCareerHistory
           matches={career.matchHistory}
           champions={career.champions}
-          previousRegistrations={<div className="divide-y divide-white/10">{previousRegistrationNodes}</div>}
-          previousRegistrationCount={previousRegistrations.length}
           loadError={career.error ? t(
             career.error === "load-failed"
               ? "dashboard.career.loadError"
               : "dashboard.career.partialError"
           ) : null}
-          registrationLoadError={registrationsResult.error ? t("dashboard.registrations.loadError") : null}
         />
+        <DashboardRegistrationArchive
+          count={previousRegistrations.length}
+          loadError={registrationsResult.error ? t("dashboard.registrations.loadError") : null}
+        >
+          <div className="divide-y divide-white/10">{previousRegistrationNodes}</div>
+        </DashboardRegistrationArchive>
 
         <div
           id="community-polls"

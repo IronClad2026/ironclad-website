@@ -33,6 +33,7 @@ Query options can be combined:
 - Dashboard: `historicalNotice=1` for a notification targeting a hidden previous registration
 - Dashboard: `pendingBadge=1` for an actual queued Badge reveal
 - Dashboard: `registrationStates=1` adds pending/manual-review current records and cancelled/voided/rejected/withdrawn historical records
+- Dashboard: `noCareerBanner=1` uses the Trophy fallback; browser checks also simulate failed banner requests
 
 Run the browser checks:
 
@@ -57,7 +58,9 @@ runs Tournament checks. If reusing an already running Vite server, restart it
 with the same source path before testing; a process variable cannot change an
 existing server's source tree.
 
-The Dashboard profile covers eight viewport widths (including 375px and 390px), six statistics, career tabs,
+The Dashboard profile covers eight viewport widths (including 375px and 390px), six statistics, the two career tabs,
+three separately identified tournament runs with identical titles, match progression and W–L records,
+authoritative championship markers, missing/failed banners, the independent Registration Archive,
 empty/missing/error states, accepted invitations, failed notification feedback,
 repeated same-hash historical navigation, native match details, proof privacy,
 initial historical anchors, action reachability and 44px touch targets, all eight
