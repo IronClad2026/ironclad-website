@@ -1,0 +1,10 @@
+{
+  "testedAt": "2026-09-28T02:59:09.566Z",
+  "status": "PASS",
+  "checks": [
+    "another session sees neither event nor message until sender transaction commits",
+    "rolled-back sender transaction never exposes a broadcast event",
+    "concurrent idempotent retries persist one message and one invalidation",
+    "reassignment commits old-topic invalidation atomically and all later events use new generation only"
+  ]
+}

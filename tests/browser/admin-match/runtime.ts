@@ -22,3 +22,16 @@ export const createAuthenticatedBrowserSupabaseClient = () => {
 };
 export const cleanupPreparedReplayUploads = fixtureAction;
 export const finalizeMatchResult = fixtureAction;
+
+// This result-management fixture has no conversation. Keep all Match Room
+// boundaries synthetic; the dedicated room fixture covers their behavior.
+export const resolveMatchRoom = async () => ({ ok: true as const, data: { room: null } });
+const unavailableRoomAction = async () => ({ ok: false as const, code: "unavailable" as const });
+export const getMatchRoomHistory = unavailableRoomAction;
+export const getMatchRoomEarlierHistory = unavailableRoomAction;
+export const markMatchRoomRead = unavailableRoomAction;
+export const sendMatchRoomMessage = unavailableRoomAction;
+export const sendAdminMatchRoomMessage = unavailableRoomAction;
+export const getMatchRoomAssistance = unavailableRoomAction;
+export const requestMatchAdminAssistance = unavailableRoomAction;
+export const resolveMatchAdminAssistance = unavailableRoomAction;

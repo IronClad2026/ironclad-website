@@ -10,6 +10,8 @@ export default defineConfig({
     alias: [
       ...[
         "@/app/tournaments/match-actions",
+        "@/app/tournaments/room-actions",
+        "@/app/tournaments/support-actions",
         "@/app/admin/tournaments/deadline-actions",
         "@/lib/supabase-browser",
         "@clerk/nextjs",

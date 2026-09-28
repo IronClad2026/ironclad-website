@@ -1,0 +1,14 @@
+{
+  "testedAt": "2026-09-28T03:02:33.440Z",
+  "postgres": "17.11",
+  "status": "PASS",
+  "checks": [
+    "tournament-first lifecycle lock causes immediate NOWAIT failure without lock-inversion deadlock or deletion",
+    "two-room purge NOWAIT rejects later-match inversion and rolls back every earlier body deletion while finalizer commits",
+    "concurrent formal-case creation serializes before purge and protects committed case content",
+    "concurrent narrow-scope hold installation serializes before purge and release resumes eligibility",
+    "canonical result-case transition locks its match and committed dispute blocks purge",
+    "purge locks serialize later hold/reopen authority and rollback restores bodies and exact audit state",
+    "successful retry after contention purges once and repeated batch is idempotent"
+  ]
+}

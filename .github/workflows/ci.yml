@@ -51,6 +51,9 @@ jobs:
       - name: Official News browser regression tests
         run: npx playwright test --config tests/browser/news/playwright.config.ts
 
+      - name: Match result and replay browser regression tests
+        run: npx playwright test --config tests/browser/match-result/playwright.config.ts
+
       - name: Bracket geometry and private unread attention browser tests
         run: npx playwright test --config tests/browser/bracket-layout/playwright.config.ts
 
@@ -59,3 +62,42 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  p03-realtime-database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Use Node.js 22.12.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+      - name: Install PostgreSQL 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17
+      - name: Start disposable loopback-only PostgreSQL
+        run: |
+          /usr/lib/postgresql/17/bin/initdb -D "$RUNNER_TEMP/p03-realtime-postgres" -U postgres -A trust --no-locale --encoding=UTF8
+          /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-realtime-postgres" -l "$RUNNER_TEMP/p03-realtime-postgres.log" -o "-h 127.0.0.1 -p 56623 -k $RUNNER_TEMP" -w start
+      - name: Replay Staging migrations and P03 SQL regressions
+        run: node scripts/p03-1/database.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Realtime transaction and generation concurrency
+        run: node scripts/p03-1/realtime-concurrency.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Existing P03 and retention concurrency; migration retry safety
+        run: |
+          node scripts/p03-1/concurrency.mjs /usr/lib/postgresql/17/bin/psql
+          node scripts/p03-1/attention-concurrency.mjs /usr/lib/postgresql/17/bin/psql
+          node scripts/p03-1/retention-concurrency.mjs /usr/lib/postgresql/17/bin/psql
+          node scripts/p03-1/repeatability.mjs /usr/lib/postgresql/17/bin/psql
+          node scripts/p03-1/result-regressions.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Stop disposable PostgreSQL
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/p03-realtime-postgres/postmaster.pid" ]; then
+            /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-realtime-postgres" -m fast -w stop
+          fi

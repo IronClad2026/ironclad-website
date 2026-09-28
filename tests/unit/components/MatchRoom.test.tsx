@@ -8,6 +8,13 @@ import { getMatchRoomCopy } from "@/lib/i18n/match-room";
 import { MATCH_ROOM_READ_ACKNOWLEDGED_EVENT } from "@/lib/match-room-unread-events";
 import type { MatchRoom as Room, MatchRoomHistory, MatchRoomMessage } from "@/lib/match-room";
 
+const authState = vi.hoisted(() => ({ getToken: vi.fn(), userId: "player", sessionId: "session" }));
+const realtimeMock = vi.hoisted(() => ({ createClient: vi.fn() }));
+vi.mock("@/lib/supabase-browser", () => ({ createAuthenticatedBrowserSupabaseClient: realtimeMock.createClient }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({
+  ...authState, isLoaded: true, isSignedIn: true,
+}) }));
+
 vi.mock("@/app/tournaments/room-actions", () => ({
   resolveMatchRoom: vi.fn(),
   getMatchRoomHistory: vi.fn(),
@@ -39,6 +46,21 @@ const deferred = <T,>() => {
   const promise = new Promise<T>((done) => { resolve = done; });
   return { promise, resolve };
 };
+function enableRealtime() {
+  let broadcast!: (input: { payload: unknown }) => void;
+  const channel = {
+    teardown: vi.fn(),
+    on: vi.fn().mockImplementation((_type, _filter, listener) => { broadcast = listener; return channel; }),
+    subscribe: vi.fn().mockReturnThis(),
+  };
+  const client = {
+    realtime: { setAuth: vi.fn().mockResolvedValue(undefined), disconnect: vi.fn().mockResolvedValue(undefined) },
+    channel: vi.fn().mockReturnValue(channel), removeChannel: vi.fn().mockResolvedValue("ok"),
+  };
+  authState.getToken.mockResolvedValue("test-only-token");
+  realtimeMock.createClient.mockReturnValue(client);
+  return { client, emit: () => broadcast({ payload: { roomId: id(100), communicationGeneration: 1 } }) };
+}
 const renderRoom = (props: Partial<React.ComponentProps<typeof MatchRoom>> = {}) =>
   render(<MatchRoom matchId={id(300)} participants={participants} {...props} />);
 async function ready() { await screen.findByText("Message 1"); }
@@ -58,6 +80,9 @@ function setTailVisible(log: HTMLElement, visible: boolean) {
 }
 
 beforeEach(() => {
+  authState.getToken.mockResolvedValue(null);
+  authState.userId = "player";
+  authState.sessionId = "session";
   initialIntersection = true;
   observedTails.clear();
   outsideViewport = new WeakSet();
@@ -90,6 +115,59 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("Match Room", () => {
+  it("keeps an invalidation received during an authoritative refresh and deduplicates the resulting messages", async () => {
+    vi.useFakeTimers();
+    const transport = enableRealtime();
+    renderRoom(); await act(async () => {});
+    const waiting = deferred<Awaited<ReturnType<typeof actions.getMatchRoomHistory>>>();
+    vi.mocked(actions.getMatchRoomHistory).mockReturnValueOnce(waiting.promise)
+      .mockResolvedValue(ok(page({ room: room({ lastSequence: 3 }), messages: [message(2), message(3)], nextAfterSequence: 3 })));
+    act(() => transport.emit());
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
+    expect(actions.getMatchRoomHistory).toHaveBeenCalledTimes(2);
+    act(() => { transport.emit(); transport.emit(); transport.emit(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
+    expect(actions.getMatchRoomHistory).toHaveBeenCalledTimes(2);
+    await act(async () => waiting.resolve(ok(page({ room: room({ lastSequence: 2 }), messages: [message(2)], nextAfterSequence: 2 }))));
+    expect(actions.getMatchRoomHistory).toHaveBeenCalledTimes(3);
+    expect(screen.getAllByText("Message 2")).toHaveLength(1);
+    expect(screen.getAllByText("Message 3")).toHaveLength(1);
+  });
+
+  it("preserves an older-history reader's scroll and unread cursor after Realtime delivery", async () => {
+    vi.useFakeTimers();
+    const transport = enableRealtime();
+    renderRoom(); await act(async () => {});
+    const log = screen.getByRole("log");
+    Object.defineProperties(log, {
+      scrollHeight: { configurable: true, value: 1000 }, clientHeight: { configurable: true, value: 200 },
+      scrollTop: { configurable: true, writable: true, value: 100 },
+    });
+    fireEvent.scroll(log);
+    const reads = vi.mocked(actions.markMatchRoomRead).mock.calls.length;
+    vi.mocked(actions.getMatchRoomHistory).mockResolvedValue(ok(page({
+      room: room({ lastSequence: 2, lastReadSequence: 1 }), messages: [message(2)], nextAfterSequence: 2,
+    })));
+    act(() => transport.emit());
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
+    expect(screen.getByText("Message 2")).toBeInTheDocument();
+    expect(log.scrollTop).toBe(100);
+    expect(actions.markMatchRoomRead).toHaveBeenCalledTimes(reads);
+    expect(screen.getByRole("button", { name: copy.newMessages })).toBeInTheDocument();
+  });
+
+  it("clears private transcript and draft immediately when the Clerk session changes", async () => {
+    const view = renderRoom(); await ready();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Previous account draft" } });
+    const waiting = deferred<Awaited<ReturnType<typeof actions.resolveMatchRoom>>>();
+    vi.mocked(actions.resolveMatchRoom).mockReturnValueOnce(waiting.promise);
+    authState.userId = "next-player"; authState.sessionId = "next-session";
+    view.rerender(<MatchRoom matchId={id(300)} participants={participants} />);
+    expect(screen.queryByText("Message 1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    await act(async () => waiting.resolve(ok({ room: null })));
+  });
+
   it("invalidates private card attention only after a successful genuine read acknowledgment", async () => {
     const acknowledged = vi.fn();
     const pending = deferred<Awaited<ReturnType<typeof actions.markMatchRoomRead>>>();

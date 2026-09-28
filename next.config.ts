@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import { assertRealtimeStagingEnvironment } from "./lib/p03-1-preview-safety";
+
+assertRealtimeStagingEnvironment();
 
 const nextConfig: NextConfig = {
   async headers() {
