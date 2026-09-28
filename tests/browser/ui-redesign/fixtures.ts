@@ -162,9 +162,9 @@ export function profileFixture(): PlayerProfile {
 
 export function registrationFixtures() {
   if (parameters().has("empty")) return [];
-  return ["approved", "waitlisted", "approved"].map((status, index) => ({
-    id: `registration-${index + 1}`, tournament_title: index === 2 ? "Previous IronClad Cup" : `IronClad Open ${index + 1}`,
-    bracket_name: "Academy", registration_status: status,
+  const registrations = ["approved", "waitlisted", "approved"].map((status, index) => ({
+    id: `registration-${index + 1}`, tournament_title: parameters().has("long") ? `IronClad_InternationalChampionship_${"TournamentName".repeat(4)}_${index + 1}` : index === 2 ? "Previous IronClad Cup" : `IronClad Open ${index + 1}`,
+    bracket_name: parameters().has("long") ? "Academy International Championship Division" : "Academy", registration_status: status,
     tournament_bracket_id: `fixture-bracket-${index}`, elo_status: "verified", submitted_elo: 1020,
     withdrawn_at: null, waitlist_offer_status: index === 1 ? "offered" : null,
     waitlist_offer_created_at: index === 1 ? fixtureDate : null,
@@ -174,6 +174,15 @@ export function registrationFixtures() {
     tournaments: { status: index === 2 ? "completed" : "registration_open" },
     created_at: fixtureDate,
   }));
+  if (parameters().has("registrationStates")) {
+    for (const status of ["pending", "manual_review", "rejected", "withdrawn"]) {
+      registrations.push({ ...registrations[0], id: `registration-${status}`, tournament_title: `IronClad ${status} Cup`, registration_status: status });
+    }
+    for (const status of ["cancelled", "voided"]) {
+      registrations.push({ ...registrations[1], id: `registration-${status}`, tournament_title: `IronClad ${status} Cup`, tournaments: { status } });
+    }
+  }
+  return registrations;
 }
 
 export function careerFixture(): PlayerCareerDashboard {

@@ -115,17 +115,17 @@ export default function PlayerRegistrationActions({
   }
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className={`min-w-0 max-w-full space-y-3 ${hasOfferMessage ? "w-full" : ""}`}>
       {waitlistOfferStatus === "offered" && (
         <div className="border-l-2 border-amber-400/60 bg-amber-500/[0.06] px-3 py-2.5 text-amber-100">
-          <p className="text-sm font-black uppercase tracking-wider">
+          <p className="text-sm font-semibold">
             {t("registrationActions.offerTitle")}
           </p>
-          <p className="mt-2 text-sm leading-6">
+          <p className="mt-1 text-sm leading-5">
             {t("registrationActions.offerDescription")}
           </p>
           {waitlistOfferExpiresAt && (
-            <p className="mt-2 text-xs font-bold uppercase tracking-wider text-amber-200">
+            <p className="mt-2 text-sm font-medium leading-5 text-amber-200">
               <HydrationSafeLocalDateTime
                 value={waitlistOfferExpiresAt}
                 fallback={t("registrationActions.respondBefore", {
@@ -174,7 +174,7 @@ export default function PlayerRegistrationActions({
             name="response"
             value="accept"
             disabled={offerPending}
-            className="min-h-11 border border-emerald-400 bg-emerald-500 px-4 py-3 text-sm font-black uppercase tracking-wider text-black transition hover:bg-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
+            className="min-h-11 min-w-0 border border-emerald-400 bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
           >
             {offerPending
               ? t("registrationActions.updating")
@@ -185,7 +185,7 @@ export default function PlayerRegistrationActions({
             name="response"
             value="decline"
             disabled={offerPending}
-            className="min-h-11 border border-white/20 bg-zinc-900 px-4 py-3 text-sm font-black uppercase tracking-wider text-white transition hover:border-red-400 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
+            className="min-h-11 min-w-0 border border-white/20 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-red-400 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
           >
             {t("registrationActions.declineSpot")}
           </button>
@@ -213,7 +213,7 @@ export default function PlayerRegistrationActions({
           <button
             type="submit"
             disabled={withdrawPending}
-            className="min-h-11 border border-red-500/50 bg-red-950/25 px-4 py-3 text-sm font-black uppercase tracking-wider text-red-200 transition hover:border-red-400 hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
+            className="min-h-11 max-w-full border border-white/15 bg-white/[0.025] px-4 py-2.5 text-sm font-semibold text-zinc-300 transition hover:border-red-400/60 hover:bg-red-500/10 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-60"
           >
             {withdrawPending
               ? t("registrationActions.withdrawing")

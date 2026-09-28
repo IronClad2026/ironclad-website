@@ -28,7 +28,7 @@ import type { TournamentStatus } from "@/lib/tournaments";
 import DashboardIdentity from "@/components/dashboard/DashboardIdentity";
 import DashboardCareerHistory from "@/components/dashboard/DashboardCareerHistory";
 import DashboardPerformance from "@/components/dashboard/DashboardPerformance";
-import { EmptyRegistrations, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
+import { EmptyRegistrations, HistoricalRegistrationRecord, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
 import { groupDashboardRegistrations, type PlayerRegistration } from "@/components/dashboard/registration-presentation";
 
 export const dynamic = "force-dynamic";
@@ -140,7 +140,7 @@ export default async function PlayerDashboardPage() {
   const { current: currentRegistrations, previous: previousRegistrations } =
     groupDashboardRegistrations(registrations);
   const previousRegistrationNodes = previousRegistrations.map((registration) => (
-    <RegistrationCard key={registration.id} registration={registration} locale={locale} t={t} />
+    <HistoricalRegistrationRecord key={registration.id} registration={registration} locale={locale} t={t} />
   ));
 
   return (
@@ -266,7 +266,7 @@ export default async function PlayerDashboardPage() {
         <DashboardCareerHistory
           matches={career.matchHistory}
           champions={career.champions}
-          previousRegistrations={<div className="grid gap-3">{previousRegistrationNodes}</div>}
+          previousRegistrations={<div className="divide-y divide-white/10">{previousRegistrationNodes}</div>}
           previousRegistrationCount={previousRegistrations.length}
           loadError={career.error ? t(
             career.error === "load-failed"
