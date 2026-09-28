@@ -1,0 +1,20 @@
+{
+  "testedAt": "2026-09-28T03:05:00.178Z",
+  "status": "PASS",
+  "checks": [
+    {
+      "suite": "match-result-transactional-notifications",
+      "status": "PASS",
+      "summary": [
+        "p1_match_result_notifications_rolled_back"
+      ]
+    },
+    {
+      "suite": "match-result-ux-confirmation",
+      "status": "PASS",
+      "summary": [
+        "PASS: fixed 30-minute deadline, setting snapshot, manual/dispute/automatic authority and exactly-once side effects"
+      ]
+    }
+  ]
+}

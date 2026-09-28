@@ -4,13 +4,16 @@ import react from "@vitejs/plugin-react";
 const root = resolve(import.meta.dirname, "../../..");
 const runtime = resolve(import.meta.dirname, "runtime.ts");
 const resultRuntime = resolve(root, "tests/browser/match-result/runtime.ts");
+const realtimeRuntime = resolve(import.meta.dirname, "realtime-runtime.ts");
 export default defineConfig({
   root, plugins: [react()],
   resolve: { alias: [
     { find: "@/app/tournaments/room-actions", replacement: runtime },
     { find: "@/app/tournaments/room-unread-actions", replacement: runtime },
     { find: "@/app/tournaments/support-actions", replacement: runtime },
-    ...["@/app/tournaments/match-actions", "@/lib/supabase-browser", "@clerk/nextjs", "next/navigation"]
+    ...["@/lib/supabase-browser", "@clerk/nextjs"]
+      .map((find) => ({ find, replacement: realtimeRuntime })),
+    ...["@/app/tournaments/match-actions", "next/navigation"]
       .map((find) => ({ find, replacement: resultRuntime })),
     { find: "@", replacement: root },
   ] },
