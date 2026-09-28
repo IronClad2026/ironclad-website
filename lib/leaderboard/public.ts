@@ -147,10 +147,14 @@ type ChampionRow = {
 
 export async function getPublicLeaderboardData(): Promise<PublicLeaderboardData> {
   const errors: string[] = [];
-  const currentSeason = await loadCurrentSeason(errors);
-  const [seasonStandings, allTimeStandings, seasonChampions] =
+  const currentSeasonRequest = loadCurrentSeason(errors);
+  const seasonStandingsRequest = currentSeasonRequest.then((currentSeason) =>
+    currentSeason ? loadSeasonStandings(currentSeason.id, errors) : []
+  );
+  const [currentSeason, seasonStandings, allTimeStandings, seasonChampions] =
     await Promise.all([
-      currentSeason ? loadSeasonStandings(currentSeason.id, errors) : [],
+      currentSeasonRequest,
+      seasonStandingsRequest,
       loadAllTimeStandings(errors),
       loadSeasonChampions(errors),
     ]);

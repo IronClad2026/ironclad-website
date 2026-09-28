@@ -322,6 +322,7 @@ export default function Navbar() {
                 alt="IronClad"
                 width={1365}
                 height={768}
+                sizes="342px"
                 className="h-14 w-auto sm:h-16 min-[1440px]:h-14 min-[1800px]:h-16"
                 priority
               />
