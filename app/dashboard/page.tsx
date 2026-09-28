@@ -27,9 +27,9 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 import type { TournamentStatus } from "@/lib/tournaments";
 import DashboardIdentity from "@/components/dashboard/DashboardIdentity";
 import DashboardCareerHistory from "@/components/dashboard/DashboardCareerHistory";
-import DashboardRegistrationArchive from "@/components/dashboard/DashboardRegistrationArchive";
+import DashboardRegistrationNavigation from "@/components/dashboard/DashboardRegistrationNavigation";
 import DashboardPerformance from "@/components/dashboard/DashboardPerformance";
-import { EmptyRegistrations, HistoricalRegistrationRecord, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
+import { EmptyRegistrations, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
 import { groupDashboardRegistrations, type PlayerRegistration } from "@/components/dashboard/registration-presentation";
 
 export const dynamic = "force-dynamic";
@@ -138,11 +138,8 @@ export default async function PlayerDashboardPage() {
       ? dictionaries.badges.dashboard.loadErrorDescription
       : null;
 
-  const { current: currentRegistrations, previous: previousRegistrations } =
+  const { current: currentRegistrations } =
     groupDashboardRegistrations(registrations);
-  const previousRegistrationNodes = previousRegistrations.map((registration) => (
-    <HistoricalRegistrationRecord key={registration.id} registration={registration} locale={locale} t={t} />
-  ));
 
   return (
     <main
@@ -158,6 +155,7 @@ export default async function PlayerDashboardPage() {
       }}
     >
       <div className="relative z-10 mx-auto max-w-7xl">
+        <DashboardRegistrationNavigation key={currentRegistrations.map((registration) => registration.id).join("|")} />
         <DashboardIdentity profile={profile} error={Boolean(profileResult.error)} locale={locale} t={t} showcaseEnabled={showcaseEnabled} />
 
         <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)]" data-dashboard-section="current-actions">
@@ -273,13 +271,6 @@ export default async function PlayerDashboardPage() {
               : "dashboard.career.partialError"
           ) : null}
         />
-        <DashboardRegistrationArchive
-          count={previousRegistrations.length}
-          loadError={registrationsResult.error ? t("dashboard.registrations.loadError") : null}
-        >
-          <div className="divide-y divide-white/10">{previousRegistrationNodes}</div>
-        </DashboardRegistrationArchive>
-
         <div
           id="community-polls"
           className="mt-8 scroll-mt-28"

@@ -20,6 +20,9 @@ async function openDashboard(page: Page, query = "") {
   await expect(page.locator("html")).toHaveAttribute("data-ui-fixture-ready", "dashboard");
   await expect(page.locator("[data-dashboard-command-centre]")).toBeVisible();
   await expect(page.locator("[data-dashboard-section=history]")).toBeVisible();
+  await expect(page.locator("[data-dashboard-section=registration-archive], [data-dashboard-section=previous-registrations], [data-registration-presentation=historical]")).toHaveCount(0);
+  await expect(page.locator("#registration-registration-3")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Registration Archive", exact: true })).toHaveCount(0);
   return errors;
 }
 
@@ -68,8 +71,7 @@ for (const width of widths) {
     await expect(history.locator("button[aria-haspopup=dialog]")).toHaveCount(6);
     await history.getByRole("tab", { name: "Championships 1", exact: true }).click();
     await expect(history.getByText("Steel Vanguard", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: /^Registration Archive/ }).click();
-    await expect(page.locator("#registration-registration-3")).toBeVisible();
+    await expect(page.locator("[data-dashboard-section=history] + [data-dashboard-section=community]")).toHaveCount(1);
     await expectNoOverflow(page);
     expect(errors).toEqual([]);
     expect(await page.evaluate(() => window.__uiFixture.blockedRequests)).toEqual([]);
@@ -84,8 +86,6 @@ test("empty Dashboard keeps informative current and career states", async ({ pag
   await expect(page.getByText("Completed tournament runs will appear here.", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Championships 0", exact: true }).click();
   await expect(page.locator("[data-career-championship]")).toHaveCount(0);
-  await page.getByRole("button", { name: /^Registration Archive 0/ }).click();
-  await expect(page.getByText("No previous registrations.", { exact: true })).toBeVisible();
   await expectNoOverflow(page);
   expect(errors).toEqual([]);
 });
@@ -113,13 +113,11 @@ test("profile load failure stays distinct from profile onboarding", async ({ pag
   expect(errors).toEqual([]);
 });
 
-test("career failure does not hide independent previous registrations", async ({ page }) => {
+test("career failure preserves current registrations without historical rows", async ({ page }) => {
   const errors = await openDashboard(page, "careerError=1");
   const history = page.locator("[data-dashboard-section=history]");
   await expect(history.getByRole("alert")).toHaveText("Your competitive history could not be loaded.");
-  await page.getByRole("button", { name: /^Registration Archive/ }).click();
-  await expect(page.locator("#registration-registration-3")).toBeVisible();
-  await expect(history.getByRole("alert")).toHaveText("Your competitive history could not be loaded.");
+  await expect(page.locator("[data-dashboard-section=registrations] article")).toHaveCount(2);
   expect(errors).toEqual([]);
 });
 
@@ -127,10 +125,7 @@ test("registration failure is not presented as an empty career", async ({ page }
   const errors = await openDashboard(page, "registrationError=1");
   const history = page.locator("[data-dashboard-section=history]");
   await expect(history.locator("button[aria-haspopup=dialog]")).toHaveCount(6);
-  const archive = page.locator("[data-dashboard-section=registration-archive]");
-  await archive.getByRole("button", { name: /^Registration Archive/ }).click();
-  await expect(archive.getByRole("alert")).toHaveText("Your Tournament Registrations could not be loaded.");
-  await expect(archive.getByText("No previous registrations.", { exact: true })).toHaveCount(0);
+  await expect(page.locator("[data-dashboard-section=registrations]").getByText("Your Tournament Registrations could not be loaded.")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -154,20 +149,31 @@ test("failed notification update remains visible in collapsed preview", async ({
   expect(errors).toEqual([]);
 });
 
-test("notification reopens hidden historical registration even for repeated same hash", async ({ page }) => {
+test("obsolete registration notification navigates safely without a missing hash or archive event", async ({ page }) => {
   const errors = await openDashboard(page, "historicalNotice=1");
-  const archiveControl = page.getByRole("button", { name: /^Registration Archive/ });
   const target = page.locator("#registration-registration-3");
-  await expect(target).toBeHidden();
+  await page.evaluate(() => {
+    window.addEventListener("ironclad:dashboard-registration-navigation", () => { throw new Error("Obsolete archive event dispatched"); });
+  });
+  await expect(target).toHaveCount(0);
   for (let index = 0; index < 2; index += 1) {
     await page.getByRole("button", { name: /Previous waitlist offer/ }).click();
-    await expect(page).toHaveURL(/#registration-registration-3$/);
-    await expect(archiveControl).toHaveAttribute("aria-expanded", "true");
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
+    await expect(target).toHaveCount(0);
+    await expect(page.locator("[data-dashboard-section=registrations] article")).toHaveCount(2);
+  }
+  expect(errors).toEqual([]);
+});
+
+test("current registration notification still reaches the exact card on repeated clicks", async ({ page }) => {
+  const errors = await openDashboard(page, "currentNotice=1");
+  const target = page.locator("#registration-registration-2");
+  for (let index = 0; index < 2; index += 1) {
+    await page.locator("[data-dashboard-section=history]").scrollIntoViewIfNeeded();
+    await page.getByRole("button", { name: /Current waitlist offer/ }).click();
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#registration-registration-2");
     await expect(target).toBeInViewport();
-    if (index === 0) {
-      await archiveControl.click();
-      await expect(target).toBeHidden();
-    }
+    await expect(target.getByRole("button", { name: "Accept Spot", exact: true })).toBeEnabled();
   }
   expect(errors).toEqual([]);
 });
@@ -233,6 +239,22 @@ for (const state of ["noCareerBanner", "failedCareerBanner"]) {
 }
 
 for (const width of [375, 390]) {
+  test(`current registration form submissions remain connected at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const errors = await openDashboard(page);
+    const offered = page.locator("#registration-registration-2");
+    await offered.getByRole("button", { name: "Accept Spot", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__uiFixture.actions.filter((name) => name === "respondToWaitlistOfferAction").length)).toBe(1);
+    await offered.getByRole("button", { name: "Decline Spot", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__uiFixture.actions.filter((name) => name === "respondToWaitlistOfferAction").length)).toBe(2);
+    page.once("dialog", (dialog) => dialog.accept());
+    await offered.getByRole("button", { name: "Withdraw Registration", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__uiFixture.actions)).toContain("withdrawTournamentRegistrationAction");
+    await expectNoOverflow(page);
+    expect(errors).toEqual([]);
+    expect(await page.evaluate(() => window.__uiFixture.blockedRequests)).toEqual([]);
+  });
+
   test(`registration actions and status labels remain reachable at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     const errors = await openDashboard(page, "registrationStates=1");
@@ -249,16 +271,9 @@ for (const width of [375, 390]) {
     }
     await expect(offered.getByText(/Respond before/)).toBeVisible();
     await expectContained(current.locator("[data-registration-status]"));
-    const history = page.locator("[data-dashboard-section=registration-archive]");
-    await history.getByRole("button", { name: /^Registration Archive/ }).click();
-    await expect(history.locator('[data-registration-presentation="historical"]')).toHaveCount(5);
     for (const status of ["cancelled", "voided", "rejected", "withdrawn"]) {
-      const record = history.locator(`#registration-registration-${status}`);
-      await expect(record).toBeVisible();
-      await expect(record.getByRole("button")).toHaveCount(0);
+      await expect(page.locator(`#registration-registration-${status}`)).toHaveCount(0);
     }
-    await expect(history.getByRole("status").filter({ hasText: "Read-only historical record" })).toHaveCount(2);
-    await expectContained(history.locator("article [data-registration-status]"));
     await expectNoOverflow(page);
     expect(errors).toEqual([]);
     expect(await page.evaluate(() => window.__uiFixture.actions)).toEqual([]);
@@ -278,9 +293,6 @@ for (const width of [375, 390]) {
         expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       }
       await expectContained(tabs);
-      const archive = page.locator("[data-dashboard-section=registration-archive]");
-      await archive.getByRole("button").first().click();
-      await expectContained(archive.getByRole("button").first());
       await expectContained(page.locator("article [data-registration-status]:visible"));
       await expectNoOverflow(page);
       expect(errors).toEqual([]);
@@ -289,16 +301,21 @@ for (const width of [375, 390]) {
   }
 }
 
-test("initial registration deep link reveals the matching historical terminal record", async ({ page }) => {
+test("initial obsolete registration deep link is removed without rendering historical records", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 844 });
   const errors = await openDashboard(page, "registrationStates=1#registration-registration-cancelled");
-  const history = page.locator("[data-dashboard-section=registration-archive]");
-  await expect(history.getByRole("button", { name: /^Registration Archive/ })).toHaveAttribute("aria-expanded", "true");
-  const target = history.locator("#registration-registration-cancelled");
-  await expect(target).toBeInViewport();
-  await expect(target.getByRole("status")).toContainText("Read-only historical record");
-  await expect(target.getByRole("button")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
+  await expect(page.locator("#registration-registration-cancelled")).toHaveCount(0);
+  await expect(page.locator("[data-dashboard-section=registrations] article")).toHaveCount(4);
   await expectNoOverflow(page);
+  expect(errors).toEqual([]);
+});
+
+test("initial current registration deep link retains the exact active card", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await openDashboard(page, "#registration-registration-2");
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#registration-registration-2");
+  await expect(page.locator("#registration-registration-2")).toBeInViewport();
   expect(errors).toEqual([]);
 });
 

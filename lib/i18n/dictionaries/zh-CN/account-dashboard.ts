@@ -333,8 +333,6 @@ const dictionary = {
       championships: "夺冠记录",
       matches: "比赛",
       champions: "冠军",
-      registrations: "历史报名",
-      registrationsEmpty: "暂无历史报名。",
       loadError: "无法加载你的竞技记录。",
       partialError: "部分锦标赛展示信息无法加载。",
     },
@@ -347,12 +345,6 @@ const dictionary = {
       losses: "负场",
       showMatches: "查看比赛",
       hideMatches: "收起比赛",
-    },
-    registrationArchive: {
-      title: "报名档案",
-      show: "查看档案",
-      hide: "收起档案",
-      empty: "暂无历史报名。",
     },
     statistics: {
       eyebrow: "竞技记录",

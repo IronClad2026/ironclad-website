@@ -125,8 +125,6 @@ const dictionary = {
       championships: "우승 기록",
       matches: "경기",
       champions: "챔피언",
-      registrations: "이전 등록",
-      registrationsEmpty: "이전 등록이 없습니다.",
       loadError: "경쟁 기록을 불러오지 못했습니다.",
       partialError: "일부 토너먼트 표시 정보를 불러오지 못했습니다.",
     },
@@ -139,12 +137,6 @@ const dictionary = {
       losses: "패배",
       showMatches: "경기 보기",
       hideMatches: "경기 숨기기",
-    },
-    registrationArchive: {
-      title: "등록 보관함",
-      show: "보관함 보기",
-      hide: "보관함 숨기기",
-      empty: "이전 등록이 없습니다.",
     },
     statistics: {
       eyebrow: "경쟁 기록",

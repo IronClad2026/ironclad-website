@@ -169,8 +169,6 @@ const dictionary = {
       championships: "Чемпионские титулы",
       matches: "Матчи",
       champions: "Чемпионы",
-      registrations: "Предыдущие регистрации",
-      registrationsEmpty: "Нет предыдущих регистраций.",
       loadError: "Не удалось загрузить вашу соревновательную историю.",
       partialError: "Не удалось загрузить некоторые сведения для отображения турниров.",
     },
@@ -183,12 +181,6 @@ const dictionary = {
       losses: "Поражения",
       showMatches: "Показать матчи",
       hideMatches: "Скрыть матчи",
-    },
-    registrationArchive: {
-      title: "Архив регистраций",
-      show: "Показать архив",
-      hide: "Скрыть архив",
-      empty: "Нет предыдущих регистраций.",
     },
     statistics: {
       eyebrow: "Соревновательная статистика",

@@ -216,7 +216,8 @@ export function careerFixture(): PlayerCareerDashboard {
 export function notificationFixture(): InAppNotification[] {
   if (parameters().has("empty")) return [];
   const historical = parameters().has("historicalNotice");
-  return [{ id: "fixture-update", recipientRole: "player", type: historical ? "registration.waitlist_offer" : "registration_approved", title: historical ? "Previous waitlist offer" : "Your registration was approved", message: historical ? "Review the retained previous registration record." : "You are in the approved Academy roster. Watch the tournament for Division launch information.", actorDisplayName: null, tournamentId: null, tournamentTitle: "IronClad Open 1", registrationId: historical ? "registration-3" : "registration-1", matchId: null, reportGroupId: null, deadlineAt: null, readAt: null, createdAt: fixtureDate, href: `/dashboard#registration-registration-${historical ? "3" : "1"}` }];
+  const current = parameters().has("currentNotice");
+  return [{ id: "fixture-update", recipientRole: "player", type: historical || current ? "registration.waitlist_offer" : "registration_approved", title: historical ? "Previous waitlist offer" : current ? "Current waitlist offer" : "Your registration was approved", message: historical ? "A retained notification from a previous event." : "You are in the approved Academy roster. Watch the tournament for Division launch information.", actorDisplayName: null, tournamentId: null, tournamentTitle: "IronClad Open 1", registrationId: historical ? "registration-3" : current ? "registration-2" : "registration-1", matchId: null, reportGroupId: null, deadlineAt: null, readAt: null, createdAt: fixtureDate, href: `/dashboard#registration-registration-${historical ? "3" : current ? "2" : "1"}` }];
 }
 
 export function badgeFixture() {
