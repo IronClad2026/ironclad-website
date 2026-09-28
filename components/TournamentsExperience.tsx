@@ -137,7 +137,7 @@ type Match = {
 const archiveEvents: ArchiveEvent[] = [
   {
     title: "Beta Blitz Tournament",
-    image: "/images/tournaments/1v1-beta-blitz-tournament.lossless.webp",
+    image: "/images/tournaments/1v1-beta-blitz-tournament.png",
     descriptionKey: "tournaments.archive.betaBlitz",
     battlefy: "https://battlefy.com/ironclad-tournaments/beta-blitz-tournament/695bc9ee265bc4002fd64e4d/info?infoTab=details",
   },
