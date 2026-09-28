@@ -57,6 +57,10 @@ vi.mock("@/lib/player-polls", () => ({
   loadCommunityPollsForRequest: loadCommunityPollsForRequestMock,
 }));
 
+vi.mock("@/lib/player-showcase/read", () => ({
+  getPlayerShowcaseEnabled: vi.fn(async () => false),
+}));
+
 vi.mock("@/lib/supabase-server", () => ({
   createAuthenticatedSupabaseClient: createAuthenticatedSupabaseClientMock,
 }));

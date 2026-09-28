@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { resolveLocale } from "@/lib/i18n/config";
 import {
   badgeFixture, careerFixture, fixtureDate, fixturePlayerId, fixtureUserId,
   notificationFixture, parameters, profileFixture, registrationFixtures,
@@ -52,7 +53,7 @@ const fixtureSignedIn = () => parameters().get("surface") === "dashboard" || par
 export const useAuth = () => ({ isLoaded: true, isSignedIn: fixtureSignedIn(), userId: fixtureSignedIn() ? fixtureUserId : null, getToken: fixtureToken });
 export const auth = async () => ({ userId: fixtureUserId, sessionClaims: { metadata: { role: "player" } } });
 export const redirect = (path: string): never => { throw new Error(`Fixture redirect: ${path}`); };
-export const getRequestLocale = async () => parameters().get("locale") === "ru" ? "ru" as const : "en" as const;
+export const getRequestLocale = async () => resolveLocale(parameters().get("locale"));
 
 export function createAuthenticatedBrowserSupabaseClient() {
   const reject = (): never => { throw new Error("UI fixture must not contact Supabase."); };

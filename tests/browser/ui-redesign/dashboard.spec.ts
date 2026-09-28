@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { SUPPORTED_LOCALES } from "../../../lib/i18n/config";
 
-const widths = [360, 390, 768, 1024, 1440, 1920, 3440];
+const widths = [360, 375, 390, 768, 1024, 1440, 1920, 3440];
 
 async function openDashboard(page: Page, query = "") {
   const errors: string[] = [];
@@ -24,6 +25,18 @@ async function openDashboard(page: Page, query = "") {
 async function expectNoOverflow(page: Page) {
   const size = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: innerWidth }));
   expect(size.page).toBeLessThanOrEqual(size.viewport + 1);
+}
+
+async function expectContained(locator: Locator) {
+  for (const element of await locator.all()) {
+    const geometry = await element.evaluate((item) => {
+      const bounds = item.getBoundingClientRect();
+      return { left: bounds.left, right: bounds.right, width: item.clientWidth, content: item.scrollWidth, viewport: innerWidth };
+    });
+    expect(geometry.left).toBeGreaterThanOrEqual(0);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.viewport + 1);
+    expect(geometry.content).toBeLessThanOrEqual(geometry.width + 1);
+  }
 }
 
 async function expectFocusCycle(page: Page, dialog: Locator) {
@@ -163,6 +176,73 @@ test("career tabs preserve keyboard arrows Home and End", async ({ page }) => {
     await expect(history.getByRole("tab", { name: tab, exact: true })).toBeFocused();
     await expect(history.getByRole("tab", { name: tab, exact: true })).toHaveAttribute("aria-selected", "true");
   }
+  expect(errors).toEqual([]);
+});
+
+for (const width of [375, 390]) {
+  test(`registration actions and status labels remain reachable at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const errors = await openDashboard(page, "registrationStates=1");
+    const current = page.locator("[data-dashboard-section=registrations]");
+    await expect(current.locator("article")).toHaveCount(4);
+    const offered = current.locator("#registration-registration-2");
+    for (const name of ["Accept Spot", "Decline Spot", "Withdraw Registration"]) {
+      const control = offered.getByRole("button", { name, exact: true });
+      await expect(control).toBeEnabled();
+      await control.click({ trial: true });
+      const bounds = await control.boundingBox();
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+      expect(bounds!.width).toBeGreaterThanOrEqual(44);
+    }
+    await expect(offered.getByText(/Respond before/)).toBeVisible();
+    await expectContained(current.locator("[data-registration-status]"));
+    const history = page.locator("[data-dashboard-section=history]");
+    await history.getByRole("tab").nth(2).click();
+    await expect(history.locator('[data-registration-presentation="historical"]')).toHaveCount(5);
+    for (const status of ["cancelled", "voided", "rejected", "withdrawn"]) {
+      const record = history.locator(`#registration-registration-${status}`);
+      await expect(record).toBeVisible();
+      await expect(record.getByRole("button")).toHaveCount(0);
+    }
+    await expect(history.getByRole("status").filter({ hasText: "Read-only historical record" })).toHaveCount(2);
+    await expectContained(history.locator("article [data-registration-status]"));
+    await expectNoOverflow(page);
+    expect(errors).toEqual([]);
+    expect(await page.evaluate(() => window.__uiFixture.actions)).toEqual([]);
+    expect(await page.evaluate(() => window.__uiFixture.blockedRequests)).toEqual([]);
+  });
+
+  for (const locale of SUPPORTED_LOCALES) {
+    test(`${locale} career tabs and long registration labels fit at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      const errors = await openDashboard(page, `locale=${locale}&long=1&registrationStates=1`);
+      await expect(page.locator("html")).toHaveAttribute("lang", locale);
+      const tabs = page.locator("[data-dashboard-section=history]").getByRole("tab");
+      await expect(tabs).toHaveCount(3);
+      for (const tab of await tabs.all()) {
+        await tab.click();
+        await expect(tab).toHaveAttribute("aria-selected", "true");
+        expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      }
+      await expectContained(tabs);
+      await expectContained(page.locator("article [data-registration-status]:visible"));
+      await expectNoOverflow(page);
+      expect(errors).toEqual([]);
+      expect(await page.evaluate(() => window.__uiFixture.blockedRequests)).toEqual([]);
+    });
+  }
+}
+
+test("initial registration deep link reveals the matching historical terminal record", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 844 });
+  const errors = await openDashboard(page, "registrationStates=1#registration-registration-cancelled");
+  const history = page.locator("[data-dashboard-section=history]");
+  await expect(history.getByRole("tab").nth(2)).toHaveAttribute("aria-selected", "true");
+  const target = history.locator("#registration-registration-cancelled");
+  await expect(target).toBeInViewport();
+  await expect(target.getByRole("status")).toContainText("Read-only historical record");
+  await expect(target.getByRole("button")).toHaveCount(0);
+  await expectNoOverflow(page);
   expect(errors).toEqual([]);
 });
 

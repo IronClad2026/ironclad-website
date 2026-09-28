@@ -136,13 +136,26 @@ describe("Dashboard career presentation", () => {
 
   it("reveals and scrolls a previous registration from an initial hash and later hash changes", async () => {
     const scroll = HTMLElement.prototype.scrollIntoView;
+    const hiddenAtScroll: boolean[] = [];
+    vi.mocked(scroll).mockImplementation(function (this: HTMLElement) {
+      hiddenAtScroll.push(this.closest("[hidden]") !== null);
+    });
+    // Browsers can paint before React commits a concurrent tab update. An
+    // eager frame reproduces that ordering; navigation must wait for visibility.
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
     window.history.replaceState(null, "", "/dashboard#registration-old");
     render(<DashboardCareerHistory matches={[]} champions={[]} previousRegistrationCount={1} previousRegistrations={<article id="registration-old">Historical registration</article>} />);
     await waitFor(() => expect(screen.getAllByRole("tab")[2]).toHaveAttribute("aria-selected", "true"));
     await waitFor(() => expect(scroll).toHaveBeenCalled());
+    expect(hiddenAtScroll).toEqual([false]);
     fireEvent.click(screen.getAllByRole("tab")[0]);
     fireEvent(window, new HashChangeEvent("hashchange"));
     await waitFor(() => expect(screen.getAllByRole("tab")[2]).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(2));
+    expect(hiddenAtScroll).toEqual([false, false]);
   });
 
   it("keeps independent registration history reachable when career data is unavailable", () => {

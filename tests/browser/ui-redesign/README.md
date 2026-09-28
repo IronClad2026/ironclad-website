@@ -25,13 +25,14 @@ Query options can be combined:
 - `ratio=portrait` or `ratio=wide` for test-only artwork with visible edge markers
 - `historical=1` for a cancelled event explicitly selected in the URL
 - `resolved=1&events=2&mixed=1` for a peer resolved by Division state despite its stored event status
-- `locale=ru` for real Russian dictionaries
+- `locale=en`, `it`, `zh-CN`, `ru`, `es`, `pt-BR`, `ko`, or `fr` for the real supported dictionaries
 - `emptyMaps=1` for no published maps
 - `pollRefresh=1` for an in-memory eligible poll and refresh regression
 - Dashboard: `empty=1`, `noProfile=1`, `accepted=1`
 - Dashboard failure states: `careerError=1`, `registrationError=1`, `profileError=1`
 - Dashboard: `historicalNotice=1` for a notification targeting a hidden previous registration
 - Dashboard: `pendingBadge=1` for an actual queued Badge reveal
+- Dashboard: `registrationStates=1` adds pending/manual-review current records and cancelled/voided/rejected/withdrawn historical records
 
 Run the browser checks:
 
@@ -56,10 +57,11 @@ runs Tournament checks. If reusing an already running Vite server, restart it
 with the same source path before testing; a process variable cannot change an
 existing server's source tree.
 
-The Dashboard profile covers seven viewport widths, six statistics, career tabs,
+The Dashboard profile covers eight viewport widths (including 375px and 390px), six statistics, career tabs,
 empty/missing/error states, accepted invitations, failed notification feedback,
 repeated same-hash historical navigation, native match details, proof privacy,
-and the actual Badge queue arriving while the match viewer is open. Its synthetic
+initial historical anchors, action reachability and 44px touch targets, all eight
+locales at 375px and 390px, and the actual Badge queue arriving while the match viewer is open. Its synthetic
 loader refresh uses `window.__uiFixture.showPendingBadgeReveal()`; it preserves
 real component state without invoking any provider or application mutation.
 
