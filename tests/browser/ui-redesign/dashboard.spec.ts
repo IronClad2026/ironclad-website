@@ -9,7 +9,8 @@ async function openDashboard(page: Page, query = "") {
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     if (url.origin !== "http://127.0.0.1:3187" || url.pathname.startsWith("/api/") ||
-      (query.includes("missingBadge=1") && route.request().resourceType() === "image" && url.pathname.includes("/badges/"))) {
+      (query.includes("missingBadge=1") && route.request().resourceType() === "image" && url.pathname.includes("/badges/")) ||
+      (query.includes("failedCareerBanner=1") && route.request().resourceType() === "image" && url.pathname.includes("/tournaments/"))) {
       await route.abort("blockedbyclient");
     } else {
       await route.continue();
@@ -62,11 +63,12 @@ for (const width of widths) {
     await expect(page.locator(".order-first").first()).toHaveCSS("order", "-9999");
     await expect(page.locator("[data-dashboard-section=statistics] dl > div")).toHaveCount(6);
     const history = page.locator("[data-dashboard-section=history]");
-    await expect(history.getByRole("tab", { name: "Matches 6", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(history.getByRole("tab", { name: "Tournaments 3", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(history.locator("[data-tournament-career-group]")).toHaveCount(3);
     await expect(history.locator("button[aria-haspopup=dialog]")).toHaveCount(6);
-    await history.getByRole("tab", { name: "Champions 1", exact: true }).click();
+    await history.getByRole("tab", { name: "Championships 1", exact: true }).click();
     await expect(history.getByText("Steel Vanguard", { exact: true })).toBeVisible();
-    await history.getByRole("tab", { name: "Previous registrations 1", exact: true }).click();
+    await page.getByRole("button", { name: /^Registration Archive/ }).click();
     await expect(page.locator("#registration-registration-3")).toBeVisible();
     await expectNoOverflow(page);
     expect(errors).toEqual([]);
@@ -79,8 +81,10 @@ test("empty Dashboard keeps informative current and career states", async ({ pag
   await page.setViewportSize({ width: 360, height: 844 });
   const errors = await openDashboard(page, "empty=1");
   await expect(page.getByRole("heading", { name: "No current registrations", exact: true })).toBeVisible();
-  await expect(page.getByText("No completed Matches", { exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "Previous registrations 0", exact: true }).click();
+  await expect(page.getByText("Completed tournament runs will appear here.", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Championships 0", exact: true }).click();
+  await expect(page.locator("[data-career-championship]")).toHaveCount(0);
+  await page.getByRole("button", { name: /^Registration Archive 0/ }).click();
   await expect(page.getByText("No previous registrations.", { exact: true })).toBeVisible();
   await expectNoOverflow(page);
   expect(errors).toEqual([]);
@@ -113,9 +117,9 @@ test("career failure does not hide independent previous registrations", async ({
   const errors = await openDashboard(page, "careerError=1");
   const history = page.locator("[data-dashboard-section=history]");
   await expect(history.getByRole("alert")).toHaveText("Your competitive history could not be loaded.");
-  await history.getByRole("tab", { name: "Previous registrations 1", exact: true }).click();
+  await page.getByRole("button", { name: /^Registration Archive/ }).click();
   await expect(page.locator("#registration-registration-3")).toBeVisible();
-  await expect(history.getByRole("alert")).toHaveCount(0);
+  await expect(history.getByRole("alert")).toHaveText("Your competitive history could not be loaded.");
   expect(errors).toEqual([]);
 });
 
@@ -123,9 +127,10 @@ test("registration failure is not presented as an empty career", async ({ page }
   const errors = await openDashboard(page, "registrationError=1");
   const history = page.locator("[data-dashboard-section=history]");
   await expect(history.locator("button[aria-haspopup=dialog]")).toHaveCount(6);
-  await history.getByRole("tab", { name: "Previous registrations", exact: true }).click();
-  await expect(history.getByRole("alert")).toHaveText("Your Tournament Registrations could not be loaded.");
-  await expect(history.getByText("No previous registrations.", { exact: true })).toHaveCount(0);
+  const archive = page.locator("[data-dashboard-section=registration-archive]");
+  await archive.getByRole("button", { name: /^Registration Archive/ }).click();
+  await expect(archive.getByRole("alert")).toHaveText("Your Tournament Registrations could not be loaded.");
+  await expect(archive.getByText("No previous registrations.", { exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -151,16 +156,16 @@ test("failed notification update remains visible in collapsed preview", async ({
 
 test("notification reopens hidden historical registration even for repeated same hash", async ({ page }) => {
   const errors = await openDashboard(page, "historicalNotice=1");
-  const history = page.locator("[data-dashboard-section=history]");
+  const archiveControl = page.getByRole("button", { name: /^Registration Archive/ });
   const target = page.locator("#registration-registration-3");
   await expect(target).toBeHidden();
   for (let index = 0; index < 2; index += 1) {
     await page.getByRole("button", { name: /Previous waitlist offer/ }).click();
     await expect(page).toHaveURL(/#registration-registration-3$/);
-    await expect(history.getByRole("tab", { name: "Previous registrations 1", exact: true })).toHaveAttribute("aria-selected", "true");
-    await expect(target).toBeVisible();
+    await expect(archiveControl).toHaveAttribute("aria-expanded", "true");
+    await expect(target).toBeInViewport();
     if (index === 0) {
-      await history.getByRole("tab", { name: "Matches 6", exact: true }).click();
+      await archiveControl.click();
       await expect(target).toBeHidden();
     }
   }
@@ -170,14 +175,62 @@ test("notification reopens hidden historical registration even for repeated same
 test("career tabs preserve keyboard arrows Home and End", async ({ page }) => {
   const errors = await openDashboard(page);
   const history = page.locator("[data-dashboard-section=history]");
-  await history.getByRole("tab", { name: "Matches 6", exact: true }).focus();
-  for (const [key, tab] of [["ArrowRight", "Champions 1"], ["End", "Previous registrations 1"], ["Home", "Matches 6"], ["ArrowLeft", "Previous registrations 1"]]) {
+  await history.getByRole("tab", { name: "Tournaments 3", exact: true }).focus();
+  for (const [key, tab] of [["ArrowRight", "Championships 1"], ["End", "Championships 1"], ["Home", "Tournaments 3"], ["ArrowLeft", "Championships 1"]]) {
     await page.keyboard.press(key);
     await expect(history.getByRole("tab", { name: tab, exact: true })).toBeFocused();
     await expect(history.getByRole("tab", { name: tab, exact: true })).toHaveAttribute("aria-selected", "true");
   }
   expect(errors).toEqual([]);
 });
+
+test("tournament runs keep identical titles separate and reveal ordered match details by keyboard", async ({ page }) => {
+  const errors = await openDashboard(page);
+  const groups = page.locator("[data-tournament-career-group]");
+  await expect(groups).toHaveCount(3);
+  for (const [index, record] of ["2–0", "1–1", "0–2"].entries()) {
+    const group = groups.nth(index);
+    await expect(group.locator("summary")).toContainText("Previous IronClad Cup");
+    await expect(group.locator("summary")).toContainText(record);
+    await expect(group.locator("summary").getByText("Tournament Champion", { exact: true })).toHaveCount(index === 0 ? 1 : 0);
+    const summary = group.locator("summary");
+    if (index > 0) {
+      await summary.focus();
+      await page.keyboard.press("Enter");
+    }
+    await expect(group).toHaveAttribute("open", "");
+    const matches = group.locator("button[aria-haspopup=dialog]");
+    await expect(matches).toHaveCount(2);
+    await expect(matches.first()).toContainText(`Opponent ${index * 2 + 1}`);
+    await expect(matches.last()).toContainText(`Opponent ${index * 2 + 2}`);
+    await matches.last().click();
+    await expect(page.locator("dialog[open]")).toContainText(`Opponent ${index * 2 + 2}`);
+    await page.keyboard.press("Escape");
+    await expect(matches.last()).toBeFocused();
+  }
+  await expectNoOverflow(page);
+  expect(errors).toEqual([]);
+});
+
+for (const state of ["noCareerBanner", "failedCareerBanner"]) {
+  test(`${state} preserves tournament and championship artwork at 375px`, async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 844 });
+    const errors = await openDashboard(page, `${state}=1`);
+    const groups = page.locator("[data-tournament-career-group]");
+    for (const group of await groups.all()) {
+      await group.locator("summary").scrollIntoViewIfNeeded();
+      const item = group.locator("[data-career-artwork=fallback]");
+      await expect(item).toBeVisible();
+      expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(90);
+    }
+    await page.getByRole("tab", { name: "Championships 1", exact: true }).click();
+    const honour = page.locator("[data-career-championship]");
+    await expect(honour.locator("[data-career-artwork=fallback]")).toBeVisible();
+    await expect(honour).toContainText("Steel Vanguard");
+    await expectNoOverflow(page);
+    expect(errors).toEqual([]);
+  });
+}
 
 for (const width of [375, 390]) {
   test(`registration actions and status labels remain reachable at ${width}px`, async ({ page }) => {
@@ -196,8 +249,8 @@ for (const width of [375, 390]) {
     }
     await expect(offered.getByText(/Respond before/)).toBeVisible();
     await expectContained(current.locator("[data-registration-status]"));
-    const history = page.locator("[data-dashboard-section=history]");
-    await history.getByRole("tab").nth(2).click();
+    const history = page.locator("[data-dashboard-section=registration-archive]");
+    await history.getByRole("button", { name: /^Registration Archive/ }).click();
     await expect(history.locator('[data-registration-presentation="historical"]')).toHaveCount(5);
     for (const status of ["cancelled", "voided", "rejected", "withdrawn"]) {
       const record = history.locator(`#registration-registration-${status}`);
@@ -218,13 +271,16 @@ for (const width of [375, 390]) {
       const errors = await openDashboard(page, `locale=${locale}&long=1&registrationStates=1`);
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       const tabs = page.locator("[data-dashboard-section=history]").getByRole("tab");
-      await expect(tabs).toHaveCount(3);
+      await expect(tabs).toHaveCount(2);
       for (const tab of await tabs.all()) {
         await tab.click();
         await expect(tab).toHaveAttribute("aria-selected", "true");
         expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       }
       await expectContained(tabs);
+      const archive = page.locator("[data-dashboard-section=registration-archive]");
+      await archive.getByRole("button").first().click();
+      await expectContained(archive.getByRole("button").first());
       await expectContained(page.locator("article [data-registration-status]:visible"));
       await expectNoOverflow(page);
       expect(errors).toEqual([]);
@@ -236,8 +292,8 @@ for (const width of [375, 390]) {
 test("initial registration deep link reveals the matching historical terminal record", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 844 });
   const errors = await openDashboard(page, "registrationStates=1#registration-registration-cancelled");
-  const history = page.locator("[data-dashboard-section=history]");
-  await expect(history.getByRole("tab").nth(2)).toHaveAttribute("aria-selected", "true");
+  const history = page.locator("[data-dashboard-section=registration-archive]");
+  await expect(history.getByRole("button", { name: /^Registration Archive/ })).toHaveAttribute("aria-expanded", "true");
   const target = history.locator("#registration-registration-cancelled");
   await expect(target).toBeInViewport();
   await expect(target.getByRole("status")).toContainText("Read-only historical record");
@@ -246,7 +302,7 @@ test("initial registration deep link reveals the matching historical terminal re
   expect(errors).toEqual([]);
 });
 
-for (const width of [390, 1440]) {
+for (const width of [375, 390, 1440]) {
   test(`real match details preserve keyboard close focus and proof privacy at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     const errors = await openDashboard(page);

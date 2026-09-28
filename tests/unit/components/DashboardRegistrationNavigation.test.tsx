@@ -24,6 +24,7 @@ vi.mock("@/lib/app-badge", () => ({
 
 import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import DashboardCareerHistory from "@/components/dashboard/DashboardCareerHistory";
+import DashboardRegistrationArchive from "@/components/dashboard/DashboardRegistrationArchive";
 
 const registrationId = "22222222-2222-4222-8222-222222222222";
 const href = `/dashboard#registration-${registrationId}`;
@@ -46,15 +47,28 @@ const notification: InAppNotification = {
 };
 
 describe("Dashboard same-page registration navigation", () => {
+  let hiddenAtScroll: boolean[];
+
   beforeEach(() => {
+    hiddenAtScroll = [];
     window.history.replaceState(null, "", "/dashboard");
     // Match App Router history semantics: pushState does not fire hashchange.
     push.mockImplementation((url: string) => window.history.pushState(null, "", url));
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(function (this: HTMLElement) {
+        hiddenAtScroll.push(this.closest("[hidden]") !== null);
+      }),
+    });
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
   });
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
     window.history.replaceState(null, "", "/");
@@ -66,17 +80,26 @@ describe("Dashboard same-page registration navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: /Previous waitlist offer/ }));
     await waitFor(() => expect(push).toHaveBeenCalledWith(href));
     await waitFor(() => expect(screen.getByText("Historical registration")).toBeVisible());
+    await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledOnce());
+    expect(hiddenAtScroll).toEqual([false]);
+    expect(screen.getByRole("button", { name: /Registration Archive/ })).toHaveAttribute("aria-expanded", "true");
     expect(markRead).not.toHaveBeenCalled();
   });
 
-  it("reopens the same registration after switching back to Matches", async () => {
+  it("reopens and scrolls the same registration after collapsing its archive", async () => {
     await renderDashboard();
     fireEvent.click(screen.getByRole("button", { name: /Previous waitlist offer/ }));
     await waitFor(() => expect(screen.getByText("Historical registration")).toBeVisible());
-    fireEvent.click(screen.getByRole("tab", { name: /^Matches/ }));
+    await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: /Registration Archive/ }));
     expect(screen.getByText("Historical registration")).not.toBeVisible();
+    expect(window.location.hash).toBe(`#registration-${registrationId}`);
     fireEvent.click(screen.getByRole("button", { name: /Previous waitlist offer/ }));
     await waitFor(() => expect(screen.getByText("Historical registration")).toBeVisible());
+    await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledTimes(2));
+    expect(push).toHaveBeenCalledTimes(2);
+    expect(hiddenAtScroll).toEqual([false, false]);
+    expect(screen.getByRole("tab", { name: /^Tournaments/ })).toHaveAttribute("aria-selected", "true");
     expect(markRead).not.toHaveBeenCalled();
   });
 });
@@ -93,12 +116,10 @@ async function renderDashboard() {
       totalCount={1}
       unreadCount={0}
     />
-    <DashboardCareerHistory
-      matches={[]}
-      champions={[]}
-      previousRegistrationCount={1}
-      previousRegistrations={<article id={`registration-${registrationId}`}>Historical registration</article>}
-    />
+    <DashboardCareerHistory matches={[]} champions={[]} />
+    <DashboardRegistrationArchive count={1}>
+      <article id={`registration-${registrationId}`}>Historical registration</article>
+    </DashboardRegistrationArchive>
   </>);
   // Finish the mount-only anchor check before clicking the existing page UI.
   await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 10)); });

@@ -65,6 +65,9 @@ vi.mock("@/lib/player-dashboard", () => ({
 vi.mock("@/lib/player-polls", () => ({
   loadCommunityPollsForRequest: loadCommunityPollsForRequestMock,
 }));
+vi.mock("@/lib/player-showcase/read", () => ({
+  getPlayerShowcaseEnabled: vi.fn(async () => false),
+}));
 vi.mock("@/lib/tournament-division-invitations", () => ({
   loadPlayerTournamentDivisionInvitations:
     loadPlayerTournamentDivisionInvitationsMock,
@@ -132,6 +135,7 @@ describe("Player Dashboard information hierarchy", () => {
       "division-invitations",
       "statistics",
       "history",
+      "registration-archive",
       "community",
       "profile-visibility",
     ].map((name) =>
@@ -161,8 +165,13 @@ describe("Player Dashboard information hierarchy", () => {
     expect(screen.getByRole("heading", { name: "Your Competition" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Career History" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Profile & Visibility" })).toBeVisible();
-    expect(screen.getAllByRole("tab")).toHaveLength(3);
-    expect(screen.getAllByRole("tab")[0]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    expect(screen.getByRole("tab", { name: /^Tournaments\s*0$/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Championships\s*0$/ })).toHaveAttribute("aria-selected", "false");
+    const careerHistory = commandCentre?.querySelector('[data-dashboard-section="history"]');
+    const registrationArchive = commandCentre?.querySelector('[data-dashboard-section="registration-archive"]');
+    expect(careerHistory?.contains(registrationArchive ?? null)).toBe(false);
+    expect(screen.getByRole("button", { name: /^Registration Archive\s*0\s*View archive$/ })).toHaveAttribute("aria-expanded", "false");
     const matchActions = commandCentre?.querySelector('[data-dashboard-surface="match-actions"]');
     const updates = commandCentre?.querySelector('[data-dashboard-surface="notifications"]');
     expect((matchActions?.compareDocumentPosition(updates!) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
