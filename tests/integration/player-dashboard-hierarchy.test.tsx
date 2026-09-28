@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
@@ -79,6 +79,7 @@ vi.mock("@/lib/supabase-server", () => ({
 import PlayerDashboardPage from "@/app/dashboard/page";
 
 describe("Player Dashboard information hierarchy", () => {
+  afterEach(cleanup);
   beforeEach(() => {
     authMock.mockResolvedValue({ userId: "user_dashboard_hierarchy" });
     createAuthenticatedSupabaseClientMock.mockResolvedValue(
@@ -135,7 +136,6 @@ describe("Player Dashboard information hierarchy", () => {
       "division-invitations",
       "statistics",
       "history",
-      "registration-archive",
       "community",
       "profile-visibility",
     ].map((name) =>
@@ -168,10 +168,13 @@ describe("Player Dashboard information hierarchy", () => {
     expect(screen.getAllByRole("tab")).toHaveLength(2);
     expect(screen.getByRole("tab", { name: /^Tournaments\s*0$/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: /^Championships\s*0$/ })).toHaveAttribute("aria-selected", "false");
-    const careerHistory = commandCentre?.querySelector('[data-dashboard-section="history"]');
-    const registrationArchive = commandCentre?.querySelector('[data-dashboard-section="registration-archive"]');
-    expect(careerHistory?.contains(registrationArchive ?? null)).toBe(false);
-    expect(screen.getByRole("button", { name: /^Registration Archive\s*0\s*View archive$/ })).toHaveAttribute("aria-expanded", "false");
+    expect(commandCentre?.querySelector('[data-dashboard-section="registration-archive"]')).toBeNull();
+    expect(screen.queryByRole("button", { name: /Registration Archive/, hidden: true })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-registration-presentation="historical"]')).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /^Championships\s*0$/ }));
+    expect(screen.getByRole("tab", { name: /^Championships\s*0$/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: /^Tournaments\s*0$/ }));
+    expect(screen.getByRole("tab", { name: /^Tournaments\s*0$/ })).toHaveAttribute("aria-selected", "true");
     const matchActions = commandCentre?.querySelector('[data-dashboard-surface="match-actions"]');
     const updates = commandCentre?.querySelector('[data-dashboard-surface="notifications"]');
     expect((matchActions?.compareDocumentPosition(updates!) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -197,6 +200,33 @@ describe("Player Dashboard information hierarchy", () => {
     ).not.toBeNull();
   });
 
+  it("renders only the current bucket while retaining every historical row in the read result", async () => {
+    const historical = [
+      { id: "completed-record", tournament_title: "Completed historical event", tournaments: { status: "completed" }, tournament_brackets: { launched_at: "2026-08-06T00:00:00.000Z" } },
+      { id: "cancelled-record", tournament_title: "Cancelled historical event", tournaments: { status: "cancelled" }, registration_status: "waitlisted", waitlist_offer_status: "offered" },
+      { id: "voided-record", tournament_title: "Voided historical event", tournaments: { status: "voided" } },
+      { id: "rejected-record", tournament_title: "Rejected historical event", registration_status: "rejected" },
+      { id: "withdrawn-record", tournament_title: "Withdrawn historical event", registration_status: "withdrawn" },
+    ];
+    const client = createDashboardClient(historical);
+    const originalRows = structuredClone(client.registrationRows);
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(client);
+
+    render(await PlayerDashboardPage());
+
+    expect(screen.getByRole("heading", { name: "Command Centre Cup" })).toBeVisible();
+    expect(document.querySelectorAll('[data-registration-presentation="current"]')).toHaveLength(1);
+    expect(document.querySelector('[data-dashboard-surface="registration-actions"]')).toBeVisible();
+    for (const record of historical) {
+      expect(screen.queryByText(record.tournament_title)).not.toBeInTheDocument();
+      expect(document.getElementById(`registration-${record.id}`)).toBeNull();
+    }
+    expect(document.querySelector('[data-dashboard-section="registration-archive"]')).toBeNull();
+    expect(screen.queryByText(/View archive|Hide archive|Registration Archive/)).not.toBeInTheDocument();
+    expect(client.registrationRows).toEqual(originalRows);
+    expect(client.registrationsQuery.eq).toHaveBeenCalledWith("clerk_user_id", "user_dashboard_hierarchy");
+  });
+
   it("redirects signed-out requests before accessing player data", async () => {
     authMock.mockResolvedValue({ userId: null });
     await expect(PlayerDashboardPage()).rejects.toThrow("NEXT_REDIRECT");
@@ -205,7 +235,7 @@ describe("Player Dashboard information hierarchy", () => {
   });
 });
 
-function createDashboardClient() {
+function createDashboardClient(historicalOverrides: Record<string, unknown>[] = []) {
   const profileQuery = chainQuery();
   profileQuery.maybeSingle.mockResolvedValue({
     data: {
@@ -231,31 +261,33 @@ function createDashboardClient() {
     error: null,
   });
 
+  const currentRegistration = {
+    id: "22222222-2222-4222-8222-222222222222",
+    tournament_title: "Command Centre Cup",
+    bracket_name: "Academy Bracket",
+    registration_status: "approved",
+    tournament_bracket_id: "33333333-3333-4333-8333-333333333333",
+    elo_status: "verified",
+    submitted_elo: 1420,
+    withdrawn_at: null,
+    waitlist_offer_status: null,
+    waitlist_offer_created_at: null,
+    waitlist_offer_expires_at: null,
+    waitlist_offer_resolved_at: null,
+    tournament_brackets: { launched_at: null },
+    tournaments: { status: "registration_open" },
+    created_at: "2026-08-05T00:00:00.000Z",
+  };
+  const registrationRows = [currentRegistration, ...historicalOverrides.map((overrides) => ({ ...currentRegistration, ...overrides }))];
   const registrationsQuery = chainQuery();
   registrationsQuery.order.mockResolvedValue({
-    data: [
-      {
-        id: "22222222-2222-4222-8222-222222222222",
-        tournament_title: "Command Centre Cup",
-        bracket_name: "Academy Bracket",
-        registration_status: "approved",
-        tournament_bracket_id: "33333333-3333-4333-8333-333333333333",
-        elo_status: "verified",
-        submitted_elo: 1420,
-        withdrawn_at: null,
-        waitlist_offer_status: null,
-        waitlist_offer_created_at: null,
-        waitlist_offer_expires_at: null,
-        waitlist_offer_resolved_at: null,
-        tournament_brackets: { launched_at: null },
-        tournaments: { status: "registration_open" },
-        created_at: "2026-08-05T00:00:00.000Z",
-      },
-    ],
+    data: registrationRows,
     error: null,
   });
 
   return {
+    registrationRows,
+    registrationsQuery,
     from: vi.fn((table: string) => {
       if (table === "players") return profileQuery;
       if (table === "registrations") return registrationsQuery;

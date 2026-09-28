@@ -35,7 +35,7 @@ export function fixtureNavigate(destination: string) {
   if (requested.pathname === "/dashboard") {
     // Next router.push uses history navigation; it does not dispatch hashchange.
     // Keep that distinction so repeated notification anchors test product code.
-    history.pushState(null, "", `/tests/browser/ui-redesign/?${parameters()}${requested.hash}`);
+    history.pushState(null, "", `/dashboard?${parameters()}${requested.hash}`);
     return;
   }
   if (!requested.pathname.startsWith("/tournaments")) return;

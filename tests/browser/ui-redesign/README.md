@@ -30,7 +30,8 @@ Query options can be combined:
 - `pollRefresh=1` for an in-memory eligible poll and refresh regression
 - Dashboard: `empty=1`, `noProfile=1`, `accepted=1`
 - Dashboard failure states: `careerError=1`, `registrationError=1`, `profileError=1`
-- Dashboard: `historicalNotice=1` for a notification targeting a hidden previous registration
+- Dashboard: `historicalNotice=1` for an old notification whose obsolete registration hash must resolve safely
+- Dashboard: `currentNotice=1` for a notification targeting the current waitlist offer
 - Dashboard: `pendingBadge=1` for an actual queued Badge reveal
 - Dashboard: `registrationStates=1` adds pending/manual-review current records and cancelled/voided/rejected/withdrawn historical records
 - Dashboard: `noCareerBanner=1` uses the Trophy fallback; browser checks also simulate failed banner requests
@@ -60,10 +61,10 @@ existing server's source tree.
 
 The Dashboard profile covers eight viewport widths (including 375px and 390px), six statistics, the two career tabs,
 three separately identified tournament runs with identical titles, match progression and W–L records,
-authoritative championship markers, missing/failed banners, the independent Registration Archive,
+authoritative championship markers, missing/failed banners, and the absence of historical registration UI,
 empty/missing/error states, accepted invitations, failed notification feedback,
-repeated same-hash historical navigation, native match details, proof privacy,
-initial historical anchors, action reachability and 44px touch targets, all eight
+safe initial/repeated obsolete registration links, current registration anchors, native match details, proof privacy,
+registration form submissions, action reachability and 44px touch targets, all eight
 locales at 375px and 390px, and the actual Badge queue arriving while the match viewer is open. Its synthetic
 loader refresh uses `window.__uiFixture.showPendingBadgeReveal()`; it preserves
 real component state without invoking any provider or application mutation.

@@ -53,33 +53,6 @@ export function RegistrationCard({
   );
 }
 
-export function HistoricalRegistrationRecord({ registration, locale, t }: RegistrationProps) {
-  return (
-    <article
-      id={`registration-${registration.id}`}
-      data-registration-presentation="historical"
-      className="min-w-0 scroll-mt-28 px-4 py-3.5 transition-colors hover:bg-white/[0.025] focus-within:bg-white/[0.025] target:bg-orange-500/[0.06] target:ring-1 target:ring-inset target:ring-orange-400/60 sm:px-5"
-    >
-      <div className="grid min-w-0 gap-x-6 gap-y-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
-        <div className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-2">
-          <div className="min-w-0 flex-1 basis-44">
-            <h3 className="break-words text-sm font-semibold leading-5 text-zinc-100 sm:text-base">
-              {registration.tournament_title}
-            </h3>
-            <p className="mt-1 break-words text-sm leading-5 text-zinc-400">{registration.bracket_name}</p>
-          </div>
-          <StatusBadge status={registration.registration_status} t={t} />
-        </div>
-        <RegistrationMetadata registration={registration} locale={locale} t={t} />
-      </div>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-3">
-        <RegistrationContext registration={registration} t={t} historical />
-        <RegistrationActions registration={registration} />
-      </div>
-    </article>
-  );
-}
-
 function RegistrationMetadata({ registration, locale, t }: RegistrationProps) {
   return (
     <dl className="flex min-w-0 flex-wrap gap-x-5 gap-y-2">
@@ -111,8 +84,7 @@ function RegistrationMetadata({ registration, locale, t }: RegistrationProps) {
 function RegistrationContext({
   registration,
   t,
-  historical = false,
-}: Pick<RegistrationProps, "registration" | "t"> & { historical?: boolean }) {
+}: Pick<RegistrationProps, "registration" | "t">) {
   if (isTournamentTerminalStatus(registration.tournament_status)) {
     return (
       <div
@@ -131,7 +103,7 @@ function RegistrationContext({
     );
   }
   if (registration.registration_status === "waitlisted" && registration.waitlist_offer_status === "offered") return null;
-  return <RegistrationDecision registration={registration} t={t} historical={historical} />;
+  return <RegistrationDecision registration={registration} t={t} />;
 }
 
 function RegistrationActions({ registration }: Pick<RegistrationProps, "registration">) {
@@ -150,11 +122,9 @@ function RegistrationActions({ registration }: Pick<RegistrationProps, "registra
 function RegistrationDecision({
   registration,
   t,
-  historical,
 }: {
   registration: PlayerRegistration;
   t: DashboardTranslator;
-  historical: boolean;
 }) {
   const waitlistContent = {
     offered: {
@@ -230,10 +200,10 @@ function RegistrationDecision({
     className: "border-white/10 bg-white/[0.04] text-zinc-300",
   };
   return (
-    <div className={`min-w-0 flex-1 basis-64 border-l-2 pl-3 text-sm leading-5 ${historical ? "border-white/15 text-zinc-400" : content.className}`}>
+    <div className={`min-w-0 flex-1 basis-64 border-l-2 pl-3 text-sm leading-5 ${content.className}`}>
       <p>
-        <span className={historical ? "font-medium text-zinc-300" : "font-semibold"}>{content.title}</span>{". "}
-        <span className={historical ? "" : "opacity-90"}>{content.message}</span>
+        <span className="font-semibold">{content.title}</span>{". "}
+        <span className="opacity-90">{content.message}</span>
       </p>
     </div>
   );

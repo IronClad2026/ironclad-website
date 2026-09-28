@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HistoricalRegistrationRecord, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
+import { RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
 import type { PlayerRegistration } from "@/components/dashboard/registration-presentation";
 import accountDashboardEnglish from "@/lib/i18n/dictionaries/en/account-dashboard";
 import { translate } from "@/lib/i18n/translate";
@@ -34,10 +34,7 @@ const t = (path: string, values?: MessageValues) => translate(accountDashboardEn
 
 afterEach(cleanup);
 
-describe.each([
-  ["current", RegistrationCard],
-  ["historical", HistoricalRegistrationRecord],
-] as const)("Dashboard %s registration facts", (presentation, Component) => {
+describe("Dashboard current registration facts", () => {
   it.each([
     ["approved", "statusApproved", "approvedMessage"],
     ["pending", "statusPending", "pendingMessage"],
@@ -46,10 +43,10 @@ describe.each([
     ["rejected", "statusRejected", "rejectedMessage"],
     ["withdrawn", "statusWithdrawn", "withdrawnMessage"],
   ] as const)("retains the %s state, ELO snapshot, date and exact registration anchor", (status, labelKey, messageKey) => {
-    render(<Component registration={{ ...registration, registration_status: status }} locale="en" t={t} />);
+    render(<RegistrationCard registration={{ ...registration, registration_status: status }} locale="en" t={t} />);
     const article = screen.getByRole("article");
     expect(article).toHaveAttribute("id", `registration-${registration.id}`);
-    expect(article).toHaveAttribute("data-registration-presentation", presentation);
+    expect(article).toHaveAttribute("data-registration-presentation", "current");
     expect(within(article).getByRole("heading", { name: registration.tournament_title })).toBeVisible();
     expect(within(article).getByText(registration.bracket_name, { exact: true })).toBeVisible();
     const statusLabel = article.querySelector(`[data-registration-status="${status}"]`);
@@ -62,7 +59,7 @@ describe.each([
   });
 
   it("preserves missing ELO and unknown verification status without inventing a rating", () => {
-    render(<Component registration={{ ...registration, submitted_elo: null, elo_status: "unknown" }} locale="en" t={t} />);
+    render(<RegistrationCard registration={{ ...registration, submitted_elo: null, elo_status: "unknown" }} locale="en" t={t} />);
     expect(screen.getByRole("article")).toHaveTextContent(t("dashboard.registrations.eloUnavailable"));
     expect(screen.getByRole("article")).toHaveTextContent(t("dashboard.notAvailable"));
     expect(screen.queryByText("0", { exact: true })).not.toBeInTheDocument();
@@ -82,16 +79,16 @@ describe("Dashboard registration action contract", () => {
     expect(screen.getAllByText("A tournament place is available", { exact: true })).toHaveLength(1);
   });
 
-  it.each(["cancelled", "voided"] as const)("keeps %s history factual and read-only even with an old offered waitlist", (tournamentStatus) => {
-    render(<HistoricalRegistrationRecord registration={{ ...registration, registration_status: "waitlisted", tournament_status: tournamentStatus, waitlist_offer_status: "offered", waitlist_offer_expires_at: "2099-09-30T12:00:00.000Z" }} locale="en" t={t} />);
+  it.each(["cancelled", "voided"] as const)("preserves the defensive %s tournament action guard even with an offered waitlist", (tournamentStatus) => {
+    render(<RegistrationCard registration={{ ...registration, registration_status: "waitlisted", tournament_status: tournamentStatus, waitlist_offer_status: "offered", waitlist_offer_expires_at: "2099-09-30T12:00:00.000Z" }} locale="en" t={t} />);
     expect(screen.getByRole("status")).toHaveTextContent(t("dashboard.registrations.historicalTitle"));
     expect(screen.getByRole("status")).toHaveTextContent(t(`dashboard.registrations.${tournamentStatus === "cancelled" ? "cancelledMessage" : "voidedMessage"}`));
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByText("A tournament place is available", { exact: true })).not.toBeInTheDocument();
   });
 
-  it("keeps launch-cancelled waitlist context in completed history without offering controls", () => {
-    render(<HistoricalRegistrationRecord registration={{ ...registration, registration_status: "waitlisted", tournament_status: "completed", launched_at: "2026-09-02T12:00:00.000Z", waitlist_offer_status: "cancelled" }} locale="en" t={t} />);
+  it("preserves launch-cancelled waitlist context without offering controls", () => {
+    render(<RegistrationCard registration={{ ...registration, registration_status: "waitlisted", tournament_status: "in_progress", launched_at: "2026-09-02T12:00:00.000Z", waitlist_offer_status: "cancelled" }} locale="en" t={t} />);
     expect(screen.getByRole("article")).toHaveTextContent(t("dashboard.registrations.waitlistClosedMessage"));
     expect(screen.getByText("This division has started and its waitlist is now closed.")).toBeVisible();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();

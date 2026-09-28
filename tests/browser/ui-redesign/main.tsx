@@ -12,6 +12,11 @@ async function start() {
   document.documentElement.lang = locale;
   const dictionaries = await loadDictionaries(locale, ["competition", "account-dashboard", "notifications", "badges", "common"] as const);
   const surface = parameters().get("surface") ?? "tournament";
+  if (surface === "dashboard") {
+    // Use the real pathname for guarded legacy-link resolution without adding
+    // a Next route or contacting any authenticated application service.
+    history.replaceState(null, "", `/dashboard${location.search}${location.hash}`);
+  }
   const events = tournamentFixtures();
   if (parameters().has("historical") && !parameters().has("tournament")) {
     const query = parameters();

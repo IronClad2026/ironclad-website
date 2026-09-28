@@ -372,8 +372,6 @@ const dictionary = {
       championships: "Títulos",
       matches: "Partidas",
       champions: "Campeones",
-      registrations: "Inscripciones anteriores",
-      registrationsEmpty: "No hay inscripciones anteriores.",
       loadError: "No se pudo cargar tu historial competitivo.",
       partialError: "No se pudieron cargar algunos datos de presentación de los torneos.",
     },
@@ -386,12 +384,6 @@ const dictionary = {
       losses: "Derrotas",
       showMatches: "Ver partidas",
       hideMatches: "Ocultar partidas",
-    },
-    registrationArchive: {
-      title: "Archivo de inscripciones",
-      show: "Ver archivo",
-      hide: "Ocultar archivo",
-      empty: "No hay inscripciones anteriores.",
     },
     statistics: {
       eyebrow: "Historial competitivo",
