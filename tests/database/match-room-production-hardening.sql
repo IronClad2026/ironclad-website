@@ -92,10 +92,10 @@ cross join public.legal_documents t cross join public.legal_documents p
 where t.document_kind = 'terms' and t.status = 'effective'
   and p.document_kind = 'privacy' and p.status = 'effective';
 
-insert into public.tournaments (id, title, slug, format, status, description, banner_image_url, prize_pool, registration_enabled)
+insert into public.tournaments (id, title, slug, format, status, description, banner_image_url, prize_pool, registration_enabled, division_model_version)
 select pg_temp.mr_id(n), 'Match Room Test ' || n, 'match-room-rollback-' || n, '1v1',
   case when n = 3 then 'registration_open' else 'in_progress' end,
-  'Rollback-only Match Room fixture', '', '', n = 3
+  'Rollback-only Match Room fixture', '', '', n = 3, 'four_division_v1'
 from generate_series(1, 4) n;
 insert into public.tournament_brackets (id, tournament_id, name, elo_rules, max_players, launched_at)
 select pg_temp.mr_id(10 + n), pg_temp.mr_id(n), 'Academy', '0-1099', 8,
@@ -110,7 +110,7 @@ insert into public.registrations (
 select pg_temp.mr_id(200 + (event_n - 1) * 10 + player_n), pg_temp.mr_id(100 + player_n),
   'match-room-test-' || player_n, 'Room Test ' || player_n, 'Match Room Test ' || event_n,
   'Academy', 'approved', 'verified', 1000, pg_temp.mr_id(event_n), pg_temp.mr_id(10 + event_n),
-  1000, 'US Forces', '1v1', now(), 'relic', 'Academy', 'match-room-test'
+  1000, 'US Forces', '1v1', now(), 'relic', 'Academy', 'relic-highest-1v1-v2'
 from generate_series(1, 4) event_n cross join generate_series(1, 3) player_n;
 insert into public.generated_brackets (id, tournament_bracket_id, format, participant_count, slot_count, generated_by, competition_locked_at)
 select pg_temp.mr_id(20 + n), pg_temp.mr_id(10 + n),

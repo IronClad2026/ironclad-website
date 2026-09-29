@@ -7,7 +7,7 @@ const root = process.cwd();
 const database = JSON.parse(readFileSync(path.join(root, "scripts/p03-1/database-evidence.json"), "utf8")).database;
 assert(/^p03_realtime_\d+$/.test(database));
 const client = localClient(localPsqlArgument(), { database });
-assert.equal(await client.run("select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=56623;"), "t");
+assert.equal(await client.run(`select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=${client.port};`), "t");
 const fingerprint = `select jsonb_build_object('gate',public.get_match_room_enabled(),
   'functions',(select md5(string_agg(pg_get_functiondef(p.oid),'' order by p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in('public','ironclad_private') and p.proname like '%match_room%'),
   'policies',(select jsonb_agg(to_jsonb(p) order by policyname) from pg_policies p where schemaname='realtime'),

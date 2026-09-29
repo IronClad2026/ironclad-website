@@ -58,7 +58,8 @@ insert into public.tournaments (
   description,
   banner_image_url,
   prize_pool,
-  registration_enabled
+  registration_enabled,
+  division_model_version
 ) values (
   'b0000000-0000-4000-8000-000000000001',
   'P1 Match Result Notification Contract',
@@ -68,7 +69,8 @@ insert into public.tournaments (
   'Rollback-only P1 notification contract.',
   '',
   '',
-  false
+  false,
+  'four_division_v1'
 );
 
 insert into public.tournament_brackets (
@@ -82,7 +84,7 @@ insert into public.tournament_brackets (
   'b1000000-0000-4000-8000-000000000001',
   'b0000000-0000-4000-8000-000000000001',
   'Academy',
-  '0-5000',
+  '0-1099',
   8,
   pg_catalog.clock_timestamp()
 );
@@ -125,7 +127,7 @@ insert into public.registrations (
     pg_catalog.clock_timestamp(),
     'relic',
     'Academy',
-    'p1-match-result-contract'
+    'relic-highest-1v1-v2'
   ),
   (
     'b2000000-0000-4000-8000-000000000002',
@@ -145,7 +147,7 @@ insert into public.registrations (
     pg_catalog.clock_timestamp(),
     'relic',
     'Academy',
-    'p1-match-result-contract'
+    'relic-highest-1v1-v2'
   );
 
 insert into public.generated_brackets (

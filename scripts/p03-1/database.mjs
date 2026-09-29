@@ -8,7 +8,7 @@ import { localClient, localPsqlArgument } from "./local-pg.mjs";
 const root = process.cwd();
 const database = "p03_realtime_" + Date.now();
 const client = localClient(localPsqlArgument(), { database });
-assert.equal(await client.run("select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=56623;", { db: "postgres" }), "t");
+assert.equal(await client.run(`select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=${client.port};`, { db: "postgres" }), "t");
 assert.equal(await client.run(`select count(*) from pg_database where datname='${database}';`, { db: "postgres" }), "0", "Refuse to overwrite a database");
 await client.run(`create database ${database};`, { db: "postgres" });
 const read = (file) => readFileSync(path.join(root, file), "utf8");

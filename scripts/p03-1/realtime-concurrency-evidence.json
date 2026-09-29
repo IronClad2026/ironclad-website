@@ -1,5 +1,5 @@
 {
-  "testedAt": "2026-09-28T02:59:09.566Z",
+  "testedAt": "2026-09-29T02:19:34.467Z",
   "status": "PASS",
   "checks": [
     "another session sees neither event nor message until sender transaction commits",
