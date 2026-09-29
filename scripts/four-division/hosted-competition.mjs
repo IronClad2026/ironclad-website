@@ -264,6 +264,7 @@ try {
       const { page, context } = await pageFor(identity);
       stage = "open-admin-editor";
       await page.goto(`${origin}/admin/tournaments/new`, { waitUntil: "domcontentloaded" });
+      await page.waitForLoadState("networkidle");
       assert.equal(await page.locator('input[name="divisionModelVersion"]').inputValue(), "four_division_v1");
       stage = "fill-admin-editor";
       await page.getByLabel("Title", { exact: true }).fill(title);
@@ -330,11 +331,17 @@ try {
       assert.deepEqual(await season(), before, "Unplayed Not Held Pro consumed an official slot");
       const points = checked(await authentication.admin.from("leaderboard_point_events").select("id").eq("tournament_bracket_id", bracket.id));
       assert.equal(points.length, 0);
+      const generated = checked(await authentication.admin.from("generated_brackets").select("id").eq("tournament_bracket_id", bracket.id));
+      assert.equal(generated.length, 0, "Unplayed Not Held scenario generated a competitive bracket");
       await page.goto(`${origin}/tournaments?tournament=${slug}`, { waitUntil: "domcontentloaded" });
+      await page.getByText("Not Held", { exact: true }).first().waitFor();
       await capture(page, "Pro-not-held-terminal");
       const final = await eventProof();
-      assert.equal(final.status, "completed");
-      record({ phase, eventId: event.id, reason: receipt.reason_code, zeroRegistrations: true, zeroPoints: true, officialSlotEffect: 0, terminalStatus: final.status });
+      // An unplayed closure preserves the event's raw status. The existing
+      // lifecycle authority disables registration and derives Not Held in the UI.
+      assert.equal(final.status, event.status);
+      assert.equal(final.registration_enabled, false);
+      record({ phase, eventId: event.id, reason: receipt.reason_code, zeroRegistrations: true, zeroGeneratedBrackets: true, zeroPoints: true, officialSlotEffect: 0, terminalStatus: "not_held", registrationDisabled: true, storedEventStatus: final.status, storedEventStatusPreserved: true });
       await context.close();
     } else if (phase === "registration") {
       for (const [division, aliases] of Object.entries(pools)) {
