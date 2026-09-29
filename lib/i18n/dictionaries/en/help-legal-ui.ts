@@ -57,7 +57,7 @@ const dictionary = {
         eyebrow: "Solo Competition",
         title: "1V1 RULES",
         description:
-          "IronClad launch Tournaments are free CoH3 1v1 Events with separate eight-Player Academy, Challenge and Main and Pro Divisions. Quarterfinals and semifinals are BO3; the grand final is BO5.",
+          "IronClad launch Tournaments are free CoH3 1v1 Events with separate eight-Player Academy, Challenge, Main and Pro Divisions. Quarterfinals and semifinals are BO3; the grand final is BO5.",
         document: "Rulebook v3.2",
       },
       rankings: {

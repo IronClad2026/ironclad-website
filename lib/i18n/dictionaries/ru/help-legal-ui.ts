@@ -34,7 +34,7 @@ const dictionary = {
     tabs: {
       oneVOne: {
         eyebrow: "Одиночное соревнование", title: "Правила 1V1",
-        description: "Стартовые Турниры IronClad — бесплатные События CoH3 1v1 с отдельными Дивизионами на восемь Игроков: Academy, Challenge и Main и Pro. Четвертьфиналы и полуфиналы — BO3, гранд-финал — BO5.",
+        description: "Стартовые Турниры IronClad — бесплатные События CoH3 1v1 с отдельными Дивизионами на восемь Игроков: Academy, Challenge, Main и Pro. Четвертьфиналы и полуфиналы — BO3, гранд-финал — BO5.",
         document: "Регламент v3.2",
       },
       rankings: {

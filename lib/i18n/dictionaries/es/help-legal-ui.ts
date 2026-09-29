@@ -35,7 +35,7 @@ const dictionary = {
     tabs: {
       oneVOne: {
         eyebrow: "Competición individual", title: "Reglas 1V1",
-        description: "Los Torneos iniciales de IronClad son Eventos gratuitos de CoH3 1v1 con Divisiones separadas de ocho Jugadores: Academy, Challenge y Main y Pro. Cuartos y semifinales son BO3; la gran final es BO5.",
+        description: "Los Torneos iniciales de IronClad son Eventos gratuitos de CoH3 1v1 con Divisiones separadas de ocho Jugadores: Academy, Challenge, Main y Pro. Cuartos y semifinales son BO3; la gran final es BO5.",
         document: "Reglamento v3.2",
       },
       rankings: {

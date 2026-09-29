@@ -34,7 +34,7 @@ const dictionary = {
     tabs: {
       oneVOne: {
         eyebrow: "Compétition individuelle", title: "Règles 1V1",
-        description: "Les tournois de lancement IronClad sont des événements CoH3 1v1 gratuits, avec des divisions distinctes de huit joueurs : Academy, Challenge et Main et Pro. Les quarts et demi-finales sont en BO3 ; la grande finale est en BO5.",
+        description: "Les tournois de lancement IronClad sont des événements CoH3 1v1 gratuits, avec des divisions distinctes de huit joueurs : Academy, Challenge, Main et Pro. Les quarts et demi-finales sont en BO3 ; la grande finale est en BO5.",
         document: "Règlement v3.2",
       },
       rankings: {
