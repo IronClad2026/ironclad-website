@@ -1,5 +1,9 @@
 # IronClad Project Context
 
+> Historical project snapshot. Current source and ordered migrations are authoritative.
+> Current Events support Academy, Challenge, Main, and Pro; legacy Events retain
+> their stored division model. The architecture below describes an earlier stage.
+
 ## Project Purpose
 
 IronClad is a Company of Heroes 3 esports tournament platform. Its intended

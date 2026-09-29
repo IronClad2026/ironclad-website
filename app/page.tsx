@@ -345,7 +345,7 @@ function CompetitionPathSection({ copy }: { copy: PublicDictionary }) {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           {competitionPaths.map((path, index) => (
             <CompetitionPathCard
               key={path.titleKey}
@@ -402,7 +402,7 @@ function CompetitionPathCard({
           </span>
         </div>
 
-        <h3 className="mt-6 text-2xl font-black leading-tight text-white">
+        <h3 className="mt-6 text-2xl font-black leading-tight text-white [overflow-wrap:anywhere]">
           {t(path.titleKey)}
         </h3>
 

@@ -14,7 +14,7 @@ const psql = localPsqlArgument();
 const template = JSON.parse(readFileSync(path.join(root, "scripts/p03-1/database-evidence.json"), "utf8")).database;
 assert(/^p03_realtime_\d+$/.test(template));
 const client = localClient(psql, { database: template });
-assert.equal(await client.run("select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=56623 and (select count(*) from public.players)=0;"), "t");
+assert.equal(await client.run(`select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=${client.port} and (select count(*) from public.players)=0;`), "t");
 const directory = mkdtempSync(path.join(tmpdir(), "p031-concurrency-"));
 const suites = [];
 for (const [name, legacyDatabase, legacyTemplate, legacyRole] of [
@@ -26,7 +26,7 @@ for (const [name, legacyDatabase, legacyTemplate, legacyRole] of [
   const file = path.join(root, "tests/database", name + ".mjs");
   let source = readFileSync(file, "utf8").replaceAll(legacyDatabase, "p03_race_" + name.replaceAll("-", "_"))
     .replaceAll(legacyTemplate, template).replaceAll(legacyRole, "p03_client_" + name.replaceAll("-", "_"))
-    .replace('const port = "56591";', 'const port = "56623";')
+    .replace('const port = "56591";', `const port = "${client.port}";`)
     .replaceAll("import.meta.url", JSON.stringify(pathToFileURL(file).href));
   if (name === "match-room-production-hardening-concurrency") {
     assert(source.includes("await run(migration);"));

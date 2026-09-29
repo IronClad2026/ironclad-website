@@ -13,7 +13,13 @@ export function localPsqlArgument() {
 // Every local rehearsal connection pins loopback and a separate cluster port.
 // No inherited database URLs, PGSERVICE, PGHOSTADDR, credentials or application
 // secrets can redirect this runner to a hosted resource.
-export function localClient(psql, { port = 56623, database = "p03_rehearsal" } = {}) {
+export function localPort() {
+  const port = Number(process.env.P03_PG_PORT ?? "56623");
+  assert([56623, 56624].includes(port), "Only isolated P03 loopback rehearsal ports are supported");
+  return port;
+}
+
+export function localClient(psql, { port = localPort(), database = "p03_rehearsal" } = {}) {
   assert(psql && Number.isInteger(port) && port > 1024 && port < 65536);
   assert(/^p03_[a-z0-9_]+$/.test(database));
   const processes = new Set();

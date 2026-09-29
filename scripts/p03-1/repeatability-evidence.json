@@ -1,5 +1,5 @@
 {
-  "testedAt": "2026-09-28T03:05:00.845Z",
+  "testedAt": "2026-09-29T02:20:31.998Z",
   "status": "PASS",
   "checks": [
     "_match_room_staging_foundation.sql rejects accidental replay atomically, preserving enabled state, policies and definitions",

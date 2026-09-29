@@ -100,6 +100,29 @@ describe("administrator Division map-pool actions", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments", "page");
   });
 
+  it("publishes all four current Divisions while retaining a finite bound", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: null }));
+    authMock.mockResolvedValue(adminIdentity);
+    createSupabaseAdminClientMock.mockReturnValue({ rpc });
+    const formData = publishFormData();
+    const fourthBracket = "a23e4567-e89b-42d3-a456-426614174000";
+    formData.append("bracketIds", fourthBracket);
+
+    await expect(publishTournamentMapPools(formData)).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=map-pool&notice=map-pool-published`
+    );
+    expect(rpc).toHaveBeenCalledExactlyOnceWith(
+      "publish_tournament_bracket_map_pools",
+      expect.objectContaining({ p_bracket_ids: [...bracketIds, fourthBracket] })
+    );
+    rpc.mockClear();
+    formData.append("bracketIds", "b23e4567-e89b-42d3-a456-426614174000");
+    await expect(publishTournamentMapPools(formData)).rejects.toThrow(
+      `NEXT_REDIRECT:/admin/tournaments/${tournamentId}?section=map-pool&notice=map-pool-invalid`
+    );
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("rejects duplicate map selections before calling the RPC", async () => {
     const rpc = vi.fn();
     const formData = publishFormData();

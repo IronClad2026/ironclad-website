@@ -48,6 +48,7 @@ export type RelicEloVerificationCardProps = {
   statusAvailable: boolean;
   initialVerification: RelicEloVerification | null;
   initialRefreshAvailableAt: string | null;
+  syntheticEligibility?: { elo: number; division: string } | null;
 };
 
 function formatDateTime(value: string, locale: ReturnType<typeof useOptionalLocale>) {
@@ -82,6 +83,7 @@ export default function RelicEloVerificationCard({
   statusAvailable,
   initialVerification,
   initialRefreshAvailableAt,
+  syntheticEligibility = null,
 }: RelicEloVerificationCardProps) {
   const locale = useOptionalLocale();
   const t = useOptionalTranslations(
@@ -197,10 +199,10 @@ export default function RelicEloVerificationCard({
           {t("relic.eyebrow")}
         </p>
         <h2 className="mt-3 text-2xl font-bold text-white">
-          {t("relic.title")}
+          {t(syntheticEligibility ? "relic.syntheticTitle" : "relic.title")}
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-          {t("relic.description")}
+          {t(syntheticEligibility ? "relic.syntheticDescription" : "relic.description")}
         </p>
 
         {!hasPlayer ? (
@@ -211,6 +213,17 @@ export default function RelicEloVerificationCard({
           <p className="mt-6 text-sm font-semibold text-zinc-300">
             {t("relic.statusUnavailable")}
           </p>
+        ) : syntheticEligibility ? (
+          <dl className="mt-6 grid gap-4 border border-orange-500/25 bg-orange-500/5 p-5 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-zinc-400">{t("relic.syntheticElo")}</dt>
+              <dd className="mt-1 text-4xl font-black text-white">{formatNumber(syntheticEligibility.elo, locale)}</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-400">{t("relic.division")}</dt>
+              <dd className="mt-1 font-semibold text-zinc-200">{syntheticEligibility.division}</dd>
+            </div>
+          </dl>
         ) : !steamConnected ? (
           <p className="mt-6 text-sm font-semibold text-zinc-300">
             {t("relic.connectFirst")}

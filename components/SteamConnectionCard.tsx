@@ -17,6 +17,7 @@ type SteamConnectionCardProps = {
   hasPlayer: boolean;
   result: SteamConnectionResult | null;
   statusAvailable: boolean;
+  syntheticFixture?: boolean;
 };
 
 const resultMessages: Record<
@@ -64,6 +65,7 @@ export default function SteamConnectionCard({
   hasPlayer,
   result,
   statusAvailable,
+  syntheticFixture = false,
 }: SteamConnectionCardProps) {
   const t = useOptionalTranslations(
     "account-dashboard",
@@ -74,7 +76,7 @@ export default function SteamConnectionCard({
     result === "refreshed" ||
     result === "display-name-failed";
   const resultMessage =
-    result && (!resultRequiresConnection || connected)
+    !syntheticFixture && result && (!resultRequiresConnection || connected)
       ? resultMessages[result]
       : null;
 
@@ -84,13 +86,13 @@ export default function SteamConnectionCard({
 
       <div className="relative z-10">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">
-          {t("steam.eyebrow")}
+          {t(syntheticFixture ? "steam.syntheticTitle" : "steam.eyebrow")}
         </p>
         <h2 className="mt-3 text-2xl font-bold text-white">
           {t("steam.title")}
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-          {t("steam.description")}
+          {t(syntheticFixture ? "steam.syntheticDescription" : "steam.description")}
         </p>
 
         {resultMessage ? (
@@ -110,6 +112,10 @@ export default function SteamConnectionCard({
           ) : !statusAvailable ? (
             <p className="text-sm font-semibold text-zinc-300">
               {t("steam.unavailable")}
+            </p>
+          ) : syntheticFixture ? (
+            <p className="text-sm font-semibold text-orange-300">
+              {t("steam.syntheticStatus")}
             </p>
           ) : connected ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

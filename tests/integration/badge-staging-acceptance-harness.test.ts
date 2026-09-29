@@ -131,12 +131,12 @@ describe("Badge Staging scenario plan", () => {
 
   it("reuses a bounded fixed UAT catalogue instead of allocating 256 players", () => {
     expect(MAX_CONCURRENT_UAT_PLAYERS).toBe(8);
-    expect(PERMANENT_UAT_PLAYERS_PER_DIVISION).toBe(10);
-    expect(FIXED_UAT_ALIASES).toHaveLength(30);
-    expect(new Set(FIXED_UAT_ALIASES)).toHaveProperty("size", 30);
+    expect(PERMANENT_UAT_PLAYERS_PER_DIVISION).toEqual({ academy: 10, challenge: 10, main: 9, pro: 9 });
+    expect(FIXED_UAT_ALIASES).toHaveLength(38);
+    expect(new Set(FIXED_UAT_ALIASES)).toHaveProperty("size", 38);
 
-    for (const pool of Object.values(FIXED_UAT_POOLS)) {
-      expect(pool).toHaveLength(PERMANENT_UAT_PLAYERS_PER_DIVISION);
+    for (const [division, pool] of Object.entries(FIXED_UAT_POOLS)) {
+      expect(pool).toHaveLength(PERMANENT_UAT_PLAYERS_PER_DIVISION[division as keyof typeof PERMANENT_UAT_PLAYERS_PER_DIVISION]);
     }
     for (const group of SCENARIO_GROUPS) {
       if (group.targetAlias) {

@@ -4,6 +4,12 @@ import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { createClerkClient } from "@clerk/backend";
 import { readFileSync } from "node:fs";
+import {
+  getFixtureDefinition,
+  buildClerkFixtureIdentity,
+  assertClerkDevelopmentInstance,
+  hasAdminMetadata,
+} from "../lib/staging-synthetic-uat.mjs";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -11,6 +17,10 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 assert.equal(url, "https://zzbnneprhjicmajpjkdg.supabase.co");
 assert.ok(process.env.CLERK_SECRET_KEY?.startsWith("sk_test_"));
 assert.ok(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_"));
+await assertClerkDevelopmentInstance({
+  clerkPublishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  clerkSecretKey: process.env.CLERK_SECRET_KEY,
+});
 for (const credential of [key, serviceKey]) {
   assert.ok(credential);
   if (credential.split(".").length === 3) {
@@ -27,10 +37,17 @@ function check(result) {
   return result.data;
 }
 function synthetic(user) {
+  let identity;
+  try {
+    identity = buildClerkFixtureIdentity(user.privateMetadata?.ironclad_fixture_alias);
+  } catch {
+    return false;
+  }
   return user.privateMetadata?.ironclad_fixture_source === "staging_synthetic_uat" &&
     user.privateMetadata?.ironclad_fixture_contract_version === "staging-synthetic-v1" &&
-    /^Test(Academy|Challenge|Main)\d+$/.test(user.privateMetadata?.ironclad_fixture_alias ?? "") &&
-    user.externalId === `ironclad:staging_synthetic_uat:staging-synthetic-v1:${user.privateMetadata.ironclad_fixture_alias}`;
+    user.externalId === identity.externalId && user.publicMetadata?.role === "player" &&
+    !hasAdminMetadata(user.publicMetadata) && !hasAdminMetadata(user.privateMetadata) &&
+    !hasAdminMetadata(user.unsafeMetadata);
 }
 async function subscribe(client, topic, onSignal) {
   const channel = client.channel(topic, { config: { private: true } });
@@ -59,9 +76,9 @@ try {
   let participant;
   for (const candidate of rooms) {
     const aliases = [candidate.participant_one_alias, candidate.participant_two_alias];
-    assert.ok(aliases.every((alias) => /^Test(Academy|Challenge|Main)([1-9]|10)$/.test(alias)));
+    assert.ok(aliases.every((alias) => getFixtureDefinition(alias).alias === alias));
     const identities = await Promise.all(aliases.map(async (alias) => {
-      const result = await clerk.users.getUserList({ externalId: [`ironclad:staging_synthetic_uat:staging-synthetic-v1:${alias}`], limit: 2 });
+      const result = await clerk.users.getUserList({ externalId: [buildClerkFixtureIdentity(alias).externalId], limit: 2 });
       assert.equal(result.data.length, 1);
       return result.data[0];
     }));

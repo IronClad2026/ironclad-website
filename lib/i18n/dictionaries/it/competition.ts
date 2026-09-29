@@ -524,6 +524,11 @@ const dictionary = {
       "Dopo l'avvio, apri la scheda Tabelloni del Torneo per vedere il tuo Tabellone, l'avversario e i dettagli del Match.",
   },
   registrationModal: {
+    syntheticIdentityReady: "Identità di test sintetica pronta",
+    syntheticEligibility: "Idoneità sintetica di Staging",
+    syntheticEligibilityDescription: "Questo account di test Staging autorizzato usa ELO e Divisione sintetici. All'invio il server verifica l'idoneità del test, senza verificare dati Relic in tempo reale o la proprietà di un vero account Steam.",
+    syntheticOwnershipConfirmation: "Confermo di controllare questo account sintetico di Staging. Il test non dichiara la proprietà di un vero account Steam.",
+    syntheticSteamLabel: "Identità Steam sintetica",
     eyebrow: "Iscrizione IronClad",
     title: "Iscrizione del giocatore esports",
     dialogDescription:

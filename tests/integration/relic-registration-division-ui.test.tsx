@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import { translate } from "@/lib/i18n/translate";
 import type { TournamentCard } from "@/lib/tournaments";
+import { resolveTournamentDivisionStates } from "@/lib/tournament-division-state";
 import { createDisabledTournamentDivisionStates } from "@/tests/fixtures/tournament-division-states";
 
 const refreshMock = vi.hoisted(() => vi.fn());
@@ -69,6 +70,7 @@ const registrationDocuments = {
     kind: "rulebook" as const,
     version: "fixture-rulebook-v1",
     url: "https://example.test/legal/rulebook/fixture-v1",
+    downloadUrl: "https://example.test/legal/rulebook/fixture-v1",
     effectiveDate: EFFECTIVE_DATE,
     sha256: DOCUMENT_SHA256,
   },
@@ -77,6 +79,7 @@ const registrationDocuments = {
     kind: "ppa" as const,
     version: "fixture-ppa-v1",
     url: "https://example.test/legal/ppa/fixture-v1",
+    downloadUrl: "https://example.test/legal/ppa/fixture-v1",
     effectiveDate: EFFECTIVE_DATE,
     sha256: DOCUMENT_SHA256,
   },
@@ -85,6 +88,7 @@ const registrationDocuments = {
     kind: "terms" as const,
     version: "fixture-terms-v1",
     url: "https://example.test/legal/terms/fixture-v1",
+    downloadUrl: "https://example.test/legal/terms/fixture-v1",
     effectiveDate: EFFECTIVE_DATE,
     sha256: DOCUMENT_SHA256,
   },
@@ -93,6 +97,7 @@ const registrationDocuments = {
     kind: "privacy" as const,
     version: "fixture-privacy-v1",
     url: "https://example.test/legal/privacy/fixture-v1",
+    downloadUrl: "https://example.test/legal/privacy/fixture-v1",
     effectiveDate: EFFECTIVE_DATE,
     sha256: DOCUMENT_SHA256,
   },
@@ -224,11 +229,15 @@ function renderModal(
     onClose = vi.fn(),
     availableTournaments = [selectedTournament],
     viewerRegistrations = [],
+    verifiedElo,
+    syntheticEligibility = false,
   }: {
     presentation?: RegistrationPresentation;
     onClose?: () => void;
     availableTournaments?: TournamentCard[];
     viewerRegistrations?: TournamentViewerRegistration[];
+    verifiedElo?: number;
+    syntheticEligibility?: boolean;
   } = {}
 ) {
   return render(
@@ -237,6 +246,8 @@ function renderModal(
       tournaments={availableTournaments}
       initialTournamentId={selectedTournament.id}
       verifiedDivision={verifiedDivision}
+      verifiedElo={verifiedElo}
+      syntheticEligibility={syntheticEligibility}
       registrationDocuments={registrationDocuments}
       viewerRegistrations={viewerRegistrations}
       presentation={presentation}
@@ -372,6 +383,28 @@ describe("Relic verified-division registration UI", () => {
     expect(
       document.getElementById("registration-tournament-choices")
     ).not.toBeInTheDocument();
+  });
+
+  it("reclassifies the same verified ELO when switching from a historical event to a future event", () => {
+    const future: TournamentCard = {
+      ...alternateTournament,
+      divisionModelVersion: "four_division_v1",
+      title: "Four Division Event",
+      brackets: [
+        ...alternateTournament.brackets.slice(0, 2),
+        { ...alternateTournament.brackets[2], name: "Main Bracket", requirement: "1400-1699 ELO" },
+        { ...alternateTournament.brackets[2], id: "22222222-2222-4222-8222-222222222234", name: "Pro Bracket", requirement: "1700+ ELO" },
+      ],
+      divisionStates: resolveTournamentDivisionStates({ tournamentId: alternateTournament.id, divisionModelVersion: "four_division_v1", eventStatus: "registration_open", divisions: [] }),
+    };
+    renderModal("Pro", tournament, { presentation: "phone", availableTournaments: [tournament, future], verifiedElo: 1750 });
+    const summary = screen.getByRole("region", { name: competitionEnglish.registrationModal.selectedTournament });
+    expect(within(summary).getByText("Main / Pro Bracket")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: competitionEnglish.registrationModal.changeTournament }));
+    const choices = document.getElementById("registration-tournament-choices")!;
+    fireEvent.click(within(choices).getByRole("button", { name: /^Four Division Event/ }));
+    expect(within(summary).getByText("Pro Bracket")).toBeInTheDocument();
+    expect(within(summary).queryByText("Main / Pro Bracket")).not.toBeInTheDocument();
   });
 
   it("lets an effective synthetic Academy viewer select TEST 2 and continue on phone", () => {
@@ -554,6 +587,22 @@ describe("Relic verified-division registration UI", () => {
     expect(within(readiness as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
+  it.each(["phone", "desktop"] as const)("describes synthetic eligibility without real-provider claims on %s", (presentation) => {
+    renderModal("Challenge", tournament, { presentation, syntheticEligibility: true });
+    expect(screen.queryByText(competitionEnglish.registrationModal.divisionExplanation)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByText(competitionEnglish.registrationModal.syntheticEligibilityDescription)).toBeInTheDocument();
+    expect(screen.queryByText(competitionEnglish.registrationModal.steamConnected)).not.toBeInTheDocument();
+    expect(screen.queryByText(competitionEnglish.registrationModal.relicVerificationOnSubmit)).not.toBeInTheDocument();
+    expect(screen.queryByText(competitionEnglish.registrationModal.freshVerification)).not.toBeInTheDocument();
+    if (presentation === "phone") expect(screen.getByText(competitionEnglish.registrationModal.syntheticIdentityReady)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("checkbox", { name: competitionEnglish.registrationModal.syntheticOwnershipConfirmation })).toBeInTheDocument();
+    expect(screen.queryByText(competitionEnglish.registrationModal.ownershipConfirmation)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(6);
+    expect(submitTournamentRegistrationMock).not.toHaveBeenCalled();
+  });
+
   it("locks missing verified-Division readiness to the safe Profile action on phone", () => {
     renderModal(null, tournament, { presentation: "phone" });
 
@@ -696,22 +745,22 @@ describe("Relic verified-division registration UI", () => {
       screen.getByRole("link", {
         name: "Player Participation Agreement (version fixture-ppa-v1) (opens in a new tab)",
       })
-    ).toHaveAttribute("href", registrationDocuments.ppa.url);
+    ).toHaveAttribute("href", registrationDocuments.ppa.downloadUrl);
     expect(
       screen.getByRole("link", {
         name: "Official Tournament Rulebook (version fixture-rulebook-v1) (opens in a new tab)",
       })
-    ).toHaveAttribute("href", registrationDocuments.rulebook.url);
+    ).toHaveAttribute("href", registrationDocuments.rulebook.downloadUrl);
     expect(
       screen.getByRole("link", {
         name: "Terms of Service (version fixture-terms-v1) (opens in a new tab)",
       })
-    ).toHaveAttribute("href", registrationDocuments.terms.url);
+    ).toHaveAttribute("href", registrationDocuments.terms.downloadUrl);
     expect(
       screen.getByRole("link", {
         name: "Privacy Policy (version fixture-privacy-v1) (opens in a new tab)",
       })
-    ).toHaveAttribute("href", registrationDocuments.privacy.url);
+    ).toHaveAttribute("href", registrationDocuments.privacy.downloadUrl);
     expect(
       screen.getAllByText(
         translate(competitionEnglish, "registrationServer.documentEffective", {

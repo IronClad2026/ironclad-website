@@ -28,7 +28,7 @@ async function release(request, commit = true) {
   assert.equal(result.code, 0, result.stderr);
 }
 
-assert.equal(await client.run("select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=56623;", { db: "postgres" }), "t");
+assert.equal(await client.run(`select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=${client.port};`, { db: "postgres" }), "t");
 await client.run(`create database ${database} template ${template};`, { db: "postgres" });
 try {
   const fixture = readFileSync(path.join(root, "tests/database/match-room-phase-1.sql"), "utf8");

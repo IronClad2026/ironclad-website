@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { generateTournamentBracket } from "@/app/admin/tournaments/actions";
@@ -14,7 +15,7 @@ import type {
 } from "@/lib/tournaments";
 import {
   getTournamentRegistrationStatusLabel,
-  TOURNAMENT_BRACKET_CONFIGS,
+  getTournamentBracketConfigs,
 } from "@/lib/tournaments";
 
 export type TournamentEditorNotice =
@@ -38,6 +39,7 @@ export type TournamentEditorNotice =
   | "map-pool-failed";
 
 export type TournamentFormValues = {
+  divisionModelVersion: DivisionModelVersion;
   id: string | null;
   title: string;
   slug: string;
@@ -56,6 +58,7 @@ export type TournamentFormValues = {
   academy: BracketFormValues;
   main: BracketFormValues;
   challenge: BracketFormValues;
+  pro: BracketFormValues;
 };
 
 export type BracketFormValues = {
@@ -112,6 +115,7 @@ export type TournamentEditorProps = {
 
 export const EMPTY_TOURNAMENT_VALUES: TournamentFormValues = {
   id: null,
+  divisionModelVersion: "four_division_v1",
   title: "",
   slug: "",
   description: "",
@@ -130,7 +134,7 @@ export const EMPTY_TOURNAMENT_VALUES: TournamentFormValues = {
     id: null,
     launchedAt: null,
     enabled: false,
-    eloRules: "Below 1100 ELO",
+    eloRules: "0-1099 ELO",
     maxPlayers: 8,
   },
   challenge: {
@@ -144,9 +148,10 @@ export const EMPTY_TOURNAMENT_VALUES: TournamentFormValues = {
     id: null,
     launchedAt: null,
     enabled: false,
-    eloRules: "1400+ ELO",
+    eloRules: "1400-1699 ELO",
     maxPlayers: 8,
   },
+  pro: { id: null, launchedAt: null, enabled: false, eloRules: "1700+ ELO", maxPlayers: 8 },
 };
 
 export function TournamentEditor({
@@ -170,6 +175,7 @@ export function TournamentEditor({
         id={formId}
         className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 sm:p-6 md:p-8"
       >
+        <input type="hidden" name="divisionModelVersion" value={values.divisionModelVersion} />
         {values.id && (
           <input type="hidden" name="tournamentId" value={values.id} />
         )}
@@ -381,13 +387,14 @@ export function TournamentEditor({
           />
         </div>
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
-          {TOURNAMENT_BRACKET_CONFIGS.map((config) => (
+        <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
+          {getTournamentBracketConfigs(values.divisionModelVersion).map((config) => (
             <BracketFields
               key={config.name}
               prefix={config.fieldPrefix}
               label={config.label}
               values={values[config.fieldPrefix]}
+              fixedEloRules={values.divisionModelVersion === "four_division_v1"}
               readOnly={
                 !isEditing ||
                 Boolean(
@@ -410,8 +417,8 @@ export function TournamentEditor({
               Generation creates a private structure only; seeding and an
               explicit Launch Division action remain separate.
             </p>
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
-              {TOURNAMENT_BRACKET_CONFIGS.map((config) => {
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {getTournamentBracketConfigs(values.divisionModelVersion).map((config) => {
                 const bracket = values[config.fieldPrefix];
                 if (!bracket.id) {
                   return null;
@@ -513,7 +520,7 @@ export function TournamentEditor({
       {values.id &&
         showBracketGeneration &&
         isEditing &&
-        TOURNAMENT_BRACKET_CONFIGS.map((config) => {
+        getTournamentBracketConfigs(values.divisionModelVersion).map((config) => {
           const bracket = values[config.fieldPrefix];
 
           return bracket.id ? (
@@ -542,11 +549,13 @@ function BracketFields({
   label,
   values,
   readOnly,
+  fixedEloRules,
 }: {
   prefix: TournamentBracketFieldPrefix;
   label: string;
   values: BracketFormValues;
   readOnly: boolean;
+  fixedEloRules: boolean;
 }) {
   return (
     <fieldset className="rounded-2xl border border-orange-500/20 bg-black/30 p-5">
@@ -565,7 +574,7 @@ function BracketFields({
           label="ELO Rules"
           name={`${prefix}EloRules`}
           defaultValue={values.eloRules}
-          readOnly={readOnly}
+          readOnly={readOnly || fixedEloRules}
         />
         <label>
           <span className="text-sm font-bold">Launch Capacity</span>
@@ -683,6 +692,7 @@ export function toTournamentFormValues(
 
   return {
     id: tournament.id,
+    divisionModelVersion: requireDivisionModelVersion(tournament.division_model_version),
     title: tournament.title,
     slug: tournament.slug,
     description: tournament.description,
@@ -703,18 +713,20 @@ export function toTournamentFormValues(
     prizePool: tournament.prize_pool,
     rulesUrl: tournament.rules_url ?? "",
     battlefyUrl: tournament.battlefy_url ?? "",
-    academy: toBracketValues(brackets, "Academy"),
-    challenge: toBracketValues(brackets, "Challenge"),
-    main: toBracketValues(brackets, "Main"),
+    academy: toBracketValues(brackets, "Academy", requireDivisionModelVersion(tournament.division_model_version)),
+    challenge: toBracketValues(brackets, "Challenge", requireDivisionModelVersion(tournament.division_model_version)),
+    main: toBracketValues(brackets, "Main", requireDivisionModelVersion(tournament.division_model_version)),
+    pro: toBracketValues(brackets, "Pro", requireDivisionModelVersion(tournament.division_model_version)),
   };
 }
 
 function toBracketValues(
   brackets: TournamentBracketRow[],
-  name: TournamentBracketRow["name"]
+  name: TournamentBracketRow["name"],
+  model: DivisionModelVersion
 ): BracketFormValues {
   const bracket = brackets.find((item) => item.name === name);
-  const config = TOURNAMENT_BRACKET_CONFIGS.find(
+  const config = getTournamentBracketConfigs(model).find(
     (item) => item.name === name
   );
 

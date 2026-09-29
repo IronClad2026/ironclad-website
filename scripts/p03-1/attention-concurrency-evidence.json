@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-09-28T03:02:21.849Z",
+  "recordedAt": "2026-09-29T02:20:17.368Z",
   "postgres": "17.11",
   "checks": [
     "unread summary sees only committed messages and never acknowledges an in-flight message",

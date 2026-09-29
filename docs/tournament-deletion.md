@@ -34,7 +34,7 @@ trusted deletion transaction.
 - **Void** is for competition whose derived scoring effects must no longer
   count while factual history remains. It preserves tournament, registration,
   bracket, match, result, and replay history and reconciles eligible derived
-  scoring. A finalized Main / Pro season is placed under review rather than
+  scoring. A finalized official season (Pro or historical Main / Pro) is placed under review rather than
   silently rewriting frozen standings.
 
 Cancelled and voided tournaments are terminal and read-only. Normal player and

@@ -12,7 +12,7 @@ import {
 
 const root = process.cwd();
 const corpus = JSON.parse(
-  readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
+  readFileSync(join(root, "content", "legal-history", "rulebook-ppa-v3.1-corpus.json"), "utf8")
 );
 const expectedArtifacts = new Map([
   [

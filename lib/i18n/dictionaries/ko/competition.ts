@@ -238,6 +238,11 @@ const dictionary = {
       "시작 후 토너먼트의 대진표 탭에서 대진표, 상대 선수, 매치 세부 정보를 확인하세요.",
   },
   registrationModal: {
+    syntheticIdentityReady: "합성 테스트 계정 준비 완료",
+    syntheticEligibility: "Staging 합성 테스트 참가 자격",
+    syntheticEligibilityDescription: "이 승인된 Staging 테스트 계정은 합성 ELO와 디비전을 사용합니다. 제출 시 서버는 테스트 참가 자격을 확인하며, 실시간 Relic 데이터나 실제 Steam 계정 소유권을 검증하지 않습니다.",
+    syntheticOwnershipConfirmation: "이 Staging 합성 테스트 계정을 제가 관리함을 확인합니다. 이 테스트는 실제 Steam 계정 소유권을 주장하지 않습니다.",
+    syntheticSteamLabel: "합성 Steam 테스트 계정",
     eyebrow: "IronClad 등록",
     title: "e스포츠 선수 등록",
     dialogDescription:

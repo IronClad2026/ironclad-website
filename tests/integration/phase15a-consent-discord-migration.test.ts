@@ -329,8 +329,10 @@ describe("Phase 15A versioned consent and Discord database contract", () => {
     }
     expect(tournamentUi).toContain('t("registrationModal.ageConfirmation")');
     expect(tournamentUi).toContain(
-      't("registrationModal.ownershipConfirmation")'
+      '"registrationModal.ownershipConfirmation"'
     );
+    expect(tournamentUi).toContain('"registrationModal.syntheticOwnershipConfirmation"');
+    expect(action).not.toContain("input.syntheticEligibility");
     expect(competitionEnglish.registrationModal.ageConfirmation).toBe(
       "I confirm that I am at least 18 years old."
     );

@@ -1,3 +1,4 @@
+import legalDeliveryManifest from "@/content/legal-document-delivery.json";
 import { isValidElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -269,6 +270,8 @@ const clientPropsShape = {
       object: {
         isAdmin: "value",
         relicVerifiedDivision: "value",
+        relicVerifiedElo: "value",
+        syntheticEligibility: "value",
         registrationIds: { array: "value" },
         registrations: { array: viewerRegistrationShape },
       },
@@ -285,6 +288,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -295,6 +299,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -305,6 +310,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -315,6 +321,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -526,11 +533,11 @@ function createPageClient(
       ].map(([document_kind, id]) => ({
         id,
         document_kind,
-        version: `fixture-${document_kind}-v1`,
+        version: legalDeliveryManifest.documents.find((document) => document.kind === document_kind)!.version,
         immutable_url: `https://ironclad.test/legal/${document_kind}/fixture-v1`,
         status: "effective",
         effective_at: "2026-08-01T00:00:00.000Z",
-        sha256: "a".repeat(64),
+        sha256: legalDeliveryManifest.documents.find((document) => document.kind === document_kind)!.sha256,
       })),
       error: null,
     },
@@ -723,7 +730,11 @@ describe("tournament Client Component result payload", () => {
     getEffectiveRegistrationViewerRelicMock.mockReset();
 
     getRequestLocaleMock.mockResolvedValue("en");
-    getEffectiveRegistrationViewerRelicMock.mockResolvedValue(null);
+    getEffectiveRegistrationViewerRelicMock.mockImplementation(async ({ persisted }) =>
+      ["Academy", "Challenge", "Main / Pro", "Main", "Pro"].includes(persisted.division)
+        ? { ...persisted, status: "rated", source: "persisted" }
+        : null
+    );
     getEloVerificationSettingMock.mockResolvedValue({
       enabled: true,
       error: null,
@@ -813,6 +824,7 @@ describe("tournament Client Component result payload", () => {
       const { client, props } = await loadClientProps({ admin });
 
       expectExactShape(props, clientPropsShape);
+      expect(props.viewer).toMatchObject({ syntheticEligibility: false });
       expectNoSensitiveBrowserData(props, [
         SECRET_PLAYER_ID,
         SECRET_ADMIN_ID,
@@ -917,6 +929,12 @@ describe("tournament Client Component result payload", () => {
     });
   });
 
+  it("does not restore persisted evidence after the authoritative viewer resolver rejects it", async () => {
+    getEffectiveRegistrationViewerRelicMock.mockResolvedValue(null);
+    const { props } = await loadClientProps({ admin: false, verifiedDivision: "Main / Pro" });
+    expect(props.viewer).toMatchObject({ relicVerifiedDivision: null, relicVerifiedElo: null, syntheticEligibility: false });
+  });
+
   it("projects an authorized synthetic Staging viewer as Academy without writing registration data", async () => {
     getEffectiveRegistrationViewerRelicMock.mockResolvedValue({
       status: "rated",
@@ -934,10 +952,12 @@ describe("tournament Client Component result payload", () => {
     });
     const viewer = props.viewer as {
       relicVerifiedDivision: string | null;
+      syntheticEligibility: boolean;
       registrations: unknown[];
     };
 
     expect(viewer.relicVerifiedDivision).toBe("Academy");
+    expect(viewer.syntheticEligibility).toBe(true);
     expect(viewer.registrations).toHaveLength(1);
     expect(getEffectiveRegistrationViewerRelicMock).toHaveBeenCalledWith({
       supabase: client,
@@ -1210,7 +1230,8 @@ describe("tournament Client Component result payload", () => {
     ["Academy", "Academy"],
     ["Challenge", "Challenge"],
     ["Main / Pro", "Main / Pro"],
-    ["Main", null],
+    ["Main", "Main"],
+    ["Pro", "Pro"],
     ["", null],
     [null, null],
   ])(

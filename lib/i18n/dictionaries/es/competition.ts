@@ -238,6 +238,11 @@ const dictionary = {
       "Después del lanzamiento, abre la pestaña Cuadros del torneo para ver tu cuadro, oponente y detalles del partido.",
   },
   registrationModal: {
+    syntheticIdentityReady: "Identidad de prueba sintética preparada",
+    syntheticEligibility: "Elegibilidad sintética de Staging",
+    syntheticEligibilityDescription: "Esta cuenta de prueba autorizada de Staging utiliza ELO y División sintéticos. Al enviar, el servidor comprueba la elegibilidad de la prueba; no verifica datos de Relic en directo ni la propiedad real de Steam.",
+    syntheticOwnershipConfirmation: "Confirmo que controlo esta cuenta sintética de Staging. Esta prueba no declara la propiedad de una cuenta real de Steam.",
+    syntheticSteamLabel: "Identidad sintética de Steam",
     eyebrow: "Inscripción en IronClad",
     title: "Inscripción de jugador de esports",
     dialogDescription:

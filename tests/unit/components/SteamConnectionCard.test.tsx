@@ -9,6 +9,15 @@ describe("SteamConnectionCard", () => {
     cleanup();
   });
 
+  it("labels an authorized fixture without real Steam connection claims or actions", () => {
+    render(<SteamConnectionCard connected={false} hasPlayer result="connected" statusAvailable syntheticFixture />);
+    expect(screen.getByText("No verified Steam connection")).toBeInTheDocument();
+    expect(screen.getByText(/does not verify ownership/)).toBeInTheDocument();
+    expect(screen.queryByText("Steam connected")).not.toBeInTheDocument();
+    expect(screen.queryByText("Steam account connected successfully.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("requires the player profile to be saved first", () => {
     render(
       <SteamConnectionCard

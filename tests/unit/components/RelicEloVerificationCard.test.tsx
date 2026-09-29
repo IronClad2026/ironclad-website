@@ -53,6 +53,19 @@ describe("RelicEloVerificationCard", () => {
     expect(verifyRelicProfileEloMock).not.toHaveBeenCalled();
   });
 
+  it("labels synthetic eligibility without provider verification or provider actions", () => {
+    render(<RelicEloVerificationCard {...defaultProps} steamConnected={false}
+      syntheticEligibility={{ elo: 1699, division: "Main" }} />);
+    expect(screen.getByRole("heading", { name: "Synthetic eligibility" })).toBeInTheDocument();
+    expect(screen.getByText("1,699")).toBeInTheDocument();
+    expect(screen.getByText("Main")).toBeInTheDocument();
+    expect(screen.getByText(/not a real Relic verification/)).toBeInTheDocument();
+    expect(screen.queryByText("Relic verified")).not.toBeInTheDocument();
+    expect(screen.queryByText("Relic", { selector: "dd" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(verifyRelicProfileEloMock).not.toHaveBeenCalled();
+  });
+
   it("requires Steam to be connected without making a request", () => {
     render(
       <RelicEloVerificationCard {...defaultProps} steamConnected={false} />

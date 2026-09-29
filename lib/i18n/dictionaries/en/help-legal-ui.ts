@@ -57,14 +57,14 @@ const dictionary = {
         eyebrow: "Solo Competition",
         title: "1V1 RULES",
         description:
-          "IronClad launch Tournaments are free CoH3 1v1 Events with separate eight-Player Academy, Challenge and Main / Pro Divisions. Quarterfinals and semifinals are BO3; the grand final is BO5.",
-        document: "Rulebook v3.1",
+          "IronClad launch Tournaments are free CoH3 1v1 Events with separate eight-Player Academy, Challenge and Main and Pro Divisions. Quarterfinals and semifinals are BO3; the grand final is BO5.",
+        document: "Rulebook v3.2",
       },
       rankings: {
         eyebrow: "Competitive Record",
         title: "RANKINGS & SEASONS",
         description:
-          "Academy and Challenge maintain permanent Career standings. Main / Pro uses six-valid-Event seasons. Only genuine played competition creates played statistics.",
+          "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate.",
         document: "Rulebook sections 13-14",
       },
       conduct: {
@@ -72,7 +72,7 @@ const dictionary = {
         title: "PPA & CONDUCT",
         description:
           "The PPA governs eligibility, account ownership, conduct, evidence cooperation, privacy-facing obligations, sanctions, media and conditional prizes. Detailed Game procedure remains in the Rulebook.",
-        document: "PPA v3.1",
+        document: "PPA v3.2",
       },
     },
     quick: {
@@ -108,7 +108,7 @@ const dictionary = {
           "Registration is free and native to IronClad. Players must be 18 or older, use their own authenticated IronClad and linked Steam accounts, complete fresh Relic 1v1 verification, and accept the exact governing-document versions presented. Discord is not required.",
         eloTitle: "ELO Snapshot & Division",
         eloText:
-          "The highest valid current Relic 1v1 faction ELO determines Academy (0–1099), Challenge (1100–1399), or Main / Pro (1400+). IronClad stores that eligibility as an immutable Event registration snapshot, so later live ELO changes do not move the Player for that Event.",
+          "The highest valid current Relic 1v1 faction ELO determines Academy (0–1099), Challenge (1100–1399), Main (1400–1699), or Pro (1700+). Historical three-division events retain Main / Pro (1400+). The immutable registration snapshot uses the event’s model; later ELO changes do not move that entry.",
         reviewTitle: "Review, Waitlist & Launch",
         reviewText:
           "The first eight valid registrations enter the Active Review Cohort; later eligible Players may join the FIFO Waitlist. A vacancy offer uses the exact deadline shown by IronClad and returns an accepting Player to review. A Division launches only with exactly eight approved Players, a ready bracket, and its required published map pool.",
@@ -137,19 +137,19 @@ const dictionary = {
       rankings: {
         pointsTitle: "Points by Division",
         pointsText:
-          "Academy and Challenge award 10 participation points, 2 points per round passed, and 3 points for a Tournament win. Main / Pro awards 10 participation points, 5 points per round passed, and 5 points for a Tournament win.",
+          "Academy and Challenge award +10 participation, +2 per round advanced and +3 for winning. Main and Pro award +10 participation, +5 per round advanced and +5 for winning. The final win earns only the winner bonus, with no additional round points. Historical Main / Pro scoring is unchanged.",
         playTitle: "Genuine Play",
         playText:
           "Played-Match totals, wins, losses, and win rate include only genuine completed Series between two Players. No-shows, automatic byes, walkovers, empty feeders, and double forfeits do not create played statistics, although legitimate non-played advancement may still earn approved round-passed points.",
         careerTitle: "Career Standings",
         careerText:
-          "Academy and Challenge maintain separate permanent Career standings. They do not reset when a Main / Pro season ends.",
+          "Academy, Challenge and Main each keep permanent Career standings. Their points remain separate and never transfer to Pro seasons or the historical Main / Pro archive.",
         catchupTitle: "Career Catch-Up",
         catchupText:
-          "Academy and Challenge may award +5 points for each prior eligible missed completed Event in the same Division, up to +25. The award is available once per Player per Division and never applies to Main / Pro.",
-        seasonTitle: "Main / Pro Season",
+          "Only Academy and Challenge may award +5 per prior eligible missed completed event in that division, once per player per division, up to +25. Main and Pro never receive this bonus.",
+        seasonTitle: "Pro Season",
         seasonText:
-          "A Main / Pro season consists of exactly six valid qualifying Events. Event seven begins the next season, and the standings freeze after the sixth valid Event is scored unless a later integrity review places the season under review.",
+          "A Pro season consists of exactly six valid Pro events. Event seven begins the next season. Standings freeze after event six unless an integrity review opens. Historical Main / Pro seasons retain their original authority and are never converted into Pro seasons.",
         rankingTitle: "Ranking & True Ties",
         rankingText:
           "Ranking order is total points, Tournament wins, rounds passed, exact genuine-Match win rate, then genuine Match wins. Players still equal on every competitive key share the same official rank. Names, display order, or internal IDs do not break a true tie.",
@@ -211,7 +211,7 @@ const dictionary = {
         "Registration is free and native to IronClad. Sign in, complete the required profile fields, link your own Steam account, complete fresh Relic 1v1 verification, choose the eligible open Division, confirm that you are 18 or older and using your own accounts, and accept the exact Effective governing-document versions shown.",
       divisionQuestion: "How is my Division determined?",
       divisionAnswer:
-        "IronClad uses the highest valid current 1v1 faction ELO returned by the authoritative Relic lookup: Academy is 0–1099, Challenge is 1100–1399, and Main / Pro is 1400+. The server stores an immutable registration snapshot, so later live ELO changes do not move that Event entry.",
+        "The highest valid current Relic 1v1 faction ELO determines Academy (0–1099), Challenge (1100–1399), Main (1400–1699), or Pro (1700+). Historical three-division events retain Main / Pro (1400+). The immutable registration snapshot uses the event’s model; later ELO changes do not move that entry.",
       discordQuestion: "Is Discord required?",
       discordAnswer:
         "No. Discord is optional but recommended. IronClad notifications and the match-scoped Admin Assistance feature provide platform fallbacks. Steam may be used where reasonably available. Public Discord visibility is a separate opt-in.",
@@ -235,7 +235,7 @@ const dictionary = {
         "The opponent may confirm or dispute before the displayed deadline. An undisputed report may then confirm automatically; a dispute goes to Admin review. A no-show is never self-awarded. Confirmed no-shows and other non-played advancement do not create fake played-Match statistics.",
       standingsQuestion: "How do standings work?",
       standingsAnswer:
-        "Academy and Challenge build permanent Career standings; Main / Pro uses exactly six valid qualifying Events per season. Rankings use total points, Tournament wins, rounds passed, exact genuine-Match win rate, then genuine Match wins. Players still equal on every key share the same official rank.",
+        "Academy, Challenge and Main have permanent Career standings; Pro has six-valid-event seasons. Ranking order is points, tournament wins, rounds advanced, exact genuine-match win rate, then genuine match wins. Players equal on all competitive keys share an official rank. Historical Main / Pro records remain separate.",
       pollQuestion: "What is Advisory versus Binding?",
       pollAnswer:
         "An Advisory Poll informs the final Admin decision. A Binding Poll has no quorum and determines its configured top-K outcome once at least one valid ballot exists; a zero-ballot Binding Poll is cancelled or replaced. Individual ballot attribution is private. Eligible Players see aggregate totals according to the configured live or after-close visibility, while anonymous public totals exist only when explicitly enabled. The final Published Decision may be public, but finalisation does not automatically change another subsystem.",

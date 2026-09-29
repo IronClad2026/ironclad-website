@@ -5,6 +5,9 @@ export const STAGING_SUPABASE_REF = "zzbnneprhjicmajpjkdg";
 export const PRODUCTION_SUPABASE_REF = "nsyjtqpvyxlzyujlbzos";
 export const FIXTURE_SOURCE = "staging_synthetic_uat";
 export const FIXTURE_CONTRACT_VERSION = "staging-synthetic-v1";
+export const FUTURE_ENROLMENT_CONTRACT_VERSION = "staging-synthetic-v2";
+export const STAGING_CLERK_FRONTEND_DOMAIN = "guided-goshawk-34.clerk.accounts.dev";
+export const STAGING_CLERK_INSTANCE_ID = "ins_3DyIunPGGFsUr026vsQmex8bIL7";
 
 const AVATAR_BUCKET = "player-avatars";
 const AVATAR_OBJECT_NAME = "avatar";
@@ -44,6 +47,7 @@ const SAFE_ERROR_CODES = new Set([
   "runtime_environment_rejected",
   "runtime_unavailable",
   "service_role_rejected",
+  "request_rate_limited",
   "supabase_project_rejected",
 ]);
 
@@ -63,9 +67,45 @@ const COMMAND_OPTIONS = Object.freeze({
     optional: [],
   }),
   "verify-login": Object.freeze({ required: ["alias"], optional: [] }),
+  "reconcile-password": Object.freeze({ required: ["alias"], optional: [] }),
 });
 
 export const SUPPORTED_COMMANDS = Object.freeze(Object.keys(COMMAND_OPTIONS));
+
+export function assertApprovedClerkPublishableKey(value) {
+  if (typeof value !== "string" || !/^pk_test_[A-Za-z0-9+/=_-]+$/.test(value)) {
+    throw fixtureError("clerk_environment_rejected");
+  }
+  const decoded = Buffer.from(value.slice(8), "base64").toString("utf8");
+  if (decoded !== `${STAGING_CLERK_FRONTEND_DOMAIN}$`) {
+    throw fixtureError("clerk_environment_rejected");
+  }
+}
+
+// Bind both keys to the approved Development instance before any mutation.
+export async function assertClerkDevelopmentInstance(config, fetchImpl = globalThis.fetch) {
+  assertApprovedClerkPublishableKey(config.clerkPublishableKey);
+  if (typeof config.clerkSecretKey !== "string" || !config.clerkSecretKey.startsWith("sk_test_")) {
+    throw fixtureError("clerk_environment_rejected");
+  }
+  const headers = {
+    Authorization: `Bearer ${config.clerkSecretKey}`,
+    "Clerk-API-Version": CLERK_API_VERSION,
+  };
+  const [instance, response] = await Promise.all([
+    requestJson(fetchImpl, `${CLERK_API_BASE_URL}/instance`, { method: "GET", headers }, "clerk_environment_rejected"),
+    requestJson(fetchImpl, `${CLERK_API_BASE_URL}/domains`, { method: "GET", headers }, "clerk_environment_rejected"),
+  ]);
+  const domains = Array.isArray(response) ? response : response?.data;
+  const matches = Array.isArray(domains) ? domains.filter((domain) =>
+    domain?.is_satellite === false &&
+    [STAGING_CLERK_FRONTEND_DOMAIN, `https://${STAGING_CLERK_FRONTEND_DOMAIN}`].includes(domain.frontend_api_url)
+  ) : [];
+  if (instance?.id !== STAGING_CLERK_INSTANCE_ID ||
+    instance.environment_type !== "development" || matches.length !== 1) {
+    throw fixtureError("clerk_environment_rejected");
+  }
+}
 
 export class FixtureContractError extends Error {
   constructor(code) {
@@ -110,17 +150,64 @@ export function buildFixtureCatalogue() {
 
   return Object.freeze(
     Object.fromEntries(
-      divisions.flatMap(([prefix, division, ratings]) =>
+      [...divisions.flatMap(([prefix, division, ratings]) =>
         ratings.map((rating, index) => {
           const alias = `${prefix}${index + 1}`;
           return [alias, freezeFixture(alias, rating, division)];
         })
-      )
+      ),
+      ...[1625, 1650, 1675, 1699].map((rating, index) => {
+        const alias = `TestMain${index + 11}`;
+        return [alias, freezeFixture(alias, rating, "Main")];
+      }),
+      ...[1701, 1750, 1850, 2100].map((rating, index) => {
+        const alias = `TestPro${index + 1}`;
+        return [alias, freezeFixture(alias, rating, "Pro")];
+      })]
     )
   );
 }
 
 export const APPROVED_FIXTURES = buildFixtureCatalogue();
+
+// Original account provenance never changes when the competition model changes.
+export function getFixtureDivision(alias, model = "four_division_v1") {
+  const { syntheticElo } = getFixtureDefinition(alias);
+  if (!["legacy_three_v1", "four_division_v1"].includes(model)) {
+    throw fixtureError("arguments_rejected");
+  }
+  if (syntheticElo < 1100) return "Academy";
+  if (syntheticElo < 1400) return "Challenge";
+  if (model === "legacy_three_v1") return "Main / Pro";
+  return syntheticElo < 1700 ? "Main" : "Pro";
+}
+
+export const FUTURE_FIXTURE_POOLS = Object.freeze(Object.fromEntries(
+  ["Academy", "Challenge", "Main", "Pro"].map((division) => [
+    division.toLowerCase(),
+    Object.freeze(Object.keys(APPROVED_FIXTURES).filter(
+      (alias) => getFixtureDivision(alias) === division
+    )),
+  ])
+));
+
+// These reserved uint64 values do not represent a verified Steam ownership claim.
+export const PREPARED_REGISTRATION_IDENTITIES = Object.freeze(Object.fromEntries(
+  Object.keys(APPROVED_FIXTURES).flatMap((alias) => {
+    const academy = /^TestAcademy([1-8])$/.exec(alias);
+    const main = /^TestMain([1-9]|1[0-4])$/.exec(alias);
+    const pro = /^TestPro([1-4])$/.exec(alias);
+    if (!academy && !main && !pro) return [];
+    const index = Number((academy ?? main ?? pro)[1]);
+    const base = academy ? 18446744073709551000n
+      : main ? 18446744073709550000n : 18446744073709550100n;
+    return [[alias, Object.freeze({
+      steamId64: String(base + BigInt(index)),
+      steamUsername: academy ? "Staging Academy UAT" : "Staging Main Pro UAT",
+      elo: academy ? 1000 : APPROVED_FIXTURES[alias].syntheticElo,
+    })]];
+  })
+));
 
 export function getFixtureDefinition(alias) {
   if (typeof alias !== "string") {
@@ -475,6 +562,8 @@ export function validateRuntimeGuards(env, alias, now = Date.now()) {
     throw fixtureError("clerk_environment_rejected");
   }
 
+  assertApprovedClerkPublishableKey(clerkPublishableKey);
+
   if (!isHighEntropySecret(fixtureSecret)) {
     throw fixtureError("fixture_secret_rejected");
   }
@@ -522,7 +611,7 @@ export function parseArgs(argv) {
     throw fixtureError("command_rejected");
   }
 
-  const allowedOptions = new Set([...contract.required, ...contract.optional]);
+  const allowedOptions = new Set([...contract.required, ...contract.optional, "env-dir"]);
   const options = {};
 
   for (let index = 0; index < tokens.length; index += 1) {
@@ -597,6 +686,7 @@ export function parseArgs(argv) {
     tournamentId: options["tournament-id"],
     bracketId: options["bracket-id"],
     confirmWaitlist: options["confirm-waitlist"] === true,
+    ...(options["env-dir"] ? { environmentDirectory: options["env-dir"] } : {}),
   });
 }
 
@@ -710,14 +800,20 @@ function requireRpcObject(value) {
 }
 
 function validateCommonRpcFixture(result, fixture, requireNullCurrentElo) {
+  const prepared = PREPARED_REGISTRATION_IDENTITIES[fixture.alias];
+  const enrolmentV2 = !requireNullCurrentElo &&
+    result.contract_version === FUTURE_ENROLMENT_CONTRACT_VERSION;
   if (
     result.alias !== fixture.alias ||
     result.synthetic_elo !== fixture.syntheticElo ||
-    result.synthetic_division !== fixture.syntheticDivision ||
+    result.synthetic_division !== (requireNullCurrentElo
+      ? fixture.syntheticDivision
+      : getFixtureDivision(fixture.alias, enrolmentV2 ? "four_division_v1" : "legacy_three_v1")) ||
     result.provenance !== FIXTURE_SOURCE ||
-    result.contract_version !== FIXTURE_CONTRACT_VERSION ||
+    (!enrolmentV2 && result.contract_version !== FIXTURE_CONTRACT_VERSION) ||
     !SAFE_UUID_PATTERN.test(String(result.player_id ?? "")) ||
-    (requireNullCurrentElo && result.current_elo !== null)
+    (requireNullCurrentElo && result.current_elo !== null &&
+      (!prepared || result.current_elo !== prepared.elo))
   ) {
     throw fixtureError("rpc_response_rejected");
   }
@@ -807,6 +903,8 @@ export function buildRedactedResult(operation, fixture, rawResult, extras = {}) 
 
     return {
       ...base,
+      syntheticDivision: result.synthetic_division,
+      contractVersion: result.contract_version,
       enrolmentPresent: registrationPresent,
       pending: result.registration_status === "pending",
       manualReview: result.registration_status === "manual_review",
@@ -825,7 +923,8 @@ export function buildRedactedResult(operation, fixture, rawResult, extras = {}) 
       (result.synthetic_elo === 1100 &&
         result.synthetic_division === "Challenge") ||
       (result.synthetic_elo === 1400 &&
-        result.synthetic_division === "Main / Pro");
+        ["Main / Pro", "Main"].includes(result.synthetic_division)) ||
+      (result.synthetic_elo === 1700 && result.synthetic_division === "Pro");
 
     if (
       !SAFE_UUID_PATTERN.test(String(result.player_id ?? "")) ||
@@ -940,6 +1039,9 @@ async function requestJson(fetchImpl, url, init, errorCode) {
     throw fixtureError(errorCode);
   }
 
+  if (response?.status === 429) {
+    throw fixtureError("request_rate_limited");
+  }
   if (!response || response.ok !== true) {
     throw fixtureError(errorCode);
   }
@@ -1263,6 +1365,20 @@ function createFixtureService({ config, fetchImpl, readFileImpl, rootDir }) {
       await verifyClerkPassword(validatedUser.id);
       return buildRedactedLoginResult(config.fixture);
     },
+
+    async reconcilePassword() {
+      const clerkUser = await findClerkFixtureUser();
+      const before = validateClerkFixtureUser(clerkUser, config);
+      const after = validateClerkFixtureUser(await clerkRequest(
+        `/users/${encodeURIComponent(before.id)}`,
+        { method: "PATCH", headers: {}, body: JSON.stringify({ password: config.password }) }
+      ), config);
+      if (after.id !== before.id || after.external_id !== before.external_id) {
+        throw fixtureError("clerk_test_identity_rejected");
+      }
+      await verifyClerkPassword(after.id);
+      return { ...buildRedactedLoginResult(config.fixture), operation: "reconcile-password" };
+    },
   });
 }
 
@@ -1277,6 +1393,7 @@ export async function executeFixtureCommand(
   }
 ) {
   const config = validateRuntimeGuards(env, parsedCommand.alias, now);
+  await assertClerkDevelopmentInstance(config, fetchImpl);
   const service = createFixtureService({
     config,
     fetchImpl,
@@ -1304,7 +1421,34 @@ export async function executeFixtureCommand(
       return service.cleanupEnrolment(parsedCommand.tournamentId);
     case "verify-login":
       return service.verifyLogin();
+    case "reconcile-password":
+      return service.reconcilePassword();
     default:
       throw fixtureError("command_rejected");
   }
+}
+
+/** Read-only account verification with one exact-instance preflight per batch. */
+export async function verifyFixtureLogins({
+  aliases,
+  env,
+  rootDir,
+  fetchImpl = globalThis.fetch,
+  now = Date.now(),
+}) {
+  if (!Array.isArray(aliases) || aliases.length === 0 ||
+    new Set(aliases).size !== aliases.length) {
+    throw fixtureError("arguments_rejected");
+  }
+  const configs = aliases.map((alias) => validateRuntimeGuards(env, alias, now));
+  await assertClerkDevelopmentInstance(configs[0], fetchImpl);
+  const results = [];
+  for (const config of configs) {
+    try {
+      results.push(await createFixtureService({ config, fetchImpl, readFileImpl: readFile, rootDir }).verifyLogin());
+    } catch (error) {
+      results.push(buildRedactedFailure(error, { command: "verify-login", alias: config.fixture.alias }));
+    }
+  }
+  return results;
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { getDivisionDisplayName, getRelicCalculationVersion, parseDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
@@ -39,6 +40,7 @@ const PLAYER_SELECT = [
 const TOURNAMENT_SELECT = [
   "id",
   "title",
+  "division_model_version",
   "status",
   "registration_open_at",
   "registration_close_at",
@@ -108,6 +110,7 @@ type RegistrationIdentity = {
 };
 type RegistrationTournament = {
   id: string;
+  divisionModelVersion: DivisionModelVersion;
   title: string;
   status: string;
   registrationOpenAt: string | null;
@@ -249,6 +252,7 @@ export async function submitTournamentRegistration(
   try {
     relicResult = await getRegistrationRelic1v1Elo({
       supabase,
+      divisionModelVersion: tournament.divisionModelVersion,
       identity: {
         playerId: identity.player.id,
         clerkUserId: userId,
@@ -267,7 +271,30 @@ export async function submitTournamentRegistration(
     return mapRelicFailure(relicResult);
   }
 
-  const calculatedDivision = getIronCladDivision(relicResult.elo);
+  const calculatedDivision = getIronCladDivision(relicResult.elo, tournament.divisionModelVersion);
+
+  if (!["relic-highest-1v1-v1", "relic-highest-1v1-v2", "staging-synthetic-academy-v1", "staging-synthetic-v1", "staging-synthetic-v2"].includes(relicResult.calculationVersion)) {
+    return failure(WRONG_DIVISION_MESSAGE, "DIVISION_MISMATCH");
+  }
+  if (relicResult.calculationVersion === "relic-highest-1v1-v1" || relicResult.calculationVersion === "relic-highest-1v1-v2") {
+    const sourceModel = relicResult.calculationVersion === "relic-highest-1v1-v1" ? "legacy_three_v1" : "four_division_v1";
+    const sourceDivision = getIronCladDivision(relicResult.elo, sourceModel);
+    if (!sourceDivision.ok || sourceDivision.division !== relicResult.division) return failure(WRONG_DIVISION_MESSAGE, "DIVISION_MISMATCH");
+    const division = calculatedDivision.ok ? calculatedDivision.division : null;
+    if (!division) return failure(WRONG_DIVISION_MESSAGE, "DIVISION_MISMATCH");
+    relicResult = { ...relicResult, division, calculationVersion: getRelicCalculationVersion(tournament.divisionModelVersion) };
+  }
+  const expectedSyntheticVersion = tournament.divisionModelVersion === "four_division_v1"
+    ? "staging-synthetic-v2"
+    : "staging-synthetic-v1";
+  if (
+    relicResult.calculationVersion.startsWith("staging-synthetic-") &&
+    relicResult.calculationVersion !== expectedSyntheticVersion &&
+    !(relicResult.calculationVersion === "staging-synthetic-academy-v1" &&
+      relicResult.elo === 1000 && relicResult.division === "Academy")
+  ) {
+    return failure(WRONG_DIVISION_MESSAGE, "DIVISION_MISMATCH");
+  }
 
   if (
     !calculatedDivision.ok ||
@@ -623,7 +650,9 @@ function parseRegistrationTournament(
     return null;
   }
 
-  const division = getBracketDivision(bracket.name);
+  const divisionModelVersion = parseDivisionModelVersion(value.division_model_version);
+  if (!divisionModelVersion) return null;
+  const division = getDivisionDisplayName(divisionModelVersion, bracket.name);
 
   if (!division) {
     return null;
@@ -632,6 +661,7 @@ function parseRegistrationTournament(
   return {
     id: value.id,
     title: value.title,
+    divisionModelVersion,
     status: value.status,
     registrationOpenAt: value.registration_open_at,
     registrationCloseAt: value.registration_close_at,
@@ -706,13 +736,6 @@ function isTournamentRegistrationOpen(tournament: RegistrationTournament) {
       registrationCloseAt: tournament.registrationCloseAt,
     })
   );
-}
-
-function getBracketDivision(name: string): IronCladDivision | null {
-  if (name === "Academy") return "Academy";
-  if (name === "Challenge") return "Challenge";
-  if (name === "Main") return "Main / Pro";
-  return null;
 }
 
 function mapRelicFailure(

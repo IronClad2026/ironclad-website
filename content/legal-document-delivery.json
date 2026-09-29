@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "documents": [
+    {
+      "kind": "rulebook",
+      "version": "3.0",
+      "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.0.pdf",
+      "sha256": "11a391d5b4602bab6f07381b30c4435fb1b4842be99006bdce2512b583859ab0"
+    },
+    {
+      "kind": "rulebook",
+      "version": "3.1",
+      "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.1.pdf",
+      "sha256": "02bef1bfe8f1b2121f62eafd09edc448764adebbfcb54e38934c7433bf6ef0f2"
+    },
+    {
+      "kind": "rulebook",
+      "version": "3.2",
+      "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.2.pdf",
+      "sha256": "0e665b6d8b815ea37808a2c91d2493c446895757580b9b0c1053833a3c8264c7"
+    },
+    {
+      "kind": "ppa",
+      "version": "3.0",
+      "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.0.pdf",
+      "sha256": "a836bda5679899cb8b402465fb750b5b0aff4eb7dcf8cdb142a163cb6d8ed600"
+    },
+    {
+      "kind": "ppa",
+      "version": "3.1",
+      "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.1.pdf",
+      "sha256": "94dcbf6ecbe0c1de4f908baeff824b8439dd81be8022712cd498e8bb2731869b"
+    },
+    {
+      "kind": "ppa",
+      "version": "3.2",
+      "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.2.pdf",
+      "sha256": "4d498aec223dd83cb7aae1690f19de2477b77b999ea5a85cafe3aaaecdc55666"
+    },
+    {
+      "kind": "privacy",
+      "version": "1.0",
+      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
+      "sha256": "cedb9cb46d2ae7bbd7328c500ca466c237afef8f11626d3095329087ec6453f0"
+    },
+    {
+      "kind": "privacy",
+      "version": "1.1",
+      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
+      "sha256": "0c2e37499f8453bdf9962b6acfc018b5307995f0b7aa6763ae6036aeb34bbb91"
+    },
+    {
+      "kind": "privacy",
+      "version": "1.2",
+      "publicPath": "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf",
+      "sha256": "aa0f7af02b69194172dd6333e1d8b7271152aad0bfdab7a935686071c784bfd6"
+    },
+    {
+      "kind": "terms",
+      "version": "1.0",
+      "publicPath": "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
+      "sha256": "99442282625dc7b2600475df7edc5649520d5cef64f2fcfe99f6e8e6d4d08ba1"
+    },
+    {
+      "kind": "terms",
+      "version": "1.1",
+      "publicPath": "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+      "sha256": "59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1"
+    }
+  ]
+}

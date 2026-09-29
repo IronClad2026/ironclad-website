@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion, getDivisionDisplayName, type DivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
 import { isFactualNoShow } from "@/lib/admin-operations-metrics";
@@ -196,6 +197,7 @@ type TournamentBracketRow = {
 };
 
 type TournamentRow = {
+  division_model_version?: DivisionModelVersion;
   id: string;
   title: string;
   banner_image_url: string | null;
@@ -475,7 +477,7 @@ export async function loadPlayerCareerDashboard(
   ];
   const { data: tournamentData, error: tournamentError } = await supabase
     .from("tournaments")
-    .select("id, title, banner_image_url")
+    .select("id, title, banner_image_url, division_model_version")
     .in("id", tournamentIds);
 
   if (tournamentError || !Array.isArray(tournamentData)) {
@@ -908,7 +910,7 @@ function buildCareerDashboard({
         tournament?.title ??
         registrationsById.get(match.winner_registration_id)?.tournament_title ??
         t("dashboard.fallbackTournament"),
-      bracketName: bracket.name,
+      bracketName: getDivisionDisplayName(requireDivisionModelVersion(tournament?.division_model_version), bracket.name) ?? (() => { throw new Error("Unknown championship division."); })(),
       bannerImageUrl: tournament?.banner_image_url ?? null,
       wonAt: match.updated_at,
       winnerName: registrationName(
@@ -942,7 +944,7 @@ function buildCareerDashboard({
         tournament?.title ??
         registrationsById.get(standing.registration_id)?.tournament_title ??
         t("dashboard.fallbackTournament"),
-      bracketName: bracket.name,
+      bracketName: getDivisionDisplayName(requireDivisionModelVersion(tournament?.division_model_version), bracket.name) ?? (() => { throw new Error("Unknown championship division."); })(),
       bannerImageUrl: tournament?.banner_image_url ?? null,
       wonAt: standing.updated_at,
       winnerName: registrationName(
@@ -999,7 +1001,7 @@ function buildCareerDashboard({
           )?.tournament_title ??
           t("dashboard.fallbackTournament"),
         bracketName:
-          bracket?.name ??
+          (bracket ? getDivisionDisplayName(requireDivisionModelVersion(tournament?.division_model_version), bracket.name) : null) ??
           registrationsById.get(
             viewerIsPlayerOne
               ? match.player_one_registration_id ?? ""

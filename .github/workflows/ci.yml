@@ -86,6 +86,8 @@ jobs:
           /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-realtime-postgres" -l "$RUNNER_TEMP/p03-realtime-postgres.log" -o "-h 127.0.0.1 -p 56623 -k $RUNNER_TEMP" -w start
       - name: Replay Staging migrations and P03 SQL regressions
         run: node scripts/p03-1/database.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Four-division authority, lifecycle, and Pro regression tests
+        run: node scripts/four-division/database.mjs /usr/lib/postgresql/17/bin/psql
       - name: Realtime transaction and generation concurrency
         run: node scripts/p03-1/realtime-concurrency.mjs /usr/lib/postgresql/17/bin/psql
       - name: Existing P03 and retention concurrency; migration retry safety

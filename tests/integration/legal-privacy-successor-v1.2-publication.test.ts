@@ -9,7 +9,7 @@ import { validateFinalPrivacyRelease } from "../../scripts/legal-successor/priva
 const root = process.cwd();
 const activationDate = "2026-08-22";
 const corpus = JSON.parse(
-  readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
+  readFileSync(join(root, "content", "legal-history", "rulebook-ppa-v3.1-corpus.json"), "utf8")
 );
 const release = JSON.parse(
   readFileSync(join(root, "content", "legal-successor-release.json"), "utf8")

@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion } from "@/lib/division-model";
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import TournamentsExperience from "@/components/TournamentsExperience";
@@ -44,7 +45,7 @@ import type { MessageValues } from "@/lib/i18n/types";
 
 export const dynamic = "force-dynamic";
 
-type RelicVerifiedDivision = "Academy" | "Challenge" | "Main / Pro";
+type RelicVerifiedDivision = "Academy" | "Challenge" | "Main / Pro" | "Main" | "Pro";
 
 type TournamentsPageProps = {
   searchParams?: Promise<{
@@ -67,7 +68,7 @@ function normalizeRelicVerifiedDivision(
 ): RelicVerifiedDivision | null {
   return value === "Academy" ||
     value === "Challenge" ||
-    value === "Main / Pro"
+    value === "Main / Pro" || value === "Main" || value === "Pro"
     ? value
     : null;
 }
@@ -111,7 +112,7 @@ export default async function TournamentsPage({
     supabase
       .from("tournaments")
       .select(
-        "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, rule_format, result_confirmation_window_minutes, terminal_at, first_completed_at, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
+        "id, division_model_version, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, rule_format, result_confirmation_window_minutes, terminal_at, first_completed_at, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
       )
       .order("created_at", { ascending: false }),
     supabase.rpc("get_tournament_bracket_capacity"),
@@ -145,6 +146,8 @@ export default async function TournamentsPage({
         relic_verified_division?: unknown;
         relic_elo_calculation_version?: unknown;
       } | null);
+  let relicVerifiedElo = typeof viewerProfile?.relic_verified_elo === "number" ? viewerProfile.relic_verified_elo : null;
+  let syntheticEligibility = false;
   let relicVerifiedDivision = viewerProfileResult.error
     ? null
     : normalizeRelicVerifiedDivision(viewerProfile?.relic_verified_division);
@@ -170,8 +173,10 @@ export default async function TournamentsPage({
       },
     });
 
+    relicVerifiedElo = effectiveViewerRelic?.elo ?? null;
+    syntheticEligibility = effectiveViewerRelic?.source === "staging_synthetic";
     relicVerifiedDivision =
-      effectiveViewerRelic?.division ?? relicVerifiedDivision;
+      effectiveViewerRelic?.division ?? null;
   }
 
   if (tournamentResult.error) {
@@ -463,7 +468,7 @@ export default async function TournamentsPage({
     tournamentRows.flatMap((tournament) =>
       (tournament.tournament_brackets ?? []).map((bracket) => [
         bracket.id,
-        getTournamentBracketDisplayName(bracket.name),
+        getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(tournament.division_model_version)),
       ])
     )
   );
@@ -574,6 +579,7 @@ export default async function TournamentsPage({
         id: bracket.id,
         name: bracket.name,
         mapPoolPublishedAt: bracket.map_pool_published_at,
+        divisionModelVersion: requireDivisionModelVersion(row.division_model_version),
         launchedAt: bracket.launched_at,
         entries: mapPoolEntriesByBracket.get(bracket.id) ?? [],
       }))
@@ -617,6 +623,8 @@ export default async function TournamentsPage({
       viewer={{
         isAdmin,
         relicVerifiedDivision,
+        relicVerifiedElo,
+        syntheticEligibility,
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
       }}
