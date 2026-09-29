@@ -48,7 +48,7 @@ const dictionary = {
       oneVOne: {
         eyebrow: "单人竞赛",
         title: "1V1 规则",
-        description: "IronClad 首发锦标赛是免费的 CoH3 1v1 赛事，分别设有八人 Academy、Challenge 和 Main和Pro 组别。四分之一决赛及半决赛为 BO3，总决赛为 BO5。",
+        description: "IronClad 首发锦标赛是免费的 CoH3 1v1 赛事，分别设有八人 Academy、Challenge、Main 和 Pro 组别。四分之一决赛及半决赛为 BO3，总决赛为 BO5。",
         document: "规则手册 v3.2",
       },
       rankings: {

@@ -57,7 +57,7 @@ const dictionary = {
         eyebrow: "Competizione individuale",
         title: "REGOLE 1V1",
         description:
-          "I Tornei di lancio IronClad sono Eventi 1v1 CoH3 gratuiti con Divisioni separate Academy, Challenge e Main e Pro da otto Giocatori. Quarti di finale e semifinali sono BO3; la finale è BO5.",
+          "I Tornei di lancio IronClad sono Eventi 1v1 CoH3 gratuiti con Divisioni separate Academy, Challenge, Main e Pro da otto Giocatori. Quarti di finale e semifinali sono BO3; la finale è BO5.",
         document: "Rulebook v3.2",
       },
       rankings: {
