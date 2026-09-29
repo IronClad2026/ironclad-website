@@ -1,8 +1,8 @@
 # Four-division remaining-assumptions audit
 
-The inventory categorizes 5422 matching source lines across 398 files. It found one application defect: all-four map-pool publication was rejected by an old three-bracket limit. That limit is fixed and its four/five boundary is tested.
+The inventory categorizes 5446 matching source lines across 399 files. The static inventory found an application defect: all-four map-pool publication was rejected by an old three-bracket limit. That limit is fixed and its four/five boundary is tested. Hosted verification later found an older deferred registration-evidence trigger rejecting the new synthetic browser contract; a fourth additive migration fixes that separate integration defect with commit-time regression checks.
 
-The JSON companion contains every indexed file/line, exact matched terms, source-line SHA256, category, reviewed-family rationale, and SQL definition context. This is a reviewed-family audit, not a claim that every historical SQL harness was rerun. Immutable migrations and version-scoped historical tests remain historical evidence; current authority was checked with a full 159-migration replay, model/permission checks, twelve P03 division variants, and the played lifecycle/concurrency harness.
+The JSON companion contains every indexed file/line, exact matched terms, source-line SHA256, category, reviewed-family rationale, and SQL definition context. This is a reviewed-family audit, not a claim that every historical SQL harness was rerun. Immutable migrations and version-scoped historical tests remain historical evidence; current authority was checked with a full 160-migration replay, model/permission checks, twelve P03 division variants, and the played lifecycle/concurrency harness.
 
 ## Counts
 
@@ -10,7 +10,7 @@ The JSON companion contains every indexed file/line, exact matched terms, source
 | --- | ---: |
 | unrelated | 258 |
 | correct_historical | 2810 |
-| correct_compatibility | 2353 |
+| correct_compatibility | 2377 |
 | defect_fixed | 1 |
 
 Unclassified source residuals: 0. Ignored directories, dependencies, generated test evidence, lock files and binary documents are excluded. The scan includes Main/main, Main / Pro, 1400+, model/accounting keys, season references, fixture aliases/contracts, three-count checks and three-column layouts.
@@ -32,6 +32,9 @@ Unclassified source residuals: 0. Ignored directories, dependencies, generated t
 | [supabase/migrations/20260929011812_four_division_fixture_authority.sql:600](../../supabase/migrations/20260929011812_four_division_fixture_authority.sql#L600) | Provider-null cross-division exception explicitly requires legacy_three_v1; future snapshots require current typed provenance. |
 | [supabase/migrations/20260929011829_four_division_accounting_badges.sql:2998](../../supabase/migrations/20260929011829_four_division_accounting_badges.sql#L2998) | valid_main_event_count remains a response alias; valid_qualifying_event_count and immutable official_bracket_type carry current season semantics. |
 | [content/legal-corpus.json:324](../../content/legal-corpus.json#L324) | 1400+ is retained only in an explicit historical-event paragraph; future Main 1400–1699 and Pro 1700+ have separate rows. |
+| [supabase/migrations/20260929032200_four_division_registration_evidence.sql:61](../../supabase/migrations/20260929032200_four_division_registration_evidence.sql#L61) | Deferred evidence checks preserve canonical-only real registration and legacy v1/future v2 fixture CLI evidence; normal synthetic browser registration requires matching provenance plus legal consent with no Steam ownership claim. Forced deferred checks cover positive and negative cases. |
+| [app/profile/page.tsx:226](../../app/profile/page.tsx#L226) | Reserved synthetic identity is only a hint: the exact pinned Staging registry resolver must authorize synthetic eligibility. Client cards receive an eligibility summary, not Steam IDs or live-provider claims. |
+| [components/TournamentsExperience.tsx:4052](../../components/TournamentsExperience.tsx#L4052) | Synthetic account-control consent is explicitly separate from Steam ownership wording; the client flag changes presentation only, while the RPC determines synthetic authority. |
 | [PROJECT_CONTEXT.md:3](../../PROJECT_CONTEXT.md#L3) | Historical banner prevents old two-division prototype text from being mistaken for current source. |
 
 ## Badge identity gate

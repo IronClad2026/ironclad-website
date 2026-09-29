@@ -9,6 +9,8 @@ const getOwnActiveTournamentEloSnapshotsMock = vi.hoisted(() => vi.fn());
 const redirectMock = vi.hoisted(() => vi.fn());
 const playerProfileFormMock = vi.hoisted(() => vi.fn());
 const relicEloVerificationCardMock = vi.hoisted(() => vi.fn());
+const steamConnectionCardMock = vi.hoisted(() => vi.fn());
+const getEffectiveRegistrationViewerRelicMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -31,7 +33,12 @@ vi.mock("@/components/RelicEloVerificationCard", () => ({
 }));
 
 vi.mock("@/components/SteamConnectionCard", () => ({
-  default: vi.fn(),
+  default: steamConnectionCardMock,
+}));
+
+vi.mock("@/lib/elo-verification/staging-synthetic-academy", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/elo-verification/staging-synthetic-academy")>(),
+  getEffectiveRegistrationViewerRelic: getEffectiveRegistrationViewerRelicMock,
 }));
 
 vi.mock("@/lib/supabase-server", () => ({
@@ -152,6 +159,8 @@ function findElementByType(
 describe("profile Relic ELO protected load", () => {
   beforeEach(() => {
     authMock.mockResolvedValue(playerIdentity);
+    getEffectiveRegistrationViewerRelicMock.mockReset();
+    getEffectiveRegistrationViewerRelicMock.mockResolvedValue(null);
     getOwnActiveTournamentEloSnapshotsMock.mockReset();
     getOwnActiveTournamentEloSnapshotsMock.mockResolvedValue(
       activeTournamentEloSnapshots
@@ -203,6 +212,7 @@ describe("profile Relic ELO protected load", () => {
         verifiedAt: VERIFIED_AT,
       },
       initialRefreshAvailableAt: "2026-08-04T00:15:00.000Z",
+      syntheticEligibility: null,
     });
     expect(form?.props).toMatchObject({
       profile: profileRow,
@@ -263,5 +273,40 @@ describe("profile Relic ELO protected load", () => {
       initialVerification: null,
       initialRefreshAvailableAt: null,
     });
+  });
+
+  it.each([[1600, "Main"], [1820, "Pro"]])("uses exact fixture authority for synthetic %s/%s eligibility without provider claims", async (elo, division) => {
+    const profile = createSingleRowClient(profileRow);
+    const syntheticSteamId = "18446744073709551001";
+    const protectedProfile = createSingleRowClient({ ...protectedProfileRow,
+      steam_id64: syntheticSteamId, relic_verified_elo: elo, relic_verified_division: division,
+      relic_elo_calculation_version: "staging-synthetic-v2",
+    });
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(profile.client);
+    createSupabaseAdminClientMock.mockReturnValue(protectedProfile.client);
+    getEffectiveRegistrationViewerRelicMock.mockResolvedValue({ source: "staging_synthetic", status: "rated", elo, division });
+
+    const page = await ProfilePage({ searchParams: Promise.resolve({ steam: "connected" }) });
+    expect(getEffectiveRegistrationViewerRelicMock).toHaveBeenCalledWith(expect.objectContaining({
+      supabase: protectedProfile.client,
+      identity: { playerId: PLAYER_ID, clerkUserId: playerIdentity.userId, steamId64: syntheticSteamId },
+    }));
+    const card = findElementByType(page, relicEloVerificationCardMock);
+    expect(card?.props).toMatchObject({ steamConnected: false, initialVerification: null, initialRefreshAvailableAt: null, syntheticEligibility: { elo, division } });
+    expect(findElementByType(page, steamConnectionCardMock)?.props).toMatchObject({ connected: false, syntheticFixture: true });
+    expect(findElementByType(page, playerProfileFormMock)?.props.verifiedCurrentElo).toBeNull();
+    expect(JSON.stringify(card?.props)).not.toContain(syntheticSteamId);
+    expect(JSON.stringify(card?.props)).not.toContain(playerIdentity.userId);
+  });
+
+  it.each([null, { source: "persisted", elo: 1600, division: "Main" }])("fails closed for unproven synthetic identity rather than trusting stored ELO: %j", async (effective) => {
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(createSingleRowClient(profileRow).client);
+    createSupabaseAdminClientMock.mockReturnValue(createSingleRowClient({ ...protectedProfileRow,
+      steam_id64: "18446744073709551001", relic_elo_calculation_version: "staging-synthetic-v2",
+    }).client);
+    getEffectiveRegistrationViewerRelicMock.mockResolvedValue(effective);
+    const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    expect(findElementByType(page, relicEloVerificationCardMock)?.props).toMatchObject({ steamConnected: false, statusAvailable: false, initialVerification: null, syntheticEligibility: null });
+    expect(findElementByType(page, steamConnectionCardMock)?.props).toMatchObject({ connected: false, statusAvailable: false, syntheticFixture: false });
   });
 });

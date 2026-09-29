@@ -124,7 +124,9 @@ describe("administrator bracket population workspace", () => {
           }`
         )
       ).toHaveClass("break-words", "[overflow-wrap:anywhere]");
-      expect(within(slot).getByRole("combobox")).toHaveClass(
+      expect(within(dialog).getByRole("combobox", {
+        name: `Assign participant to slot ${index + 1}: Opening Match ${Math.ceil((index + 1) / 2)} - Player ${(index + 1) % 2 === 1 ? "1" : "2"}`,
+      })).toHaveClass(
         "min-h-11",
         "w-full",
         "min-w-0",
@@ -136,11 +138,9 @@ describe("administrator bracket population workspace", () => {
 
   it("preserves assignment, reset, and canonical save form behavior", async () => {
     const dialog = openWorkspace();
-    const firstSlot = dialog.querySelector<HTMLElement>(
-      "[data-bracket-slot='1']"
-    );
-    expect(firstSlot).not.toBeNull();
-    const selector = within(firstSlot as HTMLElement).getByRole("combobox");
+    const selector = within(dialog).getByRole("combobox", {
+      name: "Assign participant to slot 1: Opening Match 1 - Player 1",
+    });
 
     fireEvent.change(selector, { target: { value: "registration-1" } });
     expect(selector).toHaveValue("registration-1");

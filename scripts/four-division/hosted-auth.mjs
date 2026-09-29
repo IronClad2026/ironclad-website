@@ -85,8 +85,8 @@ export async function createHostedAuth({ environmentDirectory, origin }) {
 
   async function close() {
     for (const client of participantClients) {
-      await client.removeAllChannels();
-      await client.realtime.disconnect();
+      try { await client.removeAllChannels(); } catch { /* Session revocation must still run. */ }
+      try { await client.realtime.disconnect(); } catch { /* Session revocation must still run. */ }
     }
     let revoked = 0;
     for (const session of sessions) {
@@ -97,7 +97,7 @@ export async function createHostedAuth({ environmentDirectory, origin }) {
       try { await clerk.signInTokens.revokeSignInToken(ticket); }
       catch { /* A consumed one-use ticket is already inactive. */ }
     }
-    await admin.removeAllChannels();
+    try { await admin.removeAllChannels(); } catch { /* No auth state is persisted by this read client. */ }
     assert.equal(revoked, sessions.size, "A temporary Development session could not be revoked");
     return { temporarySessionsCreated: sessions.size, temporarySessionsRevoked: revoked };
   }

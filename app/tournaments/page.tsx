@@ -147,6 +147,7 @@ export default async function TournamentsPage({
         relic_elo_calculation_version?: unknown;
       } | null);
   let relicVerifiedElo = typeof viewerProfile?.relic_verified_elo === "number" ? viewerProfile.relic_verified_elo : null;
+  let syntheticEligibility = false;
   let relicVerifiedDivision = viewerProfileResult.error
     ? null
     : normalizeRelicVerifiedDivision(viewerProfile?.relic_verified_division);
@@ -173,6 +174,7 @@ export default async function TournamentsPage({
     });
 
     relicVerifiedElo = effectiveViewerRelic?.elo ?? null;
+    syntheticEligibility = effectiveViewerRelic?.source === "staging_synthetic";
     relicVerifiedDivision =
       effectiveViewerRelic?.division ?? null;
   }
@@ -622,6 +624,7 @@ export default async function TournamentsPage({
         isAdmin,
         relicVerifiedDivision,
         relicVerifiedElo,
+        syntheticEligibility,
         registrationIds: viewerRegistrationIds,
         registrations: viewerRegistrations,
       }}

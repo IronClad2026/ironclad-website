@@ -8,6 +8,10 @@ import { getOwnActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-
 import { getIronCladDivision } from "@/lib/elo-verification/divisions";
 import { getDivisionModelForCalculationVersion } from "@/lib/division-model";
 import {
+  getEffectiveRegistrationViewerRelic,
+  isReservedSyntheticSteamIdentity,
+} from "@/lib/elo-verification/staging-synthetic-academy";
+import {
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -92,6 +96,9 @@ function getRelicVerification(
   if (!protectedProfile || elo === null) {
     return null;
   }
+
+  if (protectedProfile.relic_elo_calculation_version !== "relic-highest-1v1-v1" &&
+    protectedProfile.relic_elo_calculation_version !== "relic-highest-1v1-v2") return null;
 
   const model = getDivisionModelForCalculationVersion(protectedProfile.relic_elo_calculation_version);
   if (!model) return null;
@@ -186,6 +193,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   let steamConnected = false;
   let steamStatusAvailable = true;
   let initialVerification: RelicVerification | null = null;
+  let syntheticEligibility: { elo: number; division: string } | null = null;
   let initialRefreshAvailableAt: string | null = null;
   let activeTournamentEloSnapshots: Awaited<
     ReturnType<typeof getOwnActiveTournamentEloSnapshots>
@@ -196,8 +204,9 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       await getOwnActiveTournamentEloSnapshots(supabase, userId);
 
     try {
+      const admin = createSupabaseAdminClient();
       const { data: protectedProfileData, error: protectedProfileError } =
-        await createSupabaseAdminClient()
+        await admin
           .from("players")
           .select(
             "steam_id64, relic_verified_elo, relic_verified_faction, relic_verified_division, relic_elo_calculation_version, relic_elo_verified_at, relic_elo_last_attempt_at"
@@ -212,13 +221,36 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
         const protectedProfile =
           (protectedProfileData as ProtectedProfileData | null) ?? null;
 
-        steamConnected =
-          typeof protectedProfile?.steam_id64 === "string" &&
-          protectedProfile.steam_id64.length > 0;
-        initialVerification = getRelicVerification(protectedProfile);
-        initialRefreshAvailableAt = getRefreshAvailableAt(
-          protectedProfile?.relic_elo_last_attempt_at ?? null
-        );
+        const steamId64 = protectedProfile?.steam_id64;
+        const version = protectedProfile?.relic_elo_calculation_version;
+        const syntheticIdentity = typeof steamId64 === "string" && isReservedSyntheticSteamIdentity(steamId64);
+        const syntheticEvidence = typeof version === "string" &&
+          (version.startsWith("staging-synthetic-") || version === "phase4-staging-fixture-v1");
+        if (syntheticIdentity || syntheticEvidence) {
+          // A reserved identifier alone is never proof. The same pinned Staging
+          // registry authority used by registration must validate this tuple.
+          const effective = typeof steamId64 === "string" ? await getEffectiveRegistrationViewerRelic({
+            supabase: admin,
+            identity: { playerId: profile.id, clerkUserId: userId, steamId64 },
+            persisted: {
+              elo: protectedProfile?.relic_verified_elo,
+              faction: protectedProfile?.relic_verified_faction,
+              division: protectedProfile?.relic_verified_division,
+              calculationVersion: version,
+            },
+          }) : null;
+          if (effective?.source === "staging_synthetic" && typeof effective.elo === "number") {
+            syntheticEligibility = { elo: effective.elo, division: effective.division };
+          } else {
+            steamStatusAvailable = false;
+          }
+        } else {
+          steamConnected = typeof steamId64 === "string" && steamId64.length > 0;
+          initialVerification = getRelicVerification(protectedProfile);
+          initialRefreshAvailableAt = getRefreshAvailableAt(
+            protectedProfile?.relic_elo_last_attempt_at ?? null
+          );
+        }
       }
     } catch {
       steamStatusAvailable = false;
@@ -290,6 +322,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               hasPlayer={Boolean(profile)}
               result={steamConnectionResult}
               statusAvailable={steamStatusAvailable}
+              syntheticFixture={syntheticEligibility !== null}
             />
 
             <RelicEloVerificationCard
@@ -298,6 +331,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               statusAvailable={steamStatusAvailable}
               initialVerification={initialVerification}
               initialRefreshAvailableAt={initialRefreshAvailableAt}
+              syntheticEligibility={syntheticEligibility}
             />
 
             <DeleteAccountSection />

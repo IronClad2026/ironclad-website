@@ -13,17 +13,21 @@ import { FUTURE_FIXTURE_POOLS, getFixtureDefinition } from "../lib/staging-synth
 const args = process.argv.slice(2);
 const option = (name, fallback = null) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const phase = option("--phase");
-assert(["create", "registration", "waitlist", "prepare", "launch", "results"].includes(phase), "Unknown UI UAT phase");
+assert(["create", "registration", "waitlist", "prepare", "launch", "results", "not-held"].includes(phase), "Unknown UI UAT phase");
+const notHeldEvent = args.includes("--not-held-event");
+assert(!notHeldEvent || ["create", "not-held"].includes(phase));
+assert(phase !== "not-held" || notHeldEvent, "Not Held applies only to its separate zero-player synthetic event");
 const selectedDivision = option("--division");
 assert(!["prepare", "launch", "results"].includes(phase) || ["Main", "Pro"].includes(selectedDivision), "Competition phase requires one explicit future Division");
 const origin = new URL(option("--url", "https://unconfigured.vercel.app")).origin;
 assert.match(origin, /^https:\/\/[a-z0-9-]+\.vercel\.app$/);
-const title = "Four Division Main + Pro Staging UAT 2026-09-29";
-const slug = "four-division-main-pro-staging-uat-2026-09-29";
+const title = notHeldEvent ? "Four Division Pro Not Held Staging UAT 2026-09-29" : "Four Division Main + Pro Staging UAT 2026-09-29";
+const slug = notHeldEvent ? "four-division-pro-not-held-staging-uat-2026-09-29" : "four-division-main-pro-staging-uat-2026-09-29";
+const configuredDivisions = notHeldEvent ? ["Pro"] : ["Main", "Pro"];
 const pools = { Main: FUTURE_FIXTURE_POOLS.main, Pro: FUTURE_FIXTURE_POOLS.pro };
 assert(Object.values(pools).every((pool) => pool.length === 9), "Expected approved nine-player Main and Pro pools");
 if (args.includes("--plan")) {
-  console.log(JSON.stringify({ phase, title, slug, divisionModelVersion: "four_division_v1", fixtureCounts: { Main: 9, Pro: 9 }, mutations: "Normal admin or participant UI only; explicit --apply required" }));
+  console.log(JSON.stringify({ phase, title, slug, divisionModelVersion: "four_division_v1", configuredDivisions, fixtureCounts: notHeldEvent ? { Pro: 0 } : { Main: 9, Pro: 9 }, mutations: "Normal admin or participant UI only; explicit --apply required" }));
   process.exit(0);
 }
 assert(args.includes("--apply"), "Live UAT requires explicit --apply");
@@ -40,6 +44,9 @@ const authentication = await createHostedAuth({ environmentDirectory: option("--
 const browser = await chromium.launch({ headless: true });
 let cleanup;
 let previewAccess;
+let currentPage;
+let stage = "setup";
+const actionResponses = [];
 
 const checked = (result) => { assert(!result.error, "Scoped Staging read failed"); return result.data; };
 async function readEvent() {
@@ -52,15 +59,16 @@ async function eventProof() {
   assert(event && event.title === title && event.division_model_version === "four_division_v1", "Exact future event proof failed");
   const brackets = checked(await authentication.admin.from("tournament_brackets").select("id,name,elo_rules,max_players,launched_at,map_pool_published_at")
     .eq("tournament_id", event.id));
-  for (const division of ["Academy", "Challenge", "Main", "Pro"]) {
+  assert.equal(brackets.length, configuredDivisions.length, "Configured synthetic Divisions differ from this exact scenario");
+  for (const division of configuredDivisions) {
     const bracket = brackets.find((row) => row.name === division);
-    assert(bracket && bracket.max_players === 8, "Four independently configured eight-player Divisions required");
+    assert(bracket && bracket.max_players === 8, "Two independently configured eight-player upper Divisions required");
   }
   return { ...event, brackets };
 }
 async function registrations(event) {
   return checked(await authentication.admin.from("registrations")
-    .select("id,profile_id,tournament_bracket_id,registration_status,elo_verified_elo,elo_verified_division,elo_calculation_version,elo_checked_at,created_at,waitlist_offer_status")
+    .select("id,profile_id,tournament_bracket_id,registration_status,elo_verified_elo,elo_verified_division,elo_calculation_version,elo_checked_at,created_at,waitlist_offer_status,registration_provenance,fixture_contract_version")
     .eq("tournament_id", event.id).order("created_at").order("id"));
 }
 function waitlistPosition(row, rows) {
@@ -69,10 +77,19 @@ function waitlistPosition(row, rows) {
     .findIndex((candidate) => candidate.id === row.id) + 1;
 }
 async function pageFor(identity) {
+  stage = "authorize-preview";
   const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: "reduce" });
   await previewAccess.authorize(context);
   await context.addCookies([{ name: "ironclad_locale", value: "en", url: origin, secure: true, sameSite: "Lax" }]);
   const page = await context.newPage();
+  currentPage = page;
+  page.on("response", async (response) => {
+    const request = response.request();
+    if (request.method() !== "POST" || !request.headers()["next-action"]) return;
+    const body = await response.text().catch(() => "");
+    const codes = [...body.matchAll(/"code":"([A-Z_]{3,45})"/g)].map((match) => match[1]);
+    actionResponses.push({ status: response.status(), codes: [...new Set(codes)], success: body.includes('"success":true') });
+  });
   await page.route("**/*", async (route) => {
     const request = route.request();
     const target = new URL(request.url());
@@ -82,6 +99,7 @@ async function pageFor(identity) {
     if (foreignNavigation || foreignDatabase || foreignClerk) await route.abort("blockedbyclient");
     else await route.continue();
   });
+  stage = "sign-in-development";
   await authentication.signIn(page, identity);
   return { page, context, identity };
 }
@@ -108,40 +126,172 @@ function verifySnapshot(row, alias, division, bracket) {
   assert.equal(Number(row.elo_verified_elo), getFixtureDefinition(alias).syntheticElo, "Wrong verified fixture ELO");
   assert.equal(row.elo_verified_division, division);
   assert.equal(row.elo_calculation_version, "staging-synthetic-v2");
+  assert.equal(row.registration_provenance, "staging_synthetic_uat");
+  assert.equal(row.fixture_contract_version, "staging-synthetic-v2");
   assert(row.elo_checked_at, "Frozen registration verification timestamp missing");
+}
+
+async function verifyLegalAcceptance(row) {
+  const acceptance = checked(await authentication.admin.from("registration_acceptances")
+    .select("rulebook_document_id,rulebook_version,rulebook_sha256,ppa_document_id,ppa_version,ppa_sha256,terms_document_id,terms_version,terms_sha256,privacy_document_id,privacy_version,privacy_sha256,accepted_at,own_ironclad_account_confirmed,linked_steam_account_confirmed")
+    .eq("registration_id", row.id).single());
+  const effective = checked(await authentication.admin.from("legal_documents")
+    .select("id,document_kind,version,sha256").eq("status", "effective"));
+  for (const kind of ["rulebook", "ppa", "terms", "privacy"]) {
+    const authority = effective.find((document) => document.document_kind === kind);
+    assert(authority && acceptance[`${kind}_document_id`] === authority.id, "Acceptance references the wrong governing document");
+    assert.equal(acceptance[`${kind}_version`], authority.version);
+    assert.equal(acceptance[`${kind}_sha256`], authority.sha256);
+    if (["rulebook", "ppa"].includes(kind)) assert.equal(authority.version, "3.2");
+  }
+  assert(acceptance.accepted_at, "Versioned legal acceptance timestamp missing");
+  assert.equal(acceptance.own_ironclad_account_confirmed, true);
+  assert.equal(acceptance.linked_steam_account_confirmed, false, "Synthetic fixture must not create a real Steam ownership claim");
+}
+
+async function rejectWrongDivision(page, dialog, event, identity, division, submit) {
+  const wrong = event.brackets.find((bracket) => bracket.name === (division === "Main" ? "Pro" : "Main"));
+  let intercepted = false;
+  const target = (url) => url.origin === origin && url.pathname === "/tournaments";
+  const handler = async (route) => {
+    const request = route.request();
+    let payload;
+    try { payload = request.postDataJSON(); } catch { /* Non-action navigation. */ }
+    if (!intercepted && request.method() === "POST" && request.headers()["next-action"] &&
+      Array.isArray(payload) && payload[0]?.tournamentId === event.id && payload[0]?.bracketId) {
+      intercepted = true;
+      const input = payload[0];
+      record({ phase, division, registrationInput: {
+        rulebookDocumentId: input.rulebookDocumentId, ppaDocumentId: input.ppaDocumentId,
+        termsDocumentId: input.termsDocumentId, privacyDocumentId: input.privacyDocumentId,
+        rulebookAgreement: input.rulebookAgreement, playerParticipationAgreement: input.playerParticipationAgreement,
+        termsAgreement: input.termsAgreement, privacyAcknowledgement: input.privacyAcknowledgement,
+        age18Confirmation: input.age18Confirmation, accountAndSteamOwnershipConfirmation: input.accountAndSteamOwnershipConfirmation,
+        waitlistConfirmed: input.waitlistConfirmed,
+      } });
+      // Send an actual forged browser action to the real server, without changing
+      // its identity, ELO evidence or agreements. No response is mocked.
+      payload[0].bracketId = wrong.id;
+      payload[0].bracketName = wrong.name;
+      await route.continue({ postData: JSON.stringify(payload) });
+    } else await route.fallback();
+  };
+  await page.route(target, handler);
+  try {
+    await submit.click();
+    await dialog.getByRole("alert").filter({ hasText: "Your ELO Division has changed." }).waitFor({ timeout: 30_000 });
+    assert(intercepted, "Wrong-Division negative request was not exercised");
+    assert(!(await registrations(event)).some((row) => row.profile_id === identity.playerId), "Cross-Division request created a registration");
+    record({ phase, division, wrongDivisionRejected: wrong.name, authority: "real authenticated browser action", persistedRegistrations: 0 });
+  } finally { await page.unroute(target, handler); }
+}
+
+async function registrationAgreements(page, alias) {
+  stage = "open-registration";
+  await page.goto(`${origin}/tournaments?tournament=${slug}&register=1`, { waitUntil: "domcontentloaded" });
+  const legalGate = page.locator("#account-legal-update-title");
+  if (await legalGate.count()) {
+    assert(/^(?:TestMain1[1-4]|TestPro[1-4])$/.test(alias), "Only the approved eight new fixtures may receive initial account legal acceptance here");
+    stage = "accept-new-fixture-account-legal";
+    const documents = checked(await authentication.admin.from("legal_documents")
+      .select("id,document_kind,version").eq("status", "effective").in("document_kind", ["terms", "privacy"]));
+    for (const [kind, version] of [["terms", "1.1"], ["privacy", "1.2"]]) {
+      const document = documents.find((row) => row.document_kind === kind);
+      assert(document && document.version === version, "Unexpected current account legal version");
+      assert.equal(await page.locator(`input[name="${kind}DocumentId"]`).inputValue(), document.id);
+    }
+    await page.getByRole("link", { name: "Read Terms of Service v1.1", exact: true }).waitFor();
+    await page.getByRole("link", { name: "Read Privacy Policy v1.2", exact: true }).waitFor();
+    await page.locator('input[name="termsAccepted"]').check();
+    await page.locator('input[name="privacyAcknowledged"]').check();
+    await capture(page, `${alias}-account-legal-review`);
+    await page.getByRole("button", { name: "Accept and continue", exact: true }).click();
+    await legalGate.waitFor({ state: "hidden", timeout: 30_000 });
+    record({ phase: "account-legal", alias, termsVersion: "1.1", privacyVersion: "1.2", normalInitialAcceptance: true });
+  }
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await dialog.getByRole("heading", { name: width < 768 ? "Player Readiness" : "Player Profile Confirmation", exact: true }).waitFor();
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  stage = "accept-registration-agreements";
+  const agreements = dialog.locator("input[data-registration-field]");
+  assert.equal(await agreements.count(), 6);
+  for (const agreement of await agreements.all()) await agreement.check();
+  return dialog;
 }
 
 try {
   previewAccess = createPreviewAccess(origin);
   if (phase === "create") {
     const existing = await readEvent();
-    if (existing) { await eventProof(); record({ phase, created: false, existingVerified: true }); }
+    if (existing) { await eventProof(); record({ phase, eventId: existing.id, created: false, existingVerified: true }); }
     else {
       const identity = await authentication.existingAdmin(option("--admin-user-id"), option("--admin-name"));
       const { page, context } = await pageFor(identity);
+      stage = "open-admin-editor";
       await page.goto(`${origin}/admin/tournaments/new`, { waitUntil: "domcontentloaded" });
       assert.equal(await page.locator('input[name="divisionModelVersion"]').inputValue(), "four_division_v1");
+      stage = "fill-admin-editor";
       await page.getByLabel("Title", { exact: true }).fill(title);
-      await page.getByLabel("Description", { exact: true }).fill("Permanent approved synthetic Staging UAT for independent Main and Pro competition. No production players or live Relic claims.");
-      await page.getByLabel("Status", { exact: true }).selectOption("registration_open");
+      await page.getByLabel("Description", { exact: true }).fill(notHeldEvent
+        ? "Synthetic Staging UAT for an empty future Pro Division's Not Held closure. No played competition or production players."
+        : "Permanent approved synthetic Staging UAT for independent Main and Pro competition. No production players or live Relic claims.");
+      await page.locator('select[name="status"]').selectOption("registration_open");
+      stage = "upload-tournament-banner";
       await page.getByLabel("Browse Images", { exact: true }).setInputFiles(path.resolve("public/images/tournaments/1v1-beta-blitz-tournament.png"));
       await page.waitForFunction(() => Boolean(document.querySelector('input[name="bannerImageUrl"]')?.value));
-      for (const division of ["academy", "challenge", "main", "pro"]) await page.locator(`input[name="${division}Enabled"]`).check();
+      for (const division of ["academy", "challenge", "main", "pro"]) {
+        await page.locator(`input[name="${division}Enabled"]`).setChecked(configuredDivisions.some((name) => name.toLowerCase() === division));
+      }
       await capture(page, "create-review");
+      stage = "save-four-division-tournament";
       await page.getByRole("button", { name: "Create Tournament", exact: true }).click();
       await page.waitForURL(/\/admin\/tournaments\/[0-9a-f-]{36}/);
       const event = await eventProof();
       assert.equal(event.status, "registration_open");
       assert.equal(event.registration_enabled, true);
       await capture(page, "created");
-      record({ phase, created: true, fourDivisionsVerified: true, capacityEach: 8 });
+      record({ phase, eventId: event.id, created: true, fourDivisionModelVerified: true, configuredDivisions, unrelatedLegacyCyclesPreserved: ["Academy", "Challenge"], capacityEach: 8 });
       await context.close();
     }
   } else {
     const event = await eventProof();
-    assert(["registration_open", "in_progress"].includes(event.status), "UAT requires an active future event");
+    assert(["registration_open", "in_progress", ...(phase === "not-held" ? ["completed"] : [])].includes(event.status), "UAT requires an active future event");
     if (["registration", "waitlist"].includes(phase)) assert.equal(event.registration_enabled, true);
-    if (phase === "registration") {
+    if (phase === "not-held") {
+      const bracket = event.brackets[0];
+      assert.equal(bracket.name, "Pro");
+      assert.equal(bracket.launched_at, null);
+      assert.equal((await registrations(event)).length, 0, "Not Held scenario must remain empty");
+      const season = async () => checked(await authentication.admin.from("leaderboard_current_season").select("id,valid_qualifying_event_count").single());
+      const before = await season();
+      const closure = async () => checked(await authentication.admin.from("tournament_division_not_held_closures")
+        .select("reason_code,closed_at,active_registration_count,waitlist_registration_count").eq("tournament_bracket_id", bracket.id).maybeSingle());
+      const identity = await authentication.existingAdmin(option("--admin-user-id"), option("--admin-name"));
+      const { page, context } = await pageFor(identity);
+      stage = "close-empty-pro-not-held";
+      await page.goto(`${origin}/admin/tournaments/${event.id}?section=bracket`, { waitUntil: "domcontentloaded" });
+      if (!await closure()) {
+        const form = page.locator("form").filter({ has: page.getByRole("button", { name: "Confirm Not Held Closure", exact: true }) });
+        await form.locator('textarea[name="detail"]').fill("SYNTHETIC STAGING UAT: empty future Pro Division closed through normal Admin UI to verify no official event slot or points.");
+        await form.locator('input[name="confirmation"]').fill("NOT HELD");
+        await capture(page, "Pro-not-held-review");
+        await form.getByRole("button", { name: "Confirm Not Held Closure", exact: true }).click();
+        await page.waitForURL(/bracketNotice=division-not-held/);
+      }
+      const receipt = await closure();
+      assert(receipt?.closed_at && receipt.reason_code === "minimum_roster_not_reached");
+      assert.equal(receipt.active_registration_count, 0);
+      assert.equal(receipt.waitlist_registration_count, 0);
+      assert.deepEqual(await season(), before, "Unplayed Not Held Pro consumed an official slot");
+      const points = checked(await authentication.admin.from("leaderboard_point_events").select("id").eq("tournament_bracket_id", bracket.id));
+      assert.equal(points.length, 0);
+      await capture(page, "Pro-not-held-terminal");
+      const final = await eventProof();
+      assert.equal(final.status, "completed");
+      record({ phase, eventId: event.id, reason: receipt.reason_code, zeroRegistrations: true, zeroPoints: true, officialSlotEffect: 0, terminalStatus: final.status });
+      await context.close();
+    } else if (phase === "registration") {
       for (const [division, aliases] of Object.entries(pools)) {
         const bracket = event.brackets.find((row) => row.name === division);
         assert.equal(bracket.launched_at, null, "UAT Division has already launched");
@@ -150,29 +300,30 @@ try {
           const existing = (await registrations(event)).find((row) => row.profile_id === identity.playerId);
           if (existing) {
             verifySnapshot(existing, alias, division, bracket);
+            await verifyLegalAcceptance(existing);
             record({ phase, division, alias, resumedExisting: true, status: existing.registration_status });
             continue;
           }
           assert(identity.profileCompleted && identity.steamId64, "Approved fixture has not been prepared for normal registration");
           const { page, context } = await pageFor(identity);
-          await page.goto(`${origin}/tournaments?tournament=${slug}&register=1`, { waitUntil: "domcontentloaded" });
-          const dialog = page.getByRole("dialog");
-          await dialog.getByRole("button", { name: "Continue", exact: true }).click();
-          await dialog.getByRole("heading", { name: width < 768 ? "Player Readiness" : "Player Profile Confirmation", exact: true }).waitFor();
-          await dialog.getByRole("button", { name: "Continue", exact: true }).click();
-          const agreements = dialog.locator("input[data-registration-field]");
-          assert.equal(await agreements.count(), 6);
-          for (const agreement of await agreements.all()) await agreement.check();
+          const dialog = await registrationAgreements(page, alias);
           const waitlisted = index === 8;
           await capture(page, `${alias}-agreements`);
-          await dialog.getByRole("button", { name: waitlisted ? "Join Waitlist" : width < 768 ? "Register" : "Submit Registration", exact: true }).click();
+          const submit = dialog.getByRole("button", { name: waitlisted ? "Join Waitlist" : width < 768 ? "Register" : "Submit Registration", exact: true });
+          if (index === 0) {
+            await rejectWrongDivision(page, dialog, event, identity, division, submit);
+            await registrationAgreements(page, alias);
+          }
+          stage = "submit-normal-registration";
+          await submit.click();
           await dialog.getByRole("heading", { name: waitlisted ? "Waitlist joined" : "Registration submitted", exact: true }).waitFor({ timeout: 30_000 });
           const row = await awaitRegistration(event, identity.playerId, waitlisted ? "waitlisted" : "pending");
           verifySnapshot(row, alias, division, bracket);
+          await verifyLegalAcceptance(row);
           const position = waitlisted ? waitlistPosition(row, await registrations(event)) : null;
           if (waitlisted) assert.equal(position, 1);
           await capture(page, `${alias}-submitted`);
-          record({ phase, division, alias, status: row.registration_status, snapshotVerified: true, waitlistPosition: position });
+          record({ phase, division, alias, status: row.registration_status, snapshotVerified: true, currentLegalIdsAndHashes: true, rulebookVersion: "3.2", ppaVersion: "3.2", waitlistPosition: position });
           await context.close();
         }
       }
@@ -299,7 +450,12 @@ try {
     }
   }
 } catch (error) {
-  record({ phase, passed: false, failure: error instanceof assert.AssertionError ? error.message.split("\n")[0] : "Hosted UI operation failed; private details suppressed" });
+  let pageDiagnostic;
+  if (currentPage && !currentPage.isClosed()) {
+    await capture(currentPage, "failure-state").catch(() => {});
+    pageDiagnostic = await currentPage.evaluate(() => ({ path: location.pathname, h1Count: document.querySelectorAll("h1").length, legalGate: Boolean(document.querySelector("#account-legal-update-title")), editorModelPresent: Boolean(document.querySelector('input[name="divisionModelVersion"]')) })).catch(() => undefined);
+  }
+  record({ phase, stage, pageDiagnostic, actionResponses, passed: false, failure: error instanceof assert.AssertionError ? error.message.split("\n")[0] : "Hosted UI operation failed; private details suppressed" });
   process.exitCode = 1;
 } finally {
   try { await browser.close(); } catch { process.exitCode = 1; console.error("Browser cleanup failed; details suppressed"); }

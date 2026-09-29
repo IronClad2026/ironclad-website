@@ -271,6 +271,7 @@ const clientPropsShape = {
         isAdmin: "value",
         relicVerifiedDivision: "value",
         relicVerifiedElo: "value",
+        syntheticEligibility: "value",
         registrationIds: { array: "value" },
         registrations: { array: viewerRegistrationShape },
       },
@@ -823,6 +824,7 @@ describe("tournament Client Component result payload", () => {
       const { client, props } = await loadClientProps({ admin });
 
       expectExactShape(props, clientPropsShape);
+      expect(props.viewer).toMatchObject({ syntheticEligibility: false });
       expectNoSensitiveBrowserData(props, [
         SECRET_PLAYER_ID,
         SECRET_ADMIN_ID,
@@ -930,7 +932,7 @@ describe("tournament Client Component result payload", () => {
   it("does not restore persisted evidence after the authoritative viewer resolver rejects it", async () => {
     getEffectiveRegistrationViewerRelicMock.mockResolvedValue(null);
     const { props } = await loadClientProps({ admin: false, verifiedDivision: "Main / Pro" });
-    expect(props.viewer).toMatchObject({ relicVerifiedDivision: null, relicVerifiedElo: null });
+    expect(props.viewer).toMatchObject({ relicVerifiedDivision: null, relicVerifiedElo: null, syntheticEligibility: false });
   });
 
   it("projects an authorized synthetic Staging viewer as Academy without writing registration data", async () => {
@@ -950,10 +952,12 @@ describe("tournament Client Component result payload", () => {
     });
     const viewer = props.viewer as {
       relicVerifiedDivision: string | null;
+      syntheticEligibility: boolean;
       registrations: unknown[];
     };
 
     expect(viewer.relicVerifiedDivision).toBe("Academy");
+    expect(viewer.syntheticEligibility).toBe(true);
     expect(viewer.registrations).toHaveLength(1);
     expect(getEffectiveRegistrationViewerRelicMock).toHaveBeenCalledWith({
       supabase: client,

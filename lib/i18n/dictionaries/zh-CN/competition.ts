@@ -246,6 +246,11 @@ const dictionary = {
       "开赛后，请打开锦标赛的对阵表标签页，查看你的对阵表、对手和比赛详情。",
   },
   registrationModal: {
+    syntheticIdentityReady: "合成测试身份已就绪",
+    syntheticEligibility: "Staging 合成测试资格",
+    syntheticEligibilityDescription: "此授权 Staging 测试账号使用合成 ELO 和组别。提交时服务器会检查测试资格，不会验证实时 Relic 数据或真实 Steam 账号所有权。",
+    syntheticOwnershipConfirmation: "我确认由我控制此 Staging 合成测试账号。本测试不声明真实 Steam 账号的所有权。",
+    syntheticSteamLabel: "合成 Steam 测试身份",
     eyebrow: "IronClad 报名",
     title: "电竞选手报名",
     dialogDescription:

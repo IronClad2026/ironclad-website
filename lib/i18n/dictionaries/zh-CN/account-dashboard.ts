@@ -167,6 +167,9 @@ const dictionary = {
     bio: "个人简介",
   },
   steam: {
+    syntheticTitle: "Staging 测试身份",
+    syntheticDescription: "此合成测试账号不证明对真实 Steam 账号的所有权。",
+    syntheticStatus: "无已验证的 Steam 连接",
     eyebrow: "已验证游戏身份",
     title: "Steam 连接",
     description: "连接 Steam 以证明你拥有该游戏身份。Steam 账户不会用于登录 IronClad。",
@@ -185,6 +188,9 @@ const dictionary = {
     connect: "连接 Steam 账户",
   },
   relic: {
+    syntheticTitle: "合成测试参赛资格",
+    syntheticDescription: "Staging 测试账号。此 ELO 和分区均为合成测试数据，并非真实的 Relic 验证结果。",
+    syntheticElo: "合成测试 ELO",
     eyebrow: "竞技评分",
     title: "已验证资料 ELO",
     description: "使用已连接的 Steam 游戏身份，通过 Relic 验证当前的 1v1 排位 ELO。",

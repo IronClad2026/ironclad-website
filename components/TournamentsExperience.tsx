@@ -2864,6 +2864,7 @@ export function RegisterModal({
   initialTournamentId,
   verifiedDivision: profileVerifiedDivision,
   verifiedElo,
+  syntheticEligibility = false,
   registrationDocuments,
   viewerRegistrations = [],
   presentation = "desktop",
@@ -2875,6 +2876,7 @@ export function RegisterModal({
   initialTournamentId: string;
   verifiedDivision: RelicVerifiedDivision | null;
   verifiedElo?: number | null;
+  syntheticEligibility?: boolean;
   registrationDocuments: RegistrationDocumentSet;
   viewerRegistrations?: TournamentViewerRegistration[];
   presentation?: RegistrationPresentation;
@@ -3334,11 +3336,11 @@ export function RegisterModal({
     t("registrationModal.divisionLaunch"),
   ];
   const profileReady = profile.profile_completed === true;
-  // profile_completed is derived from the protected Steam identity link.
-  const steamConnected = profileReady;
+  // Completion comes from the protected identity link or approved Staging fixture authority.
+  const identityReady = profileReady;
   const divisionReady = Boolean(verifiedDivision && selectedBracket);
   const playerReadinessComplete =
-    profileReady && steamConnected && divisionReady;
+    profileReady && identityReady && divisionReady;
   const eligibleTournaments = tournaments.filter((tournament) => {
     const availability = getRegistrationDivisionAvailability(
       tournament,
@@ -3805,7 +3807,7 @@ export function RegisterModal({
                   </div>
                 )}
                 <p className="mt-3 text-sm leading-6 text-zinc-400">
-                  {t("registrationModal.divisionExplanation")}
+                  {t(syntheticEligibility ? "registrationModal.syntheticEligibilityDescription" : "registrationModal.divisionExplanation")}
                 </p>
                 {errors.bracketName && <FieldError message={errors.bracketName} />}
               </div>
@@ -3834,8 +3836,8 @@ export function RegisterModal({
                   label={t("registrationModal.profileReady")}
                 />
                 <RegistrationReadinessItem
-                  ready={steamConnected}
-                  label={t("registrationModal.steamConnected")}
+                  ready={identityReady}
+                  label={t(syntheticEligibility ? "registrationModal.syntheticIdentityReady" : "registrationModal.steamConnected")}
                 />
                 <RegistrationReadinessItem
                   ready={divisionReady}
@@ -3852,7 +3854,7 @@ export function RegisterModal({
                   className="mt-0.5 shrink-0 text-emerald-300"
                 />
                 <p className="text-sm leading-5 text-zinc-200">
-                  {t("registrationModal.relicVerificationOnSubmit")}
+                  {t(syntheticEligibility ? "registrationModal.syntheticEligibilityDescription" : "registrationModal.relicVerificationOnSubmit")}
                 </p>
               </div>
 
@@ -3869,7 +3871,7 @@ export function RegisterModal({
                   <RegistrationProfileValue label={t("registrationModal.displayName")} value={profile.display_name} />
                   <RegistrationProfileValue label={t("registrationModal.ign")} value={profile.in_game_name} />
                   <RegistrationProfileValue label={t("registrationModal.discordOptional")} value={profile.discord_username} />
-                  <RegistrationProfileValue label={t("registrationModal.steam")} value={profile.steam_username} />
+                  <RegistrationProfileValue label={t(syntheticEligibility ? "registrationModal.syntheticSteamLabel" : "registrationModal.steam")} value={profile.steam_username} />
                   <RegistrationProfileValue label={t("registrationModal.country")} value={profile.country} />
                   <RegistrationProfileValue label={t("registrationModal.region")} value={profile.region} />
                   <RegistrationProfileValue label={t("registrationModal.timezone")} value={profile.timezone} />
@@ -3921,7 +3923,7 @@ export function RegisterModal({
                 <RegistrationProfileValue label={t("registrationModal.displayName")} value={profile.display_name} />
                 <RegistrationProfileValue label={t("registrationModal.ign")} value={profile.in_game_name} />
                 <RegistrationProfileValue label={t("registrationModal.discordOptional")} value={profile.discord_username} />
-                <RegistrationProfileValue label={t("registrationModal.steam")} value={profile.steam_username} />
+                <RegistrationProfileValue label={t(syntheticEligibility ? "registrationModal.syntheticSteamLabel" : "registrationModal.steam")} value={profile.steam_username} />
                 <RegistrationProfileValue label={t("registrationModal.country")} value={profile.country} />
                 <RegistrationProfileValue label={t("registrationModal.region")} value={profile.region} />
                 <RegistrationProfileValue label={t("registrationModal.timezone")} value={profile.timezone} />
@@ -3933,10 +3935,10 @@ export function RegisterModal({
 
               <div className="border border-emerald-500/40 bg-emerald-950/25 p-4">
                 <p className="text-sm font-black uppercase tracking-wider text-emerald-300">
-                  {t("registrationModal.freshVerification")}
+                  {t(syntheticEligibility ? "registrationModal.syntheticEligibility" : "registrationModal.freshVerification")}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-zinc-200">
-                  {t("registrationModal.freshVerificationDescription")}
+                  {t(syntheticEligibility ? "registrationModal.syntheticEligibilityDescription" : "registrationModal.freshVerificationDescription")}
                 </p>
               </div>
 
@@ -4047,7 +4049,7 @@ export function RegisterModal({
                 <AgreementCheckbox
                   field="accountAndSteamOwnershipConfirmation"
                   compact={isPhonePresentation}
-                  label={t("registrationModal.ownershipConfirmation")}
+                  label={t(syntheticEligibility ? "registrationModal.syntheticOwnershipConfirmation" : "registrationModal.ownershipConfirmation")}
                   checked={form.accountAndSteamOwnershipConfirmation}
                   onChange={(checked) => updateField("accountAndSteamOwnershipConfirmation", checked)}
                   error={errors.accountAndSteamOwnershipConfirmation}
@@ -5404,6 +5406,7 @@ type TournamentViewer = {
   isAdmin: boolean;
   relicVerifiedDivision: RelicVerifiedDivision | null;
   relicVerifiedElo?: number | null;
+  syntheticEligibility?: boolean;
   registrationIds: string[];
   registrations: TournamentViewerRegistration[];
 };
@@ -5851,6 +5854,7 @@ export default function TournamentsExperience({
           initialTournamentId={selectedTournament.id}
           verifiedDivision={viewer.relicVerifiedDivision}
           verifiedElo={viewer.relicVerifiedElo}
+          syntheticEligibility={viewer.syntheticEligibility}
           registrationDocuments={registrationDocuments}
           viewerRegistrations={viewer.registrations}
           presentation={registrationPresentation}

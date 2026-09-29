@@ -162,7 +162,7 @@ export async function getEffectiveRegistrationViewerRelicForProject({
   return parsePersistedRegistrationViewerRelic(persisted);
 }
 
-function isReservedSyntheticSteamIdentity(value: string) {
+export function isReservedSyntheticSteamIdentity(value: string) {
   return /^1844674407370955(?:00\d{2}|010[1-4]|100[1-8])$/.test(value);
 }
 

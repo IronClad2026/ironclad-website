@@ -230,12 +230,14 @@ function renderModal(
     availableTournaments = [selectedTournament],
     viewerRegistrations = [],
     verifiedElo,
+    syntheticEligibility = false,
   }: {
     presentation?: RegistrationPresentation;
     onClose?: () => void;
     availableTournaments?: TournamentCard[];
     viewerRegistrations?: TournamentViewerRegistration[];
     verifiedElo?: number;
+    syntheticEligibility?: boolean;
   } = {}
 ) {
   return render(
@@ -245,6 +247,7 @@ function renderModal(
       initialTournamentId={selectedTournament.id}
       verifiedDivision={verifiedDivision}
       verifiedElo={verifiedElo}
+      syntheticEligibility={syntheticEligibility}
       registrationDocuments={registrationDocuments}
       viewerRegistrations={viewerRegistrations}
       presentation={presentation}
@@ -582,6 +585,22 @@ describe("Relic verified-division registration UI", () => {
     expect(within(disclosure as HTMLElement).getByText(profile.display_name)).toBeInTheDocument();
     expect(within(disclosure as HTMLElement).getByText(profile.steam_username)).toBeInTheDocument();
     expect(within(readiness as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it.each(["phone", "desktop"] as const)("describes synthetic eligibility without real-provider claims on %s", (presentation) => {
+    renderModal("Challenge", tournament, { presentation, syntheticEligibility: true });
+    expect(screen.queryByText(competitionEnglish.registrationModal.divisionExplanation)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByText(competitionEnglish.registrationModal.syntheticEligibilityDescription)).toBeInTheDocument();
+    expect(screen.queryByText(competitionEnglish.registrationModal.steamConnected)).not.toBeInTheDocument();
+    expect(screen.queryByText(competitionEnglish.registrationModal.relicVerificationOnSubmit)).not.toBeInTheDocument();
+    expect(screen.queryByText(competitionEnglish.registrationModal.freshVerification)).not.toBeInTheDocument();
+    if (presentation === "phone") expect(screen.getByText(competitionEnglish.registrationModal.syntheticIdentityReady)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("checkbox", { name: competitionEnglish.registrationModal.syntheticOwnershipConfirmation })).toBeInTheDocument();
+    expect(screen.queryByText(competitionEnglish.registrationModal.ownershipConfirmation)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(6);
+    expect(submitTournamentRegistrationMock).not.toHaveBeenCalled();
   });
 
   it("locks missing verified-Division readiness to the safe Profile action on phone", () => {

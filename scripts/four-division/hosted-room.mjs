@@ -1,6 +1,7 @@
 // Pro participant browser messages with actual authenticated RPC / Realtime evidence.
 // The fallback test closes only the isolated test context's Staging websocket.
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const checked = (result) => { assert(!result.error, "Authenticated Match Room read failed"); return result.data; };
@@ -35,12 +36,41 @@ export function createHostedRoomChecks({ authentication, pageFor, capture, recor
     const history = (client) => client.rpc("get_match_room_history", { p_room_id: room.id, p_after_sequence: 0, p_limit: 50 }).then(checked);
     const unread = () => responderClient.rpc("get_match_room_unread_summary", { p_match_ids: [match.id] }).then(checked);
     const initial = await history(responderClient);
+    const staleBody = `SYNTHETIC STAGING UAT — wrong expected room rejection for ${match.id}.`;
+    let staleIntercepted = false;
+    const roomActionTarget = (url) => url.origin === origin && url.pathname === "/tournaments";
+    const staleHandler = async (route) => {
+      let payload;
+      try { payload = route.request().postDataJSON(); } catch { /* Other navigation. */ }
+      if (route.request().method() === "POST" && Array.isArray(payload) && payload[0]?.body === staleBody && payload[0]?.expectedRoomId === room.id) {
+        staleIntercepted = true;
+        payload[0].expectedRoomId = randomUUID();
+        await route.continue({ postData: JSON.stringify(payload) });
+      } else await route.fallback();
+    };
+    await reporter.page.route(roomActionTarget, staleHandler);
+    try {
+      await reporter.page.getByLabel("Message", { exact: true }).fill(staleBody);
+      const responsePromise = reporter.page.waitForResponse((response) => {
+        try { return response.request().method() === "POST" && response.request().postDataJSON()?.[0]?.body === staleBody; }
+        catch { return false; }
+      });
+      await reporter.page.getByRole("button", { name: "Send", exact: true }).click();
+      const response = await responsePromise;
+      assert.equal(response.status(), 200);
+      assert((await response.text()).includes('"code":"forbidden"'), "Real message authority did not reject the unavailable expected room");
+      assert(staleIntercepted && !(await history(reporterClient)).messages.some((message) => message.body === staleBody), "Wrong expected room message was persisted");
+    } finally { await reporter.page.unroute(roomActionTarget, staleHandler); }
+    await reporter.page.goto(matchUrl, { waitUntil: "domcontentloaded" });
     const topic = `match-room:${room.id}:${room.communicationGeneration}`;
     let validSignals = 0;
     const joined = await subscription(responderClient, topic, ({ payload }) => {
       if (payload.roomId === room.id && payload.communicationGeneration === room.communicationGeneration) validSignals += 1;
     });
     assert.equal(joined.status, "SUBSCRIBED", "Participant private Realtime subscription failed");
+    const staleGeneration = await subscription(responderClient, `match-room:${room.id}:${room.communicationGeneration + 1}`);
+    assert.equal(staleGeneration.status, "CHANNEL_ERROR", "Participant joined a different communication generation");
+    await responderClient.removeChannel(staleGeneration.channel);
     const outsider = await pageFor(await authentication.fixture(outsiderAlias));
     try {
       const outsiderClient = authentication.clientForPage(outsider.page);
@@ -87,7 +117,7 @@ export function createHostedRoomChecks({ authentication, pageFor, capture, recor
       await fallback.page.getByRole("log", { name: "Match Room", exact: true }).getByText(messages[2], { exact: true }).waitFor({ timeout: 30_000 });
       await capture(fallback.page, "Pro-room-real-http-fallback");
     } finally { await fallback.context.close(); }
-    record({ phase: "pro-room", normalUiMessages: 3, authenticatedHistory: true, outsiderReadDenied: true, privateRealtime: true, outsiderSubscriptionDenied: true, unreadClearedByBrowser: true, realHttpFallback: true });
+    record({ phase: "pro-room", normalUiMessages: 3, authenticatedHistory: true, wrongExpectedRoomSendRejected: true, outsiderReadDenied: true, privateRealtime: true, outsiderSubscriptionDenied: true, wrongGenerationSubscriptionDenied: true, unreadClearedByBrowser: true, realHttpFallback: true });
     return { roomId: room.id, messages, responderClient };
   }
 

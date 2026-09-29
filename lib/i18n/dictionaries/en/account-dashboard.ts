@@ -180,6 +180,9 @@ const dictionary = {
     bio: "Bio",
   },
   steam: {
+    syntheticTitle: "Staging test identity",
+    syntheticDescription: "This synthetic account does not verify ownership of a real Steam account.",
+    syntheticStatus: "No verified Steam connection",
     eyebrow: "Verified Game Identity",
     title: "Steam Connection",
     description:
@@ -203,6 +206,9 @@ const dictionary = {
     connect: "Connect Steam Account",
   },
   relic: {
+    syntheticTitle: "Synthetic eligibility",
+    syntheticDescription: "Staging test account. This ELO and division are synthetic; they are not a real Relic verification.",
+    syntheticElo: "Synthetic ELO",
     eyebrow: "Competitive Rating",
     title: "Verified Profile ELO",
     description:

@@ -238,6 +238,11 @@ const dictionary = {
       "После запуска откройте вкладку «Сетка» Турнира, чтобы увидеть сетку, соперника и сведения о Матче.",
   },
   registrationModal: {
+    syntheticIdentityReady: "Синтетическая тестовая учётная запись готова",
+    syntheticEligibility: "Тестовый допуск в Staging",
+    syntheticEligibilityDescription: "Эта разрешённая тестовая учётная запись Staging использует синтетические ELO и Дивизион. При отправке сервер проверяет тестовый допуск, а не актуальные данные Relic или владение реальной учётной записью Steam.",
+    syntheticOwnershipConfirmation: "Подтверждаю, что управляю этой синтетической учётной записью Staging. Этот тест не подтверждает владение реальной учётной записью Steam.",
+    syntheticSteamLabel: "Синтетическая учётная запись Steam",
     eyebrow: "Регистрация IronClad",
     title: "Регистрация киберспортсмена",
     dialogDescription:

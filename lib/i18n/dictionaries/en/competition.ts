@@ -486,6 +486,11 @@ const dictionary = {
       "After launch, open the Tournament's Brackets tab to see your Bracket, opponent and Match details.",
   },
   registrationModal: {
+    syntheticIdentityReady: "Synthetic test identity ready",
+    syntheticEligibility: "Synthetic Staging eligibility",
+    syntheticEligibilityDescription: "This approved Staging fixture uses a synthetic ELO and Division. The server checks fixture eligibility when you submit; it does not verify live Relic data or real Steam ownership.",
+    syntheticOwnershipConfirmation: "I confirm that I control this synthetic Staging account. This test does not claim ownership of a real Steam account.",
+    syntheticSteamLabel: "Synthetic Steam identity",
     eyebrow: "IronClad Registration",
     title: "Esports Player Registration",
     dialogDescription:
