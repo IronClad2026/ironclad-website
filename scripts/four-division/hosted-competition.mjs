@@ -1,6 +1,7 @@
 // Authorized synthetic Staging UAT through the real rendered app only.
 // Service-role access below is read-only, scoped to the exact event and approved fixtures.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "@playwright/test";
@@ -108,6 +109,17 @@ async function capture(page, name) {
   assert(safe, "Private data appeared in rendered UI; screenshot refused");
   await page.screenshot({ path: path.join(output, `${name}.png`), fullPage: true, animations: "disabled" });
 }
+async function settleDashboard(page) {
+  await page.waitForFunction(() => Boolean(window.Clerk?.loaded && window.Clerk?.session));
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(350);
+  const reveal = page.locator('[role="dialog"][aria-labelledby^="badge-reveal-"]');
+  if (await reveal.isVisible()) {
+    // This dismisses only the mounted overlay; it does not acknowledge an award.
+    await reveal.getByRole("button", { name: "Not now", exact: true }).click();
+    await reveal.waitFor({ state: "hidden" });
+  }
+}
 function record(value) {
   results.push(value);
   writeFileSync(path.join(output, "summary.json"), JSON.stringify({ origin, title, slug, phase, results }, null, 2));
@@ -186,7 +198,7 @@ async function rejectWrongDivision(page, dialog, event, identity, division, subm
   } finally { await page.unroute(target, handler); }
 }
 
-async function registrationAgreements(page, alias) {
+async function registrationAgreements(page, alias, verifySyntheticPresentation = false) {
   stage = "open-registration";
   await page.goto(`${origin}/tournaments?tournament=${slug}&register=1`, { waitUntil: "domcontentloaded" });
   const legalGate = page.locator("#account-legal-update-title");
@@ -212,10 +224,32 @@ async function registrationAgreements(page, alias) {
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
   await dialog.getByRole("heading", { name: width < 768 ? "Player Readiness" : "Player Profile Confirmation", exact: true }).waitFor();
+  if (verifySyntheticPresentation) {
+    assert(width < 768, "This targeted disclosure check requires the phone wizard");
+    await dialog.getByText("Synthetic test identity ready", { exact: true }).waitFor();
+    await dialog.getByText("This approved Staging fixture uses a synthetic ELO and Division. The server checks fixture eligibility when you submit; it does not verify live Relic data or real Steam ownership.", { exact: true }).waitFor();
+    assert(!/Steam connected|Relic verified|fresh Relic/i.test(await dialog.innerText()), "Synthetic readiness made a real-provider claim");
+    await capture(page, "Pro-synthetic-readiness-disclosure");
+  }
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
   stage = "accept-registration-agreements";
   const agreements = dialog.locator("input[data-registration-field]");
   assert.equal(await agreements.count(), 6);
+  if (verifySyntheticPresentation) {
+    await dialog.getByText("I confirm that I control this synthetic Staging account. This test does not claim ownership of a real Steam account.", { exact: true }).waitFor();
+    const documents = checked(await authentication.admin.from("legal_documents").select("document_kind,version,sha256").eq("status", "effective"));
+    for (const [kind, field] of [["rulebook", "rulebookAgreement"], ["ppa", "playerParticipationAgreement"], ["terms", "termsAgreement"], ["privacy", "privacyAcknowledgement"]]) {
+      const document = documents.find((row) => row.document_kind === kind);
+      assert(document && document.version === ({ rulebook: "3.2", ppa: "3.2", terms: "1.1", privacy: "1.2" })[kind]);
+      const anchor = dialog.locator(`label:has(input[data-registration-field="${field}"])`).getByRole("link");
+      assert((await anchor.getAttribute("aria-label")).includes(document.version), "Wizard legal link version differs from current authority");
+      const url = new URL(await anchor.getAttribute("href"), origin);
+      assert.equal(url.origin, origin, "Reviewed bundled legal download must stay on this Preview");
+      const response = await page.context().request.get(url.href);
+      assert.equal(response.status(), 200);
+      assert.equal(createHash("sha256").update(await response.body()).digest("hex"), document.sha256, "Wizard legal bytes differ from current governing authority");
+    }
+  }
   for (const agreement of await agreements.all()) await agreement.check();
   return dialog;
 }
@@ -267,6 +301,16 @@ try {
       const before = await season();
       const closure = async () => checked(await authentication.admin.from("tournament_division_not_held_closures")
         .select("reason_code,closed_at,active_registration_count,waitlist_registration_count").eq("tournament_bracket_id", bracket.id).maybeSingle());
+      if (!await closure()) {
+        const participant = await pageFor(await authentication.fixture("TestMain6"));
+        try {
+          const dialog = await registrationAgreements(participant.page, "TestMain6", true);
+          await capture(participant.page, "Pro-synthetic-legal-disclosure");
+          await dialog.getByRole("button", { name: "Close registration", exact: true }).click();
+          assert.equal((await registrations(event)).length, 0, "Read-only wizard review created a registration");
+          record({ phase: "synthetic-wizard", division: "Pro", phoneReadinessTruthful: true, syntheticOwnershipDisclosure: true, currentLegalDownloadHashes: 4, submitted: false, zeroRegistrations: true });
+        } finally { await participant.context.close(); }
+      }
       const identity = await authentication.existingAdmin(option("--admin-user-id"), option("--admin-name"));
       const { page, context } = await pageFor(identity);
       stage = "close-empty-pro-not-held";
@@ -286,6 +330,7 @@ try {
       assert.deepEqual(await season(), before, "Unplayed Not Held Pro consumed an official slot");
       const points = checked(await authentication.admin.from("leaderboard_point_events").select("id").eq("tournament_bracket_id", bracket.id));
       assert.equal(points.length, 0);
+      await page.goto(`${origin}/tournaments?tournament=${slug}`, { waitUntil: "domcontentloaded" });
       await capture(page, "Pro-not-held-terminal");
       const final = await eventProof();
       assert.equal(final.status, "completed");
@@ -341,6 +386,7 @@ try {
           assert.equal(waitlistPosition(waiting, before), 1);
           const { page, context } = await pageFor(leaving);
           await page.goto(`${origin}/dashboard`, { waitUntil: "domcontentloaded" });
+          await settleDashboard(page);
           page.once("dialog", (dialog) => dialog.accept());
           await page.locator(`#registration-${departing.id}`).getByRole("button", { name: "Withdraw Registration", exact: true }).click();
           await awaitRegistration(event, leaving.playerId, "withdrawn");
@@ -352,6 +398,7 @@ try {
           assert.equal(after.waitlist_offer_status, "offered", "FIFO head did not receive the vacancy offer");
           const { page, context } = await pageFor(queued);
           await page.goto(`${origin}/dashboard`, { waitUntil: "domcontentloaded" });
+          await settleDashboard(page);
           await capture(page, `${division}-offer`);
           await page.locator(`#registration-${waiting.id}`).getByRole("button", { name: "Accept Spot", exact: true }).click();
           after = await awaitRegistration(event, queued.playerId, "pending");
@@ -384,6 +431,7 @@ try {
       const identity = await authentication.existingAdmin(option("--admin-user-id"), option("--admin-name"));
       const { page, context } = await pageFor(identity);
       if (phase === "prepare") {
+        stage = "approve-selected-cohort";
         const pending = roster.filter((row) => row.registration_status !== "approved");
         if (pending.length) {
           await page.goto(`${origin}/admin/tournaments/${event.id}?section=registrations&filter=all`, { waitUntil: "domcontentloaded" });
@@ -391,6 +439,7 @@ try {
           await page.getByRole("button", { name: `Approve Selected (${pending.length})`, exact: true }).first().click();
           for (const row of pending) await awaitRegistration(event, row.profile_id, "approved");
         }
+        stage = "publish-selected-map-pool";
         await page.goto(`${origin}/admin/tournaments/${event.id}?section=map-pool`, { waitUntil: "domcontentloaded" });
         await page.getByRole("button", { name: new RegExp(`^${selectedDivision}\\s`) }).click();
         if (!bracket.map_pool_published_at) {
@@ -404,6 +453,7 @@ try {
         }
         const mapped = (await eventProof()).brackets.find((row) => row.id === bracket.id);
         assert(mapped.map_pool_published_at, "Normal map publication did not persist");
+        stage = "generate-private-structure";
         await page.goto(`${origin}/admin/tournaments/${event.id}?section=bracket`, { waitUntil: "domcontentloaded" });
         let generated = checked(await authentication.admin.from("generated_brackets").select("id").eq("tournament_bracket_id", bracket.id).maybeSingle());
         if (!generated) {
@@ -411,11 +461,23 @@ try {
           await page.waitForURL(/notice=bracket-generated/);
           generated = checked(await authentication.admin.from("generated_brackets").select("id").eq("tournament_bracket_id", bracket.id).single());
         }
-        await page.getByLabel("Bracket", { exact: true }).selectOption(bracket.id);
+        await page.locator(`select:has(option[value="${bracket.id}"])`).selectOption(bracket.id);
         await page.getByRole("button", { name: "Edit Private Seeding", exact: true }).click();
-        const editor = page.getByRole("dialog", { name: `Private seeding for ${selectedDivision}`, exact: true });
+        stage = "assign-private-seeding";
+        const editor = page.getByRole("dialog", { name: `Private seeding for ${selectedDivision} Bracket`, exact: true });
+        await editor.waitFor({ state: "visible" });
+        await page.waitForFunction(() => {
+          const panel = document.querySelector('[role="dialog"][aria-labelledby="bracket-workspace-title"]');
+          return panel && Math.abs(panel.getBoundingClientRect().left) < 1;
+        });
         const slots = editor.locator("select");
+        await slots.first().waitFor({ state: "visible" });
         assert.equal(await slots.count(), 8);
+        const panelBounds = await editor.boundingBox();
+        assert(panelBounds && Math.abs(panelBounds.x) < 1 && panelBounds.width <= width + 1, "Private seeding panel clips outside the viewport");
+        for (let index = 0; index < 8; index += 1) {
+          assert.equal(await slots.nth(index).getAttribute("aria-label"), `Assign participant to slot ${index + 1}: Opening Match ${Math.ceil((index + 1) / 2)} - Player ${index % 2 === 0 ? "1" : "2"}`);
+        }
         for (let index = 0; index < 8; index += 1) await slots.nth(index).selectOption("");
         const seeding = selectedDivision === "Main" ? expected : [...expected].reverse();
         for (const [index, player] of seeding.entries()) {
@@ -431,10 +493,10 @@ try {
         const assigned = new Set(matches.flatMap((match) => [match.player_one_registration_id, match.player_two_registration_id]).filter(Boolean));
         assert.equal(assigned.size, 8);
         assert(roster.every((row) => assigned.has(row.id)));
-        record({ phase, division: selectedDivision, approved: 8, mapsPublished: true, privateMatches: 7, uniquelySeeded: 8, remainsUnlaunched: true });
+        record({ phase, division: selectedDivision, approved: 8, mapsPublished: true, privateMatches: 7, uniquelySeeded: 8, namedSeedingControls: 8, mobilePanelWithinViewport: true, remainsUnlaunched: true });
       } else {
         await page.goto(`${origin}/admin/tournaments/${event.id}?section=bracket`, { waitUntil: "domcontentloaded" });
-        await page.getByLabel("Bracket", { exact: true }).selectOption(bracket.id);
+        await page.locator(`select:has(option[value="${bracket.id}"])`).selectOption(bracket.id);
         await capture(page, `${selectedDivision}-launch-review`);
         await page.getByRole("button", { name: "Launch Division", exact: true }).click();
         await page.waitForURL(/bracketNotice=division-launched/);

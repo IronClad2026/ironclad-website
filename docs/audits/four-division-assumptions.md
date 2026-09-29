@@ -1,6 +1,6 @@
 # Four-division remaining-assumptions audit
 
-The inventory categorizes 5446 matching source lines across 399 files. The static inventory found an application defect: all-four map-pool publication was rejected by an old three-bracket limit. That limit is fixed and its four/five boundary is tested. Hosted verification later found an older deferred registration-evidence trigger rejecting the new synthetic browser contract; a fourth additive migration fixes that separate integration defect with commit-time regression checks.
+The inventory categorizes 5448 matching source lines across 399 files. The static inventory found an application defect: all-four map-pool publication was rejected by an old three-bracket limit. That limit is fixed and its four/five boundary is tested. Hosted verification later found an older deferred registration-evidence trigger rejecting the new synthetic browser contract; a fourth additive migration fixes that separate integration defect with commit-time regression checks.
 
 The JSON companion contains every indexed file/line, exact matched terms, source-line SHA256, category, reviewed-family rationale, and SQL definition context. This is a reviewed-family audit, not a claim that every historical SQL harness was rerun. Immutable migrations and version-scoped historical tests remain historical evidence; current authority was checked with a full 160-migration replay, model/permission checks, twelve P03 division variants, and the played lifecycle/concurrency harness.
 
@@ -10,7 +10,7 @@ The JSON companion contains every indexed file/line, exact matched terms, source
 | --- | ---: |
 | unrelated | 258 |
 | correct_historical | 2810 |
-| correct_compatibility | 2377 |
+| correct_compatibility | 2379 |
 | defect_fixed | 1 |
 
 Unclassified source residuals: 0. Ignored directories, dependencies, generated test evidence, lock files and binary documents are excluded. The scan includes Main/main, Main / Pro, 1400+, model/accounting keys, season references, fixture aliases/contracts, three-count checks and three-column layouts.

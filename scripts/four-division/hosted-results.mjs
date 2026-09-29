@@ -60,8 +60,9 @@ export async function runHostedResults({ authentication, pageFor, capture, recor
       if (!prior.length) {
         const form = reporter.page.locator("form").filter({ has: reporter.page.getByRole("button", { name: "Won", exact: true }) });
         await form.getByRole("button", { name: "Won", exact: true }).click();
-        await form.getByLabel("Score", { exact: true }).selectOption(`${wins}-0`);
+        await form.locator("select").selectOption(`${wins}-0`);
         const uploadFields = form.locator('input[type="file"]');
+        await uploadFields.nth(wins - 1).waitFor({ state: "attached" });
         assert.equal(await uploadFields.count(), wins, "UI replay slots differ from played-game count");
         const submit = form.getByRole("button", { name: "Submit Result", exact: true });
         assert(await submit.isDisabled(), "Missing replay files did not disable result submission");

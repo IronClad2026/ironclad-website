@@ -245,6 +245,8 @@ async function verifyHostedLegal(page, context) {
 
 const browser = await chromium.launch({ headless: true });
 const results = [];
+const contextStates = new Map();
+const contextFailures = [];
 let previewAccess;
 let authentication;
 let identity;
@@ -256,7 +258,10 @@ try {
     identity = mode === "admin" ? await authentication.existingAdmin(option("--admin-user-id"), option("--admin-name")) : await authentication.fixture(option("--alias"));
   }
   async function runCase({ locale, width }) {
+    const contextState = { locale, width, phase: "browser-context", runtimeErrors: [], failedResponses: [] };
+    contextStates.set(`${locale}/${width}`, contextState);
     const context = await browser.newContext({ viewport: { width, height: width < 768 ? 844 : 1000 }, reducedMotion: "reduce" });
+    contextState.phase = "preview-access";
     await previewAccess.authorize(context);
     await context.addCookies([{ name: "ironclad_locale", value: locale, url: origin, secure: true, sameSite: "Lax" }]);
     const page = await context.newPage();
@@ -270,8 +275,8 @@ try {
       if (unexpectedNavigation || unexpectedDatabase || unexpectedClerk) await route.abort("blockedbyclient");
       else await route.continue();
     });
-    const runtimeErrors = [];
-    const failedResponses = [];
+    const runtimeErrors = contextState.runtimeErrors;
+    const failedResponses = contextState.failedResponses;
     page.on("pageerror", (error) => runtimeErrors.push({ type: "pageerror", reactError: error.message.match(/Minified React error #(\d+)/)?.[1] ?? null }));
     page.on("console", (message) => {
       if (message.type() === "error") runtimeErrors.push(consoleDiagnostic(message));
@@ -283,15 +288,20 @@ try {
       }
     });
     if (authentication) {
+      contextState.phase = "sign-in";
       await authentication.signIn(page, identity);
       // Clerk activation mounts the normal locale synchronization effect. Let
       // its Server Action finish before navigating away from the sign-in page.
+      contextState.phase = "authenticated-settle";
       await page.waitForLoadState("networkidle", { timeout: 15_000 });
       assert.equal(runtimeErrors.length, 0, "Authenticated setup reported a browser error");
     }
+    contextState.phase = "legal-delivery";
     if (args.includes("--verify-legal") && locale === selectedLocales[0] && width === selectedWidths[0]) await verifyHostedLegal(page, context);
     const targets = mode === "public" ? routes : mode === "participant" ? participantRoutes : ["/admin/tournaments/new", ...(eventId ? ["overview", "registrations", "bracket", "map-pool"].map((section) => `/admin/tournaments/${eventId}?section=${section}`) : [])];
     for (const route of targets) {
+      contextState.phase = "route";
+      contextState.route = route;
       const result = { locale, width, route, passed: false };
       let stage = "navigation";
       const startErrors = runtimeErrors.length;
@@ -368,20 +378,30 @@ try {
         result.errorType = error?.name === "TimeoutError" ? "timeout" : error instanceof assert.AssertionError ? "assertion" : "browser-operation";
       }
       result.screenshot = `${mode}-${locale}-${width}-${route.replace(/[^a-z0-9]/gi, "_") || "home"}.png`;
+      contextState.phase = "screenshot";
       // A content assertion can fail before the full layout inspection. Recheck
       // rendered privacy before every screenshot, including failed cases.
       const captureSafe = await page.evaluate(() => !/(?:sk_(?:live|test)_|sb_secret_|service_role|storage\/v1\/object\/(?:sign|authenticated)\/match-proofs|user_[A-Za-z0-9]{20,})/.test(document.body.innerText)).catch(() => false);
       if (!captureSafe || result.layout?.privateEvidenceExposed) result.screenshot = null;
       else await page.screenshot({ path: path.join(output, result.screenshot), fullPage: true, animations: "disabled", mask: [page.locator('input[type="email"], input[type="password"]')] });
       results.push(result);
-      writeFileSync(path.join(output, "summary.json"), JSON.stringify({ origin, mode, explicitApplicationMutations: false, normalLocalePreferenceSync: Boolean(authentication), results }, null, 2));
+      writeFileSync(path.join(output, "summary.json"), JSON.stringify({ origin, mode, explicitApplicationMutations: false, normalLocalePreferenceSync: Boolean(authentication), contextFailures, results }, null, 2));
       console.log(JSON.stringify({ locale, width, route, passed: result.passed, failure: result.failure }));
     }
+    contextState.phase = "context-close";
     await context.close();
   }
   const queue = [...matrix];
   const workers = await Promise.allSettled(Array.from({ length: concurrency }, async () => {
-    while (queue.length) await runCase(queue.shift());
+    while (queue.length) {
+      const next = queue.shift();
+      try { await runCase(next); }
+      catch (error) {
+        contextFailures.push({ ...contextStates.get(`${next.locale}/${next.width}`),
+          errorType: error?.name === "TimeoutError" ? "timeout" : error instanceof assert.AssertionError ? "assertion" : "browser-operation" });
+        throw new Error("Hosted context failed; sanitized diagnostics retained");
+      }
+    }
   }));
   assert(workers.every((worker) => worker.status === "fulfilled"), "A hosted context failed; sensitive details suppressed");
 } catch {
@@ -392,6 +412,6 @@ try {
   try { if (authentication) sessionCleanup = await authentication.close(); } catch { process.exitCode = 1; console.error("Temporary session cleanup failed; details suppressed"); }
   try { if (previewAccess) previewAccess.revoke(); } catch { process.exitCode = 1; console.error("Temporary Preview grant revocation failed; details suppressed"); }
 }
-writeFileSync(path.join(output, "summary.json"), JSON.stringify({ origin, mode, explicitApplicationMutations: false, normalLocalePreferenceSync: Boolean(authentication), sessionCleanup, results }, null, 2));
+writeFileSync(path.join(output, "summary.json"), JSON.stringify({ origin, mode, explicitApplicationMutations: false, normalLocalePreferenceSync: Boolean(authentication), sessionCleanup, contextFailures, results }, null, 2));
 console.log(JSON.stringify({ mode, total: results.length, passed: results.filter((result) => result.passed).length, sessionCleanup, output }));
 if (results.some((result) => !result.passed)) process.exitCode = 1;

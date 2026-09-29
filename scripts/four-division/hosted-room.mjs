@@ -27,6 +27,9 @@ async function subscription(client, topic, signal) {
 
 export function createHostedRoomChecks({ authentication, pageFor, capture, record, origin }) {
   async function before({ match, matchUrl, reporter, responder, outsiderAlias }) {
+    let checkStage = "resolve-room";
+    try {
+    await reporter.page.bringToFront();
     const reporterClient = authentication.clientForPage(reporter.page);
     const responderClient = authentication.clientForPage(responder.page);
     const resolved = checked(await reporterClient.rpc("resolve_match_room", { p_match_id: match.id }));
@@ -36,7 +39,8 @@ export function createHostedRoomChecks({ authentication, pageFor, capture, recor
     const history = (client) => client.rpc("get_match_room_history", { p_room_id: room.id, p_after_sequence: 0, p_limit: 50 }).then(checked);
     const unread = () => responderClient.rpc("get_match_room_unread_summary", { p_match_ids: [match.id] }).then(checked);
     const initial = await history(responderClient);
-    const staleBody = `SYNTHETIC STAGING UAT — wrong expected room rejection for ${match.id}.`;
+    const runMarker = randomUUID();
+    const staleBody = `SYNTHETIC STAGING UAT — wrong expected room rejection for ${match.id}. Check ${runMarker}.`;
     let staleIntercepted = false;
     const roomActionTarget = (url) => url.origin === origin && url.pathname === "/tournaments";
     const staleHandler = async (route) => {
@@ -49,6 +53,7 @@ export function createHostedRoomChecks({ authentication, pageFor, capture, recor
       } else await route.fallback();
     };
     await reporter.page.route(roomActionTarget, staleHandler);
+    checkStage = "wrong-expected-room-send";
     try {
       await reporter.page.getByLabel("Message", { exact: true }).fill(staleBody);
       const responsePromise = reporter.page.waitForResponse((response) => {
@@ -62,6 +67,7 @@ export function createHostedRoomChecks({ authentication, pageFor, capture, recor
       assert(staleIntercepted && !(await history(reporterClient)).messages.some((message) => message.body === staleBody), "Wrong expected room message was persisted");
     } finally { await reporter.page.unroute(roomActionTarget, staleHandler); }
     await reporter.page.goto(matchUrl, { waitUntil: "domcontentloaded" });
+    checkStage = "participant-realtime-subscribe";
     const topic = `match-room:${room.id}:${room.communicationGeneration}`;
     let validSignals = 0;
     const joined = await subscription(responderClient, topic, ({ payload }) => {
@@ -72,6 +78,7 @@ export function createHostedRoomChecks({ authentication, pageFor, capture, recor
     assert.equal(staleGeneration.status, "CHANNEL_ERROR", "Participant joined a different communication generation");
     await responderClient.removeChannel(staleGeneration.channel);
     const outsider = await pageFor(await authentication.fixture(outsiderAlias));
+    checkStage = "outsider-room-denial";
     try {
       const outsiderClient = authentication.clientForPage(outsider.page);
       const deniedRead = await outsiderClient.rpc("get_match_room_history", { p_room_id: room.id, p_after_sequence: 0, p_limit: 50 });
@@ -80,45 +87,64 @@ export function createHostedRoomChecks({ authentication, pageFor, capture, recor
       assert.equal(denied.status, "CHANNEL_ERROR", "Unrelated fixture joined private Pro room Realtime");
       await outsiderClient.removeChannel(denied.channel);
     } finally { await outsider.context.close(); }
+    record({ phase: "pro-room-access", wrongExpectedRoomSendRejected: true, participantPrivateSubscription: true, wrongGenerationSubscriptionDenied: true, outsiderHistoryDenied: true, outsiderSubscriptionDenied: true });
 
-    const messages = ["Unread and delivery", "Realtime refresh", "HTTP fallback"].map((purpose) => `SYNTHETIC STAGING UAT — ${purpose}. Pro match ${match.id}.`);
+    const messages = ["Unread and delivery", "Realtime refresh", "HTTP fallback"].map((purpose) => `SYNTHETIC STAGING UAT — ${purpose}. Pro match ${match.id}. Check ${runMarker}.`);
     const send = async (body) => {
       await reporter.page.bringToFront();
       await reporter.page.getByLabel("Message", { exact: true }).fill(body);
       await reporter.page.getByRole("button", { name: "Send", exact: true }).click();
       await reporter.page.getByRole("log", { name: "Match Room", exact: true }).getByText(body, { exact: true }).waitFor({ timeout: 30_000 });
     };
+    checkStage = "send-first-message";
     await send(messages[0]);
     const first = await eventually(() => history(responderClient), (value) => value.messages.some((message) => message.body === messages[0]), "Normal UI room message was not persisted");
     assert.equal(first.room.lastReadSequence, initial.room.lastReadSequence, "Read-only SDK history advanced the read cursor");
     assert((await unread()).items.some((item) => item.matchId === match.id && item.unreadSource === "opponent"), "Opponent unread summary missing");
     await responder.page.goto(matchUrl, { waitUntil: "domcontentloaded" });
+    checkStage = "offscreen-unread-and-visible-ack";
     await responder.page.bringToFront();
     await responder.page.getByRole("log", { name: "Match Room", exact: true }).getByText(messages[0], { exact: true }).waitFor();
+    const offscreen = await responder.page.locator("[data-match-room-tail]").boundingBox();
+    assert(offscreen && (offscreen.y < 0 || offscreen.y + offscreen.height > responder.page.viewportSize().height), "Unread negative check requires the transcript tail outside the viewport");
+    await pause(400);
+    assert((await unread()).items.some((item) => item.matchId === match.id), "Offscreen room mount incorrectly cleared unread state");
+    await responder.page.locator("[data-match-room-tail]").scrollIntoViewIfNeeded();
     await eventually(unread, (value) => !value.items.some((item) => item.matchId === match.id), "Visible browser catch-up did not acknowledge unread state");
     await capture(responder.page, "Pro-room-unread-cleared");
 
     const priorSignals = validSignals;
+    checkStage = "realtime-message-delivery";
     await send(messages[1]);
     await responder.page.bringToFront();
     await responder.page.getByRole("log", { name: "Match Room", exact: true }).getByText(messages[1], { exact: true }).waitFor({ timeout: 20_000 });
+    await responder.page.locator("[data-match-room-tail]").scrollIntoViewIfNeeded();
     await eventually(async () => validSignals, (count) => count > priorSignals, "Server message did not deliver a private Realtime invalidation");
     await responderClient.removeChannel(joined.channel);
 
     // Real authenticated fallback reads continue while only this browser context's
     // websocket is intentionally unavailable; HTTP responses are never mocked.
     const fallback = await pageFor(await authentication.fixture(responder.identity.alias));
+    checkStage = "real-http-fallback";
     try {
       await fallback.context.routeWebSocket((url) => url.hostname === "zzbnneprhjicmajpjkdg.supabase.co" && url.pathname.startsWith("/realtime/"), (socket) => socket.close());
       await fallback.page.goto(matchUrl, { waitUntil: "domcontentloaded" });
       await fallback.page.getByRole("log", { name: "Match Room", exact: true }).waitFor();
+      await fallback.page.locator("[data-match-room-tail]").scrollIntoViewIfNeeded();
       await send(messages[2]);
       await fallback.page.bringToFront();
       await fallback.page.getByRole("log", { name: "Match Room", exact: true }).getByText(messages[2], { exact: true }).waitFor({ timeout: 30_000 });
+      await fallback.page.locator("[data-match-room-tail]").scrollIntoViewIfNeeded();
       await capture(fallback.page, "Pro-room-real-http-fallback");
     } finally { await fallback.context.close(); }
-    record({ phase: "pro-room", normalUiMessages: 3, authenticatedHistory: true, wrongExpectedRoomSendRejected: true, outsiderReadDenied: true, privateRealtime: true, outsiderSubscriptionDenied: true, wrongGenerationSubscriptionDenied: true, unreadClearedByBrowser: true, realHttpFallback: true });
+    record({ phase: "pro-room", normalUiMessages: 3, authenticatedHistory: true, wrongExpectedRoomSendRejected: true, outsiderReadDenied: true, privateRealtime: true, outsiderSubscriptionDenied: true, wrongGenerationSubscriptionDenied: true, offscreenUnreadPreserved: true, unreadClearedByBrowser: true, realHttpFallback: true });
     return { roomId: room.id, messages, responderClient };
+    } catch (error) {
+      record({ phase: "pro-room-diagnostic", checkStage, failureType: error instanceof assert.AssertionError ? "AssertionError" : error?.name === "TimeoutError" ? "TimeoutError" : "operation-failed" });
+      await capture(reporter.page, "Pro-room-reporter-failure").catch(() => {});
+      await capture(responder.page, "Pro-room-responder-failure").catch(() => {});
+      throw error;
+    }
   }
 
   async function after({ match, matchUrl, responder, roomState }) {
