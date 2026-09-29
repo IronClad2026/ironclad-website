@@ -54,10 +54,12 @@ APPROVED_FILENAMES = {
     "rulebook": {
         "3.0": "ironclad-official-tournament-rulebook-v3.0.pdf",
         "3.1": "ironclad-official-tournament-rulebook-v3.1.pdf",
+        "3.2": "ironclad-official-tournament-rulebook-v3.2.pdf",
     },
     "ppa": {
         "3.0": "ironclad-player-participation-agreement-v3.0.pdf",
         "3.1": "ironclad-player-participation-agreement-v3.1.pdf",
+        "3.2": "ironclad-player-participation-agreement-v3.2.pdf",
     },
     "terms": {
         "1.0": "ironclad-terms-of-service-v1.0.pdf",
@@ -705,6 +707,7 @@ def render_blocks(
     blocks: list[dict[str, Any]],
     styles: dict[str, ParagraphStyle],
     available_width: float,
+    keep_small_tables: bool = False,
 ) -> list[Flowable]:
     story: list[Flowable] = []
     for block in blocks:
@@ -732,8 +735,12 @@ def render_blocks(
                 )
             story.append(Spacer(1, 1.5 * mm))
         elif block_type == "table":
+            table = make_table(block, styles, available_width)
+            if keep_small_tables and len(block["rows"]) <= 6:
+                preceding = [story.pop()] if story and isinstance(story[-1], Paragraph) else []
+                table = KeepTogether([*preceding, table])
             story.extend(
-                [make_table(block, styles, available_width), Spacer(1, 3 * mm)]
+                [table, Spacer(1, 3 * mm)]
             )
         elif block_type == "callout":
             contents = [
@@ -777,13 +784,18 @@ def build_pdf(
         story.append(Spacer(1, 2 * mm))
     for section in document["sections"]:
         heading = f"{section['number']}. {section['title']}" if section["number"] else section["title"]
-        story.append(OrangeRule(template.width))
-        story.append(Paragraph(paragraph_text(heading), styles["section"]))
-        story.extend(render_blocks(section["blocks"], styles, template.width))
+        section_start = [OrangeRule(template.width), Paragraph(paragraph_text(heading), styles["section"])]
+        blocks = render_blocks(section["blocks"], styles, template.width, document["version"] == "3.2")
+        if document["version"] == "3.2" and blocks and isinstance(blocks[0], KeepTogether):
+            story.append(KeepTogether([*section_start, *blocks.pop(0)._content]))
+        else:
+            story.extend(section_start)
+        story.extend(blocks)
     story.append(
         Paragraph(
             f"END OF {html.escape(document['shortTitle'].upper())} v{html.escape(document['version'])}",
-            styles["end"],
+            ParagraphStyle("EndSuccessor", parent=styles["end"], spaceBefore=3 * mm)
+            if document["version"] == "3.2" else styles["end"],
         )
     )
     template.multiBuild(story, canvasmaker=InvariantCanvas)

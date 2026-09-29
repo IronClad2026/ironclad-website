@@ -208,6 +208,7 @@ function createTournament(
   return {
     id: TOURNAMENT_ID,
     title: "IronClad Open",
+    division_model_version: "legacy_three_v1",
     status: "registration_open",
     registration_open_at: "2026-08-01T00:00:00.000Z",
     registration_close_at: "2026-08-10T00:00:00.000Z",
@@ -701,6 +702,60 @@ describe("Relic-authoritative tournament registration action", () => {
       expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments");
     }
   );
+
+  it.each([
+    [1099, "Academy"], [1100, "Challenge"], [1399, "Challenge"],
+    [1400, "Main"], [1699, "Main"], [1700, "Pro"],
+  ])("freezes a v2 future snapshot at ELO %i in %s", async (elo, division) => {
+    const client = createRegistrationClient({
+      tournament: createTournament(String(division), { division_model_version: "four_division_v1" }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+    getRelic1v1EloMock.mockResolvedValue({
+      ...ratedResult({ elo: Number(elo), division: String(division) }),
+      calculationVersion: "relic-highest-1v1-v2",
+    });
+    expect(await submitTournamentRegistration(registrationInput())).toMatchObject({ success: true });
+    expect(client.rpc).toHaveBeenCalledWith("submit_verified_player_registration", expect.objectContaining({
+      p_relic_elo: elo, p_relic_division: division, p_relic_calculation_version: "relic-highest-1v1-v2",
+    }));
+  });
+
+  it("classifies a fresh Pro-rated player under the target historical event model", async () => {
+    const client = createRegistrationClient({ tournament: createTournament("Main") });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+    getRelic1v1EloMock.mockResolvedValue({
+      ...ratedResult({ elo: 1750, division: "Pro" }), calculationVersion: "relic-highest-1v1-v2",
+    });
+    expect(await submitTournamentRegistration(registrationInput())).toMatchObject({ success: true });
+    expect(client.rpc).toHaveBeenCalledWith("submit_verified_player_registration", expect.objectContaining({
+      p_relic_elo: 1750, p_relic_division: "Main / Pro", p_relic_calculation_version: "relic-highest-1v1-v1",
+    }));
+  });
+
+  it.each([
+    { elo: 1700, division: "Main", calculationVersion: "relic-highest-1v1-v2" },
+    { elo: 1699, division: "Pro", calculationVersion: "relic-highest-1v1-v2" },
+    { elo: 1500, division: "Main", calculationVersion: "unrecognized-v3" },
+  ])("rejects invalid classifier evidence before persisting a snapshot: $calculationVersion/$division", async (snapshot) => {
+    const client = createRegistrationClient({
+      tournament: createTournament("Main", { division_model_version: "four_division_v1" }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+    getRelic1v1EloMock.mockResolvedValue({ ...ratedResult(), ...snapshot });
+    expect(await submitTournamentRegistration(registrationInput())).toMatchObject({ success: false, code: "DIVISION_MISMATCH" });
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not verify or register an event with unknown model metadata", async () => {
+    const client = createRegistrationClient({
+      tournament: createTournament("Main", { division_model_version: "unrecognized-model" }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+    expect(await submitTournamentRegistration(registrationInput())).toMatchObject({ success: false });
+    expect(getRelic1v1EloMock).not.toHaveBeenCalled();
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
 
   it("performs another independent fresh Relic request for another tournament", async () => {
     const firstClient = createRegistrationClient();

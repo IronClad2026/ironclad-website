@@ -6,7 +6,9 @@ export type LeaderboardBracketType =
   | "overall"
   | "academy"
   | "challenge"
-  | "main";
+  | "main"
+  | "main_progression"
+  | "pro";
 export type LeaderboardScope = "season" | "all_time";
 
 export type PublicLeaderboardSeason = {
@@ -17,7 +19,8 @@ export type PublicLeaderboardSeason = {
   startDate: string;
   endDate: string;
   isActive: boolean;
-  validMainEventCount: number;
+  officialBracketType: "main" | "pro";
+  validQualifyingEventCount: number;
   isFinalized: boolean;
   isUnderReview: boolean;
 };
@@ -80,7 +83,8 @@ type SeasonRow = {
   start_date: string;
   end_date: string;
   is_active: boolean;
-  valid_main_event_count: number;
+  official_bracket_type: "main" | "pro";
+  valid_qualifying_event_count: number;
   is_finalized: boolean;
   is_under_review: boolean;
 };
@@ -172,7 +176,7 @@ async function loadCurrentSeason(errors: string[]) {
   const { data, error } = await supabase
     .from("leaderboard_current_season")
     .select(
-      "id, name, year, season_number, start_date, end_date, is_active, valid_main_event_count, is_finalized, is_under_review"
+      "id, name, year, season_number, start_date, end_date, is_active, official_bracket_type, valid_qualifying_event_count, is_finalized, is_under_review"
     )
     .maybeSingle();
 
@@ -182,6 +186,10 @@ async function loadCurrentSeason(errors: string[]) {
     return null;
   }
 
+  if (data && data.official_bracket_type !== "main" && data.official_bracket_type !== "pro") {
+    errors.push("Current season has an unsupported division model.");
+    return null;
+  }
   return data ? mapSeason(data as SeasonRow) : null;
 }
 
@@ -279,7 +287,7 @@ async function loadSeasonChampions(errors: string[]) {
     .select(
       "id, season_id, season_name, player_id, player_name, country, has_avatar, bracket_type, final_rank, final_points"
     )
-    .eq("bracket_type", "main")
+    .in("bracket_type", ["main", "pro"])
     .order("created_at", { ascending: false })
     .limit(24);
 
@@ -312,7 +320,8 @@ function mapSeason(row: SeasonRow): PublicLeaderboardSeason {
     startDate: row.start_date,
     endDate: row.end_date,
     isActive: row.is_active,
-    validMainEventCount: row.valid_main_event_count,
+    officialBracketType: row.official_bracket_type,
+    validQualifyingEventCount: row.valid_qualifying_event_count,
     isFinalized: row.is_finalized,
     isUnderReview: row.is_under_review,
   };

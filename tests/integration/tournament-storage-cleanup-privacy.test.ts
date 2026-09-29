@@ -51,6 +51,7 @@ const bannerUrl =
 function createTournamentFormData(url: string) {
   const formData = new FormData();
   formData.set("tournamentId", "tournament-1");
+  formData.set("divisionModelVersion", "legacy_three_v1");
   formData.set("title", "Privacy Cup");
   formData.set("description", "Description");
   formData.set("bannerImageUrl", url);
@@ -68,6 +69,7 @@ function createTournamentFormData(url: string) {
 function createTournamentDeletionFormData() {
   const formData = new FormData();
   formData.set("tournamentId", "tournament-1");
+  formData.set("divisionModelVersion", "legacy_three_v1");
   formData.set("confirmation", "DELETE");
   return formData;
 }
@@ -102,6 +104,26 @@ describe("tournament storage cleanup privacy", () => {
     redirectMock.mockClear();
     revalidatePathMock.mockReset();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("rejects a stale editor without an explicit event model before reaching the save RPC", async () => {
+    authMock.mockResolvedValue(adminIdentity);
+    const formData = createTournamentFormData(bannerUrl);
+    formData.delete("divisionModelVersion");
+    await expect(saveTournament({ error: null }, formData)).resolves.toEqual({
+      error: "Refresh the tournament editor before saving.",
+    });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects ordinary creation under the historical model", async () => {
+    authMock.mockResolvedValue(adminIdentity);
+    const formData = createTournamentFormData(bannerUrl);
+    formData.delete("tournamentId");
+    await expect(saveTournament({ error: null }, formData)).resolves.toEqual({
+      error: "New tournaments require the four-division model.",
+    });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
   it("does not persist or log a historical identity-bearing proof path", async () => {
@@ -283,7 +305,7 @@ describe("tournament storage cleanup privacy", () => {
       select: vi.fn((columns: string) => {
         if (
           columns ===
-          "slug, banner_image_url, status, registration_enabled, grand_final_at"
+          "slug, banner_image_url, status, registration_enabled, grand_final_at, division_model_version"
         ) return existingQuery;
         if (columns === "id") {
           referenceQueries += 1;
@@ -329,6 +351,7 @@ describe("tournament storage cleanup privacy", () => {
     );
     const formData = new FormData();
     formData.set("tournamentId", "tournament-1");
+  formData.set("divisionModelVersion", "legacy_three_v1");
     formData.set("title", "Privacy Cup");
     formData.set("description", "Description");
     formData.set("bannerImageUrl", bannerUrl);
@@ -396,7 +419,7 @@ describe("tournament storage cleanup privacy", () => {
       select: vi.fn((columns: string) => {
         if (
           columns ===
-          "slug, banner_image_url, status, registration_enabled, grand_final_at"
+          "slug, banner_image_url, status, registration_enabled, grand_final_at, division_model_version"
         ) return existingQuery;
         if (columns === "id") return unreferencedQuery;
         return savedQuery;
@@ -471,7 +494,7 @@ describe("tournament storage cleanup privacy", () => {
     const unreferencedQuery = createQuery({ data: [], error: null });
     const tournamentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at"
+        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at, division_model_version"
           ? existingQuery
           : unreferencedQuery
       ),
@@ -535,7 +558,7 @@ describe("tournament storage cleanup privacy", () => {
     const unreferencedQuery = createQuery({ data: [], error: null });
     const currentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at"
+        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at, division_model_version"
           ? currentQuery
           : unreferencedQuery
       ),
@@ -593,7 +616,7 @@ describe("tournament storage cleanup privacy", () => {
       select: vi.fn((columns: string) => {
         if (
           columns ===
-          "slug, banner_image_url, status, registration_enabled, grand_final_at"
+          "slug, banner_image_url, status, registration_enabled, grand_final_at, division_model_version"
         ) return existingQuery;
         referenceQueryCount += 1;
         return referenceQueryCount === 1
@@ -647,7 +670,7 @@ describe("tournament storage cleanup privacy", () => {
     const unreferencedQuery = createQuery({ data: [], error: null });
     const tournamentTable = {
       select: vi.fn((columns: string) =>
-        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at"
+        columns === "slug, banner_image_url, status, registration_enabled, grand_final_at, division_model_version"
           ? existingQuery
           : unreferencedQuery
       ),

@@ -6,6 +6,7 @@ import RelicEloVerificationCard from "@/components/RelicEloVerificationCard";
 import SteamConnectionCard from "@/components/SteamConnectionCard";
 import { getOwnActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
 import { getIronCladDivision } from "@/lib/elo-verification/divisions";
+import { getDivisionModelForCalculationVersion } from "@/lib/division-model";
 import {
   type PlayerProfile,
 } from "@/lib/player-profile";
@@ -92,7 +93,9 @@ function getRelicVerification(
     return null;
   }
 
-  const expectedDivision = getIronCladDivision(elo);
+  const model = getDivisionModelForCalculationVersion(protectedProfile.relic_elo_calculation_version);
+  if (!model) return null;
+  const expectedDivision = getIronCladDivision(elo, model);
 
   if (
     !expectedDivision.ok ||

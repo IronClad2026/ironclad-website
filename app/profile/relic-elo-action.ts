@@ -530,7 +530,7 @@ function isIronCladDivision(value: unknown): value is IronCladDivision {
   return (
     value === "Academy" ||
     value === "Challenge" ||
-    value === "Main / Pro"
+    value === "Main / Pro" || value === "Main" || value === "Pro"
   );
 }
 

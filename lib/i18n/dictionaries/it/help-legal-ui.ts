@@ -57,14 +57,14 @@ const dictionary = {
         eyebrow: "Competizione individuale",
         title: "REGOLE 1V1",
         description:
-          "I Tornei di lancio IronClad sono Eventi 1v1 CoH3 gratuiti con Divisioni separate Academy, Challenge e Main / Pro da otto Giocatori. Quarti di finale e semifinali sono BO3; la finale è BO5.",
-        document: "Rulebook v3.1",
+          "I Tornei di lancio IronClad sono Eventi 1v1 CoH3 gratuiti con Divisioni separate Academy, Challenge e Main e Pro da otto Giocatori. Quarti di finale e semifinali sono BO3; la finale è BO5.",
+        document: "Rulebook v3.2",
       },
       rankings: {
         eyebrow: "Storico competitivo",
         title: "CLASSIFICHE E STAGIONI",
         description:
-          "Academy e Challenge mantengono Classifiche permanenti di carriera. Main / Pro utilizza stagioni di sei Eventi validi. Solo le competizioni effettivamente disputate generano statistiche di gioco.",
+          "Academy, Challenge e Main mantengono carriere permanenti separate. Pro usa stagioni di sei eventi validi. I risultati storici Main / Pro restano separati.",
         document: "Rulebook sections 13-14",
       },
       conduct: {
@@ -72,7 +72,7 @@ const dictionary = {
         title: "PPA E CONDOTTA",
         description:
           "Il PPA disciplina idoneità, titolarità dell’account, condotta, collaborazione sulle prove, obblighi relativi alla privacy, sanzioni, media e premi condizionati. La procedura dettagliata di gioco resta nel Regolamento.",
-        document: "PPA v3.1",
+        document: "PPA v3.2",
       },
     },
     quick: {
@@ -108,7 +108,7 @@ const dictionary = {
           "L’Iscrizione è gratuita e integrata in IronClad. I Giocatori devono avere almeno 18 anni, utilizzare il proprio account IronClad autenticato e il proprio account Steam collegato, completare una nuova verifica Relic 1v1 e accettare le versioni esatte dei documenti normativi presentati. Discord non è obbligatorio.",
         eloTitle: "Istantanea ELO e Divisione",
         eloText:
-          "Il più alto ELO di fazione Relic 1v1 attuale e valido determina Academy (0–1099), Challenge (1100–1399) o Main / Pro (1400+). IronClad memorizza tale idoneità come istantanea immutabile dell’Iscrizione all’Evento, quindi successive variazioni dell’ELO in tempo reale non spostano il Giocatore per quell’Evento.",
+          "Il più alto ELO di fazione Relic 1v1 attuale e valido determina Academy (0–1099), Challenge (1100–1399), Main (1400–1699) o Pro (1700+). Gli eventi storici a tre divisioni mantengono Main / Pro (1400+). Lo snapshot immutabile di iscrizione segue il modello dell’evento; variazioni successive dell’ELO non spostano il giocatore.",
         reviewTitle: "Revisione, Lista d’attesa e lancio",
         reviewText:
           "Le prime otto Iscrizioni valide entrano nel gruppo di revisione attiva; i Giocatori idonei successivi possono entrare nella Lista d’attesa FIFO. Un’offerta per un posto vacante usa la scadenza esatta mostrata da IronClad e riporta in revisione il Giocatore che accetta. Una Divisione viene avviata solo con esattamente otto Giocatori approvati, un tabellone pronto e il pool di mappe richiesto pubblicato.",
@@ -137,19 +137,19 @@ const dictionary = {
       rankings: {
         pointsTitle: "Punti per Divisione",
         pointsText:
-          "Academy e Challenge assegnano 10 punti di partecipazione, 2 punti per ogni turno superato e 3 punti per la vittoria in un Torneo. Main / Pro assegna 10 punti di partecipazione, 5 punti per ogni turno superato e 5 punti per la vittoria in un Torneo.",
+          "Academy e Challenge assegnano +10 per la partecipazione, +2 per turno superato e +3 per la vittoria. Main e Pro assegnano rispettivamente +10, +5 e +5. La vittoria in finale assegna solo il bonus vittoria, senza punti aggiuntivi per il turno. Il punteggio storico Main / Pro resta invariato.",
         playTitle: "Gioco effettivo",
         playText:
           "Il totale dei Match disputati, le vittorie, le sconfitte e la percentuale di vittorie includono solo serie effettivamente completate tra due Giocatori. Mancate presenze, bye automatici, vittorie a tavolino, rami vuoti del tabellone e doppie sconfitte a tavolino non generano statistiche di gioco, sebbene un avanzamento legittimo senza partita possa comunque assegnare i punti approvati per il superamento del turno.",
         careerTitle: "Classifiche di carriera",
         careerText:
-          "Academy e Challenge mantengono Classifiche permanenti di carriera separate. Non si azzerano al termine di una stagione Main / Pro.",
+          "Academy, Challenge e Main mantengono ciascuna una classifica Carriera permanente. I punti restano separati e non passano alle stagioni Pro né all’archivio storico Main / Pro.",
         catchupTitle: "Recupero della carriera",
         catchupText:
-          "Academy e Challenge possono assegnare +5 punti per ogni precedente Evento idoneo completato nella stessa Divisione al quale il Giocatore non ha partecipato, fino a +25. L’assegnazione è disponibile una sola volta per Giocatore e per Divisione e non si applica mai a Main / Pro.",
-        seasonTitle: "Stagione Main / Pro",
+          "Solo Academy e Challenge possono assegnare +5 per ogni precedente evento concluso idoneo saltato nella stessa divisione, una volta per giocatore e divisione, fino a +25. Main e Pro non ricevono mai questo bonus.",
+        seasonTitle: "Stagione Pro",
         seasonText:
-          "Una stagione Main / Pro comprende esattamente sei Eventi validi di qualificazione. Il settimo Evento dà inizio alla stagione successiva e la Classifica viene bloccata dopo l’assegnazione del punteggio del sesto Evento valido, salvo che una successiva verifica dell’integrità ponga la stagione in revisione.",
+          "Una stagione Pro comprende esattamente sei eventi Pro validi. Il settimo inizia la stagione successiva. La classifica si blocca dopo il sesto salvo revisione d’integrità. Le stagioni storiche Main / Pro mantengono la propria autorità originale e non diventano stagioni Pro.",
         rankingTitle: "Classifica e parità effettive",
         rankingText:
           "L’ordine della Classifica è determinato da punti totali, vittorie nei Tornei, turni superati, percentuale esatta di vittorie nei Match effettivi e infine vittorie nei Match effettivi. I Giocatori ancora pari in ogni criterio competitivo condividono la stessa posizione ufficiale. Nomi, ordine di visualizzazione o ID interni non risolvono una parità effettiva.",
@@ -211,7 +211,7 @@ const dictionary = {
         "L’Iscrizione è gratuita e integrata in IronClad. Accedi, completa i campi obbligatori del Profilo, collega il tuo account Steam, completa una nuova verifica Relic 1v1, scegli la Divisione aperta per la quale sei idoneo, conferma di avere almeno 18 anni e di utilizzare i tuoi account e accetta le versioni esatte in vigore dei documenti normativi mostrate.",
       divisionQuestion: "Come viene determinata la mia Divisione?",
       divisionAnswer:
-        "IronClad utilizza il più alto ELO di fazione 1v1 attuale e valido restituito dalla ricerca ufficiale di Relic: Academy è 0–1099, Challenge è 1100–1399 e Main / Pro è 1400+. Il server memorizza un’istantanea immutabile dell’Iscrizione, quindi successive variazioni dell’ELO in tempo reale non spostano l’Iscrizione a quell’Evento.",
+        "Il più alto ELO di fazione Relic 1v1 attuale e valido determina Academy (0–1099), Challenge (1100–1399), Main (1400–1699) o Pro (1700+). Gli eventi storici a tre divisioni mantengono Main / Pro (1400+). Lo snapshot immutabile di iscrizione segue il modello dell’evento; variazioni successive dell’ELO non spostano il giocatore.",
       discordQuestion: "Discord è obbligatorio?",
       discordAnswer:
         "No. Discord è facoltativo ma consigliato. Le notifiche IronClad e la funzionalità Assistenza Admin relativa al Match offrono alternative sulla piattaforma. Steam può essere usato ove ragionevolmente disponibile. La visibilità pubblica su Discord richiede un consenso separato.",
@@ -235,7 +235,7 @@ const dictionary = {
         "L’avversario può confermare o contestare prima della scadenza mostrata. Un risultato non contestato può quindi essere confermato automaticamente; una contestazione passa alla revisione di un Admin. Una mancata presenza non può mai essere assegnata autonomamente. Le mancate presenze confermate e gli altri avanzamenti senza partita non generano statistiche fittizie di Match disputati.",
       standingsQuestion: "Come funzionano le Classifiche?",
       standingsAnswer:
-        "Academy e Challenge alimentano Classifiche permanenti di carriera; Main / Pro utilizza esattamente sei Eventi validi di qualificazione per stagione. Le Classifiche usano punti totali, vittorie nei Tornei, turni superati, percentuale esatta di vittorie nei Match effettivi e infine vittorie nei Match effettivi. I Giocatori ancora pari in ogni criterio condividono la stessa posizione ufficiale.",
+        "Academy, Challenge e Main hanno carriere permanenti; Pro usa stagioni di sei eventi validi. L’ordine è punti, vittorie nei tornei, turni superati, percentuale esatta di vittorie nei match realmente giocati, poi vittorie in tali match. La parità su tutti i criteri dà lo stesso rango ufficiale. I risultati storici Main / Pro restano separati.",
       pollQuestion: "Qual è la differenza tra Consultivo e Vincolante?",
       pollAnswer:
         "Un Sondaggio Consultivo orienta la decisione finale dell’Admin. Un Sondaggio Vincolante non ha quorum e determina l’esito top-K configurato quando esiste almeno una scheda valida; un Sondaggio Vincolante senza schede viene annullato o sostituito. L’attribuzione delle singole schede è privata. I Giocatori idonei vedono i totali aggregati in base alla visibilità configurata durante la votazione o dopo la chiusura, mentre i totali pubblici anonimi esistono solo quando espressamente abilitati. La Decisione pubblicata finale può essere pubblica, ma la finalizzazione non modifica automaticamente un altro sottosistema.",

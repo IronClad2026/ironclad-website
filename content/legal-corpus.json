@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
-  "effectiveDate": "2026-08-22",
-  "effectiveDateDisplay": "22 August 2026",
-  "activationDatePolicy": "The current document set may contain different Effective dates. Rulebook v3.1 and PPA v3.1 use 22 August 2026, Terms v1.1 retains 20 August 2026, and Privacy v1.2 uses its actual controlled Production publication date.",
+  "effectiveDate": "2026-09-29",
+  "effectiveDateDisplay": "29 September 2026",
+  "activationDatePolicy": "Rulebook v3.2 and PPA v3.2 describe the four-division system effective on 29 September 2026 for the Staging release. Existing Terms and Privacy document identities, dates and acceptance requirements are unchanged. Earlier Rulebook and PPA artifacts remain immutable historical documents.",
   "documents": [
     {
       "kind": "rulebook",
       "title": "OFFICIAL TOURNAMENT RULEBOOK",
       "shortTitle": "Official Tournament Rulebook",
       "subtitle": "Company of Heroes 3 - 1v1 Launch Events",
-      "version": "3.1",
+      "version": "3.2",
       "status": "Effective",
-      "effectiveDate": "2026-08-22",
-      "filename": "ironclad-official-tournament-rulebook-v3.1.pdf",
-      "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.1.pdf",
+      "effectiveDate": "2026-09-29",
+      "filename": "ironclad-official-tournament-rulebook-v3.2.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.2.pdf",
       "operatorStatement": "Operated by Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy, through the IronClad Tournaments project.",
       "introBlocks": [
         {
@@ -104,7 +104,7 @@
                 ],
                 [
                   "Division",
-                  "Academy, Challenge or Main / Pro, determined by the registration-time ELO snapshot."
+                  "Academy, Challenge, Main or Pro in four-division Events, determined by the registration-time ELO snapshot. Earlier three-division Events retain their historical Academy, Challenge and Main / Pro structure."
                 ],
                 [
                   "Game",
@@ -222,6 +222,10 @@
               "type": "paragraph",
               "number": "3.5",
               "text": "Matches use the official CoH3 version identified for the Event. A patch, outage, exploit or material technical issue may justify a pause, schedule change or proportionate Published Decision."
+            },
+            {
+              "type": "paragraph",
+              "text": "Academy, Challenge, Main and Pro each have independent eight-Player capacity, FIFO waitlists, bracket generation, seeding, map pools, launch, completion and scoring. A Division that cannot be held may be closed as Not Held without manufacturing Matches, points or a season slot, and without cancelling other Divisions."
             }
           ]
         },
@@ -259,7 +263,7 @@
             {
               "type": "paragraph",
               "number": "4.4",
-              "text": "The highest valid current 1v1 faction ELO determines Division:"
+              "text": "For four-division Events, the highest valid current 1v1 faction ELO determines Division:"
             },
             {
               "type": "table",
@@ -281,8 +285,12 @@
                   "1100-1399"
                 ],
                 [
-                  "Main / Pro",
-                  "1400+"
+                  "Main",
+                  "1400-1699"
+                ],
+                [
+                  "Pro",
+                  "1700+"
                 ]
               ]
             },
@@ -310,6 +318,10 @@
               "type": "paragraph",
               "number": "4.9",
               "text": "Supplying a Discord username and enabling its public visibility are separate choices. Public Discord visibility requires a separate opt-in."
+            },
+            {
+              "type": "paragraph",
+              "text": "Earlier three-division Events retain their original registration snapshots and Main / Pro threshold of 1400+. Historical records are not reclassified into future Main or Pro. The Event's published division model controls eligibility."
             }
           ]
         },
@@ -845,7 +857,13 @@
                   "3"
                 ],
                 [
-                  "Main / Pro",
+                  "Main",
+                  "10",
+                  "5",
+                  "5"
+                ],
+                [
+                  "Pro",
                   "10",
                   "5",
                   "5"
@@ -865,7 +883,7 @@
             {
               "type": "paragraph",
               "number": "13.4",
-              "text": "Tournament-win points go to the official bracket winner."
+              "text": "Tournament-win points go to the official bracket winner. Winning the Final earns the Tournament-win award, without an additional round-passed award for the Final. An eight-Player Main or Pro champion earns 25 points: 10 participation, two rounds at 5 points each, and 5 for the Tournament win."
             },
             {
               "type": "paragraph",
@@ -911,12 +929,12 @@
         },
         {
           "number": "14",
-          "title": "Career Standings and Main / Pro Seasons",
+          "title": "Career Standings, Pro Seasons and Historical Main / Pro",
           "blocks": [
             {
               "type": "paragraph",
               "number": "14.1",
-              "text": "Academy and Challenge use separate permanent Career standings."
+              "text": "Academy, Challenge and future Main use separate permanent Career standings. Future Main progression does not enter official Pro season standings. Historical Main / Pro standings remain a separate factual record."
             },
             {
               "type": "paragraph",
@@ -929,7 +947,7 @@
                 "+5 per prior eligible missed completed Event in that Division;",
                 "maximum +25;",
                 "once per Player per Division;",
-                "never for Main / Pro;",
+                "never for Main, Pro or historical Main / Pro;",
                 "excluding Void Events; and",
                 "fixed by the permanent first-entry anchor."
               ]
@@ -941,7 +959,7 @@
             {
               "type": "paragraph",
               "number": "14.3",
-              "text": "A Main / Pro season contains exactly six valid qualifying Events: completed Tournaments with a launched, non-Void Main / Pro Division."
+              "text": "A Pro season contains exactly six valid qualifying Events with a launched, completed, non-Void Pro Division. Each Division settles independently: Academy, Challenge or Main completion cannot consume a Pro season slot, and an Event contributes at most one qualifying Pro slot. Pro settlement does not wait for other Divisions to finish."
             },
             {
               "type": "paragraph",
@@ -951,7 +969,7 @@
             {
               "type": "paragraph",
               "number": "14.5",
-              "text": "After six valid Events are scored, final Main / Pro standings freeze."
+              "text": "After six valid qualifying Pro Events are scored, final official Pro standings freeze."
             },
             {
               "type": "paragraph",
@@ -961,7 +979,12 @@
             {
               "type": "paragraph",
               "number": "14.7",
-              "text": "Main / Pro standings are prize-bearing only where separate Event Prize Terms say so."
+              "text": "Official season standings are prize-bearing only where separate Event Prize Terms say so."
+            },
+            {
+              "type": "paragraph",
+              "number": "14.8",
+              "text": "Only one official season is active. An already active historical Main / Pro season completes its six qualifying Events under its original authority. Its successor is a Pro season starting at zero qualifying Events; historical points and final standings are not reset, converted or transferred."
             }
           ]
         },
@@ -1095,7 +1118,7 @@
             {
               "type": "paragraph",
               "number": "18.5",
-              "text": "A finalised Main / Pro season is not silently rewritten."
+              "text": "A finalised official season, including a historical Main / Pro season, is not silently rewritten."
             },
             {
               "type": "paragraph",
@@ -1326,8 +1349,13 @@
                   "Permanent Career standings"
                 ],
                 [
-                  "Main / Pro",
-                  "1400+",
+                  "Main",
+                  "1400-1699",
+                  "Permanent Career standings"
+                ],
+                [
+                  "Pro",
+                  "1700+",
                   "Six valid Events per season"
                 ]
               ]
@@ -1354,7 +1382,13 @@
                   "3"
                 ],
                 [
-                  "Main / Pro",
+                  "Main",
+                  "10",
+                  "5",
+                  "5"
+                ],
+                [
+                  "Pro",
                   "10",
                   "5",
                   "5"
@@ -1492,11 +1526,11 @@
       "title": "PLAYER PARTICIPATION AGREEMENT",
       "shortTitle": "Player Participation Agreement",
       "subtitle": "Company of Heroes 3 - 1v1 Launch Events",
-      "version": "3.1",
+      "version": "3.2",
       "status": "Effective",
-      "effectiveDate": "2026-08-22",
-      "filename": "ironclad-player-participation-agreement-v3.1.pdf",
-      "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.1.pdf",
+      "effectiveDate": "2026-09-29",
+      "filename": "ironclad-player-participation-agreement-v3.2.pdf",
+      "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.2.pdf",
       "operatorStatement": "Agreement between the Player and Marco Stucchi, based in New South Wales, Australia, and Simone Vitiello, based in Italy.",
       "introBlocks": [
         {
@@ -1717,7 +1751,7 @@
             {
               "type": "paragraph",
               "number": "4.3",
-              "text": "Launch Divisions are:"
+              "text": "Four-division Event Divisions are:"
             },
             {
               "type": "table",
@@ -1739,8 +1773,12 @@
                   "1100-1399"
                 ],
                 [
-                  "Main / Pro",
-                  "1400+"
+                  "Main",
+                  "1400-1699"
+                ],
+                [
+                  "Pro",
+                  "1700+"
                 ]
               ]
             },
@@ -1758,6 +1796,10 @@
               "type": "paragraph",
               "number": "4.6",
               "text": "Players must not manipulate account or verification information to gain a Division or competitive advantage."
+            },
+            {
+              "type": "paragraph",
+              "text": "Earlier three-division Events retain their original registration snapshots and Main / Pro threshold of 1400+. Historical records are not reclassified into future Main or Pro. The Event's published division model controls eligibility."
             }
           ]
         },

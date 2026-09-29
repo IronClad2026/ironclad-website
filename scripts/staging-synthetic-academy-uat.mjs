@@ -2,22 +2,12 @@ import { fileURLToPath } from "node:url";
 import {
   loadFixtureEnvironment,
   validateRuntimeGuards,
+  PREPARED_REGISTRATION_IDENTITIES,
+  assertClerkDevelopmentInstance,
 } from "./lib/staging-synthetic-uat.mjs";
 
-const ACADEMY_ALIASES = Object.freeze(
-  Array.from({ length: 8 }, (_, index) => `TestAcademy${index + 1}`)
-);
-const REGISTRATION_IDENTITIES = Object.freeze(
-  Object.fromEntries(
-    ACADEMY_ALIASES.map((alias, index) => [
-      alias,
-      Object.freeze({
-        steamId64: `1844674407370955100${index + 1}`,
-        steamUsername: "Staging Academy UAT",
-      }),
-    ])
-  )
-);
+// Retain the existing entry point while preparing both Academy and Main/Pro.
+const REGISTRATION_IDENTITIES = PREPARED_REGISTRATION_IDENTITIES;
 const INTEGRITY_TABLES = Object.freeze([
   "player_badge_awards",
   "player_badge_reveals",
@@ -38,9 +28,14 @@ function parseCommand(argv) {
 
   let environmentDirectory = rootDir;
   let apply = false;
+  let pool = "all";
 
   for (let index = 0; index < options.length; index += 1) {
     const option = options[index];
+    if (option === "--pool" && ["academy", "main-pro", "all"].includes(options[index + 1])) {
+      pool = options[++index];
+      continue;
+    }
 
     if (option === "--apply" && !apply) {
       apply = true;
@@ -65,7 +60,7 @@ function parseCommand(argv) {
     throw new Error("arguments_rejected");
   }
 
-  return { operation, environmentDirectory };
+  return { operation, environmentDirectory, pool };
 }
 
 function fail(code) {
@@ -379,14 +374,18 @@ async function loadTournamentContext(config, players) {
 }
 
 async function main() {
-  const { operation, environmentDirectory } = parseCommand(
+  const { operation, environmentDirectory, pool } = parseCommand(
     process.argv.slice(2)
   );
   const env = await loadFixtureEnvironment({ rootDir: environmentDirectory });
-  const configs = ACADEMY_ALIASES.map((alias) =>
+  const aliases = Object.keys(REGISTRATION_IDENTITIES).filter((alias) =>
+    pool === "all" || (pool === "academy" ? alias.startsWith("TestAcademy") : !alias.startsWith("TestAcademy"))
+  );
+  const configs = aliases.map((alias) =>
     validateRuntimeGuards(env, alias)
   );
   const first = configs[0];
+  await assertClerkDevelopmentInstance(first);
 
   if (
     configs.some(

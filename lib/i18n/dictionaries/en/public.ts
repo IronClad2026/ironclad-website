@@ -15,7 +15,7 @@ const dictionary = {
       eyebrow: "Competitive Company of Heroes 3 Events",
       title: "IronClad Tournaments",
       description:
-        "Join native 1v1 competition built around verified Divisions, fair play, permanent Career standings, and six-event Main / Pro seasons.",
+        "Join native 1v1 competition built around verified Divisions, fair play, permanent Career standings, and six-event Pro seasons.",
       viewTournaments: "View Tournaments",
       joinDiscord: "Join Discord (Optional)",
       launchFormat: "Launch format",
@@ -55,7 +55,7 @@ const dictionary = {
         "Verify your Division, play through a structured eight-Player bracket, and build an official competitive record.",
       verifyTitle: "VERIFIED 1V1",
       verifyText:
-        "Connect Steam and verify your current Relic 1v1 ELO. IronClad places you in Academy, Challenge, or Main / Pro and locks that eligibility snapshot for the Event.",
+        "Connect Steam and verify your current Relic 1v1 ELO. IronClad places you in Academy, Challenge, Main, or Pro and locks that eligibility snapshot for the Event. Academy 0–1099 · Challenge 1100–1399 · Main 1400–1699 · Pro 1700+.",
       verifyCta: "VIEW TOURNAMENTS",
       reportTitle: "PLAY & REPORT",
       reportText:
@@ -63,11 +63,13 @@ const dictionary = {
       reportCta: "READ 1V1 RULES",
       progressTitle: "COMPETE & PROGRESS",
       progressText:
-        "Earn points through valid participation and progression. Academy and Challenge build permanent Career standings; Main / Pro runs in six-Event seasons.",
+        "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate.",
       progressCta: "VIEW RANKINGS",
     },
   },
   about: {
+    proRange: "1700+ ELO",
+    proText: "For elite competitors in official six-event Pro seasons.",
     heroEyebrow: "Built for Competitive Company of Heroes 3",
     heroTitle: "IronClad Tournaments",
     heroDescription:
@@ -89,7 +91,7 @@ const dictionary = {
     fairBracketsText: "Players compete inside defined ELO ranges.",
     competitiveProgress: "Competitive Progress",
     competitiveProgressText:
-      "Results build permanent Career standings or a six-Event Main / Pro season.",
+      "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate.",
     structureEyebrow: "Tournament Structure",
     structureTitle: "Structured Events. Clear Progression.",
     structureText:
@@ -100,9 +102,9 @@ const dictionary = {
     challengeRange: "1100–1399 ELO",
     challengeText:
       "For rising competitors pushing into sharper Brackets and stronger opponents.",
-    mainRange: "1400+ ELO",
+    mainRange: "1400–1699 ELO",
     mainText:
-      "For top competitors fighting for the highest IronClad placements.",
+      "For experienced competitors building a permanent Main Career before the Pro division.",
     integrityEyebrow: "Integrity",
     integrityTitle: "Fair Competition Comes First",
     integrityText:
@@ -198,14 +200,24 @@ const dictionary = {
     profileMetadataDescription: "Public IronClad player profile for {name}.",
   },
   rankings: {
+    proDivision: "Pro",
+    mainProgression: "Main Career",
+    proSeason: "Pro Season",
+    proAllTime: "Pro All-Time",
+    proDescription: "Official Pro standings for the featured six-valid-event season.",
+    proAllTimeDescription: "Permanent Pro standings across valid Pro events.",
+    mainProgressionDescription: "Main progression standings for four-division events. Historical Main / Pro records remain in their archive.",
+    mainProgressionScoring: "Main awards +10 participation, +5 per round advanced and +5 for winning; no late-entry bonus. The final win earns the winner bonus only.",
+    officialScope: "Official Division Ranking",
+    officialAllTimeRecord: "Every valid {division} point event contributes to this permanent record.",
     metadataTitle: "Leaderboard & Rankings | IronClad",
     metadataDescription:
-      "Track the six-event Main / Pro season and its all-time standings alongside permanent Academy and Challenge Career standings.",
-    mainDivision: "Main / Pro",
-    mainSeason: "Main / Pro Season",
+      "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate.",
+    mainDivision: "Legacy · Main / Pro",
+    mainSeason: "Legacy · Main / Pro Season",
     currentSeasonScope: "Current Season",
     allTimeScope: "All-Time",
-    mainScope: "Main / Pro Ranking",
+    mainScope: "Legacy · Main / Pro Ranking",
     academyCareer: "Academy Career",
     challengeCareer: "Challenge Career",
     loadWarning:
@@ -213,9 +225,9 @@ const dictionary = {
     publicLeaderboard: "Public Rankings",
     dynamicStandings: "Dynamic Standings",
     mainDescription:
-      "Official Main / Pro standings for the featured six-valid-Event season.",
+      "Legacy · Official Main / Pro standings for the featured six-valid-Event season.",
     mainAllTimeDescription:
-      "Permanent Main / Pro standings across every valid ranked Event, including the active season.",
+      "Legacy · Permanent Main / Pro standings across every valid ranked Event, including the active season.",
     academyDescription:
       "Academy points and Results remain in this permanent Career view.",
     challengeDescription:
@@ -224,31 +236,31 @@ const dictionary = {
     visibleCompetitors: "Visible Competitors",
     rankingModel: "Ranking Model",
     sixEventSeason: "Six-Event season",
-    permanentMainPro: "Permanent Main / Pro",
+    permanentMainPro: "Legacy · Permanent Main / Pro",
     permanentCareer: "Permanent Career",
     seasonState: "Season State",
     division: "Division",
     heroEyebrow: "IronClad Competitive Command",
     heroTitle: "Leaderboard & Rankings",
     heroDescription:
-      "Main / Pro shows the authoritative six-valid-event season and its permanent all-time record. Academy and Challenge track separate permanent Career standings.",
-    featuredSeason: "Featured Main / Pro Season",
-    mainAllTime: "Main / Pro All-Time",
+      "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate.",
+    featuredSeason: "Featured Season",
+    mainAllTime: "Legacy · Main / Pro All-Time",
     mainAllTimeRecord:
-      "Every valid Main / Pro point event contributes to this permanent record.",
+      "Legacy · Every valid Main / Pro point event contributes to this permanent record.",
     mainAllTimeNoReset:
       "Current-season points are included. The record does not reset when a season closes, and it does not determine current-season prize positions.",
     careerStandings: "Career Standings",
     seasonNotStarted: "Season not started",
     noSeason:
-      "No qualifying season is underway. Standings begin with the first valid Main / Pro event.",
+      "No qualifying season is underway. Standings begin with the first valid event.",
     careerRecord:
       "Points remain part of this division's permanent competitive record.",
     validEvents: "Valid qualifying events",
     underReviewNotice:
       "Season results are under review. Displayed standings are not final while season review remains open.",
     careerNoReset:
-      "Career points do not reset when a Main / Pro season finishes and remain separate from the other Career division.",
+      "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate.",
     competitors: "Competitors",
     season: "Season",
     state: "State",
@@ -259,7 +271,7 @@ const dictionary = {
     tba: "TBA",
     careerTitle: "{division} is a permanent Career standing.",
     careerSeparation:
-      "Points do not reset when a Main / Pro season finishes. Academy history remains Academy history, Challenge history remains Challenge history, and neither Career standing carries into Main / Pro season standings.",
+      "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate.",
     entrantBonus:
       "New Career entrants may receive +5 points per prior eligible event, awarded once per division, up to +25.",
     notStarted: "Not started",
@@ -268,21 +280,21 @@ const dictionary = {
     underReviewDescription:
       "Frozen historical standings remain displayed while the finalized season is under review.",
     finalized: "Finalized",
-    finalizedDescription: "Finalized. These Main / Pro standings are frozen.",
+    finalizedDescription: "Finalized. These standings are frozen.",
     finalizationPending: "Finalization pending",
     finalizationPendingDescription:
       "Finalization pending. Automatic scoring and finalization should normally complete after the sixth valid event.",
     inProgress: "In progress",
     inProgressDescription: "Season in progress.",
-    topUnavailable: "Main / Pro top standings unavailable",
+    topUnavailable: "Official top standings unavailable",
     topUnavailableText:
-      "Official competitive ranks will appear after valid Main / Pro results are published.",
-    topAria: "Main / Pro top standings",
-    finalStandings: "Final Main / Pro Standings",
-    currentStandings: "Current Main / Pro Standings",
+      "Official competitive ranks will appear after valid results are published.",
+    topAria: "Official top standings",
+    finalStandings: "Final Standings",
+    currentStandings: "Current Standings",
     topStandings: "Top Standings",
     tieNotice:
-      "Every competitor sharing official Main / Pro rank 1, 2 or 3 remains represented. Display order does not change official rank. Any prize-bearing Event is governed separately by its published Event Prize Terms.",
+      "Every competitor sharing official rank 1, 2 or 3 remains represented. Display order does not change official rank. Any prize-bearing Event is governed separately by its published Event Prize Terms.",
     rank: "Rank",
     player: "Player",
     country: "Country",
@@ -305,7 +317,7 @@ const dictionary = {
     dateTba: "Date TBA",
     pointsShort: "{points} pts",
     topScorer: "Top published scorer: {name}",
-    championArchive: "Main / Pro Champion Archive",
+    championArchive: "Champion Archive",
     latestFinalized: "Latest Finalized Results",
     championsEmpty: "Season champions will appear here when a season closes.",
     rankNumber: "Rank #{rank}",

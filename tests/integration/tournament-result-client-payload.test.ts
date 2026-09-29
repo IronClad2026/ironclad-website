@@ -269,6 +269,7 @@ const clientPropsShape = {
       object: {
         isAdmin: "value",
         relicVerifiedDivision: "value",
+        relicVerifiedElo: "value",
         registrationIds: { array: "value" },
         registrations: { array: viewerRegistrationShape },
       },
@@ -723,7 +724,11 @@ describe("tournament Client Component result payload", () => {
     getEffectiveRegistrationViewerRelicMock.mockReset();
 
     getRequestLocaleMock.mockResolvedValue("en");
-    getEffectiveRegistrationViewerRelicMock.mockResolvedValue(null);
+    getEffectiveRegistrationViewerRelicMock.mockImplementation(async ({ persisted }) =>
+      ["Academy", "Challenge", "Main / Pro", "Main", "Pro"].includes(persisted.division)
+        ? { ...persisted, status: "rated", source: "persisted" }
+        : null
+    );
     getEloVerificationSettingMock.mockResolvedValue({
       enabled: true,
       error: null,
@@ -915,6 +920,12 @@ describe("tournament Client Component result payload", () => {
         calculationVersion: "relic-highest-1v1-v1",
       },
     });
+  });
+
+  it("does not restore persisted evidence after the authoritative viewer resolver rejects it", async () => {
+    getEffectiveRegistrationViewerRelicMock.mockResolvedValue(null);
+    const { props } = await loadClientProps({ admin: false, verifiedDivision: "Main / Pro" });
+    expect(props.viewer).toMatchObject({ relicVerifiedDivision: null, relicVerifiedElo: null });
   });
 
   it("projects an authorized synthetic Staging viewer as Academy without writing registration data", async () => {
@@ -1210,7 +1221,8 @@ describe("tournament Client Component result payload", () => {
     ["Academy", "Academy"],
     ["Challenge", "Challenge"],
     ["Main / Pro", "Main / Pro"],
-    ["Main", null],
+    ["Main", "Main"],
+    ["Pro", "Pro"],
     ["", null],
     [null, null],
   ])(

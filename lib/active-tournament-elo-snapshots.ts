@@ -15,7 +15,7 @@ const ACTIVE_TOURNAMENT_STATUSES = [
   "registration_open",
   "in_progress",
 ] as const;
-const RELIC_DIVISIONS = new Set(["Academy", "Challenge", "Main / Pro"]);
+const RELIC_DIVISIONS = new Set(["Academy", "Challenge", "Main / Pro", "Main", "Pro"]);
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

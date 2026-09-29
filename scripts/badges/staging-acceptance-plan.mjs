@@ -5,13 +5,14 @@ import {
   statSync,
 } from "node:fs";
 import { resolve } from "node:path";
+import { APPROVED_FIXTURES, FUTURE_FIXTURE_POOLS } from "../lib/staging-synthetic-uat.mjs";
 
 export const STAGING_PROJECT_REF = "zzbnneprhjicmajpjkdg";
 export const PRODUCTION_PROJECT_REF = "nsyjtqpvyxlzyujlbzos";
-export const ACCEPTANCE_SCHEMA_VERSION = 1;
-export const ACCEPTANCE_PROVENANCE = "badge-acceptance-v1";
+export const ACCEPTANCE_SCHEMA_VERSION = 2;
+export const ACCEPTANCE_PROVENANCE = "badge-acceptance-v2";
 export const MAX_CONCURRENT_UAT_PLAYERS = 8;
-export const PERMANENT_UAT_PLAYERS_PER_DIVISION = 10;
+export const PERMANENT_UAT_PLAYERS_PER_DIVISION = Object.freeze({ academy: 10, challenge: 10, main: 9, pro: 9 });
 
 export const ACCEPTANCE_STATUSES = Object.freeze([
   "PASS",
@@ -20,14 +21,10 @@ export const ACCEPTANCE_STATUSES = Object.freeze([
   "INCONCLUSIVE",
 ]);
 
-export const FIXED_UAT_POOLS = Object.freeze({
-  academy: fixturePool("TestAcademy"),
-  challenge: fixturePool("TestChallenge"),
-  main: fixturePool("TestMain"),
-});
+export const FIXED_UAT_POOLS = FUTURE_FIXTURE_POOLS;
 
 export const FIXED_UAT_ALIASES = Object.freeze(
-  Object.values(FIXED_UAT_POOLS).flat()
+  Object.keys(APPROVED_FIXTURES)
 );
 
 export const SCENARIO_GROUPS = Object.freeze([
@@ -131,8 +128,8 @@ export const SCENARIO_GROUPS = Object.freeze([
   Object.freeze({
     key: "finalized-season",
     execution: "existing-uat-authority",
-    targetAlias: "TestMain2",
-    fixturePool: "main",
+    targetAlias: "TestMain6",
+    fixturePool: "pro",
     badges: Object.freeze([9, 29, 30]),
     purpose:
       "One finalized, non-under-review season cohort covers four-event participation, podium, and champion authority.",
@@ -273,13 +270,16 @@ export function validateAcceptanceManifest(manifest) {
   if (Object.keys(manifest).some((key) => !allowedManifestKeys.has(key))) {
     throw new Error("manifest_field_rejected");
   }
-  if (manifest.schemaVersion !== ACCEPTANCE_SCHEMA_VERSION) {
+  const legacy = manifest.schemaVersion === 1;
+  const expectedProvenance = legacy ? "badge-acceptance-v1" : ACCEPTANCE_PROVENANCE;
+  const expectedAliases = legacy ? FIXED_UAT_ALIASES.slice(0, 30) : FIXED_UAT_ALIASES;
+  if (!legacy && manifest.schemaVersion !== ACCEPTANCE_SCHEMA_VERSION) {
     throw new Error("manifest_schema_rejected");
   }
   assertStagingProjectRef(manifest.projectRef);
   if (
     manifest.environment !== "ironclad-staging" ||
-    manifest.provenance !== ACCEPTANCE_PROVENANCE
+    manifest.provenance !== expectedProvenance
   ) {
     throw new Error("manifest_scope_rejected");
   }
@@ -294,15 +294,15 @@ export function validateAcceptanceManifest(manifest) {
     throw new Error("manifest_uat_aliases_rejected");
   }
   if (
-    manifest.permanentUatAliases.length !== FIXED_UAT_ALIASES.length ||
+    manifest.permanentUatAliases.length !== expectedAliases.length ||
     manifest.permanentUatAliases.some(
-      (alias, index) => alias !== FIXED_UAT_ALIASES[index]
+      (alias, index) => alias !== expectedAliases[index]
     )
   ) {
     throw new Error("manifest_uat_aliases_rejected");
   }
 
-  validateResources(manifest.resources, manifest.runMarker);
+  validateResources(manifest.resources, manifest.runMarker, expectedProvenance, expectedAliases);
 
   if (!Array.isArray(manifest.badgeResults) || manifest.badgeResults.length !== 30) {
     throw new Error("manifest_badge_results_rejected");
@@ -342,7 +342,7 @@ export function buildCleanupPlan(manifest) {
       kind: resource.kind,
       id: resource.id,
       runMarker: manifest.runMarker,
-      provenance: ACCEPTANCE_PROVENANCE,
+      provenance: manifest.provenance,
       alias: resource.alias ?? null,
       tournamentId: resource.tournamentId ?? null,
       wouldMutate: false,
@@ -390,14 +390,6 @@ export function getScenarioForBadge(number) {
   return BADGE_BY_NUMBER.get(number) ?? null;
 }
 
-function fixturePool(prefix) {
-  return Object.freeze(
-    Array.from({ length: PERMANENT_UAT_PLAYERS_PER_DIVISION }, (_, index) =>
-      `${prefix}${index + 1}`
-    )
-  );
-}
-
 function badge(
   number,
   slug,
@@ -430,7 +422,7 @@ function assertRunMarker(runMarker) {
   }
 }
 
-function validateResources(resources, runMarker) {
+function validateResources(resources, runMarker, provenance, aliases) {
   if (!Array.isArray(resources)) {
     throw new Error("manifest_resources_rejected");
   }
@@ -471,7 +463,7 @@ function validateResources(resources, runMarker) {
     if (
       !allowedKinds.has(resource.kind) ||
       !allowedCleanup.has(resource.cleanupDisposition) ||
-      resource.provenance !== ACCEPTANCE_PROVENANCE ||
+      resource.provenance !== provenance ||
       resource.runMarker !== runMarker
     ) {
       throw new Error("manifest_resource_scope_rejected");
@@ -479,7 +471,7 @@ function validateResources(resources, runMarker) {
     if (!isUuid(resource.id) && !isRunScopedStoragePath(resource, runMarker)) {
       throw new Error("manifest_resource_id_rejected");
     }
-    if (resource.alias != null && !FIXED_UAT_ALIASES.includes(resource.alias)) {
+    if (resource.alias != null && !aliases.includes(resource.alias)) {
       throw new Error("manifest_resource_alias_rejected");
     }
     if (resource.tournamentId != null && !isUuid(resource.tournamentId)) {

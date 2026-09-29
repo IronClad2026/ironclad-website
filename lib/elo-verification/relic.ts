@@ -6,7 +6,7 @@ import {
 } from "@/lib/elo-verification/divisions";
 
 export const RELIC_ELO_CALCULATION_VERSION =
-  "relic-highest-1v1-v1" as const;
+  "relic-highest-1v1-v2" as const;
 
 export type Relic1v1Faction =
   | "US Forces"
@@ -20,7 +20,7 @@ export type RelicEloResult =
       elo: number;
       faction: Relic1v1Faction;
       division: IronCladDivision;
-      calculationVersion: typeof RELIC_ELO_CALCULATION_VERSION;
+      calculationVersion: "relic-highest-1v1-v1" | typeof RELIC_ELO_CALCULATION_VERSION;
     }
   | { status: "invalid_steam_input" }
   | { status: "profile_not_found" }

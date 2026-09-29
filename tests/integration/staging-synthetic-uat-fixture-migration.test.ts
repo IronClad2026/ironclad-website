@@ -128,7 +128,7 @@ describe("Staging synthetic UAT migration security boundary", () => {
     }
   });
 
-  it("keeps the SQL fixture catalogue exactly aligned with the CLI catalogue", () => {
+  it("preserves the original migration's thirty immutable identity definitions", () => {
     const catalogueFunction = extractFunction(
       "ironclad_private.staging_synthetic_uat_alias_definition"
     );
@@ -142,7 +142,7 @@ describe("Staging synthetic UAT migration security boundary", () => {
         syntheticDivision: division,
       })
     );
-    const cliCatalogue = Object.values(APPROVED_FIXTURES).map(
+    const cliCatalogue = Object.values(APPROVED_FIXTURES).slice(0, 30).map(
       ({ alias, syntheticElo, syntheticDivision }) => ({
         alias,
         syntheticElo,
@@ -152,6 +152,23 @@ describe("Staging synthetic UAT migration security boundary", () => {
 
     expect(sqlCatalogue).toEqual(cliCatalogue);
     expect(sqlCatalogue).toHaveLength(30);
+  });
+
+  it("extends the same SQL identity catalogue to exactly the approved thirty-eight fixtures", () => {
+    const extension = readFileSync(resolve(process.cwd(),
+      "supabase/migrations/20260929011812_four_division_fixture_authority.sql"), "utf8");
+    const catalogue = extension.slice(
+      extension.indexOf("CREATE OR REPLACE FUNCTION ironclad_private.staging_synthetic_uat_alias_definition"),
+      extension.indexOf("alter function ironclad_private.staging_synthetic_uat_alias_definition")
+    );
+    const definitions = Array.from(catalogue.matchAll(
+      /\('(Test(?:Academy|Challenge|Main|Pro)\d+)',\s*(\d+),\s*'(Academy|Challenge|Main \/ Pro|Main|Pro)'\)/g
+    ), ([, alias, elo, division]) => ({ alias, syntheticElo: Number(elo), syntheticDivision: division }));
+    expect(definitions).toEqual(Object.values(APPROVED_FIXTURES).map(
+      ({ alias, syntheticElo, syntheticDivision }) => ({ alias, syntheticElo, syntheticDivision })
+    ));
+    expect(definitions).toHaveLength(38);
+    expect(extension).not.toContain(PRODUCTION_SUPABASE_REF);
   });
 });
 

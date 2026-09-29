@@ -745,12 +745,15 @@ describe("Admin Operations canonical loader metrics", () => {
     expect(metrics.tournaments.participationByDivision).toEqual([
       { label: "Academy", value: 1 },
       { label: "Challenge", value: 0 },
+      { label: "Main", value: 0 },
+      { label: "Pro", value: 0 },
       { label: "Main / Pro", value: 2 },
     ]);
     expect(metrics.tournaments.completedByDivision).toEqual([
       { label: "Academy", value: 1 },
       { label: "Challenge", value: 0 },
-      { label: "Main / Pro", value: 0 },
+      { label: "Main", value: 0 },
+      { label: "Pro", value: 0 },
     ]);
     expect(metrics.health.repeatApprovedParticipants).toBe(1);
   });

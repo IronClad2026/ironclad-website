@@ -156,8 +156,8 @@ describe("versioned legal publication contract", () => {
         version: document.version,
       }))
     ).toEqual([
-      { effectiveDate: "2026-08-22", kind: "rulebook", status: "Effective", version: "3.1" },
-      { effectiveDate: "2026-08-22", kind: "ppa", status: "Effective", version: "3.1" },
+      { effectiveDate: "2026-09-29", kind: "rulebook", status: "Effective", version: "3.2" },
+      { effectiveDate: "2026-09-29", kind: "ppa", status: "Effective", version: "3.2" },
       { effectiveDate: "2026-08-20", kind: "terms", status: "Effective", version: "1.1" },
       { effectiveDate: "2026-08-22", kind: "privacy", status: "Effective", version: "1.2" },
     ]);
@@ -187,6 +187,9 @@ describe("versioned legal publication contract", () => {
       expect(document.sha256).toMatch(/^[0-9a-f]{64}$/);
       expectedArtifacts.set(document.filename, document.sha256);
     }
+
+    expectedArtifacts.set("ironclad-official-tournament-rulebook-v3.2.pdf", "0e665b6d8b815ea37808a2c91d2493c446895757580b9b0c1053833a3c8264c7");
+    expectedArtifacts.set("ironclad-player-participation-agreement-v3.2.pdf", "4d498aec223dd83cb7aae1690f19de2477b77b999ea5a85cafe3aaaecdc55666");
 
     const pdfNames = readdirSync(publicDirectory)
       .filter((name) => name.toLowerCase().endsWith(".pdf"))

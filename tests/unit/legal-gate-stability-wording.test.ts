@@ -59,25 +59,25 @@ function sha256(value: unknown) {
 }
 
 describe("Rulebook and PPA prospective successor wording", () => {
-  it("publishes the exact v3.1 identities and activation date", () => {
+  it("publishes the exact v3.2 identities and activation date", () => {
     expect(corpus.activationDatePolicy).toBe(
-      "The current document set may contain different Effective dates. Rulebook v3.1 and PPA v3.1 use 22 August 2026, Terms v1.1 retains 20 August 2026, and Privacy v1.2 uses its actual controlled Production publication date."
+      "Rulebook v3.2 and PPA v3.2 describe the four-division system effective on 29 September 2026 for the Staging release. Existing Terms and Privacy document identities, dates and acceptance requirements are unchanged. Earlier Rulebook and PPA artifacts remain immutable historical documents."
     );
     expect(document("rulebook")).toMatchObject({
-      effectiveDate: "2026-08-22",
-      filename: "ironclad-official-tournament-rulebook-v3.1.pdf",
+      effectiveDate: "2026-09-29",
+      filename: "ironclad-official-tournament-rulebook-v3.2.pdf",
       publicPath:
-        "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.1.pdf",
+        "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.2.pdf",
       status: "Effective",
-      version: "3.1",
+      version: "3.2",
     });
     expect(document("ppa")).toMatchObject({
-      effectiveDate: "2026-08-22",
-      filename: "ironclad-player-participation-agreement-v3.1.pdf",
+      effectiveDate: "2026-09-29",
+      filename: "ironclad-player-participation-agreement-v3.2.pdf",
       publicPath:
-        "/documents-rules-ppa/ironclad-player-participation-agreement-v3.1.pdf",
+        "/documents-rules-ppa/ironclad-player-participation-agreement-v3.2.pdf",
       status: "Effective",
-      version: "3.1",
+      version: "3.2",
     });
   });
 

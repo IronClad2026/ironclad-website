@@ -205,7 +205,7 @@ describe("player dashboard result privacy", () => {
         tournamentBracketId: "bracket-1",
         generatedBracketId: "generated-1",
         tournamentName: "Synthetic Tournament",
-        bracketName: "Main",
+        bracketName: "Main / Pro",
         winnerName: "Viewer",
       }),
     ]);

@@ -32,7 +32,8 @@ const featuredSeason: PublicLeaderboardSeason = {
   startDate: "2020-01-01",
   endDate: "2020-12-31",
   isActive: true,
-  validMainEventCount: 3,
+  officialBracketType: "main",
+  validQualifyingEventCount: 3,
   isFinalized: false,
   isUnderReview: false,
 };
@@ -100,7 +101,7 @@ describe("LeaderboardExperience", () => {
         data={leaderboardData({
           currentSeason: {
             ...featuredSeason,
-            validMainEventCount: 6,
+            validQualifyingEventCount: 6,
           },
         })}
       />
@@ -116,7 +117,7 @@ describe("LeaderboardExperience", () => {
           currentSeason: {
             ...featuredSeason,
             isActive: false,
-            validMainEventCount: 6,
+            validQualifyingEventCount: 6,
             isFinalized: true,
           },
         })}
@@ -131,7 +132,7 @@ describe("LeaderboardExperience", () => {
           currentSeason: {
             ...featuredSeason,
             isActive: false,
-            validMainEventCount: 6,
+            validQualifyingEventCount: 6,
             isFinalized: true,
             isUnderReview: true,
           },
@@ -145,6 +146,13 @@ describe("LeaderboardExperience", () => {
     expect(screen.getByRole("status")).not.toHaveTextContent("administrator");
 
     view.rerender(
+      <LeaderboardExperience
+        data={leaderboardData({ currentSeason: null, seasonStandings: [] })}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "Current Season" })).not.toBeInTheDocument();
+    view.unmount();
+    render(
       <LeaderboardExperience
         data={leaderboardData({ currentSeason: null, seasonStandings: [] })}
       />
@@ -208,7 +216,7 @@ describe("LeaderboardExperience", () => {
       />
     );
     let topStandings = screen.getByRole("region", {
-      name: "Main / Pro top standings",
+      name: /top standings/i,
     });
 
     expect(within(topStandings).getByText("First Alpha")).toBeInTheDocument();
@@ -255,7 +263,7 @@ describe("LeaderboardExperience", () => {
       />
     );
     topStandings = screen.getByRole("region", {
-      name: "Main / Pro top standings",
+      name: /top standings/i,
     });
     expect(within(topStandings).getByText("Rank One")).toBeInTheDocument();
     expect(within(topStandings).getByText("Rank Two Alpha")).toBeInTheDocument();
@@ -349,7 +357,7 @@ describe("LeaderboardExperience", () => {
     expect(within(table).queryByText("Last Pts")).not.toBeInTheDocument();
     expect(within(table).queryByText("Movement")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("region", { name: "Main / Pro top standings" })
+      screen.queryByRole("region", { name: /top standings/i })
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Published Tournament Impact")).not.toBeInTheDocument();
     expect(screen.getByText("Latest Finalized Results")).toBeInTheDocument();
@@ -362,6 +370,50 @@ describe("LeaderboardExperience", () => {
     table = screen.getByRole("table");
     expect(within(table).queryByText("Historical Main Veteran")).not.toBeInTheDocument();
     expect(within(table).getByText("Last Pts")).toBeInTheDocument();
+  });
+
+  it("separates Pro official results, Main Career, and legacy Main / Pro history", () => {
+    render(<LeaderboardExperience data={leaderboardData({
+      currentSeason: { ...featuredSeason, name: "2026 Pro Season 1", officialBracketType: "pro" },
+      seasonStandings: [
+        standing({ bracketType: "pro", playerName: "Pro Seasonal", displayName: "Pro Seasonal" }),
+        standing({ bracketType: "main_progression", playerName: "Wrong Career Source", displayName: "Wrong Career Source" }),
+        standing({ bracketType: "main", playerName: "Wrong Legacy Source", displayName: "Wrong Legacy Source" }),
+      ],
+      allTimeStandings: [
+        standing({ bracketType: "pro", scope: "all_time", seasonId: null, playerName: "Pro Lifetime", displayName: "Pro Lifetime" }),
+        standing({ bracketType: "main_progression", scope: "all_time", seasonId: null, playerName: "Main Progression", displayName: "Main Progression" }),
+        standing({ bracketType: "main", scope: "all_time", seasonId: null, playerName: "Legacy Veteran", displayName: "Legacy Veteran" }),
+      ],
+    })} />);
+    let table = screen.getByRole("table");
+    expect(within(table).getByText("Pro Seasonal")).toBeInTheDocument();
+    expect(screen.queryByText("Wrong Career Source")).not.toBeInTheDocument();
+    expect(screen.queryByText("Wrong Legacy Source")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Current Season" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Main Career" }));
+    table = screen.getByRole("table");
+    expect(within(table).getByText("Main Progression")).toBeInTheDocument();
+    expect(within(table).queryByText("Pro Lifetime")).not.toBeInTheDocument();
+    expect(within(table).queryByText("Legacy Veteran")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Current Season" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /top standings/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Main awards \+10 participation/)).toHaveTextContent("The final win earns the winner bonus only.");
+    expect(screen.queryByText(/New Career entrants may receive/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Legacy · Main / Pro" }));
+    table = screen.getByRole("table");
+    expect(within(table).getByText("Legacy Veteran")).toBeInTheDocument();
+    expect(within(table).queryByText("Main Progression")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Current Season" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Pro$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "All-Time" }));
+    table = screen.getByRole("table");
+    expect(within(table).getByText("Pro Lifetime")).toBeInTheDocument();
+    expect(within(table).queryByText("Legacy Veteran")).not.toBeInTheDocument();
+    expect(within(table).queryByText("Main Progression")).not.toBeInTheDocument();
   });
 
   it("keeps Career divisions separate and renders opted-out and closed identities safely", () => {
@@ -445,7 +497,7 @@ describe("LeaderboardExperience", () => {
     ).toHaveTextContent("awarded once per division, up to +25");
     expect(screen.queryByText("Valid qualifying events")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("region", { name: "Main / Pro top standings" })
+      screen.queryByRole("region", { name: /top standings/i })
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Latest Finalized Results")).not.toBeInTheDocument();
 

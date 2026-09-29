@@ -161,7 +161,7 @@ test("About and Rankings use Career and season language without universal prizes
   await expect(page.getByText("Career and season standings")).toBeVisible();
   await expect(
     page.getByText(
-      "Results build permanent Career standings or a six-Event Main / Pro season."
+      "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate."
     )
   ).toBeVisible();
   await expect(page.getByText(/Main \/ Elite/i)).toHaveCount(0);
@@ -171,7 +171,7 @@ test("About and Rankings use Career and season language without universal prizes
     page.getByRole("heading", { name: "Leaderboard & Ranking" })
   ).toBeVisible();
   await expect(
-    page.getByText(/Main \/ Pro is the authoritative six-valid-event season/)
+    page.getByText(/Academy, Challenge and Main build separate permanent Career standings/).first()
   ).toBeVisible();
   await expect(page.getByText(/Prize Positions/i)).toHaveCount(0);
   await expect(page.getByText(/prize season/i)).toHaveCount(0);

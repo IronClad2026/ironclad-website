@@ -15,7 +15,10 @@ let parsedCommand;
 
 try {
   parsedCommand = parseArgs(process.argv.slice(2));
-  const env = await loadFixtureEnvironment({ rootDir: repositoryRoot });
+  const env = await loadFixtureEnvironment({
+    rootDir: parsedCommand.environmentDirectory
+      ? resolve(parsedCommand.environmentDirectory) : repositoryRoot,
+  });
   const result = await executeFixtureCommand(parsedCommand, {
     env,
     rootDir: repositoryRoot,

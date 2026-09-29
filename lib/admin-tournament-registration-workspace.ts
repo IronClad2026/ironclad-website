@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
@@ -181,7 +182,7 @@ export async function loadAdminTournamentRegistrationWorkspace(
     brackets.map((bracket) => [
       bracket.id,
       {
-        name: getTournamentBracketDisplayName(bracket.name),
+        name: getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(tournament.division_model_version)),
         launchedAt:
           divisionStateByBracket.get(bracket.id)?.launchedAt ??
           bracket.launched_at,

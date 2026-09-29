@@ -190,11 +190,11 @@ describe("administrator tournament terminal actions", () => {
   it.each([
     [
       "under_review",
-      "The finalized Main season is now under review; the tournament was not voided.",
+      "The finalized official season is now under review; the tournament was not voided.",
     ],
     [
       "already_under_review",
-      "The finalized Main season is already under review; the tournament was not voided.",
+      "The finalized official season is already under review; the tournament was not voided.",
     ],
   ])("maps the safe %s result", async (outcome, message) => {
     const rpc = vi.fn(async () => ({ data: { outcome }, error: null }));

@@ -128,11 +128,12 @@ describe("permanent Staging synthetic Academy rating adapter", () => {
       calculationVersion: STAGING_SYNTHETIC_ACADEMY_CALCULATION_VERSION,
     });
     expect(supabase.rpc).toHaveBeenCalledWith(
-      "resolve_staging_synthetic_academy_elo",
+      "resolve_staging_synthetic_registration_elo",
       {
         p_profile_id: IDENTITY.playerId,
         p_clerk_user_id: IDENTITY.clerkUserId,
         p_steam_id64: IDENTITY.steamId64,
+        p_division_model_version: "four_division_v1",
       }
     );
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
@@ -159,11 +160,12 @@ describe("permanent Staging synthetic Academy rating adapter", () => {
         source: "staging_synthetic",
       });
       expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith(
-        "resolve_staging_synthetic_academy_elo",
+        "resolve_staging_synthetic_registration_elo",
         {
           p_profile_id: identity.playerId,
           p_clerk_user_id: identity.clerkUserId,
           p_steam_id64: identity.steamId64,
+          p_division_model_version: "four_division_v1",
         }
       );
       expect(getRelic1v1EloMock).not.toHaveBeenCalled();
@@ -239,7 +241,7 @@ describe("permanent Staging synthetic Academy rating adapter", () => {
     expect(getRelic1v1EloMock).not.toHaveBeenCalled();
   });
 
-  it("makes the same synthetic account use real Relic outside confirmed Staging", async () => {
+  it("rejects a synthetic account outside Staging without a live Relic lookup", async () => {
     const supabase = clientWith({ data: [SYNTHETIC_ROW], error: null });
 
     await expect(
@@ -248,11 +250,9 @@ describe("permanent Staging synthetic Academy rating adapter", () => {
         identity: IDENTITY,
         projectUrl: PRODUCTION_URL,
       })
-    ).resolves.toEqual(REAL_RESULT);
+    ).resolves.toEqual({ status: "invalid_relic_response" });
     expect(supabase.rpc).not.toHaveBeenCalled();
-    expect(getRelic1v1EloMock).toHaveBeenCalledExactlyOnceWith(
-      IDENTITY.steamId64
-    );
+    expect(getRelic1v1EloMock).not.toHaveBeenCalled();
   });
 
   it("keeps a normal Staging player on the real Relic path", async () => {
@@ -279,7 +279,7 @@ describe("permanent Staging synthetic Academy rating adapter", () => {
     { data: [SYNTHETIC_ROW, SYNTHETIC_ROW], error: null },
     { data: [{ ...SYNTHETIC_ROW, elo: 1_001 }], error: null },
     { data: null, error: { code: "42501" } },
-  ])("fails safely to real Relic for an unavailable or invalid resolver response", async (result) => {
+  ])("fails closed for an unavailable or invalid synthetic resolver response", async (result) => {
     const supabase = clientWith(result);
 
     await expect(
@@ -288,9 +288,47 @@ describe("permanent Staging synthetic Academy rating adapter", () => {
         identity: IDENTITY,
         projectUrl: STAGING_URL,
       })
-    ).resolves.toEqual(REAL_RESULT);
-    expect(getRelic1v1EloMock).toHaveBeenCalledExactlyOnceWith(
-      IDENTITY.steamId64
-    );
+    ).resolves.toEqual({ status: "invalid_relic_response" });
+    expect(getRelic1v1EloMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["18446744073709550001", 1400, "Main"],
+    ["18446744073709550006", 1700, "Pro"],
+    ["18446744073709550014", 1699, "Main"],
+    ["18446744073709550101", 1701, "Pro"],
+    ["18446744073709550104", 2100, "Pro"],
+  ])("resolves future prepared identity %s without rewriting its original rating", async (steamId64, elo, division) => {
+    const supabase = clientWith({ data: [{ elo, division, faction: "US Forces", calculation_version: "staging-synthetic-v2" }], error: null });
+    await expect(getRegistrationRelic1v1EloForProject({
+      supabase: supabase as never,
+      identity: { ...IDENTITY, steamId64: String(steamId64) },
+      projectUrl: STAGING_URL,
+    })).resolves.toMatchObject({ status: "rated", elo, division, calculationVersion: "staging-synthetic-v2" });
+    expect(getRelic1v1EloMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a prepared 1700 fixture eligible for an existing legacy Main event", async () => {
+    const supabase = clientWith({ data: [{ elo: 1700, division: "Main / Pro", faction: "US Forces", calculation_version: "staging-synthetic-v1" }], error: null });
+    await expect(getRegistrationRelic1v1EloForProject({
+      supabase: supabase as never,
+      identity: { ...IDENTITY, steamId64: "18446744073709550006" },
+      projectUrl: STAGING_URL,
+      divisionModelVersion: "legacy_three_v1",
+    })).resolves.toMatchObject({ status: "rated", division: "Main / Pro", calculationVersion: "staging-synthetic-v1" });
+  });
+
+  it.each([
+    { elo: 1700, division: "Main", calculation_version: "staging-synthetic-v2" },
+    { elo: 1700, division: "Pro", calculation_version: "staging-synthetic-v1" },
+    { elo: 1699, division: "Main", calculation_version: "staging-synthetic-v2" },
+  ])("rejects forged future fixture rating, division or version", async (row) => {
+    const supabase = clientWith({ data: [{ ...row, faction: "US Forces" }], error: null });
+    await expect(getRegistrationRelic1v1EloForProject({
+      supabase: supabase as never,
+      identity: { ...IDENTITY, steamId64: "18446744073709550006" },
+      projectUrl: STAGING_URL,
+    })).resolves.toEqual({ status: "invalid_relic_response" });
+    expect(getRelic1v1EloMock).not.toHaveBeenCalled();
   });
 });

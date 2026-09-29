@@ -6,6 +6,11 @@ import {
   type RelicEloResult,
 } from "@/lib/elo-verification/relic";
 import type { IronCladDivision } from "@/lib/elo-verification/divisions";
+import {
+  CURRENT_DIVISION_MODEL,
+  getDivisionForElo,
+  type DivisionModelVersion,
+} from "@/lib/division-model";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { supabaseUrl } from "@/lib/supabase-config";
 
@@ -15,15 +20,19 @@ export const STAGING_SYNTHETIC_ACADEMY_FACTION = "US Forces" as const;
 export const STAGING_SYNTHETIC_ACADEMY_DIVISION = "Academy" as const;
 export const STAGING_SYNTHETIC_ACADEMY_CALCULATION_VERSION =
   "staging-synthetic-academy-v1" as const;
+export const STAGING_SYNTHETIC_FUTURE_CALCULATION_VERSION =
+  "staging-synthetic-v2" as const;
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
 type SyntheticAcademyRatedResult = {
   status: "rated";
-  elo: typeof STAGING_SYNTHETIC_ACADEMY_ELO;
+  elo: number;
   faction: typeof STAGING_SYNTHETIC_ACADEMY_FACTION;
-  division: typeof STAGING_SYNTHETIC_ACADEMY_DIVISION;
-  calculationVersion: typeof STAGING_SYNTHETIC_ACADEMY_CALCULATION_VERSION;
+  division: IronCladDivision;
+  calculationVersion: typeof STAGING_SYNTHETIC_ACADEMY_CALCULATION_VERSION
+    | typeof STAGING_SYNTHETIC_FUTURE_CALCULATION_VERSION
+    | "staging-synthetic-v1";
 };
 
 export type RegistrationRelicEloResult =
@@ -55,13 +64,16 @@ export type EffectiveRegistrationViewerRelic = {
 export async function getRegistrationRelic1v1Elo({
   supabase,
   identity,
+  divisionModelVersion = CURRENT_DIVISION_MODEL,
 }: {
   supabase: SupabaseAdminClient;
   identity: RegistrationIdentity;
+  divisionModelVersion?: DivisionModelVersion;
 }): Promise<RegistrationRelicEloResult> {
   return getRegistrationRelic1v1EloForProject({
     supabase,
     identity,
+    divisionModelVersion,
     projectUrl: supabaseUrl,
   });
 }
@@ -70,21 +82,28 @@ export async function getRegistrationRelic1v1EloForProject({
   supabase,
   identity,
   projectUrl,
+  divisionModelVersion = CURRENT_DIVISION_MODEL,
 }: {
   supabase: SupabaseAdminClient;
   identity: RegistrationIdentity;
   projectUrl: string;
+  divisionModelVersion?: DivisionModelVersion;
 }): Promise<RegistrationRelicEloResult> {
   const syntheticResult = await resolveStagingSyntheticAcademyRelic({
     supabase,
     identity,
     projectUrl,
+    divisionModelVersion,
   });
 
   if (syntheticResult) {
     return syntheticResult;
   }
 
+  // A reserved fixture identity must never fall through to live provider lookup.
+  if (isReservedSyntheticSteamIdentity(identity.steamId64)) {
+    return { status: "invalid_relic_response" };
+  }
   return getRelic1v1Elo(identity.steamId64);
 }
 
@@ -92,15 +111,18 @@ export async function getEffectiveRegistrationViewerRelic({
   supabase,
   identity,
   persisted,
+  divisionModelVersion = CURRENT_DIVISION_MODEL,
 }: {
   supabase: SupabaseAdminClient;
   identity: RegistrationIdentity;
   persisted: PersistedRegistrationViewerRelic;
+  divisionModelVersion?: DivisionModelVersion;
 }): Promise<EffectiveRegistrationViewerRelic | null> {
   return getEffectiveRegistrationViewerRelicForProject({
     supabase,
     identity,
     persisted,
+    divisionModelVersion,
     projectUrl: supabaseUrl,
   });
 }
@@ -110,16 +132,19 @@ export async function getEffectiveRegistrationViewerRelicForProject({
   identity,
   persisted,
   projectUrl,
+  divisionModelVersion = CURRENT_DIVISION_MODEL,
 }: {
   supabase: SupabaseAdminClient;
   identity: RegistrationIdentity;
   persisted: PersistedRegistrationViewerRelic;
   projectUrl: string;
+  divisionModelVersion?: DivisionModelVersion;
 }): Promise<EffectiveRegistrationViewerRelic | null> {
   const syntheticResult = await resolveStagingSyntheticAcademyRelic({
     supabase,
     identity,
     projectUrl,
+    divisionModelVersion,
   });
 
   if (syntheticResult) {
@@ -129,17 +154,28 @@ export async function getEffectiveRegistrationViewerRelicForProject({
     };
   }
 
+  if (isReservedSyntheticSteamIdentity(identity.steamId64) ||
+    (typeof persisted.calculationVersion === "string" &&
+      persisted.calculationVersion.startsWith("staging-synthetic-"))) {
+    return null;
+  }
   return parsePersistedRegistrationViewerRelic(persisted);
+}
+
+function isReservedSyntheticSteamIdentity(value: string) {
+  return /^1844674407370955(?:00\d{2}|010[1-4]|100[1-8])$/.test(value);
 }
 
 async function resolveStagingSyntheticAcademyRelic({
   supabase,
   identity,
   projectUrl,
+  divisionModelVersion,
 }: {
   supabase: SupabaseAdminClient;
   identity: RegistrationIdentity;
   projectUrl: string;
+  divisionModelVersion: DivisionModelVersion;
 }): Promise<SyntheticAcademyRatedResult | null> {
   if (!isConfirmedStagingSupabaseProjectUrl(projectUrl)) {
     return null;
@@ -148,22 +184,23 @@ async function resolveStagingSyntheticAcademyRelic({
   let lookup: { data: unknown; error: unknown };
 
   try {
-    lookup = await supabase.rpc("resolve_staging_synthetic_academy_elo", {
+    lookup = await supabase.rpc("resolve_staging_synthetic_registration_elo", {
       p_profile_id: identity.playerId,
       p_clerk_user_id: identity.clerkUserId,
       p_steam_id64: identity.steamId64,
+      p_division_model_version: divisionModelVersion,
     });
   } catch {
-    console.error("Synthetic Academy rating lookup failed unexpectedly.");
+    console.error("Synthetic registration rating lookup failed unexpectedly.");
     return null;
   }
 
   if (lookup.error) {
-    console.error("Synthetic Academy rating lookup failed.");
+    console.error("Synthetic registration rating lookup failed.");
     return null;
   }
 
-  return parseSyntheticAcademyResult(lookup.data);
+  return parseSyntheticAcademyResult(lookup.data, identity, divisionModelVersion);
 }
 
 export function isConfirmedStagingSupabaseProjectUrl(value: string) {
@@ -188,7 +225,9 @@ export function isConfirmedStagingSupabaseProjectUrl(value: string) {
 }
 
 function parseSyntheticAcademyResult(
-  value: unknown
+  value: unknown,
+  identity: RegistrationIdentity,
+  model: DivisionModelVersion
 ): SyntheticAcademyRatedResult | null {
   if (!Array.isArray(value) || value.length !== 1) {
     return null;
@@ -196,23 +235,29 @@ function parseSyntheticAcademyResult(
 
   const row = value[0];
 
-  if (
-    !isRecord(row) ||
-    row.elo !== STAGING_SYNTHETIC_ACADEMY_ELO ||
-    row.faction !== STAGING_SYNTHETIC_ACADEMY_FACTION ||
-    row.division !== STAGING_SYNTHETIC_ACADEMY_DIVISION ||
-    row.calculation_version !==
-      STAGING_SYNTHETIC_ACADEMY_CALCULATION_VERSION
-  ) {
+  const academy = /^1844674407370955100[1-8]$/.test(identity.steamId64);
+  const main = /^184467440737095500(0[1-9]|1[0-4])$/.exec(identity.steamId64);
+  const pro = /^1844674407370955010([1-4])$/.exec(identity.steamId64);
+  const mainRatings = [1400, 1450, 1500, 1550, 1600, 1700, 1800, 1900, 2000, 2200, 1625, 1650, 1675, 1699];
+  const proRatings = [1701, 1750, 1850, 2100];
+  const elo = academy ? 1000 : main ? mainRatings[Number(main[1]) - 1]
+    : pro ? proRatings[Number(pro[1]) - 1] : null;
+  const version = academy ? STAGING_SYNTHETIC_ACADEMY_CALCULATION_VERSION
+    : model === "four_division_v1" ? STAGING_SYNTHETIC_FUTURE_CALCULATION_VERSION
+      : "staging-synthetic-v1";
+  const division = elo === null ? null : getDivisionForElo(elo, model);
+  if (!isRecord(row) || elo === null || !division ||
+    row.elo !== elo || row.faction !== STAGING_SYNTHETIC_ACADEMY_FACTION ||
+    row.division !== division || row.calculation_version !== version) {
     return null;
   }
 
   return {
     status: "rated",
-    elo: STAGING_SYNTHETIC_ACADEMY_ELO,
+    elo,
     faction: STAGING_SYNTHETIC_ACADEMY_FACTION,
-    division: STAGING_SYNTHETIC_ACADEMY_DIVISION,
-    calculationVersion: STAGING_SYNTHETIC_ACADEMY_CALCULATION_VERSION,
+    division,
+    calculationVersion: version,
   };
 }
 
@@ -242,7 +287,7 @@ function parsePersistedRegistrationViewerRelic(
 function parseIronCladDivision(value: unknown): IronCladDivision | null {
   return value === "Academy" ||
     value === "Challenge" ||
-    value === "Main / Pro"
+    value === "Main / Pro" || value === "Main" || value === "Pro"
     ? value
     : null;
 }

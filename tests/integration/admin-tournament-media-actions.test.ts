@@ -296,6 +296,7 @@ describe("Admin Tournament media actions", () => {
 
   it("loads only Match options reached through the current Tournament brackets", async () => {
     const { client, calls } = createClient({
+      tournaments: [{ data: { id: tournamentId, division_model_version: "legacy_three_v1" }, error: null }],
       tournament_media: [{ data: [], error: null }],
       tournament_brackets: [
         { data: [{ id: tournamentBracketId, name: "Main" }], error: null },
