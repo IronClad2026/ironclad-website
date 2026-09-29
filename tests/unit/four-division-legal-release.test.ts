@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildFourDivisionLegalSql,
   STAGING_PROJECT_REF,
+  STAGING_LEGAL_STORAGE_ORIGIN,
+  getFourDivisionLegalDocumentUrl,
   validateFourDivisionLegalRelease,
 } from "../../scripts/four-division/legal-publication.mjs";
 
@@ -40,5 +42,17 @@ describe("four-division legal successor", () => {
     expect(() => buildFourDivisionLegalSql({ ...options, origin: "https://www.ironcladtournaments.com" })).toThrow();
     expect(() => buildFourDivisionLegalSql({ ...options, origin: "https://ironclad-website-git-staging-ironclad-tournaments.vercel.app" })).toThrow();
     expect(buildFourDivisionLegalSql({ ...options, apply: true }).trim().endsWith("commit;")).toBe(true);
+  });
+
+  it("uses only the exact Staging bucket and manifest-bound content-hash PDF paths", () => {
+    const release = validateFourDivisionLegalRelease();
+    const sql = buildFourDivisionLegalSql({ projectRef: STAGING_PROJECT_REF, origin: STAGING_LEGAL_STORAGE_ORIGIN });
+    for (const document of release.documents) {
+      expect(sql).toContain(`${STAGING_LEGAL_STORAGE_ORIGIN}/${document.sha256}/${document.filename}`);
+      expect(getFourDivisionLegalDocumentUrl(document, STAGING_LEGAL_STORAGE_ORIGIN)).toBe(`${STAGING_LEGAL_STORAGE_ORIGIN}/${document.sha256}/${document.filename}`);
+    }
+    for (const origin of [STAGING_LEGAL_STORAGE_ORIGIN + "/", STAGING_LEGAL_STORAGE_ORIGIN.replace("staging-legal-documents", "match-proofs"), STAGING_LEGAL_STORAGE_ORIGIN.replace(STAGING_PROJECT_REF, "another-project"), STAGING_LEGAL_STORAGE_ORIGIN + "?token=unexpected"]) {
+      expect(() => buildFourDivisionLegalSql({ projectRef: STAGING_PROJECT_REF, origin })).toThrow();
+    }
   });
 });

@@ -54,12 +54,14 @@ const requiredState = {
   terms: {
     id: "11111111-1111-4111-8111-111111111111",
     version: "1.1",
-    url: "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
+    url: "https://retired-preview.example/terms-v1.1.pdf",
+    downloadUrl: "/documents-rules-ppa/ironclad-terms-of-service-v1.1.pdf",
   },
   privacy: {
     id: "22222222-2222-4222-8222-222222222222",
     version: "1.1",
-    url: "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
+    url: "https://retired-preview.example/privacy-v1.1.pdf",
+    downloadUrl: "/documents-rules-ppa/ironclad-privacy-policy-v1.1.pdf",
   },
 };
 const currentTermsAgreement = "I accept the Terms of Service v1.1.";
@@ -101,10 +103,10 @@ describe("AccountLegalUpdateShell", () => {
 
     expect(
       screen.getByRole("link", { name: /Terms of Service v1\.1/ })
-    ).toHaveAttribute("href", requiredState.terms.url);
+    ).toHaveAttribute("href", requiredState.terms.downloadUrl);
     expect(
       screen.getByRole("link", { name: /Privacy Policy v1\.1/ })
-    ).toHaveAttribute("href", requiredState.privacy.url);
+    ).toHaveAttribute("href", requiredState.privacy.downloadUrl);
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
     expect(screen.queryByText(/allow analytics/i)).not.toBeInTheDocument();
@@ -119,6 +121,7 @@ describe("AccountLegalUpdateShell", () => {
             ...requiredState.privacy,
             version: "1.2",
             url: "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf",
+            downloadUrl: "/documents-rules-ppa/ironclad-privacy-policy-v1.2.pdf",
           },
         }}
         copy={copy}

@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { buildFourDivisionLegalSql, validateFourDivisionLegalRelease, STAGING_PROJECT_REF } from "../../scripts/four-division/legal-publication.mjs";
+import { buildFourDivisionLegalSql, validateFourDivisionLegalRelease, STAGING_PROJECT_REF, STAGING_LEGAL_STORAGE_ORIGIN } from "../../scripts/four-division/legal-publication.mjs";
 
 const [psql, port, database] = process.argv.slice(2);
 assert.equal(process.argv.length, 5);
@@ -12,7 +12,7 @@ assert(/^\d{2,5}$/.test(port) && Number(port) <= 65535);
 assert(/^p03_four_division_legal_\d+$/.test(database));
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`;
-const config = { projectRef: STAGING_PROJECT_REF, origin: "https://ironclad-website-abcdefghi-ironclad-tournaments.vercel.app" };
+const config = { projectRef: STAGING_PROJECT_REF, origin: STAGING_LEGAL_STORAGE_ORIGIN };
 function run(sql, fail = false) {
   const result = spawnSync(psql, ["-X", "-w", "-qAt", "-v", "ON_ERROR_STOP=1", "-h", "127.0.0.1", "-p", port, "-U", "postgres", "-d", database], {
     input: sql, encoding: "utf8", windowsHide: true, timeout: 60_000, maxBuffer: 8 * 1024 * 1024,

@@ -1,3 +1,4 @@
+import legalDeliveryManifest from "@/content/legal-document-delivery.json";
 import { isValidElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -286,6 +287,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -296,6 +298,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -306,6 +309,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -316,6 +320,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -527,11 +532,11 @@ function createPageClient(
       ].map(([document_kind, id]) => ({
         id,
         document_kind,
-        version: `fixture-${document_kind}-v1`,
+        version: legalDeliveryManifest.documents.find((document) => document.kind === document_kind)!.version,
         immutable_url: `https://ironclad.test/legal/${document_kind}/fixture-v1`,
         status: "effective",
         effective_at: "2026-08-01T00:00:00.000Z",
-        sha256: "a".repeat(64),
+        sha256: legalDeliveryManifest.documents.find((document) => document.kind === document_kind)!.sha256,
       })),
       error: null,
     },

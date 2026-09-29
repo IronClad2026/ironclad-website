@@ -70,6 +70,7 @@ const registrationDocuments = {
     kind: "rulebook" as const,
     version: "fixture-rulebook-v1",
     url: "https://example.test/legal/rulebook/fixture-v1",
+    downloadUrl: "https://example.test/legal/rulebook/fixture-v1",
     effectiveDate: EFFECTIVE_DATE,
     sha256: DOCUMENT_SHA256,
   },
@@ -78,6 +79,7 @@ const registrationDocuments = {
     kind: "ppa" as const,
     version: "fixture-ppa-v1",
     url: "https://example.test/legal/ppa/fixture-v1",
+    downloadUrl: "https://example.test/legal/ppa/fixture-v1",
     effectiveDate: EFFECTIVE_DATE,
     sha256: DOCUMENT_SHA256,
   },
@@ -86,6 +88,7 @@ const registrationDocuments = {
     kind: "terms" as const,
     version: "fixture-terms-v1",
     url: "https://example.test/legal/terms/fixture-v1",
+    downloadUrl: "https://example.test/legal/terms/fixture-v1",
     effectiveDate: EFFECTIVE_DATE,
     sha256: DOCUMENT_SHA256,
   },
@@ -94,6 +97,7 @@ const registrationDocuments = {
     kind: "privacy" as const,
     version: "fixture-privacy-v1",
     url: "https://example.test/legal/privacy/fixture-v1",
+    downloadUrl: "https://example.test/legal/privacy/fixture-v1",
     effectiveDate: EFFECTIVE_DATE,
     sha256: DOCUMENT_SHA256,
   },
@@ -722,22 +726,22 @@ describe("Relic verified-division registration UI", () => {
       screen.getByRole("link", {
         name: "Player Participation Agreement (version fixture-ppa-v1) (opens in a new tab)",
       })
-    ).toHaveAttribute("href", registrationDocuments.ppa.url);
+    ).toHaveAttribute("href", registrationDocuments.ppa.downloadUrl);
     expect(
       screen.getByRole("link", {
         name: "Official Tournament Rulebook (version fixture-rulebook-v1) (opens in a new tab)",
       })
-    ).toHaveAttribute("href", registrationDocuments.rulebook.url);
+    ).toHaveAttribute("href", registrationDocuments.rulebook.downloadUrl);
     expect(
       screen.getByRole("link", {
         name: "Terms of Service (version fixture-terms-v1) (opens in a new tab)",
       })
-    ).toHaveAttribute("href", registrationDocuments.terms.url);
+    ).toHaveAttribute("href", registrationDocuments.terms.downloadUrl);
     expect(
       screen.getByRole("link", {
         name: "Privacy Policy (version fixture-privacy-v1) (opens in a new tab)",
       })
-    ).toHaveAttribute("href", registrationDocuments.privacy.url);
+    ).toHaveAttribute("href", registrationDocuments.privacy.downloadUrl);
     expect(
       screen.getAllByText(
         translate(competitionEnglish, "registrationServer.documentEffective", {

@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 export const STAGING_PROJECT_REF = "zzbnneprhjicmajpjkdg";
+export const STAGING_LEGAL_BUCKET = "staging-legal-documents";
+export const STAGING_LEGAL_STORAGE_ORIGIN = `https://${STAGING_PROJECT_REF}.supabase.co/storage/v1/object/public/${STAGING_LEGAL_BUCKET}`;
 const predecessors = [
   ["rulebook", "3.1", "02bef1bfe8f1b2121f62eafd09edc448764adebbfcb54e38934c7433bf6ef0f2"],
   ["ppa", "3.1", "94dcbf6ecbe0c1de4f908baeff824b8439dd81be8022712cd498e8bb2731869b"],
@@ -43,12 +45,19 @@ export function validateFourDivisionLegalRelease(root = process.cwd()) {
   return release;
 }
 
+export function getFourDivisionLegalDocumentUrl(document, origin) {
+  assert.match(document.sha256, /^[a-f0-9]{64}$/);
+  assert.match(document.filename, /^ironclad-[a-z-]+-v3\.2\.pdf$/);
+  if (origin === STAGING_LEGAL_STORAGE_ORIGIN) return `${origin}/${document.sha256}/${document.filename}`;
+  assert.match(origin, /^https:\/\/ironclad-website-[a-z0-9]{9}-ironclad-tournaments\.vercel\.app$/, "Use the pinned Staging legal Storage origin or immutable tested Preview origin");
+  return `${origin}${document.publicPath}`;
+}
+
 export function buildFourDivisionLegalSql({ projectRef, origin, apply = false, root = process.cwd() }) {
   assert.equal(projectRef, STAGING_PROJECT_REF, "Only the approved Staging project is authorized");
-  assert.match(origin, /^https:\/\/ironclad-website-[a-z0-9]{9}-ironclad-tournaments\.vercel\.app$/, "Use the immutable tested Preview origin");
   const release = validateFourDivisionLegalRelease(root);
   const rows = predecessors.map(([kind, version, sha256]) => `('${kind}','${version}','${sha256}')`).join(",\n");
-  const inserts = release.documents.map((document) => `('${document.kind}','3.2','${origin}${document.publicPath}','effective',v_now,v_now,'${document.sha256}')`).join(",\n");
+  const inserts = release.documents.map((document) => `('${document.kind}','3.2','${getFourDivisionLegalDocumentUrl(document, origin)}','effective',v_now,v_now,'${document.sha256}')`).join(",\n");
   const evidence = (table) => `(select md5(coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text)::text,'[]')) from public.${table} r)`;
   return `begin;
 set local lock_timeout = '5s';

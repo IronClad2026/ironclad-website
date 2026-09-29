@@ -20,13 +20,14 @@ cleanup dry-run.
 
 ## Fixture policy
 
-The plan may reuse any of the 30 permanent `staging-synthetic-v1` UAT aliases:
-ten each from Academy, Challenge, and Main. A maximum of eight are active in
-one tournament scenario; aliases 9 and 10 remain clean reserves until an
-isolated threshold or authenticated Reveal journey needs them. No new identity
-pool, 256-player capacity, arbitrary
-semantic role, protected Steam/Relic/current-ELO write, or general cleanup RPC
-is introduced.
+The current plan may reuse the 38 permanent UAT aliases. The original 30
+`staging-synthetic-v1` registry identities and ELO values remain unchanged.
+Future pools contain ten Academy, ten Challenge, nine Main, and nine Pro players;
+Main uses 1400–1699 and Pro uses 1700+. The eight additions are TestMain11–14
+and TestPro1–4. Future event enrolments use `staging-synthetic-v2`; legacy
+history and registry provenance retain v1. A maximum of eight players enter
+any one Division. The fixture helpers validate exact prepared synthetic
+identities and never claim real Steam ownership or live Relic verification.
 
 The same fixed players may be reused sequentially when their authoritative
 history does not invalidate the boundary being tested. Threshold, streak,
@@ -39,11 +40,14 @@ Badges 1, 18, and 19 retain an Owner-controlled provider checkpoint. Synthetic
 fixtures may prove their negative cases but cannot prove protected positive
 identity or registration-ELO facts. Badge 20 uses a genuinely played official
 series; it never alters timestamps to bypass a deadline. Badges 5 and 28 use
-one exact Staging-only helper for `TestAcademy1`. It can arrange one
+one exact Staging-only legacy-Event helper for `TestAcademy1`. It can arrange one
 provider-null Challenge registration and one provider-null Main registration,
 but only current tournament completion and championship flows can create Badge
-authority. Use only the `enrol-badge-progression` command for those two
-registrations; the ordinary enrol command remains division-native.
+authority. The Main/Elite and Triple Crown Main leg accepts legacy Main / Pro or
+future Main; future Pro championships never substitute for that leg. Use only the `enrol-badge-progression` command for those two
+registrations on legacy Events; it does not bypass future eligibility. Future Main
+and Pro championship authority is covered by the four-division lifecycle harness.
+The ordinary enrol command remains division-native.
 
 ## Shared journeys
 
@@ -60,7 +64,7 @@ registrations; the ordinary enrol command remains division-native.
 | Division progression | 5 | `TestAcademy1` | Exact provider-null cross-division enrollment followed by real completion authority |
 | Triple Crown | 28 | `TestAcademy1` | Exact enrollment support followed by three real division-specific tournament wins |
 | Flawless | 20 | `TestChallenge3` | Championship path, at least one played series, zero game losses |
-| Finalized season | 9, 29–30 | `TestMain2` | Membership plus finalized non-review standings/archive |
+| Finalized season | 9, 29–30 | `TestMain6` | Future Pro membership plus finalized non-review standings/archive; legacy Main / Pro authority remains historical |
 
 ## Evidence manifest
 

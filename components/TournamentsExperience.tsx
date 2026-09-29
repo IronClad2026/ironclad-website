@@ -4354,7 +4354,7 @@ function DocumentAgreementLabel({
           label,
           version: document.version,
         })}
-        href={document.url}
+        href={document.downloadUrl}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => event.stopPropagation()}
