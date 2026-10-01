@@ -210,7 +210,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, created_at, tournament_brackets(id, name, launched_at)"
+          "id, division_model_version, title, status, created_at, tournament_brackets(id, name, launched_at)"
         )
         .order("created_at", { ascending: false }),
       loadAdminNotifications(50),

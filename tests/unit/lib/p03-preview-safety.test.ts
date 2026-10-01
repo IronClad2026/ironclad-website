@@ -154,7 +154,7 @@ describe("P03 candidate Preview isolation", () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     vi.stubEnv("VERCEL_GIT_COMMIT_REF", "codex/p03-production-ready");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://unapproved.invalid");
-    await expect(import("@/next.config")).rejects.toThrow("P03 Preview isolation check failed");
+    await expect(import("@/next.config")).rejects.toThrow("Release Preview is disabled");
   });
 
   it("preserves existing request limits and headers in ordinary builds", async () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { getDivisionForElo, requireDivisionModelVersion } from "@/lib/division-model";
 import {
   useCallback,
   useEffect,
@@ -2719,7 +2720,9 @@ type RegistrationSubmissionOutcome =
 export type RelicVerifiedDivision =
   | "Academy"
   | "Challenge"
-  | "Main / Pro";
+  | "Main / Pro"
+  | "Main"
+  | "Pro";
 
 export function getVerifiedDivisionBracketName(
   verifiedDivision: RelicVerifiedDivision | null
@@ -2729,7 +2732,8 @@ export function getVerifiedDivisionBracketName(
   }
 
   return getTournamentBracketDisplayName(
-    verifiedDivision === "Main / Pro" ? "Main" : verifiedDivision
+    verifiedDivision === "Main / Pro" ? "Main" : verifiedDivision,
+    verifiedDivision === "Main" || verifiedDivision === "Pro" ? "four_division_v1" : "legacy_three_v1"
   );
 }
 
@@ -2859,7 +2863,8 @@ export function RegisterModal({
   profile,
   tournaments,
   initialTournamentId,
-  verifiedDivision,
+  verifiedDivision: profileVerifiedDivision,
+  verifiedElo,
   registrationDocuments,
   viewerRegistrations = [],
   presentation = "desktop",
@@ -2870,6 +2875,7 @@ export function RegisterModal({
   tournaments: TournamentCard[];
   initialTournamentId: string;
   verifiedDivision: RelicVerifiedDivision | null;
+  verifiedElo?: number | null;
   registrationDocuments: RegistrationDocumentSet;
   viewerRegistrations?: TournamentViewerRegistration[];
   presentation?: RegistrationPresentation;
@@ -2891,9 +2897,10 @@ export function RegisterModal({
   const initialTournament =
     tournaments.find((tournament) => tournament.id === initialTournamentId) ??
     tournaments[0];
+  const divisionForEvent = (tournament: TournamentCard) => verifiedElo == null ? profileVerifiedDivision : getDivisionForElo(verifiedElo, requireDivisionModelVersion(tournament.divisionModelVersion));
   const getVerifiedBracket = (tournament: TournamentCard) => {
     const verifiedBracketName =
-      getVerifiedDivisionBracketName(verifiedDivision);
+      getVerifiedDivisionBracketName(divisionForEvent(tournament));
     const verifiedBracket = tournament.brackets.find(
       (bracket) => bracket.name === verifiedBracketName
     );
@@ -2914,6 +2921,7 @@ export function RegisterModal({
   const [showTournamentChoices, setShowTournamentChoices] = useState(false);
   const [selectedTournament, setSelectedTournament] =
     useState<TournamentCard>(initialTournament);
+  const verifiedDivision = verifiedElo == null ? profileVerifiedDivision : getDivisionForElo(verifiedElo, requireDivisionModelVersion(selectedTournament.divisionModelVersion));
   const [form, setForm] = useState<RegistrationFormState>({
     tournamentTitle: initialTournament.title,
     bracketName: getVerifiedBracket(initialTournament),
@@ -3335,7 +3343,7 @@ export function RegisterModal({
   const eligibleTournaments = tournaments.filter((tournament) => {
     const availability = getRegistrationDivisionAvailability(
       tournament,
-      verifiedDivision
+      divisionForEvent(tournament)
     );
     return (
       (availability === "open" || availability === "waitlist") &&
@@ -3539,7 +3547,7 @@ export function RegisterModal({
                         const availability =
                           getRegistrationDivisionAvailability(
                             event,
-                            verifiedDivision
+                            divisionForEvent(event)
                           );
                         const selected = selectedTournament.id === event.id;
                         return (
@@ -3627,11 +3635,11 @@ export function RegisterModal({
                   const registrationAvailable =
                     getRegistrationDivisionAvailability(
                       event,
-                      verifiedDivision
+                      divisionForEvent(event)
                     ) === "open" ||
                     getRegistrationDivisionAvailability(
                       event,
-                      verifiedDivision
+                      divisionForEvent(event)
                     ) === "waitlist";
                   return (
                     <button
@@ -4347,7 +4355,7 @@ function DocumentAgreementLabel({
           label,
           version: document.version,
         })}
-        href={document.url}
+        href={document.downloadUrl}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => event.stopPropagation()}
@@ -5396,6 +5404,7 @@ function RegistrationGatePrompt({
 type TournamentViewer = {
   isAdmin: boolean;
   relicVerifiedDivision: RelicVerifiedDivision | null;
+  relicVerifiedElo?: number | null;
   registrationIds: string[];
   registrations: TournamentViewerRegistration[];
 };
@@ -5462,6 +5471,7 @@ export default function TournamentsExperience({
   );
   const urlTournament = findTournamentFromUrl(tournaments, rawTournamentParam);
   const selectedTournament = urlTournament ?? publicTournaments[0];
+  const selectedVerifiedDivision = viewer.relicVerifiedElo == null ? viewer.relicVerifiedDivision : getDivisionForElo(viewer.relicVerifiedElo, requireDivisionModelVersion(selectedTournament.divisionModelVersion));
   const focusedMatchId = selectedTournament.generatedBrackets
     .flatMap((bracket) => bracket.matches)
     .some((match) => match.id === rawMatchParam)
@@ -5681,7 +5691,7 @@ export default function TournamentsExperience({
     );
     const registrationAvailability = getRegistrationDivisionAvailability(
       selectedTournament,
-      viewer.relicVerifiedDivision
+      selectedVerifiedDivision
     );
 
     if (
@@ -5748,7 +5758,7 @@ export default function TournamentsExperience({
     registrationDocuments,
     selectedTournament,
     userId,
-    viewer.relicVerifiedDivision,
+    selectedVerifiedDivision,
   ]);
 
   const handleRegisterClick = useCallback(async () => {
@@ -5814,7 +5824,7 @@ export default function TournamentsExperience({
             <main className="py-6">
               <Overview tournament={selectedTournament} tournaments={publicTournaments} activePanel={activeOverviewPanel} setActivePanel={handleSetActiveOverviewPanel}
                 onSelectTournament={handleMobileSelectTournament}
-                selectedContext={<Hero tournament={selectedTournament} viewerRegistration={selectedViewerRegistration} verifiedDivision={viewer.relicVerifiedDivision} onRegisterClick={handleRegisterClick} />}
+                selectedContext={<Hero tournament={selectedTournament} viewerRegistration={selectedViewerRegistration} verifiedDivision={selectedVerifiedDivision} onRegisterClick={handleRegisterClick} />}
               />
             </main>
           ) : (
@@ -5843,6 +5853,7 @@ export default function TournamentsExperience({
           tournaments={publicTournaments}
           initialTournamentId={selectedTournament.id}
           verifiedDivision={viewer.relicVerifiedDivision}
+          verifiedElo={viewer.relicVerifiedElo}
           registrationDocuments={registrationDocuments}
           viewerRegistrations={viewer.registrations}
           presentation={registrationPresentation}

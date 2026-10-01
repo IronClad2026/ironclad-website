@@ -1,4 +1,6 @@
 import HomeAccountSection from "@/components/HomeAccountSection";
+import LatestNewsSection from "@/components/news/LatestNewsSection";
+import { Suspense } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
 import {
   ArrowRight,
@@ -94,6 +96,9 @@ export default async function Home() {
       <HomeAccountSection />
       <PlayersSection copy={copy} />
       <CompetitionPathSection copy={copy} />
+      <Suspense fallback={null}>
+        <LatestNewsSection copy={copy.news} locale={locale} />
+      </Suspense>
     </main>
   );
 }
@@ -340,7 +345,7 @@ function CompetitionPathSection({ copy }: { copy: PublicDictionary }) {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           {competitionPaths.map((path, index) => (
             <CompetitionPathCard
               key={path.titleKey}
@@ -397,7 +402,7 @@ function CompetitionPathCard({
           </span>
         </div>
 
-        <h3 className="mt-6 text-2xl font-black leading-tight text-white">
+        <h3 className="mt-6 text-2xl font-black leading-tight text-white [overflow-wrap:anywhere]">
           {t(path.titleKey)}
         </h3>
 

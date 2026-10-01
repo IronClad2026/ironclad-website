@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion, getDivisionDisplayName } from "@/lib/division-model";
 import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -102,7 +103,7 @@ export async function loadPlayerTournamentDivisionInvitations(
   ];
   const tournamentResult = await supabase
     .from("tournaments")
-    .select("id, slug, title")
+    .select("id, slug, title, division_model_version")
     .in("id", tournamentIds);
 
   if (tournamentResult.error) {
@@ -143,7 +144,7 @@ export async function loadPlayerTournamentDivisionInvitations(
       targetTournamentId: tournament.id,
       targetTournamentSlug: tournament.slug,
       targetTournamentTitle: tournament.title,
-      targetDivisionName: bracket.name === "Main" ? "Main / Pro" : bracket.name,
+      targetDivisionName: getDivisionDisplayName(requireDivisionModelVersion(tournament.division_model_version), bracket.name) ?? (() => { throw new Error("Unknown invitation division."); })(),
     });
   }
 

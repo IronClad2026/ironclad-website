@@ -1,6 +1,69 @@
 import type { DictionaryShape } from "@/lib/i18n/types";
 
 const dictionary = {
+  showcase: {
+    reviewLatest: "Review latest saved version",
+    latestThought: "Latest saved thought",
+    latestEmpty: "No thought saved.",
+    conflictResolved: "Latest saved version loaded. Your unsaved thought has been kept. Review it before saving.",
+    title: "Player Showcase",
+    description: "Make your public profile your own with a Current Thought and one earned achievement.",
+    manage: "Manage Showcase",
+    backToDashboard: "Back to Dashboard",
+    publicProfile: "Public profile",
+    privateProfile: "Private profile",
+    publicVisibilityHelp: "Your Current Thought and featured achievement appear on your public profile.",
+    privateVisibilityHelp: "Your Showcase stays hidden while your profile is private.",
+    viewPublicProfile: "View Public Profile",
+    manageVisibility: "Manage visibility",
+    thoughtTitle: "Current Thought",
+    thoughtHelp: "Up to 160 characters of plain text. Emoji are welcome; combined emoji may count as several characters.",
+    thoughtPlaceholder: "What’s on your mind?",
+    characterCount: "{count} / {max}",
+    saveThought: "Save thought",
+    cancel: "Cancel",
+    removeThought: "Remove thought",
+    thoughtHidden: "An administrator has hidden this thought from your public profile.",
+    featuredBadgeTitle: "Featured Achievement",
+    featuredBadgeHelp: "Choose one achievement you have earned to display beside your avatar.",
+    noFeaturedBadge: "No featured achievement selected.",
+    chooseBadge: "Choose achievement",
+    changeBadge: "Change achievement",
+    removeBadge: "Remove featured achievement",
+    noEarnedBadges: "Your earned achievements will appear here.",
+    viewCollection: "View achievements",
+    pickerTitle: "Choose a featured achievement",
+    pickerHelp: "Only achievements you have earned can be featured on your profile.",
+    selectBadge: "Showcase {name}",
+    selectedBadge: "Featured",
+    close: "Close",
+    saving: "Saving…",
+    badgeDetails: "View featured achievement: {name}",
+    retry: "Try again",
+    thoughtPreview: "Preview",
+    removedBadge: "This achievement is no longer available to showcase.",
+    report: "Report a concern",
+    adminTitle: "Showcase moderation",
+    adminDescription: "Hide or restore a player’s Current Thought. Public-profile privacy still applies.",
+    playerId: "Player ID",
+    hideThought: "Hide thought",
+    restoreThought: "Restore thought",
+    thoughtSaved: "Current Thought saved.",
+    badgeSaved: "Featured achievement updated.",
+    moderationSaved: "Thought visibility updated.",
+    signInRequired: "Sign in again to update your Showcase.",
+    profileRequired: "Complete your player profile before updating your Showcase.",
+    unavailable: "Player Showcase is temporarily unavailable. Please try again later.",
+    thoughtTooLong: "Keep your thought within 160 characters.",
+    thoughtInvalid: "Use plain text without unsupported control characters.",
+    invalidAward: "Choose a valid earned achievement.",
+    awardNotOwned: "You can only showcase an achievement you have earned.",
+    conflict: "Your Showcase changed in another session. Refresh and try again.",
+    saveFailed: "Your changes could not be saved. Please try again.",
+    forbidden: "You do not have permission to make this change.",
+    legalRequired: "Review and accept the latest required agreements before continuing.",
+    invalidPlayer: "Enter a valid player ID.",
+  },
   homeAccount: {
     accountEyebrow: "IronClad Account",
     createTitle: "Create your competitive identity",
@@ -117,6 +180,9 @@ const dictionary = {
     bio: "Bio",
   },
   steam: {
+
+
+
     eyebrow: "Verified Game Identity",
     title: "Steam Connection",
     description:
@@ -140,6 +206,9 @@ const dictionary = {
     connect: "Connect Steam Account",
   },
   relic: {
+
+
+
     eyebrow: "Competitive Rating",
     title: "Verified Profile ELO",
     description:
@@ -298,13 +367,23 @@ const dictionary = {
     },
     career: {
       title: "Career History",
+      tournaments: "Tournaments",
+      championships: "Championships",
       matches: "Matches",
       champions: "Champions",
-      registrations: "Previous registrations",
-      registrationsEmpty: "No previous registrations.",
       loadError: "Your competitive history could not be loaded.",
       partialError:
         "Some Tournament presentation details could not be loaded.",
+    },
+    tournamentHistory: {
+      title: "Tournament History",
+      empty: "Completed tournament runs will appear here.",
+      record: "Tournament record",
+      recordValue: "{wins}–{losses}",
+      wins: "Wins",
+      losses: "Losses",
+      showMatches: "View matches",
+      hideMatches: "Hide matches",
     },
     statistics: {
       eyebrow: "Competitive Record",
@@ -318,7 +397,7 @@ const dictionary = {
     },
     champions: {
       eyebrow: "Victory Archive",
-      title: "Tournament Champions",
+      title: "Tournament Championships",
       empty: "Tournament victories will be permanently displayed here.",
       champion: "Tournament Champion",
       bracket: "{name} Bracket",

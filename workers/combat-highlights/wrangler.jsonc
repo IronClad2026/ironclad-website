@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "ironclad-production-combat-highlights",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-13",
+  "workers_dev": false,
+  "preview_urls": false,
+  // Intentionally no account, route or R2 binding. Provision only after separate authorization.
+  "vars": {
+    "DEPLOYMENT_ENV": "production",
+    "ENABLED": "false",
+    "SUPABASE_URL": "https://nsyjtqpvyxlzyujlbzos.supabase.co",
+    "MEDIA_ORIGIN": "",
+    "ALLOWED_ORIGINS": "https://ironcladtournaments.com,https://www.ironcladtournaments.com"
+  },
+  "observability": { "enabled": false }
+}

@@ -1,5 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { supabaseUrl } from "@/lib/supabase-config";
+import { AVATAR_SIGNED_URL_TTL_SECONDS, isExpectedAvatarSignedUrl, readBoundedAvatar } from "@/lib/avatar-proxy";
 
 const AVATAR_BUCKET = "player-avatars";
 const AVATAR_CACHE_CONTROL = "private, no-store, max-age=0";
@@ -33,7 +35,7 @@ const FALLBACK_AVATAR_SVG = `
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ playerId: string }> }
 ) {
   const { playerId } = await params;
@@ -70,21 +72,18 @@ export async function GET(
     return createFallbackAvatarResponse();
   }
 
-  const { data: avatar, error: avatarError } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .download(`${player.clerk_user_id}/avatar`);
-
-  if (avatarError || !avatar) {
-    return createFallbackAvatarResponse();
-  }
-
-  return new Response(avatar, {
-    headers: {
-      "Cache-Control": AVATAR_CACHE_CONTROL,
-      "Content-Type": avatar.type || "application/octet-stream",
+  try {
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(player.clerk_user_id)) return createFallbackAvatarResponse();
+    const { data, error } = await supabase.storage.from(AVATAR_BUCKET)
+      .createSignedUrl(`${player.clerk_user_id}/avatar`, AVATAR_SIGNED_URL_TTL_SECONDS);
+    if (error || !data?.signedUrl || !isExpectedAvatarSignedUrl(data.signedUrl, supabaseUrl, player.clerk_user_id)) return createFallbackAvatarResponse();
+    const avatar = await readBoundedAvatar(data.signedUrl, request.signal);
+    if (!avatar) return createFallbackAvatarResponse();
+    return new Response(avatar.bytes, { headers: {
+      "Cache-Control": AVATAR_CACHE_CONTROL, "Content-Type": avatar.type,
       "X-Content-Type-Options": "nosniff",
-    },
-  });
+    } });
+  } catch { return createFallbackAvatarResponse(); }
 }
 
 function createFallbackAvatarResponse() {

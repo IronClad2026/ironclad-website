@@ -97,7 +97,7 @@ describe("admin responsive component and CSS contracts", () => {
       'className="mt-8 grid gap-5 md:grid-cols-2"'
     );
     expect(tournamentEditor).toContain(
-      'className="mt-8 grid gap-5 lg:grid-cols-3"'
+      'className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-4"'
     );
     expect(tournamentEditor).toContain(
       'className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"'

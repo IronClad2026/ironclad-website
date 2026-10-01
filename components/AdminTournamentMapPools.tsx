@@ -1,5 +1,6 @@
 "use client";
 
+import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import { useMemo, useState } from "react";
 import {
   correctTournamentMapPool,
@@ -12,6 +13,7 @@ import {
 import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 
 export type AdminTournamentMapPoolBracket = {
+  divisionModelVersion?: DivisionModelVersion;
   id: string;
   name: string;
   launchedAt: string | null;
@@ -138,7 +140,7 @@ export default function AdminTournamentMapPools({
               }`}
             >
               <span className="block font-black text-white">
-                {getTournamentBracketDisplayName(bracket.name)}
+                {getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(bracket.divisionModelVersion))}
               </span>
               <span className="mt-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
                 {bracket.mapPoolPublishedAt ? "Published" : "Unpublished"} / {count}{" "}
@@ -168,7 +170,7 @@ export default function AdminTournamentMapPools({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h3 className="text-xl font-black text-white">
-              {getTournamentBracketDisplayName(activeBracket.name)}
+              {getTournamentBracketDisplayName(activeBracket.name, requireDivisionModelVersion(activeBracket.divisionModelVersion))}
             </h3>
             <p className="mt-1 text-sm text-zinc-400">
               {activeSelection.length} selected / five required

@@ -1,0 +1,36 @@
+{
+  "policy": "atomic-consolidated-production-v1",
+  "baseSHA": "0114b1c9f4908c0f8a0e43cfa7a25fb96d361fd1",
+  "migrations": [
+    {
+      "file": "20261001032942_production_showcase_authority.sql",
+      "version": "20261001032942",
+      "name": "production_showcase_authority",
+      "sha256": "633a7217fae8c35a0dd622c1eda8275caa25132c187cc8db691fdb518b293557"
+    },
+    {
+      "file": "20261001032957_production_combat_highlights_authority.sql",
+      "version": "20261001032957",
+      "name": "production_combat_highlights_authority",
+      "sha256": "bae91df6d08a47010848424073b37aacb04d25967a1557b30ca0e23a30a0df8d"
+    },
+    {
+      "file": "20261001032959_production_private_match_room_realtime.sql",
+      "version": "20261001032959",
+      "name": "production_private_match_room_realtime",
+      "sha256": "df6d136eeb3740dfd241b25ea8d4cdec7acc81811e1fa98a9b12947027628f67"
+    },
+    {
+      "file": "20261001033000_production_versioned_competition_authority.sql",
+      "version": "20261001033000",
+      "name": "production_versioned_competition_authority",
+      "sha256": "94b60c46382856c20bafb55ef99c037a8e70fa72da2f639c1e843547723ab9c7"
+    },
+    {
+      "file": "20261001033001_production_versioned_accounting_badges.sql",
+      "version": "20261001033001",
+      "name": "production_versioned_accounting_badges",
+      "sha256": "77a80aca1aa2a9d4ea4c9a33cf68b195a2dd97bd710d08e27cd278dec8f91ff9"
+    }
+  ]
+}

@@ -262,7 +262,7 @@ test("phone Tournament Decisions stays live without an inactive desktop gate", a
   await expect(page.getByRole("article", { name: "Fixture tournament decision", exact: true })).toBeVisible();
   await page.evaluate(() => { window.dispatchEvent(new Event("focus")); });
   await expect(page.getByRole("article", { name: "Refreshed fixture decision", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => window.__uiFixture.actions)).toContain("fixture:get_my_poll");
+  expect(await page.evaluate(() => window.__uiFixture.actions)).toContain("fixture:polls-snapshot");
   expect(await page.evaluate(() => window.__uiFixture.blockedRequests)).toEqual([]);
   expect(errors).toEqual([]);
 });

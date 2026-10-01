@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion, resolveDivisionId, type DivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
@@ -102,7 +103,7 @@ export async function loadAdminTournamentWorkspace(tournamentId: string) {
   const tournamentResult = await supabase
     .from("tournaments")
     .select(
-      "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, terminal_at, terminal_reason, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
+      "id, division_model_version, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, terminal_at, terminal_reason, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)"
     )
     .eq("id", tournamentId)
     .maybeSingle();
@@ -121,7 +122,7 @@ export async function loadAdminTournamentWorkspace(tournamentId: string) {
 
   const tournament = tournamentResult.data as AdminTournamentWorkspaceRow;
   tournament.tournament_brackets = sortBrackets(
-    tournament.tournament_brackets ?? []
+    tournament.tournament_brackets ?? [], requireDivisionModelVersion(tournament.division_model_version)
   );
   const [registrationResult, divisionStatesByTournament] = await Promise.all([
     supabase
@@ -399,7 +400,7 @@ export async function loadAdminTournamentBracketWorkspaceData(
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, registration_enabled, registration_open_at, registration_close_at, terminal_at"
+          "id, title, division_model_version, status, registration_enabled, registration_open_at, registration_close_at, terminal_at"
         ),
       supabase
         .from("tournament_division_not_held_closures")
@@ -583,7 +584,7 @@ export async function loadAdminTournamentBracketWorkspaceData(
         return {
           generatedBracketId: generated?.id ?? null,
           bracketId: bracket.id,
-          bracketName: getTournamentBracketDisplayName(bracket.name),
+          bracketName: getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(tournament.division_model_version)),
           format: generated?.format ?? null,
           slotCount: generated?.slot_count ?? 0,
           actualMatchCount: generated?.tournament_matches?.length ?? 0,
@@ -668,10 +669,15 @@ export async function loadAdminTournamentBracketWorkspaceData(
                 targetTournament?.registration_close_at
                   ? Date.parse(targetTournament.registration_close_at)
                   : null;
+              const sourceDivision = resolveDivisionId(requireDivisionModelVersion(tournament.division_model_version), bracket.name);
+              const targetDivision = targetTournament
+                ? resolveDivisionId(requireDivisionModelVersion(targetTournament.division_model_version), candidate.name)
+                : null;
               const acceptsRegistration = Boolean(
                 targetTournament &&
                   candidate.id !== bracket.id &&
-                  candidate.name === bracket.name &&
+                  sourceDivision !== null &&
+                  sourceDivision === targetDivision &&
                   candidate.launched_at === null &&
                   !allClosures.has(candidate.id) &&
                   ["registration_open", "in_progress"].includes(
@@ -728,11 +734,11 @@ export async function loadAdminTournamentDeletionPreview(
   return (data ?? EMPTY_TOURNAMENT_DELETION_PREVIEW) as TournamentDeletionPreview;
 }
 
-function sortBrackets<T extends TournamentBracketRow>(brackets: T[]) {
+function sortBrackets<T extends TournamentBracketRow>(brackets: T[], model: DivisionModelVersion) {
   return [...brackets].sort(
     (left, right) =>
-      getTournamentBracketSortOrder(left.name) -
-        getTournamentBracketSortOrder(right.name) ||
+      getTournamentBracketSortOrder(left.name, model) -
+        getTournamentBracketSortOrder(right.name, model) ||
       left.name.localeCompare(right.name)
   );
 }

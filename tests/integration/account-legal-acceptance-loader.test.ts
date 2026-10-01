@@ -4,6 +4,7 @@ import { anonymousIdentity, playerIdentity } from "@/tests/fixtures/auth";
 const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const legalCorpusMock = vi.hoisted(() => ({ documents: [] as unknown[] }));
+const deliveryManifestMock = vi.hoisted(() => ({ schemaVersion: 1, documents: [] as unknown[] }));
 const legalSuccessorReleaseMock = vi.hoisted(() => ({
   schemaVersion: 1,
   status: "Final",
@@ -18,6 +19,7 @@ vi.mock("@/content/legal-successor-release.json", () => ({
 vi.mock("@/lib/legal-corpus-publication", () => ({
   legalCorpus: legalCorpusMock,
 }));
+vi.mock("@/content/legal-document-delivery.json", () => ({ default: deliveryManifestMock }));
 vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
 }));
@@ -117,6 +119,14 @@ function setReleaseTransition(
       : [releaseDocument("privacy", successorPrivacyVersion)]),
   ];
   setBundledDocumentPair(successorTermsVersion, successorPrivacyVersion);
+  // A future deployment includes the separately reviewed delivery catalogue too.
+  deliveryManifestMock.documents = Array.from(new Map(
+    [...legalSuccessorReleaseMock.predecessorDocuments, ...legalSuccessorReleaseMock.documents]
+      .map((value) => {
+        const document = value as ReturnType<typeof releaseDocument>;
+        return [`${document.kind}:${document.version}`, document] as const;
+      })
+  ).values());
 }
 
 function releaseDocument(kind: "terms" | "privacy", version: string) {
@@ -241,6 +251,14 @@ describe("account legal acceptance gate loader", () => {
       originalPreviewLegalOrigins
     );
     vi.useRealTimers();
+  });
+
+  it("does not offer a download when the reviewed delivery identity is missing", async () => {
+    authMock.mockResolvedValue(playerIdentity);
+    const fixture = clientFixture({ documents: documentRows("1.1", "1.2") });
+    deliveryManifestMock.documents = [];
+    await expect(loadAccountLegalGateState()).resolves.toEqual({ status: "unavailable" });
+    expect(fixture.acceptanceQuery.maybeSingle).not.toHaveBeenCalled();
   });
 
   it("leaves anonymous public browsing untouched before trusted-client construction", async () => {
@@ -475,12 +493,14 @@ describe("account legal acceptance gate loader", () => {
       terms: {
         id: TERMS_ID,
         version: "1.1",
-        url: documentPath("terms", "1.1"),
+        url: "https://www.ironcladtournaments.com" + documentPath("terms", "1.1"),
+        downloadUrl: documentPath("terms", "1.1"),
       },
       privacy: {
         id: PRIVACY_V12_ID,
         version: "1.2",
-        url: documentPath("privacy", "1.2"),
+        url: "https://www.ironcladtournaments.com" + documentPath("privacy", "1.2"),
+        downloadUrl: documentPath("privacy", "1.2"),
       },
     });
     expect(fixture.acceptanceQuery.eq).toHaveBeenCalledWith(
@@ -522,12 +542,14 @@ describe("account legal acceptance gate loader", () => {
       terms: {
         id: TERMS_ID,
         version: "1.2",
-        url: documentPath("terms", "1.2"),
+        url: "https://www.ironcladtournaments.com" + documentPath("terms", "1.2"),
+        downloadUrl: documentPath("terms", "1.2"),
       },
       privacy: {
         id: PRIVACY_V13_ID,
         version: "1.3",
-        url: documentPath("privacy", "1.3"),
+        url: "https://www.ironcladtournaments.com" + documentPath("privacy", "1.3"),
+        downloadUrl: documentPath("privacy", "1.3"),
       },
     });
   });
@@ -542,12 +564,14 @@ describe("account legal acceptance gate loader", () => {
       terms: {
         id: TERMS_ID,
         version: "1.2",
-        url: documentPath("terms", "1.2"),
+        url: "https://www.ironcladtournaments.com" + documentPath("terms", "1.2"),
+        downloadUrl: documentPath("terms", "1.2"),
       },
       privacy: {
         id: PRIVACY_V12_ID,
         version: "1.2",
-        url: documentPath("privacy", "1.2"),
+        url: "https://www.ironcladtournaments.com" + documentPath("privacy", "1.2"),
+        downloadUrl: documentPath("privacy", "1.2"),
       },
     });
   });
@@ -562,12 +586,14 @@ describe("account legal acceptance gate loader", () => {
       terms: {
         id: TERMS_ID,
         version: "1.2",
-        url: documentPath("terms", "1.2"),
+        url: "https://www.ironcladtournaments.com" + documentPath("terms", "1.2"),
+        downloadUrl: documentPath("terms", "1.2"),
       },
       privacy: {
         id: PRIVACY_V13_ID,
         version: "1.3",
-        url: documentPath("privacy", "1.3"),
+        url: "https://www.ironcladtournaments.com" + documentPath("privacy", "1.3"),
+        downloadUrl: documentPath("privacy", "1.3"),
       },
     });
   });
@@ -776,12 +802,14 @@ describe("account legal acceptance gate loader", () => {
       terms: {
         id: TERMS_ID,
         version: "1.0",
-        url: documentPath("terms", "1.0"),
+        url: "https://www.ironcladtournaments.com" + documentPath("terms", "1.0"),
+        downloadUrl: documentPath("terms", "1.0"),
       },
       privacy: {
         id: PRIVACY_ID,
         version: "1.0",
-        url: documentPath("privacy", "1.0"),
+        url: "https://www.ironcladtournaments.com" + documentPath("privacy", "1.0"),
+        downloadUrl: documentPath("privacy", "1.0"),
       },
     });
     expect(authMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -1104,12 +1132,14 @@ describe("account legal acceptance gate loader", () => {
       terms: {
         id: TERMS_ID,
         version: "1.1",
-        url: documentPath("terms", "1.1"),
+        url: "https://www.ironcladtournaments.com" + documentPath("terms", "1.1"),
+        downloadUrl: documentPath("terms", "1.1"),
       },
       privacy: {
         id: PRIVACY_ID,
         version: "1.1",
-        url: documentPath("privacy", "1.1"),
+        url: "https://www.ironcladtournaments.com" + documentPath("privacy", "1.1"),
+        downloadUrl: documentPath("privacy", "1.1"),
       },
     });
     expect(fixture.acceptanceQuery.eq).toHaveBeenCalledWith(

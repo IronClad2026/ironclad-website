@@ -1,0 +1,23 @@
+{
+  "candidateSha": null,
+  "productionBaseSha": "0114b1c9f4908c0f8a0e43cfa7a25fb96d361fd1",
+  "currentProductionSha": null,
+  "targetAttestation": { "projectRef": "nsyjtqpvyxlzyujlbzos", "verified": false, "receiptSha256": null },
+  "schemaDrift": { "verified": false, "receiptSha256": null, "ledgerSha256": null },
+  "ci": [
+    { "name": "validate", "headSha": null, "conclusion": "unverified", "receiptSha256": null },
+    { "name": "p03-database", "headSha": null, "conclusion": "unverified", "receiptSha256": null },
+    { "name": "p03-hosted-backup", "headSha": null, "conclusion": "unverified", "receiptSha256": null },
+    { "name": "consolidated-database", "headSha": null, "conclusion": "unverified", "receiptSha256": null },
+    { "name": "consolidated-release-safety", "headSha": null, "conclusion": "unverified", "receiptSha256": null },
+    { "name": "browser", "headSha": null, "conclusion": "unverified", "receiptSha256": null }
+  ],
+  "knownIssues": { "P0": null, "P1": null, "P2": null },
+  "backup": { "verified": false, "projectRef": "nsyjtqpvyxlzyujlbzos", "capturedAt": null, "backupSha256": null, "restoreVerified": false, "restoreReceiptSha256": null, "snapshotSha256": null },
+  "quietWindow": { "competitionWritesFrozen": false, "registrationAndCreationFrozen": false, "operatorVerified": false, "receiptSha256": null },
+  "highlightsProviderOff": true,
+  "legalPublicationPlanSha256": null,
+  "migrationPackageSha256": null,
+  "previewIsolation": "not-used",
+  "checkedAt": null
+}

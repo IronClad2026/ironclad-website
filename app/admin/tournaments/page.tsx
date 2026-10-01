@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import { auth } from "@clerk/nextjs/server";
 import { ChevronLeft, Plus, Trophy } from "lucide-react";
 import Link from "next/link";
@@ -35,6 +36,7 @@ type AdminTournamentsPageProps = {
 };
 
 type AdminTournamentListRow = {
+  division_model_version?: DivisionModelVersion;
   id: string;
   title: string;
   status: TournamentStatus;
@@ -77,7 +79,7 @@ export default async function AdminTournamentsPage({
     supabase
       .from("tournaments")
       .select(
-        "id, title, status, registration_enabled, registration_open_at, registration_close_at, created_at, tournament_brackets(id, name, max_players, launched_at)"
+        "id, division_model_version, title, status, registration_enabled, registration_open_at, registration_close_at, created_at, tournament_brackets(id, name, max_players, launched_at)"
       )
       .order("created_at", { ascending: false }),
     supabase
@@ -237,7 +239,7 @@ export default async function AdminTournamentsPage({
                   <p className="mt-4 break-words text-xs leading-5 text-zinc-500">
                     {brackets
                       .map((bracket) =>
-                        getTournamentBracketDisplayName(bracket.name)
+                        getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(tournament.division_model_version))
                       )
                       .join(" · ")}
                   </p>

@@ -36,7 +36,7 @@ export async function publishTournamentMapPools(formData: FormData) {
   if (
     !isUuid(tournamentId) ||
     bracketIds.length === 0 ||
-    bracketIds.length > 3 ||
+    bracketIds.length > 4 ||
     mapIds.length < 5
   ) {
     redirectToTournament(tournamentId, "map-pool-invalid");

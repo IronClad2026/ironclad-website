@@ -19,21 +19,24 @@ import {
 import type { BadgeCollectionItem } from "@/lib/badges/types";
 import type { BadgesDictionary } from "@/lib/i18n/badges";
 
-type BadgeArtworkVariant = "slot" | "detail" | "reveal";
+type BadgeArtworkVariant = "slot" | "detail" | "reveal" | "featured";
 
 const frameClassNames: Record<BadgeArtworkVariant, string> = {
+  featured: "aspect-square w-full",
   slot: "aspect-square w-full",
   detail: "aspect-square w-full",
   reveal: "aspect-square w-48 sm:w-56",
 };
 
 const imageDimensions: Record<BadgeArtworkVariant, number> = {
+  featured: 64,
   slot: 280,
   detail: 340,
   reveal: 320,
 };
 
 const responsiveImageSizes: Record<BadgeArtworkVariant, string> = {
+  featured: "56px",
   slot:
     "(max-width: 639px) 42vw, (max-width: 1023px) 28vw, (max-width: 1535px) 20vw, 180px",
   detail: "(max-width: 639px) 80vw, 340px",
@@ -41,12 +44,14 @@ const responsiveImageSizes: Record<BadgeArtworkVariant, string> = {
 };
 
 const fallbackNumberClassNames: Record<BadgeArtworkVariant, string> = {
+  featured: "text-lg",
   slot: "text-5xl sm:text-6xl",
   detail: "text-6xl",
   reveal: "text-6xl",
 };
 
 const fallbackNameClassNames: Record<BadgeArtworkVariant, string> = {
+  featured: "sr-only",
   slot: "text-[11px] leading-4",
   detail: "text-sm leading-5",
   reveal: "text-sm leading-5",
@@ -108,6 +113,32 @@ export default function BadgeArtwork({
       : LockKeyhole;
   const artworkScale = artwork?.scale ?? 1;
 
+  if (variant === "featured") {
+    return (
+      <span
+        className={`pointer-events-none relative grid aspect-square w-full place-items-center ${className}`}
+        data-badge-artwork={showArtwork ? "real" : "fallback"}
+        data-badge-artwork-variant="featured"
+        aria-hidden={alt === "" ? true : undefined}
+      >
+        {showArtwork && artwork ? (
+          <Image
+            src={artwork.src}
+            alt={alt ?? interpolateBadgeCopy(copy.metadata.artworkAlt, { name: localizedItem.definition.name })}
+            width={64}
+            height={64}
+            sizes="56px"
+            className="h-full w-full object-contain"
+            onError={() => setFailedArtworkSrc(artwork.src)}
+          />
+        ) : (
+          <span role="img" aria-label={localizedItem.definition.name} className="grid h-full w-full place-items-center text-zinc-300">
+            <Award size={24} aria-hidden="true" />
+          </span>
+        )}
+      </span>
+    );
+  }
   return (
     <span
       ref={rootRef}

@@ -219,7 +219,7 @@ function DocumentLink({
 }) {
   return (
     <a
-      href={document.url}
+      href={document.downloadUrl}
       target="_blank"
       rel="noreferrer"
       className="flex min-h-12 items-center justify-between gap-3 border border-white/12 bg-black/50 px-4 py-3 text-sm font-bold text-white transition hover:border-orange-400/50 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"

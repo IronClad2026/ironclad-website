@@ -20,13 +20,13 @@ describe("Phase 15B public competition content", () => {
       "Verify your Division, play through a structured eight-Player bracket, and build an official competitive record."
     );
     expect(publicCopy.home.path.verifyText).toBe(
-      "Connect Steam and verify your current Relic 1v1 ELO. IronClad places you in Academy, Challenge, or Main / Pro and locks that eligibility snapshot for the Event."
+      "Connect Steam and verify your current Relic 1v1 ELO. IronClad places you in Academy, Challenge, Main, or Pro and locks that eligibility snapshot for the Event. Academy 0–1099 · Challenge 1100–1399 · Main 1400–1699 · Pro 1700+."
     );
     expect(publicCopy.home.path.reportText).toBe(
       "Play from the published Division map pool, use authenticated Dice for odd-Game roll-offs, and report the Series with one private .rec replay for every Game played. Your opponent can confirm or dispute the report."
     );
     expect(publicCopy.home.path.progressText).toBe(
-      "Earn points through valid participation and progression. Academy and Challenge build permanent Career standings; Main / Pro runs in six-Event seasons."
+      "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate."
     );
     expect(home).toContain('href: "/rules#one-v-one-rules"');
     expect(`${home}\n${homeCopy}`).not.toMatch(
@@ -82,19 +82,19 @@ describe("Phase 15B public competition content", () => {
     expect(publicCopy.about.careerStandings).toBe("Career and season standings");
     expect(publicCopy.about.careerRankings).toBe("Career and season rankings");
     expect(publicCopy.about.competitiveProgressText).toBe(
-      "Results build permanent Career standings or a six-Event Main / Pro season."
+      "Academy, Challenge and Main build separate permanent Career standings. Pro uses six-valid-event seasons. Historical Main / Pro records remain separate."
     );
     expect(aboutCopy).not.toMatch(
       /Main \/ Elite|Seasonal leaderboard tracking|Seasonal Progress/
     );
     expect(publicCopy.rankings.metadataDescription).toContain(
-      "six-event Main / Pro season"
+      "Pro uses six-valid-event seasons"
     );
     expect(rankingsCopy).not.toContain("prize season");
-    expect(publicCopy.rankings.topAria).toBe("Main / Pro top standings");
+    expect(publicCopy.rankings.topAria).toBe("Official top standings");
     expect(publicCopy.rankings.topStandings).toBe("Top Standings");
     expect(publicCopy.rankings.tieNotice).toMatch(
-      /Every competitor sharing official Main \/ Pro rank 1, 2 or 3 remains\s+represented\./
+      /Every competitor sharing official rank 1, 2 or 3 remains\s+represented\./
     );
     expect(publicCopy.rankings.tieNotice).toMatch(
       /Any\s+prize-bearing Event is governed separately by its published Event\s+Prize Terms\./

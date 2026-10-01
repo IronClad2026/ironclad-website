@@ -105,6 +105,7 @@ export async function updatePublicProfileEnabled(
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/showcase");
   revalidatePath("/players");
   revalidatePath(`/players/${persistedPlayer.id as string}`);
   revalidatePath("/tournaments");

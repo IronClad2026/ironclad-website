@@ -225,6 +225,7 @@ function tournamentPrestigeSummary(overrides: Record<string, unknown> = {}) {
     main_championship_count: 0,
     first_main_championship_tournament_id: null,
     first_main_championship_at: null,
+    first_main_championship_bracket_type: null,
     championship_count: 0,
     second_championship_tournament_id: null,
     second_championship_at: null,
@@ -1879,6 +1880,7 @@ describe("badge authority evaluators", () => {
           main_championship_count: 1,
           first_main_championship_tournament_id: FIRST_MAIN_TOURNAMENT_ID,
           first_main_championship_at: "2026-08-22T12:00:00.000Z",
+          first_main_championship_bracket_type: "main",
         }),
       },
     });
@@ -1914,6 +1916,54 @@ describe("badge authority evaluators", () => {
     ]);
   });
 
+  it.each(["main", "main_progression"])(
+    "retains the actual %s source when awarding Elite Champion",
+    async (bracketType) => {
+      const fixture = createAuthorityClient({
+        tournamentPrestigeSummaries: {
+          [PLAYER_ID]: tournamentPrestigeSummary({
+            main_championship_count: 1,
+            first_main_championship_tournament_id: FIRST_MAIN_TOURNAMENT_ID,
+            first_main_championship_at: "2026-08-22T12:00:00.000Z",
+            first_main_championship_bracket_type: bracketType,
+          }),
+        },
+      });
+      const result = await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+        playerId: PLAYER_ID,
+        supabase: fixture.client,
+      });
+      expect(result.createdSlugs).toEqual(["elite-champion"]);
+      expect(fixture.upsertPayloads[0].source_metadata).toMatchObject({
+        evaluator: "division-championship",
+        bracketType,
+        eventType: "tournament_win",
+      });
+    }
+  );
+
+  it.each(["pro", "unknown", null, undefined])(
+    "refuses to treat %s championship authority as an Elite Main championship",
+    async (bracketType) => {
+      const fixture = createAuthorityClient({
+        tournamentPrestigeSummaries: {
+          [PLAYER_ID]: tournamentPrestigeSummary({
+            main_championship_count: 1,
+            first_main_championship_tournament_id: FIRST_MAIN_TOURNAMENT_ID,
+            first_main_championship_at: "2026-08-22T12:00:00.000Z",
+            first_main_championship_bracket_type: bracketType,
+          }),
+        },
+      });
+      const result = await evaluateTournamentPrestigeBadgeAwardsForPlayer({
+        playerId: PLAYER_ID,
+        supabase: fixture.client,
+      });
+      expect(result.createdSlugs).toEqual([]);
+      expect(fixture.upsert).not.toHaveBeenCalled();
+    }
+  );
+
   it("cascades championship prestige thresholds without duplicate awards", async () => {
     const oneChampion = createAuthorityClient({
       tournamentPrestigeSummaries: {
@@ -1938,6 +1988,7 @@ describe("badge authority evaluators", () => {
           main_championship_count: 1,
           first_main_championship_tournament_id: FIRST_MAIN_TOURNAMENT_ID,
           first_main_championship_at: "2026-08-22T12:00:00.000Z",
+          first_main_championship_bracket_type: "main",
           championship_count: 3,
           second_championship_tournament_id: SECOND_CHAMPIONSHIP_TOURNAMENT_ID,
           second_championship_at: "2026-08-21T12:00:00.000Z",

@@ -16,7 +16,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       CLERK_SECRET_KEY: sk_test_not-a-real-secret
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsudGVzdCQ=
@@ -37,6 +37,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Consolidated release source and environment boundaries
+        run: node scripts/consolidated-release/cli.mjs check-source
 
       - name: Lint
         run: npm run lint
@@ -61,6 +64,110 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLERK_SECRET_KEY: sk_test_not-a-real-secret
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsudGVzdCQ=
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-only-publishable-key
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      SUPABASE_SERVICE_ROLE_KEY: test-only-service-role-key
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use Node.js 22.12.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium
+      - name: Showcase browser regression tests (synthetic local actions)
+        run: npx playwright test --config tests/browser/showcase/playwright.config.ts
+      - name: Highlights browser regression tests (synthetic local media)
+        run: npx playwright test --config tests/browser/combat-highlights/playwright.config.ts
+      - name: Official News and navigation browser regression tests
+        run: npx playwright test --config tests/browser/news/playwright.config.ts
+      - name: Responsive public presentation regressions
+        run: npx playwright test --config tests/browser/ui-redesign/playwright.config.ts
+      - name: Dashboard and career browser regressions
+        env:
+          UI_REDESIGN_SURFACE: dashboard
+        run: npx playwright test --config tests/browser/ui-redesign/playwright.config.ts
+      - name: Admin match workspace regressions
+        run: npx playwright test --config tests/browser/admin-match/playwright.config.ts
+      - name: Admin operations regressions
+        run: npx playwright test --config tests/browser/admin-operations/playwright.config.ts
+      - name: Save failed synthetic browser traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolidated-browser-failure-traces
+          path: .playwright
+          if-no-files-found: ignore
+          retention-days: 7
+
+  consolidated-release-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use Node.js 22.12.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check deployable source and environment boundaries
+        run: node scripts/consolidated-release/cli.mjs check-source
+      - name: Check exact legal publication package without publishing
+        run: node scripts/consolidated-legal/publication.mjs check
+      - name: Check offline release gates and fail-closed Preview and media boundaries
+        run: >-
+          npx vitest run
+          tests/consolidated-release/release-safety.test.ts
+          tests/unit/lib/release-preview-safety.test.ts
+          tests/unit/lib/p03-preview-safety.test.ts
+          tests/unit/lib/combat-highlights-config.test.ts
+          tests/integration/combat-highlights-disabled-boundary.test.ts
+
+  consolidated-database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CONSOLIDATED_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use Node.js 22.12.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+      - name: Install exact disposable PostgreSQL protocol client without lifecycle scripts
+        run: npm install --prefix "$RUNNER_TEMP/consolidated-pg-client" --ignore-scripts --no-audit --no-fund --save-exact pg@8.16.3
+      - name: Check hosted rehearsal isolation guards
+        run: node --test tests/consolidated-db/hosted-guards.mjs tests/consolidated-db/schema-diagnostics.mjs tests/consolidated-db/relation-acl.mjs
+      - name: Rehearse current Production catalog and consolidated candidate on real Supabase extensions
+        run: node scripts/consolidated-db/hosted-runtime.mjs
+      - name: Save non-sensitive actual-extension and complete restore evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolidated-hosted-runtime-evidence
+          path: test-results/consolidated-hosted-runtime-evidence.json
+          if-no-files-found: error
+          retention-days: 14
 
   p03-database:
     runs-on: ubuntu-24.04

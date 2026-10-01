@@ -20,7 +20,10 @@ type QueryCall = {
   method: string;
 };
 
-function createQuery(result: QueryResult) {
+function createQuery(
+  result: QueryResult | Promise<QueryResult>,
+  onStart: () => void = () => undefined
+) {
   const calls: QueryCall[] = [];
   const query = {
     eq: (...args: unknown[]) => {
@@ -37,6 +40,7 @@ function createQuery(result: QueryResult) {
     },
     maybeSingle: () => {
       calls.push({ method: "maybeSingle", args: [] });
+      onStart();
       return Promise.resolve(result);
     },
     order: (...args: unknown[]) => {
@@ -50,10 +54,21 @@ function createQuery(result: QueryResult) {
     then: (
       resolve: (value: QueryResult) => unknown,
       reject: (reason: unknown) => unknown
-    ) => Promise.resolve(result).then(resolve, reject),
+    ) => {
+      onStart();
+      return Promise.resolve(result).then(resolve, reject);
+    },
   };
 
   return { calls, query };
+}
+
+function deferredQueryResult() {
+  let resolve!: (result: QueryResult) => void;
+  const promise = new Promise<QueryResult>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 const currentSeason = {
@@ -64,7 +79,8 @@ const currentSeason = {
   start_date: "2026-07-01",
   end_date: "2026-12-31",
   is_active: true,
-  valid_main_event_count: 3,
+  official_bracket_type: "main",
+  valid_qualifying_event_count: 3,
   is_finalized: false,
   is_under_review: false,
 };
@@ -121,6 +137,184 @@ describe("public leaderboard projection", () => {
     fromMock.mockReset();
   });
 
+  it("starts independent reads while the season is pending and starts standings as soon as it resolves", async () => {
+    const season = deferredQueryResult();
+    const standings = deferredQueryResult();
+    const allTime = deferredQueryResult();
+    const champions = deferredQueryResult();
+    const started = new Set<string>();
+    const queries = new Map<string, ReturnType<typeof createQuery>>();
+    const results: Record<string, Promise<QueryResult>> = {
+      leaderboard_current_season: season.promise,
+      leaderboard_public_season_standings: standings.promise,
+      leaderboard_public_all_time_standings: allTime.promise,
+      leaderboard_public_season_champions: champions.promise,
+    };
+    fromMock.mockImplementation((table: string) => {
+      const query = createQuery(results[table], () => started.add(table));
+      queries.set(table, query);
+      return query.query;
+    });
+
+    const result = getPublicLeaderboardData();
+
+    await vi.waitFor(() => {
+      expect([...started].sort()).toEqual([
+        "leaderboard_current_season",
+        "leaderboard_public_all_time_standings",
+        "leaderboard_public_season_champions",
+      ]);
+    });
+    expect(fromMock).not.toHaveBeenCalledWith(
+      "leaderboard_public_season_standings"
+    );
+
+    season.resolve({ data: currentSeason, error: null });
+
+    await vi.waitFor(() => {
+      expect(started.has("leaderboard_public_season_standings")).toBe(true);
+    });
+    expect(queries.get("leaderboard_public_season_standings")?.calls)
+      .toContainEqual({ method: "eq", args: ["season_id", "season-1"] });
+
+    standings.resolve({ data: [seasonStanding], error: null });
+    allTime.resolve({ data: [allTimeStanding], error: null });
+    champions.resolve({ data: [], error: null });
+
+    await expect(result).resolves.toMatchObject({
+      currentSeason: { id: "season-1" },
+      seasonStandings: [{ playerId: "player-1", totalPoints: 12 }],
+      allTimeStandings: [{ playerId: "player-1", totalPoints: 24 }],
+      seasonChampions: [],
+      errors: [],
+    });
+    expect(fromMock).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    { label: "missing", error: null, errors: [] },
+    {
+      label: "failed",
+      error: { message: "Season unavailable" },
+      errors: ["Current season could not be loaded."],
+    },
+  ])("preserves independent results when the current season is $label", async ({ error, errors }) => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const results: Record<string, QueryResult> = {
+      leaderboard_current_season: { data: null, error },
+      leaderboard_public_all_time_standings: {
+        data: [allTimeStanding],
+        error: null,
+      },
+      leaderboard_public_season_champions: { data: [], error: null },
+    };
+    fromMock.mockImplementation((table: string) =>
+      createQuery(results[table]).query
+    );
+
+    await expect(getPublicLeaderboardData()).resolves.toMatchObject({
+      currentSeason: null,
+      seasonStandings: [],
+      allTimeStandings: [{ playerId: "player-1", totalPoints: 24 }],
+      seasonChampions: [],
+      errors,
+    });
+    expect(fromMock).not.toHaveBeenCalledWith(
+      "leaderboard_public_season_standings"
+    );
+    expect(fromMock).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(["main_progression", "academy", "unknown", null, undefined])(
+    "rejects unsupported official season authority %s without losing independent history",
+    async (officialBracketType) => {
+      const results: Record<string, QueryResult> = {
+        leaderboard_current_season: {
+          data: { ...currentSeason, official_bracket_type: officialBracketType },
+          error: null,
+        },
+        leaderboard_public_all_time_standings: { data: [allTimeStanding], error: null },
+        leaderboard_public_season_champions: { data: [], error: null },
+      };
+      fromMock.mockImplementation((table: string) => createQuery(results[table]).query);
+
+      await expect(getPublicLeaderboardData()).resolves.toMatchObject({
+        currentSeason: null,
+        seasonStandings: [],
+        allTimeStandings: [{ playerId: "player-1", totalPoints: 24 }],
+        errors: ["Current season has an unsupported division model."],
+      });
+      expect(fromMock).not.toHaveBeenCalledWith("leaderboard_public_season_standings");
+      expect(fromMock).toHaveBeenCalledTimes(3);
+    }
+  );
+
+  it("preserves separate future Pro, Main progression, and legacy Main accounting buckets", async () => {
+    const results: Record<string, QueryResult> = {
+      leaderboard_current_season: {
+        data: { ...currentSeason, name: "2026 Pro Season 1", official_bracket_type: "pro" },
+        error: null,
+      },
+      leaderboard_public_season_standings: {
+        data: [{ ...seasonStanding, bracket_type: "pro", total_points: 17 }],
+        error: null,
+      },
+      leaderboard_public_all_time_standings: {
+        data: [
+          { ...allTimeStanding, bracket_type: "pro", total_points: 37 },
+          { ...allTimeStanding, bracket_type: "main_progression", total_points: 27 },
+          { ...allTimeStanding, bracket_type: "main", total_points: 47 },
+        ],
+        error: null,
+      },
+      leaderboard_public_season_champions: { data: [], error: null },
+    };
+    fromMock.mockImplementation((table: string) => createQuery(results[table]).query);
+
+    const data = await getPublicLeaderboardData();
+    expect(data.currentSeason).toMatchObject({ officialBracketType: "pro" });
+    expect(data.seasonStandings).toMatchObject([{ bracketType: "pro", totalPoints: 17 }]);
+    expect(data.allTimeStandings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ bracketType: "pro", totalPoints: 37 }),
+      expect.objectContaining({ bracketType: "main_progression", totalPoints: 27 }),
+      expect.objectContaining({ bracketType: "main", totalPoints: 47 }),
+    ]));
+    expect(data.allTimeStandings).toHaveLength(3);
+    expect(data.allTimeStandings.every((row) => row.rank === 1)).toBe(true);
+    expect(data.errors).toEqual([]);
+  });
+
+  it("reads fresh season and standings data on each invocation", async () => {
+    for (const revision of [1, 2]) {
+      const results: Record<string, QueryResult> = {
+        leaderboard_current_season: {
+          data: { ...currentSeason, id: `season-${revision}` },
+          error: null,
+        },
+        leaderboard_public_season_standings: {
+          data: [{ ...seasonStanding, season_id: `season-${revision}` }],
+          error: null,
+        },
+        leaderboard_public_all_time_standings: {
+          data: [{ ...allTimeStanding, total_points: 24 + revision }],
+          error: null,
+        },
+        leaderboard_public_season_champions: { data: [], error: null },
+      };
+      fromMock.mockImplementation((table: string) =>
+        createQuery(results[table]).query
+      );
+
+      await expect(getPublicLeaderboardData()).resolves.toMatchObject({
+        currentSeason: { id: `season-${revision}` },
+        seasonStandings: [{ seasonId: `season-${revision}` }],
+        allTimeStandings: [{ totalPoints: 24 + revision }],
+        errors: [],
+      });
+      expect(fromMock).toHaveBeenCalledTimes(4 * revision);
+    }
+  });
+
   it("loads all three public views with their existing anonymous contracts", async () => {
     const queries = new Map<string, ReturnType<typeof createQuery>>();
     const results: Record<string, QueryResult> = {
@@ -159,7 +353,7 @@ describe("public leaderboard projection", () => {
         .get("leaderboard_current_season")
         ?.calls.find((call) => call.method === "select")?.args[0]
     ).toBe(
-      "id, name, year, season_number, start_date, end_date, is_active, valid_main_event_count, is_finalized, is_under_review"
+      "id, name, year, season_number, start_date, end_date, is_active, official_bracket_type, valid_qualifying_event_count, is_finalized, is_under_review"
     );
     expect(
       queries.get("leaderboard_current_season")?.calls
@@ -190,8 +384,8 @@ describe("public leaderboard projection", () => {
     expect(
       queries.get("leaderboard_public_season_champions")?.calls
     ).toContainEqual({
-      method: "eq",
-      args: ["bracket_type", "main"],
+      method: "in",
+      args: ["bracket_type", ["main", "pro"]],
     });
     expect(
       queries
@@ -227,7 +421,8 @@ describe("public leaderboard projection", () => {
       id: "season-1",
       seasonNumber: 3,
       isActive: true,
-      validMainEventCount: 3,
+      officialBracketType: "main",
+      validQualifyingEventCount: 3,
       isFinalized: false,
       isUnderReview: false,
     });
