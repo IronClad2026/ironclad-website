@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { normalizeSchema } from "../p03-release/backup.mjs";
@@ -13,6 +13,8 @@ import { boundedSchemaDiff } from "./schema-diagnostics.mjs";
 
 export const image = "supabase/postgres:17.6.1.127";
 export const nodeImage = "node:22.12.0-bookworm-slim";
+export const rehearsalReceiptPath = "/tmp/consolidated-db-rehearsal.json";
+export const maxRehearsalReceiptBytes = 1024 * 1024;
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const database = "consolidated_rehearsal";
 const port = "56623";
@@ -84,6 +86,21 @@ export function formatSchemaDiagnostic(diff, phase) {
   assert(Buffer.byteLength(output) <= 16384, "Schema diagnostic byte limit exceeded");
   return output;
 }
+
+export function readBoundedRehearsalReceipt(filesystem = { statSync, readFileSync }) {
+  const file = filesystem.statSync(rehearsalReceiptPath);
+  assert(file.isFile() && Number.isSafeInteger(file.size) && file.size > 0 && file.size <= maxRehearsalReceiptBytes,
+    "Fixed synthetic receipt must be a regular file of at most 1MiB");
+  const bytes = filesystem.readFileSync(rehearsalReceiptPath);
+  assert(Buffer.isBuffer(bytes) && bytes.length === file.size && bytes.length <= maxRehearsalReceiptBytes,
+    "Synthetic receipt changed during bounded retrieval");
+  const receipt = JSON.parse(bytes.toString("utf8"));
+  assert(receipt && typeof receipt === "object" && !Array.isArray(receipt), "Synthetic receipt must be a JSON object");
+  return receipt;
+}
+
+const receiptReadScript = `import { readBoundedRehearsalReceipt } from '/work/scripts/consolidated-db/hosted-runtime.mjs';
+process.stdout.write(JSON.stringify(readBoundedRehearsalReceipt()));`;
 
 function command(binary, args, options = {}) {
   assert(["docker", "git"].includes(binary), "Only local Docker and checkout identity commands are allowed");
@@ -295,12 +312,17 @@ export async function rehearseHostedRuntime() {
     const before = archiveAndRestore(source, beforeTarget, "before-consolidated");
     console.log("Verified full seeded baseline archive and restore, including owners, grants, contents, sequences and retained history.");
     node(source, "scripts/consolidated-db/rehearse.mjs", "--seeded");
-    docker(["cp", `${runtime(source)}:/tmp/consolidated-db-rehearsal.json`, path.join(output, "consolidated-db-rehearsal.json")]);
-    const rehearsal = JSON.parse(readFileSync(path.join(output, "consolidated-db-rehearsal.json"), "utf8"));
+    // Docker cp does not support tmpfs. Read only the fixed, bounded aggregate
+    // receipt inside the already attested matching Node namespace.
+    const rehearsal = JSON.parse(docker(["exec", "-i", runtime(source), "node", "--input-type=module"],
+      { input: receiptReadScript, timeout: 5000, maxBuffer: maxRehearsalReceiptBytes }));
     assert.equal(rehearsal.status, "PASS"); assert.equal(rehearsal.providerMode, "actual-supabase");
     assert.equal(rehearsal.baselineLedgerEntries, 153); assert.equal(rehearsal.candidateLedgerEntries, 159);
     assert.deepEqual(rehearsal.migrations, reviewedMigrations);
     assert.equal(rehearsal.postdeployment, reviewedPostdeployment);
+    assert.equal(rehearsal.productionApplicationDataImported, false);
+    assert.equal(rehearsal.productionRead, false); assert.equal(rehearsal.productionMutated, false);
+    writeFileSync(path.join(output, "consolidated-db-rehearsal.json"), JSON.stringify(rehearsal, null, 2) + "\n", { mode: 0o600 });
     const after = archiveAndRestore(source, afterTarget, "after-consolidated");
     console.log("Verified consolidated migration, legal and postdeployment rehearsal, followed by a complete candidate archive and restore.");
     report = { schemaVersion: 1, status: "PASS", candidateSha, checkedAt: new Date().toISOString(), image, imageId: imageMetadata.Id, imageDigests: imageMetadata.RepoDigests,

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertHostedContext, assertNodeRuntimeState, boundedSyntheticDiagnostic, formatSchemaDiagnostic, startup, image, nodeImage } from "../../scripts/consolidated-db/hosted-runtime.mjs";
+import { assertHostedContext, assertNodeRuntimeState, boundedSyntheticDiagnostic, formatSchemaDiagnostic, readBoundedRehearsalReceipt,
+  rehearsalReceiptPath, maxRehearsalReceiptBytes, startup, image, nodeImage } from "../../scripts/consolidated-db/hosted-runtime.mjs";
 import { boundedSchemaDiff } from "../../scripts/consolidated-db/schema-diagnostics.mjs";
 
 const repository = "/isolated/candidate";
@@ -142,4 +143,34 @@ test("large schema diagnostics remain valid JSON below 16KiB and preserve hashes
   assert(Buffer.byteLength(output) <= 16384); assert.equal(parsed.changedObjects, 40); assert.equal(parsed.truncated, true);
   assert(parsed.changes.length > 0); assert.match(parsed.changes[0].fields[0].sourceSha256, /^[a-f0-9]{64}$/);
   assert(!output.includes("x ".repeat(1000)));
+});
+
+test("receipt retrieval reads only the fixed synthetic path and accepts a normal aggregate JSON", () => {
+  const bytes = Buffer.from(JSON.stringify({ status: "PASS", providerMode: "actual-supabase", candidateLedgerEntries: 159 }));
+  const calls = [];
+  const filesystem = {
+    statSync: file => { calls.push(["stat", file]); return { isFile: () => true, size: bytes.length }; },
+    readFileSync: file => { calls.push(["read", file]); return bytes; },
+  };
+  assert.deepEqual(readBoundedRehearsalReceipt(filesystem), { status: "PASS", providerMode: "actual-supabase", candidateLedgerEntries: 159 });
+  assert.deepEqual(calls, [["stat", "/tmp/consolidated-db-rehearsal.json"], ["read", "/tmp/consolidated-db-rehearsal.json"]]);
+  assert.equal(rehearsalReceiptPath, "/tmp/consolidated-db-rehearsal.json");
+  assert.equal(maxRehearsalReceiptBytes, 1024 * 1024);
+});
+
+test("receipt retrieval rejects oversized and nonregular files before reading their bytes", () => {
+  for (const [regular, size] of [[true, maxRehearsalReceiptBytes + 1], [false, 10], [true, 0], [true, -1], [true, 10.5]]) {
+    let reads = 0;
+    assert.throws(() => readBoundedRehearsalReceipt({ statSync: () => ({ isFile: () => regular, size }),
+      readFileSync: () => { reads++; return Buffer.from("{}"); } }), /at most 1MiB/);
+    assert.equal(reads, 0);
+  }
+});
+
+test("receipt retrieval rejects changed size, invalid JSON and nonobject receipts", () => {
+  for (const body of ["invalid-json", "null", "[]", "true"]) {
+    const bytes = Buffer.from(body);
+    assert.throws(() => readBoundedRehearsalReceipt({ statSync: () => ({ isFile: () => true, size: bytes.length }), readFileSync: () => bytes }));
+  }
+  assert.throws(() => readBoundedRehearsalReceipt({ statSync: () => ({ isFile: () => true, size: 2 }), readFileSync: () => Buffer.from('{"changed":true}') }), /changed during/);
 });
