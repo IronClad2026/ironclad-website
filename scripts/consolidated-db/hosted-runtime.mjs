@@ -11,6 +11,7 @@ import { verifyPackage } from "./package.mjs";
 import { verifyPostDeploymentPackage } from "./post-deployment.mjs";
 
 export const image = "supabase/postgres:17.6.1.127";
+export const nodeImage = "node:22.12.0-bookworm-slim";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const database = "consolidated_rehearsal";
 const port = "56623";
@@ -26,17 +27,63 @@ export function assertHostedContext(platform, env, repository = root) {
   assert.match(env.CONSOLIDATED_EXPECTED_SHA ?? "", /^[a-f0-9]{40}$/, "Exact candidate SHA required");
 }
 
+export function assertNodeRuntimeState(state, expected) {
+  assert.equal(state.Config.Image, nodeImage);
+  assert.equal(state.Image, expected.imageId, "Exact pulled Node image identity required");
+  assert([`container:${expected.databaseName}`, `container:${expected.databaseId}`].includes(state.HostConfig.NetworkMode),
+    "Node must share only its attested database network namespace");
+  assert.equal(Object.keys(state.HostConfig.PortBindings ?? {}).length, 0, "Node published ports forbidden");
+  assert.equal(state.HostConfig.ReadonlyRootfs, true);
+  assert.equal(state.Config.User, "node");
+  assert.deepEqual(state.HostConfig.CapDrop, ["ALL"]);
+  assert(state.HostConfig.SecurityOpt?.some(value => /^no-new-privileges(?::true)?$/.test(value)), "Node privilege escalation forbidden");
+  assert.deepEqual(Object.keys(state.HostConfig.Tmpfs ?? {}), ["/tmp"], "Only bounded Node scratch storage permitted");
+  const scratch = new Set(state.HostConfig.Tmpfs["/tmp"].split(","));
+  for (const option of ["rw", "noexec", "nosuid", "size=64m", "mode=1777"]) {
+    assert(scratch.has(option), "Node scratch storage must remain bounded, non-executable and unprivileged");
+  }
+  const binds = state.Mounts.filter(mount => mount.Type === "bind");
+  assert.equal(binds.length, 2, "Only checkout and pinned protocol-client host mounts permitted");
+  for (const [destination, source] of [["/work", expected.repository], ["/client/node_modules", expected.clientModules]]) {
+    assert.equal(binds.filter(mount => mount.Destination === destination && mount.Source === source && mount.RW === false).length, 1,
+      "Node host mounts must remain exact and read-only");
+  }
+  // Engine versions may include the configured scratch tmpfs in Mounts.
+  assert(state.Mounts.every(mount => mount.Type === "bind" || (mount.Type === "tmpfs" && mount.Destination === "/tmp")),
+    "Additional Node mounts forbidden");
+}
+
 export const startup = `set -eu
 initdb -D /tmp/consolidated-data -U postgres --auth-local=trust --auth-host=trust --encoding=UTF8 --no-locale >/dev/null
 exec postgres -D /tmp/consolidated-data -c listen_addresses=127.0.0.1 -c port=${port} -c unix_socket_directories=/tmp -c shared_preload_libraries=pg_cron,pg_net,pg_stat_statements -c cron.database_name=${database} -c cron.launch_active_jobs=off -c pg_net.database_name=postgres -c max_connections=40`;
 
+export function boundedSyntheticDiagnostic(value) {
+  return String(value ?? "")
+    .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL REDACTED]")
+    .replace(/\b(authorization|api[-_]?key|password|secret|token)\s*[:=]\s*[^\r\n,;]+/gi, "$1=[REDACTED]")
+    .replace(/\b(?:sk_(?:live|test)_|sb_secret_)[a-zA-Z0-9_-]+/g, "[CREDENTIAL REDACTED]")
+    .replace(/\b[a-zA-Z0-9_-]{16,}\.[a-zA-Z0-9_-]{16,}\.[a-zA-Z0-9_-]{16,}\b/g, "[JWT REDACTED]")
+    .replace(/[^\n\t\x20-\x7e]/g, "?")
+    .slice(-4096);
+}
+
 function command(binary, args, options = {}) {
   assert(["docker", "git"].includes(binary), "Only local Docker and checkout identity commands are allowed");
+  const { emptyContainerDiagnostic, ...spawnOptions } = options;
   const result = spawnSync(binary, args, {
     encoding: "utf8", timeout: 180000, maxBuffer: 32 * 1024 * 1024,
-    cwd: root, ...options,
+    cwd: root, ...spawnOptions,
   });
-  // Dump bytes and synthetic SQL diagnostics are never printed into CI logs.
+  // Only a fixed Node --version command in the unseeded synthetic cluster may
+  // emit bounded stderr. Archive bytes and SQL output remain suppressed.
+  if ((result.error || result.status !== 0) && emptyContainerDiagnostic) {
+    assert.equal(binary, "docker");
+    assert.equal(args[0], "exec");
+    assert.equal(args.at(-2), "node");
+    assert.equal(args.at(-1), "--version");
+    console.error(JSON.stringify({ syntheticOnly: true, phase: "empty-container-node-version", status: result.status,
+      error: result.error?.code, diagnostic: boundedSyntheticDiagnostic(result.stderr) }));
+  }
   assert(!result.error && result.status === 0, `Synthetic ${binary} operation failed (${result.error?.code ?? result.status}); no live endpoint is configured`);
   return result.stdout?.trim() ?? "";
 }
@@ -45,7 +92,7 @@ const snapshotScript = String.raw`
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
-const {Client}=createRequire('/tmp/consolidated-tools/node_modules/pg/lib/index.js')('/tmp/consolidated-tools/node_modules/pg/lib/index.js');
+const {Client}=createRequire('/client/node_modules/pg/lib/index.js')('/client/node_modules/pg/lib/index.js');
 const client=new Client({host:'127.0.0.1',port:56623,database:'consolidated_rehearsal',user:'postgres',password:'',ssl:false,connectionTimeoutMillis:5000});
 const quote=value=>String.fromCharCode(34)+value.replaceAll(String.fromCharCode(34),String.fromCharCode(34).repeat(2))+String.fromCharCode(34);
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -98,10 +145,13 @@ export async function rehearseHostedRuntime() {
   let report;
   let cleanupFailed = false;
   let expectedImageId;
+  let expectedNodeImageId;
+  const nodeContainers = new Map();
   const docker = (args, options) => command("docker", args, options);
   const sql = (name, query) => docker(["exec", "-i", name, "psql", "-X", "--no-password", "-h", "127.0.0.1", "-p", port, "-U", "postgres", "-d", database, "-qAt", "-v", "ON_ERROR_STOP=1"], { input: query });
-  const node = (name, script, ...args) => docker(["exec", "--workdir", "/work", "-e", "CONSOLIDATED_PROVIDER_MODE=actual-supabase", "-e", "CONSOLIDATED_PG_CLIENT_MODULE=/tmp/consolidated-tools/node_modules/pg/lib/index.js", "-e", "CONSOLIDATED_EVIDENCE_FILE=/tmp/consolidated-db-rehearsal.json", name, "/tmp/consolidated-node", script, ...args], { timeout: 600000 });
-  const snapshot = name => JSON.parse(docker(["exec", "-i", name, "/tmp/consolidated-node", "--input-type=module"], { input: snapshotScript }));
+  const runtime = name => { const value = nodeContainers.get(name); assert(value, "Attested matching Node namespace required"); return value; };
+  const node = (name, script, ...args) => docker(["exec", "--workdir", "/work", "-e", "CONSOLIDATED_PROVIDER_MODE=actual-supabase", "-e", "CONSOLIDATED_PG_CLIENT_MODULE=/client/node_modules/pg/lib/index.js", "-e", "CONSOLIDATED_EVIDENCE_FILE=/tmp/consolidated-db-rehearsal.json", runtime(name), "node", script, ...args], { timeout: 600000 });
+  const snapshot = name => JSON.parse(docker(["exec", "-i", runtime(name), "node", "--input-type=module"], { input: snapshotScript }));
   const applicationCapture = name => JSON.parse(node(name, "scripts/consolidated-db/capture.mjs"));
   const schema = name => normalizeSchema(docker(["exec", name, "pg_dump", "--no-password", "-h", "127.0.0.1", "-p", port, "-U", "postgres", "--schema-only", database]));
 
@@ -115,20 +165,52 @@ export async function rehearseHostedRuntime() {
     assert.deepEqual(Object.keys(state.NetworkSettings.Networks), [network]);
     assert(state.Mounts.some(mount => mount.Destination === "/work" && mount.RW === false), "Checkout must be mounted read-only");
     assert(state.Mounts.every(mount => mount.Destination === "/work" && mount.RW === false), "No writable host mount permitted");
-    docker(["exec", name, "mkdir", "-p", "/tmp/consolidated-tools"]);
-    docker(["cp", process.execPath, `${name}:/tmp/consolidated-node`]);
-    docker(["cp", path.join(clientRoot, "node_modules"), `${name}:/tmp/consolidated-tools/node_modules`]);
-    docker(["exec", "--user", "root", name, "chmod", "755", "/tmp/consolidated-node"]);
-    assert.equal(docker(["exec", name, "/tmp/consolidated-node", "--version"]), "v22.12.0", "Exact in-container Node version required");
     let ready = false;
     for (let attempt = 0; attempt < 30; attempt++) {
       try { docker(["exec", name, "pg_isready", "-h", "127.0.0.1", "-p", port, "-U", "postgres"], { timeout: 2000 }); ready = true; break; }
       catch { await new Promise(resolve => setTimeout(resolve, 1000)); }
     }
+    if (!ready) emptyStartupDiagnostic(name);
     assert(ready, "Disposable cluster did not start");
     docker(["exec", name, "createdb", "--no-password", "-h", "127.0.0.1", "-p", port, "-U", "postgres", "--template=template0", database]);
     assert.equal(sql(name, "select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=56623 and current_database()='consolidated_rehearsal';"), "t");
+    await startNodeRuntime(name, state.Id);
     return name;
+  }
+
+  async function startNodeRuntime(databaseName, databaseId) {
+    const name = `${databaseName}-node`;
+    // The official Debian Node runtime avoids copying a glibc executable into
+    // the exact Alpine/Nix Supabase runtime. Shared network namespace preserves
+    // the existing literal loopback database guard without exposing a port.
+    docker(["run", "--detach", "--name", name, "--network", `container:${databaseName}`, "--user", "node", "--read-only",
+      "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m,mode=1777",
+      "--mount", `type=bind,source=${root},target=/work,readonly`,
+      "--mount", `type=bind,source=${path.join(clientRoot, "node_modules")},target=/client/node_modules,readonly`,
+      "--entrypoint", "node", nodeImage, "--eval", "setInterval(() => {}, 2147483647)"]);
+    created.push(name);
+    const state = JSON.parse(docker(["inspect", name]))[0];
+    assertNodeRuntimeState(state, { imageId: expectedNodeImageId, databaseName, databaseId,
+      repository: path.resolve(root), clientModules: path.join(clientRoot, "node_modules") });
+    try {
+      assert.equal(docker(["exec", name, "node", "--version"], { emptyContainerDiagnostic: true }), "v22.12.0", "Exact sidecar Node version required");
+    } catch (error) { emptyStartupDiagnostic(name); throw error; }
+    nodeContainers.set(databaseName, name);
+  }
+
+  function emptyStartupDiagnostic(name) {
+    // Startup calls this before replaying any application SQL or seeding data.
+    // Only the exact random container created by this invocation is inspected.
+    assert(created.includes(name));
+    const result = spawnSync("docker", ["inspect", name], { encoding: "utf8", timeout: 5000, maxBuffer: 1024 * 1024 });
+    try {
+      const state = JSON.parse(result.stdout)[0].State;
+      console.error(JSON.stringify({ syntheticOnly: true, phase: "empty-container-startup", container: name,
+        status: state.Status, exitCode: state.ExitCode, oomKilled: state.OOMKilled }));
+    } catch { console.error("Synthetic empty-container state unavailable."); }
+    const logs = spawnSync("docker", ["logs", "--tail", "30", name], { encoding: "utf8", timeout: 5000, maxBuffer: 16384 });
+    console.error(JSON.stringify({ syntheticOnly: true, phase: "empty-container-startup-log",
+      diagnostic: boundedSyntheticDiagnostic(`${logs.stdout ?? ""}${logs.stderr ?? ""}`) }));
   }
 
   function installExtensions(name) {
@@ -169,6 +251,10 @@ export async function rehearseHostedRuntime() {
     const imageMetadata = JSON.parse(docker(["image", "inspect", image]))[0];
     expectedImageId = imageMetadata.Id;
     assert(Array.isArray(imageMetadata.RepoDigests) && imageMetadata.RepoDigests.length > 0, "Pulled image digest required");
+    docker(["pull", nodeImage], { timeout: 300000 });
+    const nodeImageMetadata = JSON.parse(docker(["image", "inspect", nodeImage]))[0];
+    expectedNodeImageId = nodeImageMetadata.Id;
+    assert(Array.isArray(nodeImageMetadata.RepoDigests) && nodeImageMetadata.RepoDigests.length > 0, "Pulled Node image digest required");
     docker(["network", "create", "--internal", network]); networkCreated = true;
     assert.equal(JSON.parse(docker(["network", "inspect", network]))[0].Internal, true);
     const source = await start(`consolidated-source-${suffix}`);
@@ -181,7 +267,7 @@ export async function rehearseHostedRuntime() {
     const before = archiveAndRestore(source, beforeTarget, "before-consolidated");
     console.log("Verified full seeded baseline archive and restore, including owners, grants, contents, sequences and retained history.");
     node(source, "scripts/consolidated-db/rehearse.mjs", "--seeded");
-    docker(["cp", `${source}:/tmp/consolidated-db-rehearsal.json`, path.join(output, "consolidated-db-rehearsal.json")]);
+    docker(["cp", `${runtime(source)}:/tmp/consolidated-db-rehearsal.json`, path.join(output, "consolidated-db-rehearsal.json")]);
     const rehearsal = JSON.parse(readFileSync(path.join(output, "consolidated-db-rehearsal.json"), "utf8"));
     assert.equal(rehearsal.status, "PASS"); assert.equal(rehearsal.providerMode, "actual-supabase");
     assert.equal(rehearsal.baselineLedgerEntries, 153); assert.equal(rehearsal.candidateLedgerEntries, 159);
@@ -189,7 +275,9 @@ export async function rehearseHostedRuntime() {
     assert.equal(rehearsal.postdeployment, reviewedPostdeployment);
     const after = archiveAndRestore(source, afterTarget, "after-consolidated");
     console.log("Verified consolidated migration, legal and postdeployment rehearsal, followed by a complete candidate archive and restore.");
-    report = { schemaVersion: 1, status: "PASS", candidateSha, checkedAt: new Date().toISOString(), image, imageId: imageMetadata.Id, imageDigests: imageMetadata.RepoDigests, extensions, before, after, rehearsal,
+    report = { schemaVersion: 1, status: "PASS", candidateSha, checkedAt: new Date().toISOString(), image, imageId: imageMetadata.Id, imageDigests: imageMetadata.RepoDigests,
+      nodeRuntime: { image: nodeImage, imageId: nodeImageMetadata.Id, imageDigests: nodeImageMetadata.RepoDigests, version: "22.12.0", network: "attested matching database namespace", hostMounts: "read-only" },
+      extensions, before, after, rehearsal,
       productionDataRead: false, productionDataMutated: false,
       limitations: ["Synthetic Auth/Storage metadata and identities; schema-only canonical Realtime provider reproduction", "No hosted WebSocket, Clerk session, Storage object byte or external media provider proof", "These synthetic complete logical archives never replace the fresh authorized release-day Production backup and restore receipt"] };
   } finally {

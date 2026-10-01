@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertHostedContext, startup, image } from "../../scripts/consolidated-db/hosted-runtime.mjs";
+import { assertHostedContext, assertNodeRuntimeState, boundedSyntheticDiagnostic, startup, image, nodeImage } from "../../scripts/consolidated-db/hosted-runtime.mjs";
 
 const repository = "/isolated/candidate";
 const valid = {
@@ -40,4 +40,79 @@ test("isolated cluster cannot listen externally or execute copied cron and netwo
   assert.match(startup, /pg_net\.database_name=postgres/);
   assert(!startup.includes("listen_addresses='*'"));
   assert(!startup.includes("POSTGRES_PASSWORD"));
+});
+
+test("synthetic startup diagnostics are bounded and redact tokens, URLs and credentials", () => {
+  const secret = "synthetic-sensitive-value";
+  const output = boundedSyntheticDiagnostic(`loader GLIBC_2.28 missing\nAuthorization: Bearer ${secret}\npassword=${secret}\nhttps://example.invalid?token=${secret}\nsk_live_syntheticfakevalue\n${"a".repeat(20)}.${"b".repeat(20)}.${"c".repeat(20)}`);
+  assert(output.includes("GLIBC_2.28 missing"));
+  assert(!output.includes(secret)); assert(!output.includes("sk_live_")); assert(!output.includes("https://"));
+  assert(!output.includes("a".repeat(20)));
+  assert.equal(boundedSyntheticDiagnostic("x".repeat(10000)).length, 4096);
+  assert(!boundedSyntheticDiagnostic("\u001b[31mloader").includes("\u001b"));
+});
+
+const expectedNode = {
+  imageId: "sha256:synthetic-node-image", databaseName: "consolidated-source-synthetic", databaseId: "synthetic-database-id",
+  repository: "/isolated/candidate", clientModules: "/isolated/temporary/consolidated-pg-client/node_modules",
+};
+const nodeState = () => ({
+  Image: expectedNode.imageId,
+  Config: { Image: nodeImage, User: "node" },
+  HostConfig: {
+    NetworkMode: `container:${expectedNode.databaseName}`, PortBindings: {}, ReadonlyRootfs: true,
+    CapDrop: ["ALL"], SecurityOpt: ["no-new-privileges"], Tmpfs: { "/tmp": "rw,noexec,nosuid,size=64m,mode=1777" },
+  },
+  Mounts: [
+    { Type: "bind", Source: expectedNode.repository, Destination: "/work", RW: false },
+    { Type: "bind", Source: expectedNode.clientModules, Destination: "/client/node_modules", RW: false },
+  ],
+});
+
+test("Node runtime accepts only its exact database namespace and official pinned image", () => {
+  assert.equal(nodeImage, "node:22.12.0-bookworm-slim");
+  assert.doesNotThrow(() => assertNodeRuntimeState(nodeState(), expectedNode));
+  const resolvedId = nodeState(); resolvedId.HostConfig.NetworkMode = `container:${expectedNode.databaseId}`;
+  assert.doesNotThrow(() => assertNodeRuntimeState(resolvedId, expectedNode));
+  for (const mode of ["host", "bridge", "none", "container:another-database", "consolidated-ci-synthetic"]) {
+    const state = nodeState(); state.HostConfig.NetworkMode = mode;
+    assert.throws(() => assertNodeRuntimeState(state, expectedNode), `Network ${mode} must stop`);
+  }
+  const wrongDigest = nodeState(); wrongDigest.Image = "sha256:other-image";
+  assert.throws(() => assertNodeRuntimeState(wrongDigest, expectedNode));
+  const wrongTag = nodeState(); wrongTag.Config.Image = "node:latest";
+  assert.throws(() => assertNodeRuntimeState(wrongTag, expectedNode));
+  const published = nodeState(); published.HostConfig.PortBindings = { "56623/tcp": [{ HostPort: "56623" }] };
+  assert.throws(() => assertNodeRuntimeState(published, expectedNode));
+});
+
+test("Node runtime rejects writable or substituted host mounts and privilege escalation", () => {
+  for (const change of [
+    state => { state.Mounts[0].RW = true; },
+    state => { state.Mounts[1].RW = true; },
+    state => { state.Mounts[0].Source = "/different/repository"; },
+    state => { state.Mounts[1].Source = "/different/client"; },
+    state => { state.Mounts.push({ Type: "bind", Source: "/", Destination: "/host", RW: false }); },
+    state => { state.Mounts.push({ Type: "volume", Destination: "/data", RW: true }); },
+    state => { state.HostConfig.ReadonlyRootfs = false; },
+    state => { state.Config.User = "root"; },
+    state => { state.HostConfig.CapDrop = []; },
+    state => { state.HostConfig.SecurityOpt = []; },
+  ]) {
+    const state = nodeState(); change(state);
+    assert.throws(() => assertNodeRuntimeState(state, expectedNode));
+  }
+});
+
+test("Node scratch stays bounded and non-executable without extra mounts", () => {
+  const includedTmpfs = nodeState(); includedTmpfs.Mounts.push({ Type: "tmpfs", Destination: "/tmp", RW: true });
+  assert.doesNotThrow(() => assertNodeRuntimeState(includedTmpfs, expectedNode));
+  for (const option of ["noexec", "nosuid", "size=64m", "mode=1777"]) {
+    const state = nodeState(); state.HostConfig.Tmpfs["/tmp"] = state.HostConfig.Tmpfs["/tmp"].split(",").filter(value => value !== option).join(",");
+    assert.throws(() => assertNodeRuntimeState(state, expectedNode));
+  }
+  const extra = nodeState(); extra.HostConfig.Tmpfs["/other"] = "rw,noexec,nosuid,size=64m";
+  assert.throws(() => assertNodeRuntimeState(extra, expectedNode));
+  const wrongScratch = nodeState(); wrongScratch.Mounts.push({ Type: "tmpfs", Destination: "/other", RW: true });
+  assert.throws(() => assertNodeRuntimeState(wrongScratch, expectedNode));
 });
