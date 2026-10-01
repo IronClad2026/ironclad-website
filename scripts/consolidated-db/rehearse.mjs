@@ -9,6 +9,7 @@ import {preflightSql} from '../consolidated-release/sql.mjs';
 import {historySql,capture} from './fingerprint.mjs';
 import {buildPostDeploymentSql,postDeploymentRetryState,verifyPostDeploymentPackage} from './post-deployment.mjs';
 import {checkConcurrency,checkMigrationLock} from './concurrency.mjs';
+import {checkRelationAclFingerprints} from './relation-acl-regression.mjs';
 const client=await connect();
 const steps=[];
 const passed=step=>{steps.push(step);console.log('PASS '+step);};
@@ -25,6 +26,7 @@ try {
   assert.equal(await scalar(client,'select count(*)::integer from public.players'),24);
   assert.equal(await scalar(client,'select count(*)::integer from public.legal_documents'),10);
   passed('Synthetic three-division completed legacy event: 21 normal scored matches, three settlements, one genuine Main qualifying slot, coherent legal and retention history');
+  passed(await checkRelationAclFingerprints(client));
   if(process.argv.includes('--seed-only')) {console.log(JSON.stringify({status:'PASS',scope:'seed-only',providerMode,capture:await capture(client)}));await client.end();process.exit(0);}
   const historyBefore=await scalar(client,historySql());
   const functionsBefore=await scalar(client,catalogQuery);
