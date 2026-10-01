@@ -104,11 +104,13 @@ describe("AccountLegalUpdateGate", () => {
           id: "11111111-1111-4111-8111-111111111111",
           version: "1.1",
           url: "/terms-v1.1.pdf",
+          downloadUrl: "/terms-v1.1.pdf",
         },
         privacy: {
           id: "22222222-2222-4222-8222-222222222222",
           version: "1.1",
           url: "/privacy-v1.1.pdf",
+          downloadUrl: "/privacy-v1.1.pdf",
         },
       },
       "Review legal documents",

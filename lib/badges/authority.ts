@@ -204,6 +204,7 @@ type TournamentPrestigeSummaryRow = {
   main_championship_count: unknown;
   first_main_championship_tournament_id: unknown;
   first_main_championship_at: unknown;
+  first_main_championship_bracket_type: unknown;
   championship_count: unknown;
   second_championship_tournament_id: unknown;
   second_championship_at: unknown;
@@ -1144,6 +1145,11 @@ export async function evaluateTournamentPrestigeBadgeAwardsForPlayer({
       continue;
     }
 
+    if (threshold.badgeSlug === "elite-champion" && !summary.firstMainChampionshipBracketType) {
+      skippedReasons.push("elite-champion_source_division_missing");
+      continue;
+    }
+
     const created = await persistBadgeAward(supabase, {
       playerId,
       badgeSlug: threshold.badgeSlug,
@@ -1156,7 +1162,9 @@ export async function evaluateTournamentPrestigeBadgeAwardsForPlayer({
         evaluationMode,
         threshold: threshold.threshold,
         qualifyingCount,
-        bracketType: threshold.bracketType ?? null,
+        bracketType: threshold.badgeSlug === "elite-champion"
+          ? summary.firstMainChampionshipBracketType
+          : threshold.bracketType ?? null,
         eventType: threshold.eventType ?? null,
         originalUnlockedAtBasis: originalUnlockedAt
           ? threshold.sourceType === "match"
@@ -2093,6 +2101,11 @@ async function loadTournamentPrestigeBadgeSummary(
       row.first_main_championship_tournament_id
     ),
     firstMainChampionshipAt: isoOrNull(row.first_main_championship_at),
+    firstMainChampionshipBracketType:
+      row.first_main_championship_bracket_type === "main" ||
+      row.first_main_championship_bracket_type === "main_progression"
+        ? row.first_main_championship_bracket_type
+        : null,
     championshipCount: integerOrZero(row.championship_count),
     secondChampionshipTournamentId: stringOrNull(
       row.second_championship_tournament_id

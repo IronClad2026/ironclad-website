@@ -1,6 +1,69 @@
 import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/account-dashboard";
 
 const dictionary = {
+  showcase: {
+    reviewLatest: "Revisar la última versión guardada",
+    latestThought: "Última idea guardada",
+    latestEmpty: "No hay ninguna idea guardada.",
+    conflictResolved: "Se ha cargado la última versión guardada. Tu idea sin guardar se ha conservado. Revísala antes de guardarla.",
+    title: "Presentación del jugador",
+    description: "Dale un toque personal a tu perfil público con una idea del momento y un logro conseguido.",
+    manage: "Gestionar presentación",
+    backToDashboard: "Volver al panel",
+    publicProfile: "Perfil público",
+    privateProfile: "Perfil privado",
+    publicVisibilityHelp: "Tu idea del momento y tu logro destacado aparecen en tu perfil público.",
+    privateVisibilityHelp: "Tu presentación permanece oculta mientras tu perfil sea privado.",
+    viewPublicProfile: "Ver perfil público",
+    manageVisibility: "Gestionar visibilidad",
+    thoughtTitle: "Idea del momento",
+    thoughtHelp: "Hasta 160 caracteres de texto sin formato. Se permiten emojis; los emojis combinados pueden contar como varios caracteres.",
+    thoughtPlaceholder: "¿Qué tienes en mente?",
+    characterCount: "{count} / {max}",
+    saveThought: "Guardar idea",
+    cancel: "Cancelar",
+    removeThought: "Eliminar idea",
+    thoughtHidden: "Un administrador ha ocultado esta idea de tu perfil público.",
+    featuredBadgeTitle: "Logro destacado",
+    featuredBadgeHelp: "Elige un logro que hayas conseguido para mostrarlo junto a tu avatar.",
+    noFeaturedBadge: "No has seleccionado ningún logro destacado.",
+    chooseBadge: "Elegir logro",
+    changeBadge: "Cambiar logro",
+    removeBadge: "Quitar logro destacado",
+    noEarnedBadges: "Aquí aparecerán los logros que consigas.",
+    viewCollection: "Ver logros",
+    pickerTitle: "Elige un logro destacado",
+    pickerHelp: "Solo puedes destacar en tu perfil los logros que hayas conseguido.",
+    selectBadge: "Destacar {name}",
+    selectedBadge: "Destacado",
+    close: "Cerrar",
+    saving: "Guardando…",
+    badgeDetails: "Ver logro destacado: {name}",
+    retry: "Reintentar",
+    thoughtPreview: "Vista previa",
+    removedBadge: "Este logro ya no está disponible para destacar.",
+    report: "Informar de un problema",
+    adminTitle: "Moderación de la presentación",
+    adminDescription: "Oculta o restaura la idea del momento de un jugador. La privacidad del perfil sigue aplicándose.",
+    playerId: "ID del jugador",
+    hideThought: "Ocultar idea",
+    restoreThought: "Restaurar idea",
+    thoughtSaved: "Idea del momento guardada.",
+    badgeSaved: "Logro destacado actualizado.",
+    moderationSaved: "Visibilidad de la idea actualizada.",
+    signInRequired: "Vuelve a iniciar sesión para actualizar tu presentación.",
+    profileRequired: "Completa tu perfil de jugador antes de actualizar tu presentación.",
+    unavailable: "La presentación del jugador no está disponible temporalmente. Inténtalo más tarde.",
+    thoughtTooLong: "La idea no puede superar los 160 caracteres.",
+    thoughtInvalid: "Usa texto sin formato y sin caracteres de control no admitidos.",
+    invalidAward: "Elige un logro conseguido válido.",
+    awardNotOwned: "Solo puedes destacar un logro que hayas conseguido.",
+    conflict: "Tu presentación ha cambiado en otra sesión. Actualiza la página y vuelve a intentarlo.",
+    saveFailed: "No se han podido guardar los cambios. Vuelve a intentarlo.",
+    forbidden: "No tienes permiso para realizar este cambio.",
+    legalRequired: "Lee y acepta los últimos acuerdos obligatorios antes de continuar.",
+    invalidPlayer: "Introduce un ID de jugador válido.",
+  },
   homeAccount: {
     accountEyebrow: "Cuenta de IronClad",
     createTitle: "Crea tu identidad competitiva",
@@ -117,6 +180,9 @@ const dictionary = {
     bio: "La biografía",
   },
   steam: {
+
+
+
     eyebrow: "Identidad de juego verificada",
     title: "Conexión con Steam",
     description:
@@ -140,6 +206,9 @@ const dictionary = {
     connect: "Conectar cuenta de Steam",
   },
   relic: {
+
+
+
     eyebrow: "Puntuación competitiva",
     title: "ELO de perfil verificado",
     description:
@@ -305,12 +374,22 @@ const dictionary = {
     },
     career: {
       title: "Historial competitivo",
+      tournaments: "Torneos",
+      championships: "Títulos",
       matches: "Partidas",
       champions: "Campeones",
-      registrations: "Inscripciones anteriores",
-      registrationsEmpty: "No hay inscripciones anteriores.",
       loadError: "No se pudo cargar tu historial competitivo.",
       partialError: "No se pudieron cargar algunos datos de presentación de los torneos.",
+    },
+    tournamentHistory: {
+      title: "Historial de torneos",
+      empty: "Aquí aparecerán tus participaciones en torneos completados.",
+      record: "Balance del torneo",
+      recordValue: "{wins}–{losses}",
+      wins: "Victorias",
+      losses: "Derrotas",
+      showMatches: "Ver partidas",
+      hideMatches: "Ocultar partidas",
     },
     statistics: {
       eyebrow: "Historial competitivo",
@@ -324,7 +403,7 @@ const dictionary = {
     },
     champions: {
       eyebrow: "Archivo de victorias",
-      title: "Campeones de torneos",
+      title: "Títulos de torneos",
       empty: "Las victorias en torneos se mostrarán aquí de forma permanente.",
       champion: "Campeón del torneo",
       bracket: "Cuadro {name}",

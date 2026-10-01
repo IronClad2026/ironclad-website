@@ -1,3 +1,4 @@
+import { getDivisionModelForCalculationVersion } from "@/lib/division-model";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import PlayerProfileForm from "@/components/PlayerProfileForm";
@@ -92,7 +93,12 @@ function getRelicVerification(
     return null;
   }
 
-  const expectedDivision = getIronCladDivision(elo);
+  if (protectedProfile.relic_elo_calculation_version !== "relic-highest-1v1-v1" &&
+    protectedProfile.relic_elo_calculation_version !== "relic-highest-1v1-v2") return null;
+
+  const model = getDivisionModelForCalculationVersion(protectedProfile.relic_elo_calculation_version);
+  if (!model) return null;
+  const expectedDivision = getIronCladDivision(elo, model);
 
   if (
     !expectedDivision.ok ||

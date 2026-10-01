@@ -26,6 +26,7 @@ import type {
   EarnedBadgeCollectionItem,
   PlayerBadgeAward,
 } from "@/lib/badges/types";
+import type { MatchHistoryEntry } from "@/lib/player-dashboard";
 
 type MockImageProps = ImgHTMLAttributes<HTMLImageElement> & {
   src: string;
@@ -134,10 +135,12 @@ describe("Badge reveal experience", () => {
     });
     const fixture = buildRevealFixture("first-victory", "new-award");
     const acknowledge = vi.fn();
-    const match = {
+    const match: MatchHistoryEntry = {
       id: "old-match", tournamentName: "Previous Championship", bracketName: "Challenge",
+      tournamentId: "previous-championship", tournamentBracketId: "challenge-division",
+      generatedBracketId: "previous-championship-bracket", tournamentBannerImageUrl: null,
       opponentName: "Opponent", result: "win" as const, score: "2–0",
-      playedAt: "2026-08-01T12:00:00.000Z", roundName: "Final", matchNumber: 1,
+      playedAt: "2026-08-01T12:00:00.000Z", roundName: "Final", roundNumber: 1, matchNumber: 1,
       seriesBestOf: 3, replayAvailable: false, screenshotAvailable: false,
     };
     const { rerender } = render(

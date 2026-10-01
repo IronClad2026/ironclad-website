@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "policy": "mandatory-postdeployment-four-model-creation-and-showcase-v1",
+  "mustFollow": [
+    "exact reviewed app deployment",
+    "Rulebook/PPA3.2 legal activation and immutable history comparison"
+  ],
+  "mustPrecede": [
+    "creation/registration unfreeze"
+  ],
+  "migration": {
+    "file": "20261001040810_production_retire_legacy_creation.sql",
+    "version": "20261001040810",
+    "name": "production_retire_legacy_creation",
+    "sha256": "d21fcc5f035773bf941b63066badc2f7dcc3a11caa2f3f02af2aa55bc1c612b4"
+  },
+  "configuration": {
+    "player_showcase": {
+      "enabled": true
+    },
+    "player_combat_highlights": {
+      "enabled": false
+    },
+    "existingCoreFlags": "unchanged"
+  }
+}

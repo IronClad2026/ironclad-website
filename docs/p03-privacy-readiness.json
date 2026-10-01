@@ -67,7 +67,7 @@
     },
     {
       "path": "scripts/legal-successor/p03-legal-runtime.mjs",
-      "sha256": "a6d2f769833536943fcf0d2299dc3ea2b3e18bc77f7946da253d15834c24f819",
+      "sha256": "fc6b3e66712f15a8eeb828e3151cf62662e8936192454684f56e8881820ff9ff",
       "encoding": "utf8-lf"
     },
     {
@@ -127,7 +127,7 @@
     },
     {
       "path": "tests/unit/legal-p03-staging.test.ts",
-      "sha256": "f7eef31fdf5783f592dfaba717a3bf21da7dc1cf5a8eb7e43c75317bd1a3a5fa",
+      "sha256": "3617cbdd952994e9017cec292c72312f31faf1fa6dd525497c314e57d0973b46",
       "encoding": "utf8-lf"
     },
     {
@@ -139,6 +139,26 @@
       "path": "tests/unit/p03-release/privacy.test.ts",
       "sha256": "d7e30fbbd8521b011515c7dac84f1a4f40c7817fb7c37d691c4bfd3c809ae8ed",
       "encoding": "utf8-lf"
+    },
+    {
+      "encoding": "utf8-lf",
+      "path": "scripts/consolidated-legal/publication.mjs",
+      "sha256": "89279f7c9d34c68b847fc2ca27cb805c2ce6ff7b2ac2a0b6f51d68abf16bc2ed"
+    },
+    {
+      "encoding": "utf8-lf",
+      "path": "content/production-four-division-legal-release.json",
+      "sha256": "2644bba6e11075ea2ff91517b7f5e5191344e28f726631a70e9e5ba36d58be6d"
+    },
+    {
+      "encoding": "utf8-lf",
+      "path": "content/legal-history/production-rulebook-ppa-v3.1-corpus.json",
+      "sha256": "6bbd9a87d88cce902ad04a46d5ec9ec55602e40cbb6ac3b02fe2d045ef29154e"
+    },
+    {
+      "encoding": "utf8-lf",
+      "path": "content/legal-document-delivery.json",
+      "sha256": "cc90d1ef89c9cdb62c422095e1cd447825418accb4bed734e9670aef9cf727ff"
     }
   ]
 }

@@ -162,9 +162,9 @@ export function profileFixture(): PlayerProfile {
 
 export function registrationFixtures() {
   if (parameters().has("empty")) return [];
-  return ["approved", "waitlisted", "approved"].map((status, index) => ({
-    id: `registration-${index + 1}`, tournament_title: index === 2 ? "Previous IronClad Cup" : `IronClad Open ${index + 1}`,
-    bracket_name: "Academy", registration_status: status,
+  const registrations = ["approved", "waitlisted", "approved"].map((status, index) => ({
+    id: `registration-${index + 1}`, tournament_title: parameters().has("long") ? `IronClad_InternationalChampionship_${"TournamentName".repeat(4)}_${index + 1}` : index === 2 ? "Previous IronClad Cup" : `IronClad Open ${index + 1}`,
+    bracket_name: parameters().has("long") ? "Academy International Championship Division" : "Academy", registration_status: status,
     tournament_bracket_id: `fixture-bracket-${index}`, elo_status: "verified", submitted_elo: 1020,
     withdrawn_at: null, waitlist_offer_status: index === 1 ? "offered" : null,
     waitlist_offer_created_at: index === 1 ? fixtureDate : null,
@@ -174,10 +174,21 @@ export function registrationFixtures() {
     tournaments: { status: index === 2 ? "completed" : "registration_open" },
     created_at: fixtureDate,
   }));
+  if (parameters().has("registrationStates")) {
+    for (const status of ["pending", "manual_review", "rejected", "withdrawn"]) {
+      registrations.push({ ...registrations[0], id: `registration-${status}`, tournament_title: `IronClad ${status} Cup`, registration_status: status });
+    }
+    for (const status of ["cancelled", "voided"]) {
+      registrations.push({ ...registrations[1], id: `registration-${status}`, tournament_title: `IronClad ${status} Cup`, tournaments: { status } });
+    }
+  }
+  return registrations;
 }
 
 export function careerFixture(): PlayerCareerDashboard {
   const empty = parameters().has("empty");
+  const careerBanner = parameters().has("noCareerBanner") ? null : "/images/tournaments/1v1-operation-skyfall.jpeg";
+  const careerName = parameters().has("long") ? `Previous IronClad ${"InternationalChampionship".repeat(4)}` : "Previous IronClad Cup";
   return {
     error: parameters().has("careerError") ? "load-failed" : null,
     statistics: { matchesPlayed: empty ? 0 : 18, matchesWon: empty ? 0 : 12, matchesLost: empty ? 0 : 6, winRate: empty ? 0 : 66.7, tournamentsParticipated: empty ? 0 : 4, tournamentsWon: empty ? 0 : 1 },
@@ -190,11 +201,13 @@ export function careerFixture(): PlayerCareerDashboard {
       reviewedAt: null, submittedByViewer: false, confirmationDeadlineAt: fixtureDeadline, finalizedAt: null,
       canConfirm: true, canDispute: true,
     }],
-    champions: empty ? [] : [{ id: "fixture-champion", winnerName: "Steel Vanguard", tournamentName: "Previous IronClad Cup", bracketName: "Academy", bannerImageUrl: "/images/tournaments/1v1-operation-skyfall.jpeg", wonAt: fixtureDate }],
+    champions: empty ? [] : [{ id: "fixture-champion", tournamentId: "career-event-0", tournamentBracketId: "career-division-0", generatedBracketId: "career-generation-0", winnerName: "Steel Vanguard", tournamentName: careerName, bracketName: "Academy", bannerImageUrl: careerBanner, wonAt: "2026-09-02T12:00:00.000Z" }],
     matchHistory: empty ? [] : Array.from({ length: 6 }, (_, index) => ({
-      id: `fixture-match-${index}`, tournamentName: "Previous IronClad Cup", bracketName: "Academy",
-      opponentName: `Opponent ${index + 1}`, result: index % 2 === 0 ? "win" : "loss", score: index % 2 === 0 ? "2–1" : "0–2",
-      playedAt: fixtureDate, roundName: "Semifinal", matchNumber: index + 1, seriesBestOf: 3,
+      id: `fixture-match-${index}`, tournamentName: careerName, bracketName: "Academy",
+      tournamentId: `career-event-${Math.floor(index / 2)}`, tournamentBracketId: `career-division-${Math.floor(index / 2)}`,
+      generatedBracketId: `career-generation-${Math.floor(index / 2)}`, tournamentBannerImageUrl: careerBanner,
+      opponentName: `Opponent ${index + 1}`, result: index < 3 ? "win" : "loss", score: index < 3 ? "2–1" : "0–2",
+      playedAt: `2026-0${9 - Math.floor(index / 2)}-0${index % 2 + 1}T12:00:00.000Z`, roundName: index % 2 === 0 ? "Semifinal" : "Final", roundNumber: index % 2 + 1, matchNumber: index + 1, seriesBestOf: 3,
       replayAvailable: false, screenshotAvailable: false,
     })),
   };
@@ -203,7 +216,8 @@ export function careerFixture(): PlayerCareerDashboard {
 export function notificationFixture(): InAppNotification[] {
   if (parameters().has("empty")) return [];
   const historical = parameters().has("historicalNotice");
-  return [{ id: "fixture-update", recipientRole: "player", type: historical ? "registration.waitlist_offer" : "registration_approved", title: historical ? "Previous waitlist offer" : "Your registration was approved", message: historical ? "Review the retained previous registration record." : "You are in the approved Academy roster. Watch the tournament for Division launch information.", actorDisplayName: null, tournamentId: null, tournamentTitle: "IronClad Open 1", registrationId: historical ? "registration-3" : "registration-1", matchId: null, reportGroupId: null, deadlineAt: null, readAt: null, createdAt: fixtureDate, href: `/dashboard#registration-registration-${historical ? "3" : "1"}` }];
+  const current = parameters().has("currentNotice");
+  return [{ id: "fixture-update", recipientRole: "player", type: historical || current ? "registration.waitlist_offer" : "registration_approved", title: historical ? "Previous waitlist offer" : current ? "Current waitlist offer" : "Your registration was approved", message: historical ? "A retained notification from a previous event." : "You are in the approved Academy roster. Watch the tournament for Division launch information.", actorDisplayName: null, tournamentId: null, tournamentTitle: "IronClad Open 1", registrationId: historical ? "registration-3" : current ? "registration-2" : "registration-1", matchId: null, reportGroupId: null, deadlineAt: null, readAt: null, createdAt: fixtureDate, href: `/dashboard#registration-registration-${historical ? "3" : current ? "2" : "1"}` }];
 }
 
 export function badgeFixture() {

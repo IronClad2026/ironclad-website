@@ -23,7 +23,7 @@ describe("mechanical P03 legal staging", () => {
       copyFileSync(join(root, predecessorPath), join(directory, "content/legal-corpus.json"));
       copyFileSync(join(root, previousReleasePath), join(directory, "content/legal-successor-release.json"));
       writeFileSync(join(directory, ".gitignore"), "p03-artifacts/\n");
-      const git = (args: string[]) => execFileSync("git", args, { cwd: directory, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+      const git = (args: string[]) => execFileSync("git", args, { cwd: directory, encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "pipe"] }).trim();
       git(["init", "--initial-branch=codex/p03-production-ready"]);
       git(["add", "."]);
       git(["-c", "user.name=P03 test", "-c", "user.email=p03-test@example.invalid", "commit", "--no-gpg-sign", "-m", "Synthetic local staging fixture"]);
@@ -39,10 +39,10 @@ describe("mechanical P03 legal staging", () => {
       writeFileSync(join(bundle, "legal-corpus.json"), JSON.stringify(staged));
       writeFileSync(join(bundle, "legal-successor-release.json"), JSON.stringify(release));
       writeFileSync(join(bundle, "ironclad-privacy-policy-v1.3.pdf"), pdf);
-      const invoke = (sha: string) => spawnSync(process.execPath, [join(root, "scripts/legal-successor/stage-p03-privacy.mjs"), "--package-dir", bundle, "--expected-head", sha], { cwd: directory, encoding: "utf8" });
+      const invoke = (sha: string) => spawnSync(process.execPath, [join(root, "scripts/legal-successor/stage-p03-privacy.mjs"), "--package-dir", bundle, "--expected-head", sha], { cwd: directory, encoding: "utf8", timeout: 10_000 });
       expect(invoke("0".repeat(40)).status).not.toBe(0);
       expect(validateP03LegalRuntime(directory).mode).toBe("prepared-review");
-      const publication = (output: string) => spawnSync(process.execPath, [join(root, "scripts/legal-successor/p03-privacy-publication.mjs"), "--package-dir", bundle, "--out", join(bundle, output)], { cwd: directory, encoding: "utf8" });
+      const publication = (output: string) => spawnSync(process.execPath, [join(root, "scripts/legal-successor/p03-privacy-publication.mjs"), "--package-dir", bundle, "--out", join(bundle, output)], { cwd: directory, encoding: "utf8", timeout: 10_000 });
       expect(publication("before-stage.sql").status).not.toBe(0);
       const applied = invoke(head);
       expect(applied.status, applied.stderr).toBe(0);
@@ -64,5 +64,7 @@ describe("mechanical P03 legal staging", () => {
       if (!directory.includes("ironclad-p03-legal-stage-test-")) throw new Error("Unexpected test cleanup target.");
       rmSync(directory, { recursive: true, force: true });
     }
-  });
+  // This integration proof starts Git and several isolated Node processes.
+  // Keep each child bounded while allowing contention in the complete suite.
+  }, 30_000);
 });

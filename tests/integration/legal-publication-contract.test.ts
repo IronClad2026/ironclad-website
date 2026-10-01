@@ -130,8 +130,8 @@ describe("versioned legal publication contract", () => {
       schemaVersion: 1,
       status: "Final",
     });
-    expect(corpus.effectiveDate).toBe(manifest.effectiveDate);
-    expect(corpus.effectiveDateDisplay).toBe(displayDate);
+    expect(corpus.effectiveDate).toBe("2026-09-29");
+    expect(corpus.effectiveDateDisplay).toBe("29 September 2026");
     expect(manifest.documents).toHaveLength(1);
     expect(manifest.documents[0].kind).toBe("privacy");
     expect(manifest.documents[0].effectiveDate).toBe(manifest.effectiveDate);
@@ -182,20 +182,20 @@ describe("versioned legal publication contract", () => {
       }))
     ).toEqual([
       {
-        effectiveDate: "2026-08-22",
-        filename: "ironclad-official-tournament-rulebook-v3.1.pdf",
+        effectiveDate: "2026-09-29",
+        filename: "ironclad-official-tournament-rulebook-v3.2.pdf",
         kind: "rulebook",
-        publicPath: "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.1.pdf",
+        publicPath: "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.2.pdf",
         status: "Effective",
-        version: "3.1",
+        version: "3.2",
       },
       {
-        effectiveDate: "2026-08-22",
-        filename: "ironclad-player-participation-agreement-v3.1.pdf",
+        effectiveDate: "2026-09-29",
+        filename: "ironclad-player-participation-agreement-v3.2.pdf",
         kind: "ppa",
-        publicPath: "/documents-rules-ppa/ironclad-player-participation-agreement-v3.1.pdf",
+        publicPath: "/documents-rules-ppa/ironclad-player-participation-agreement-v3.2.pdf",
         status: "Effective",
-        version: "3.1",
+        version: "3.2",
       },
       ...(["terms", "privacy"] as const).map((kind) => {
         const document = activeAccountDocuments.get(kind)!;
@@ -223,6 +223,8 @@ describe("versioned legal publication contract", () => {
       ]),
       ...publishedV11Artifacts,
       ...publishedCompetitionV31Artifacts,
+      ["ironclad-official-tournament-rulebook-v3.2.pdf", "0e665b6d8b815ea37808a2c91d2493c446895757580b9b0c1053833a3c8264c7"],
+      ["ironclad-player-participation-agreement-v3.2.pdf", "4d498aec223dd83cb7aae1690f19de2477b77b999ea5a85cafe3aaaecdc55666"],
       [
         "ironclad-privacy-policy-v1.2.pdf",
         "aa0f7af02b69194172dd6333e1d8b7271152aad0bfdab7a935686071c784bfd6",

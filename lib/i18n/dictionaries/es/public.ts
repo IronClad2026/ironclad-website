@@ -15,7 +15,7 @@ const dictionary = {
       eyebrow: "Eventos competitivos de Company of Heroes 3",
       title: "Torneos IronClad",
       description:
-        "Compite en 1v1 con divisiones verificadas, juego limpio, clasificaciones permanentes de carrera y temporadas Main / Pro de seis eventos.",
+        "Compite en 1v1 con divisiones verificadas, juego limpio, clasificaciones permanentes de carrera y temporadas Pro de seis eventos.",
       viewTournaments: "Ver torneos",
       joinDiscord: "Unirse a Discord (opcional)",
       launchFormat: "Formato de lanzamiento",
@@ -56,7 +56,7 @@ const dictionary = {
         "Verifica tu división, juega en un cuadro estructurado de ocho jugadores y crea un historial competitivo oficial.",
       verifyTitle: "1V1 VERIFICADO",
       verifyText:
-        "Conecta Steam y verifica tu ELO 1v1 actual de Relic. IronClad te asigna a Academy, Challenge o Main / Pro y bloquea esa instantánea de elegibilidad para el evento.",
+        "Conecta Steam y verifica tu ELO 1v1 actual de Relic. IronClad te asigna a Academy, Challenge, Main o Pro y bloquea esa instantánea de elegibilidad para el evento. Academy 0–1099 · Challenge 1100–1399 · Main 1400–1699 · Pro 1700+.",
       verifyCta: "VER TORNEOS",
       reportTitle: "JUEGA E INFORMA",
       reportText:
@@ -64,11 +64,13 @@ const dictionary = {
       reportCta: "LEER REGLAS 1V1",
       progressTitle: "COMPITE Y PROGRESA",
       progressText:
-        "Suma puntos mediante la participación y el progreso válidos. Academy y Challenge mantienen clasificaciones permanentes de carrera; Main / Pro se disputa en temporadas de seis eventos.",
+        "Academy, Challenge y Main mantienen carreras permanentes separadas. Pro usa temporadas de seis eventos válidos. Los resultados históricos Main / Pro permanecen separados.",
       progressCta: "VER CLASIFICACIONES",
     },
   },
   about: {
+    proRange: "1700+ ELO",
+    proText: "Para competidores de élite en temporadas oficiales Pro de seis eventos.",
     heroEyebrow: "Creado para la competición de Company of Heroes 3",
     heroTitle: "Torneos IronClad",
     heroDescription:
@@ -90,7 +92,7 @@ const dictionary = {
     fairBracketsText: "Los jugadores compiten en rangos ELO definidos.",
     competitiveProgress: "Progreso competitivo",
     competitiveProgressText:
-      "Los resultados crean clasificaciones permanentes de carrera o una temporada Main / Pro de seis eventos.",
+      "Academy, Challenge y Main mantienen carreras permanentes separadas. Pro usa temporadas de seis eventos válidos. Los resultados históricos Main / Pro permanecen separados.",
     structureEyebrow: "Estructura de torneos",
     structureTitle: "Eventos estructurados. Progreso claro.",
     structureText:
@@ -101,9 +103,9 @@ const dictionary = {
     challengeRange: "1100–1399 ELO",
     challengeText:
       "Para competidores en ascenso que buscan cuadros más exigentes y rivales más fuertes.",
-    mainRange: "1400+ ELO",
+    mainRange: "1400–1699 ELO",
     mainText:
-      "Para los mejores competidores que luchan por los puestos más altos de IronClad.",
+      "Para competidores experimentados que construyen una carrera Main permanente antes de la división Pro.",
     integrityEyebrow: "Integridad",
     integrityTitle: "La competición justa es lo primero",
     integrityText:
@@ -201,14 +203,24 @@ const dictionary = {
     profileMetadataDescription: "Perfil público de IronClad de {name}.",
   },
   rankings: {
+    proDivision: "Pro",
+    mainProgression: "Carrera Main",
+    proSeason: "Temporada Pro",
+    proAllTime: "Pro de todos los tiempos",
+    proDescription: "Clasificación oficial Pro de la temporada seleccionada de seis eventos válidos.",
+    proAllTimeDescription: "Clasificación permanente Pro de los eventos Pro válidos.",
+    mainProgressionDescription: "Progresión Main de los eventos de cuatro divisiones. Los resultados históricos Main / Pro permanecen en su archivo.",
+    mainProgressionScoring: "Main otorga +10 por participar, +5 por ronda superada y +5 por ganar, sin bonificación por incorporación tardía. La victoria en la final solo concede la bonificación de ganador.",
+    officialScope: "Clasificación de la división oficial",
+    officialAllTimeRecord: "Cada evento válido que otorga puntos en {division} contribuye a este registro permanente.",
     metadataTitle: "Clasificación general | IronClad",
     metadataDescription:
-      "Sigue la temporada actual y el historial Main / Pro junto a las clasificaciones permanentes de carrera de Academy y Challenge.",
-    mainDivision: "Main / Pro",
-    mainSeason: "Temporada Main / Pro",
+      "Academy, Challenge y Main mantienen carreras permanentes separadas. Pro usa temporadas de seis eventos válidos. Los resultados históricos Main / Pro permanecen separados.",
+    mainDivision: "Histórico · Main / Pro",
+    mainSeason: "Histórico · Temporada Main / Pro",
     currentSeasonScope: "Temporada actual",
     allTimeScope: "Histórico",
-    mainScope: "Clasificación Main / Pro",
+    mainScope: "Histórico · Clasificación Main / Pro",
     academyCareer: "Carrera de Academy",
     challengeCareer: "Carrera de Challenge",
     loadWarning:
@@ -216,9 +228,9 @@ const dictionary = {
     publicLeaderboard: "Clasificación pública",
     dynamicStandings: "Clasificación dinámica",
     mainDescription:
-      "Clasificación oficial Main / Pro de la temporada destacada de seis eventos válidos.",
+      "Histórico · Clasificación oficial Main / Pro de la temporada destacada de seis eventos válidos.",
     mainAllTimeDescription:
-      "Clasificación permanente Main / Pro de todos los eventos puntuables válidos, incluida la temporada activa.",
+      "Histórico · Clasificación permanente Main / Pro de todos los eventos puntuables válidos, incluida la temporada activa.",
     academyDescription:
       "Los puntos y resultados de Academy permanecen en esta vista permanente de carrera.",
     challengeDescription:
@@ -227,31 +239,31 @@ const dictionary = {
     visibleCompetitors: "Competidores visibles",
     rankingModel: "Modelo de clasificación",
     sixEventSeason: "Temporada de seis eventos",
-    permanentMainPro: "Main / Pro permanente",
+    permanentMainPro: "Histórico · Main / Pro permanente",
     permanentCareer: "Carrera permanente",
     seasonState: "Estado de temporada",
     division: "División",
     heroEyebrow: "Mando competitivo de IronClad",
     heroTitle: "Clasificación general",
     heroDescription:
-      "Main / Pro muestra la temporada oficial de seis eventos válidos y su historial permanente. Academy y Challenge mantienen clasificaciones permanentes separadas.",
-    featuredSeason: "Temporada Main / Pro destacada",
-    mainAllTime: "Histórico Main / Pro",
+      "Academy, Challenge y Main mantienen carreras permanentes separadas. Pro usa temporadas de seis eventos válidos. Los resultados históricos Main / Pro permanecen separados.",
+    featuredSeason: "Temporada destacada",
+    mainAllTime: "Histórico · Histórico Main / Pro",
     mainAllTimeRecord:
-      "Cada evento válido con puntos Main / Pro contribuye a este historial permanente.",
+      "Histórico · Cada evento válido con puntos Main / Pro contribuye a este historial permanente.",
     mainAllTimeNoReset:
       "Incluye los puntos de la temporada actual. El historial no se reinicia al cerrar una temporada ni determina los puestos con premio de la temporada actual.",
     careerStandings: "Clasificación de carrera",
     seasonNotStarted: "Temporada no iniciada",
     noSeason:
-      "No hay una temporada clasificatoria en curso. La clasificación empieza con el primer evento Main / Pro válido.",
+      "No hay una temporada clasificatoria en curso. La clasificación empieza con el primer evento válido.",
     careerRecord:
       "Los puntos forman parte del historial competitivo permanente de esta División.",
     validEvents: "Eventos clasificatorios válidos",
     underReviewNotice:
       "Los resultados están en revisión. La clasificación mostrada no es definitiva mientras siga abierta.",
     careerNoReset:
-      "Los puntos de carrera no se reinician al terminar una temporada Main / Pro y permanecen separados de la otra División de carrera.",
+      "Academy, Challenge y Main mantienen carreras permanentes separadas. Pro usa temporadas de seis eventos válidos. Los resultados históricos Main / Pro permanecen separados.",
     competitors: "Competidores",
     season: "Temporada",
     state: "Estado",
@@ -262,7 +274,7 @@ const dictionary = {
     tba: "Por confirmar",
     careerTitle: "{division} es una clasificación permanente de carrera.",
     careerSeparation:
-      "Los puntos no se reinician al acabar una temporada Main / Pro. El historial Academy sigue en Academy, el de Challenge en Challenge y ninguno pasa a Main / Pro.",
+      "Academy, Challenge y Main mantienen carreras permanentes separadas. Pro usa temporadas de seis eventos válidos. Los resultados históricos Main / Pro permanecen separados.",
     entrantBonus:
       "Los nuevos participantes pueden recibir +5 puntos por evento elegible anterior, una vez por División, hasta +25.",
     notStarted: "No iniciada",
@@ -271,21 +283,21 @@ const dictionary = {
     underReviewDescription:
       "La clasificación histórica congelada sigue visible durante la revisión de la temporada finalizada.",
     finalized: "Finalizada",
-    finalizedDescription: "Finalizada. Esta clasificación Main / Pro está congelada.",
+    finalizedDescription: "Finalizada. Esta clasificación está congelada.",
     finalizationPending: "Finalización pendiente",
     finalizationPendingDescription:
       "Finalización pendiente. La puntuación y finalización automáticas deberían completarse tras el sexto evento válido.",
     inProgress: "En curso",
     inProgressDescription: "Temporada en curso.",
-    topUnavailable: "Primeros puestos de Main / Pro no disponibles",
+    topUnavailable: "Primeros puestos de no disponibles",
     topUnavailableText:
-      "Los rangos oficiales aparecerán tras publicarse resultados Main / Pro válidos.",
-    topAria: "Primeros puestos Main / Pro",
-    finalStandings: "Clasificación final Main / Pro",
-    currentStandings: "Clasificación actual Main / Pro",
+      "Los rangos oficiales aparecerán tras publicarse resultados válidos.",
+    topAria: "Primeros puestos",
+    finalStandings: "Clasificación final",
+    currentStandings: "Clasificación actual",
     topStandings: "Primeros puestos",
     tieNotice:
-      "Se muestra a cada competidor que comparte oficialmente los puestos 1, 2 o 3 de Main / Pro. El orden visual no cambia el puesto oficial. Cada Evento con premios se rige por sus Condiciones de Premios publicadas.",
+      "Se muestra a cada competidor que comparte oficialmente los puestos 1, 2 o 3 de . El orden visual no cambia el puesto oficial. Cada Evento con premios se rige por sus Condiciones de Premios publicadas.",
     rank: "Posición",
     player: "Jugador",
     country: "País",
@@ -308,7 +320,7 @@ const dictionary = {
     dateTba: "Fecha por confirmar",
     pointsShort: "{points} pts",
     topScorer: "Mayor puntuación publicada: {name}",
-    championArchive: "Archivo de campeones Main / Pro",
+    championArchive: "Archivo de campeones",
     latestFinalized: "Últimos resultados finalizados",
     championsEmpty: "Los campeones aparecerán al cerrarse una temporada.",
     rankNumber: "Puesto {rank}",
@@ -317,6 +329,32 @@ const dictionary = {
     academyBracket: "Cuadro Academy",
     challengeBracket: "Cuadro Challenge",
     aggregate: "Total",
+  },
+  news: {
+    title: "Noticias oficiales de CoH3",
+    intro: "Publicaciones recientes sobre Company of Heroes 3 del canal oficial de Relic en Steam. Lee cada anuncio en su fuente original.",
+    sourceLabel: "Relic Entertainment · Publicación oficial en Steam",
+    sourceLanguage: "Los artículos originales se publican en inglés.",
+    readAnnouncement: "Leer el anuncio oficial",
+    opensNewTab: "Se abre en una pestaña nueva",
+    published: "Publicado",
+    latestFromRelic: "Lo último de Relic",
+    viewAll: "Ver todas las noticias",
+    moreOnSteam: "Más noticias oficiales de CoH3 en Steam",
+    unavailableTitle: "Noticias temporalmente no disponibles",
+    unavailableDescription: "No hemos podido cargar las últimas publicaciones. Puedes seguir leyendo los anuncios oficiales de CoH3 en Steam.",
+    emptyTitle: "No hay noticias recientes para mostrar",
+    emptyDescription: "Consulta el canal oficial de CoH3 de Relic en Steam para ver más anuncios.",
+    fallbackLabel: "Noticias oficiales de CoH3",
+    disclaimer: "IronClad Tournaments es una plataforma comunitaria independiente y no está afiliada a Relic Entertainment ni a Valve, ni cuenta con su respaldo. Company of Heroes, Relic, Steam y las marcas relacionadas pertenecen a sus respectivos propietarios.",
+    categoryLabel: "Categoría asignada por IronClad",
+    categories: {
+      patchNotes: "Notas del parche",
+      update: "Actualización",
+      announcement: "Anuncio",
+    },
+    metadataTitle: "Noticias oficiales y notas de parches de CoH3 | IronClad",
+    metadataDescription: "Consulta las últimas noticias y notas de parches de Company of Heroes 3 del canal oficial de Relic en Steam, con extractos breves y enlaces a los anuncios originales.",
   },
   announcements: {
     metadataTitle: "Anuncios oficiales | IronClad",

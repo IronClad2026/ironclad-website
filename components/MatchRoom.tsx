@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useAuth } from "@clerk/nextjs";
+import useMatchRoomRealtime from "@/components/useMatchRoomRealtime";
 import {
   getMatchRoomHistory,
   getMatchRoomEarlierHistory,
@@ -60,8 +62,9 @@ function mergeRoomSnapshot(previous: Room | undefined, incoming: Room): Room {
 }
 
 export default function MatchRoom(props: MatchRoomProps) {
+  const { userId, sessionId } = useAuth();
   // A new workspace must never render the previous workspace's transcript or draft.
-  return <MatchRoomSession key={`${props.matchId}:${props.roomId ?? "current"}:${!!props.admin}`} {...props} />;
+  return <MatchRoomSession key={`${userId}:${sessionId}:${props.matchId}:${props.roomId ?? "current"}:${!!props.admin}`} {...props} />;
 }
 
 function MatchRoomSession({ matchId, roomId, participants, admin = false, footer }: MatchRoomProps) {
@@ -160,7 +163,8 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
         target = result.data.room;
       }
 
-      if (current.current && current.current.room.id !== target?.id) {
+      if (current.current && (current.current.room.id !== target?.id ||
+          current.current.room.communicationGeneration !== target?.communicationGeneration)) {
         discardRoom();
         requestEpoch = scope.current.epoch;
       }
@@ -174,7 +178,8 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
       const result = await getMatchRoomHistory({ roomId: target.id, afterSequence, limit: 50 });
       if (!isCurrentRequest()) return;
       if (!result.ok) throw result.code;
-      if (result.data.room.matchId !== matchId) throw "forbidden";
+      if (result.data.room.matchId !== matchId || result.data.room.id !== target.id ||
+          result.data.room.communicationGeneration !== target.communicationGeneration) throw "forbidden";
       const incoming = result.data;
       // An earlier page or read acknowledgement may have arrived during this poll.
       const latest = current.current;
@@ -270,25 +275,14 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
     lifecycle.alive = true;
     lifecycle.session++;
     void Promise.resolve().then(refresh);
-    const onReturn = () => {
-      if (visibleAndOnline()) {
-        setViewVersion((value) => value + 1);
-        void refresh();
-      }
-    };
-    const timer = window.setInterval(() => { if (visibleAndOnline()) void refresh(); }, 10_000);
-    window.addEventListener("focus", onReturn);
-    window.addEventListener("online", onReturn);
-    document.addEventListener("visibilitychange", onReturn);
     return () => {
       lifecycle.alive = false;
       lifecycle.epoch++;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", onReturn);
-      window.removeEventListener("online", onReturn);
-      document.removeEventListener("visibilitychange", onReturn);
     };
   }, [refresh]);
+
+  const onReturn = useCallback(() => setViewVersion((value) => value + 1), []);
+  useMatchRoomRealtime({ room: history?.room ?? null, refresh, onReturn });
 
   useLayoutEffect(() => {
     const node = transcript.current;

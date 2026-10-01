@@ -54,6 +54,11 @@ describe("player dashboard result privacy", () => {
     );
     expect(history).toMatchObject({
       id: "match-1",
+      tournamentId: "tournament-1",
+      tournamentBracketId: "bracket-1",
+      generatedBracketId: "generated-1",
+      tournamentBannerImageUrl: "/images/tournament-banner.webp",
+      roundNumber: 1,
       replayAvailable: true,
       screenshotAvailable: true,
     });
@@ -61,6 +66,10 @@ describe("player dashboard result privacy", () => {
     expect(typeof history.screenshotAvailable).toBe("boolean");
     expect(Object.keys(history)).toEqual([
       "id",
+      "tournamentId",
+      "tournamentBracketId",
+      "generatedBracketId",
+      "tournamentBannerImageUrl",
       "tournamentName",
       "bracketName",
       "opponentName",
@@ -68,6 +77,7 @@ describe("player dashboard result privacy", () => {
       "score",
       "playedAt",
       "roundName",
+      "roundNumber",
       "matchNumber",
       "seriesBestOf",
       "replayAvailable",
@@ -191,8 +201,11 @@ describe("player dashboard result privacy", () => {
     expect(dashboard.matchHistory).toEqual([]);
     expect(dashboard.champions).toEqual([
       expect.objectContaining({
+        tournamentId: "tournament-1",
+        tournamentBracketId: "bracket-1",
+        generatedBracketId: "generated-1",
         tournamentName: "Synthetic Tournament",
-        bracketName: "Main",
+        bracketName: "Main / Pro",
         winnerName: "Viewer",
       }),
     ]);
@@ -603,7 +616,7 @@ function resolveDashboardQuery(
       {
         id: "tournament-1",
         title: "Synthetic Tournament",
-        banner_image_url: null,
+        banner_image_url: "/images/tournament-banner.webp",
       },
     ],
   };

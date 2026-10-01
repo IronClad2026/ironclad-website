@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "consolidated-production-2026-10",
+  "productionBaseSha": "0114b1c9f4908c0f8a0e43cfa7a25fb96d361fd1",
+  "stagingSourceSha": "17979c40c7e9bee154dbc9c9a98bcbb9b36152cb",
+  "productionProjectRef": "nsyjtqpvyxlzyujlbzos",
+  "stagingProjectRef": "zzbnneprhjicmajpjkdg",
+  "candidateBranch": "release/consolidated-production-2026-10",
+  "candidateSha": null,
+  "candidateBinding": "Resolve the final immutable Git head in external evidence; never treat this null value as approval.",
+  "productionAuthorized": false,
+  "migrationManifest": "scripts/consolidated-db/manifest.json",
+  "postDeploymentManifest": "scripts/consolidated-db/post-deployment-manifest.json",
+  "legalPublicationManifest": "content/production-four-division-legal-release.json",
+  "preflightMaxAgeSeconds": 600,
+  "requiredCiJobs": ["validate", "p03-database", "p03-hosted-backup", "consolidated-database", "consolidated-release-safety", "browser"],
+  "migrations": [
+    "20261001032942_production_showcase_authority.sql",
+    "20261001032957_production_combat_highlights_authority.sql",
+    "20261001032959_production_private_match_room_realtime.sql",
+    "20261001033000_production_versioned_competition_authority.sql",
+    "20261001033001_production_versioned_accounting_badges.sql"
+  ],
+  "postDeploymentMigration": "20261001040810_production_retire_legacy_creation.sql",
+  "postDeploymentActivation": { "player_showcase": true, "player_combat_highlights": false, "coreSettings": "unchanged" },
+  "legal": { "rulebook": "3.2", "ppa": "3.2", "privacy": "1.3", "terms": "1.1", "activation": "deferred; exact separately reviewed publication plan only" },
+  "included": ["P01 Player Showcase", "P02 Combat Highlights code with Production provider OFF", "P04 official CoH3/Relic news", "P03.1 private Realtime invalidation with polling fallback", "Dashboard/Career refinements", "Performance Phase 1", "immutable legacy_three_v1", "future four_division_v1", "Main main_progression career", "Pro pro six-event season", "Rulebook/PPA 3.2 corpus and legal delivery"],
+  "preserved": ["Privacy 1.3", "Terms 1.1", "Production poll recovery snapshots", "Production P03 hardening and retention/privacy", "genuine Steam/Relic identity authority", "legacy registrations/ELO snapshots", "legacy tournaments/brackets/matches/results/replays", "badge awards/evidence", "legal acceptances", "Production migration provenance", "six real qualifying events; no fabricated finalization"],
+  "excluded": ["Staging migration ledger replay", "Staging application data and identities", "TestAcademy/TestChallenge/TestMain/TestPro", "synthetic ELO adapters and consent bypasses", "synthetic legacy transition events", "Staging legal Privacy 1.2", "Staging Cloudflare/R2 configuration and secrets", "unverified hosted Preview", "Production mutation executor"],
+  "sourceExceptions": [
+    { "path": "lib/p03-preview-safety.ts", "rule": "staging-reference", "purpose": "existing explicit non-Production guard; not a deployable resource target" },
+    { "path": "lib/p03-preview-safety.ts", "rule": "clerk-test-key", "purpose": "existing validation regex; no credential or Production assumption" },
+    { "path": ".github/workflows/ci.yml", "rule": "clerk-test-key", "purpose": "exact non-secret test placeholders only" }
+  ]
+}

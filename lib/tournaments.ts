@@ -2,6 +2,7 @@ import { PHASE_FOUR_ACTIVE_COHORT_SIZE } from "@/lib/tournament-registration-coh
 import type { PublishedTournamentMapPool } from "@/lib/tournament-map-pools";
 import type { TournamentMediaItem } from "@/lib/tournament-media";
 import type { PublicTournamentDivisionStateResolution } from "@/lib/tournament-division-state";
+import { getDivisionDisplayName, requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 
 export type TournamentStatus =
   | "upcoming"
@@ -13,8 +14,8 @@ export type TournamentStatus =
 
 export type TournamentFormat = "1v1" | "2v2" | "4v4";
 export type TournamentRuleFormat = "format_a" | "format_b";
-export type TournamentBracketName = "Academy" | "Challenge" | "Main";
-export type TournamentBracketFieldPrefix = "academy" | "challenge" | "main";
+export type TournamentBracketName = "Academy" | "Challenge" | "Main" | "Pro";
+export type TournamentBracketFieldPrefix = "academy" | "challenge" | "main" | "pro";
 
 export const WAITLIST_DISCLOSURE_MESSAGE =
   "This division currently has all 8 active places filled. By continuing, you will join the waitlist. Your place is not guaranteed. If a player withdraws before launch, waitlisted players will be contacted in order and asked to confirm the available spot.";
@@ -49,23 +50,33 @@ export const TOURNAMENT_BRACKET_CONFIGS: readonly {
   },
 ];
 
-const bracketOrder = new Map(
-  TOURNAMENT_BRACKET_CONFIGS.map((bracket, index) => [bracket.name, index])
-);
+export const FOUR_DIVISION_BRACKET_CONFIGS: typeof TOURNAMENT_BRACKET_CONFIGS = [
+  { ...TOURNAMENT_BRACKET_CONFIGS[0], defaultEloRules: "0-1099 ELO" },
+  TOURNAMENT_BRACKET_CONFIGS[1],
+  { ...TOURNAMENT_BRACKET_CONFIGS[2], label: "Main Bracket", defaultEloRules: "1400-1699 ELO" },
+  { name: "Pro", fieldPrefix: "pro", label: "Pro Bracket", defaultEloRules: "1700+ ELO", defaultMaxPlayers: 8 },
+];
 
-export function getTournamentBracketDisplayName(name: string) {
-  return (
-    TOURNAMENT_BRACKET_CONFIGS.find((bracket) => bracket.name === name)
-      ?.label ?? (name.endsWith("Bracket") ? name : `${name} Bracket`)
-  );
+export function getTournamentBracketConfigs(model: DivisionModelVersion) {
+  return requireDivisionModelVersion(model) === "legacy_three_v1"
+    ? TOURNAMENT_BRACKET_CONFIGS : FOUR_DIVISION_BRACKET_CONFIGS;
 }
 
-export function getTournamentBracketSortOrder(name: string) {
-  return bracketOrder.get(name as TournamentBracketName) ?? Number.MAX_SAFE_INTEGER;
+export function getTournamentBracketDisplayName(name: string, model: DivisionModelVersion = "legacy_three_v1") {
+  const displayName = getDivisionDisplayName(model, name);
+  if (!displayName) throw new Error("Unknown tournament division.");
+  return `${displayName} Bracket`;
+}
+
+export function getTournamentBracketSortOrder(name: string, model: DivisionModelVersion = "legacy_three_v1") {
+  const index = getTournamentBracketConfigs(model).findIndex((config) => config.name === name);
+  if (index < 0) throw new Error("Unknown tournament division.");
+  return index;
 }
 
 export type TournamentCard = {
   id: string;
+  divisionModelVersion?: DivisionModelVersion;
   slug: string;
   title: string;
   format: TournamentFormat;
@@ -357,6 +368,7 @@ export type GeneratedTournamentBracket = {
 
 export type TournamentRow = {
   id: string;
+  division_model_version?: DivisionModelVersion;
   slug: string;
   title: string;
   description: string;
@@ -429,16 +441,18 @@ export function mapTournamentRow(
   localization?: { locale: string; t: TournamentProjectionTranslator },
   divisionStates: readonly PublicTournamentDivisionStateResolution[] = []
 ): TournamentCard {
+  const divisionModelVersion = requireDivisionModelVersion(row.division_model_version);
   const brackets = [...(row.tournament_brackets ?? [])].sort(
     (left, right) =>
-      getTournamentBracketSortOrder(left.name) -
-        getTournamentBracketSortOrder(right.name) ||
+      getTournamentBracketSortOrder(left.name, divisionModelVersion) -
+        getTournamentBracketSortOrder(right.name, divisionModelVersion) ||
       left.name.localeCompare(right.name)
   );
   const ruleFormat = row.rule_format ?? "format_a";
 
   return {
     id: row.id,
+    divisionModelVersion,
     slug: row.slug,
     title: row.title,
     format: row.format,
@@ -468,7 +482,7 @@ export function mapTournamentRow(
     ),
     brackets: brackets.map((bracket) => ({
       id: bracket.id,
-      name: getTournamentBracketDisplayName(bracket.name),
+      name: getTournamentBracketDisplayName(bracket.name, divisionModelVersion),
       requirement: bracket.elo_rules,
       maxPlayers:
         localization?.t("tournaments.projection.maxPlayers", {

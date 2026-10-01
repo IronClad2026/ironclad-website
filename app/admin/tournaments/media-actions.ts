@@ -12,6 +12,7 @@ import {
   sortTournamentMediaNewestFirst,
   type TournamentMediaAdminItem,
 } from "@/lib/tournament-media";
+import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import { getTournamentBracketDisplayName } from "@/lib/tournaments";
 
 type CustomClaims = {
@@ -49,7 +50,7 @@ export async function loadAdminTournamentMediaWorkspace(
   const client = createSupabaseAdminClient();
 
   try {
-    const [mediaResult, bracketResult] = await Promise.all([
+    const [mediaResult, bracketResult, tournamentResult] = await Promise.all([
       client
         .from("tournament_media")
         .select(MEDIA_SELECT)
@@ -60,9 +61,11 @@ export async function loadAdminTournamentMediaWorkspace(
         .from("tournament_brackets")
         .select("id, name")
         .eq("tournament_id", tournamentId),
+      client.from("tournaments").select("id, division_model_version").eq("id", tournamentId).maybeSingle(),
     ]);
 
     if (
+      tournamentResult.error || !tournamentResult.data ||
       mediaResult.error ||
       bracketResult.error ||
       !Array.isArray(mediaResult.data) ||
@@ -86,7 +89,7 @@ export async function loadAdminTournamentMediaWorkspace(
       return null;
     }
 
-    const matchOptions = await loadTournamentMatchOptions(client, brackets);
+    const matchOptions = await loadTournamentMatchOptions(client, brackets, requireDivisionModelVersion(tournamentResult.data.division_model_version));
     if (matchOptions === null) return null;
 
     return {
@@ -330,7 +333,8 @@ type GeneratedBracketRow = {
 
 async function loadTournamentMatchOptions(
   client: TrustedClient,
-  brackets: BracketRow[]
+  brackets: BracketRow[],
+  model: DivisionModelVersion
 ): Promise<TournamentMediaMatchOption[] | null> {
   if (brackets.length === 0) return [];
 
@@ -368,7 +372,7 @@ async function loadTournamentMatchOptions(
   const bracketNames = new Map(
     brackets.map((bracket) => [
       bracket.id,
-      getTournamentBracketDisplayName(bracket.name),
+      getTournamentBracketDisplayName(bracket.name, model),
     ])
   );
   const generatedToBracket = new Map(

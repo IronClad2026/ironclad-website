@@ -1,4 +1,4 @@
-import { CalendarDays, CheckCircle2, Clock3, ShieldAlert, Trophy, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, ShieldAlert, Trophy, XCircle } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
@@ -11,91 +11,111 @@ import type { PlayerRegistration, RegistrationStatus } from "@/components/dashbo
 
 type DashboardTranslator = (path: string, values?: MessageValues) => string;
 
+type RegistrationProps = {
+  registration: PlayerRegistration;
+  locale: Locale;
+  t: DashboardTranslator;
+};
+
 export function RegistrationCard({
   registration,
   locale,
   t,
-}: {
-  registration: PlayerRegistration;
-  locale: Locale;
-  t: DashboardTranslator;
-}) {
-  const terminalTournament = isTournamentTerminalStatus(
-    registration.tournament_status
-  );
-
+}: RegistrationProps) {
   return (
-    <article id={`registration-${registration.id}`} className="min-w-0 scroll-mt-28 border border-white/12 bg-zinc-950/80 p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-orange-300">
-            <Trophy size={18} />
-            <p className="text-xs font-black uppercase tracking-[0.22em]">
-              {t("dashboard.registrations.cardEyebrow")}
+    <article
+      id={`registration-${registration.id}`}
+      data-registration-presentation="current"
+      className="min-w-0 scroll-mt-28 border border-white/12 border-t-orange-400/50 bg-zinc-950/85 transition-colors focus-within:border-white/25 target:border-orange-400/70"
+    >
+      <div className="px-4 py-3.5 sm:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0 flex-1 basis-48">
+            <h3 className="break-words text-base font-bold leading-6 text-white sm:text-lg">
+              {registration.tournament_title}
+            </h3>
+            <p className="mt-1 flex items-start gap-2 text-sm leading-5 text-zinc-400">
+              <Trophy size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-orange-300/80" />
+              <span className="min-w-0 break-words">{registration.bracket_name}</span>
             </p>
           </div>
-          <h3 className="mt-1.5 break-words text-lg font-black text-white">
-            {registration.tournament_title}
-          </h3>
-          <p className="mt-2 text-sm font-semibold text-zinc-400">
-            {registration.bracket_name}
-          </p>
+          <StatusBadge status={registration.registration_status} t={t} />
         </div>
-        <StatusBadge status={registration.registration_status} t={t} />
       </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-white/10 py-3 sm:grid-cols-3">
-        <RegistrationValue
-          label={t("dashboard.registrations.eloStatus")}
-          value={eloStatusLabel(registration.elo_status, t)}
-        />
-        <RegistrationValue
-          label={t("dashboard.registrations.submittedElo")}
-          value={
-            registration.submitted_elo === null
-              ? t("dashboard.notAvailable")
-              : formatNumber(registration.submitted_elo, locale)
-          }
-        />
-        <RegistrationValue
-          label={t("dashboard.registrations.submitted")}
-          value={
-            <HydrationSafeLocalDateTime
-              value={registration.created_at}
-              fallback={t("dashboard.notAvailable")}
-            />
-          }
-        />
+      <div className="border-y border-white/8 bg-white/[0.025] px-4 py-2.5 sm:px-5">
+        <RegistrationMetadata registration={registration} locale={locale} t={t} />
       </div>
-
-      {terminalTournament ? (
-        <div
-          role="status"
-          className="mt-5 border border-amber-400/30 bg-amber-950/20 p-4 text-amber-100"
-        >
-          <p className="text-sm font-black uppercase tracking-wider">
-            {t("dashboard.registrations.historicalTitle")}
-          </p>
-          <p className="mt-2 text-sm leading-6">
-            {t(
-              registration.tournament_status === "cancelled"
-                ? "dashboard.registrations.cancelledMessage"
-                : "dashboard.registrations.voidedMessage"
-            )}
-          </p>
-        </div>
-      ) : registration.registration_status === "waitlisted" && registration.waitlist_offer_status === "offered" ? null : (
-        <RegistrationDecision registration={registration} t={t} />
-      )}
-      <PlayerRegistrationActions
-        registrationId={registration.id}
-        registrationStatus={registration.registration_status}
-        waitlistOfferStatus={registration.waitlist_offer_status}
-        waitlistOfferExpiresAt={registration.waitlist_offer_expires_at}
-        launchedAt={registration.launched_at}
-        tournamentStatus={registration.tournament_status}
-      />
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 sm:px-5">
+        <RegistrationContext registration={registration} t={t} />
+        <RegistrationActions registration={registration} />
+      </div>
     </article>
+  );
+}
+
+function RegistrationMetadata({ registration, locale, t }: RegistrationProps) {
+  return (
+    <dl className="flex min-w-0 flex-wrap gap-x-5 gap-y-2">
+      <RegistrationValue
+        label={t("dashboard.registrations.eloStatus")}
+        value={eloStatusLabel(registration.elo_status, t)}
+      />
+      <RegistrationValue
+        label={t("dashboard.registrations.submittedElo")}
+        value={
+          registration.submitted_elo === null
+            ? t("dashboard.notAvailable")
+            : formatNumber(registration.submitted_elo, locale)
+        }
+      />
+      <RegistrationValue
+        label={t("dashboard.registrations.submitted")}
+        value={
+          <HydrationSafeLocalDateTime
+            value={registration.created_at}
+            fallback={t("dashboard.notAvailable")}
+          />
+        }
+      />
+    </dl>
+  );
+}
+
+function RegistrationContext({
+  registration,
+  t,
+}: Pick<RegistrationProps, "registration" | "t">) {
+  if (isTournamentTerminalStatus(registration.tournament_status)) {
+    return (
+      <div
+        role="status"
+        className="min-w-0 flex-1 basis-64 border-l-2 border-amber-400/40 pl-3 text-sm leading-5 text-amber-100/90"
+      >
+        <p>
+          <span className="font-semibold">{t("dashboard.registrations.historicalTitle")}</span>{". "}
+          {t(
+            registration.tournament_status === "cancelled"
+              ? "dashboard.registrations.cancelledMessage"
+              : "dashboard.registrations.voidedMessage"
+          )}
+        </p>
+      </div>
+    );
+  }
+  if (registration.registration_status === "waitlisted" && registration.waitlist_offer_status === "offered") return null;
+  return <RegistrationDecision registration={registration} t={t} />;
+}
+
+function RegistrationActions({ registration }: Pick<RegistrationProps, "registration">) {
+  return (
+    <PlayerRegistrationActions
+      registrationId={registration.id}
+      registrationStatus={registration.registration_status}
+      waitlistOfferStatus={registration.waitlist_offer_status}
+      waitlistOfferExpiresAt={registration.waitlist_offer_expires_at}
+      launchedAt={registration.launched_at}
+      tournamentStatus={registration.tournament_status}
+    />
   );
 }
 
@@ -180,11 +200,11 @@ function RegistrationDecision({
     className: "border-white/10 bg-white/[0.04] text-zinc-300",
   };
   return (
-    <div className={`mt-3 border-l-2 px-3 py-2.5 ${content.className}`}>
-      <p className="text-sm font-black uppercase tracking-wider">
-        {content.title}
+    <div className={`min-w-0 flex-1 basis-64 border-l-2 pl-3 text-sm leading-5 ${content.className}`}>
+      <p>
+        <span className="font-semibold">{content.title}</span>{". "}
+        <span className="opacity-90">{content.message}</span>
       </p>
-      <p className="mt-1 text-sm leading-5 opacity-90">{content.message}</p>
     </div>
   );
 }
@@ -237,10 +257,11 @@ function StatusBadge({
 
   return (
     <span
-      className={`inline-flex w-fit shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-black uppercase tracking-wider ${content.className}`}
+      data-registration-status={status}
+      className={`inline-flex max-w-full items-center gap-1.5 rounded-sm border px-2 py-1 text-xs font-semibold leading-5 ${content.className}`}
     >
-      <Icon size={14} />
-      {content.label}
+      <Icon size={14} aria-hidden="true" className="shrink-0" />
+      <span className="min-w-0 break-words">{content.label}</span>
     </span>
   );
 }
@@ -253,30 +274,29 @@ function RegistrationValue({
   value: ReactNode;
 }) {
   return (
-    <div className="min-w-0 last:col-span-2 sm:last:col-span-1">
-      <p className="text-xs text-zinc-400">
+    <div className="min-w-0 max-w-full">
+      <dt className="text-xs leading-5 text-zinc-400">
         {label}
-      </p>
-      <p className="mt-1 break-words text-sm font-semibold text-zinc-200">{value}</p>
+      </dt>
+      <dd className="break-words text-sm font-medium leading-5 tabular-nums text-zinc-300">{value}</dd>
     </div>
   );
 }
 
 export function EmptyRegistrations({ t }: { t: DashboardTranslator }) {
   return (
-    <div className="mt-3 border border-dashed border-white/15 bg-zinc-950/50 p-4 sm:p-5">
-      <div className="hidden">
-        <CalendarDays size={21} />
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-4 border border-dashed border-white/15 bg-zinc-950/50 p-4 sm:px-5">
+      <div className="min-w-0 flex-1 basis-64">
+        <h3 className="text-base font-bold text-white">
+          {t("dashboard.competition.emptyCurrentTitle")}
+        </h3>
+        <p className="mt-1 max-w-lg text-sm leading-5 text-zinc-400">
+          {t("dashboard.competition.emptyCurrentDescription")}
+        </p>
       </div>
-      <h3 className="text-base font-bold text-white">
-        {t("dashboard.competition.emptyCurrentTitle")}
-      </h3>
-      <p className="mt-1 max-w-lg text-sm leading-5 text-zinc-400">
-        {t("dashboard.competition.emptyCurrentDescription")}
-      </p>
       <Link
         href="/tournaments"
-        className="mt-3 inline-flex min-h-11 items-center border border-orange-400 bg-orange-500 px-5 py-2.5 text-sm font-bold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
+        className="inline-flex min-h-11 items-center border border-orange-400 bg-orange-500 px-4 py-2.5 text-sm font-semibold text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
       >
         {t("dashboard.registrations.explore")}
       </Link>

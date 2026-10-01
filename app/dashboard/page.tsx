@@ -18,6 +18,7 @@ import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
 import { loadCommunityPollsForRequest } from "@/lib/player-polls";
 import { loadPlayerCareerDashboard } from "@/lib/player-dashboard";
+import { getPlayerShowcaseEnabled } from "@/lib/player-showcase/read";
 import { loadPlayerTournamentDivisionInvitations } from "@/lib/tournament-division-invitations";
 import {
   type PlayerProfile,
@@ -26,6 +27,7 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 import type { TournamentStatus } from "@/lib/tournaments";
 import DashboardIdentity from "@/components/dashboard/DashboardIdentity";
 import DashboardCareerHistory from "@/components/dashboard/DashboardCareerHistory";
+import DashboardRegistrationNavigation from "@/components/dashboard/DashboardRegistrationNavigation";
 import DashboardPerformance from "@/components/dashboard/DashboardPerformance";
 import { EmptyRegistrations, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
 import { groupDashboardRegistrations, type PlayerRegistration } from "@/components/dashboard/registration-presentation";
@@ -71,6 +73,7 @@ export default async function PlayerDashboardPage() {
     career,
     playerNotifications,
     communityPolls,
+    showcaseEnabled,
   ] =
     await Promise.all([
       supabase
@@ -90,6 +93,7 @@ export default async function PlayerDashboardPage() {
       loadPlayerCareerDashboard(userId, locale),
       loadPlayerNotifications(userId, 8, locale),
       loadCommunityPollsForRequest(),
+      getPlayerShowcaseEnabled(),
     ]);
 
   if (profileResult.error) {
@@ -134,11 +138,8 @@ export default async function PlayerDashboardPage() {
       ? dictionaries.badges.dashboard.loadErrorDescription
       : null;
 
-  const { current: currentRegistrations, previous: previousRegistrations } =
+  const { current: currentRegistrations } =
     groupDashboardRegistrations(registrations);
-  const previousRegistrationNodes = previousRegistrations.map((registration) => (
-    <RegistrationCard key={registration.id} registration={registration} locale={locale} t={t} />
-  ));
 
   return (
     <main
@@ -154,7 +155,8 @@ export default async function PlayerDashboardPage() {
       }}
     >
       <div className="relative z-10 mx-auto max-w-7xl">
-        <DashboardIdentity profile={profile} error={Boolean(profileResult.error)} locale={locale} t={t} />
+        <DashboardRegistrationNavigation key={currentRegistrations.map((registration) => registration.id).join("|")} />
+        <DashboardIdentity profile={profile} error={Boolean(profileResult.error)} locale={locale} t={t} showcaseEnabled={showcaseEnabled} />
 
         <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)]" data-dashboard-section="current-actions">
           <section className="min-w-0" aria-labelledby="dashboard-competition-title">
@@ -263,16 +265,12 @@ export default async function PlayerDashboardPage() {
         <DashboardCareerHistory
           matches={career.matchHistory}
           champions={career.champions}
-          previousRegistrations={<div className="grid gap-3">{previousRegistrationNodes}</div>}
-          previousRegistrationCount={previousRegistrations.length}
           loadError={career.error ? t(
             career.error === "load-failed"
               ? "dashboard.career.loadError"
               : "dashboard.career.partialError"
           ) : null}
-          registrationLoadError={registrationsResult.error ? t("dashboard.registrations.loadError") : null}
         />
-
         <div
           id="community-polls"
           className="mt-8 scroll-mt-28"
@@ -282,8 +280,8 @@ export default async function PlayerDashboardPage() {
             surface="community"
             density="compact"
             initialPolls={communityPolls.polls}
-            initialError={communityPolls.error}
             initialSnapshot={communityPolls.snapshot}
+            initialError={communityPolls.error}
           />
         </div>
 

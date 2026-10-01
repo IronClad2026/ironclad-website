@@ -57,6 +57,10 @@ vi.mock("@/lib/player-polls", () => ({
   loadCommunityPollsForRequest: loadCommunityPollsForRequestMock,
 }));
 
+vi.mock("@/lib/player-showcase/read", () => ({
+  getPlayerShowcaseEnabled: vi.fn(async () => false),
+}));
+
 vi.mock("@/lib/supabase-server", () => ({
   createAuthenticatedSupabaseClient: createAuthenticatedSupabaseClientMock,
 }));
@@ -123,8 +127,14 @@ describe("dashboard registration-note privacy", () => {
       ).mock.calls[0];
       expect(registrationColumns).toEqual(expect.any(String));
       expect(String(registrationColumns)).not.toContain("admin_notes");
-      expect(screen.getByText(title)).toBeInTheDocument();
-      expect(screen.getByText(message)).toBeInTheDocument();
+      if (registrationStatus === "manual_review") {
+        expect(screen.getByText(title)).toBeInTheDocument();
+        expect(screen.getByText(message)).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText(title)).not.toBeInTheDocument();
+        expect(screen.queryByText(message)).not.toBeInTheDocument();
+        expect(screen.queryByText("Privacy Test Tournament")).not.toBeInTheDocument();
+      }
       expect(screen.queryByText(PRIVATE_ADMIN_NOTE)).not.toBeInTheDocument();
       expect(document.body.textContent).not.toContain(PRIVATE_ADMIN_NOTE);
       expect(document.body.textContent).not.toContain("Admin Note");
@@ -132,7 +142,7 @@ describe("dashboard registration-note privacy", () => {
   );
 
   it.each(["cancelled", "voided"] as const)(
-    "renders a %s tournament registration as factual read-only history",
+    "does not render a %s tournament registration or its private history",
     async (tournamentStatus) => {
       const client = createDashboardClient("waitlisted", {
         waitlist_offer_status: "offered",
@@ -149,8 +159,9 @@ describe("dashboard registration-note privacy", () => {
       expect(String(registrationColumns)).toContain(
         "tournaments!inner(status)"
       );
-      expect(screen.getByText("Read-only historical record")).toBeInTheDocument();
-      expect(screen.getByText("Privacy Test Tournament")).toBeInTheDocument();
+      expect(screen.queryByText("Read-only historical record")).not.toBeInTheDocument();
+      expect(screen.queryByText("Privacy Test Tournament")).not.toBeInTheDocument();
+      expect(document.querySelector("[data-registration-presentation=historical]")).toBeNull();
       expect(
         screen.queryByRole("button", { name: "Accept Spot" })
       ).not.toBeInTheDocument();
