@@ -158,7 +158,7 @@ jobs:
       - name: Install exact disposable PostgreSQL protocol client without lifecycle scripts
         run: npm install --prefix "$RUNNER_TEMP/consolidated-pg-client" --ignore-scripts --no-audit --no-fund --save-exact pg@8.16.3
       - name: Check hosted rehearsal isolation guards
-        run: node --test tests/consolidated-db/hosted-guards.mjs
+        run: node --test tests/consolidated-db/hosted-guards.mjs tests/consolidated-db/schema-diagnostics.mjs
       - name: Rehearse current Production catalog and consolidated candidate on real Supabase extensions
         run: node scripts/consolidated-db/hosted-runtime.mjs
       - name: Save non-sensitive actual-extension and complete restore evidence

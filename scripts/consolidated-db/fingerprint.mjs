@@ -8,7 +8,7 @@ export function historySql() {
  return `select ${literal(name)} name,jsonb_build_object('count',count(*),'sha256',encode(sha256(convert_to(coalesce(jsonb_agg(fact order by fact::text),'[]'::jsonb)::text,'UTF8')),'hex')) value from (select jsonb_build_object(${projection}) fact from ${name} t${scope}) facts`;
  }).join('\nunion all\n')+') checks;';
 }
-export const schemaSql=`with objects as (
+const schemaObjectsCte=`with objects as (
  select 'functions' category,n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' name,jsonb_build_object('body',replace(pg_get_functiondef(p.oid),chr(13),''),'acl',case when p.proacl is null then null else array(select x::text from unnest(p.proacl) x order by x::text) end,'owner',pg_get_userbyid(p.proowner)) fact from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','ironclad_private') and not exists(select 1 from pg_depend d where d.classid='pg_proc'::regclass and d.objid=p.oid and d.deptype='e')
  union all select 'relations',n.nspname||'.'||c.relname,jsonb_build_object('kind',c.relkind,'rls',c.relrowsecurity,'forceRls',c.relforcerowsecurity,'owner',pg_get_userbyid(c.relowner),'acl',case when c.relacl is null then null else array(select x::text from unnest(c.relacl) x order by x::text) end,'options',c.reloptions) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','ironclad_private') and c.relkind in ('r','p','v')
  union all select 'columns',n.nspname||'.'||c.relname||'.'||a.attname,jsonb_build_object('type',format_type(a.atttypid,a.atttypmod),'notnull',a.attnotnull,'default',pg_get_expr(d.adbin,d.adrelid),'acl',case when a.attacl is null then null else array(select x::text from unnest(a.attacl) x order by x::text) end) from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum where n.nspname in ('public','ironclad_private') and c.relkind in ('r','p','v') and a.attnum>0 and not a.attisdropped
@@ -17,7 +17,11 @@ export const schemaSql=`with objects as (
  union all select 'triggers',n.nspname||'.'||c.relname||'.'||t.tgname,jsonb_build_object('definition',pg_get_triggerdef(t.oid,true),'enabled',t.tgenabled) from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','ironclad_private') and not t.tgisinternal
  union all select 'policies',schemaname||'.'||tablename||'.'||policyname,jsonb_build_object('permissive',permissive,'roles',roles,'cmd',cmd,'qual',qual,'check',with_check) from pg_policies where schemaname in ('public','ironclad_private','storage','realtime')
  union all select 'views',schemaname||'.'||viewname,jsonb_build_object('definition',definition) from pg_views where schemaname in ('public','ironclad_private')
-) select jsonb_build_object('objects',count(*),'sha256',encode(sha256(convert_to(jsonb_agg(jsonb_build_object('category',category,'name',name,'fact',fact) order by category,name)::text,'UTF8')),'hex')) as value from objects;`;
+)`;
+export const schemaSql=schemaObjectsCte+` select jsonb_build_object('objects',count(*),'sha256',encode(sha256(convert_to(jsonb_agg(jsonb_build_object('category',category,'name',name,'fact',fact) order by category,name)::text,'UTF8')),'hex')) as value from objects;`;
+// Diagnostic metadata stays inside the isolated synthetic runtime. Callers must
+// use boundedSchemaDiff before emitting it; function bodies never enter logs.
+export const schemaObjectsSql=schemaObjectsCte+` select jsonb_agg(jsonb_build_object('category',category,'name',name,'fact',fact) order by category,name) as value from objects;`;
 export async function capture(client) {
  const rows=(await client.query("select n.nspname,c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','ironclad_private') and c.relkind in ('r','p') order by n.nspname,c.relname")).rows;
  const dataSql='select jsonb_object_agg(name,value) value from ('+rows.map(({nspname,relname})=>`select ${literal(nspname+'.'+relname)} name,jsonb_build_object('count',count(*),'sha256',encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]'::jsonb)::text,'UTF8')),'hex')) value from "${nspname}"."${relname}" t`).join(' union all ')+') all_data;';

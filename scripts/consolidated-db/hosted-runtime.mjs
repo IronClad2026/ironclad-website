@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { normalizeSchema } from "../p03-release/backup.mjs";
 import { verifyPackage } from "./package.mjs";
 import { verifyPostDeploymentPackage } from "./post-deployment.mjs";
+import { boundedSchemaDiff } from "./schema-diagnostics.mjs";
 
 export const image = "supabase/postgres:17.6.1.127";
 export const nodeImage = "node:22.12.0-bookworm-slim";
@@ -65,6 +66,23 @@ export function boundedSyntheticDiagnostic(value) {
     .replace(/\b[a-zA-Z0-9_-]{16,}\.[a-zA-Z0-9_-]{16,}\.[a-zA-Z0-9_-]{16,}\b/g, "[JWT REDACTED]")
     .replace(/[^\n\t\x20-\x7e]/g, "?")
     .slice(-4096);
+}
+
+export function formatSchemaDiagnostic(diff, phase) {
+  const report = { syntheticOnly: true, phase, ...diff, changes: [...diff.changes] };
+  let output = JSON.stringify(report);
+  if (Buffer.byteLength(output) > 16384) {
+    // Keep object/field hashes even when exact CHECK or ACL metadata is large.
+    report.truncated = true;
+    report.changes = report.changes.map(change => ({ ...change,
+      fields: change.fields?.map(field => Object.fromEntries(Object.entries(field).filter(([key]) => key !== "source" && key !== "restored"))) }));
+    output = JSON.stringify(report);
+  }
+  while (Buffer.byteLength(output) > 16384 && report.changes.length) {
+    report.changes.pop(); report.truncated = true; output = JSON.stringify(report);
+  }
+  assert(Buffer.byteLength(output) <= 16384, "Schema diagnostic byte limit exceeded");
+  return output;
 }
 
 function command(binary, args, options = {}) {
@@ -241,7 +259,17 @@ export async function rehearseHostedRuntime() {
     assert.deepEqual(snapshot(source), before, "Source changed during complete logical backup");
     const restored = snapshot(target);
     assert.deepEqual(restored, before, "Restored table contents, sequences, roles, memberships or extension inventory differ");
-    assert.deepEqual(applicationCapture(target), applicationBefore, "Restored application schema/data/ledger/retention fingerprint differs");
+    const applicationRestored = applicationCapture(target);
+    if (applicationRestored.schema.sha256 !== applicationBefore.schema.sha256) {
+      try {
+        const sourceObjects = JSON.parse(node(source, "scripts/consolidated-db/capture.mjs", "--schema-objects"));
+        const restoredObjects = JSON.parse(node(target, "scripts/consolidated-db/capture.mjs", "--schema-objects"));
+        console.error(formatSchemaDiagnostic(boundedSchemaDiff(sourceObjects, restoredObjects, 24), `${phase}-application-schema-mismatch`));
+      } catch {
+        console.error(JSON.stringify({ syntheticOnly: true, phase: `${phase}-application-schema-mismatch`, diagnosticUnavailable: true }));
+      }
+    }
+    assert.deepEqual(applicationRestored, applicationBefore, "Restored application schema/data/ledger/retention fingerprint differs");
     assert.equal(schema(target), sourceSchema, "Full restored schema, owners or permissions differ");
     return { phase, archiveSha256: sha256(readFileSync(hostArchive)), snapshotSha256: sha256(JSON.stringify(before)), applicationSha256: sha256(JSON.stringify(applicationBefore)), schemaSha256: sha256(sourceSchema), tableCount: Object.keys(before.tables).length, sequenceCount: Object.keys(before.sequences).length, restored: true };
   }

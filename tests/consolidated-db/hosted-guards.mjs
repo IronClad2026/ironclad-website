@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertHostedContext, assertNodeRuntimeState, boundedSyntheticDiagnostic, startup, image, nodeImage } from "../../scripts/consolidated-db/hosted-runtime.mjs";
+import { assertHostedContext, assertNodeRuntimeState, boundedSyntheticDiagnostic, formatSchemaDiagnostic, startup, image, nodeImage } from "../../scripts/consolidated-db/hosted-runtime.mjs";
+import { boundedSchemaDiff } from "../../scripts/consolidated-db/schema-diagnostics.mjs";
 
 const repository = "/isolated/candidate";
 const valid = {
@@ -115,4 +116,30 @@ test("Node scratch stays bounded and non-executable without extra mounts", () =>
   assert.throws(() => assertNodeRuntimeState(extra, expectedNode));
   const wrongScratch = nodeState(); wrongScratch.Mounts.push({ Type: "tmpfs", Destination: "/other", RW: true });
   assert.throws(() => assertNodeRuntimeState(wrongScratch, expectedNode));
+});
+
+test("schema mismatch logs retain exact safe CHECK differences without bodies or row data", () => {
+  const before = [
+    { category: "constraints", name: "public.synthetic.check", fact: { definition: "CHECK (a AND (b AND c))", valid: true } },
+    { category: "functions", name: "public.synthetic()", fact: { body: "select 'synthetic-secret-body'" } },
+  ];
+  const after = structuredClone(before); after[0].fact.definition = "CHECK (a AND b AND c)";
+  after[1].fact.body = "select 'changed-synthetic-secret-body'";
+  const output = formatSchemaDiagnostic(boundedSchemaDiff(before, after, 24), "before-consolidated-application-schema-mismatch");
+  const parsed = JSON.parse(output);
+  assert.equal(parsed.changedObjects, 2); assert.equal(parsed.syntheticOnly, true);
+  assert(output.includes("CHECK (a AND (b AND c))")); assert(output.includes("CHECK (a AND b AND c)"));
+  assert(!output.includes("synthetic-secret-body")); assert(!output.includes("select '"));
+  assert.match(parsed.changes[1].fields[0].sourceSha256, /^[a-f0-9]{64}$/);
+});
+
+test("large schema diagnostics remain valid JSON below 16KiB and preserve hashes", () => {
+  const before = Array.from({ length: 40 }, (_, i) => ({ category: "constraints", name: `public.synthetic.check_${i}`,
+    fact: { definition: "CHECK (" + "x ".repeat(3000) + ")", valid: true } }));
+  const after = structuredClone(before); for (const object of after) object.fact.definition += " ";
+  const output = formatSchemaDiagnostic(boundedSchemaDiff(before, after, 24), "after-consolidated-application-schema-mismatch");
+  const parsed = JSON.parse(output);
+  assert(Buffer.byteLength(output) <= 16384); assert.equal(parsed.changedObjects, 40); assert.equal(parsed.truncated, true);
+  assert(parsed.changes.length > 0); assert.match(parsed.changes[0].fields[0].sourceSha256, /^[a-f0-9]{64}$/);
+  assert(!output.includes("x ".repeat(1000)));
 });
