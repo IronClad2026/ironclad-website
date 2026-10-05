@@ -123,3 +123,57 @@ export type RevokeWarfrontCompanyInvitationOutput = {
   status: "invalidated";
   duplicate: boolean;
 };
+
+export type CancelWarfrontOpenOperationInput = {
+  operationId: string;
+};
+
+export type SubmitWarfrontOperationResultInput = {
+  operationId: string;
+  clientSubmissionId: string;
+  challengerWins: number;
+  opponentWins: number;
+};
+
+export type ConfirmWarfrontOperationResultInput = {
+  operationId: string;
+};
+
+export type DisputeWarfrontOperationResultInput = {
+  operationId: string;
+};
+
+export type CancelWarfrontOpenOperationOutput = {
+  operationId: string;
+  status: "cancelled";
+  cancelledAt: string;
+  duplicate: boolean;
+};
+
+export type WarfrontOperationSubmittedResult = {
+  challengerWins: number;
+  opponentWins: number;
+  winnerSide: string;
+};
+
+export type WarfrontOperationResultState = {
+  operationId: string;
+  operationStatus: string;
+  submittedResult: WarfrontOperationSubmittedResult;
+  disputed: boolean;
+};
+
+export type SubmitWarfrontOperationResultOutput = {
+  result: WarfrontOperationResultState;
+  duplicate: boolean;
+};
+
+export type ConfirmWarfrontOperationResultOutput = {
+  result: WarfrontOperationResultState;
+  outcome: "confirmed" | "already_confirmed" | "already_finalized";
+};
+
+export type DisputeWarfrontOperationResultOutput = {
+  result: WarfrontOperationResultState;
+  outcome: "disputed" | "already_finalized";
+};

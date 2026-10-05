@@ -3,17 +3,25 @@
 import type {
   AcceptWarfrontCompanyInvitationOutput,
   ArchiveWarfrontCompanyOutput,
+  CancelWarfrontOpenOperationInput,
+  CancelWarfrontOpenOperationOutput,
   CommandResult,
+  ConfirmWarfrontOperationResultInput,
+  ConfirmWarfrontOperationResultOutput,
   CreateWarfrontCompanyInput,
   CreateWarfrontCompanyOutput,
   DeclineWarfrontCompanyInvitationOutput,
   DemoteWarfrontCompanyOfficerOutput,
+  DisputeWarfrontOperationResultInput,
+  DisputeWarfrontOperationResultOutput,
   InviteWarfrontCompanyPlayerInput,
   InviteWarfrontCompanyPlayerOutput,
   LeaveWarfrontCompanyOutput,
   PromoteWarfrontCompanyMemberOutput,
   RemoveWarfrontCompanyMemberOutput,
   RevokeWarfrontCompanyInvitationOutput,
+  SubmitWarfrontOperationResultInput,
+  SubmitWarfrontOperationResultOutput,
   TransferWarfrontCompanyCommanderOutput,
   WarfrontCompanyIdInput,
   WarfrontCompanyMemberInput,
@@ -34,6 +42,12 @@ import {
   inviteWarfrontCompanyPlayer,
   revokeWarfrontCompanyInvitation,
 } from "@/lib/warfront/commands/invitations";
+import {
+  cancelWarfrontOpenOperation,
+  confirmWarfrontOperationResult,
+  disputeWarfrontOperationResult,
+  submitWarfrontOperationResult,
+} from "@/lib/warfront/commands/operations";
 
 export async function createWarfrontCompanyAction(
   input: CreateWarfrontCompanyInput
@@ -99,4 +113,28 @@ export async function revokeWarfrontCompanyInvitationAction(
   input: WarfrontInvitationIdInput
 ): Promise<CommandResult<RevokeWarfrontCompanyInvitationOutput>> {
   return revokeWarfrontCompanyInvitation(input);
+}
+
+export async function cancelWarfrontOpenOperationAction(
+  input: CancelWarfrontOpenOperationInput
+): Promise<CommandResult<CancelWarfrontOpenOperationOutput>> {
+  return cancelWarfrontOpenOperation(input);
+}
+
+export async function submitWarfrontOperationResultAction(
+  input: SubmitWarfrontOperationResultInput
+): Promise<CommandResult<SubmitWarfrontOperationResultOutput>> {
+  return submitWarfrontOperationResult(input);
+}
+
+export async function confirmWarfrontOperationResultAction(
+  input: ConfirmWarfrontOperationResultInput
+): Promise<CommandResult<ConfirmWarfrontOperationResultOutput>> {
+  return confirmWarfrontOperationResult(input);
+}
+
+export async function disputeWarfrontOperationResultAction(
+  input: DisputeWarfrontOperationResultInput
+): Promise<CommandResult<DisputeWarfrontOperationResultOutput>> {
+  return disputeWarfrontOperationResult(input);
 }

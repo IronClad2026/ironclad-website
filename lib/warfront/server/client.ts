@@ -29,6 +29,17 @@ type InviteCompanyPlayerRpcInput = CompanyActorRpcInput & {
   recipientPlayerId: string;
 };
 
+type OperationActorRpcInput = {
+  operationId: string;
+  actorClerkUserId: string;
+};
+
+type SubmitOperationResultRpcInput = OperationActorRpcInput & {
+  clientSubmissionId: string;
+  challengerWins: number;
+  opponentWins: number;
+};
+
 export type WarfrontRpcResponse = {
   data: unknown;
   error: unknown;
@@ -150,6 +161,49 @@ export async function callRevokeWarfrontCompanyInvitation(
   const client = createSupabaseAdminClient();
   return client.rpc("revoke_warfront_company_invitation_api", {
     p_invitation_id: input.invitationId,
+    p_actor_clerk_user_id: input.actorClerkUserId,
+  });
+}
+
+export async function callCancelWarfrontOpenOperation(
+  input: OperationActorRpcInput
+): Promise<WarfrontRpcResponse> {
+  const client = createSupabaseAdminClient();
+  return client.rpc("cancel_warfront_open_operation_api", {
+    p_operation_id: input.operationId,
+    p_actor_clerk_user_id: input.actorClerkUserId,
+  });
+}
+
+export async function callSubmitWarfrontOperationResult(
+  input: SubmitOperationResultRpcInput
+): Promise<WarfrontRpcResponse> {
+  const client = createSupabaseAdminClient();
+  return client.rpc("submit_warfront_operation_result_api", {
+    p_operation_id: input.operationId,
+    p_actor_clerk_user_id: input.actorClerkUserId,
+    p_client_submission_id: input.clientSubmissionId,
+    p_challenger_wins: input.challengerWins,
+    p_opponent_wins: input.opponentWins,
+  });
+}
+
+export async function callConfirmWarfrontOperationResult(
+  input: OperationActorRpcInput
+): Promise<WarfrontRpcResponse> {
+  const client = createSupabaseAdminClient();
+  return client.rpc("confirm_warfront_operation_result_api", {
+    p_operation_id: input.operationId,
+    p_actor_clerk_user_id: input.actorClerkUserId,
+  });
+}
+
+export async function callDisputeWarfrontOperationResult(
+  input: OperationActorRpcInput
+): Promise<WarfrontRpcResponse> {
+  const client = createSupabaseAdminClient();
+  return client.rpc("dispute_warfront_operation_result_api", {
+    p_operation_id: input.operationId,
     p_actor_clerk_user_id: input.actorClerkUserId,
   });
 }
