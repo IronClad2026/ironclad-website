@@ -34,6 +34,19 @@ type OperationActorRpcInput = {
   actorClerkUserId: string;
 };
 
+type IssueOperationRpcInput = {
+  actorClerkUserId: string;
+  format: string;
+  seriesBestOf: number;
+  challengerPlayerIds: string[];
+  region: string | null;
+  notes: string | null;
+};
+
+type AcceptOperationRpcInput = OperationActorRpcInput & {
+  opponentPlayerIds: string[];
+};
+
 type SubmitOperationResultRpcInput = OperationActorRpcInput & {
   clientSubmissionId: string;
   challengerWins: number;
@@ -172,6 +185,31 @@ export async function callCancelWarfrontOpenOperation(
   return client.rpc("cancel_warfront_open_operation_api", {
     p_operation_id: input.operationId,
     p_actor_clerk_user_id: input.actorClerkUserId,
+  });
+}
+
+export async function callIssueWarfrontOperation(
+  input: IssueOperationRpcInput
+): Promise<WarfrontRpcResponse> {
+  const client = createSupabaseAdminClient();
+  return client.rpc("issue_warfront_operation_api", {
+    p_actor_clerk_user_id: input.actorClerkUserId,
+    p_format: input.format,
+    p_series_best_of: input.seriesBestOf,
+    p_challenger_player_ids: input.challengerPlayerIds,
+    p_region: input.region,
+    p_notes: input.notes,
+  });
+}
+
+export async function callAcceptWarfrontOperation(
+  input: AcceptOperationRpcInput
+): Promise<WarfrontRpcResponse> {
+  const client = createSupabaseAdminClient();
+  return client.rpc("accept_warfront_operation_api", {
+    p_operation_id: input.operationId,
+    p_actor_clerk_user_id: input.actorClerkUserId,
+    p_opponent_player_ids: input.opponentPlayerIds,
   });
 }
 

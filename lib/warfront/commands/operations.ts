@@ -2,6 +2,8 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import type {
+  AcceptWarfrontOperationInput,
+  AcceptWarfrontOperationOutput,
   CancelWarfrontOpenOperationInput,
   CancelWarfrontOpenOperationOutput,
   CommandResult,
@@ -9,8 +11,11 @@ import type {
   ConfirmWarfrontOperationResultOutput,
   DisputeWarfrontOperationResultInput,
   DisputeWarfrontOperationResultOutput,
+  IssueWarfrontOperationInput,
+  IssueWarfrontOperationOutput,
   SubmitWarfrontOperationResultInput,
   SubmitWarfrontOperationResultOutput,
+  WarfrontOperationFormat,
   WarfrontOperationResultState,
 } from "@/lib/warfront/contracts";
 import {
@@ -22,9 +27,11 @@ import {
   normalizeWarfrontCommandError,
 } from "@/lib/warfront/commands/errors";
 import {
+  callAcceptWarfrontOperation,
   callCancelWarfrontOpenOperation,
   callConfirmWarfrontOperationResult,
   callDisputeWarfrontOperationResult,
+  callIssueWarfrontOperation,
   callSubmitWarfrontOperationResult,
   type WarfrontRpcResponse,
 } from "@/lib/warfront/server/client";
@@ -33,6 +40,33 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SMALLINT_MINIMUM = -32768;
 const SMALLINT_MAXIMUM = 32767;
+const MAX_ROSTER_SELECTORS = 4;
+
+export async function issueWarfrontOperation(
+  input: IssueWarfrontOperationInput
+): Promise<CommandResult<IssueWarfrontOperationOutput>> {
+  return executeOperationCommand(
+    input,
+    parseIssueWarfrontOperationInput,
+    "issue_operation",
+    (actorClerkUserId, parsed) =>
+      callIssueWarfrontOperation({ actorClerkUserId, ...parsed }),
+    parseIssueWarfrontOperationOutput
+  );
+}
+
+export async function acceptWarfrontOperation(
+  input: AcceptWarfrontOperationInput
+): Promise<CommandResult<AcceptWarfrontOperationOutput>> {
+  return executeOperationCommand(
+    input,
+    parseAcceptWarfrontOperationInput,
+    "accept_operation",
+    (actorClerkUserId, parsed) =>
+      callAcceptWarfrontOperation({ actorClerkUserId, ...parsed }),
+    parseAcceptWarfrontOperationOutput
+  );
+}
 
 export async function cancelWarfrontOpenOperation(
   input: CancelWarfrontOpenOperationInput
@@ -174,6 +208,50 @@ function parseSubmitWarfrontOperationResultInput(
   };
 }
 
+function parseIssueWarfrontOperationInput(
+  value: unknown
+): IssueWarfrontOperationInput | null {
+  if (
+    !isRecord(value) ||
+    !hasOnlyFields(value, [
+      "format",
+      "seriesBestOf",
+      "challengerPlayerIds",
+      "region",
+      "notes",
+    ]) ||
+    !isWarfrontOperationFormat(value.format) ||
+    !isSmallint(value.seriesBestOf) ||
+    !isUuidArray(value.challengerPlayerIds) ||
+    !hasOptionalBoundedString(value.region, 80) ||
+    !hasOptionalBoundedString(value.notes, 1000)
+  ) {
+    return null;
+  }
+
+  return {
+    format: value.format,
+    seriesBestOf: value.seriesBestOf,
+    challengerPlayerIds: value.challengerPlayerIds,
+    region: value.region ?? null,
+    notes: value.notes ?? null,
+  };
+}
+
+function parseAcceptWarfrontOperationInput(
+  value: unknown
+): AcceptWarfrontOperationInput | null {
+  return isRecord(value) &&
+    hasOnlyFields(value, ["operationId", "opponentPlayerIds"]) &&
+    isUuid(value.operationId) &&
+    isUuidArray(value.opponentPlayerIds)
+    ? {
+        operationId: value.operationId,
+        opponentPlayerIds: value.opponentPlayerIds,
+      }
+    : null;
+}
+
 function parseCancelWarfrontOpenOperationOutput(
   value: unknown
 ): CancelWarfrontOpenOperationOutput | null {
@@ -187,6 +265,60 @@ function parseCancelWarfrontOpenOperationOutput(
         status: value.status,
         cancelledAt: value.cancelledAt,
         duplicate: value.duplicate,
+      }
+    : null;
+}
+
+function parseIssueWarfrontOperationOutput(
+  value: unknown
+): IssueWarfrontOperationOutput | null {
+  return isRecord(value) &&
+    isUuid(value.operationId) &&
+    value.status === "open" &&
+    isUuid(value.challengerCompanyId) &&
+    isWarfrontOperationFormat(value.format) &&
+    isSmallint(value.seriesBestOf) &&
+    isFiniteNumber(value.challengerRosterEloSnapshot) &&
+    isTimestamp(value.openedAt) &&
+    isTimestamp(value.expiresAt)
+    ? {
+        operationId: value.operationId,
+        status: value.status,
+        challengerCompanyId: value.challengerCompanyId,
+        format: value.format,
+        seriesBestOf: value.seriesBestOf,
+        challengerRosterEloSnapshot: value.challengerRosterEloSnapshot,
+        openedAt: value.openedAt,
+        expiresAt: value.expiresAt,
+      }
+    : null;
+}
+
+function parseAcceptWarfrontOperationOutput(
+  value: unknown
+): AcceptWarfrontOperationOutput | null {
+  return isRecord(value) &&
+    isUuid(value.operationId) &&
+    value.status === "accepted" &&
+    isUuid(value.challengerCompanyId) &&
+    isUuid(value.opponentCompanyId) &&
+    isWarfrontOperationFormat(value.format) &&
+    isSmallint(value.seriesBestOf) &&
+    isFiniteNumber(value.challengerRosterEloSnapshot) &&
+    isFiniteNumber(value.opponentRosterEloSnapshot) &&
+    isTimestamp(value.acceptedAt) &&
+    isTimestamp(value.rosterLockedAt)
+    ? {
+        operationId: value.operationId,
+        status: value.status,
+        challengerCompanyId: value.challengerCompanyId,
+        opponentCompanyId: value.opponentCompanyId,
+        format: value.format,
+        seriesBestOf: value.seriesBestOf,
+        challengerRosterEloSnapshot: value.challengerRosterEloSnapshot,
+        opponentRosterEloSnapshot: value.opponentRosterEloSnapshot,
+        acceptedAt: value.acceptedAt,
+        rosterLockedAt: value.rosterLockedAt,
       }
     : null;
 }
@@ -296,6 +428,36 @@ function isSmallint(value: unknown): value is number {
     value >= SMALLINT_MINIMUM &&
     value <= SMALLINT_MAXIMUM
   );
+}
+
+function isUuidArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= MAX_ROSTER_SELECTORS &&
+    value.every(isUuid)
+  );
+}
+
+function hasOptionalBoundedString(
+  value: unknown,
+  maximum: number
+): value is string | null | undefined {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "string" && value.trim().length > 0 && value.length <= maximum)
+  );
+}
+
+function isWarfrontOperationFormat(
+  value: unknown
+): value is WarfrontOperationFormat {
+  return value === "2v2" || value === "3v3" || value === "4v4";
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function hasBoundedString(

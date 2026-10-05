@@ -128,6 +128,21 @@ export type CancelWarfrontOpenOperationInput = {
   operationId: string;
 };
 
+export type WarfrontOperationFormat = "2v2" | "3v3" | "4v4";
+
+export type IssueWarfrontOperationInput = {
+  format: WarfrontOperationFormat;
+  seriesBestOf: number;
+  challengerPlayerIds: string[];
+  region?: string | null;
+  notes?: string | null;
+};
+
+export type AcceptWarfrontOperationInput = {
+  operationId: string;
+  opponentPlayerIds: string[];
+};
+
 export type SubmitWarfrontOperationResultInput = {
   operationId: string;
   clientSubmissionId: string;
@@ -148,6 +163,30 @@ export type CancelWarfrontOpenOperationOutput = {
   status: "cancelled";
   cancelledAt: string;
   duplicate: boolean;
+};
+
+export type IssueWarfrontOperationOutput = {
+  operationId: string;
+  status: "open";
+  challengerCompanyId: string;
+  format: WarfrontOperationFormat;
+  seriesBestOf: number;
+  challengerRosterEloSnapshot: number;
+  openedAt: string;
+  expiresAt: string;
+};
+
+export type AcceptWarfrontOperationOutput = {
+  operationId: string;
+  status: "accepted";
+  challengerCompanyId: string;
+  opponentCompanyId: string;
+  format: WarfrontOperationFormat;
+  seriesBestOf: number;
+  challengerRosterEloSnapshot: number;
+  opponentRosterEloSnapshot: number;
+  acceptedAt: string;
+  rosterLockedAt: string;
 };
 
 export type WarfrontOperationSubmittedResult = {

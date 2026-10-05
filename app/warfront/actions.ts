@@ -1,6 +1,8 @@
 "use server";
 
 import type {
+  AcceptWarfrontOperationInput,
+  AcceptWarfrontOperationOutput,
   AcceptWarfrontCompanyInvitationOutput,
   ArchiveWarfrontCompanyOutput,
   CancelWarfrontOpenOperationInput,
@@ -16,6 +18,8 @@ import type {
   DisputeWarfrontOperationResultOutput,
   InviteWarfrontCompanyPlayerInput,
   InviteWarfrontCompanyPlayerOutput,
+  IssueWarfrontOperationInput,
+  IssueWarfrontOperationOutput,
   LeaveWarfrontCompanyOutput,
   PromoteWarfrontCompanyMemberOutput,
   RemoveWarfrontCompanyMemberOutput,
@@ -43,9 +47,11 @@ import {
   revokeWarfrontCompanyInvitation,
 } from "@/lib/warfront/commands/invitations";
 import {
+  acceptWarfrontOperation,
   cancelWarfrontOpenOperation,
   confirmWarfrontOperationResult,
   disputeWarfrontOperationResult,
+  issueWarfrontOperation,
   submitWarfrontOperationResult,
 } from "@/lib/warfront/commands/operations";
 
@@ -119,6 +125,18 @@ export async function cancelWarfrontOpenOperationAction(
   input: CancelWarfrontOpenOperationInput
 ): Promise<CommandResult<CancelWarfrontOpenOperationOutput>> {
   return cancelWarfrontOpenOperation(input);
+}
+
+export async function issueWarfrontOperationAction(
+  input: IssueWarfrontOperationInput
+): Promise<CommandResult<IssueWarfrontOperationOutput>> {
+  return issueWarfrontOperation(input);
+}
+
+export async function acceptWarfrontOperationAction(
+  input: AcceptWarfrontOperationInput
+): Promise<CommandResult<AcceptWarfrontOperationOutput>> {
+  return acceptWarfrontOperation(input);
 }
 
 export async function submitWarfrontOperationResultAction(
