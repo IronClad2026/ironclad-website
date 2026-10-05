@@ -531,7 +531,7 @@ function parseDiceGame(value: unknown): WarfrontRoomDiceGame | null {
 function parseDiceRound(value: unknown): WarfrontRoomDiceRound | null {
   if (!hasExactKeys(value, ["tieRound", "rolls"])) return null;
   const tieRound = property(value, "tieRound"); const rolls = parseArray(property(value, "rolls"), parseDiceRoll);
-  if (!isSafeInteger(tieRound) || !rolls) return null;
+  if (!isPositiveSafeInteger(tieRound) || !rolls) return null;
   return { tieRound, rolls };
 }
 
@@ -540,7 +540,15 @@ function parseDiceRoll(value: unknown): WarfrontRoomDiceRoll | null {
   const side = property(value, "side"); const rolledByPlayerId = property(value, "rolledByPlayerId");
   const die1 = property(value, "die1"); const die2 = property(value, "die2");
   const total = property(value, "total"); const rolledAt = property(value, "rolledAt");
-  if (!isRoomSide(side) || !isWarfrontOperationRoomId(rolledByPlayerId) || !isFiniteNumber(die1) || !isFiniteNumber(die2) || !isFiniteNumber(total) || !isTimestamp(rolledAt)) return null;
+  if (
+    !isRoomSide(side) ||
+    !isWarfrontOperationRoomId(rolledByPlayerId) ||
+    !isDiceFace(die1) ||
+    !isDiceFace(die2) ||
+    !isDiceTotal(total) ||
+    total !== die1 + die2 ||
+    !isTimestamp(rolledAt)
+  ) return null;
   return { side, rolledByPlayerId, die1, die2, total, rolledAt };
 }
 
@@ -665,6 +673,18 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isSafeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isPositiveSafeInteger(value: unknown): value is number {
+  return isSafeInteger(value) && value >= 1;
+}
+
+function isDiceFace(value: unknown): value is number {
+  return isPositiveSafeInteger(value) && value <= 6;
+}
+
+function isDiceTotal(value: unknown): value is number {
+  return isSafeInteger(value) && value >= 2 && value <= 12;
 }
 
 function isNullableSafeInteger(value: unknown): value is number | null {

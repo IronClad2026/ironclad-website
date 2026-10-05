@@ -3,6 +3,8 @@ import { anonymousIdentity, playerIdentity } from "@/tests/fixtures/auth";
 import {
   parseWarfrontOperationRoomBootstrap,
   type WarfrontOperationRoomBootstrap,
+  type WarfrontRoomDiceRoll,
+  type WarfrontRoomDiceRound,
 } from "@/lib/warfront/contracts";
 
 const authMock = vi.hoisted(() => vi.fn());
@@ -102,6 +104,35 @@ function bootstrapFixture(): WarfrontOperationRoomBootstrap {
   };
 }
 
+function bootstrapFixtureWithDiceValues(
+  roundOverrides: Partial<Pick<WarfrontRoomDiceRound, "tieRound">>,
+  rollOverrides: Partial<Pick<WarfrontRoomDiceRoll, "die1" | "die2" | "total">>
+): WarfrontOperationRoomBootstrap {
+  const fixture = bootstrapFixture();
+  const game = fixture.dice.games[0];
+  const round = game.rounds[0];
+  const roll = round.rolls[0];
+
+  return {
+    ...fixture,
+    dice: {
+      ...fixture.dice,
+      games: [
+        {
+          ...game,
+          rounds: [
+            {
+              ...round,
+              ...roundOverrides,
+              rolls: [{ ...roll, ...rollOverrides }],
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
 describe("WARFRONT Operation Room bootstrap", () => {
   beforeEach(() => {
     authMock.mockReset();
@@ -128,6 +159,54 @@ describe("WARFRONT Operation Room bootstrap", () => {
     expect(parseWarfrontOperationRoomBootstrap(widenedRoot)).toBeNull();
     expect(parseWarfrontOperationRoomBootstrap(widenedChat)).toBeNull();
     expect(parseWarfrontOperationRoomBootstrap(malformedDice)).toBeNull();
+  });
+
+  it("rejects invalid Dice round and roll values", () => {
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({ tieRound: 0 }, {})
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({ tieRound: -1 }, {})
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({ tieRound: 1.5 }, {})
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { die1: 0 })
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { die1: 7 })
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { die1: 1.5 })
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { die2: 0 })
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { die2: 7 })
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { die2: 1.5 })
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { total: 1 })
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { total: 13 })
+    )).toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { total: 5 })
+    )).toBeNull();
+  });
+
+  it("accepts valid minimum and maximum Dice rolls", () => {
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { die1: 1, die2: 1, total: 2 })
+    )).not.toBeNull();
+    expect(parseWarfrontOperationRoomBootstrap(
+      bootstrapFixtureWithDiceValues({}, { die1: 6, die2: 6, total: 12 })
+    )).not.toBeNull();
   });
 
   it("rejects anonymous access before constructing the service-role client", async () => {
