@@ -99,6 +99,15 @@ export function readBoundedRehearsalReceipt(filesystem = { statSync, readFileSyn
   return receipt;
 }
 
+export function assertHostedRehearsalReceipt(rehearsal, reviewedMigrations, reviewedPostdeployment) {
+  assert.equal(rehearsal.status, "PASS"); assert.equal(rehearsal.providerMode, "actual-supabase");
+  assert.equal(rehearsal.baselineLedgerEntries, 153); assert.equal(rehearsal.candidateLedgerEntries, 160);
+  assert.deepEqual(rehearsal.migrations, reviewedMigrations);
+  assert.equal(rehearsal.postdeployment, reviewedPostdeployment);
+  assert.equal(rehearsal.productionApplicationDataImported, false);
+  assert.equal(rehearsal.productionRead, false); assert.equal(rehearsal.productionMutated, false);
+}
+
 const receiptReadScript = `import { readBoundedRehearsalReceipt } from '/work/scripts/consolidated-db/hosted-runtime.mjs';
 process.stdout.write(JSON.stringify(readBoundedRehearsalReceipt()));`;
 
@@ -316,12 +325,7 @@ export async function rehearseHostedRuntime() {
     // receipt inside the already attested matching Node namespace.
     const rehearsal = JSON.parse(docker(["exec", "-i", runtime(source), "node", "--input-type=module"],
       { input: receiptReadScript, timeout: 5000, maxBuffer: maxRehearsalReceiptBytes }));
-    assert.equal(rehearsal.status, "PASS"); assert.equal(rehearsal.providerMode, "actual-supabase");
-    assert.equal(rehearsal.baselineLedgerEntries, 153); assert.equal(rehearsal.candidateLedgerEntries, 159);
-    assert.deepEqual(rehearsal.migrations, reviewedMigrations);
-    assert.equal(rehearsal.postdeployment, reviewedPostdeployment);
-    assert.equal(rehearsal.productionApplicationDataImported, false);
-    assert.equal(rehearsal.productionRead, false); assert.equal(rehearsal.productionMutated, false);
+    assertHostedRehearsalReceipt(rehearsal, reviewedMigrations, reviewedPostdeployment);
     writeFileSync(path.join(output, "consolidated-db-rehearsal.json"), JSON.stringify(rehearsal, null, 2) + "\n", { mode: 0o600 });
     const after = archiveAndRestore(source, afterTarget, "after-consolidated");
     console.log("Verified consolidated migration, legal and postdeployment rehearsal, followed by a complete candidate archive and restore.");

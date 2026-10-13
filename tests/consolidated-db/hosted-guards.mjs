@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertHostedContext, assertNodeRuntimeState, boundedSyntheticDiagnostic, formatSchemaDiagnostic, readBoundedRehearsalReceipt,
+import { assertHostedContext, assertNodeRuntimeState, assertHostedRehearsalReceipt, boundedSyntheticDiagnostic, formatSchemaDiagnostic, readBoundedRehearsalReceipt,
   rehearsalReceiptPath, maxRehearsalReceiptBytes, startup, image, nodeImage } from "../../scripts/consolidated-db/hosted-runtime.mjs";
 import { boundedSchemaDiff } from "../../scripts/consolidated-db/schema-diagnostics.mjs";
 
@@ -146,16 +146,29 @@ test("large schema diagnostics remain valid JSON below 16KiB and preserve hashes
 });
 
 test("receipt retrieval reads only the fixed synthetic path and accepts a normal aggregate JSON", () => {
-  const bytes = Buffer.from(JSON.stringify({ status: "PASS", providerMode: "actual-supabase", candidateLedgerEntries: 159 }));
+  const bytes = Buffer.from(JSON.stringify({ status: "PASS", providerMode: "actual-supabase", candidateLedgerEntries: 160 }));
   const calls = [];
   const filesystem = {
     statSync: file => { calls.push(["stat", file]); return { isFile: () => true, size: bytes.length }; },
     readFileSync: file => { calls.push(["read", file]); return bytes; },
   };
-  assert.deepEqual(readBoundedRehearsalReceipt(filesystem), { status: "PASS", providerMode: "actual-supabase", candidateLedgerEntries: 159 });
+  assert.deepEqual(readBoundedRehearsalReceipt(filesystem), { status: "PASS", providerMode: "actual-supabase", candidateLedgerEntries: 160 });
   assert.deepEqual(calls, [["stat", "/tmp/consolidated-db-rehearsal.json"], ["read", "/tmp/consolidated-db-rehearsal.json"]]);
   assert.equal(rehearsalReceiptPath, "/tmp/consolidated-db-rehearsal.json");
   assert.equal(maxRehearsalReceiptBytes, 1024 * 1024);
+});
+
+test("hosted receipt requires the exact six-PRE plus POST ledger and package", () => {
+  const migrations = Array.from({ length: 6 }, (_, index) => ({ file: `reviewed-${index}.sql`, sha256: String(index).repeat(64) }));
+  const postdeployment = "f".repeat(64);
+  const receipt = { status: "PASS", providerMode: "actual-supabase", baselineLedgerEntries: 153, candidateLedgerEntries: 160,
+    migrations, postdeployment, productionApplicationDataImported: false, productionRead: false, productionMutated: false };
+  assert.doesNotThrow(() => assertHostedRehearsalReceipt(receipt, migrations, postdeployment));
+  for (const change of [{ candidateLedgerEntries: 159 }, { candidateLedgerEntries: 161 }, { baselineLedgerEntries: 152 },
+    { migrations: migrations.slice(0, 5) }, { postdeployment: "0".repeat(64) }, { providerMode: "native-compatibility" },
+    { productionApplicationDataImported: true }, { productionRead: true }, { productionMutated: true }, { status: "FAIL" }]) {
+    assert.throws(() => assertHostedRehearsalReceipt({ ...receipt, ...change }, migrations, postdeployment));
+  }
 });
 
 test("receipt retrieval rejects oversized and nonregular files before reading their bytes", () => {
