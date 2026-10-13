@@ -12,7 +12,7 @@
     "file": "20261001040810_production_retire_legacy_creation.sql",
     "version": "20261001040810",
     "name": "production_retire_legacy_creation",
-    "sha256": "d21fcc5f035773bf941b63066badc2f7dcc3a11caa2f3f02af2aa55bc1c612b4"
+    "sha256": "b17607392a823b314e38a5877beb9ee3d468350cdc451949872eb71534412b93"
   },
   "configuration": {
     "player_showcase": {

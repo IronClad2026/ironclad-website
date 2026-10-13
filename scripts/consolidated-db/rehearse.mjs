@@ -9,7 +9,10 @@ import {preflightSql} from '../consolidated-release/sql.mjs';
 import {historySql,capture} from './fingerprint.mjs';
 import {buildPostDeploymentSql,postDeploymentRetryState,verifyPostDeploymentPackage} from './post-deployment.mjs';
 import {checkConcurrency,checkMigrationLock} from './concurrency.mjs';
+import {checkLegacyProConcurrency} from '../../tests/consolidated-db/legacy-pro-concurrency.mjs';
 import {checkRelationAclFingerprints} from './relation-acl-regression.mjs';
+import {checkHistoricalConstraintInventory} from './historical-constraint-regression.mjs';
+import {checkLegacyProReleaseGate} from '../../tests/consolidated-db/legacy-pro-gate-contract.mjs';
 const client=await connect();
 const steps=[];
 const passed=step=>{steps.push(step);console.log('PASS '+step);};
@@ -28,11 +31,15 @@ try {
   passed('Synthetic three-division completed legacy event: 21 normal scored matches, three settlements, one genuine Main qualifying slot, coherent legal and retention history');
   passed(await checkRelationAclFingerprints(client));
   if(process.argv.includes('--seed-only')) {console.log(JSON.stringify({status:'PASS',scope:'seed-only',providerMode,capture:await capture(client)}));await client.end();process.exit(0);}
+  for(const step of await checkHistoricalConstraintInventory(client))passed(step);
   const historyBefore=await scalar(client,historySql());
   const functionsBefore=await scalar(client,catalogQuery);
   assert.deepEqual(functionsBefore,expectedFunctions);
-  const targetId=await scalar(client,"select md5('consolidated-production-rehearsal:event:1:0')::uuid");
-  await run(client,preflightSql({candidateSha:'a'.repeat(40),targetRef:'nsyjtqpvyxlzyujlbzos',tournamentIds:[targetId],phase:'before-schema'}));
+  const targetId=await scalar(client,"select pg_temp.fd_id('event',1)");
+  const beforePreflight=await run(client,preflightSql({candidateSha:'a'.repeat(40),targetRef:'nsyjtqpvyxlzyujlbzos',tournamentIds:[targetId],phase:'before-schema'}));
+  const beforeSnapshot=(Array.isArray(beforePreflight)?beforePreflight:[beforePreflight]).find(r=>r.rows?.[0]?.jsonb_build_object)?.rows[0].jsonb_build_object;
+  assert(beforeSnapshot,'Baseline read-only preflight did not return aggregate evidence');
+  assert.equal(beforeSnapshot.checks.historicConstraintInventoryMismatch,0,'Unchanged baseline constraint inventory must pass the generated aggregate query');
   passed(await checkMigrationLock(client));
   assert.equal(retryState((await client.query('select version,name,statements from supabase_migrations.schema_migrations')).rows),'unapplied');
   let injected=false;
@@ -42,13 +49,13 @@ try {
   assert.deepEqual(await scalar(client,historySql()),historyBefore,'History rollback exact');
   assert.equal(await scalar(client,"select to_regclass('public.player_showcases') is null"),true);
   assert.equal(await scalar(client,'select count(*)::integer from supabase_migrations.schema_migrations'),153);
-  passed('Injected final-step failure rolled back all five DDL bodies, all ledger entries, functions and every old application column');
+  passed('Injected final-step failure rolled back all six predeployment DDL bodies, mapping, ledger entries, functions and every old application column');
   await run(client,buildAtomicMigrationSql());
   assert.deepEqual(await scalar(client,historySql()),historyBefore,'Migration altered historical fields or timestamps');
   const retry=retryState((await client.query('select version,name,statements from supabase_migrations.schema_migrations')).rows);
   assert.equal(retry,'already-applied');
-  assert.equal(await scalar(client,'select count(*)::integer from supabase_migrations.schema_migrations'),158);
-  passed('Atomic apply and exact-checksum retry: 158 entries; every pre-existing application field and row is byte-identical');
+  assert.equal(await scalar(client,'select count(*)::integer from supabase_migrations.schema_migrations'),159);
+  passed('Atomic apply and exact-checksum retry: 159 entries; every pre-existing application field and row is byte-identical; transition inert');
   const afterFunctions=await scalar(client,catalogQuery);
   for(const [key,hash] of Object.entries(functionsBefore))if(/(retention|privacy_audit|redact|purge_closed)/.test(key))assert.equal(afterFunctions[key],hash,'Protected retention definition changed: '+key);
   await run(client,read('tests/consolidated-db/contracts.sql'));
@@ -56,12 +63,15 @@ try {
   passed('Version, grants, legal/privacy, retention-chain, optional-feature and partial-season contract assertions');
   for(const phase of ['before-schema','after-schema']){
     if(phase==='before-schema')continue;
-    const sql=preflightSql({candidateSha:'a'.repeat(40),targetRef:'nsyjtqpvyxlzyujlbzos',tournamentIds:[await scalar(client,"select md5('consolidated-production-rehearsal:event:1:0')::uuid")],phase});
+    const sql=preflightSql({candidateSha:'a'.repeat(40),targetRef:'nsyjtqpvyxlzyujlbzos',tournamentIds:[targetId],phase});
     const result=await run(client,sql);
     const snapshot=(Array.isArray(result)?result: [result]).find(r=>r.rows?.[0]?.jsonb_build_object)?.rows[0].jsonb_build_object;
     assert(snapshot,'Read-only release preflight did not return aggregate evidence');
-    assert.equal(snapshot.checks.partialLegacyMainSeasons,1,'Partial historical Main must STOP');
-    passed('Final preflight compiles and identifies preserved one-of-six legacy Main season as STOP');
+    assert.equal(snapshot.checks.partialLegacyMainSeasons,0,'Only the exact positively verified continuation may proceed');
+    assert.equal(snapshot.checks.legacyProTransitionSourceMismatch,0);
+    assert.equal(snapshot.checks.legacyProTransitionMarkerMismatch,0);
+    assert.equal(snapshot.checks.historicConstraintInventoryMismatch,0,'Approved schema additions must preserve the exact historical constraint inventory');
+    passed('Final preflight admits only the exact source-bound one-of-six continuation; schema marker remains inert');
   }
   validateLegalArtifacts(root);
   await client.query("select set_config('ironclad.release_project_ref','nsyjtqpvyxlzyujlbzos',false),set_config('ironclad.release_candidate_sha',$1,false)",['a'.repeat(40)]);
@@ -86,10 +96,20 @@ try {
   assert(postFailure);assert.deepEqual(await capture(client),preGuard,'Postdeploy rollback changed schema/data/ledger');
   await run(client,buildPostDeploymentSql(postOptions));
   assert.equal(postDeploymentRetryState((await client.query('select version,name,statements from supabase_migrations.schema_migrations')).rows),'already-applied');
-  assert.equal(await scalar(client,'select count(*)::integer from supabase_migrations.schema_migrations'),159);
+  assert.equal(await scalar(client,'select count(*)::integer from supabase_migrations.schema_migrations'),160);
   assert.deepEqual(await scalar(client,historySql()),afterLegal,'Postdeploy guard changed old history/core flags');
   await run(client,read('tests/consolidated-db/editor-compatibility.sql'));
   passed('Postdeployment guard/Showcase activation rollback, apply and exact retry: cached19 creation rejected, legacy edits retained, HighlightsOFF/core flags/history unchanged');
+  await run(client,read('tests/consolidated-db/legacy-pro-badge-contract.sql'));
+  passed('Same-season legacy Main Event 1 plus five genuine Pro events: badges, podiums, source identity and immutable earned awards');
+  await run(client,read('tests/consolidated-db/legacy-pro-completion-contract.sql'));
+  passed('Sixth Pro division cannot finalize an unfinished tournament; genuine whole-event completion finalizes normally');
+  await run(client,read('tests/consolidated-db/legacy-pro-recovery-contract.sql'));
+  passed('Recalculation, settlement retry, scoped corrections, privacy pseudonymization and cached editor source guards');
+  await run(client,read('tests/consolidated-db/legacy-pro-public-privacy.sql'));
+  passed('Actual anonymous Pro projection and closed/private profile masking; no private authority access');
+  for(const proof of await checkLegacyProReleaseGate(client))passed(proof);
+  assert.deepEqual(await scalar(client,historySql()),afterLegal,'Bridge proof rollback leaked historical state');
   await run(client,read('tests/consolidated-db/future-lifecycle.sql'));
   assert.deepEqual(await scalar(client,historySql()),afterLegal,'Rolled-back future rehearsal leaked state');
   passed('Future four-division six-event lifecycle and badge/accounting retry assertions, fully rolled back');
@@ -104,12 +124,14 @@ try {
   await run(client,prefix+read('tests/consolidated-db/realtime-contract.sql'));
   assert.deepEqual(await scalar(client,historySql()),afterLegal,'Retention/Realtime rollback leaked history');
   passed('Production retention/privacy contract plus private Realtime authorization, transactional rollback, fallback and stale-generation contracts');
-  const lastPreflight=await run(client,preflightSql({candidateSha:'a'.repeat(40),targetRef:'nsyjtqpvyxlzyujlbzos',tournamentIds:[await scalar(client,"select md5('consolidated-production-rehearsal:event:1:0')::uuid")],phase:'after-activation'}));
+  const lastPreflight=await run(client,preflightSql({candidateSha:'a'.repeat(40),targetRef:'nsyjtqpvyxlzyujlbzos',tournamentIds:[targetId],phase:'after-activation'}));
   const snapshot=(Array.isArray(lastPreflight)?lastPreflight:[lastPreflight]).find(r=>r.rows?.[0]?.jsonb_build_object)?.rows[0].jsonb_build_object;
-  assert(snapshot);assert.equal(snapshot.checks.partialLegacyMainSeasons,1);
-  passed('Final postactivation aggregate preflight compiles with159 ledger entries and still STOPs on partial legacy Main');
+  assert(snapshot);assert.equal(snapshot.checks.partialLegacyMainSeasons,0);
+  assert.equal(snapshot.checks.historicConstraintInventoryMismatch,0,'Postactivation historical constraint inventory must remain exact');
+  passed('Final postactivation aggregate preflight compiles with160 ledger entries and exact continued Pro Event 1');
   for(const proof of await checkConcurrency(client))passed(proof);
-  const report={schemaVersion:1,status:'PASS',scope:'isolated synthetic consolidated migration rehearsal',providerMode,serverVersion:await scalar(client,'show server_version'),exactBaselineFunctions:320,baselineLedgerEntries:153,candidateLedgerEntries:159,steps,migrations:verifyPackage().map(({file,sha256})=>({file,sha256})),postdeployment:verifyPostDeploymentPackage().sha256,productionApplicationDataImported:false,productionRead:false,productionMutated:false,
+  for(const proof of await checkLegacyProConcurrency(client))passed(proof);
+  const report={schemaVersion:1,status:'PASS',scope:'isolated synthetic consolidated migration rehearsal',providerMode,serverVersion:await scalar(client,'show server_version'),exactBaselineFunctions:320,baselineLedgerEntries:153,candidateLedgerEntries:160,steps,migrations:verifyPackage().map(({file,sha256})=>({file,sha256})),postdeployment:verifyPostDeploymentPackage().sha256,productionApplicationDataImported:false,productionRead:false,productionMutated:false,
     limitations:providerMode==='native-compatibility'?['Native PostgreSQL 17.6 provider stubs: no actual pg_cron/pg_net/Vault/hosted Realtime proof','No full logical backup/restore proof; mandatory exact Supabase image CI remains separate','No hosted WebSocket, Clerk, Storage byte or external media runtime proof']:['Actual extension binaries; synthetic Auth/Storage metadata, no hosted WebSocket service','A fresh real Production backup and restore receipt remain mandatory at release time']};
   const out=process.env.CONSOLIDATED_EVIDENCE_FILE??path.join(root,'test-results/consolidated-db-rehearsal.json');assert(path.isAbsolute(out),'Evidence path must be absolute');mkdirSync(path.dirname(out),{recursive:true});writeFileSync(out,JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({status:'PASS',steps:steps.length,providerMode,evidence:out}));

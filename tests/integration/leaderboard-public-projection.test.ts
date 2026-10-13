@@ -284,6 +284,47 @@ describe("public leaderboard projection", () => {
     expect(data.errors).toEqual([]);
   });
 
+  it("projects the approved Pro continuation while preserving historical Main rows and Career totals", async () => {
+    const results: Record<string, QueryResult> = {
+      leaderboard_current_season: {
+        data: { ...currentSeason, official_bracket_type: "pro", valid_qualifying_event_count: 1, has_legacy_main_transition: true },
+        error: null,
+      },
+      leaderboard_public_season_standings: {
+        data: [
+          { ...seasonStanding, bracket_type: "main", last_tournament_bracket_type: "main", total_points: 12 },
+          { ...seasonStanding, bracket_type: "pro", last_tournament_bracket_type: "main", total_points: 12 },
+        ],
+        error: null,
+      },
+      leaderboard_public_all_time_standings: { data: [allTimeStanding], error: null },
+      leaderboard_public_season_champions: { data: [], error: null },
+    };
+    fromMock.mockImplementation((table: string) => createQuery(results[table]).query);
+
+    const data = await getPublicLeaderboardData();
+
+    expect(data.currentSeason).toMatchObject({ id: currentSeason.id, officialBracketType: "pro", validQualifyingEventCount: 1, hasLegacyMainTransition: true });
+    expect(data.seasonStandings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ bracketType: "main", totalPoints: 12 }),
+      expect.objectContaining({ bracketType: "pro", lastTournamentBracketType: "main", totalPoints: 12 }),
+    ]));
+    expect(data.allTimeStandings).toEqual([expect.objectContaining({ bracketType: "main", totalPoints: 24 })]);
+    expect(data.errors).toEqual([]);
+  });
+
+  it.each([undefined, null, false, "true", 1])("does not infer a historical bridge from flag %s", async (flag) => {
+    const results: Record<string, QueryResult> = {
+      leaderboard_current_season: { data: { ...currentSeason, official_bracket_type: "pro", has_legacy_main_transition: flag }, error: null },
+      leaderboard_public_season_standings: { data: [], error: null },
+      leaderboard_public_all_time_standings: { data: [], error: null },
+      leaderboard_public_season_champions: { data: [], error: null },
+    };
+    fromMock.mockImplementation((table: string) => createQuery(results[table]).query);
+
+    expect((await getPublicLeaderboardData()).currentSeason?.hasLegacyMainTransition).toBe(false);
+  });
+
   it("reads fresh season and standings data on each invocation", async () => {
     for (const revision of [1, 2]) {
       const results: Record<string, QueryResult> = {
@@ -353,7 +394,7 @@ describe("public leaderboard projection", () => {
         .get("leaderboard_current_season")
         ?.calls.find((call) => call.method === "select")?.args[0]
     ).toBe(
-      "id, name, year, season_number, start_date, end_date, is_active, official_bracket_type, valid_qualifying_event_count, is_finalized, is_under_review"
+      "id, name, year, season_number, start_date, end_date, is_active, official_bracket_type, valid_qualifying_event_count, is_finalized, is_under_review, has_legacy_main_transition"
     );
     expect(
       queries.get("leaderboard_current_season")?.calls

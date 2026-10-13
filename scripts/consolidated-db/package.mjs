@@ -11,6 +11,7 @@ export const migrationFiles = Object.freeze([
   "20261001032959_production_private_match_room_realtime.sql",
   "20261001033000_production_versioned_competition_authority.sql",
   "20261001033001_production_versioned_accounting_badges.sql",
+  "20261013184857_production_legacy_main_pro_event_one.sql",
 ]);
 export const read = (name) => readFileSync(path.join(root, name), "utf8");
 export const sha256 = (value) => createHash("sha256").update(value).digest("hex");

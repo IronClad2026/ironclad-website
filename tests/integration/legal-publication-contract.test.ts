@@ -223,8 +223,8 @@ describe("versioned legal publication contract", () => {
       ]),
       ...publishedV11Artifacts,
       ...publishedCompetitionV31Artifacts,
-      ["ironclad-official-tournament-rulebook-v3.2.pdf", "0e665b6d8b815ea37808a2c91d2493c446895757580b9b0c1053833a3c8264c7"],
-      ["ironclad-player-participation-agreement-v3.2.pdf", "4d498aec223dd83cb7aae1690f19de2477b77b999ea5a85cafe3aaaecdc55666"],
+      ["ironclad-official-tournament-rulebook-v3.2.pdf", "7f98e646934a0dd6329ef06e550575185db3f4f7c182ed834f65c662995f1467"],
+      ["ironclad-player-participation-agreement-v3.2.pdf", "4c32335de8c6ba488bbe5549298cf15cd46f08645e582a14943ee9e1a3d3a1d8"],
       [
         "ironclad-privacy-policy-v1.2.pdf",
         "aa0f7af02b69194172dd6333e1d8b7271152aad0bfdab7a935686071c784bfd6",

@@ -12,8 +12,8 @@
       "effectiveDate": "2026-09-29",
       "filename": "ironclad-official-tournament-rulebook-v3.2.pdf",
       "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.2.pdf",
-      "sha256": "0e665b6d8b815ea37808a2c91d2493c446895757580b9b0c1053833a3c8264c7",
-      "sourceSha256": "6ed7d8c7ca86571b0aeb47c1886bd70b15347d706f98d584cf431985ed5e6aff"
+      "sha256": "7f98e646934a0dd6329ef06e550575185db3f4f7c182ed834f65c662995f1467",
+      "sourceSha256": "35694e6a36f6f57da825d80095186fa41670fceaf1db330b7d348f661bbdfce3"
     },
     {
       "kind": "ppa",
@@ -21,12 +21,20 @@
       "effectiveDate": "2026-09-29",
       "filename": "ironclad-player-participation-agreement-v3.2.pdf",
       "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.2.pdf",
-      "sha256": "4d498aec223dd83cb7aae1690f19de2477b77b999ea5a85cafe3aaaecdc55666",
-      "sourceSha256": "0b75a2b06e879b3ad188a6610eda76abaa879243d6ea485a2badb78ff0d66f88"
+      "sha256": "4c32335de8c6ba488bbe5549298cf15cd46f08645e582a14943ee9e1a3d3a1d8",
+      "sourceSha256": "d4dc5681483ec2530047e09ce82b9067569dff4be5b91a0f468bcdcd0a5e3c28"
     }
   ],
   "preserved": [
-    { "kind": "terms", "version": "1.1", "sha256": "59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1" },
-    { "kind": "privacy", "version": "1.3", "sha256": "6e0d930983e2f7fb82b0e6fa17da52b8255a0102d23bd7532874db2aa28de00a" }
+    {
+      "kind": "terms",
+      "version": "1.1",
+      "sha256": "59d3dfa890a8e259ab8ed81e3b490589583e5d1f7ae53d9f9caa2d77078534f1"
+    },
+    {
+      "kind": "privacy",
+      "version": "1.3",
+      "sha256": "6e0d930983e2f7fb82b0e6fa17da52b8255a0102d23bd7532874db2aa28de00a"
+    }
   ]
 }

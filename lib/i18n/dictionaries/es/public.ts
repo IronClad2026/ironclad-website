@@ -203,6 +203,8 @@ const dictionary = {
     profileMetadataDescription: "Perfil público de IronClad de {name}.",
   },
   rankings: {
+    proTransitionLabel: "Temporada Pro de transición",
+    proTransitionNotice: "En esta temporada, el Evento 1 se jugó con la estructura anterior, donde Main / Pro era la división más alta. Cuenta como Evento Pro 1 de 6, aunque históricamente sigue siendo Main / Pro. A partir del Evento 2, solo clasifican nuevos eventos Pro (1700+ ELO); los futuros eventos Main no cuentan.",
     proDivision: "Pro",
     mainProgression: "Carrera Main",
     proSeason: "Temporada Pro",

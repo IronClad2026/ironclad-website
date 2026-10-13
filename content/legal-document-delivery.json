@@ -17,7 +17,7 @@
       "kind": "rulebook",
       "version": "3.2",
       "publicPath": "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.2.pdf",
-      "sha256": "0e665b6d8b815ea37808a2c91d2493c446895757580b9b0c1053833a3c8264c7"
+      "sha256": "7f98e646934a0dd6329ef06e550575185db3f4f7c182ed834f65c662995f1467"
     },
     {
       "kind": "ppa",
@@ -35,7 +35,7 @@
       "kind": "ppa",
       "version": "3.2",
       "publicPath": "/documents-rules-ppa/ironclad-player-participation-agreement-v3.2.pdf",
-      "sha256": "4d498aec223dd83cb7aae1690f19de2477b77b999ea5a85cafe3aaaecdc55666"
+      "sha256": "4c32335de8c6ba488bbe5549298cf15cd46f08645e582a14943ee9e1a3d3a1d8"
     },
     {
       "kind": "privacy",

@@ -4,6 +4,7 @@
 begin;
 set local lock_timeout='5s';
 set local statement_timeout='120s';
+set local timezone='UTC';
 CREATE OR REPLACE FUNCTION public.save_tournament(p_tournament_id uuid, p_title text, p_slug text, p_description text, p_banner_image_url text, p_registration_open_at timestamp with time zone, p_registration_close_at timestamp with time zone, p_start_date timestamp with time zone, p_end_date timestamp with time zone, p_status text, p_format text, p_prize_pool text, p_rules_url text, p_battlefy_url text, p_registration_enabled boolean, p_grand_final_at timestamp with time zone, p_rule_format text, p_result_confirmation_window_minutes integer, p_brackets jsonb)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -84,6 +85,9 @@ begin
 
     if not found then
       raise exception 'Tournament not found';
+    end if;
+    if not exists(select 1 from public.tournaments where id=v_tournament_id and division_model_version='legacy_three_v1') then
+      raise exception 'Four-division edits require the current explicit-model editor' using errcode='55000';
     end if;
   end if;
 
@@ -262,4 +266,19 @@ $function$
 alter function public.save_tournament(p_tournament_id uuid, p_title text, p_slug text, p_description text, p_banner_image_url text, p_registration_open_at timestamp with time zone, p_registration_close_at timestamp with time zone, p_start_date timestamp with time zone, p_end_date timestamp with time zone, p_status text, p_format text, p_prize_pool text, p_rules_url text, p_battlefy_url text, p_registration_enabled boolean, p_grand_final_at timestamp with time zone, p_rule_format text, p_result_confirmation_window_minutes integer, p_brackets jsonb) owner to postgres;
 revoke all on function public.save_tournament(p_tournament_id uuid, p_title text, p_slug text, p_description text, p_banner_image_url text, p_registration_open_at timestamp with time zone, p_registration_close_at timestamp with time zone, p_start_date timestamp with time zone, p_end_date timestamp with time zone, p_status text, p_format text, p_prize_pool text, p_rules_url text, p_battlefy_url text, p_registration_enabled boolean, p_grand_final_at timestamp with time zone, p_rule_format text, p_result_confirmation_window_minutes integer, p_brackets jsonb) from public,anon,authenticated,service_role;
 grant execute on function public.save_tournament(p_tournament_id uuid, p_title text, p_slug text, p_description text, p_banner_image_url text, p_registration_open_at timestamp with time zone, p_registration_close_at timestamp with time zone, p_start_date timestamp with time zone, p_end_date timestamp with time zone, p_status text, p_format text, p_prize_pool text, p_rules_url text, p_battlefy_url text, p_registration_enabled boolean, p_grand_final_at timestamp with time zone, p_rule_format text, p_result_confirmation_window_minutes integer, p_brackets jsonb) to service_role;
+-- Activate the exact approved one-time continuation only after the outer app/legal gates.
+-- This is an official-authority boundary; recovery after it must remain bridge-aware.
+do $bridge_activation$ declare x ironclad_private.legacy_main_pro_season_transition%rowtype; begin
+ perform pg_advisory_xact_lock(hashtextextended('ironclad:leaderboard:all-time',0));
+ select * into x from ironclad_private.legacy_main_pro_season_transition where singleton for update;
+ if not found or x.activated_at is not null
+ or x.source_point_sha256 is distinct from (select encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(p) order by p.id),'[]'::jsonb)::text,'UTF8')),'hex') from public.leaderboard_point_events p where p.tournament_id=x.tournament_id)
+ or x.source_settlement_sha256 is distinct from (select encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(s) order by s.tournament_bracket_id),'[]'::jsonb)::text,'UTF8')),'hex') from public.leaderboard_division_settlements s join public.tournament_brackets b on b.id=s.tournament_bracket_id where b.tournament_id=x.tournament_id)
+ or x.source_membership_sha256 is distinct from (select encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(m) order by m.tournament_id),'[]'::jsonb)::text,'UTF8')),'hex') from public.leaderboard_tournament_season_memberships m where m.tournament_id=x.tournament_id)
+ or not exists(select 1 from public.leaderboard_seasons where id=x.season_id and official_bracket_type='main' and finalized_at is null and under_review_at is null and is_active)
+ or exists(select 1 from public.leaderboard_season_champions where season_id=x.season_id)
+ then raise exception 'Exact inert transition source changed before activation; STOP' using errcode='55000'; end if;
+ update ironclad_private.legacy_main_pro_season_transition set activated_at=clock_timestamp() where singleton;
+end; $bridge_activation$;
+
 commit;

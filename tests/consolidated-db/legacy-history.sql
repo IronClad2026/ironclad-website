@@ -1,6 +1,9 @@
 -- Synthetic LOCAL ONLY; complete genuine-shaped legacy divisions through normal authority.
 begin;
 set local request.jwt.claims='{"role":"service_role","sub":"local-consolidated-admin"}';
+-- Approved public season identifier, synthetic contents; no Production application rows are copied.
+insert into public.leaderboard_seasons(id,name,year,season_number,start_date,end_date,is_active)
+values('003db606-b891-4f4e-8893-a54dd4cd503c','2026 Main / Pro Season 1',2026,1,'2026-10-01','2026-10-01',true);
 select pg_temp.fd_create(1,'Academy');
 select pg_temp.fd_create(1,'Challenge');
 select pg_temp.fd_create(1,'Main');

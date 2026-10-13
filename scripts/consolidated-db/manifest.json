@@ -31,6 +31,12 @@
       "version": "20261001033001",
       "name": "production_versioned_accounting_badges",
       "sha256": "77a80aca1aa2a9d4ea4c9a33cf68b195a2dd97bd710d08e27cd278dec8f91ff9"
+    },
+    {
+      "file": "20261013184857_production_legacy_main_pro_event_one.sql",
+      "version": "20261013184857",
+      "name": "production_legacy_main_pro_event_one",
+      "sha256": "0b62182f772f9a84db2b5ab1aa835ae4a6b9fe09bb7eea3e692397042174ed0f"
     }
   ]
 }

@@ -257,6 +257,9 @@ const dictionary = {
     careerRecord:
       "Points remain part of this division's permanent competitive record.",
     validEvents: "Valid qualifying events",
+    proTransitionLabel: "Transitional Pro season",
+    proTransitionNotice:
+      "For this season, Event 1 was played under the previous structure, where Main / Pro was the highest division. It counts as Pro Event 1 of 6 while remaining historically Main / Pro. From Event 2 onward, only new Pro events (1700+ ELO) qualify; future Main events do not count.",
     underReviewNotice:
       "Season results are under review. Displayed standings are not final while season review remains open.",
     careerNoReset:

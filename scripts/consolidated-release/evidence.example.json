@@ -18,6 +18,17 @@
   "highlightsProviderOff": true,
   "legalPublicationPlanSha256": null,
   "migrationPackageSha256": null,
+  "legacyProContinuation": {
+    "policy": "legacy-main-pro-event-one-v1",
+    "seasonId": "003db606-b891-4f4e-8893-a54dd4cd503c",
+    "tournamentId": "1cb06045-0ffc-4745-a8cd-1a16b71baffc",
+    "tournamentBracketId": "f34400e9-f7c8-43ac-90dc-6c70b438a04d",
+    "sourcePointSha256": null,
+    "sourceSettlementSha256": null,
+    "sourceMembershipSha256": null,
+    "verified": false,
+    "receiptSha256": null
+  },
   "previewIsolation": "not-used",
   "checkedAt": null
 }

@@ -122,9 +122,9 @@ describe("help and legal localization contract", () => {
       readFileSync(join(root, "content", "legal-corpus.json"), "utf8")
     ) as { documents: { kind: string }[] };
     const expected = {
-      ppa: "0b75a2b06e879b3ad188a6610eda76abaa879243d6ea485a2badb78ff0d66f88",
+      ppa: "d4dc5681483ec2530047e09ce82b9067569dff4be5b91a0f468bcdcd0a5e3c28",
       rulebook:
-        "6ed7d8c7ca86571b0aeb47c1886bd70b15347d706f98d584cf431985ed5e6aff",
+        "35694e6a36f6f57da825d80095186fa41670fceaf1db330b7d348f661bbdfce3",
     };
 
     for (const [kind, sha256] of Object.entries(expected)) {

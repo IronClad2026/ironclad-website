@@ -12,10 +12,10 @@ export function verifyPostDeploymentPackage() {
  return {...actual,source};
 }
 export function postDeploymentRetryState(rows) {
- assert.equal(retryState(rows),'already-applied','All five schema changes must be applied first');
+ assert.equal(retryState(rows),'already-applied','All six schema changes must be applied first');
  const guard=verifyPostDeploymentPackage();
  const entry=rows.find(row=>row.version===guard.version);
- assert.equal(rows.length,entry?159:158,'Unexpected postdeployment ledger count');
+ assert.equal(rows.length,entry?160:159,'Unexpected postdeployment ledger count');
  for(const old of baseline.ledger)assert.equal(rows.find(row=>row.version===old.version)?.name,old.name,'Historical ledger changed');
  if(!entry)return 'unapplied';
  assert.equal(entry.name,guard.name);assert.deepEqual(entry.statements,[guard.source],'Postdeployment applied source changed');
@@ -37,7 +37,7 @@ do $postdeploy_preflight$ begin
  or current_setting('ironclad.release_candidate_sha',true) is distinct from '${candidateSha}'
  or current_setting('ironclad.release_app_verified_sha',true) is distinct from '${candidateSha}' then
  raise exception 'Missing independently verified exact app/Production/candidate attestation' using errcode='55000'; end if;
- if (select count(*) from supabase_migrations.schema_migrations)<>158
+ if (select count(*) from supabase_migrations.schema_migrations)<>159
  or (select jsonb_agg(jsonb_build_object('version',version,'name',name) order by version) from supabase_migrations.schema_migrations where version not in (${schema.map(m=>literal(m.version)).join(',')}))
  is distinct from ${literal(JSON.stringify(baseline.ledger.map(({version,name})=>({version,name}))))}::jsonb
  then raise exception 'Historical Production ledger changed before postdeployment guard' using errcode='55000'; end if;
@@ -57,7 +57,8 @@ ${body(guard.source)}
 insert into supabase_migrations.schema_migrations(version,name,statements) values(${literal(guard.version)},${literal(guard.name)},array[${literal(guard.source)}]::text[]);
 update public.platform_settings set value='{"enabled":true}'::jsonb where key='player_showcase';
 do $postdeploy_flags$ begin
- if (select value from public.platform_settings where key='player_showcase') is distinct from '{"enabled":true}'::jsonb
+ if not exists(select 1 from ironclad_private.legacy_main_pro_season_transition where activated_at is not null)
+ or (select value from public.platform_settings where key='player_showcase') is distinct from '{"enabled":true}'::jsonb
  or (select value from public.platform_settings where key='player_combat_highlights') is distinct from '{"enabled":false}'::jsonb then raise exception 'Showcase activation/Highlights shutdown failed'; end if;
 end; $postdeploy_flags$;
 ${injectFailure?"do $local_failure$ begin raise exception 'LOCAL_POSTDEPLOYMENT_INJECTED_FAILURE'; end; $local_failure$;":''}

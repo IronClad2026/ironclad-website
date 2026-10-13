@@ -182,6 +182,8 @@ const dictionary = {
     profileMetadataDescription: "{name} 的 IronClad 公开玩家资料。",
   },
   rankings: {
+    proTransitionLabel: "过渡期 Pro 赛季",
+    proTransitionNotice: "本赛季的第 1 场赛事采用旧结构，当时 Main / Pro 是最高级别。它计为 Pro 赛季六场赛事中的第 1 场，但历史记录仍归属 Main / Pro。从第 2 场起，只有新举办的 Pro 赛事（1700+ ELO）才符合资格；未来的 Main 赛事不计入本赛季。",
     proDivision: "Pro",
     mainProgression: "Main 生涯",
     proSeason: "Pro 赛季",

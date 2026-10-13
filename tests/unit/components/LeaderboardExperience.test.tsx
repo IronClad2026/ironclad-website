@@ -87,6 +87,72 @@ function leaderboardData(
 }
 
 describe("LeaderboardExperience", () => {
+  it("shows the approved Event 1 continuation beside Pro progress without moving Career totals", () => {
+    render(<LeaderboardExperience data={leaderboardData({
+      currentSeason: { ...featuredSeason, officialBracketType: "pro", validQualifyingEventCount: 1, hasLegacyMainTransition: true },
+      seasonStandings: [standing({ bracketType: "pro", totalPoints: 12, lastTournamentId: "historical-event", lastTournamentTitle: "Historical Highest Division Event", lastTournamentBracketType: "main" })],
+      allTimeStandings: [standing({ scope: "all_time", seasonId: null, bracketType: "main", totalPoints: 24 })],
+    })} />);
+
+    expect(screen.getByText("1 / 6")).toBeInTheDocument();
+    const notice = screen.getByRole("note", { name: "Transitional Pro season" });
+    expect(notice).toHaveTextContent("Main / Pro was the highest division");
+    expect(notice).toHaveTextContent("historically Main / Pro");
+    expect(notice).toHaveTextContent("only new Pro events (1700+ ELO) qualify");
+    expect(notice).toHaveTextContent("future Main events do not count");
+    expect(notice.parentElement).toHaveTextContent("1 / 6");
+    const historicalEvent = screen.getByText("Historical Highest Division Event").parentElement;
+    expect(historicalEvent).toHaveTextContent("Legacy · Main / Pro");
+
+    fireEvent.click(screen.getByRole("button", { name: "Legacy · Main / Pro" }));
+    expect(screen.queryByRole("note", { name: "Transitional Pro season" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("24")).toBeInTheDocument();
+  });
+
+  it("does not relabel a bridged event when its historical source identity is unavailable", () => {
+    render(<LeaderboardExperience data={leaderboardData({
+      currentSeason: { ...featuredSeason, officialBracketType: "pro", hasLegacyMainTransition: true },
+      seasonStandings: [standing({ bracketType: "pro", lastTournamentId: "unverified-event", lastTournamentTitle: "Unverified Source Event" })],
+    })} />);
+    expect(screen.queryByText("Unverified Source Event")).not.toBeInTheDocument();
+  });
+
+  it("archives the finalized continuation as a Pro season while historical Main Career remains separate", () => {
+    render(<LeaderboardExperience data={leaderboardData({
+      currentSeason: { ...featuredSeason, id: "next-pro-season", name: "2026 Pro Season 4", seasonNumber: 4, officialBracketType: "pro", validQualifyingEventCount: 0 },
+      seasonStandings: [],
+      allTimeStandings: [standing({ scope: "all_time", seasonId: null, bracketType: "main", totalPoints: 24 })],
+      seasonChampions: [{
+        id: "continued-pro-champion",
+        seasonName: "2026 Pro Season 3",
+        bracketType: "pro",
+        playerId: null,
+        playerName: "Continuing Pro Champion",
+        country: null,
+        hasAvatar: false,
+        avatarUrl: null,
+        finalRank: 1,
+        finalPoints: 120,
+      }],
+    })} />);
+
+    const champion = screen.getByText("Continuing Pro Champion").parentElement;
+    expect(champion).toHaveTextContent("2026 Pro Season 3 - Pro");
+    expect(champion).not.toHaveTextContent("Main / Pro");
+    fireEvent.click(screen.getByRole("button", { name: "Legacy · Main / Pro" }));
+    expect(within(screen.getByRole("table")).getByText("24")).toBeInTheDocument();
+    expect(champion).toHaveTextContent("2026 Pro Season 3 - Pro");
+  });
+
+  it.each([
+    { officialBracketType: "pro" as const },
+    { officialBracketType: "pro" as const, hasLegacyMainTransition: false },
+    { officialBracketType: "main" as const, hasLegacyMainTransition: true },
+  ])("does not advertise a transition without approved Pro metadata %j", (season) => {
+    render(<LeaderboardExperience data={leaderboardData({ currentSeason: { ...featuredSeason, ...season } })} />);
+    expect(screen.queryByRole("note", { name: "Transitional Pro season" })).not.toBeInTheDocument();
+  });
+
   it("uses factual valid-event progress and presents every safe Main season state", () => {
     const view = render(<LeaderboardExperience data={leaderboardData()} />);
 

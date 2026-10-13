@@ -2,7 +2,10 @@
 -- Derived from inspected lifecycle helper structure; fresh namespace, genuine versioned snapshot shape, no Staging identity or authority.
 create function pg_temp.fd_id(kind text,event integer,slot integer default 0)
 returns uuid language sql immutable as $$
-  select md5('consolidated-production-rehearsal:'||kind||':'||event||':'||slot)::uuid;
+  -- Public release-binding metadata only; all players, registrations and facts remain synthetic.
+  select case when kind='event' and event=1 and slot=0 then '1cb06045-0ffc-4745-a8cd-1a16b71baffc'::uuid
+    when kind='Main' and event=1 and slot=0 then 'f34400e9-f7c8-43ac-90dc-6c70b438a04d'::uuid
+    else md5('consolidated-production-rehearsal:'||kind||':'||event||':'||slot)::uuid end;
 $$;
 create temporary table fd_assertions(message text);
 create function pg_temp.fd_assert(ok boolean,message text)
@@ -18,7 +21,7 @@ declare
   bid uuid:=pg_temp.fd_id(division,event);
   gid uuid:=pg_temp.fd_id(division||'-generated',event);
   pid uuid; rid uuid; rd uuid; idx integer; round_no integer; match_no integer;
-  elo integer:=case division when 'Academy' then 1000 when 'Challenge' then 1250 when 'Pro' then 1800 when 'Main' then case when current_setting('ironclad.test_model',true)='four_division_v1' then 1500 else 1800 end end;
+  elo integer:=case division when 'Academy' then 1000 when 'Challenge' then 1250 when 'Pro' then 1800 when 'Main' then 1500 end;
 begin
   perform set_config('session_replication_role','replica',true);
   insert into public.tournaments(id,title,slug,format,status,description,banner_image_url,prize_pool,registration_enabled)
@@ -73,7 +76,20 @@ begin
       and tm.player_two_registration_id is not null
     order by r.round_number,tm.match_number limit 1;
     exit when not found;
-    perform public.apply_admin_official_match_result_api(m.id,m.series_best_of/2+1,0,m.player_one_registration_id,'local-consolidated-admin');
+    if event=1 and division='Main' and m.id=pg_temp.fd_id('Main-match-1',1,1)
+      and current_setting('ironclad.test_model',true) is distinct from 'four_division_v1' then
+      -- Synthetic genuine-shaped no-show report; the ordinary finalization writer scores it.
+      insert into public.match_result_report_groups(id,match_id,tournament_id,submitted_by_clerk_user_id,
+        submitted_by_registration_id,opponent_registration_id,winner_registration_id,player_one_score,player_two_score,
+        status,confirmation_deadline_at,result_type,no_show_reported_by_registration_id,no_show_registration_id,no_show_status)
+      select pg_temp.fd_id('Main-no-show-report',1),m.id,pg_temp.fd_id('event',1),r.clerk_user_id,
+        m.player_one_registration_id,m.player_two_registration_id,m.player_one_registration_id,m.series_best_of/2+1,0,
+        'pending_confirmation',now()+interval '30 minutes','no_show',m.player_one_registration_id,m.player_two_registration_id,'pending'
+      from public.registrations r where r.id=m.player_one_registration_id;
+      perform public.finalize_match_result_report_group(pg_temp.fd_id('Main-no-show-report',1),'approved','admin_approval','local-consolidated-admin',null);
+    else
+      perform public.apply_admin_official_match_result_api(m.id,m.series_best_of/2+1,0,m.player_one_registration_id,'local-consolidated-admin');
+    end if;
     played:=played+1;
     exit when played=p_limit;
   end loop;

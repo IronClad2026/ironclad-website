@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CHECKS, HISTORY, HISTORICAL_CHECK_CONSTRAINTS, preflightSql, PRODUCTION_REF } from "../../scripts/consolidated-release/sql.mjs";
 import { assessPreflight, compareHistory, comparePublishedLegal, compareActivation, canonicalManifestHash, historyDigest, validateSnapshot } from "../../scripts/consolidated-release/gate.mjs";
 import { scanText } from "../../scripts/consolidated-release/source-check.mjs";
+import { LEGACY_PRO_CONTINUATION, legacyProSourceCtes } from "../../scripts/consolidated-release/legacy-pro-transition.mjs";
 
 const manifest = { ...JSON.parse(readFileSync("scripts/consolidated-release/manifest.json", "utf8")), resolvedLegalPlanSha256: "b".repeat(64), resolvedMigrationPackageSha256: "b".repeat(64) };
 const head = "a".repeat(40);
@@ -12,10 +13,11 @@ const now = Date.parse("2026-10-01T04:00:00Z");
 const target = "10000000-0000-4000-8000-000000000001";
 function snapshot(phase = "before-schema") {
   return {
-    schemaVersion: 1, format: "aggregate-only-v1", candidateSha: head, projectRef: PRODUCTION_REF, phase,
+    schemaVersion: 2, format: "aggregate-only-v2", candidateSha: head, projectRef: PRODUCTION_REF, phase,
     capturedAt: new Date(now).toISOString(), readOnly: true, requestedTournamentCount: 1, scopeSha256: hash,
     checks: Object.fromEntries([...Object.keys(CHECKS), ...(phase !== "before-schema" ? ["unknownDivisionModels", "reclassifiedHistoricalTournaments", "reclassifiedHistoricalSeasons", phase === "after-activation" ? "showcaseNotOn" : "showcaseNotOff", "manufacturedShowcaseRows", "manufacturedHighlightRows", "highlightsNotOff", ...(phase === "after-activation" ? ["postDeploymentGuardLedgerMismatch"] : [])] : [])].map((key) => [key, 0])),
-    tables: Object.fromEntries(Object.keys(HISTORY).map((name) => [name, { count: 1, sha256: hash }])), ledgerRowCount: phase === "before-schema" ? 153 : phase === "after-schema" ? 158 : 159, ledgerSha256: hash,
+    tables: Object.fromEntries(Object.keys(HISTORY).map((name) => [name, { count: 1, sha256: hash }])), ledgerRowCount: phase === "before-schema" ? 153 : phase === "after-schema" ? 159 : 160, ledgerSha256: hash,
+    legacyProContinuation: { sourcePointSha256: hash, sourceSettlementSha256: hash, sourceMembershipSha256: hash, markerSha256: phase === "before-schema" ? null : hash, activated: phase === "after-activation" },
   };
 }
 function evidence(state = snapshot()) {
@@ -28,6 +30,7 @@ function evidence(state = snapshot()) {
     backup: { verified: true, projectRef: PRODUCTION_REF, capturedAt: new Date(now).toISOString(), backupSha256: hash, restoreVerified: true, restoreReceiptSha256: hash, snapshotSha256: historyDigest(state) },
     quietWindow: { competitionWritesFrozen: true, registrationAndCreationFrozen: true, operatorVerified: true, receiptSha256: hash },
     highlightsProviderOff: true, legalPublicationPlanSha256: hash, migrationPackageSha256: hash, previewIsolation: "not-used", checkedAt: new Date(now).toISOString(),
+    legacyProContinuation: { ...LEGACY_PRO_CONTINUATION, sourcePointSha256: hash, sourceSettlementSha256: hash, sourceMembershipSha256: hash, verified: true, receiptSha256: hash },
   };
 }
 
@@ -62,6 +65,29 @@ describe("offline final Production preflight", () => {
     proof.backup.restoreVerified = false; proof.schemaDrift.verified = false; proof.highlightsProviderOff = false;
     expect(assessPreflight(state, proof, manifest, now).reasons).toEqual(expect.arrayContaining(["RELEVANT_P0_P1_P2_NOT_ZERO", "EXACT_HEAD_MANDATORY_CI_INCOMPLETE", "BACKUP_AND_RESTORE_EVIDENCE_INVALID", "SCHEMA_DRIFT_UNVERIFIED", "HIGHLIGHTS_MUST_REMAIN_OFF"]));
   });
+  it.each(["policy", "seasonId", "tournamentId", "tournamentBracketId", "sourcePointSha256", "sourceSettlementSha256", "sourceMembershipSha256"])(
+    "rejects unbound legacy-to-Pro continuation %s", (key) => {
+      const state = snapshot(); const proof = evidence(state);
+      const changed = { ...proof, legacyProContinuation: { ...proof.legacyProContinuation, [key]: "c".repeat(64) } };
+      expect(assessPreflight(state, changed, manifest, now).reasons).toContain("LEGACY_PRO_CONTINUATION_UNVERIFIED");
+    }
+  );
+  it("never substitutes an unverified continuation attestation or an old envelope/ledger", () => {
+    const state = snapshot(); const proof = evidence(state); proof.legacyProContinuation.verified = false;
+    expect(assessPreflight(state, proof, manifest, now).reasons).toContain("LEGACY_PRO_CONTINUATION_UNVERIFIED");
+    const old = { ...state, schemaVersion: 1, format: "aggregate-only-v1" }; Reflect.deleteProperty(old, "legacyProContinuation");
+    expect(validateSnapshot(old, { candidateSha: head, now })).toContain("SNAPSHOT_SHAPE_INVALID");
+    const schema = snapshot("after-schema"); schema.ledgerRowCount = 158;
+    expect(validateSnapshot(schema, { candidateSha: head, now })).toContain("LEDGER_ROW_COUNT_DRIFT");
+    const activated = snapshot("after-activation"); activated.ledgerRowCount = 159;
+    expect(validateSnapshot(activated, { candidateSha: head, now })).toContain("LEDGER_ROW_COUNT_DRIFT");
+  });
+  it("requires phase-correct continuation activation and aggregate-only fingerprints", () => {
+    const state = snapshot("after-schema"); state.legacyProContinuation.activated = true;
+    expect(validateSnapshot(state, { candidateSha: head, now })).toContain("LEGACY_PRO_CONTINUATION_SNAPSHOT_INVALID");
+    const before = snapshot(); before.legacyProContinuation.markerSha256 = hash;
+    expect(validateSnapshot(before, { candidateSha: head, now })).toContain("LEGACY_PRO_CONTINUATION_SNAPSHOT_INVALID");
+  });
   it("rejects unexpected raw rows/PII/proof paths and bounded hash overflow", () => {
     const state = snapshot(); const tables = state.tables as Record<string, Record<string, unknown>>;
     tables.registrations.rows = [{ email: "synthetic@example.invalid" }];
@@ -84,6 +110,12 @@ describe("offline final Production preflight", () => {
     after.capturedAt = new Date(now - 601000).toISOString();
     expect(compareHistory(before, after, head, now).verdict).toBe("STOP");
   });
+  it("preserves exact continuation source fingerprints without a historical-row exemption", () => {
+    const before = snapshot(); const after = snapshot("after-schema"); after.legacyProContinuation.sourceMembershipSha256 = "c".repeat(64);
+    expect(compareHistory(before, after, head, now).reasons).toContain("LEGACY_PRO_CONTINUATION_SOURCE_CHANGED");
+    after.legacyProContinuation.sourceMembershipSha256 = hash; after.tables.leaderboard_point_events.sha256 = "c".repeat(64);
+    expect(compareHistory(before, after, head, now).reasons).toContain("HISTORY_CHANGED:leaderboard_point_events");
+  });
   it("only permits a hash-bound exact approved legal delta; accepts no acceptance/history changes", () => {
     const before = snapshot("after-schema"); const after = snapshot("after-schema");
     before.tables.legal_documents.count = 10; after.tables.legal_documents.count = 12; after.tables.legal_documents.sha256 = "c".repeat(64);
@@ -93,6 +125,8 @@ describe("offline final Production preflight", () => {
     expect(comparePublishedLegal(before, after, head, receipt, now, hash).reasons).toContain("HISTORY_CHANGED:registration_acceptances");
     receipt.predecessorRowsPreserved = false;
     expect(comparePublishedLegal(before, after, head, receipt, now, hash).reasons).toContain("EXACT_LEGAL_PUBLICATION_RECEIPT_INVALID");
+    after.legacyProContinuation.markerSha256 = "d".repeat(64);
+    expect(comparePublishedLegal(before, after, head, receipt, now, hash).reasons).toContain("LEGACY_PRO_CONTINUATION_CHANGED_DURING_LEGAL_PUBLICATION");
   });
   it("does not accept a hash-shaped substitute for the reviewed local package/legal manifest", () => {
     const proof = evidence(); proof.legalPublicationPlanSha256 = "e".repeat(64);
@@ -105,12 +139,16 @@ describe("offline final Production preflight", () => {
   });
   it("checks guarded postdeployment activation and unchanged history before unfreeze", () => {
     const before = snapshot("after-schema"); const after = snapshot("after-activation"); after.ledgerSha256 = "c".repeat(64);
-    const receipt = { projectRef: PRODUCTION_REF, candidateSha: head, postDeploymentManifestSha256: hash, receiptSha256: hash, oldCreationRetired: true, existingLegacyEditsPreserved: true, explicitFourCreationPreserved: true, checkedAt: new Date(now).toISOString() };
+    const receipt = { projectRef: PRODUCTION_REF, candidateSha: head, postDeploymentManifestSha256: hash, receiptSha256: hash, oldCreationRetired: true, existingLegacyEditsPreserved: true, explicitFourCreationPreserved: true, legacyProContinuationActivated: true, checkedAt: new Date(now).toISOString() };
     expect(compareActivation(before, after, head, receipt, hash, now).verdict).toBe("PASS");
     after.checks.showcaseNotOn = 1;
     expect(compareActivation(before, after, head, receipt, hash, now).reasons).toContain("STOP:showcaseNotOn");
     after.checks.showcaseNotOn = 0; receipt.oldCreationRetired = false;
     expect(compareActivation(before, after, head, receipt, hash, now).reasons).toContain("POSTDEPLOYMENT_READONLY_RECEIPT_INVALID");
+    receipt.oldCreationRetired = true; receipt.legacyProContinuationActivated = false;
+    expect(compareActivation(before, after, head, receipt, hash, now).reasons).toContain("POSTDEPLOYMENT_READONLY_RECEIPT_INVALID");
+    receipt.legacyProContinuationActivated = true; after.legacyProContinuation.markerSha256 = "d".repeat(64);
+    expect(compareActivation(before, after, head, receipt, hash, now).reasons).toContain("LEGACY_PRO_CONTINUATION_SOURCE_OR_MARKER_CHANGED");
   });
 });
 
@@ -126,7 +164,7 @@ describe("SQL generation and source isolation", () => {
     expect(sql).toContain("rollback;");
     expect(sql).not.toMatch(/\b(insert|update|delete|truncate|create|alter|drop|grant|revoke|call|perform)\b/i);
     expect(sql).not.toMatch(/public\.[a-z0-9_]+\(/i);
-    expect(sql).toContain("'format','aggregate-only-v1'");
+    expect(sql).toContain("'format','aggregate-only-v2'");
     expect(sql).toContain("limit 20001");
     expect(sql).toContain("else null end as sha256");
     expect(sql).toContain("partialLegacyMainSeasons");
@@ -141,7 +179,8 @@ describe("SQL generation and source isolation", () => {
     expect(sql.match(/\) is false/g)).toHaveLength(5);
     expect(sql).toContain("'historicConstraintInventoryMismatch'");
     expect(sql).toContain("c.convalidated is distinct from false");
-    expect(sql).toContain("pg_catalog.pg_get_constraintdef(c.oid) is distinct from expected.definition");
+    expect(sql).toContain("pg_catalog.pg_get_constraintdef(c.oid,true) is distinct from expected.definition");
+    expect(sql).not.toContain("and not c.convalidated and c.conname not in");
     expect(HISTORICAL_CHECK_CONSTRAINTS.map((check) => check.name)).toEqual(["tournaments_end_after_start", "tournaments_format_check", "tournaments_registration_dates", "tournaments_slug_format", "tournaments_start_after_registration"]);
     expect(HISTORICAL_CHECK_CONSTRAINTS.every((check) => check.definition.endsWith(" NOT VALID"))).toBe(true);
   });
@@ -155,10 +194,34 @@ describe("SQL generation and source isolation", () => {
     expect(after).toContain("official_bracket_type is distinct from 'main'");
     expect(after).toContain("key='player_showcase'");
     expect(after).toContain("ironclad_private.player_combat_highlight_uploads");
+    expect(before).not.toContain("'tournaments_division_model_version_check'");
+    expect(after).toContain("'tournaments_division_model_version_check'");
     const activated = preflightSql({ candidateSha: head, targetRef: PRODUCTION_REF, tournamentIds: [target], phase: "after-activation" });
     expect(activated).toContain("'showcaseNotOn'");
     expect(activated).toContain("version='20261001040810'");
     expect(activated).toContain("'postDeploymentGuardLedgerMismatch'");
+  });
+  it("binds only the exact approved event-one source and a singleton phase-correct marker", () => {
+    const before = preflightSql({ candidateSha: head, targetRef: PRODUCTION_REF, tournamentIds: [target] });
+    const after = preflightSql({ candidateSha: head, targetRef: PRODUCTION_REF, tournamentIds: [target], phase: "after-schema" });
+    const activated = preflightSql({ candidateSha: head, targetRef: PRODUCTION_REF, tournamentIds: [target], phase: "after-activation" });
+    for (const value of Object.values(LEGACY_PRO_CONTINUATION)) expect(after).toContain(value);
+    expect(legacyProSourceCtes("before-schema")).not.toContain("division_model_version");
+    expect(legacyProSourceCtes("before-schema")).not.toContain("official_bracket_type");
+    expect(after).toContain("t.division_model_version='legacy_three_v1' and s.official_bracket_type='main'");
+    expect(before).toContain("id not in (select season_id from recognized_legacy_pro_transition)");
+    expect(before).toContain("s.year=2026 and s.season_number=1");
+    expect(before).toContain("event_type='participation_withheld' and points<>0");
+    expect(before).toContain("event_type not in ('participation','participation_withheld','round_passed','tournament_win')");
+    expect(before).toContain("coalesce(p.tournament_bracket_id,r.tournament_bracket_id)");
+    expect(before).toContain("bracket_type='main')=15");
+    expect(before).toContain("bracket_type='main')=105");
+    expect(before).toContain("tournament_id=t.id)=45");
+    expect(after).toContain("m.singleton is true");
+    expect(after).toContain("m.activated_at is null");
+    expect(activated).toContain("m.activated_at is not null");
+    expect(activated).toContain("to_jsonb(m)-'activated_at'");
+    expect(Object.keys(HISTORY)).not.toContain("legacy_main_pro_season_transition");
   });
   it("rejects wrong target, missing SHA, duplicate or injected UUIDs, excessive scopes and unknown phase", () => {
     const valid = { candidateSha: head, targetRef: PRODUCTION_REF, tournamentIds: [target] };

@@ -175,6 +175,8 @@ const dictionary = {
     profileMetadataDescription: "Публичный профиль игрока IronClad: {name}.",
   },
   rankings: {
+    proTransitionLabel: "Переходный сезон Pro",
+    proTransitionNotice: "В этом сезоне Событие 1 прошло по прежней структуре, где Main / Pro был высшим дивизионом. Оно учитывается как Событие Pro 1 из 6, сохраняя историческую принадлежность к Main / Pro. Начиная с События 2 учитываются только новые события Pro (1700+ ELO); будущие события Main не учитываются.",
     proDivision: "Pro",
     mainProgression: "Карьера Main",
     proSeason: "Сезон Pro",

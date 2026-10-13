@@ -1,6 +1,7 @@
 import { FACTS } from "../p03-release/facts.mjs";
 import { verifyPostDeploymentPackage } from "../consolidated-db/post-deployment.mjs";
 import { baseline } from "../consolidated-db/package.mjs";
+import { legacyProSourceCtes, legacyProMarkerMismatchSql, legacyProSnapshotSql } from "./legacy-pro-transition.mjs";
 
 export const PRODUCTION_REF = "nsyjtqpvyxlzyujlbzos";
 export const SHA = /^[0-9a-f]{40}$/;
@@ -13,6 +14,17 @@ export const HISTORICAL_CHECK_CONSTRAINTS = originalCheckNames.map((name) => {
 });
 const literal = (value) => `'${value.replaceAll("'", "''")}'`;
 const originalCheckValues = HISTORICAL_CHECK_CONSTRAINTS.map((item) => `(${literal(item.name)},${literal(item.definition)})`).join(",");
+const baselineTournamentCheckNames = baseline.constraints.filter((item) => item.schema === "public" && item.table_name === "tournaments" && item.contype === "c").map((item) => item.constraint_name);
+
+export function historicalConstraintInventorySql(phase = "before-schema") {
+  // The reviewed baseline was captured with PostgreSQL's pretty deparser. Use
+  // that same renderer; do not strip parentheses, operators, casts or literals.
+  // All original identities/types/NOT VALID states remain exact. Also reject
+  // unexpected validated CHECKs, allowing only the reviewed forward addition
+  // at the boundary where its checksum-bound migration has already applied.
+  const expectedNames = [...baselineTournamentCheckNames, ...(phase === "before-schema" ? [] : ["tournaments_division_model_version_check"])];
+  return `select (select count(*) from (values ${originalCheckValues}) expected(name,definition) left join pg_catalog.pg_constraint c on c.conrelid='public.tournaments'::regclass and c.conname=expected.name where c.oid is null or c.contype<>'c' or c.convalidated is distinct from false or pg_catalog.pg_get_constraintdef(c.oid,true) is distinct from expected.definition)+(select count(*) from pg_catalog.pg_constraint c where c.conrelid='public.tournaments'::regclass and c.contype='c' and c.conname not in (${expectedNames.map(literal).join(",")}))`;
+}
 
 // Whole-relation digests only. Identifiers and private values never leave SQL.
 // Do not import the old capture()/competitionSql() runner: those export rows.
@@ -56,7 +68,9 @@ export const CHECKS = {
   missingOfficialMemberships: "select count(*) from relevant_tournaments t where t.status='completed' and exists(select 1 from launched_brackets b where b.tournament_id=t.id and b.name='Main') and not exists(select 1 from public.leaderboard_tournament_season_memberships m where m.tournament_id=t.id and m.scored_at is not null and m.voided_at is null)",
   invalidMemberships: "select count(*) from public.leaderboard_tournament_season_memberships m join public.tournaments t on t.id=m.tournament_id where (m.voided_at is null and (m.scored_at is null or t.status<>'completed')) or m.qualifying_event_number not between 1 and 6",
   duplicateMembershipSlots: "select count(*) from (select season_id, qualifying_event_number from public.leaderboard_tournament_season_memberships where voided_at is null group by season_id, qualifying_event_number having count(*)>1) duplicates",
-  partialLegacyMainSeasons: "select count(*) from season_summary where official_family='main' and finalized_at is null and (valid_events<>6 or scored_events<>6)",
+  partialLegacyMainSeasons: "select count(*) from season_summary where official_family='main' and finalized_at is null and (valid_events<>6 or scored_events<>6) and id not in (select season_id from recognized_legacy_pro_transition)",
+  legacyProTransitionSourceMismatch: "select case when (select count(*) from recognized_legacy_pro_transition)=1 then 0 else 1 end",
+  legacyProTransitionMarkerMismatch: legacyProMarkerMismatchSql("before-schema"),
   unfinalizedSixEventSeasons: "select count(*) from season_summary where finalized_at is null and valid_events=6",
   invalidFinalizedSeasons: "select count(*) from season_summary where finalized_at is not null and (valid_events<>6 or scored_events<>6 or is_active)",
   seasonsUnderReview: "select count(*) from public.leaderboard_seasons where under_review_at is not null",
@@ -68,7 +82,7 @@ export const CHECKS = {
   invalidHistoricRegistrationDates: "select count(*) from public.tournaments where (registration_open_at is null or registration_close_at is null or registration_open_at<registration_close_at) is false",
   invalidHistoricSlug: "select count(*) from public.tournaments where (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::text) is false",
   invalidHistoricStartAfterRegistration: "select count(*) from public.tournaments where (registration_close_at is null or start_date is null or registration_close_at<=start_date) is false",
-  historicConstraintInventoryMismatch: `select (select count(*) from (values ${originalCheckValues}) expected(name,definition) left join pg_catalog.pg_constraint c on c.conrelid='public.tournaments'::regclass and c.conname=expected.name where c.oid is null or c.contype<>'c' or c.convalidated is distinct from false or pg_catalog.pg_get_constraintdef(c.oid) is distinct from expected.definition)+(select count(*) from pg_catalog.pg_constraint c where c.conrelid='public.tournaments'::regclass and c.contype='c' and not c.convalidated and c.conname not in (${originalCheckNames.map(literal).join(",")}))`,
+  historicConstraintInventoryMismatch: historicalConstraintInventorySql(),
 };
 
 /** Generate SQL only. Never opens a connection or calls application functions. */
@@ -85,6 +99,8 @@ export function preflightSql({ candidateSha, targetRef, tournamentIds, phase = "
     return `select '${table}' as name, count(*) as count, case when count(*) <= ${rowLimit} then encode(sha256(convert_to(coalesce(jsonb_agg(fact order by fact::text), '[]'::jsonb)::text,'UTF8')),'hex') else null end as sha256 from (select jsonb_build_object(${fields}) as fact from ${spec.schema}.${table} t where ${spec.scope} limit ${rowLimit + 1}) bounded`;
   });
   const checks = { ...CHECKS };
+  checks.historicConstraintInventoryMismatch = historicalConstraintInventorySql(phase);
+  checks.legacyProTransitionMarkerMismatch = legacyProMarkerMismatchSql(phase);
   if (phase !== "before-schema") {
     checks.missingOfficialMemberships = checks.missingOfficialMemberships.replace("b.name='Main'", "((t.division_model_version='legacy_three_v1' and b.name='Main') or (t.division_model_version='four_division_v1' and b.name='Pro'))");
     checks.unknownDivisionModels = "select count(*) from public.tournaments where division_model_version not in ('legacy_three_v1','four_division_v1') or division_model_version is null";
@@ -107,6 +123,7 @@ set local lock_timeout = '2s';
 set local idle_in_transaction_session_timeout = '45s';
 set local timezone = 'UTC';
 with requested_ids(id) as (values ${ids}),
+${legacyProSourceCtes(phase)},
 relevant_tournaments as (select t.* from public.tournaments t where t.id in (select id from requested_ids) or exists(select 1 from public.tournament_brackets b where b.tournament_id=t.id and b.launched_at is not null)),
 launched_brackets as (select b.* from public.tournament_brackets b join relevant_tournaments t on t.id=b.tournament_id where b.launched_at is not null),
 relevant_matches as (select m.*, b.id as bracket_id from public.tournament_matches m join public.generated_brackets g on g.id=m.generated_bracket_id join launched_brackets b on b.id=g.tournament_bracket_id),
@@ -116,11 +133,12 @@ season_summary as (select s.id, s.finalized_at, s.is_active, ${family} as offici
  from public.leaderboard_seasons s left join public.leaderboard_tournament_season_memberships m on m.season_id=s.id group by s.id),
 digests as (${digests.join("\nunion all\n")})
 select jsonb_build_object(
- 'schemaVersion',1, 'format','aggregate-only-v1', 'candidateSha','${candidateSha}', 'projectRef','${targetRef}', 'phase','${phase}',
+ 'schemaVersion',2, 'format','aggregate-only-v2', 'candidateSha','${candidateSha}', 'projectRef','${targetRef}', 'phase','${phase}',
  'capturedAt',clock_timestamp(), 'readOnly',current_setting('transaction_read_only')='on', 'requestedTournamentCount',${tournamentIds.length},
  'scopeSha256',(select encode(sha256(convert_to(jsonb_agg(id order by id)::text,'UTF8')),'hex') from requested_ids),
  'ledgerRowCount',(select count(*) from supabase_migrations.schema_migrations),
  'checks',jsonb_build_object(${Object.entries(checks).map(([key, query]) => `'${key}', (${query})`).join(",\n")}),
+ 'legacyProContinuation',${legacyProSnapshotSql(phase)},
  'tables',(select jsonb_object_agg(name,jsonb_build_object('count',count,'sha256',sha256)) from digests),
  'ledgerSha256',(select encode(sha256(convert_to(coalesce(jsonb_agg(jsonb_build_object('version',version,'name',name) order by version),'[]'::jsonb)::text,'UTF8')),'hex') from supabase_migrations.schema_migrations)
 );

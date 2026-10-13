@@ -62,7 +62,7 @@
     },
     {
       "path": "scripts/generate-legal-pdfs.py",
-      "sha256": "9261caa058056af8a415bd8a63cbe3547560a4bb868e4d9ea27fc5e8db722611",
+      "sha256": "1528935a8007b7c12141de58861a275ceb97f1cf2966b18fedc7c8840825d420",
       "encoding": "utf8-lf"
     },
     {
@@ -148,7 +148,7 @@
     {
       "encoding": "utf8-lf",
       "path": "content/production-four-division-legal-release.json",
-      "sha256": "2644bba6e11075ea2ff91517b7f5e5191344e28f726631a70e9e5ba36d58be6d"
+      "sha256": "450d17e52c629d0825cb4f755d84e97afe877e4e1378324f859379cfe938b3c8"
     },
     {
       "encoding": "utf8-lf",
@@ -158,7 +158,7 @@
     {
       "encoding": "utf8-lf",
       "path": "content/legal-document-delivery.json",
-      "sha256": "cc90d1ef89c9cdb62c422095e1cd447825418accb4bed734e9670aef9cf727ff"
+      "sha256": "6763475c19a552273d2b4da3bc33d2b1b56138fdee2e5f358e0af087995f9727"
     }
   ]
 }
