@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
 import ReferenceDialog from "@/components/ui/ReferenceDialog";
+import englishAccount from "@/lib/i18n/dictionaries/en/account-dashboard";
 import type { HighlightSlot } from "@/lib/combat-highlights/types";
 import { HighlightMediaError, prepareHighlight, type PreparedHighlight } from "./media";
 import { HIGHLIGHT_BUTTON, highlightMessage } from "./presentation";
@@ -13,6 +15,7 @@ export default function UploadHighlightDialog({
   onClose: () => void;
   onSubmit: (prepared: PreparedHighlight, title: string, declarationAccepted: boolean) => void;
 }) {
+  const t = useOptionalTranslations("account-dashboard", englishAccount);
   const titleId = useId();
   const fileId = useId();
   const declarationId = useId();
@@ -55,6 +58,14 @@ export default function UploadHighlightDialog({
       }} className="space-y-5">
         <p className="text-sm leading-6 text-zinc-300">Up to 15 seconds · 15 MB · 1920 × 1080 · 60 fps.</p>
         <p id={fileId + "-help"} className="text-sm leading-6 text-zinc-400">MP4: H.264/AVC video with optional AAC audio. WebM: VP8/VP9 video with optional Opus/Vorbis audio. The clip is checked again after upload.</p>
+        <div role="note" className="space-y-2 border-l-2 border-zinc-600 pl-3 text-sm leading-6 text-zinc-400">
+          <p>{t("showcase.highlightProviderProcessing")}</p>
+          <p>{t("showcase.highlightProviderVisibility")}</p>
+          <p>{t("showcase.highlightProviderDeletion")}</p>
+          <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer" aria-label={`${t("showcase.highlightProviderPrivacy")} (${t("showcase.highlightProviderOpensNewTab")})`} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300">
+            {t("showcase.highlightProviderPrivacy")}
+          </a>
+        </div>
         {slot.clip ? <p className="border-l-2 border-zinc-600 pl-3 text-sm text-zinc-300">Current clip: <span className="font-semibold">{slot.clip.title}</span>. It stays in place until the replacement is accepted.</p> : null}
         <div>
           <label htmlFor={fileId} className="block text-sm font-semibold">Video file</label>

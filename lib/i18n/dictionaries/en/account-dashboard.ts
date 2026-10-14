@@ -2,6 +2,11 @@ import type { DictionaryShape } from "@/lib/i18n/types";
 
 const dictionary = {
   showcase: {
+    highlightProviderProcessing: "Cloudflare Workers checks upload access and stores clips and preview images in private R2 storage. Cloudflare also receives network and request metadata.",
+    highlightProviderVisibility: "Public playback is available only while your public profile is enabled.",
+    highlightProviderDeletion: "Removing a clip or closing your account hides it immediately. Storage cleanup runs asynchronously.",
+    highlightProviderPrivacy: "Cloudflare privacy policy",
+    highlightProviderOpensNewTab: "Opens in a new tab",
     reviewLatest: "Review latest saved version",
     latestThought: "Latest saved thought",
     latestEmpty: "No thought saved.",

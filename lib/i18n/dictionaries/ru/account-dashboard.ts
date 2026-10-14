@@ -2,6 +2,11 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 
 const dictionary = {
   showcase: {
+    highlightProviderProcessing: "Cloudflare Workers проверяет доступ к загрузке и хранит клипы и изображения предпросмотра в закрытом хранилище R2. Cloudflare также получает метаданные сети и запросов.",
+    highlightProviderVisibility: "Публичное воспроизведение доступно только при включённом публичном профиле.",
+    highlightProviderDeletion: "Удаление клипа или закрытие аккаунта сразу скрывает клип. Очистка хранилища выполняется асинхронно.",
+    highlightProviderPrivacy: "Политика конфиденциальности Cloudflare",
+    highlightProviderOpensNewTab: "Открывается в новой вкладке",
     reviewLatest: "Проверить последнюю сохранённую версию",
     latestThought: "Последняя сохранённая мысль",
     latestEmpty: "Сохранённой мысли нет.",
