@@ -96,7 +96,7 @@ const dictionary = {
     structureTitle: "Structured Events. Clear Progression.",
     structureText:
       "We run community Tournaments designed for different skill levels, from new competitive players to elite competitors. Each Event is built around clear rules, Bracket integrity, Match reporting, and competitive progression.",
-    academyRange: "Below 1100 ELO",
+    academyRange: "0–1099 ELO",
     academyText:
       "For players building competitive fundamentals in a protected skill range.",
     challengeRange: "1100–1399 ELO",
@@ -201,6 +201,7 @@ const dictionary = {
   },
   rankings: {
     proDivision: "Pro",
+    proCareer: "Pro Career",
     mainProgression: "Main Career",
     proSeason: "Pro Season",
     proAllTime: "Pro All-Time",

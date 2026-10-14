@@ -474,7 +474,7 @@ describe("LeaderboardExperience", () => {
     expect(within(table).queryByText("Main Progression")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Current Season" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Pro$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Pro Career$/ }));
     fireEvent.click(screen.getByRole("button", { name: "All-Time" }));
     table = screen.getByRole("table");
     expect(within(table).getByText("Pro Lifetime")).toBeInTheDocument();

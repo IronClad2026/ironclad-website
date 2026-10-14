@@ -28,6 +28,7 @@ export function rankingsFixture(transition: boolean): PublicLeaderboardData {
       standing({ bracketType: "pro", lastTournamentBracketType: transition ? "main" : "pro" }),
     ],
     allTimeStandings: [
+      standing({ scope: "all_time", seasonId: null, bracketType: "pro", playerName: "Pro Career Competitor", displayName: "Pro Career Competitor", totalPoints: 12 }),
       standing({ scope: "all_time", seasonId: null, bracketType: "main", totalPoints: 12 }),
       standing({ scope: "all_time", seasonId: null, bracketType: "main_progression", playerName: "Main Career Competitor", displayName: "Main Career Competitor", totalPoints: 22 }),
     ],

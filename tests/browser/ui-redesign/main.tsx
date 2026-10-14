@@ -23,11 +23,14 @@ async function start() {
   const root = createRoot(document.getElementById("root")!);
   const render = async () => {
     const RankingsExperience = surface === "rankings" ? (await import("@/components/LeaderboardExperience")).default : null;
+    const AboutPage = surface === "about" ? (await import("@/app/about/page")).default : null;
     const content = surface === "dashboard"
       ? await (await import("@/app/dashboard/page")).default()
-      : RankingsExperience
-        ? <RankingsExperience data={rankingsFixture(!parameters().has("noTransition"))} />
-      : <TournamentsExperience tournaments={events} tournamentPollsByTournament={parameters().has("pollRefresh") ? { [events[0].id]: [pollFixture()] } : {}} viewer={{ isAdmin: false, relicVerifiedDivision: null, registrationIds: [], registrations: [] }} matchResultSubmissions={[]} matchResultReportGroups={[]} eloVerificationEnabled />;
+      : AboutPage
+        ? <AboutPage />
+        : RankingsExperience
+          ? <RankingsExperience data={rankingsFixture(!parameters().has("noTransition"))} />
+          : <TournamentsExperience tournaments={events} tournamentPollsByTournament={parameters().has("pollRefresh") ? { [events[0].id]: [pollFixture()] } : {}} viewer={{ isAdmin: false, relicVerifiedDivision: null, registrationIds: [], registrations: [] }} matchResultSubmissions={[]} matchResultReportGroups={[]} eloVerificationEnabled />;
     root.render(<LocaleProvider locale={locale} dictionaries={dictionaries}>{content}</LocaleProvider>);
   };
   // A synthetic loader refresh preserves real child component state. This lets

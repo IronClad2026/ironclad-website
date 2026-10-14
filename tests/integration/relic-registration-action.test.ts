@@ -830,6 +830,26 @@ describe("Relic-authoritative tournament registration action", () => {
     });
   });
 
+  it.each([
+    [1100, "Challenge", "Academy"],
+    [1099, "Academy", "Challenge"],
+  ])("rejects ELO %i from the neighboring %s / %s registration bracket", async (elo, division, selectedBracket) => {
+    const client = createRegistrationClient({
+      tournament: createTournament(String(selectedBracket), { division_model_version: "four_division_v1" }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+    getRelic1v1EloMock.mockResolvedValue({
+      ...ratedResult({ elo: Number(elo), division: String(division) }),
+      calculationVersion: "relic-highest-1v1-v2",
+    });
+
+    expect(await submitTournamentRegistration(registrationInput())).toMatchObject({
+      success: false,
+      code: "DIVISION_MISMATCH",
+    });
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
   it("rejects a strict division mismatch after one fresh lookup and before mutation", async () => {
     const client = createRegistrationClient();
     createSupabaseAdminClientMock.mockReturnValue(client.client);
