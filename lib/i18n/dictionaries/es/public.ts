@@ -97,7 +97,7 @@ const dictionary = {
     structureTitle: "Eventos estructurados. Progreso claro.",
     structureText:
       "Organizamos torneos comunitarios para distintos niveles, desde nuevos competidores hasta jugadores de élite. Cada evento se basa en reglas claras, integridad del cuadro, informes de partidas y progreso competitivo.",
-    academyRange: "Menos de 1100 ELO",
+    academyRange: "0–1099 ELO",
     academyText:
       "Para jugadores que desarrollan sus fundamentos competitivos en un rango protegido.",
     challengeRange: "1100–1399 ELO",
@@ -206,6 +206,7 @@ const dictionary = {
     proTransitionLabel: "Temporada Pro de transición",
     proTransitionNotice: "En esta temporada, el Evento 1 se jugó con la estructura anterior, donde Main / Pro era la división más alta. Cuenta como Evento Pro 1 de 6, aunque históricamente sigue siendo Main / Pro. A partir del Evento 2, solo clasifican nuevos eventos Pro (1700+ ELO); los futuros eventos Main no cuentan.",
     proDivision: "Pro",
+    proCareer: "Carrera Pro",
     mainProgression: "Carrera Main",
     proSeason: "Temporada Pro",
     proAllTime: "Pro de todos los tiempos",

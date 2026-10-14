@@ -89,7 +89,7 @@ const dictionary = {
     structureTitle: "赛事有序，晋升清晰。",
     structureText:
       "我们为不同水平的玩家举办社区锦标赛，从竞技新手到顶尖选手。每场赛事都围绕清晰规则、对阵公平、赛果报告与竞技晋升构建。",
-    academyRange: "低于 1100 ELO",
+    academyRange: "0–1099 ELO",
     academyText: "适合在受保护水平区间内打磨竞技基础的玩家。",
     challengeRange: "1100–1399 ELO",
     challengeText: "适合挑战更强对手与更激烈对阵的新锐选手。",
@@ -185,6 +185,7 @@ const dictionary = {
     proTransitionLabel: "过渡期 Pro 赛季",
     proTransitionNotice: "本赛季的第 1 场赛事采用旧结构，当时 Main / Pro 是最高级别。它计为 Pro 赛季六场赛事中的第 1 场，但历史记录仍归属 Main / Pro。从第 2 场起，只有新举办的 Pro 赛事（1700+ ELO）才符合资格；未来的 Main 赛事不计入本赛季。",
     proDivision: "Pro",
+    proCareer: "Pro 生涯",
     mainProgression: "Main 生涯",
     proSeason: "Pro 赛季",
     proAllTime: "Pro 历史总榜",

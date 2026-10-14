@@ -124,7 +124,7 @@ export default function LeaderboardExperience({
   );
   const translatedRankingOptions = rankingOptions.map((option) => ({
     value: option.value,
-    label: t(option.labelKey),
+    label: t(option.value === "pro" ? "rankings.proCareer" : option.labelKey),
   }));
   const translatedOfficialScopeOptions = officialScopeOptions.map((option) => ({
     value: option.value,
