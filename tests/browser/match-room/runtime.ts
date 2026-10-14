@@ -77,7 +77,7 @@ function room(): MatchRoom {
       ? uxMatch.playerTwoRegistrationId : uxMatch.playerOneRegistrationId,
     createdAt: timestamp, closedAt: closed ? timestamp : null,
     closureReason: closed ? "match_completed" : null,
-    writable: !closed, lastSequence: state.messages.length, lastReadSequence: state.reads[viewer] ?? 0,
+    writable: !closed && enabled, lastSequence: state.messages.length, lastReadSequence: state.reads[viewer] ?? 0,
   };
 }
 const forbidden = () => ({ ok: false as const, code: "forbidden" as const });
@@ -195,7 +195,7 @@ export const fixture = {
   incomingAdmin: (body: string) => { reload(); const entry = message(body, true); persist(); return entry; },
   dismissNotification: () => { state.episodes[viewer] = null; persist(); },
   raceNextRead: (body: string) => { readRaceMessage = body; },
-  setEnabled: (value: boolean) => { enabled = value; },
+  setEnabled: (value: boolean) => { enabled = value; persist(); },
   failResponse: () => { failedResponse = true; },
   failHistory: (fail: boolean) => { historyFails = fail; },
   deny: () => { denied = true; },

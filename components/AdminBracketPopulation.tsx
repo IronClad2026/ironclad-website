@@ -520,6 +520,7 @@ function AdminBracketPopulationWorkspace({
                             )}
 
                             <select
+                              aria-label={`Assign participant to slot ${slotNumber}: ${slotLabel}`}
                               value={registrationId}
                               onChange={(event) =>
                                 assignParticipant(

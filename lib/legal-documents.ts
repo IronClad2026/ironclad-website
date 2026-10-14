@@ -6,6 +6,7 @@ import type {
   RegistrationDocumentSet,
 } from "@/lib/legal-document-types";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { resolveLegalDocumentDownloadUrl } from "@/lib/legal-document-delivery";
 
 const DOCUMENT_KINDS: RegistrationDocumentKind[] = [
   "rulebook",
@@ -70,11 +71,21 @@ export async function loadEffectiveRegistrationDocumentSet(
       return null;
     }
 
+    const downloadUrl = resolveLegalDocumentDownloadUrl({
+      kind: row.document_kind,
+      version: row.version,
+      sha256: row.sha256,
+    });
+    if (!downloadUrl) {
+      return null;
+    }
+
     documents.set(row.document_kind, {
       id: row.id,
       kind: row.document_kind,
       version: row.version,
       url: row.immutable_url,
+      downloadUrl,
       effectiveDate: row.effective_at,
       sha256: row.sha256,
     });

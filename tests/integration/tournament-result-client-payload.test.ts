@@ -1,5 +1,6 @@
 import { isValidElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import legalDelivery from "@/content/legal-document-delivery.json";
 import {
   adminIdentity,
   playerIdentity,
@@ -262,6 +263,7 @@ const clientPropsShape = {
       object: {
         isAdmin: "value",
         relicVerifiedDivision: "value",
+        relicVerifiedElo: "value",
         registrationIds: { array: "value" },
         registrations: { array: viewerRegistrationShape },
       },
@@ -279,6 +281,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -289,6 +292,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -299,6 +303,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -309,6 +314,7 @@ const clientPropsShape = {
             kind: "value",
             version: "value",
             url: "value",
+            downloadUrl: "value",
             effectiveDate: "value",
             sha256: "value",
           },
@@ -517,15 +523,19 @@ function createPageClient(
         ["ppa", "22222222-2222-4222-8222-222222222222"],
         ["terms", "33333333-3333-4333-8333-333333333333"],
         ["privacy", "44444444-4444-4444-8444-444444444444"],
-      ].map(([document_kind, id]) => ({
+      ].map(([document_kind, id]) => {
+        const version = document_kind === "rulebook" || document_kind === "ppa" ? "3.2" : document_kind === "privacy" ? "1.3" : "1.1";
+        const document = legalDelivery.documents.find((candidate) => candidate.kind === document_kind && candidate.version === version)!;
+        return {
         id,
         document_kind,
-        version: `fixture-${document_kind}-v1`,
+        version,
         immutable_url: `https://ironclad.test/legal/${document_kind}/fixture-v1`,
         status: "effective",
         effective_at: "2026-08-01T00:00:00.000Z",
-        sha256: "a".repeat(64),
-      })),
+        sha256: document.sha256,
+        };
+      }),
       error: null,
     },
   };
@@ -869,7 +879,7 @@ describe("tournament Client Component result payload", () => {
     };
 
     expect(client.viewerDivisionQuery.select).toHaveBeenCalledWith(
-      "relic_verified_division"
+      "relic_verified_elo, relic_verified_division"
     );
     expect(client.viewerDivisionQuery.eq).toHaveBeenCalledWith(
       "clerk_user_id",
@@ -1116,7 +1126,8 @@ describe("tournament Client Component result payload", () => {
     ["Academy", "Academy"],
     ["Challenge", "Challenge"],
     ["Main / Pro", "Main / Pro"],
-    ["Main", null],
+    ["Main", "Main"],
+    ["Pro", "Pro"],
     ["", null],
     [null, null],
   ])(

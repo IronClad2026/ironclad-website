@@ -54,10 +54,12 @@ APPROVED_FILENAMES = {
     "rulebook": {
         "3.0": "ironclad-official-tournament-rulebook-v3.0.pdf",
         "3.1": "ironclad-official-tournament-rulebook-v3.1.pdf",
+        "3.2": "ironclad-official-tournament-rulebook-v3.2.pdf",
     },
     "ppa": {
         "3.0": "ironclad-player-participation-agreement-v3.0.pdf",
         "3.1": "ironclad-player-participation-agreement-v3.1.pdf",
+        "3.2": "ironclad-player-participation-agreement-v3.2.pdf",
     },
     "terms": {
         "1.0": "ironclad-terms-of-service-v1.0.pdf",

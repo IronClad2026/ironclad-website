@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import { assertP03PreviewSafety } from "./lib/p03-preview-safety";
+import { assertReleasePreviewSafety } from "./lib/release-preview-safety";
 
+assertReleasePreviewSafety();
 assertP03PreviewSafety();
 
 const nextConfig: NextConfig = {

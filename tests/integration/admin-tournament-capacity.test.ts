@@ -19,6 +19,7 @@ const bannerUrl =
 
 function tournamentFormData(maxPlayers: number) {
   const formData = new FormData();
+  formData.set("divisionModelVersion", "four_division_v1");
   formData.set("title", "Eight Player Cup");
   formData.set("description", "Exactly eight players per Division.");
   formData.set("bannerImageUrl", bannerUrl);

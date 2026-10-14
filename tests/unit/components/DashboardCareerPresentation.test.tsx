@@ -9,6 +9,10 @@ import type { MatchHistoryEntry } from "@/lib/player-dashboard";
 
 const match: MatchHistoryEntry = {
   id: "match-history-test",
+  tournamentId: "tournament-history-test",
+  tournamentBracketId: "division-history-test",
+  generatedBracketId: "generation-history-test",
+  tournamentBannerImageUrl: null,
   tournamentName: "IronClad Autumn Championship",
   bracketName: "Challenge",
   opponentName: "Opposing Player",
@@ -16,6 +20,7 @@ const match: MatchHistoryEntry = {
   score: "3–1",
   playedAt: "2026-08-30T10:00:00.000Z",
   roundName: "Final",
+  roundNumber: 3,
   matchNumber: 7,
   seriesBestOf: 5,
   replayAvailable: true,
@@ -117,48 +122,49 @@ describe("Dashboard career presentation", () => {
     expect(fireEvent.keyDown(close, { key: "ArrowDown" })).toBe(true);
   });
 
-  it("supports keyboard history views while keeping every registration anchor mounted", () => {
-    render(<DashboardCareerHistory matches={[match]} champions={[]} previousRegistrationCount={1} previousRegistrations={<article id="registration-old">Historical registration</article>} />);
+  it("keeps two keyboard-operated career tabs without an administrative history section", () => {
+    render(<DashboardCareerHistory matches={[match]} champions={[]} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveAccessibleName(/^Tournaments\s*1$/);
+    expect(tabs[1]).toHaveAccessibleName(/^Championships\s*0$/);
+    expect(screen.queryByRole("tab", { name: /registrations/i })).not.toBeInTheDocument();
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(document.getElementById("registration-old")).toBeInTheDocument();
-    expect(screen.queryByText("Historical registration")).not.toBeVisible();
+    expect(tabs[0]).toHaveAttribute("tabindex", "0");
+    expect(tabs[1]).toHaveAttribute("tabindex", "-1");
+    for (const tab of tabs) {
+      expect(document.getElementById(tab.getAttribute("aria-controls")!))
+        .toHaveAttribute("aria-labelledby", tab.id);
+    }
+    expect(screen.queryByRole("button", { name: /Registration Archive/, hidden: true })).not.toBeInTheDocument();
     tabs[0].focus();
-    fireEvent.keyDown(tabs[0], { key: "End" });
-    expect(tabs[2]).toHaveFocus();
-    expect(tabs[2]).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Historical registration")).toBeVisible();
-    fireEvent.keyDown(tabs[2], { key: "ArrowRight" });
-    expect(tabs[0]).toHaveFocus();
+    for (const [key, selectedIndex] of [["End", 1], ["ArrowRight", 0], ["ArrowLeft", 1], ["Home", 0]] as const) {
+      fireEvent.keyDown(document.activeElement!, { key });
+      expect(tabs[selectedIndex]).toHaveFocus();
+      expect(tabs[selectedIndex]).toHaveAttribute("aria-selected", "true");
+      expect(tabs[selectedIndex]).toHaveAttribute("tabindex", "0");
+      expect(tabs[1 - selectedIndex]).toHaveAttribute("aria-selected", "false");
+      expect(tabs[1 - selectedIndex]).toHaveAttribute("tabindex", "-1");
+    }
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
   });
 
-  it("reveals and scrolls a previous registration from an initial hash and later hash changes", async () => {
-    const scroll = HTMLElement.prototype.scrollIntoView;
-    window.history.replaceState(null, "", "/dashboard#registration-old");
-    render(<DashboardCareerHistory matches={[]} champions={[]} previousRegistrationCount={1} previousRegistrations={<article id="registration-old">Historical registration</article>} />);
-    await waitFor(() => expect(screen.getAllByRole("tab")[2]).toHaveAttribute("aria-selected", "true"));
-    await waitFor(() => expect(scroll).toHaveBeenCalled());
-    fireEvent.click(screen.getAllByRole("tab")[0]);
-    fireEvent(window, new HashChangeEvent("hashchange"));
-    await waitFor(() => expect(screen.getAllByRole("tab")[2]).toHaveAttribute("aria-selected", "true"));
-  });
-
-  it("keeps independent registration history reachable when career data is unavailable", () => {
-    render(<DashboardCareerHistory matches={[]} champions={[]} loadError="Career data unavailable" previousRegistrationCount={1} previousRegistrations={<article id="registration-old">Historical registration</article>} />);
+  it("preserves career load errors in both competitive views", () => {
+    render(<DashboardCareerHistory matches={[]} champions={[]} loadError="Career data unavailable" />);
     expect(screen.getByRole("alert")).toHaveTextContent("Career data unavailable");
-    expect(screen.getAllByRole("tab")[0]).not.toHaveTextContent("0");
-    fireEvent.click(screen.getAllByRole("tab")[2]);
-    expect(screen.getByText("Historical registration")).toBeVisible();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tournaments" })).not.toHaveTextContent("0");
+    expect(screen.getByRole("tab", { name: "Championships" })).not.toHaveTextContent("0");
+    fireEvent.click(screen.getByRole("tab", { name: "Championships" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Career data unavailable");
   });
 
-  it("does not turn a registration read error into an empty history", () => {
-    render(<DashboardCareerHistory matches={[]} champions={[]} registrationLoadError="Registrations unavailable" />);
-    const registrationTab = screen.getAllByRole("tab")[2];
-    expect(registrationTab).not.toHaveTextContent("0");
-    fireEvent.click(registrationTab);
-    expect(screen.getByRole("alert")).toHaveTextContent("Registrations unavailable");
+  it("preserves empty tournament and championship states without an archive", () => {
+    render(<DashboardCareerHistory matches={[]} champions={[]} />);
+    expect(screen.getByRole("tab", { name: /^Tournaments\s*0$/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Completed tournament runs will appear here.")).toBeVisible();
+    fireEvent.click(screen.getByRole("tab", { name: /^Championships\s*0$/ }));
+    expect(screen.getByText("Tournament victories will be permanently displayed here.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Registration Archive/, hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

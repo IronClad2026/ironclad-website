@@ -1,8 +1,9 @@
 import {
-  TOURNAMENT_BRACKET_CONFIGS,
+  getTournamentBracketConfigs,
   type TournamentBracketName,
   type TournamentStatus,
 } from "@/lib/tournaments";
+import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 
 export const TOURNAMENT_DIVISION_STATES = [
   "disabled",
@@ -46,6 +47,7 @@ export type TournamentDivisionStateEvidence = {
 
 type TournamentDivisionStateResolutionBase = {
   tournamentId: string;
+  divisionModelVersion?: DivisionModelVersion;
   canonicalName: TournamentBracketName;
   displayName: string;
   terminalOverlay: TournamentDivisionTerminalOverlay | null;
@@ -84,6 +86,7 @@ export type PublicTournamentDivisionStateResolution = Omit<
 
 export type TournamentDivisionStateResolverInput = {
   tournamentId: string;
+  divisionModelVersion?: DivisionModelVersion;
   eventStatus: TournamentStatus;
   divisions: readonly TournamentDivisionStateEvidence[];
 };
@@ -99,10 +102,12 @@ const VALID_TOURNAMENT_STATUSES = new Set<TournamentStatus>([
 
 export function resolveTournamentDivisionStates({
   tournamentId,
+  divisionModelVersion = "legacy_three_v1",
   eventStatus,
   divisions,
 }: TournamentDivisionStateResolverInput): readonly TournamentDivisionStateResolution[] {
   assertNonEmptyString(tournamentId, "Tournament ID");
+  const configs = getTournamentBracketConfigs(requireDivisionModelVersion(divisionModelVersion));
 
   if (!VALID_TOURNAMENT_STATUSES.has(eventStatus)) {
     throw new Error("Tournament division state received an invalid event status.");
@@ -115,7 +120,7 @@ export function resolveTournamentDivisionStates({
   const bracketIds = new Set<string>();
 
   for (const evidence of divisions) {
-    const config = TOURNAMENT_BRACKET_CONFIGS.find(
+    const config = configs.find(
       (candidate) => candidate.name === evidence.canonicalName
     );
 
@@ -201,12 +206,13 @@ export function resolveTournamentDivisionStates({
 
   const terminalOverlay = getTournamentTerminalOverlay(eventStatus);
 
-  return TOURNAMENT_BRACKET_CONFIGS.map((config) => {
+  return configs.map((config) => {
     const evidence = evidenceByName.get(config.name);
 
     if (!evidence) {
       return {
         tournamentId,
+        divisionModelVersion,
         canonicalName: config.name,
         displayName: config.label,
         bracketId: null,
@@ -227,6 +233,7 @@ export function resolveTournamentDivisionStates({
 
     return {
       tournamentId,
+      divisionModelVersion,
       canonicalName: config.name,
       displayName: config.label,
       bracketId: evidence.bracketId,
@@ -385,6 +392,8 @@ function formatReadinessCount(
 function orderAndValidateResolutions(
   resolutions: readonly PublicTournamentDivisionStateResolution[]
 ) {
+  const model = requireDivisionModelVersion(resolutions[0]?.divisionModelVersion);
+  const configs = getTournamentBracketConfigs(model);
   const byName = new Map<
     TournamentBracketName,
     PublicTournamentDivisionStateResolution
@@ -393,6 +402,9 @@ function orderAndValidateResolutions(
   let terminalOverlay: TournamentDivisionTerminalOverlay | null | undefined;
 
   for (const resolution of resolutions) {
+    if (requireDivisionModelVersion(resolution.divisionModelVersion) !== model) {
+      throw new Error("Tournament event state cannot combine division models.");
+    }
     if (byName.has(resolution.canonicalName)) {
       throw new Error(
         "Tournament event state received duplicate canonical divisions."
@@ -419,13 +431,13 @@ function orderAndValidateResolutions(
     byName.set(resolution.canonicalName, resolution);
   }
 
-  if (byName.size !== TOURNAMENT_BRACKET_CONFIGS.length) {
+  if (byName.size !== configs.length) {
     throw new Error(
       "Tournament event state requires every canonical division resolution."
     );
   }
 
-  return TOURNAMENT_BRACKET_CONFIGS.map((config) => {
+  return configs.map((config) => {
     const resolution = byName.get(config.name);
 
     if (!resolution) {

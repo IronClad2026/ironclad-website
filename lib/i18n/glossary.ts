@@ -13,6 +13,8 @@ export const LOCKED_COMPETITION_NAMES = [
   "BO5",
   "Academy",
   "Challenge",
+  "Main",
+  "Pro",
   "Main / Pro",
   "Dice Roll-Off",
 ] as const;

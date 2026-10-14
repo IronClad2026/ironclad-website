@@ -6,11 +6,18 @@ const root = resolve(import.meta.dirname, "../../..");
 const support = (name: string) => resolve(import.meta.dirname, name);
 export default defineConfig({
   root, envDir: support("no-environment-files"), envPrefix: "OPERATIONS_FIXTURE_UNUSED_",
+  cacheDir: resolve(root, ".playwright/vite-cache/admin-operations"),
   plugins: [{ name: "operations-no-server-imports", enforce: "pre", resolveId(source) {
     if (source.includes("supabase") || source.includes("@clerk") || /\/lib\/(?:admin-operations|vercel-web-analytics)(?:\.ts)?$/.test(source)) throw new Error("A server provider must not enter the Operations fixture.");
     return null;
   } }, react()],
-  optimizeDeps: { entries: [support("index.html")] },
+  optimizeDeps: {
+    entries: [support("index.html")],
+    // A single initial optimizer batch avoids React interop rediscovery racing
+    // the first page load and invalidating its generated Rolldown runtime.
+    include: ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime", "lenis", "lucide-react"],
+    noDiscovery: true,
+  },
   css: { postcss: { plugins: [tailwindcss({ base: root })] } },
   resolve: { alias: [
     { find: "next/navigation", replacement: support("runtime.ts") },

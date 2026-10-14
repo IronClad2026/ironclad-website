@@ -18,7 +18,7 @@ import {
 
 export type AdminTournamentMatchesViewer = {
   isAdmin: boolean;
-  relicVerifiedDivision: "Academy" | "Challenge" | "Main / Pro" | null;
+  relicVerifiedDivision: "Academy" | "Challenge" | "Main / Pro" | "Main" | "Pro" | null;
   registrationIds: string[];
   registrations: TournamentViewerRegistration[];
 };

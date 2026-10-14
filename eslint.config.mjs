@@ -7,6 +7,9 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // Disposable dependency/runtime and generated browser optimizer artifacts.
+    ".release-tooling/**",
+    ".release-local/**",
     "_recovery_backup_*/**",
     "_worktrees/**",
     // Default ignores of eslint-config-next:

@@ -123,6 +123,7 @@ describe("Admin Command Center and global Registrations authorization", () => {
     const tournamentRows = [
       {
         id: "tournament-1",
+        division_model_version: "legacy_three_v1",
         title: "Active Cup",
         status: "registration_open",
         grand_final_at: null,
@@ -165,7 +166,7 @@ describe("Admin Command Center and global Registrations authorization", () => {
       "registration_status"
     );
     expect(tournamentSelect).toHaveBeenCalledExactlyOnceWith(
-      "id, title, status, created_at, tournament_brackets(id, name, launched_at)"
+      "id, division_model_version, title, status, created_at, tournament_brackets(id, name, launched_at)"
     );
     expect(loadTournamentDivisionStatesMock).toHaveBeenCalledExactlyOnceWith(
       supabase,

@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
@@ -98,6 +99,7 @@ type SupabaseRegistration = {
 };
 
 type AdminTournamentOption = {
+  division_model_version?: DivisionModelVersion;
   id: string;
   title: string;
   status: TournamentStatus;
@@ -305,7 +307,7 @@ function getContextualWaitlistGroups(rows: SupabaseRegistration[]) {
     key,
     bracketName:
       bracketRows[0]?.bracket_name?.trim()
-        ? getTournamentBracketDisplayName(bracketRows[0].bracket_name.trim())
+        ? bracketRows[0].bracket_name.trim()
         : "Division not assigned",
     rows: bracketRows,
   }));
@@ -528,7 +530,7 @@ export default async function AdminRegistrationsPage({
     supabase
       .from("tournaments")
       .select(
-        "id, title, status, created_at, tournament_brackets(id, name, launched_at)"
+        "id, division_model_version, title, status, created_at, tournament_brackets(id, name, launched_at)"
       )
       .order("created_at", { ascending: false }),
   ]);
@@ -594,7 +596,7 @@ export default async function AdminRegistrationsPage({
         {
           tournamentId: tournament.id,
           tournamentTitle: tournament.title,
-          bracketName: getTournamentBracketDisplayName(bracket.name),
+          bracketName: getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(tournament.division_model_version)),
           launchedAt:
             divisionStateByBracket.get(bracket.id)?.launchedAt ??
             bracket.launched_at,
@@ -603,6 +605,10 @@ export default async function AdminRegistrationsPage({
       ])
     )
   );
+  for (const registration of baseRegistrations) {
+    const meta = registration.tournament_bracket_id ? bracketMetaById.get(registration.tournament_bracket_id) : null;
+    if (meta) registration.bracket_name = meta.bracketName;
+  }
   const isBracketWaitlistOpen = (bracketId: string | null) =>
     bracketId !== null &&
     bracketMetaById.get(bracketId)?.launchedAt === null &&

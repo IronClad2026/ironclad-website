@@ -3,6 +3,7 @@ import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { createHash } from "node:crypto";
 import { applyP03PrivacyDraft, finalizeP03PrivacyCorpus, buildP03PrivacyRelease } from "./prepare-p03-privacy.mjs";
+import { validateLegalArtifacts } from "../consolidated-legal/publication.mjs";
 
 export const P03_LEGAL_PREDECESSOR_CORPUS = "docs/legal-drafts/p03-privacy-v1.3/predecessor-corpus.json";
 export const P03_LEGAL_PREDECESSOR_RELEASE = "docs/legal-drafts/p03-privacy-v1.3/predecessor-release.json";
@@ -24,7 +25,14 @@ export function validateP03LegalRuntime(repository) {
   }
   if (release?.status !== "Final" || typeof release.effectiveDate !== "string") throw new Error("Runtime legal state is neither exact predecessor nor finalized successor.");
   const expectedCorpus = finalizeP03PrivacyCorpus(predecessor, source, release.effectiveDate);
-  if (!isDeepStrictEqual(corpus, expectedCorpus)) throw new Error("Runtime Privacy successor wording/date or unchanged documents differ.");
+  if (!isDeepStrictEqual(corpus, expectedCorpus)) {
+    // A governing-document extension must preserve the exact finalized P03
+    // corpus as its predecessor and independently verify the approved 3.2
+    // source/PDF identities. Privacy authority is never relaxed.
+    const productionPredecessor = readJson(repository, "content/legal-history/production-rulebook-ppa-v3.1-corpus.json");
+    if (!isDeepStrictEqual(productionPredecessor, expectedCorpus)) throw new Error("Runtime Privacy successor wording/date or unchanged documents differ.");
+    validateLegalArtifacts(repository);
+  }
   const pdfBytes = readFileSync(path.join(repository, "public/documents-rules-ppa/ironclad-privacy-policy-v1.3.pdf"));
   const expectedRelease = buildP03PrivacyRelease(predecessor, expectedCorpus, pdfBytes, repository);
   if (!isDeepStrictEqual(release, expectedRelease)) throw new Error("Runtime Final legal transition/PDF differs from the exact successor.");

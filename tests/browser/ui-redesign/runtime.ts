@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { isLocale } from "@/lib/i18n/config";
 import {
   badgeFixture, careerFixture, fixtureDate, fixturePlayerId, fixtureUserId,
   notificationFixture, parameters, profileFixture, registrationFixtures,
@@ -15,11 +16,32 @@ declare global {
   }
 }
 window.__uiFixture ??= { actions: [], navigations: [], blockedRequests: [] };
+// Exercise the product's real pathname-dependent registration navigation while
+// keeping the rendered document and every fixture resource on the local origin.
+if (parameters().get("surface") === "dashboard") {
+  history.replaceState(null, "", `/dashboard${location.search}${location.hash}`);
+}
 
 const nativeFetch = window.fetch.bind(window);
 window.fetch = (input, init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  if (url.origin === location.origin && url.pathname === "/api/polls" && method === "GET") {
+    const surface = url.searchParams.get("surface");
+    const tournamentId = url.searchParams.get("tournamentId");
+    if ((surface === "community" && tournamentId === null) ||
+        (surface === "tournament" && tournamentId === pollFixture().tournamentId)) {
+      window.__uiFixture.actions.push("fixture:polls-snapshot");
+      const signedIn = fixtureSignedIn();
+      return Promise.resolve(Response.json({
+        surface, tournamentId,
+        public: surface === "community" ? { status: "not_applicable" } : { status: "loaded", polls: [] },
+        private: signedIn ? { status: "loaded", polls: surface === "tournament" ? [pollFixture(true)] : [] } : { status: "not_applicable" },
+        accountState: signedIn ? "active" : "anonymous",
+        viewerContext: { userId: signedIn ? fixtureUserId : null, sessionId: signedIn ? "sess_ui_fixture" : null },
+      }));
+    }
+  }
   if (url.origin !== location.origin || url.pathname.startsWith("/api/") || method !== "GET") {
     window.__uiFixture.blockedRequests.push(url.pathname);
     return Promise.reject(new Error("UI fixture blocked an external or API request."));
@@ -34,7 +56,7 @@ export function fixtureNavigate(destination: string) {
   if (requested.pathname === "/dashboard") {
     // Next router.push uses history navigation; it does not dispatch hashchange.
     // Keep that distinction so repeated notification anchors test product code.
-    history.pushState(null, "", `/tests/browser/ui-redesign/?${parameters()}${requested.hash}`);
+    history.pushState(null, "", `/dashboard?${parameters()}${requested.hash}`);
     return;
   }
   if (!requested.pathname.startsWith("/tournaments")) return;
@@ -49,10 +71,13 @@ export const usePathname = () => parameters().get("surface") === "dashboard" ? "
 export function useSearchParams() { const search = useSyncExternalStore(subscribe, () => location.search, () => ""); return new URLSearchParams(search); }
 const fixtureToken = async () => null;
 const fixtureSignedIn = () => parameters().get("surface") === "dashboard" || parameters().has("pollRefresh");
-export const useAuth = () => ({ isLoaded: true, isSignedIn: fixtureSignedIn(), userId: fixtureSignedIn() ? fixtureUserId : null, getToken: fixtureToken });
+export const useAuth = () => ({ isLoaded: true, isSignedIn: fixtureSignedIn(), userId: fixtureSignedIn() ? fixtureUserId : null, sessionId: fixtureSignedIn() ? "sess_ui_fixture" : null, getToken: fixtureToken });
 export const auth = async () => ({ userId: fixtureUserId, sessionClaims: { metadata: { role: "player" } } });
 export const redirect = (path: string): never => { throw new Error(`Fixture redirect: ${path}`); };
-export const getRequestLocale = async () => parameters().get("locale") === "ru" ? "ru" as const : "en" as const;
+export const getRequestLocale = async () => {
+  const locale = parameters().get("locale");
+  return isLocale(locale) ? locale : "en";
+};
 
 export function createAuthenticatedBrowserSupabaseClient() {
   const reject = (): never => { throw new Error("UI fixture must not contact Supabase."); };
@@ -78,6 +103,7 @@ export async function createAuthenticatedSupabaseClient() {
 export const loadPlayerCareerDashboard = async () => careerFixture();
 export const loadPlayerNotifications = async () => ({ notifications: notificationFixture(), totalCount: notificationFixture().length, unreadCount: notificationFixture().length, error: null });
 export const loadCommunityPollsForRequest = async () => ({ polls: [], error: null });
+export const getPlayerShowcaseEnabled = async () => false;
 export const loadPlayerTournamentDivisionInvitations = async () => ({ status: "success", invitations: parameters().has("empty") ? [] : [
   { id: "fixture-invitation", status: parameters().has("accepted") ? "accepted" : "pending", createdAt: fixtureDate, invalidationReason: null, targetTournamentId: fixturePlayerId, targetTournamentSlug: "fixture-event-2", targetTournamentTitle: "IronClad Open 2", targetDivisionName: "Academy" },
 ] });

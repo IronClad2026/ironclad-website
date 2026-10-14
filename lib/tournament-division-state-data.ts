@@ -2,10 +2,11 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  TOURNAMENT_BRACKET_CONFIGS,
+  getTournamentBracketConfigs,
   type TournamentBracketName,
   type TournamentStatus,
 } from "@/lib/tournaments";
+import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import {
   resolveTournamentDivisionStates,
   type TournamentDivisionStateEvidence,
@@ -25,6 +26,7 @@ export type TournamentDivisionStateBracketRow = {
 
 export type TournamentDivisionStateTournamentRow = {
   id: string;
+  division_model_version?: DivisionModelVersion;
   status: string;
   // Existing repository projections make this selected relationship optional
   // at the type level. Runtime resolution requires the array and fails closed
@@ -54,6 +56,7 @@ type NormalizedBracket = {
 
 type NormalizedTournament = {
   id: string;
+  divisionModelVersion: DivisionModelVersion;
   status: TournamentStatus;
   brackets: NormalizedBracket[];
 };
@@ -101,10 +104,6 @@ const VALID_TOURNAMENT_STATUSES = new Set<TournamentStatus>([
   "cancelled",
   "voided",
 ]);
-
-const CANONICAL_DIVISION_NAMES = new Set<TournamentBracketName>(
-  TOURNAMENT_BRACKET_CONFIGS.map((config) => config.name)
-);
 
 const VALID_MATCH_STATUSES = new Set<GeneratedBracketMatchEvidence["status"]>([
   "scheduled",
@@ -219,6 +218,7 @@ function resolveFromAuthorityEvidence(
       tournament.id,
       resolveTournamentDivisionStates({
         tournamentId: tournament.id,
+        divisionModelVersion: tournament.divisionModelVersion,
         eventStatus: tournament.status,
         divisions: evidence,
       })
@@ -650,6 +650,8 @@ function normalizeTournamentRows(
     const id = readNonEmptyString(value.id);
     const status = value.status;
     const rawBrackets = value.tournament_brackets;
+    const divisionModelVersion = requireDivisionModelVersion(value.division_model_version);
+    const canonicalDivisionNames = new Set(getTournamentBracketConfigs(divisionModelVersion).map((config) => config.name));
 
     if (
       id === null ||
@@ -681,7 +683,7 @@ function normalizeTournamentRows(
         bracketId === null ||
         bracketIds.has(bracketId) ||
         typeof name !== "string" ||
-        !CANONICAL_DIVISION_NAMES.has(name as TournamentBracketName) ||
+        !canonicalDivisionNames.has(name as TournamentBracketName) ||
         canonicalNames.has(name as TournamentBracketName) ||
         launchedAt === undefined
       ) {
@@ -703,6 +705,7 @@ function normalizeTournamentRows(
     tournamentIds.add(id);
     tournaments.push({
       id,
+      divisionModelVersion,
       status: status as TournamentStatus,
       brackets,
     });

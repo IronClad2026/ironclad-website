@@ -103,6 +103,7 @@ const registrationDocuments = {
     kind: "rulebook" as const,
     version: "3.0",
     url: "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.0.pdf",
+    downloadUrl: "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.0.pdf",
     effectiveDate: EFFECTIVE_DATE,
     sha256:
       "11a391d5b4602bab6f07381b30c4435fb1b4842be99006bdce2512b583859ab0",
@@ -112,6 +113,7 @@ const registrationDocuments = {
     kind: "ppa" as const,
     version: "3.0",
     url: "/documents-rules-ppa/ironclad-player-participation-agreement-v3.0.pdf",
+    downloadUrl: "/documents-rules-ppa/ironclad-player-participation-agreement-v3.0.pdf",
     effectiveDate: EFFECTIVE_DATE,
     sha256:
       "a836bda5679899cb8b402465fb750b5b0aff4eb7dcf8cdb142a163cb6d8ed600",
@@ -121,6 +123,7 @@ const registrationDocuments = {
     kind: "terms" as const,
     version: "1.0",
     url: "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
+    downloadUrl: "/documents-rules-ppa/ironclad-terms-of-service-v1.0.pdf",
     effectiveDate: EFFECTIVE_DATE,
     sha256:
       "99442282625dc7b2600475df7edc5649520d5cef64f2fcfe99f6e8e6d4d08ba1",
@@ -130,6 +133,7 @@ const registrationDocuments = {
     kind: "privacy" as const,
     version: "1.0",
     url: "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
+    downloadUrl: "/documents-rules-ppa/ironclad-privacy-policy-v1.0.pdf",
     effectiveDate: EFFECTIVE_DATE,
     sha256:
       "cedb9cb46d2ae7bbd7328c500ca466c237afef8f11626d3095329087ec6453f0",
@@ -469,7 +473,7 @@ describe("non-English registration gate", () => {
         screen.getByRole("link", {
           name: `${label} (version ${document.version}) (opens in a new tab)`,
         })
-      ).toHaveAttribute("href", document.url);
+      ).toHaveAttribute("href", document.downloadUrl);
     }
 
     expect(submitTournamentRegistrationMock).not.toHaveBeenCalled();

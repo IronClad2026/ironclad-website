@@ -14,43 +14,50 @@ import type { MatchHistoryEntry } from "@/lib/player-dashboard";
 
 type DashboardTranslator = (path: string, values?: MessageValues) => string;
 
-export default function DashboardMatchHistory({ matches }: { matches: MatchHistoryEntry[] }) {
+export default function DashboardMatchHistory({
+  matches,
+  variant = "standalone",
+}: {
+  matches: MatchHistoryEntry[];
+  variant?: "standalone" | "grouped";
+}) {
   const [selected, setSelected] = useState<MatchHistoryEntry | null>(null);
   const locale = useOptionalLocale();
   const t = useOptionalTranslations("account-dashboard", accountDashboardEnglish);
   const roundT = useOptionalTranslations("competition", competitionEnglish);
+  const grouped = variant === "grouped";
 
   return (
-    <section aria-label={t("dashboard.matchHistory.title")}>
-      <p className="border-b border-white/10 px-4 py-3 text-xs text-zinc-400 sm:px-5">
+    <section aria-label={t("dashboard.matchHistory.title")} data-match-history-variant={variant}>
+      {!grouped && <p className="border-b border-white/10 px-4 py-3 text-xs text-zinc-400 sm:px-5">
         {matches.length === 0
           ? t("dashboard.matchHistory.noCompleted")
           : completedMatchSummary(matches.length, locale, t)}
-      </p>
+      </p>}
       {matches.length === 0 ? (
         <p className="px-4 py-6 text-sm leading-6 text-zinc-400">
           {t("dashboard.matchHistory.empty")}
         </p>
       ) : (
-        <div className="max-h-[34rem] overflow-y-auto overscroll-contain divide-y divide-white/10" data-lenis-prevent>
+        <div className={grouped ? "divide-y divide-white/8" : "max-h-[34rem] overflow-y-auto overscroll-contain divide-y divide-white/10"} data-lenis-prevent={!grouped || undefined}>
           {matches.map((match) => (
             <button
               key={match.id}
               type="button"
               aria-haspopup="dialog"
               onClick={() => setSelected(match)}
-              className="grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-4 text-left transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-300 sm:px-5"
+              className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 text-left transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-orange-300 sm:px-5 ${grouped ? "min-h-14 py-3" : "min-h-16 py-4"}`}
             >
               <span className="min-w-0">
-                <span className="block break-words text-sm font-bold text-white">{match.tournamentName}</span>
-                <span className="mt-1 block break-words text-xs leading-5 text-zinc-300">
+                <span className="block break-words text-sm font-bold text-white">{grouped ? match.opponentName : match.tournamentName}</span>
+                {!grouped && <span className="mt-1 block break-words text-xs leading-5 text-zinc-300">
                   {t("dashboard.matchHistory.versus", {
                     opponent: match.opponentName,
                     round: localizeBracketRoundName(match.roundName, roundT),
                   })}
-                </span>
+                </span>}
                 <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
-                  <span>{match.bracketName}</span>
+                  <span>{grouped ? localizeBracketRoundName(match.roundName, roundT) : match.bracketName}</span>
                   <HydrationSafeLocalDateTime value={match.playedAt} fallback={t("dashboard.notAvailable")} options={{ dateStyle: "medium" }} />
                 </span>
               </span>

@@ -8,7 +8,7 @@ import {
   getEffectiveTournamentDivisionState,
   type TournamentDivisionStateResolution,
 } from "@/lib/tournament-division-state";
-import { TOURNAMENT_BRACKET_CONFIGS } from "@/lib/tournaments";
+import { getTournamentBracketConfigs } from "@/lib/tournaments";
 
 export default function TournamentBracketStructureControls({
   divisionStates,
@@ -51,8 +51,8 @@ export default function TournamentBracketStructureControls({
         <GenerationNotice notice={notice} />
       )}
 
-      <div className="mt-5 grid min-w-0 gap-4 md:grid-cols-3">
-        {TOURNAMENT_BRACKET_CONFIGS.map((config) => {
+      <div className="mt-5 grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {getTournamentBracketConfigs(values.divisionModelVersion).map((config) => {
           const bracket = values[config.fieldPrefix];
           if (!bracket.id) return null;
 

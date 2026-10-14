@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
@@ -22,7 +23,7 @@ import {
 } from "@/lib/tournaments";
 
 const TOURNAMENT_SELECT =
-  "id, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)";
+  "id, division_model_version, slug, title, description, banner_image_url, registration_open_at, registration_close_at, start_date, end_date, status, format, prize_pool, rules_url, battlefy_url, registration_enabled, grand_final_at, rule_format, result_confirmation_window_minutes, created_at, updated_at, tournament_brackets(id, tournament_id, name, elo_rules, max_players, launched_at, map_pool_published_at, created_at, updated_at)";
 
 const REGISTRATION_SELECT =
   "id, clerk_user_id, tournament_id, tournament_bracket_id, player_name, country, submitted_elo, elo_verified_elo, registration_status, waitlist_offer_status";
@@ -203,7 +204,7 @@ export async function loadAdminTournamentMatchWorkspace(
     const bracketNames = new Map(
       tournamentBrackets.map((bracket) => [
         bracket.id,
-        getTournamentBracketDisplayName(bracket.name),
+        getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(tournamentRow.division_model_version)),
       ])
     );
     const participants: TournamentParticipant[] = [];

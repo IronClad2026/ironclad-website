@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion } from "@/lib/division-model";
 import { ChevronLeft, Users } from "lucide-react";
 import Link from "next/link";
 import TournamentManagementMenu, {
@@ -97,7 +98,7 @@ export default function TournamentWorkspaceHeader({
             <p className="break-words text-xs leading-5 text-zinc-500 sm:max-w-[55%] sm:text-right">
               {brackets
                 .map((bracket) =>
-                  getTournamentBracketDisplayName(bracket.name)
+                  getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(tournament.division_model_version))
                 )
                 .join(" · ")}
             </p>

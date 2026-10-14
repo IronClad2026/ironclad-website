@@ -84,7 +84,9 @@ describe("getIronCladDivision", () => {
     [1_099, "Academy"],
     [1_100, "Challenge"],
     [1_399, "Challenge"],
-    [1_400, "Main / Pro"],
+    [1_400, "Main"],
+    [1_699, "Main"],
+    [1_700, "Pro"],
   ] as const)("maps %i ELO to %s", (elo, division) => {
     expect(getIronCladDivision(elo)).toEqual({ ok: true, division });
   });
@@ -147,7 +149,7 @@ describe("selectRelic1v1Elo", () => {
       status: "rated",
       elo: 1_420,
       faction: "British Forces",
-      division: "Main / Pro",
+      division: "Main",
       calculationVersion: RELIC_ELO_CALCULATION_VERSION,
     });
   });

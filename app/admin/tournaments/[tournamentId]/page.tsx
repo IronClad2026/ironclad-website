@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion } from "@/lib/division-model";
 import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -362,6 +363,7 @@ async function renderWorkspaceSection({
           notHeldAt:
             divisionStateByBracket.get(bracket.id)?.notHeldAt ?? null,
           mapPoolPublishedAt: bracket.map_pool_published_at,
+          divisionModelVersion: requireDivisionModelVersion(tournament.division_model_version),
           currentMapIds:
             mapPool.currentMapIdsByBracket.get(bracket.id) ?? [],
         }))}

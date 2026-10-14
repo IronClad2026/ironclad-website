@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion, getDivisionDisplayName, type DivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
 import { isFactualNoShow } from "@/lib/admin-operations-metrics";
@@ -53,6 +54,9 @@ export type DashboardNotification = {
 
 export type ChampionAchievement = {
   id: string;
+  tournamentId: string;
+  tournamentBracketId: string;
+  generatedBracketId: string;
   winnerName: string;
   tournamentName: string;
   bracketName: string;
@@ -71,6 +75,10 @@ export type PlayerStatistics = {
 
 export type MatchHistoryEntry = {
   id: string;
+  tournamentId: string | null;
+  tournamentBracketId: string | null;
+  generatedBracketId: string;
+  tournamentBannerImageUrl: string | null;
   tournamentName: string;
   bracketName: string;
   opponentName: string;
@@ -78,6 +86,7 @@ export type MatchHistoryEntry = {
   score: string;
   playedAt: string;
   roundName: string;
+  roundNumber: number | null;
   matchNumber: number;
   seriesBestOf: number;
   replayAvailable: boolean;
@@ -188,6 +197,7 @@ type TournamentBracketRow = {
 };
 
 type TournamentRow = {
+  division_model_version?: DivisionModelVersion;
   id: string;
   title: string;
   banner_image_url: string | null;
@@ -467,7 +477,7 @@ export async function loadPlayerCareerDashboard(
   ];
   const { data: tournamentData, error: tournamentError } = await supabase
     .from("tournaments")
-    .select("id, title, banner_image_url")
+    .select("id, title, banner_image_url, division_model_version")
     .in("id", tournamentIds);
 
   if (tournamentError || !Array.isArray(tournamentData)) {
@@ -893,11 +903,14 @@ function buildCareerDashboard({
 
     championsByKey.set(`${bracket.tournament_id}:${bracket.id}`, {
       id: `${bracket.id}:${match.id}`,
+      tournamentId: bracket.tournament_id,
+      tournamentBracketId: bracket.id,
+      generatedBracketId: match.generated_bracket_id,
       tournamentName:
         tournament?.title ??
         registrationsById.get(match.winner_registration_id)?.tournament_title ??
         t("dashboard.fallbackTournament"),
-      bracketName: bracket.name,
+      bracketName: getDivisionDisplayName(requireDivisionModelVersion(tournament?.division_model_version), bracket.name) ?? (() => { throw new Error("Unknown championship division."); })(),
       bannerImageUrl: tournament?.banner_image_url ?? null,
       wonAt: match.updated_at,
       winnerName: registrationName(
@@ -924,11 +937,14 @@ function buildCareerDashboard({
     const tournament = tournamentsById.get(bracket.tournament_id);
     championsByKey.set(`${bracket.tournament_id}:${bracket.id}`, {
       id: `${bracket.id}:${standing.registration_id}`,
+      tournamentId: bracket.tournament_id,
+      tournamentBracketId: bracket.id,
+      generatedBracketId: generated.id,
       tournamentName:
         tournament?.title ??
         registrationsById.get(standing.registration_id)?.tournament_title ??
         t("dashboard.fallbackTournament"),
-      bracketName: bracket.name,
+      bracketName: getDivisionDisplayName(requireDivisionModelVersion(tournament?.division_model_version), bracket.name) ?? (() => { throw new Error("Unknown championship division."); })(),
       bannerImageUrl: tournament?.banner_image_url ?? null,
       wonAt: standing.updated_at,
       winnerName: registrationName(
@@ -958,7 +974,7 @@ function buildCareerDashboard({
         ? match.player_two_score
         : match.player_one_score;
       const round = roundsById.get(match.round_id);
-      const { bracket, tournament } = tournamentForMatch(match);
+      const { generated, bracket, tournament } = tournamentForMatch(match);
       const proofSubmission =
         submissions.find(
           (submission) =>
@@ -972,6 +988,10 @@ function buildCareerDashboard({
 
       return {
         id: match.id,
+        tournamentId: bracket?.tournament_id ?? null,
+        tournamentBracketId: bracket?.id ?? generated?.tournament_bracket_id ?? null,
+        generatedBracketId: match.generated_bracket_id,
+        tournamentBannerImageUrl: tournament?.banner_image_url ?? null,
         tournamentName:
           tournament?.title ??
           registrationsById.get(
@@ -981,7 +1001,7 @@ function buildCareerDashboard({
           )?.tournament_title ??
           t("dashboard.fallbackTournament"),
         bracketName:
-          bracket?.name ??
+          (bracket ? getDivisionDisplayName(requireDivisionModelVersion(tournament?.division_model_version), bracket.name) : null) ??
           registrationsById.get(
             viewerIsPlayerOne
               ? match.player_one_registration_id ?? ""
@@ -997,6 +1017,7 @@ function buildCareerDashboard({
         score: `${viewerScore ?? 0}-${opponentScore ?? 0}`,
         playedAt: match.updated_at,
         roundName: round?.name ?? t("dashboard.fallbackMatch"),
+        roundNumber: round?.round_number ?? null,
         matchNumber: match.match_number,
         seriesBestOf: match.series_best_of,
         replayAvailable: Boolean(proofSubmission?.replay_storage_path),

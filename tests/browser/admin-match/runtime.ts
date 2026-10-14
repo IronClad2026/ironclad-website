@@ -22,3 +22,17 @@ export const createAuthenticatedBrowserSupabaseClient = () => {
 };
 export const cleanupPreparedReplayUploads = fixtureAction;
 export const finalizeMatchResult = fixtureAction;
+
+// Match Room itself has a separate browser suite; this workspace fixture keeps
+// its optional room unavailable without importing or calling server actions.
+export const resolveMatchRoom = async () => ({ ok: true as const, data: { room: null } });
+const unavailableRoom = async () => ({ ok: false as const, code: "unavailable" as const });
+export const getMatchRoomHistory = unavailableRoom;
+export const getMatchRoomEarlierHistory = unavailableRoom;
+export const markMatchRoomRead = unavailableRoom;
+export const sendAdminMatchRoomMessage = unavailableRoom;
+export const sendMatchRoomMessage = unavailableRoom;
+export const getMatchRoomAssistance = unavailableRoom;
+export const requestMatchAdminAssistance = unavailableRoom;
+export const resolveMatchAdminAssistance = unavailableRoom;
+export const getMatchRoomOpponentDiscord = async () => ({ discordUsername: null });

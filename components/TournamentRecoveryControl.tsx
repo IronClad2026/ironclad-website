@@ -68,7 +68,7 @@ export default function TournamentRecoveryControl({
       </div>
 
       <p className="mt-4 border border-sky-400/20 bg-sky-950/15 p-3 text-sm leading-6 text-sky-100">
-        For a finalized Main / Pro qualifier, Void places the season under
+        For a finalized official season qualifier, Void places the season under
         review; frozen standings are not rewritten.
       </p>
 

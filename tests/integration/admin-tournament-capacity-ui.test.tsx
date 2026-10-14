@@ -51,14 +51,15 @@ import TournamentEditor, {
   type TournamentFormValues,
 } from "@/components/admin/tournaments/TournamentEditor";
 
-function expectFixedEightPlayerCapacity() {
+function expectFixedEightPlayerCapacity(count: 3 | 4 = 3) {
   const capacityInputs = screen.getAllByLabelText(/Launch Capacity/);
 
-  expect(capacityInputs).toHaveLength(3);
+  expect(capacityInputs).toHaveLength(count);
   expect(capacityInputs.map((input) => input.getAttribute("name"))).toEqual([
     "academyMaxPlayers",
     "challengeMaxPlayers",
     "mainMaxPlayers",
+    ...(count === 4 ? ["proMaxPlayers"] : []),
   ]);
 
   for (const input of capacityInputs) {
@@ -71,10 +72,11 @@ function expectFixedEightPlayerCapacity() {
     screen.getAllByText(
       "Fixed at exactly eight players for the current 1v1 launch format."
     )
-  ).toHaveLength(3);
+  ).toHaveLength(count);
 }
 
 const existingTournamentValues: TournamentFormValues = {
+  divisionModelVersion: "legacy_three_v1",
   id: "11111111-1111-4111-8111-111111111111",
   slug: "existing-eight-player-cup",
   title: "Existing Eight Player Cup",
@@ -111,6 +113,7 @@ const existingTournamentValues: TournamentFormValues = {
     eloRules: "1400+ ELO",
     maxPlayers: 8,
   },
+  pro: { id: null, launchedAt: null, enabled: false, eloRules: "1700+ ELO", maxPlayers: 8 },
 };
 
 describe("Admin tournament fixed capacity presentation", () => {
@@ -132,7 +135,7 @@ describe("Admin tournament fixed capacity presentation", () => {
     expect(
       screen.getByRole("heading", { name: "New Tournament" })
     ).toBeVisible();
-    expectFixedEightPlayerCapacity();
+    expectFixedEightPlayerCapacity(4);
   });
 
   it("keeps all existing-tournament Division capacities read-only at eight while editing", async () => {

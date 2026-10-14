@@ -5,6 +5,8 @@ const root = resolve(import.meta.dirname, "../../..");
 const runtime = resolve(import.meta.dirname, "runtime.ts");
 export default defineConfig({
   root,
+  cacheDir: resolve(root, ".release-local/vite-cache-match-result"),
+  optimizeDeps: { entries: [resolve(import.meta.dirname, "index.html")] },
   plugins: [react()],
   resolve: {
     alias: [

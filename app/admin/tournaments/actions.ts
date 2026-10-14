@@ -1,5 +1,7 @@
 "use server";
 
+import { parseDivisionModelVersion, requireDivisionModelVersion } from "@/lib/division-model";
+
 import { auth } from "@clerk/nextjs/server";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -28,6 +30,7 @@ import type {
 } from "@/lib/tournaments";
 import {
   TOURNAMENT_BRACKET_CONFIGS,
+  getTournamentBracketConfigs,
   parseEloEligibilityRule,
 } from "@/lib/tournaments";
 
@@ -206,6 +209,11 @@ export async function saveTournament(
   await requireCurrentAccountLegalAcceptance();
 
   const tournamentId = getOptionalText(formData, "tournamentId");
+  const divisionModelVersion = parseDivisionModelVersion(formData.get("divisionModelVersion"));
+  if (!divisionModelVersion) return { error: "Refresh the tournament editor before saving." };
+  if (!tournamentId && divisionModelVersion !== "four_division_v1") {
+    return { error: "New tournaments require the four-division model." };
+  }
   const title = getText(formData, "title");
   let slug = generateTournamentSlug(title);
   const description = getText(formData, "description");
@@ -229,7 +237,7 @@ export async function saveTournament(
   const rulesUrl = getOptionalText(formData, "rulesUrl");
   const battlefyUrl = getOptionalText(formData, "battlefyUrl");
   let registrationEnabled = status === "registration_open";
-  const bracketInputs = TOURNAMENT_BRACKET_CONFIGS.map((config) => ({
+  const bracketInputs = getTournamentBracketConfigs(divisionModelVersion).map((config) => ({
     config,
     enabled: formData.get(`${config.fieldPrefix}Enabled`) === "on",
     bracket: readBracket(formData, config.fieldPrefix, config.name),
@@ -285,6 +293,7 @@ export async function saveTournament(
         supabase,
         tournamentId
       );
+      if (existingTournament.divisionModelVersion !== divisionModelVersion) return { error: "Tournament division model cannot be changed." };
       slug = existingTournament.slug;
       previousBannerUrl = existingTournament.bannerImageUrl;
       preservedGrandFinalAt = toTimestamp(existingTournament.grandFinalAt);
@@ -371,6 +380,7 @@ export async function saveTournament(
     p_result_confirmation_window_minutes:
       resultConfirmationWindowMinutes,
     p_brackets: brackets,
+    p_division_model_version: divisionModelVersion,
   });
 
   if (error || !data) {
@@ -1233,9 +1243,9 @@ function getTournamentTerminalSuccessMessage(
     case "already_voided":
       return "The tournament is already voided.";
     case "under_review":
-      return "The finalized Main season is now under review; the tournament was not voided.";
+      return "The finalized official season is now under review; the tournament was not voided.";
     case "already_under_review":
-      return "The finalized Main season is already under review; the tournament was not voided.";
+      return "The finalized official season is already under review; the tournament was not voided.";
   }
 }
 
@@ -1513,7 +1523,7 @@ async function getExistingTournamentDetails(
   const { data, error } = await supabase
     .from("tournaments")
     .select(
-      "slug, banner_image_url, status, registration_enabled, grand_final_at"
+      "slug, banner_image_url, status, registration_enabled, grand_final_at, division_model_version"
     )
     .eq("id", tournamentId)
     .maybeSingle();
@@ -1534,6 +1544,7 @@ async function getExistingTournamentDetails(
   }
 
   return {
+    divisionModelVersion: requireDivisionModelVersion(data.division_model_version),
     bannerImageUrl: data.banner_image_url,
     grandFinalAt: data.grand_final_at,
     registrationEnabled: data.registration_enabled,

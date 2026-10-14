@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import rawLegalSuccessorRelease from "@/content/legal-successor-release.json";
 import { legalCorpus } from "@/lib/legal-corpus-publication";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { resolveLegalDocumentDownloadUrl } from "@/lib/legal-document-delivery";
 
 const CANONICAL_LEGAL_ORIGIN = "https://www.ironcladtournaments.com";
 const PREVIEW_LEGAL_DOCUMENT_ORIGIN_ENV = "PREVIEW_LEGAL_DOCUMENT_ORIGIN";
@@ -20,6 +21,7 @@ export type AccountLegalGateDocument = {
   id: string;
   version: string;
   url: string;
+  downloadUrl: string;
 };
 
 export type AccountLegalGateState =
@@ -228,8 +230,8 @@ async function loadLegalRuntimeState(
   return {
     accountGate: {
       status: "required",
-      terms: presentDocument(documents.terms, approvedDocuments.terms.path),
-      privacy: presentDocument(documents.privacy, approvedDocuments.privacy.path),
+      terms: presentDocument(documents.terms),
+      privacy: presentDocument(documents.privacy),
     },
     analyticsAvailable: true,
   };
@@ -676,7 +678,12 @@ function parseEffectiveDocument(
     trustedLegalOrigins
   );
 
-  if (!url) {
+  const downloadUrl = resolveLegalDocumentDownloadUrl({
+    kind: value.document_kind,
+    version: value.version,
+    sha256: value.sha256,
+  });
+  if (!url || !downloadUrl) {
     return null;
   }
 
@@ -685,6 +692,7 @@ function parseEffectiveDocument(
     kind: value.document_kind,
     version: value.version,
     url,
+    downloadUrl,
     effectiveAt: value.effective_at,
     sha256: value.sha256,
   };
@@ -721,14 +729,12 @@ function isSatisfiedAcceptance(
   );
 }
 
-function presentDocument(
-  document: EffectiveLegalDocument,
-  deployedPath: string
-): AccountLegalGateDocument {
+function presentDocument(document: EffectiveLegalDocument): AccountLegalGateDocument {
   return {
     id: document.id,
     version: document.version,
-    url: deployedPath,
+    url: document.url,
+    downloadUrl: document.downloadUrl,
   };
 }
 

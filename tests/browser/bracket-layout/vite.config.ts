@@ -23,6 +23,7 @@ const rejectServerCode: Plugin = {
 // existing harness files or application modules are modified by this fixture.
 export default defineConfig(mergeConfig(base, {
   root: sourceRoot,
+  cacheDir: resolve(sourceRoot, ".release-local/vite-cache-bracket-layout"),
   envDir: support("no-environment-files"),
   envPrefix: "BRACKET_FIXTURE_UNUSED_",
   plugins: [rejectServerCode],

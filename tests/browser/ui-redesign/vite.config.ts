@@ -39,6 +39,8 @@ function isolatedActions(): Plugin {
 
 export default defineConfig({
   root,
+  cacheDir: support("../../../.release-local/vite-cache-ui-redesign"),
+  optimizeDeps: { entries: [support("index.html")] },
   envDir: support("no-environment-files"),
   envPrefix: "UI_FIXTURE_UNUSED_",
   plugins: [isolatedActions(), react()],
@@ -52,6 +54,7 @@ export default defineConfig({
         "@/lib/notifications", "@/lib/player-dashboard", "@/lib/player-polls",
         "@/lib/tournament-division-invitations", "@/lib/badges/reveals",
         "@/lib/i18n/request",
+        "@/lib/player-showcase/read",
       ].map((find) => ({ find, replacement: support("runtime.ts") })),
       { find: "next/link", replacement: support("link.tsx") },
       { find: "next/image", replacement: support("image.tsx") },

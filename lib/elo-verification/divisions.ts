@@ -1,23 +1,14 @@
 import "server-only";
 
-export type IronCladDivision = "Academy" | "Challenge" | "Main / Pro";
+import { CURRENT_DIVISION_MODEL, getDivisionForElo, type DivisionModelVersion, type VerifiedDivision } from "@/lib/division-model";
+
+export type IronCladDivision = VerifiedDivision;
 
 export type IronCladDivisionResult =
   | { ok: true; division: IronCladDivision }
   | { ok: false; reason: "invalid_elo" };
 
-export function getIronCladDivision(elo: number): IronCladDivisionResult {
-  if (!Number.isSafeInteger(elo) || elo < 0) {
-    return { ok: false, reason: "invalid_elo" };
-  }
-
-  if (elo < 1_100) {
-    return { ok: true, division: "Academy" };
-  }
-
-  if (elo < 1_400) {
-    return { ok: true, division: "Challenge" };
-  }
-
-  return { ok: true, division: "Main / Pro" };
+export function getIronCladDivision(elo: number, model: DivisionModelVersion = CURRENT_DIVISION_MODEL): IronCladDivisionResult {
+  const division = getDivisionForElo(elo, model);
+  return division ? { ok: true, division } : { ok: false, reason: "invalid_elo" };
 }

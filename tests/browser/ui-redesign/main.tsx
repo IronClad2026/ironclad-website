@@ -2,14 +2,17 @@ import { createRoot } from "react-dom/client";
 import TournamentsExperience from "@/components/TournamentsExperience";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
 import { loadDictionaries } from "@/lib/i18n/loaders";
+import { isLocale } from "@/lib/i18n/config";
 import { parameters, pollFixture, tournamentFixtures } from "./fixtures";
+import { rankingsFixture } from "./rankings-fixture";
 import "./runtime";
 import "@/app/globals.css";
 
 async function start() {
-  const locale = parameters().get("locale") === "ru" ? "ru" : "en";
+  const requestedLocale = parameters().get("locale");
+  const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   document.documentElement.lang = locale;
-  const dictionaries = await loadDictionaries(locale, ["competition", "account-dashboard", "notifications", "badges", "common"] as const);
+  const dictionaries = await loadDictionaries(locale, ["competition", "account-dashboard", "notifications", "badges", "common", "public"] as const);
   const surface = parameters().get("surface") ?? "tournament";
   const events = tournamentFixtures();
   if (parameters().has("historical") && !parameters().has("tournament")) {
@@ -19,8 +22,11 @@ async function start() {
   }
   const root = createRoot(document.getElementById("root")!);
   const render = async () => {
+    const RankingsExperience = surface === "rankings" ? (await import("@/components/LeaderboardExperience")).default : null;
     const content = surface === "dashboard"
       ? await (await import("@/app/dashboard/page")).default()
+      : RankingsExperience
+        ? <RankingsExperience data={rankingsFixture(!parameters().has("noTransition"))} />
       : <TournamentsExperience tournaments={events} tournamentPollsByTournament={parameters().has("pollRefresh") ? { [events[0].id]: [pollFixture()] } : {}} viewer={{ isAdmin: false, relicVerifiedDivision: null, registrationIds: [], registrations: [] }} matchResultSubmissions={[]} matchResultReportGroups={[]} eloVerificationEnabled />;
     root.render(<LocaleProvider locale={locale} dictionaries={dictionaries}>{content}</LocaleProvider>);
   };

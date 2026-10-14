@@ -90,7 +90,7 @@ const protectedProfileRow = {
   relic_verified_elo: "1375",
   relic_verified_faction: "British Forces",
   relic_verified_division: "Challenge",
-  relic_elo_calculation_version: "relic-1v1-v1",
+  relic_elo_calculation_version: "relic-highest-1v1-v1",
   relic_elo_verified_at: VERIFIED_AT,
   relic_elo_last_attempt_at: LAST_ATTEMPT_AT,
 };
@@ -199,7 +199,7 @@ describe("profile Relic ELO protected load", () => {
         elo: 1375,
         faction: "British Forces",
         division: "Challenge",
-        calculationVersion: "relic-1v1-v1",
+        calculationVersion: "relic-highest-1v1-v1",
         verifiedAt: VERIFIED_AT,
       },
       initialRefreshAvailableAt: "2026-08-04T00:15:00.000Z",
@@ -227,6 +227,48 @@ describe("profile Relic ELO protected load", () => {
       STEAM_ID64
     );
     expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["relic-highest-1v1-v1", "Main / Pro"],
+    ["relic-highest-1v1-v2", "Pro"],
+  ])("preserves a 1750 snapshot under its original %s contract", async (version, division) => {
+    const profile = createSingleRowClient(profileRow);
+    const protectedProfile = createSingleRowClient({
+      ...protectedProfileRow,
+      relic_verified_elo: 1750,
+      relic_verified_division: division,
+      relic_elo_calculation_version: version,
+    });
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(profile.client);
+    createSupabaseAdminClientMock.mockReturnValue(protectedProfile.client);
+    const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    const card = findElementByType(page, relicEloVerificationCardMock);
+    expect(card?.props.initialVerification).toMatchObject({
+      elo: 1750,
+      division,
+      calculationVersion: version,
+    });
+  });
+
+  it.each([
+    ["relic-highest-1v1-v2", "Main / Pro"],
+    ["relic-highest-1v1-v1", "Pro"],
+    ["staging-synthetic-v2", "Pro"],
+    ["unknown-v3", "Pro"],
+  ])("rejects mismatched or synthetic %s/%s profile evidence", async (version, division) => {
+    const profile = createSingleRowClient(profileRow);
+    const protectedProfile = createSingleRowClient({
+      ...protectedProfileRow,
+      relic_verified_elo: 1750,
+      relic_verified_division: division,
+      relic_elo_calculation_version: version,
+    });
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(profile.client);
+    createSupabaseAdminClientMock.mockReturnValue(protectedProfile.client);
+    const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    const card = findElementByType(page, relicEloVerificationCardMock);
+    expect(card?.props.initialVerification).toBeNull();
   });
 
   it("does not construct a verification snapshot from invalid protected data", async () => {

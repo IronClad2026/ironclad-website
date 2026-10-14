@@ -1,3 +1,4 @@
+import { getDivisionDisplayName, requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
@@ -63,6 +64,7 @@ type RegistrationRow = {
 };
 
 type TournamentRow = {
+  division_model_version?: DivisionModelVersion;
   id: string;
   title: string;
   status: string;
@@ -154,7 +156,7 @@ export async function loadAdminOperationsMetrics(
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, registration_enabled, registration_open_at, registration_close_at, created_at, first_completed_at",
+          "id, title, division_model_version, status, registration_enabled, registration_open_at, registration_close_at, created_at, first_completed_at",
           { count: "exact" }
         )
         .limit(MAX_NARROW_ROWS + 1),
@@ -275,7 +277,7 @@ function buildMetrics(input: {
     period,
     now,
     players,
-    registrations,
+    registrations: rawRegistrations,
     tournaments,
     brackets,
     generatedBrackets,
@@ -287,6 +289,12 @@ function buildMetrics(input: {
   } = input;
   const tournamentById = new Map(tournaments.map((row) => [row.id, row]));
   const bracketById = new Map(brackets.map((row) => [row.id, row]));
+  const registrations = rawRegistrations.map((row) => {
+    const bracket = row.tournament_bracket_id ? bracketById.get(row.tournament_bracket_id) : null;
+    const tournament = tournamentById.get(row.tournament_id);
+    const name = bracket?.name ?? row.bracket_name?.replace(/ Bracket$/, "");
+    return { ...row, bracket_name: name ? getDivisionDisplayName(requireDivisionModelVersion(tournament?.division_model_version), name) : null };
+  });
   const registrationById = new Map(registrations.map((row) => [row.id, row]));
   const launchedBracketIds = new Set(
     brackets.filter((row) => row.launched_at !== null).map((row) => row.id)
@@ -438,7 +446,7 @@ function buildMetrics(input: {
         (row) =>
           row.launched_at !== null && tournamentById.get(row.tournament_id)?.status === "completed"
       )
-      .map((row) => ({ bracket_name: row.name }))
+      .map((row) => ({ bracket_name: getDivisionDisplayName(requireDivisionModelVersion(tournamentById.get(row.tournament_id)?.division_model_version), row.name) }))
   );
 
   const repeatTournamentsByPlayer = new Map<string, Set<string>>();
@@ -829,7 +837,7 @@ function namedCounts<T extends Record<string, unknown>>(
 }
 
 function divisionGroups(rows: { bracket_name: string | null }[]): AdminOperationsGroupPoint[] {
-  const canonical = ["Academy", "Challenge", "Main"];
+  const canonical = ["Academy", "Challenge", "Main", "Pro", ...(rows.some((row) => row.bracket_name === "Main / Pro") ? ["Main / Pro"] : [])];
   return canonical.map((division) => ({
     label: displayDivision(division),
     value: rows.filter((row) => row.bracket_name === division).length,
@@ -837,7 +845,6 @@ function divisionGroups(rows: { bracket_name: string | null }[]): AdminOperation
 }
 
 function displayDivision(value: string | null): string {
-  if (value === "Main") return "Main / Pro";
   return value || "Division pending";
 }
 

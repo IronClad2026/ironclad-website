@@ -1,3 +1,4 @@
+import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
 import {
   mapPublicCoh3MapDatabaseRow,
   normalizeCoh3MapName,
@@ -18,6 +19,7 @@ export type TournamentMapPoolEntryRow = {
 };
 
 export type TournamentMapPoolBracketRow = {
+  divisionModelVersion?: DivisionModelVersion;
   id: string;
   name: string;
   mapPoolPublishedAt: string | null;
@@ -46,8 +48,8 @@ export function projectPublishedTournamentMapPools(
   return [...brackets]
     .sort(
       (left, right) =>
-        getTournamentBracketSortOrder(left.name) -
-          getTournamentBracketSortOrder(right.name) ||
+        getTournamentBracketSortOrder(left.name, requireDivisionModelVersion(left.divisionModelVersion)) -
+          getTournamentBracketSortOrder(right.name, requireDivisionModelVersion(right.divisionModelVersion)) ||
         left.name.localeCompare(right.name)
     )
     .flatMap((bracket) => {
@@ -58,7 +60,7 @@ export function projectPublishedTournamentMapPools(
       return [
         {
           bracketId: bracket.id,
-          divisionName: getTournamentBracketDisplayName(bracket.name),
+          divisionName: getTournamentBracketDisplayName(bracket.name, requireDivisionModelVersion(bracket.divisionModelVersion)),
           publishedAt: bracket.mapPoolPublishedAt,
           launchedAt: bracket.launchedAt,
           maps: bracket.entries

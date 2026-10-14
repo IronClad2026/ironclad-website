@@ -187,13 +187,11 @@ describe("match actions card presentation", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    // Focus restoration runs in the dialog's passive-effect cleanup.
     await waitFor(() => expect(opener).toHaveFocus());
 
     ({ closeButton, dialog } = await openDialog());
     fireEvent.click(closeButton);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    // Focus restoration runs in the dialog's passive-effect cleanup.
     await waitFor(() => expect(opener).toHaveFocus());
 
     ({ dialog } = await openDialog());
@@ -203,7 +201,6 @@ describe("match actions card presentation", () => {
     expect(backdrop).toHaveAttribute("aria-hidden", "true");
     fireEvent.mouseDown(backdrop as HTMLElement);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    // Focus restoration runs in the dialog's passive-effect cleanup.
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
@@ -284,7 +281,6 @@ describe("match actions card presentation", () => {
 
     fireEvent.click(closeButton);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    // Focus restoration runs in the dialog's passive-effect cleanup.
     await waitFor(() => expect(opener).toHaveFocus());
   });
 });

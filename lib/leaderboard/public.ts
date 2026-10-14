@@ -6,7 +6,9 @@ export type LeaderboardBracketType =
   | "overall"
   | "academy"
   | "challenge"
-  | "main";
+  | "main"
+  | "main_progression"
+  | "pro";
 export type LeaderboardScope = "season" | "all_time";
 
 export type PublicLeaderboardSeason = {
@@ -17,9 +19,12 @@ export type PublicLeaderboardSeason = {
   startDate: string;
   endDate: string;
   isActive: boolean;
-  validMainEventCount: number;
+  // Public official role; the approved bridge does not rewrite its stored source family.
+  officialBracketType: "main" | "pro";
+  validQualifyingEventCount: number;
   isFinalized: boolean;
   isUnderReview: boolean;
+  hasLegacyMainTransition?: boolean;
 };
 
 export type PublicLeaderboardStanding = {
@@ -44,6 +49,8 @@ export type PublicLeaderboardStanding = {
   winRate: number;
   lastTournamentId: string | null;
   lastTournamentTitle: string | null;
+  // Factual event division, independent of a derived official season ranking bucket.
+  lastTournamentBracketType?: LeaderboardBracketType | null;
   lastTournamentPoints: number;
   rank: number | null;
   previousRank: number | null;
@@ -80,9 +87,11 @@ type SeasonRow = {
   start_date: string;
   end_date: string;
   is_active: boolean;
-  valid_main_event_count: number;
+  official_bracket_type: "main" | "pro";
+  valid_qualifying_event_count: number;
   is_finalized: boolean;
   is_under_review: boolean;
+  has_legacy_main_transition?: boolean;
 };
 
 type SeasonStandingRow = {
@@ -105,6 +114,7 @@ type SeasonStandingRow = {
   win_rate: number;
   last_tournament_id: string | null;
   last_tournament_title: string | null;
+  last_tournament_bracket_type?: LeaderboardBracketType | null;
   last_tournament_points: number;
   current_rank: number | null;
   previous_rank: number | null;
@@ -147,10 +157,14 @@ type ChampionRow = {
 
 export async function getPublicLeaderboardData(): Promise<PublicLeaderboardData> {
   const errors: string[] = [];
-  const currentSeason = await loadCurrentSeason(errors);
-  const [seasonStandings, allTimeStandings, seasonChampions] =
+  const currentSeasonRequest = loadCurrentSeason(errors);
+  const seasonStandingsRequest = currentSeasonRequest.then((currentSeason) =>
+    currentSeason ? loadSeasonStandings(currentSeason.id, errors) : []
+  );
+  const [currentSeason, seasonStandings, allTimeStandings, seasonChampions] =
     await Promise.all([
-      currentSeason ? loadSeasonStandings(currentSeason.id, errors) : [],
+      currentSeasonRequest,
+      seasonStandingsRequest,
       loadAllTimeStandings(errors),
       loadSeasonChampions(errors),
     ]);
@@ -168,7 +182,7 @@ async function loadCurrentSeason(errors: string[]) {
   const { data, error } = await supabase
     .from("leaderboard_current_season")
     .select(
-      "id, name, year, season_number, start_date, end_date, is_active, valid_main_event_count, is_finalized, is_under_review"
+      "id, name, year, season_number, start_date, end_date, is_active, official_bracket_type, valid_qualifying_event_count, is_finalized, is_under_review, has_legacy_main_transition"
     )
     .maybeSingle();
 
@@ -178,6 +192,10 @@ async function loadCurrentSeason(errors: string[]) {
     return null;
   }
 
+  if (data && data.official_bracket_type !== "main" && data.official_bracket_type !== "pro") {
+    errors.push("Current season has an unsupported division model.");
+    return null;
+  }
   return data ? mapSeason(data as SeasonRow) : null;
 }
 
@@ -205,6 +223,7 @@ async function loadSeasonStandings(seasonId: string, errors: string[]) {
         "win_rate",
         "last_tournament_id",
         "last_tournament_title",
+        "last_tournament_bracket_type",
         "last_tournament_points",
         "current_rank",
         "previous_rank",
@@ -275,7 +294,7 @@ async function loadSeasonChampions(errors: string[]) {
     .select(
       "id, season_id, season_name, player_id, player_name, country, has_avatar, bracket_type, final_rank, final_points"
     )
-    .eq("bracket_type", "main")
+    .in("bracket_type", ["main", "pro"])
     .order("created_at", { ascending: false })
     .limit(24);
 
@@ -308,9 +327,11 @@ function mapSeason(row: SeasonRow): PublicLeaderboardSeason {
     startDate: row.start_date,
     endDate: row.end_date,
     isActive: row.is_active,
-    validMainEventCount: row.valid_main_event_count,
+    officialBracketType: row.official_bracket_type,
+    validQualifyingEventCount: row.valid_qualifying_event_count,
     isFinalized: row.is_finalized,
     isUnderReview: row.is_under_review,
+    hasLegacyMainTransition: row.has_legacy_main_transition === true,
   };
 }
 
@@ -337,6 +358,9 @@ function mapSeasonStanding(row: SeasonStandingRow): PublicLeaderboardStanding {
     winRate: Number(row.win_rate),
     lastTournamentId: row.last_tournament_id,
     lastTournamentTitle: row.last_tournament_title,
+    lastTournamentBracketType: ["academy", "challenge", "main", "main_progression", "pro"].includes(row.last_tournament_bracket_type ?? "")
+      ? row.last_tournament_bracket_type
+      : null,
     lastTournamentPoints: row.last_tournament_points,
     rank: row.current_rank,
     previousRank: row.previous_rank,
@@ -368,6 +392,7 @@ function mapAllTimeStanding(row: AllTimeStandingRow): PublicLeaderboardStanding 
     winRate: Number(row.win_rate),
     lastTournamentId: null,
     lastTournamentTitle: null,
+    lastTournamentBracketType: null,
     lastTournamentPoints: 0,
     rank: null,
     previousRank: null,

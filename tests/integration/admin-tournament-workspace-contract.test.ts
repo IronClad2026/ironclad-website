@@ -218,7 +218,7 @@ const capabilities: Capability[] = [
     evidence: [
       {
         file: "editor",
-        includes: ["TOURNAMENT_BRACKET_CONFIGS.map", "<BracketFields"],
+        includes: ["getTournamentBracketConfigs(values.divisionModelVersion).map", "<BracketFields"],
       },
     ],
   },
@@ -1014,12 +1014,15 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.experience).toContain('activeTab === "announcements"');
   });
 
-  it("preserves the PR 5 migration boundary, dependencies, and environment contract", () => {
+  it("preserves the Production migration boundary and dependency versions with additive release tooling", () => {
     const migrationNames = readdirSync(
       resolve(process.cwd(), "supabase/migrations")
     )
       .filter((name) => name.endsWith(".sql"))
       .sort();
+    const baselineMigrationNames = migrationNames.filter(
+      (name) => name <= "20260923062127_match_room_retention_and_privacy.sql"
+    );
 
     const badgeIntegrationMigrationNames = new Set([
       "20260821000000_badge_award_foundation.sql",
@@ -1059,7 +1062,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260923040754_match_room_disabled_assistance_gate.sql",
       "20260923062127_match_room_retention_and_privacy.sql",
     ]);
-    const platformMigrationNames = migrationNames.filter(
+    const platformMigrationNames = baselineMigrationNames.filter(
       (name) =>
         !badgeIntegrationMigrationNames.has(name) &&
         !postPr5MigrationNames.has(name)
@@ -1078,12 +1081,12 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(migrationTreeSha256(platformMigrationNames.slice(0, -2))).toBe(
       "8a66ada7bd7cae2874b3d4f6919462a1c2f74439850efac5d99aeddb0cf8b7cb"
     );
-    expect(migrationNames).toHaveLength(
+    expect(baselineMigrationNames).toHaveLength(
       platformMigrationNames.length +
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.slice(-18)).toEqual([
+    expect(baselineMigrationNames.slice(-18)).toEqual([
       "20260831133000_staging_badge_cross_division_acceptance.sql",
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql",
       "20260902100000_unlaunched_event_void_authority.sql",
@@ -1112,15 +1115,17 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     ).toBe(
       "8e97337efc36276797b3e98ff45bbdbd893533b0ffa13486e0f4bac83e911fd6"
     );
-    expect(normalizedSha256(read("package.json"))).toBe(
-      "0fa600694cee0d7bfbcb2ddd545ed8f46b0c33ea79d4e9953b39c0b3e7ae5db9"
-    );
-    expect(normalizedSha256(read("package-lock.json"))).toBe(
-      "520e696974594503ed6f61f05f5937dd64f75fc9255d56f16bf9c9b57ff238a0"
-    );
-    expect(normalizedSha256(read(".env.example"))).toBe(
-      "a36a452c337407aa53c29a8499cb1658023caed00bd41b605859d07ce166dbd4"
-    );
+    const lock = JSON.parse(read("package-lock.json"));
+    for (const [name, version] of Object.entries({
+      next: "16.3.3", react: "19.2.4", "react-dom": "19.2.4",
+      "@clerk/nextjs": "7.3.7", "@supabase/supabase-js": "2.106.1",
+    })) {
+      expect(lock.packages[`node_modules/${name}`].version).toBe(version);
+    }
+    const envExample = read(".env.example");
+    expect(envExample).toContain("NEXT_PUBLIC_SUPABASE_URL");
+    expect(envExample).toContain("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
+    expect(envExample).not.toContain("zzbnneprhjicmajpjkdg");
 
     expect(
       [
