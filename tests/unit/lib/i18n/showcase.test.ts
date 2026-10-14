@@ -28,6 +28,29 @@ const actionCodes = Object.keys(actionMessages) as ShowcaseMessageCode[];
 
 describe("Player Showcase localization", () => {
   it.each(SUPPORTED_LOCALES)(
+    "%s translates the factual pre-upload provider notice",
+    async (locale) => {
+      const dictionary = await loadDictionary(locale, "account-dashboard");
+      for (const key of [
+        "highlightProviderProcessing",
+        "highlightProviderVisibility",
+        "highlightProviderDeletion",
+        "highlightProviderPrivacy",
+        "highlightProviderOpensNewTab",
+      ] as const) {
+        const message = dictionary.showcase[key];
+        expect(message.trim(), `${locale}/${key}`).not.toBe("");
+        expect(translate(dictionary, `showcase.${key}`)).toBe(message);
+        if (locale !== "en") {
+          expect(message, `${locale}/${key}`).not.toBe(english.showcase[key]);
+        }
+      }
+      expect(dictionary.showcase.highlightProviderProcessing).toContain("Cloudflare");
+      expect(dictionary.showcase.highlightProviderProcessing).toContain("R2");
+    }
+  );
+
+  it.each(SUPPORTED_LOCALES)(
     "%s supplies translated copy for every shared action result",
     async (locale) => {
       const dictionary = await loadDictionary(locale, "account-dashboard");

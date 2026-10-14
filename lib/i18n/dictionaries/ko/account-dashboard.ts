@@ -2,6 +2,11 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 
 const dictionary = {
   showcase: {
+    highlightProviderProcessing: "Cloudflare Workers는 업로드 권한을 확인하고 클립과 미리보기 이미지를 비공개 R2 저장소에 보관합니다. Cloudflare는 네트워크 및 요청 메타데이터도 수신합니다.",
+    highlightProviderVisibility: "공개 프로필이 활성화된 동안에만 클립을 공개 재생할 수 있습니다.",
+    highlightProviderDeletion: "클립을 제거하거나 계정을 폐쇄하면 클립이 즉시 숨겨집니다. 저장소 정리는 비동기적으로 진행됩니다.",
+    highlightProviderPrivacy: "Cloudflare 개인정보 처리방침",
+    highlightProviderOpensNewTab: "새 탭에서 열림",
     reviewLatest: "최근 저장된 버전 확인",
     latestThought: "최근 저장된 생각",
     latestEmpty: "저장된 생각이 없습니다.",

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -29,6 +29,15 @@ const compactVercelBypassMigration = vercelBypassMigration
   .toLowerCase()
   .replace(/\s+/g, " ")
   .trim();
+
+function expectNoVercelEmailScheduler() {
+  const configuration = JSON.parse(readFileSync(resolve(process.cwd(), "vercel.json"), "utf8"));
+  // The sole Vercel schedule is media cleanup. Email and notification delivery
+  // retain their one existing PostgreSQL job, with no second scheduler here.
+  expect(configuration.crons).toEqual([
+    { path: "/api/cron/combat-highlights-cleanup", schedule: "*/5 * * * *" },
+  ]);
+}
 
 const emailFields = [
   "email_template_key",
@@ -585,9 +594,7 @@ describe("transactional-email migration contract", () => {
     expect(compactMigration).not.toContain("vercel cron");
     expect(compactMigration).not.toContain("cron_secret");
     expect(compactMigration).not.toContain("exception when others");
-    expect(
-      existsSync(resolve(process.cwd(), "vercel.json"))
-    ).toBe(false);
+    expectNoVercelEmailScheduler();
   });
 });
 
@@ -703,6 +710,6 @@ describe("transactional-email Vercel protection bypass migration", () => {
     expect(combinedMigrations).toContain(
       "'select public.invoke_transactional_email_worker();'"
     );
-    expect(existsSync(resolve(process.cwd(), "vercel.json"))).toBe(false);
+    expectNoVercelEmailScheduler();
   });
 });

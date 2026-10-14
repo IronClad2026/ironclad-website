@@ -2,6 +2,11 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 
 const dictionary = {
   showcase: {
+    highlightProviderProcessing: "Cloudflare Workers 检查上传权限，并将视频片段和预览图片存储在私有 R2 存储空间中。Cloudflare 还会接收网络和请求元数据。",
+    highlightProviderVisibility: "只有启用公开个人资料时，视频片段才可公开播放。",
+    highlightProviderDeletion: "移除视频片段或关闭账户会立即隐藏视频片段。存储清理会异步执行。",
+    highlightProviderPrivacy: "Cloudflare 隐私政策",
+    highlightProviderOpensNewTab: "在新标签页中打开",
     reviewLatest: "查看最新保存版本",
     latestThought: "最新保存的想法",
     latestEmpty: "尚未保存想法。",

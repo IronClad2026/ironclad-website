@@ -2,6 +2,11 @@ import type { DictionaryShape } from "@/lib/i18n/types";
 
 const dictionary = {
   showcase: {
+    highlightProviderProcessing: "Cloudflare Workers verifica l’accesso al caricamento e conserva clip e immagini di anteprima nello spazio R2 privato. Cloudflare riceve anche metadati di rete e delle richieste.",
+    highlightProviderVisibility: "La riproduzione pubblica è disponibile solo quando il tuo profilo pubblico è attivo.",
+    highlightProviderDeletion: "Rimuovere una clip o chiudere l’account la nasconde immediatamente. La pulizia dello spazio di archiviazione avviene in modo asincrono.",
+    highlightProviderPrivacy: "Informativa sulla privacy di Cloudflare",
+    highlightProviderOpensNewTab: "Si apre in una nuova scheda",
     reviewLatest: "Controlla l’ultima versione salvata",
     latestThought: "Ultimo pensiero salvato",
     latestEmpty: "Nessun pensiero salvato.",

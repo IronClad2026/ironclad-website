@@ -33,6 +33,7 @@ describe("public route access", () => {
     "/profile",
     "/admin",
     "/api",
+    "/api/cron/combat-highlights-cleanup",
     "/api/steam/connect",
     "/api/match-proofs",
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
@@ -55,6 +56,7 @@ describe("public route access", () => {
 
 describe("self-authenticated API route access", () => {
   it.each([
+    "/api/cron/combat-highlights-cleanup",
     "/api/match-proofs",
     "/api/match-proofs/",
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
@@ -75,6 +77,12 @@ describe("self-authenticated API route access", () => {
 
   it.each([
     "/api",
+    "/api/cron",
+    "/api/cron/combat-highlights-cleanup/",
+    "/api/cron/combat-highlights-cleanup/run",
+    "/api/cron/combat-highlights-cleanup-private",
+    "/api/cron/combat-highlights-cleanups",
+    "/api/cron/combat-highlights-cleanup.example",
     "/api/match-proof",
     "/api/match-proofs-private",
     "/api/match-proofs.example",

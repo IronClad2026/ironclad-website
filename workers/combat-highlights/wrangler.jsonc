@@ -1,16 +1,19 @@
 {
   "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
   "name": "ironclad-production-combat-highlights",
+  "account_id": "cbe0a3809d7429e07e97e3795803182b",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-13",
-  "workers_dev": false,
+  "workers_dev": true,
   "preview_urls": false,
-  // Intentionally no account, route or R2 binding. Provision only after separate authorization.
+  // Dedicated private Production resources. Signing/public API keys are secrets,
+  // and activation remains a separate, verified deployment step.
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "ironclad-production-combat-highlights" }],
   "vars": {
     "DEPLOYMENT_ENV": "production",
     "ENABLED": "false",
     "SUPABASE_URL": "https://nsyjtqpvyxlzyujlbzos.supabase.co",
-    "MEDIA_ORIGIN": "",
+    "MEDIA_ORIGIN": "https://ironclad-production-combat-highlights.ironclad-website.workers.dev",
     "ALLOWED_ORIGINS": "https://ironcladtournaments.com,https://www.ironcladtournaments.com"
   },
   "observability": { "enabled": false }

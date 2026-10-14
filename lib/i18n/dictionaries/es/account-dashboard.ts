@@ -2,6 +2,11 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 
 const dictionary = {
   showcase: {
+    highlightProviderProcessing: "Cloudflare Workers comprueba el acceso a las subidas y almacena los clips y las imágenes de vista previa en R2 privado. Cloudflare también recibe metadatos de red y de las solicitudes.",
+    highlightProviderVisibility: "La reproducción pública solo está disponible mientras tu perfil público esté activado.",
+    highlightProviderDeletion: "Eliminar un clip o cerrar tu cuenta lo oculta de inmediato. La limpieza del almacenamiento se realiza de forma asíncrona.",
+    highlightProviderPrivacy: "Política de privacidad de Cloudflare",
+    highlightProviderOpensNewTab: "Se abre en una pestaña nueva",
     reviewLatest: "Revisar la última versión guardada",
     latestThought: "Última idea guardada",
     latestEmpty: "No hay ninguna idea guardada.",

@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import LocaleProvider from "@/components/i18n/LocaleProvider";
 import CombatHighlights from "@/components/combat-highlights/CombatHighlights";
 import CombatHighlightsEditor from "@/components/combat-highlights/CombatHighlightsEditor";
+import { SUPPORTED_LOCALES } from "@/lib/i18n/config";
+import englishAccount from "@/lib/i18n/dictionaries/en/account-dashboard";
+import { loadDictionary } from "@/lib/i18n/loaders";
 import { prepareHighlight, putHighlightObject } from "@/components/combat-highlights/media";
 import type { HighlightEditorActions, HighlightsState, PublicHighlightClip } from "@/lib/combat-highlights/types";
 
@@ -92,6 +96,34 @@ describe("public Combat Highlights", () => {
 });
 
 describe("Combat Highlights editor", () => {
+  it.each(SUPPORTED_LOCALES)("discloses the provider in %s before selecting or uploading a clip", async (locale) => {
+    const dictionary = await loadDictionary(locale, "account-dashboard");
+    const api = actions();
+    render(
+      <LocaleProvider locale={locale} dictionaries={{ "account-dashboard": dictionary }}>
+        <CombatHighlightsEditor initialState={initial()} actions={api} />
+      </LocaleProvider>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add clip 3" }));
+    const note = screen.getByRole("note");
+    expect(within(note).getByText(dictionary.showcase.highlightProviderProcessing)).toBeVisible();
+    expect(within(note).getByText(dictionary.showcase.highlightProviderVisibility)).toBeVisible();
+    expect(within(note).getByText(dictionary.showcase.highlightProviderDeletion)).toBeVisible();
+    const link = within(note).getByRole("link", {
+      name: `${dictionary.showcase.highlightProviderPrivacy} (${dictionary.showcase.highlightProviderOpensNewTab})`,
+    });
+    expect(link).toHaveAttribute("href", "https://www.cloudflare.com/privacypolicy/");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(note.compareDocumentPosition(screen.getByLabelText("Video file")) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(screen.getByRole("button", { name: "Upload clip" })).toBeDisabled();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+    expect(prepareHighlight).not.toHaveBeenCalled();
+    expect(putHighlightObject).not.toHaveBeenCalled();
+    expect(api.reserve).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("confirms removal and submits the physical slot revision", async () => {
     const api = actions();
     const updated = initial();
@@ -162,6 +194,7 @@ describe("Combat Highlights editor", () => {
     vi.mocked(api.complete).mockResolvedValue({ ok: true, code: "saved", state: complete });
     render(<CombatHighlightsEditor initialState={initial()} actions={api} />);
     fireEvent.click(screen.getByRole("button", { name: "Replace A clean flank" }));
+    expect(screen.getByRole("note")).toHaveTextContent(englishAccount.showcase.highlightProviderProcessing);
     fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [file] } });
     await screen.findByText(/flank.mp4 ·/);
     const submit = screen.getByRole("button", { name: "Upload replacement" });

@@ -236,6 +236,29 @@ describe("SQL generation and source isolation", () => {
     expect(result.map((finding) => finding.rule)).toEqual(expect.arrayContaining(["fixture-identity", "embedded-secret", "provider-endpoint"]));
     expect(JSON.stringify(result)).not.toContain("sk_live_"); expect(JSON.stringify(result)).not.toContain("TestPro");
   });
+  it("allows only the complete disabled dedicated Production Worker configuration", () => {
+    const file = "workers/combat-highlights/wrangler.jsonc";
+    const source = readFileSync(file, "utf8");
+    expect(scanText(file, source)).toEqual([]);
+    expect(scanText("app/media.ts", source).map((finding) => finding.rule)).toContain("provider-endpoint");
+    for (const [before, after] of [
+      ["ironclad-production-combat-highlights.ironclad-website.workers.dev", "ironclad-staging-combat-highlights.ironclad-website.workers.dev"],
+      ['"bucket_name": "ironclad-production-combat-highlights"', '"bucket_name": "ironclad-staging-combat-highlights"'],
+      ["cbe0a3809d7429e07e97e3795803182b", "unverified-account"],
+      ['"ENABLED": "false"', '"ENABLED": "true"'],
+      ['"preview_urls": false', '"preview_urls": true'],
+      ['"DEPLOYMENT_ENV": "production"', '"DEPLOYMENT_ENV": "local"'],
+      ['"binding": "MEDIA"', '"binding": "OTHER"'],
+      ["https://nsyjtqpvyxlzyujlbzos.supabase.co", "https://unrelated.supabase.co"],
+      ["https://ironcladtournaments.com,https://www.ironcladtournaments.com", "https://unrelated.example"],
+      ['"observability": { "enabled": false }', '"observability": { "enabled": true }'],
+    ]) {
+      expect(source).toContain(before);
+      expect(scanText(file, source.replace(before, after)).map((finding) => finding.rule)).toContain("provider-endpoint");
+    }
+    const extra = source.replace('"vars": {', '"unexpected_route": "https://extra.workers.dev", "vars": {');
+    expect(scanText(file, extra).map((finding) => finding.rule)).toContain("provider-endpoint");
+  });
   it("rejects embedded cross-environment identity constants or runtime imports of fixture tooling", () => {
     expect(scanText("app/unsafe.ts", `const player="${target}";`).map((finding) => finding.rule)).toContain("embedded-identity");
     expect(scanText("lib/unsafe.ts", 'import data from "@/tests/fixtures/private";').map((finding) => finding.rule)).toContain("runtime-tooling-import");

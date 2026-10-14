@@ -7,11 +7,13 @@ const syntheticVideo = readFileSync(resolve(process.cwd(), "tests/fixtures/comba
 async function openFixture(page: Page, query: string) {
   const errors: string[] = [];
   const mediaRequests: string[] = [];
+  const blockedRequests: string[] = [];
   const uploads: Array<{ type: string; authorization: string; clerk: string }> = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     if (url.origin !== "http://127.0.0.1:3218" || url.pathname.startsWith("/api/")) {
+      blockedRequests.push(url.origin + url.pathname);
       await route.abort("blockedbyclient");
     } else if (url.pathname.startsWith("/fixture-media/")) {
       mediaRequests.push(url.pathname);
@@ -25,7 +27,7 @@ async function openFixture(page: Page, query: string) {
   await page.goto(`/tests/browser/combat-highlights/?${query}`);
   await expect(page.locator("html")).toHaveAttribute("data-highlights-fixture-ready", query.includes("surface=editor") ? "editor" : "public");
   await expect(page.locator("vite-error-overlay")).toHaveCount(0);
-  return { errors, mediaRequests, uploads };
+  return { errors, mediaRequests, uploads, blockedRequests };
 }
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
@@ -91,6 +93,56 @@ test("report modal preserves keyboard close and returns focus", async ({ page })
 });
 
 for (const width of [320, 1440]) {
+  test(`provider disclosure is readable before file selection at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
+    const check = await openFixture(page, "surface=editor&count=2");
+    const trigger = page.getByRole("button", { name: "Add clip 3" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Add Combat Highlight" });
+    await expect(dialog).toBeVisible();
+    const note = dialog.getByRole("note");
+    await expect(note).toContainText("Cloudflare Workers checks upload access and stores clips and preview images in private R2 storage.");
+    await expect(note).toContainText("Cloudflare also receives network and request metadata.");
+    await expect(note).toContainText("Public playback is available only while your public profile is enabled.");
+    await expect(note).toContainText("Removing a clip or closing your account hides it immediately. Storage cleanup runs asynchronously.");
+    const policy = note.getByRole("link", { name: "Cloudflare privacy policy (Opens in a new tab)" });
+    await expect(policy).toHaveAttribute("href", "https://www.cloudflare.com/privacypolicy/");
+    await expect(policy).toHaveAttribute("target", "_blank");
+    await expect(policy).toHaveAttribute("rel", "noopener noreferrer");
+    const fileInput = dialog.getByLabel("Video file");
+    expect(await fileInput.evaluate((input: HTMLInputElement) => input.files?.length)).toBe(0);
+    expect(await note.evaluate((element) => {
+      const input = element.closest("form")!.querySelector('input[type="file"]')!;
+      return Boolean(element.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING);
+    })).toBe(true);
+    await expect(dialog.getByRole("checkbox")).toHaveCount(1);
+    await expect(dialog.getByRole("checkbox", { name: "This is genuine Company of Heroes 3 gameplay involving me, and I have the rights to share this clip." })).not.toBeChecked();
+    await expect(dialog.getByRole("button", { name: "Upload clip", exact: true })).toBeDisabled();
+    await noOverflow(page);
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    const scrollingBody = dialog.locator("[data-lenis-prevent]");
+    await expect(scrollingBody).toHaveCSS("overflow-y", "auto");
+    if (width === 320) {
+      expect(await scrollingBody.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    }
+    await policy.focus();
+    await expect(policy).toBeFocused();
+    await expect(policy).toBeInViewport();
+    const cancel = dialog.getByRole("button", { name: "Cancel", exact: true });
+    await cancel.focus();
+    await expect(cancel).toBeFocused();
+    await expect(cancel).toBeInViewport();
+    expect(check.mediaRequests).toEqual([]);
+    expect(check.uploads).toEqual([]);
+    expect(check.blockedRequests).toEqual([]);
+    await expect(page.locator("[data-fixture-actions]")).toHaveText("");
+    await page.screenshot({ path: testInfo.outputPath(`provider-disclosure-${width}.png`), fullPage: true });
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    expect(check.errors).toEqual([]);
+  });
+
   test(`editor controls and owner preview work at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     const check = await openFixture(page, "surface=editor&count=2");
