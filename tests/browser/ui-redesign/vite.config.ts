@@ -43,7 +43,17 @@ export default defineConfig({
   optimizeDeps: { entries: [support("index.html")] },
   envDir: support("no-environment-files"),
   envPrefix: "UI_FIXTURE_UNUSED_",
-  plugins: [isolatedActions(), react()],
+  plugins: [isolatedActions(), {
+    name: "isolated-tournament-history-route",
+    configureServer(server) {
+      server.middlewares.use((request, _response, next) => {
+        if (request.url === "/tournaments" || request.url?.startsWith("/tournaments?")) {
+          request.url = "/tests/browser/ui-redesign/" + (request.url.slice("/tournaments".length) || "");
+        }
+        next();
+      });
+    },
+  }, react()],
   css: { postcss: { plugins: [tailwindcss({ base: sourceRoot })] } },
   resolve: {
     dedupe: ["react", "react-dom", "framer-motion"],

@@ -14,7 +14,7 @@ async function start() {
   document.documentElement.lang = locale;
   const dictionaries = await loadDictionaries(locale, ["competition", "account-dashboard", "notifications", "badges", "common", "public"] as const);
   const surface = parameters().get("surface") ?? "tournament";
-  const events = tournamentFixtures();
+  let events = tournamentFixtures();
   if (parameters().has("historical") && !parameters().has("tournament")) {
     const query = parameters();
     query.set("tournament", events.at(-1)!.slug);
@@ -37,6 +37,10 @@ async function start() {
   // tests deliver an earned badge while the actual match viewer is already open.
   window.__uiFixture.showPendingBadgeReveal = async () => {
     window.__uiFixture.pendingBadgeReveal = true;
+    await render();
+  };
+  window.__uiFixture.deliverTournamentRefresh = async (description: string) => {
+    events = events.map((event, index) => index === 0 ? { ...event, description } : event);
     await render();
   };
   await render();

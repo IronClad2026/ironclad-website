@@ -19,7 +19,7 @@ import {
   useOptionalLocale,
   useOptionalTranslations,
 } from "@/components/i18n/LocaleProvider";
-import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public-players";
 import { formatNumber, selectPlural } from "@/lib/i18n/format";
 
 type PublicPlayersDirectoryProps = {
@@ -31,9 +31,9 @@ export default function PublicPlayersDirectory({
 }: PublicPlayersDirectoryProps) {
   const t = useOptionalTranslations("public", englishPublicDictionary);
   const locale = useOptionalLocale();
-  const countryOptions = getLocalizedCountryFilterOptions(
-    locale,
-    t("players.allCountries")
+  const countryOptions = useMemo(
+    () => getLocalizedCountryFilterOptions(locale, t("players.allCountries")),
+    [locale, t]
   );
   const eloOptions = [
     { ...allEloFilterOption, label: t("players.allElo") },

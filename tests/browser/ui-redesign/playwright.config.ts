@@ -7,7 +7,7 @@ export default defineConfig({
     ? "dashboard.spec.ts"
     : process.env.UI_REDESIGN_SURFACE === "rankings"
       ? "rankings.spec.ts"
-      : ["flow.spec.ts", "rankings.spec.ts"],
+      : ["flow.spec.ts", "rankings.spec.ts", "navigation-performance.spec.ts"],
   fullyParallel: false,
   workers: 1,
   outputDir: "../../../.playwright/ui-redesign",

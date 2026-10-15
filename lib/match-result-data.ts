@@ -183,28 +183,18 @@ export async function loadMatchResultData(
     const participantMatchIds = isAdmin
       ? []
       : await loadParticipantMatchIds(supabase, viewerRegistrationIds);
-    const reportGroupRows = await loadVisibleReportGroupRows(
-      supabase,
-      isAdmin,
-      viewerRegistrationIds,
-      adminMatchIds
-    );
-    const submissionRows = await loadVisibleSubmissionRows(
-      supabase,
-      isAdmin,
-      participantMatchIds,
-      adminMatchIds
-    );
-    const replayProofRows = await loadReplayProofRows(
-      supabase,
-      reportGroupRows.map((row) => row.id)
-    );
-    const audit = isAdmin
-      ? await loadAdminMatchResultAudit({
+    const [reportGroupRows, submissionRows] = await Promise.all([
+      loadVisibleReportGroupRows(supabase, isAdmin, viewerRegistrationIds, adminMatchIds),
+      loadVisibleSubmissionRows(supabase, isAdmin, participantMatchIds, adminMatchIds),
+    ]);
+    const [replayProofRows, audit] = await Promise.all([
+      loadReplayProofRows(supabase, reportGroupRows.map((row) => row.id)),
+      isAdmin ? loadAdminMatchResultAudit({
           submissionIds: submissionRows.map((row) => row.id),
           reportGroupIds: reportGroupRows.map((row) => row.id),
         })
-      : createEmptyAudit();
+      : Promise.resolve(createEmptyAudit()),
+    ]);
     const viewerRegistrations = new Set(viewerRegistrationIds);
     const replayProofsByGroup = groupReplayProofs(replayProofRows);
 

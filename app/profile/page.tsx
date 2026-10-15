@@ -195,38 +195,59 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   > = [];
 
   if (profile) {
-    activeTournamentEloSnapshots =
-      await getOwnActiveTournamentEloSnapshots(supabase, userId);
+    // Both follow-up reads are scoped to this authenticated owner and neither
+    // depends on the other's response. Keep protected fields server-only.
+    const [snapshots, protectedStatus] = await Promise.all([
+      getOwnActiveTournamentEloSnapshots(supabase, userId),
+      (async () => {
+        const status: {
+          steamConnected: boolean;
+          statusAvailable: boolean;
+          verification: RelicVerification | null;
+          refreshAvailableAt: string | null;
+        } = {
+          steamConnected: false,
+          statusAvailable: true,
+          verification: null,
+          refreshAvailableAt: null,
+        };
+        try {
+          const { data: protectedProfileData, error: protectedProfileError } =
+            await createSupabaseAdminClient()
+              .from("players")
+              .select(
+                "steam_id64, relic_verified_elo, relic_verified_faction, relic_verified_division, relic_elo_calculation_version, relic_elo_verified_at, relic_elo_last_attempt_at"
+              )
+              .eq("clerk_user_id", userId)
+              .maybeSingle();
 
-    try {
-      const { data: protectedProfileData, error: protectedProfileError } =
-        await createSupabaseAdminClient()
-          .from("players")
-          .select(
-            "steam_id64, relic_verified_elo, relic_verified_faction, relic_verified_division, relic_elo_calculation_version, relic_elo_verified_at, relic_elo_last_attempt_at"
-          )
-          .eq("clerk_user_id", userId)
-          .maybeSingle();
+          if (protectedProfileError) {
+            console.error("Protected profile status lookup failed.");
+            status.statusAvailable = false;
+          } else {
+            const protectedProfile =
+              (protectedProfileData as ProtectedProfileData | null) ?? null;
 
-      if (protectedProfileError) {
-        steamStatusAvailable = false;
-        console.error("Protected profile status lookup failed.");
-      } else {
-        const protectedProfile =
-          (protectedProfileData as ProtectedProfileData | null) ?? null;
-
-        steamConnected =
-          typeof protectedProfile?.steam_id64 === "string" &&
-          protectedProfile.steam_id64.length > 0;
-        initialVerification = getRelicVerification(protectedProfile);
-        initialRefreshAvailableAt = getRefreshAvailableAt(
-          protectedProfile?.relic_elo_last_attempt_at ?? null
-        );
-      }
-    } catch {
-      steamStatusAvailable = false;
-      console.error("Protected profile status is not configured.");
-    }
+            status.steamConnected =
+              typeof protectedProfile?.steam_id64 === "string" &&
+              protectedProfile.steam_id64.length > 0;
+            status.verification = getRelicVerification(protectedProfile);
+            status.refreshAvailableAt = getRefreshAvailableAt(
+              protectedProfile?.relic_elo_last_attempt_at ?? null
+            );
+          }
+        } catch {
+          console.error("Protected profile status is not configured.");
+          status.statusAvailable = false;
+        }
+        return status;
+      })(),
+    ]);
+    activeTournamentEloSnapshots = snapshots;
+    steamConnected = protectedStatus.steamConnected;
+    steamStatusAvailable = protectedStatus.statusAvailable;
+    initialVerification = protectedStatus.verification;
+    initialRefreshAvailableAt = protectedStatus.refreshAvailableAt;
   }
 
   const profileComplete = profile?.profile_completed === true;

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import PublicPlayerProfileHeader from "@/components/PublicPlayerProfileHeader";
 import PublicPlayerStats from "@/components/PublicPlayerStats";
@@ -17,9 +18,13 @@ type PublicPlayerPageProps = {
   params: Promise<{ playerId: string }>;
 };
 
+// Share only this render's public profile snapshot between metadata and page.
+// Keep the general loader fresh for Server Actions and other request surfaces.
+const getPlayerForRequest = cache(getPublicPlayerById);
+
 export async function generateMetadata({ params }: PublicPlayerPageProps) {
   const { playerId } = await params;
-  const player = await getPublicPlayerById(playerId);
+  const player = await getPlayerForRequest(playerId);
   const locale = await getRequestLocale();
   const copy = await loadDictionary(locale, "public");
 
@@ -45,7 +50,7 @@ export default async function PublicPlayerProfilePage({
   params,
 }: PublicPlayerPageProps) {
   const { playerId } = await params;
-  const player = await getPublicPlayerById(playerId);
+  const player = await getPlayerForRequest(playerId);
 
   if (!player) {
     notFound();

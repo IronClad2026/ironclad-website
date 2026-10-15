@@ -1,13 +1,15 @@
 "use client";
 
-import { startTransition, useEffect, useRef, useState } from "react";
+import { lazy, startTransition, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Play, Plus, Video } from "lucide-react";
 import Link from "next/link";
 import ReferenceDialog from "@/components/ui/ReferenceDialog";
 import type { HighlightEditorActions, HighlightResult, HighlightSlot, HighlightsState } from "@/lib/combat-highlights/types";
-import UploadHighlightDialog from "./UploadHighlightDialog";
-import { HighlightMediaError, MAX_HIGHLIGHT_BYTES, putHighlightObject, type PreparedHighlight } from "./media";
+import type { PreparedHighlight } from "./media-preparation";
+import { HighlightMediaError, MAX_HIGHLIGHT_BYTES, putHighlightObject } from "./media-transfer";
 import { HIGHLIGHT_BUTTON, highlightDuration, highlightMessage } from "./presentation";
+
+const UploadHighlightDialog = lazy(() => import("./UploadHighlightDialog"));
 
 export default function CombatHighlightsEditor({ initialState, actions }: {
   initialState: HighlightsState; actions: HighlightEditorActions;
@@ -244,7 +246,13 @@ export default function CombatHighlightsEditor({ initialState, actions }: {
       </div>
       {busy && uploadSlot === null ? <p role="status" className="mt-4 text-sm text-zinc-300">{stage || "Updating Combat Highlights…"}</p> : null}
       {message ? <p role="status" className="mt-4 text-sm leading-6 text-zinc-200">{message}</p> : null}
-      {activeSlot ? <UploadHighlightDialog slot={activeSlot} busy={busy} progress={progress} stage={stage} message={uploadMessage} onClose={closeUpload} onSubmit={upload} /> : null}
+      {activeSlot ? (
+        <ReferenceDialog title={activeSlot.clip ? "Replace Combat Highlight" : "Add Combat Highlight"} closeLabel={busy ? "Cancel upload" : "Close clip upload"} onClose={closeUpload} size="compact">
+          <Suspense fallback={<p role="status" className="text-sm leading-6 text-zinc-300">Loading clip editor…</p>}>
+            <UploadHighlightDialog slot={activeSlot} busy={busy} progress={progress} stage={stage} message={uploadMessage} onClose={closeUpload} onSubmit={upload} />
+          </Suspense>
+        </ReferenceDialog>
+      ) : null}
       {removing ? (
         <ReferenceDialog title="Remove Combat Highlight?" context={removing.clip?.title} closeLabel="Close removal confirmation" onClose={() => { if (!busy) setRemoving(null); }} size="compact">
           <p className="text-sm leading-6 text-zinc-300">The clip will be removed from your Showcase. You can upload another clip to this slot later.</p>

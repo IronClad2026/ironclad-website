@@ -31,7 +31,7 @@ import {
 } from "@/lib/i18n/format";
 import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
 import type { MessageValues } from "@/lib/i18n/types";
-import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public-rankings";
 
 type LeaderboardExperienceProps = {
   data: PublicLeaderboardData;

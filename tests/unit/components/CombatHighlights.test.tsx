@@ -7,12 +7,16 @@ import CombatHighlightsEditor from "@/components/combat-highlights/CombatHighlig
 import { SUPPORTED_LOCALES } from "@/lib/i18n/config";
 import englishAccount from "@/lib/i18n/dictionaries/en/account-dashboard";
 import { loadDictionary } from "@/lib/i18n/loaders";
-import { prepareHighlight, putHighlightObject } from "@/components/combat-highlights/media";
+import { prepareHighlight } from "@/components/combat-highlights/media-preparation";
+import { putHighlightObject } from "@/components/combat-highlights/media-transfer";
 import type { HighlightEditorActions, HighlightsState, PublicHighlightClip } from "@/lib/combat-highlights/types";
 
-vi.mock("@/components/combat-highlights/media", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/components/combat-highlights/media")>(),
+vi.mock("@/components/combat-highlights/media-preparation", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/components/combat-highlights/media-preparation")>(),
   prepareHighlight: vi.fn(),
+}));
+vi.mock("@/components/combat-highlights/media-transfer", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/components/combat-highlights/media-transfer")>(),
   putHighlightObject: vi.fn(),
 }));
 
@@ -105,7 +109,7 @@ describe("Combat Highlights editor", () => {
       </LocaleProvider>
     );
     fireEvent.click(screen.getByRole("button", { name: "Add clip 3" }));
-    const note = screen.getByRole("note");
+    const note = await screen.findByRole("note");
     expect(within(note).getByText(dictionary.showcase.highlightProviderProcessing)).toBeVisible();
     expect(within(note).getByText(dictionary.showcase.highlightProviderVisibility)).toBeVisible();
     expect(within(note).getByText(dictionary.showcase.highlightProviderDeletion)).toBeVisible();
@@ -194,7 +198,7 @@ describe("Combat Highlights editor", () => {
     vi.mocked(api.complete).mockResolvedValue({ ok: true, code: "saved", state: complete });
     render(<CombatHighlightsEditor initialState={initial()} actions={api} />);
     fireEvent.click(screen.getByRole("button", { name: "Replace A clean flank" }));
-    expect(screen.getByRole("note")).toHaveTextContent(englishAccount.showcase.highlightProviderProcessing);
+    expect(await screen.findByRole("note")).toHaveTextContent(englishAccount.showcase.highlightProviderProcessing);
     fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [file] } });
     await screen.findByText(/flank.mp4 ·/);
     const submit = screen.getByRole("button", { name: "Upload replacement" });
@@ -225,7 +229,7 @@ describe("Combat Highlights editor", () => {
     }));
     render(<CombatHighlightsEditor initialState={initial()} actions={api} />);
     fireEvent.click(screen.getByRole("button", { name: "Replace A clean flank" }));
-    fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [file] } });
+    fireEvent.change(await screen.findByLabelText("Video file"), { target: { files: [file] } });
     await screen.findByText(/flank.mp4 ·/);
     fireEvent.click(screen.getByLabelText(/This is genuine Company of Heroes 3/));
     fireEvent.click(screen.getByRole("button", { name: "Upload replacement" }));

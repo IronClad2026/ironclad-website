@@ -3,7 +3,7 @@
 import { Check, Copy, MessageCircle, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
-import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public-players";
 
 type DiscordContactButtonProps = {
   discordUsername: string | null;
