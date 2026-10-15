@@ -233,11 +233,12 @@ describe("Tournament Rules essentials summary", () => {
         Node.DOCUMENT_POSITION_FOLLOWING
     ).not.toBe(0);
 
+    const previousServerNavigations = routerPush.mock.calls.length;
     fireEvent.click(rulesControl);
-    expect(routerPush).toHaveBeenLastCalledWith(
-      expect.stringContaining("tab=overview&panel=rules"),
-      { scroll: false }
-    );
+    const selectedPanel = new URLSearchParams(window.location.search);
+    expect(selectedPanel.get("tab")).toBe("overview");
+    expect(selectedPanel.get("panel")).toBe("rules");
+    expect(routerPush).toHaveBeenCalledTimes(previousServerNavigations);
     view.rerender(experience());
 
     mobile = getMobileExperience();

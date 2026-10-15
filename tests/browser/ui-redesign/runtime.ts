@@ -12,6 +12,9 @@ declare global {
       actions: string[]; navigations: string[]; blockedRequests: string[];
       pendingBadgeReveal?: boolean;
       showPendingBadgeReveal?: () => Promise<void>;
+      refreshes?: number;
+      onServerRefresh?: () => void;
+      deliverTournamentRefresh?: (description: string) => Promise<void>;
     };
   }
 }
@@ -49,7 +52,23 @@ window.fetch = (input, init) => {
   return nativeFetch(input, init);
 };
 
-const subscribe = (listener: () => void) => { window.addEventListener("popstate", listener); return () => window.removeEventListener("popstate", listener); };
+// Next 16 patches native history to synchronize useSearchParams. Model that
+// documented integration here without adding synthetic popstate events to product code.
+for (const method of ["pushState", "replaceState"] as const) {
+  const original = history[method].bind(history);
+  history[method] = (data: unknown, unused: string, url?: string | URL | null) => {
+    original(data, unused, url);
+    window.dispatchEvent(new Event("ui-fixture:history"));
+  };
+}
+const subscribe = (listener: () => void) => {
+  window.addEventListener("popstate", listener);
+  window.addEventListener("ui-fixture:history", listener);
+  return () => {
+    window.removeEventListener("popstate", listener);
+    window.removeEventListener("ui-fixture:history", listener);
+  };
+};
 export function fixtureNavigate(destination: string) {
   window.__uiFixture.navigations.push(destination);
   const requested = new URL(destination, location.origin);
@@ -66,7 +85,10 @@ export function fixtureNavigate(destination: string) {
   history.replaceState(null, "", `/tests/browser/ui-redesign/?${current}${requested.hash}`);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
-export const useRouter = () => ({ push: fixtureNavigate, replace: fixtureNavigate, refresh() {} });
+export const useRouter = () => ({ push: fixtureNavigate, replace: fixtureNavigate, refresh() {
+  window.__uiFixture.refreshes = (window.__uiFixture.refreshes ?? 0) + 1;
+  window.__uiFixture.onServerRefresh?.();
+} });
 export const usePathname = () => parameters().get("surface") === "dashboard" ? "/dashboard" : "/tournaments";
 export function useSearchParams() { const search = useSyncExternalStore(subscribe, () => location.search, () => ""); return new URLSearchParams(search); }
 const fixtureToken = async () => null;

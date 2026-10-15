@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  startTransition,
 } from "react";
 import type { ReactNode, ElementType, ComponentProps } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -15,6 +16,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { navigateTournamentPresentation } from "@/lib/tournament-presentation-navigation";
 import {
   submitTournamentRegistration,
   type TournamentRegistrationResult,
@@ -5531,6 +5533,16 @@ export default function TournamentsExperience({
     return createAuthenticatedBrowserSupabaseClient(getToken);
   }, [getToken]);
 
+  useEffect(() => {
+    const refreshAfterHistoryNavigation = () => {
+      if (window.location.pathname === pathname) {
+        startTransition(() => router.refresh());
+      }
+    };
+    window.addEventListener("popstate", refreshAfterHistoryNavigation);
+    return () => window.removeEventListener("popstate", refreshAfterHistoryNavigation);
+  }, [pathname, router]);
+
   const updateTournamentUrl = useCallback(
     ({
       tournament,
@@ -5568,14 +5580,16 @@ export default function TournamentsExperience({
         : pathname;
 
       if (nextPath !== currentPath) {
-        if (mode === "replace") {
-          router.replace(nextPath, { scroll: false });
-        } else {
-          router.push(nextPath, { scroll: false });
-        }
+        navigateTournamentPresentation({
+          href: nextPath,
+          mode,
+          sameTournament: tournament.id === selectedTournament.id,
+          router: { ...router, refresh: () => startTransition(() => router.refresh()) },
+          history: window.history,
+        });
       }
     },
-    [focusedPollId, pathname, rawPollParam, router, searchParamString]
+    [focusedPollId, pathname, rawPollParam, router, searchParamString, selectedTournament.id]
   );
 
   const scrollMobileHeroIntoView = useCallback(() => {

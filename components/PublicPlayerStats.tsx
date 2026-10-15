@@ -11,7 +11,7 @@ import {
   useOptionalTranslations,
 } from "@/components/i18n/LocaleProvider";
 import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
-import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public";
+import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public-players";
 import { formatNumber } from "@/lib/i18n/format";
 
 type PublicPlayerStatsProps = {

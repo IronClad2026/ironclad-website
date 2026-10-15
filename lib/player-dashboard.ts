@@ -415,13 +415,25 @@ export async function loadPlayerCareerDashboard(
   const roundRobinGeneratedBracketIds = generatedBrackets
     .filter((generated) => generated.format === "round_robin")
     .map((generated) => generated.id);
-  const roundRobinMatchesResult =
+  const bracketIds = [
+    ...new Set(
+      generatedBrackets.map((generated) => generated.tournament_bracket_id)
+    ),
+  ];
+  // Both reads depend on the same generated-bracket metadata, not each other.
+  const [roundRobinMatchesResult, { data: bracketData, error: bracketError }] =
+    await Promise.all([
     roundRobinGeneratedBracketIds.length > 0
-      ? await supabase
+      ? supabase
           .from("tournament_matches")
           .select("generated_bracket_id, status")
           .in("generated_bracket_id", roundRobinGeneratedBracketIds)
-      : { data: [], error: null };
+      : { data: [], error: null },
+    supabase
+      .from("tournament_brackets")
+      .select("id, tournament_id, name, launched_at")
+      .in("id", bracketIds),
+  ]);
 
   if (
     roundRobinMatchesResult.error ||
@@ -429,16 +441,6 @@ export async function loadPlayerCareerDashboard(
   ) {
     logDashboardCareerFailure("load-round-robin-status");
   }
-
-  const bracketIds = [
-    ...new Set(
-      generatedBrackets.map((generated) => generated.tournament_bracket_id)
-    ),
-  ];
-  const { data: bracketData, error: bracketError } = await supabase
-    .from("tournament_brackets")
-    .select("id, tournament_id, name, launched_at")
-    .in("id", bracketIds);
 
   if (bracketError || !Array.isArray(bracketData)) {
     logDashboardCareerFailure("load-brackets");
@@ -475,23 +477,20 @@ export async function loadPlayerCareerDashboard(
       ...approvedTournamentIds,
     ]),
   ];
-  const { data: tournamentData, error: tournamentError } = await supabase
-    .from("tournaments")
-    .select("id, title, banner_image_url, division_model_version")
-    .in("id", tournamentIds);
-
-  if (tournamentError || !Array.isArray(tournamentData)) {
-    logDashboardCareerFailure("load-tournaments");
-  }
-
   const submissionRows = submissionsResult.data as SubmissionRow[];
   const reportGroupRows = reportGroupsResult.data as ReportGroupRow[];
   const legacyNotificationSubmissions = submissionRows.filter(
     (submission) => submission.report_group_id === null
   );
-  const dismissalResult =
+  // Dismissals use the already-loaded result IDs; neither read needs tournament
+  // presentation fields. Keep their caller scope and error handling unchanged.
+  const [{ data: tournamentData, error: tournamentError }, dismissalResult, reportGroupDismissalResult] = await Promise.all([
+    supabase
+      .from("tournaments")
+      .select("id, title, banner_image_url, division_model_version")
+      .in("id", tournamentIds),
     legacyNotificationSubmissions.length > 0
-      ? await supabase
+      ? supabase
           .from("player_notification_dismissals")
           .select("submission_id, dismissed_status")
           .eq("clerk_user_id", clerkUserId)
@@ -499,10 +498,9 @@ export async function loadPlayerCareerDashboard(
             "submission_id",
             legacyNotificationSubmissions.map((submission) => submission.id)
           )
-      : { data: [], error: null };
-  const reportGroupDismissalResult =
+      : { data: [], error: null },
     reportGroupRows.length > 0
-      ? await supabase
+      ? supabase
           .from("player_report_group_notification_dismissals")
           .select("report_group_id, dismissed_status")
           .eq("clerk_user_id", clerkUserId)
@@ -510,7 +508,13 @@ export async function loadPlayerCareerDashboard(
             "report_group_id",
             reportGroupRows.map((reportGroup) => reportGroup.id)
           )
-      : { data: [], error: null };
+      : { data: [], error: null },
+  ]);
+
+  if (tournamentError || !Array.isArray(tournamentData)) {
+    logDashboardCareerFailure("load-tournaments");
+  }
+
   const { data: dismissalData, error: dismissalError } = dismissalResult;
   const {
     data: reportGroupDismissalData,

@@ -251,14 +251,16 @@ export async function getRecentLeaderboardRecalculationRuns(
   }
 
   const runs = (data ?? []) as RecalculationRunRow[];
-  const tournamentTitles = await loadTournamentTitles(
-    supabase,
-    uniquePresent(runs.map((run) => run.tournament_id))
-  );
-  const seasonNames = await loadSeasonNames(
-    supabase,
-    uniquePresent(runs.map((run) => run.season_id))
-  );
+  const [tournamentTitles, seasonNames] = await Promise.all([
+    loadTournamentTitles(
+      supabase,
+      uniquePresent(runs.map((run) => run.tournament_id))
+    ),
+    loadSeasonNames(
+      supabase,
+      uniquePresent(runs.map((run) => run.season_id))
+    ),
+  ]);
 
   return runs.map((run) => ({
     id: run.id,

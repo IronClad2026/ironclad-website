@@ -7,7 +7,7 @@ import { useOptionalLocale, useOptionalTranslations } from "@/components/i18n/Lo
 import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
 import type { BadgesDictionary } from "@/lib/i18n/badges";
 import englishAccount from "@/lib/i18n/dictionaries/en/account-dashboard";
-import englishPublic from "@/lib/i18n/dictionaries/en/public";
+import englishPublic from "@/lib/i18n/dictionaries/en/public-players";
 import { formatNumber } from "@/lib/i18n/format";
 import type { PublicPlayerShowcase } from "@/lib/player-showcase/types";
 import type { PublicPlayerProfile } from "@/lib/public-players";

@@ -1,6 +1,7 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { playerIdentity } from "@/tests/fixtures/auth";
+import { loadDictionary } from "@/lib/i18n/loaders";
 
 const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
@@ -95,8 +96,11 @@ const protectedProfileRow = {
   relic_elo_last_attempt_at: LAST_ATTEMPT_AT,
 };
 
-function createSingleRowClient(data: Record<string, unknown> | null) {
-  const maybeSingle = vi.fn(async () => ({ data, error: null }));
+function createSingleRowClient(data: Record<string, unknown> | null, delayMs = 0) {
+  const maybeSingle = vi.fn(async () => {
+    if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return { data, error: null };
+  });
   const eq = vi.fn((column: string, value: unknown) => {
     void column;
     void value;
@@ -150,12 +154,114 @@ function findElementByType(
 }
 
 describe("profile Relic ELO protected load", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await loadDictionary("en", "account-dashboard");
     authMock.mockResolvedValue(playerIdentity);
     getOwnActiveTournamentEloSnapshotsMock.mockReset();
     getOwnActiveTournamentEloSnapshotsMock.mockResolvedValue(
       activeTournamentEloSnapshots
     );
+  });
+
+  it("measures 30 delayed profile loads while retaining safe fields and caller scope", async () => {
+    vi.useFakeTimers();
+    try {
+      const samples: number[] = [];
+      let firstProps: unknown;
+      for (let sample = 0; sample < 30; sample++) {
+        const profile = createSingleRowClient(profileRow, 20);
+        const protectedProfile = createSingleRowClient(protectedProfileRow, 20);
+        createAuthenticatedSupabaseClientMock.mockResolvedValue(profile.client);
+        createSupabaseAdminClientMock.mockReturnValue(protectedProfile.client);
+        getOwnActiveTournamentEloSnapshotsMock.mockImplementation(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return activeTournamentEloSnapshots;
+        });
+        const start = Date.now();
+        const pending = ProfilePage({ searchParams: Promise.resolve({}) });
+        await vi.runAllTimersAsync();
+        const page = await pending;
+        samples.push(Date.now() - start);
+        const props = {
+          form: findElementByType(page, playerProfileFormMock)?.props,
+          card: findElementByType(page, relicEloVerificationCardMock)?.props,
+        };
+        firstProps ??= props;
+        expect(props).toEqual(firstProps);
+        expect(profile.eq).toHaveBeenCalledWith("clerk_user_id", playerIdentity.userId);
+        expect(protectedProfile.eq).toHaveBeenCalledWith("clerk_user_id", playerIdentity.userId);
+        expect(profile.select).toHaveBeenCalledOnce();
+        expect(protectedProfile.select).toHaveBeenCalledOnce();
+        expect(getOwnActiveTournamentEloSnapshotsMock).toHaveBeenLastCalledWith(profile.client, playerIdentity.userId);
+        expect(JSON.stringify(props.card)).not.toContain(STEAM_ID64);
+      }
+      expect(samples).toEqual(Array(30).fill(40));
+      console.info("PROFILE_DELAYED_BENCHMARK", JSON.stringify({ samples: samples.length, artificialQueryLatencyMs: 20, virtualP50Ms: samples[15], virtualP95Ms: samples[28], protectedProfileReadsPerRequest: 1, ownSnapshotReadsPerRequest: 1, memberProfileReadsPerRequest: 1 }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not acquire private status or snapshot data for a missing profile", async () => {
+    const profile = createSingleRowClient(null);
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(profile.client);
+    const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    expect(findElementByType(page, relicEloVerificationCardMock)?.props).toMatchObject({ hasPlayer: false, initialVerification: null });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+    expect(getOwnActiveTournamentEloSnapshotsMock).not.toHaveBeenCalled();
+  });
+
+  it("retains own snapshots when protected status acquisition fails", async () => {
+    const profile = createSingleRowClient(profileRow);
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(profile.client);
+    createSupabaseAdminClientMock.mockImplementation(() => { throw new Error("synthetic private diagnostic"); });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    expect(findElementByType(page, playerProfileFormMock)?.props.activeTournamentEloSnapshots).toEqual(activeTournamentEloSnapshots);
+    expect(findElementByType(page, relicEloVerificationCardMock)?.props).toMatchObject({ statusAvailable: false, initialVerification: null });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("synthetic private diagnostic");
+  });
+
+  it("preserves already-validated status fields if later cooldown normalization fails", async () => {
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(createSingleRowClient(profileRow).client);
+    createSupabaseAdminClientMock.mockReturnValue(createSingleRowClient({ ...protectedProfileRow, relic_elo_last_attempt_at: "+275760-09-13T00:00:00.000Z" }).client);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    expect(findElementByType(page, relicEloVerificationCardMock)?.props).toMatchObject({
+      steamConnected: true, statusAvailable: false, initialVerification: { elo: 1375 }, initialRefreshAvailableAt: null,
+    });
+  });
+
+  it("keeps simultaneous private owner loads scoped to each authenticated identity", async () => {
+    const ownerUser = playerIdentity.userId;
+    if (!ownerUser) throw new Error("Synthetic owner identity is required");
+    const otherUser = "user_synthetic_other_profile";
+    const profiles: Record<string, Record<string, unknown>> = {
+      [ownerUser]: profileRow,
+      [otherUser]: { ...profileRow, id: "22222222-2222-4222-8222-222222222222", clerk_user_id: otherUser, in_game_name: "OtherSyntheticPlayer" },
+    };
+    const protectedProfiles: Record<string, Record<string, unknown>> = {
+      [ownerUser]: protectedProfileRow,
+      [otherUser]: { ...protectedProfileRow, relic_verified_elo: 1000, relic_verified_division: "Academy" },
+    };
+    const filters: string[] = [];
+    const scopedClient = (rows: typeof profiles) => ({ from: () => ({ select: () => ({ eq: (column: string, identity: string) => {
+      expect(column).toBe("clerk_user_id");
+      filters.push(identity);
+      return { maybeSingle: async () => ({ data: rows[identity], error: null }) };
+    } }) }) });
+    const member = scopedClient(profiles);
+    createAuthenticatedSupabaseClientMock.mockResolvedValue(member);
+    createSupabaseAdminClientMock.mockReturnValue(scopedClient(protectedProfiles));
+    authMock.mockResolvedValueOnce(playerIdentity).mockResolvedValueOnce({ ...playerIdentity, userId: otherUser });
+    getOwnActiveTournamentEloSnapshotsMock.mockImplementation(async (_client: unknown, identity: string) => [{ tournamentTitle: identity === otherUser ? "Other synthetic event" : "Original synthetic event", elo: 1000, division: "Academy" }]);
+    const [first, second] = await Promise.all([ProfilePage({ searchParams: Promise.resolve({}) }), ProfilePage({ searchParams: Promise.resolve({}) })]);
+    const firstForm = findElementByType(first, playerProfileFormMock)?.props;
+    const secondForm = findElementByType(second, playerProfileFormMock)?.props;
+    expect(firstForm).toMatchObject({ profile: { clerk_user_id: playerIdentity.userId }, verifiedCurrentElo: 1375, activeTournamentEloSnapshots: [{ tournamentTitle: "Original synthetic event" }] });
+    expect(secondForm).toMatchObject({ profile: { clerk_user_id: otherUser }, verifiedCurrentElo: 1000, activeTournamentEloSnapshots: [{ tournamentTitle: "Other synthetic event" }] });
+    expect(filters.filter((identity) => identity === playerIdentity.userId)).toHaveLength(2);
+    expect(filters.filter((identity) => identity === otherUser)).toHaveLength(2);
   });
 
   it("loads protected fields with the admin client and passes only normalized safe props", async () => {

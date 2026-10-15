@@ -92,6 +92,54 @@ test("report modal preserves keyboard close and returns focus", async ({ page })
   expect(check.errors).toEqual([]);
 });
 
+test("upload preparation is deferred while its loading dialog retains focus and cancellation", async ({ page }) => {
+  const modules: string[] = [];
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (/\/(UploadHighlightDialog|media-preparation)\.tsx?$/.test(pathname)) modules.push(pathname);
+  });
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  try {
+    const check = await openFixture(page, "surface=editor&count=2");
+    expect(modules).toEqual([]);
+    await page.route("**/components/combat-highlights/UploadHighlightDialog.tsx", async (route) => {
+      await pending;
+      await route.continue();
+    });
+    const trigger = page.getByRole("button", { name: "Add clip 3" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Add Combat Highlight" });
+    await expect(dialog).toBeVisible();
+    const heading = dialog.getByRole("heading", { name: "Add Combat Highlight" });
+    await expect(heading).toBeFocused();
+    await expect(dialog.getByRole("status")).toHaveText("Loading clip editor…");
+    expect(modules).toHaveLength(1);
+    await expect(dialog.getByLabel("Video file")).toHaveCount(0);
+    await page.keyboard.press("Tab");
+    await expect(dialog.getByRole("button", { name: "Close clip upload" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await expect(page.locator("[data-fixture-actions]")).toHaveText("");
+    expect(check.uploads).toEqual([]);
+    release();
+    await trigger.click();
+    await expect(dialog.getByLabel("Video file")).toBeVisible();
+    await expect(heading).toBeFocused();
+    await expect(dialog.getByRole("note")).toContainText("Cloudflare Workers checks upload access");
+    await expect(dialog.getByRole("button", { name: "Upload clip", exact: true })).toBeDisabled();
+    expect(modules.some((path) => path.endsWith("/media-preparation.ts"))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+    expect(check.mediaRequests).toEqual([]);
+    expect(check.blockedRequests).toEqual([]);
+    expect(check.errors).toEqual([]);
+  } finally {
+    release();
+  }
+});
+
 for (const width of [320, 1440]) {
   test(`provider disclosure is readable before file selection at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
