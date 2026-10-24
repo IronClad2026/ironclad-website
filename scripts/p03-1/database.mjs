@@ -23,7 +23,7 @@ for (const name of migrations) {
 console.log("PASS full staging migration replay: " + migrations.length);
 await client.run("select public.set_match_room_enabled(true,'match-room-test-4');");
 const suites = [];
-for (const name of ["match-room-phase-1", "match-room-phase-3", "match-room-production-hardening", "match-room-unread-summary"]) {
+for (const name of ["match-room-phase-1", "match-room-phase-3", "match-room-production-hardening", "match-room-unread-summary", "announcement-rich-documents"]) {
   const output = await client.run(read("tests/database/" + name + ".sql"));
   const result = output.split(/\r?\n/).findLast((line) => line.startsWith('{"suite"'));
   const count = output.match(/(?:ASSERTIONS|assertions)=(\d+)/)?.[1]
