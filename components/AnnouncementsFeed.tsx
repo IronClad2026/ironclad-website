@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { markAnnouncementSeen } from "@/app/announcements/actions";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import AnnouncementBody from "@/components/AnnouncementBody";
 import {
   dispatchAnnouncementSeenReconcile,
   writeAnonymousAnnouncementMarker,
@@ -146,9 +147,17 @@ export default function AnnouncementsFeed({
               <h2 className="mt-4 break-words text-2xl font-black leading-tight text-white sm:text-3xl">
                 {announcement.title}
               </h2>
-              <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-300 sm:text-base sm:leading-8">
-                {announcement.body}
-              </p>
+              {announcement.bodyDocument ? (
+                <AnnouncementBody
+                  body={announcement.body}
+                  bodyDocument={announcement.bodyDocument}
+                  className="mt-5"
+                />
+              ) : (
+                <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-300 sm:text-base sm:leading-8">
+                  {announcement.body}
+                </p>
+              )}
               {announcement.tournamentHref ? (
                 <Link
                   href={announcement.tournamentHref}

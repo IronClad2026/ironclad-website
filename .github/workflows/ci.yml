@@ -94,6 +94,8 @@ jobs:
         run: npx playwright test --config tests/browser/combat-highlights/playwright.config.ts
       - name: Official News and navigation browser regression tests
         run: npx playwright test --config tests/browser/news/playwright.config.ts
+      - name: Announcement editor desktop and mobile regressions
+        run: npx playwright test --config tests/browser/announcements/playwright.config.ts
       - name: Responsive public presentation regressions
         run: npx playwright test --config tests/browser/ui-redesign/playwright.config.ts
       - name: Dashboard and career browser regressions
@@ -215,6 +217,8 @@ jobs:
           node scripts/p03-db/retention-concurrency.mjs /usr/lib/postgresql/17/bin/psql
       - name: Rehearse prepared privacy publication transaction
         run: node scripts/legal-successor/rehearse-p03-privacy.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Announcement rich-document persistence and permissions
+        run: node scripts/announcements/database.mjs /usr/lib/postgresql/17/bin/psql
       - name: Stop disposable PostgreSQL
         if: always()
         run: |

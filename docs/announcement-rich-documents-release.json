@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "path": "supabase/migrations/20261024173736_announcement_rich_documents.sql",
+    "version": "20261024173736",
+    "name": "announcement_rich_documents",
+    "lfSha256": "3bab3be4dbb9f3dc6afe20e2fc258fed2512345222f4245e6fbc6395c3074cf4",
+    "normalizedTrimSha256": "30d7f9d68ad7c4a840b03c1d1df52eaec9c5624726b9c14566c9a6ed379713b1"
+  },
+  "applications": [
+    {
+      "environment": "staging",
+      "projectRef": "zzbnneprhjicmajpjkdg",
+      "version": "20261024174929",
+      "name": "announcement_rich_documents",
+      "statementCount": 1,
+      "statementSha256": "84e388e0ec2d1ef64cae59decfaf98199728272a7a310466a8f7029f000a9eea",
+      "normalizedTrimSha256": "30d7f9d68ad7c4a840b03c1d1df52eaec9c5624726b9c14566c9a6ed379713b1",
+      "difference": "The provider-generated version differs from the CLI-created source version. The single ledger statement equals the source plus one trailing CRLF; no SQL statement differs."
+    }
+  ],
+  "expectedFunctions": [
+    {
+      "signature": "list_active_announcements_with_tournament_v2()",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "configuration": ["search_path=pg_catalog"],
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "definitionSha256": "71baabda580a304993c676b5e6876c43cecf275144f685f5ed7bd15ecf32ea61",
+      "aclSha256": "fbafe3bfaed21ba605e4c84f054cfe31484d3df07d5445aa6ebfb7f1a277f4e3"
+    },
+    {
+      "signature": "publish_official_announcement_v2(text,text,jsonb,text,text,text,text,text,uuid)",
+      "owner": "postgres",
+      "securityDefiner": true,
+      "configuration": ["search_path=pg_catalog"],
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "definitionSha256": "9c608250f14002f869a83aaf1732a5cd73a2016c117263a82c8066133044b43e",
+      "aclSha256": "fbafe3bfaed21ba605e4c84f054cfe31484d3df07d5445aa6ebfb7f1a277f4e3"
+    }
+  ],
+  "applicationPolicy": "Apply only the explicitly approved source once per positively identified environment. Preserve existing application records and append a separately verified Production record after its authorized application. This manifest never authorizes SQL execution, migration repair, or generic db push."
+}
