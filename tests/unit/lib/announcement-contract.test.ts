@@ -10,6 +10,7 @@ import {
   hasAnnouncementMediaSignature,
   hasUnseenAnnouncement,
   parseAnnouncementFeedProjection,
+  parseAnnouncementRichFeedProjection,
   parseAnnouncementMediaPath,
   readAnonymousAnnouncementMarker,
   writeAnonymousAnnouncementMarker,
@@ -23,6 +24,27 @@ const newer = {
 };
 
 describe("official announcement contract", () => {
+  it("keeps legacy RPC strict while accepting a validated V2 document", () => {
+    const document = { version: 1, doc: { type: "doc", content: [
+      { type: "paragraph", content: [{ type: "text", text: "Plain text body", marks: [{ type: "bold" }] }] },
+    ] } };
+    const row = { ...announcementRow(newer), body_document: document };
+    expect(parseAnnouncementFeedProjection({ announcements: [row] })).toBeNull();
+    expect(parseAnnouncementRichFeedProjection({ announcements: [row] })?.announcements[0].bodyDocument).toEqual(document);
+  });
+
+  it.each([null, { version: 99 }, { version: 1, doc: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Mismatched" }] }] } }])(
+    "keeps announcements readable when V2 rich content is absent or unusable", (bodyDocument) => {
+      const result = parseAnnouncementRichFeedProjection({ announcements: [{ ...announcementRow(newer), body_document: bodyDocument }] });
+      expect(result?.announcements[0]).toMatchObject({ body: "Plain text body", bodyDocument: null });
+    }
+  );
+
+  it("rejects unexpected V2 envelope keys without relaxing legacy identity/media validation", () => {
+    expect(parseAnnouncementRichFeedProjection({ announcements: [{ ...announcementRow(newer), body_document: null, publisher: "private" }] })).toBeNull();
+    expect(parseAnnouncementRichFeedProjection({ announcements: [announcementRow(newer)] })).toBeNull();
+  });
+
   it.each([
     ["notice.jpg", "image/jpeg", ANNOUNCEMENT_LIMITS.imageBytes, "jpg"],
     ["notice.jpeg", "image/jpeg", ANNOUNCEMENT_LIMITS.imageBytes, "jpg"],

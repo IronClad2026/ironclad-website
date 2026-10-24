@@ -1065,6 +1065,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260929011812_four_division_fixture_authority.sql",
       "20260929011829_four_division_accounting_badges.sql",
       "20260929032200_four_division_registration_evidence.sql",
+      "20261024173736_announcement_rich_documents.sql",
     ]);
     const platformMigrationNames = migrationNames.filter(
       (name) =>
@@ -1090,7 +1091,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.slice(-25)).toEqual([
+    expect(migrationNames.slice(-26)).toEqual([
       "20260831133000_staging_badge_cross_division_acceptance.sql",
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql",
       "20260902100000_unlaunched_event_void_authority.sql",
@@ -1116,6 +1117,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260929011812_four_division_fixture_authority.sql",
       "20260929011829_four_division_accounting_badges.sql",
       "20260929032200_four_division_registration_evidence.sql",
+      "20261024173736_announcement_rich_documents.sql",
     ]);
     expect(
       normalizedSha256(
@@ -1126,12 +1128,13 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     ).toBe(
       "8e97337efc36276797b3e98ff45bbdbd893533b0ffa13486e0f4bac83e911fd6"
     );
-    // P04 Official CoH3 News authorizes the XML and HTML parser dependencies.
+    // P04 News authorizes the parsers; the announcement editor adds only the
+    // three approved, exact-pinned Tiptap packages and their resolved graph.
     expect(normalizedSha256(read("package.json"))).toBe(
-      "d701c98388bac497e70fadd3f4306a36b1a2e5a6f1f4eae23234f9c3fb5db096"
+      "c4746ee51402c2bb8195b873c4c331761e257f0be4e76daea7a615bc6d6826f5"
     );
     expect(normalizedSha256(read("package-lock.json"))).toBe(
-      "a591feee6254289c59f30dc81e7b7f6482a18cfc82f6059d894f8f99cb8ee5e7"
+      "cc5cd5b040b6a63b59e0cc03f7f7e454c4f1f57f11d7e005af99405e97c06ffb"
     );
     expect(normalizedSha256(read(".env.example"))).toBe(
       "a36a452c337407aa53c29a8499cb1658023caed00bd41b605859d07ce166dbd4"

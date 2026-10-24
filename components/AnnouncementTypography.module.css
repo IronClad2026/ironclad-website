@@ -1,0 +1,101 @@
+.typography {
+  color: #d4d4d8;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.typography p {
+  min-height: 1.65em;
+  margin: 0 0 0.8em;
+}
+
+.typography h3,
+.typography h4 {
+  color: #f4f4f5;
+  font-weight: 650;
+  line-height: 1.35;
+  margin: 1.2em 0 0.6em;
+  min-height: 1.35em;
+}
+
+.typography h3 {
+  font-size: 1.25em;
+}
+
+.typography h4 {
+  font-size: 1.1em;
+}
+
+.typography ul,
+.typography ol {
+  margin: 0 0 0.8em;
+  padding-inline-start: 1.65em;
+}
+
+.typography ul {
+  list-style-type: disc;
+}
+
+.typography ol {
+  list-style-type: decimal;
+}
+
+.typography li {
+  padding-inline-start: 0.2em;
+}
+
+.typography li > p {
+  margin-bottom: 0.3em;
+}
+
+.typography li > ul,
+.typography li > ol {
+  margin-top: 0.3em;
+}
+
+.typography a {
+  color: #fb923c;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.typography a:hover {
+  color: #fdba74;
+}
+
+.typography a:focus-visible {
+  border-radius: 0.125rem;
+  outline: 2px solid #f97316;
+  outline-offset: 3px;
+}
+
+.typography strong {
+  font-weight: 700;
+}
+
+.typography em {
+  font-style: italic;
+}
+
+.typography u {
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.typography > :first-child,
+.typography > :global(.tiptap) > :first-child {
+  margin-top: 0;
+}
+
+.typography > :last-child,
+.typography > :global(.tiptap) > :last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .typography {
+    font-size: 1rem;
+  }
+}

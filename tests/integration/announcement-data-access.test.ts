@@ -30,6 +30,7 @@ describe("official announcement server data access", () => {
             id,
             title: "Official update",
             body: "Plain text",
+            body_document: null,
             media_kind: "image",
             media_path: `media/${id}.png`,
             media_mime_type: "image/png",
@@ -58,7 +59,7 @@ describe("official announcement server data access", () => {
       `/announcement-media/media/${id}.png`
     );
     expect(rpc).toHaveBeenCalledWith(
-      "list_active_announcements_with_tournament"
+      "list_active_announcements_with_tournament_v2"
     );
   });
 

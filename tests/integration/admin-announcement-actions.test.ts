@@ -160,6 +160,62 @@ describe("Admin official announcement actions", () => {
     expect(rpcInput).not.toHaveProperty("p_published_at");
   });
 
+  it.each([null, tournamentId])("derives rich fallback on the server and publishes atomically with Tournament %s", async (linkedId) => {
+    const fixture = storageClient();
+    fixture.client.rpc.mockResolvedValue({
+      data: {
+        id: "223e4567-e89b-42d3-a456-426614174000",
+        published_at: "2026-08-26T02:00:00.000Z",
+      },
+      error: null,
+    });
+    createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+    const bodyDocument = {
+      version: 1,
+      doc: { type: "doc", content: [
+        { type: "paragraph", content: [{ type: "text", text: "Bold update", marks: [{ type: "bold" }] }] },
+        { type: "paragraph" },
+        { type: "paragraph" },
+        { type: "paragraph", content: [{ type: "text", text: "Unicode 中文 🎮" }] },
+      ] },
+    };
+    await expect(publishAnnouncement({
+      title: "Rich briefing",
+      body: "INJECTED CLIENT FALLBACK",
+      bodyDocument,
+      mediaPath: null,
+      mediaDescription: null,
+      linkToTournament: linkedId !== null,
+      linkedTournamentId: linkedId,
+    })).resolves.toMatchObject({ ok: true });
+    expect(fixture.client.rpc).toHaveBeenCalledWith("publish_official_announcement_v2", expect.objectContaining({
+      p_body: "Bold update\n\n\n\n\n\nUnicode 中文 🎮",
+      p_body_document: bodyDocument,
+      p_linked_tournament_id: linkedId,
+      p_actor_clerk_user_id: "user_admin",
+    }));
+    expect(revalidatePathMock).toHaveBeenCalledWith("/announcements");
+  });
+
+  it.each([
+    { version: 2, doc: { type: "doc", content: [] } },
+    { version: 1, doc: { type: "doc", content: [{ type: "iframe", attrs: { src: "https://example.com" } }] } },
+    { version: 1, doc: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Unsafe", marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }] }] }] } },
+    { version: 1, doc: { type: "doc", content: [{ type: "paragraph" }] } },
+    { version: 1, doc: { type: "doc", content: [{ type: "bulletList", content: [{ type: "listItem", content: [{ type: "paragraph" }] }] }] } },
+  ])("rejects malformed, executable, or empty rich content before trusted access", async (bodyDocument) => {
+    await expect(publishAnnouncement({
+      title: "Invalid briefing",
+      body: "Do not trust this fallback",
+      bodyDocument,
+      mediaPath: null,
+      mediaDescription: null,
+      linkToTournament: false,
+      linkedTournamentId: null,
+    })).resolves.toMatchObject({ ok: false });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
   it("publishes one server-verified linked Tournament through the atomic linked RPC", async () => {
     const fixture = storageClient();
     fixture.client.rpc.mockResolvedValue({

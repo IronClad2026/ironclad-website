@@ -3,7 +3,7 @@ export function assertRealtimeStagingEnvironment(
   environment: Readonly<Record<string, string | undefined>> = process.env
 ): void {
   if (environment.VERCEL_ENV !== "preview" ||
-    !["staging", "codex/p03-1-realtime-match-room"].includes(environment.VERCEL_GIT_COMMIT_REF ?? "")) return;
+    !["staging", "codex/p03-1-realtime-match-room", "feature/announcement-rich-text-staging-2026-10"].includes(environment.VERCEL_GIT_COMMIT_REF ?? "")) return;
 
   const failures: string[] = [];
   if (environment.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") !== "https://zzbnneprhjicmajpjkdg.supabase.co") {

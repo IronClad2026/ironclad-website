@@ -51,6 +51,9 @@ jobs:
       - name: Official News browser regression tests
         run: npx playwright test --config tests/browser/news/playwright.config.ts
 
+      - name: Announcement editor desktop and mobile regressions
+        run: npx playwright test --config tests/browser/announcements/playwright.config.ts
+
       - name: Match result and replay browser regression tests
         run: npx playwright test --config tests/browser/match-result/playwright.config.ts
 

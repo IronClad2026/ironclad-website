@@ -16,6 +16,12 @@ import {
   type AnnouncementMediaMimeType,
 } from "@/lib/announcement-contract";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import {
+  getAnnouncementPlainText,
+  hasAnnouncementDocumentText,
+  parseAnnouncementDocument,
+  type AnnouncementDocument,
+} from "@/lib/announcement-document";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type CustomClaims = {
@@ -32,6 +38,7 @@ export type AnnouncementMediaUploadAuthorization = {
 export type AnnouncementPublishInput = {
   title: string;
   body: string;
+  bodyDocument?: unknown;
   mediaPath: string | null;
   mediaDescription: string | null;
   linkToTournament: boolean;
@@ -178,7 +185,13 @@ export async function publishAnnouncement(
       p_media_description: media ? parsed.mediaDescription : null,
       p_actor_clerk_user_id: userId,
     };
-    const { data, error } = parsed.linkedTournamentId
+    const { data, error } = parsed.bodyDocument
+      ? await client.rpc("publish_official_announcement_v2", {
+          ...publicationInput,
+          p_body_document: parsed.bodyDocument,
+          p_linked_tournament_id: parsed.linkedTournamentId,
+        })
+      : parsed.linkedTournamentId
       ? await client.rpc("publish_official_announcement_with_tournament", {
           ...publicationInput,
           p_linked_tournament_id: parsed.linkedTournamentId,
@@ -255,6 +268,7 @@ function parsePublishInput(input: AnnouncementPublishInput):
       ok: true;
       title: string;
       body: string;
+      bodyDocument: AnnouncementDocument | null;
       mediaPath: string | null;
       mediaDescription: string | null;
       linkedTournamentId: string | null;
@@ -265,7 +279,17 @@ function parsePublishInput(input: AnnouncementPublishInput):
   }
 
   const title = typeof input.title === "string" ? input.title.trim() : "";
-  const body = typeof input.body === "string" ? input.body.trim() : "";
+  const hasDocument = input.bodyDocument !== undefined && input.bodyDocument !== null;
+  const bodyDocument = hasDocument
+    ? parseAnnouncementDocument(input.bodyDocument)
+    : null;
+  if (hasDocument && !bodyDocument) {
+    return { ok: false, message: "The message contains invalid or unsupported formatting." };
+  }
+  // The browser's fallback is never authoritative for a rich announcement.
+  const body = bodyDocument
+    ? getAnnouncementPlainText(bodyDocument).trim()
+    : typeof input.body === "string" ? input.body.trim() : "";
   const mediaPath = typeof input.mediaPath === "string" && input.mediaPath
     ? input.mediaPath
     : null;
@@ -279,7 +303,7 @@ function parsePublishInput(input: AnnouncementPublishInput):
       ? null
       : undefined;
 
-  if (!title || !body) {
+  if (!title || !body || (bodyDocument && !hasAnnouncementDocumentText(bodyDocument))) {
     return { ok: false, message: "Enter a title and message." };
   }
   if (title.length > ANNOUNCEMENT_LIMITS.title) {
@@ -317,6 +341,7 @@ function parsePublishInput(input: AnnouncementPublishInput):
     ok: true,
     title,
     body,
+    bodyDocument,
     mediaPath,
     mediaDescription,
     linkedTournamentId: linkedTournamentId?.toLowerCase() ?? null,

@@ -26,4 +26,9 @@ describe("P03.1 deployment isolation", () => {
     }
     expect(() => assertRealtimeStagingEnvironment({ ...staging, CLERK_SECRET_KEY: "sk_live_do_not_echo" })).not.toThrow("sk_live_do_not_echo");
   });
+  it("fails closed for the announcement feature branch before any build-time reads", () => {
+    const branch = { ...staging, VERCEL_GIT_COMMIT_REF: "feature/announcement-rich-text-staging-2026-10" };
+    expect(() => assertRealtimeStagingEnvironment(branch)).not.toThrow();
+    expect(() => assertRealtimeStagingEnvironment({ ...branch, NEXT_PUBLIC_SUPABASE_URL: "https://nsyjtqpvyxlzyujlbzos.supabase.co" })).toThrow("Staging isolation failed");
+  });
 });
