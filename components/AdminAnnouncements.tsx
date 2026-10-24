@@ -17,6 +17,13 @@ import {
   withdrawAnnouncement,
 } from "@/app/admin/announcements/actions";
 import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime";
+import AnnouncementEditor from "@/components/AnnouncementEditor";
+import AnnouncementBody from "@/components/AnnouncementBody";
+import {
+  getAnnouncementPlainText,
+  hasAnnouncementDocumentText,
+  type AnnouncementDocument,
+} from "@/lib/announcement-document";
 import {
   ANNOUNCEMENT_LIMITS,
   getAnnouncementMediaExtension,
@@ -31,7 +38,6 @@ const acceptedMediaTypes =
   "image/jpeg,image/png,image/webp,video/mp4,video/webm";
 const inputClass =
   "mt-2 min-h-11 w-full min-w-0 border border-white/10 bg-black/40 px-4 text-sm text-white outline-none transition focus:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-400/50";
-const textareaClass = `${inputClass} py-3`;
 
 export default function AdminAnnouncements({
   announcements,
@@ -46,7 +52,9 @@ export default function AdminAnnouncements({
 }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  const [bodyDocument, setBodyDocument] = useState<AnnouncementDocument | null>(null);
+  const [editorRevision, setEditorRevision] = useState(0);
+  const body = bodyDocument ? getAnnouncementPlainText(bodyDocument) : "";
   const [mediaDescription, setMediaDescription] = useState("");
   const [linkToTournament, setLinkToTournament] = useState(false);
   const [linkedTournamentId, setLinkedTournamentId] = useState("");
@@ -114,6 +122,10 @@ export default function AdminAnnouncements({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending || loadFailed) return;
+    if (!bodyDocument || !hasAnnouncementDocumentText(bodyDocument)) {
+      setNotice({ tone: "error", message: "Add an announcement message." });
+      return;
+    }
     if (file && !mediaDescription.trim()) {
       setNotice({
         tone: "error",
@@ -151,6 +163,7 @@ export default function AdminAnnouncements({
       const result = await publishAnnouncement({
         title,
         body,
+        bodyDocument,
         mediaPath: uploadedPath,
         mediaDescription: file ? mediaDescription : null,
         linkToTournament,
@@ -167,7 +180,8 @@ export default function AdminAnnouncements({
       }
 
       setTitle("");
-      setBody("");
+      setBodyDocument(null);
+      setEditorRevision((revision) => revision + 1);
       setLinkToTournament(false);
       setLinkedTournamentId("");
       clearMedia();
@@ -209,7 +223,7 @@ export default function AdminAnnouncements({
             Announcements
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-            Publish immutable plain-text updates with no media, one image, or
+            Publish formatted updates with no media, one image, or
             one video. Withdrawal preserves the audit record.
           </p>
         </header>
@@ -233,18 +247,15 @@ export default function AdminAnnouncements({
               />
             </label>
 
-            <label className="mt-5 block min-w-0">
-              <span className="text-sm font-bold">Message</span>
-              <textarea
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                required
-                maxLength={ANNOUNCEMENT_LIMITS.body}
-                rows={8}
+            <div className="mt-5 min-w-0">
+              <p className="text-sm font-bold">Message</p>
+              <AnnouncementEditor
+                key={editorRevision}
+                value={bodyDocument}
+                onChange={setBodyDocument}
                 disabled={pending || loadFailed}
-                className={textareaClass}
               />
-            </label>
+            </div>
 
             <div className="mt-5 border border-white/10 bg-black/30 p-4">
               <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-bold text-white">
@@ -395,9 +406,11 @@ export default function AdminAnnouncements({
                 <h3 className="break-words text-xl font-black">
                   {title || "Announcement title"}
                 </h3>
-                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">
-                  {body || "Announcement message preview."}
-                </p>
+                <AnnouncementBody
+                  body={body || "Announcement message preview."}
+                  bodyDocument={bodyDocument}
+                  className="mt-3"
+                />
                 {linkToTournament && selectedTournament ? (
                   <span className="mt-5 inline-flex min-h-11 items-center border border-orange-400/40 bg-orange-500/10 px-4 text-sm font-black text-orange-200">
                     View Tournament

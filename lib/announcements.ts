@@ -3,6 +3,7 @@ import "server-only";
 import {
   isUuid,
   parseAnnouncementFeedProjection,
+  parseAnnouncementRichFeedProjection,
   parseAnnouncementNavigationProjection,
   type AnnouncementMarker,
   type PublicAnnouncement,
@@ -43,9 +44,9 @@ export async function loadPublicAnnouncements(): Promise<PublicAnnouncementLoadR
   try {
     const client = createSupabaseAdminClient();
     const { data, error } = await client.rpc(
-      "list_active_announcements_with_tournament"
+      "list_active_announcements_with_tournament_v2"
     );
-    const parsed = error ? null : parseAnnouncementFeedProjection(data);
+    const parsed = error ? null : parseAnnouncementRichFeedProjection(data);
 
     if (!parsed) {
       logAnnouncementFailure("public-feed");

@@ -37,9 +37,26 @@ vi.mock("@/lib/supabase", () => ({
 vi.mock("@/components/HydrationSafeLocalDateTime", () => ({
   default: ({ value }: { value: string }) => <time>{value}</time>,
 }));
+vi.mock("@/components/AnnouncementEditor", () => ({
+  default: ({ value, onChange, disabled }: {
+    value: AnnouncementDocument | null;
+    onChange: (document: AnnouncementDocument) => void;
+    disabled: boolean;
+  }) => <textarea
+    aria-label="Message"
+    value={value ? getAnnouncementPlainText(value) : ""}
+    disabled={disabled}
+    onChange={(event) => onChange(documentFor(event.target.value))}
+  />,
+}));
 
 import AdminAnnouncements from "@/components/AdminAnnouncements";
 import type { AdminAnnouncement } from "@/lib/announcements";
+import { getAnnouncementPlainText, type AnnouncementDocument } from "@/lib/announcement-document";
+
+function documentFor(text: string): AnnouncementDocument {
+  return { version: 1, doc: { type: "doc", content: [{ type: "paragraph", content: text ? [{ type: "text", text }] : undefined }] } };
+}
 
 const announcement: AdminAnnouncement = {
   id: "223e4567-e89b-42d3-a456-426614174000",
@@ -263,6 +280,7 @@ describe("AdminAnnouncements", () => {
       expect(publishAnnouncementMock).toHaveBeenCalledWith({
         title: "Text-only update",
         body: "No stale media should publish.",
+        bodyDocument: documentFor("No stale media should publish."),
         mediaPath: null,
         mediaDescription: null,
         linkToTournament: false,
@@ -315,6 +333,7 @@ describe("AdminAnnouncements", () => {
       expect(publishAnnouncementMock).toHaveBeenCalledWith({
         title: "Academy registration opens",
         body: "Registration is now open.",
+        bodyDocument: documentFor("Registration is now open."),
         mediaPath: null,
         mediaDescription: null,
         linkToTournament: true,

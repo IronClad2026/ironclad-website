@@ -1,4 +1,9 @@
 import { supabaseUrl } from "@/lib/supabase-config";
+import {
+  getAnnouncementPlainText,
+  parseAnnouncementDocument,
+  type AnnouncementDocument,
+} from "@/lib/announcement-document";
 
 export const ANNOUNCEMENT_LIMITS = {
   title: 160,
@@ -46,6 +51,7 @@ export type AnnouncementMarker = {
 export type PublicAnnouncement = AnnouncementMarker & {
   title: string;
   body: string;
+  bodyDocument?: AnnouncementDocument | null;
   tournamentHref: string | null;
   mediaKind: AnnouncementMediaKind | null;
   mediaMimeType: AnnouncementMediaMimeType | null;
@@ -156,6 +162,41 @@ export function parseAnnouncementFeedProjection(
   }
 
   return { announcements: parsed };
+}
+
+/** V2 is additive: keep the legacy RPC's exact-key contract unchanged. */
+export function parseAnnouncementRichFeedProjection(
+  value: unknown
+): AnnouncementFeedProjection | null {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["announcements"]) ||
+    !Array.isArray(value.announcements)
+  ) return null;
+
+  const documents: unknown[] = [];
+  const legacyItems: unknown[] = [];
+  for (const item of value.announcements) {
+    if (!isRecord(item) || !Object.hasOwn(item, "body_document")) return null;
+    const { body_document: document, ...legacy } = item;
+    documents.push(document);
+    legacyItems.push(legacy);
+  }
+  const legacy = parseAnnouncementFeedProjection({ announcements: legacyItems });
+  if (!legacy) return null;
+  return {
+    announcements: legacy.announcements.map((announcement, index) => {
+      const document = parseAnnouncementDocument(documents[index]);
+      return {
+        ...announcement,
+        // A bad rich document must not hide the otherwise valid announcement.
+        bodyDocument: document &&
+          getAnnouncementPlainText(document).trim() === announcement.body
+          ? document
+          : null,
+      };
+    }),
+  };
 }
 
 export function parseAnnouncementNavigationProjection(
