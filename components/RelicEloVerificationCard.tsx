@@ -135,10 +135,17 @@ export default function RelicEloVerificationCard({
 
     requestInFlight.current = true;
     setFeedback(null);
+    const traceStartedAt = Date.now();
+    console.info("Relic ELO completion trace: client action start.");
 
     startTransition(async () => {
       try {
         const result = await verifyRelicProfileElo();
+        console.info("Relic ELO completion trace: client action returned.", {
+          elapsedMs: Date.now() - traceStartedAt,
+          status: result.status,
+          code: result.code,
+        });
         const nextRefreshAvailableAt = getRefreshAvailableAt(result);
 
         if (result.status === "success") {
@@ -169,13 +176,20 @@ export default function RelicEloVerificationCard({
           message: locale === "en" ? result.message : localizedMessage,
           status: result.status,
         });
-      } catch {
+      } catch (error) {
+        console.error("Relic ELO completion trace: client action rejected.", {
+          elapsedMs: Date.now() - traceStartedAt,
+          kind: error instanceof Error ? error.name : "unknown",
+        });
         setFeedback({
           message: t("relic.unexpected"),
           status: "error",
         });
       } finally {
         requestInFlight.current = false;
+        console.info("Relic ELO completion trace: client action settled.", {
+          elapsedMs: Date.now() - traceStartedAt,
+        });
       }
     });
   };

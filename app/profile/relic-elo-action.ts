@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
@@ -93,6 +94,8 @@ type ClaimResult =
   | { status: "invalid" };
 
 export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
+  const trace = createRelicActionTrace();
+  trace("action:start");
   let userId: string | null;
 
   try {
@@ -208,6 +211,8 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     );
   }
 
+  trace("provider:complete");
+
   if (relicResult.status !== "rated") {
     return mapRelicFailure(relicResult, refreshAvailableAt);
   }
@@ -224,6 +229,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
 
   let snapshotUpdate: { data: unknown; error: unknown };
 
+  trace("save_rpc:start");
   try {
     snapshotUpdate = await supabase.rpc(
       "save_relic_profile_elo_snapshot_with_identity",
@@ -248,6 +254,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     );
   }
 
+  trace("save_rpc:return");
   const { data: rawSnapshot, error: updateError } = snapshotUpdate;
 
   if (updateError) {
@@ -289,6 +296,8 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     );
   }
 
+  trace("snapshot:validated");
+  trace("badge:start");
   try {
     await evaluateProfileBadgesAfterCommit({
       playerId: player.id,
@@ -299,13 +308,17 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     // The verified provider snapshot is already committed and authoritative.
     console.error("Relic ELO Badge follow-up failed unexpectedly.");
   }
+  trace("badge:end");
 
+  trace("revalidate:start");
   try {
     revalidatePath(PROFILE_PATH);
   } catch {
     console.error("Relic ELO profile revalidation failed.");
   }
+  trace("revalidate:end");
 
+  trace("action:return");
   return {
     status: "success",
     code: "verified",
@@ -585,4 +598,43 @@ function parseSafeInteger(value: unknown): number | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+type RelicActionTraceMarker =
+  | "action:start"
+  | "provider:complete"
+  | "save_rpc:start"
+  | "save_rpc:return"
+  | "snapshot:validated"
+  | "badge:start"
+  | "badge:end"
+  | "revalidate:start"
+  | "revalidate:end"
+  | "action:return";
+
+function createRelicActionTrace(): (marker: RelicActionTraceMarker) => void {
+  if (
+    process.env.VERCEL_ENV !== "preview" ||
+    process.env.VERCEL_GIT_COMMIT_REF !== "staging"
+  ) {
+    return () => undefined;
+  }
+
+  try {
+    const traceId = randomUUID();
+    const startedAt = performance.now();
+    return (marker) => {
+      try {
+        console.info("Relic ELO action trace.", {
+          traceId,
+          marker,
+          elapsedMs: Math.round(performance.now() - startedAt),
+        });
+      } catch {
+        // Temporary diagnostics must not affect verification behaviour.
+      }
+    };
+  } catch {
+    return () => undefined;
+  }
 }
