@@ -1,5 +1,7 @@
 import "server-only";
 
+import { readCompetitionPage } from "@/lib/competition-read-models/read-page";
+
 import {
   COMPETITION_READ_LIMITS,
   COMPETITION_SCHEMA_VERSION,
@@ -142,15 +144,24 @@ export async function loadPlayerCompetitionHistory(
   // One registration per event is a database invariant. A sentinel supplies
   // hasMore without loading or aggregating the player's complete history.
   const { rows: candidates, count: candidateCount } = await readCountedRows(
-    client
-      .from("registrations")
-      .select(CANDIDATE_COLUMNS, { count: "exact" })
-      .eq("profile_id", identity.id)
-      .in("registration_status", ["approved", "withdrawn"])
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(offset, offset + limit)
-      .limit(limit + 1),
+    readCompetitionPage(
+      client
+        .from("registrations")
+        .select(CANDIDATE_COLUMNS, { count: "exact" })
+        .eq("profile_id", identity.id)
+        .in("registration_status", ["approved", "withdrawn"])
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(offset, offset + limit)
+        .limit(limit + 1),
+      offset,
+      () =>
+        client
+          .from("registrations")
+          .select("id", { count: "exact", head: true })
+          .eq("profile_id", identity.id)
+          .in("registration_status", ["approved", "withdrawn"]),
+    ),
     limit + 1,
     parseCandidate,
     offset,

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { readCompetitionPage } from "@/lib/competition-read-models/read-page";
+
 import {
   COMPETITION_READ_LIMITS,
   COMPETITION_SCHEMA_VERSION,
@@ -65,22 +67,22 @@ export async function loadTournamentCompetitionList(
   }
   const statuses =
     status === undefined ? [...PUBLIC_TOURNAMENT_LIST_STATUSES] : [status];
-  let result: { data: unknown; error: unknown; count: number | null };
-  try {
-    result = await client
+  const result = await readCompetitionPage(
+    client
       .from("tournaments")
       .select("id", { count: "exact" })
       .in("status", statuses)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .range(offset, offset + limit)
-      .limit(limit + 1);
-  } catch {
-    throw new CompetitionReadError(
-      "Competition data is unavailable.",
-      "QUERY_FAILED",
-    );
-  }
+      .limit(limit + 1),
+    offset,
+    () =>
+      client
+        .from("tournaments")
+        .select("id", { count: "exact", head: true })
+        .in("status", statuses),
+  );
   const candidates = await readCompetitionRows(
     Promise.resolve(result),
     limit + 1,

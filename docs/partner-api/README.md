@@ -16,6 +16,15 @@ selectors and semantics are unchanged. The additive tournament-list selector
 selects only a bounded page of event IDs, then delegates to the existing batch
 selector. Routes contain no database queries or RPC calls.
 
+Hosted acceptance exposed one direct Phase 3 boundary defect: PostgREST returns
+416/PGRST103 for a positive offset beyond the available rows, and the SDK drops
+the count on that error response. The paged read helper now confirms this exact
+case with a fresh HEAD exact-count SELECT using the same filters. Only a valid
+count at/below the requested offset becomes an empty page. It never parses
+provider error prose, normalizes unrelated errors or skips the final player
+visibility check. This preserves the intended empty-page/identity semantics;
+no authority, writer, constraint or transactional behavior changes.
+
 There are no database changes, new dependencies, authentication-provider calls,
 identity/provider refreshes, lazy reconciliation, notification/consent writes,
 or competition mutations in this request path. The service client is created
