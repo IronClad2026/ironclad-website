@@ -35,6 +35,9 @@ describe("public route access", () => {
     "/api",
     "/api/cron/combat-highlights-cleanup",
     "/api/steam/connect",
+    "/api/partners/v1/tournaments",
+    "/api/partners/v1/tournaments/hold-the-line",
+    "/api/partners/v1/players/1234567/tournaments",
     "/api/match-proofs",
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
     "/unknown",
@@ -63,13 +66,16 @@ describe("self-authenticated API route access", () => {
     "/api/match-proofs/22222222-2222-4222-8222-222222222222/report-group/11111111-1111-4111-8111-111111111111/replay",
     "/api/internal/transactional-email",
     "/api/notifications/click",
+    "/api/partners/v1/tournaments",
+    "/api/partners/v1/tournaments/hold-the-line",
+    "/api/partners/v1/players/1234567/tournaments",
   ])("matches the intended self-authenticated pathname %s", (pathname) => {
     expect(isSelfAuthenticatedApiPathname(pathname)).toBe(true);
   });
 
   it("classifies the notification click route by pathname when a query is present", () => {
     const url = new URL(
-      "https://example.test/api/notifications/click?notificationId=11111111-1111-4111-8111-111111111111&scope=player"
+      "https://example.test/api/notifications/click?notificationId=11111111-1111-4111-8111-111111111111&scope=player",
     );
 
     expect(isSelfAuthenticatedApiPathname(url.pathname)).toBe(true);
@@ -96,6 +102,25 @@ describe("self-authenticated API route access", () => {
     "/api/notifications/click-private",
     "/api/notifications/clicks",
     "/match-proofs/submission/id/replay",
+    "/api/partners",
+    "/api/partners/v1",
+    "/api/partners/v1/private",
+    "/api/partners/v1/tournaments/",
+    "/api/partners/v1/tournaments/private/nested",
+    "/api/partners/v1/tournaments/%2fadmin",
+    "/api/partners/v1/tournaments/%5cadmin",
+    "/api/partners/v1/tournaments/%00",
+    "/api/partners/v1/tournaments/%",
+    "/api/partners/v1/tournaments/..",
+    "/api/partners/v1/players",
+    "/api/partners/v1/players/1234567",
+    "/api/partners/v1/players/1234567/tournaments/",
+    "/api/partners/v1/players/1234567/tournaments/private",
+    "/api/partners/v1/players/123/456/tournaments",
+    "/api/partners/v1/players/%2f/tournaments",
+    "/api/partners/v1/players/../tournaments",
+    "/api/partners/v2/tournaments",
+    "/api/partner/v1/tournaments",
   ])("does not exempt the lookalike pathname %s", (pathname) => {
     expect(isSelfAuthenticatedApiPathname(pathname)).toBe(false);
   });

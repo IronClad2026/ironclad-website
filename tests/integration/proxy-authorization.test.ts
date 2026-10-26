@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { unstable_doesMiddlewareMatch as doesProxyMatch } from "next/experimental/testing/server";
 
 const clerkMiddlewareMock = vi.hoisted(() =>
-  vi.fn((handler: unknown) => handler)
+  vi.fn((handler: unknown) => handler),
 );
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -23,7 +23,7 @@ type ProxyRequest = {
 
 const proxyHandler = proxy as unknown as (
   auth: ProxyAuth,
-  request: ProxyRequest
+  request: ProxyRequest,
 ) => Promise<void>;
 
 describe("Next.js proxy authorization", () => {
@@ -53,6 +53,9 @@ describe("Next.js proxy authorization", () => {
     "/api/internal/transactional-email",
     "/api/notifications/click",
     "/api/polls",
+    "/api/partners/v1/tournaments",
+    "/api/partners/v1/tournaments/hold-the-line",
+    "/api/partners/v1/players/1234567/tournaments",
   ])(
     "lets the self-authenticated route %s reach its own auth boundary",
     async (pathname) => {
@@ -61,7 +64,7 @@ describe("Next.js proxy authorization", () => {
       await proxyHandler({ protect }, { nextUrl: { pathname } });
 
       expect(protect).not.toHaveBeenCalled();
-    }
+    },
   );
 
   it.each([
@@ -88,6 +91,13 @@ describe("Next.js proxy authorization", () => {
     "/api/polls/",
     "/api/polls/private",
     "/api/polls-private",
+    "/api/partners",
+    "/api/partners/v1/private",
+    "/api/partners/v1/tournaments/",
+    "/api/partners/v1/tournaments/hold-the-line/private",
+    "/api/partners/v1/tournaments/%2fadmin",
+    "/api/partners/v1/players/1234567/tournaments/private",
+    "/api/partners/v1/players/%2f/tournaments",
   ])("calls auth.protect for %s", async (pathname) => {
     const protect = vi.fn(async () => undefined);
 
@@ -102,42 +112,42 @@ describe("Next.js proxy authorization", () => {
         config,
         nextConfig: {},
         url: "/profile",
-      })
+      }),
     ).toBe(true);
     expect(
       doesProxyMatch({
         config,
         nextConfig: {},
         url: "/players/11111111-1111-4111-8111-111111111111",
-      })
+      }),
     ).toBe(true);
     expect(
       doesProxyMatch({
         config,
         nextConfig: {},
         url: "/api/private.json",
-      })
+      }),
     ).toBe(true);
     expect(
       doesProxyMatch({
         config,
         nextConfig: {},
         url: "/api/match-proofs/22222222-2222-4222-8222-222222222222/submission/11111111-1111-4111-8111-111111111111/replay",
-      })
+      }),
     ).toBe(true);
     expect(
       doesProxyMatch({
         config,
         nextConfig: {},
         url: "/api/notifications/click?notificationId=11111111-1111-4111-8111-111111111111&scope=player",
-      })
+      }),
     ).toBe(true);
     expect(
       doesProxyMatch({
         config,
         nextConfig: {},
         url: "/images/player-avatar.png",
-      })
+      }),
     ).toBe(false);
   });
 });
