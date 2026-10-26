@@ -242,7 +242,7 @@ describe("Staging synthetic UAT truthfulness and evidence", () => {
       "relicResult = await getRelic1v1Elo(identity.player.steamId64)"
     );
     expect(registrationAction).toContain(
-      '"submit_verified_player_registration"'
+      '"submit_verified_player_registration_with_identity"'
     );
     expect(registrationAction).toContain("p_relic_elo: relicResult.elo");
     expect(registrationAction).not.toContain(

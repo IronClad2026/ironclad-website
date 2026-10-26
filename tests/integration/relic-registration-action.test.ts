@@ -46,6 +46,7 @@ const SECOND_BRACKET_ID = "66666666-6666-4666-8666-666666666666";
 const REGISTRATION_ID = "33333333-3333-4333-8333-333333333333";
 const OLDER_REGISTRATION_ID = "44444444-4444-4444-8444-444444444444";
 const STEAM_ID64 = "76561198000000000";
+const RELIC_PROFILE_ID = "42";
 const CALCULATION_VERSION = "relic-highest-1v1-v1";
 const NOW = "2026-08-04T02:00:00.000Z";
 const RULEBOOK_DOCUMENT_ID = "77777777-7777-4777-8777-777777777771";
@@ -252,6 +253,7 @@ function ratedResult({
 } = {}) {
   return {
     status: "rated",
+    relicProfileId: RELIC_PROFILE_ID,
     elo,
     faction,
     division,
@@ -576,7 +578,7 @@ describe("Relic-authoritative tournament registration action", () => {
     });
     expect(result.message).toContain("Your place is not guaranteed");
     expect(client.rpc).toHaveBeenCalledWith(
-      "submit_verified_player_registration",
+      "submit_verified_player_registration_with_identity",
       expect.objectContaining({ p_waitlist_confirmed: false })
     );
     expect(createInAppNotificationMock).not.toHaveBeenCalled();
@@ -665,11 +667,12 @@ describe("Relic-authoritative tournament registration action", () => {
       expect(getRelic1v1EloMock).toHaveBeenCalledWith(STEAM_ID64);
       expect(client.rpc).toHaveBeenCalledOnce();
       expect(client.rpc).toHaveBeenCalledWith(
-        "submit_verified_player_registration",
+        "submit_verified_player_registration_with_identity",
         {
           p_profile_id: PLAYER_ID,
           p_clerk_user_id: CLERK_USER_ID,
           p_steam_id64: STEAM_ID64,
+          p_relic_profile_id: RELIC_PROFILE_ID,
           p_tournament_id: TOURNAMENT_ID,
           p_tournament_bracket_id: BRACKET_ID,
           p_relic_elo: elo,
@@ -716,7 +719,7 @@ describe("Relic-authoritative tournament registration action", () => {
       calculationVersion: "relic-highest-1v1-v2",
     });
     expect(await submitTournamentRegistration(registrationInput())).toMatchObject({ success: true });
-    expect(client.rpc).toHaveBeenCalledWith("submit_verified_player_registration", expect.objectContaining({
+    expect(client.rpc).toHaveBeenCalledWith("submit_verified_player_registration_with_identity", expect.objectContaining({
       p_relic_elo: elo, p_relic_division: division, p_relic_calculation_version: "relic-highest-1v1-v2",
     }));
   });
@@ -728,7 +731,7 @@ describe("Relic-authoritative tournament registration action", () => {
       ...ratedResult({ elo: 1750, division: "Pro" }), calculationVersion: "relic-highest-1v1-v2",
     });
     expect(await submitTournamentRegistration(registrationInput())).toMatchObject({ success: true });
-    expect(client.rpc).toHaveBeenCalledWith("submit_verified_player_registration", expect.objectContaining({
+    expect(client.rpc).toHaveBeenCalledWith("submit_verified_player_registration_with_identity", expect.objectContaining({
       p_relic_elo: 1750, p_relic_division: "Main / Pro", p_relic_calculation_version: "relic-highest-1v1-v1",
     }));
   });
@@ -984,6 +987,73 @@ describe("Relic-authoritative tournament registration action", () => {
     expect(client.rpc).toHaveBeenCalledOnce();
   });
 
+  it.each([null, undefined, "042", "0", "42.0", 42])(
+    "rejects a rated result without canonical identity before the atomic registration: %s",
+    async (relicProfileId) => {
+      const client = createRegistrationClient();
+      createSupabaseAdminClientMock.mockReturnValue(client.client);
+      getRelic1v1EloMock.mockResolvedValue({ ...ratedResult(), relicProfileId });
+
+      expect(await submitTournamentRegistration(registrationInput())).toEqual({
+        success: false,
+        code: "ELO_VERIFICATION_FAILED",
+        message: "ELO verification could not be completed right now.",
+      });
+      expect(client.rpc).not.toHaveBeenCalled();
+      expect(createInAppNotificationMock).not.toHaveBeenCalled();
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["duplicate owner", "unexpected identity change"])(
+    "maps %s to one safe identity-conflict result without leaking provider details",
+    async (reason) => {
+      const privateDetail = `${reason}: another player's private identity`;
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const client = createRegistrationClient({
+        rpcResults: [{
+          data: null,
+          error: {
+            code: "P0001",
+            message: "RELIC_IDENTITY_CONFLICT",
+            details: privateDetail,
+          },
+        }],
+      });
+      createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+      const result = await submitTournamentRegistration(registrationInput());
+      expect(result).toEqual({
+        success: false,
+        code: "RELIC_IDENTITY_CONFLICT",
+        message: "Your connected game identity could not be verified. Your previous identity and ELO remain unchanged. Contact an admin for help.",
+      });
+      expect(JSON.stringify(result)).not.toContain(privateDetail);
+      expect(JSON.stringify(consoleError.mock.calls)).not.toContain(privateDetail);
+      expect(createInAppNotificationMock).not.toHaveBeenCalled();
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it("passes only the fresh server-resolved Relic ID and never exposes it in the registration result", async () => {
+    const client = createRegistrationClient();
+    createSupabaseAdminClientMock.mockReturnValue(client.client);
+
+    const result = await submitTournamentRegistration(registrationInput({
+      relicProfileId: "999",
+      coh3_profile_id: "999",
+    }));
+
+    expect(result.success).toBe(true);
+    expect(client.rpc).toHaveBeenCalledExactlyOnceWith(
+      "submit_verified_player_registration_with_identity",
+      expect.objectContaining({ p_relic_profile_id: RELIC_PROFILE_ID })
+    );
+    expect(result).not.toHaveProperty("relicProfileId");
+    expect(result).not.toHaveProperty("coh3_profile_id");
+    expect(result).not.toHaveProperty("values.relicProfileId");
+  });
+
   it.each([
     "Already registered for this tournament",
     "verified elo does not match selected bracket",
@@ -1070,7 +1140,7 @@ describe("Relic-authoritative tournament registration action", () => {
       message: "Registration submitted to waitlist position #2.",
     });
     expect(client.rpc).toHaveBeenCalledWith(
-      "submit_verified_player_registration",
+      "submit_verified_player_registration_with_identity",
       expect.objectContaining({ p_waitlist_confirmed: true })
     );
     expect(createInAppNotificationMock).toHaveBeenCalledWith(

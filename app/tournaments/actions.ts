@@ -89,6 +89,7 @@ export type TournamentRegistrationCode =
   | "STEAM_IDENTITY_INVALID"
   | "RELIC_PROFILE_NOT_FOUND"
   | "STEAM_IDENTITY_MISMATCH"
+  | "RELIC_IDENTITY_CONFLICT"
   | "ELO_UNAVAILABLE"
   | "ELO_VERIFICATION_FAILED"
   | "DIVISION_MISMATCH"
@@ -262,6 +263,13 @@ export async function submitTournamentRegistration(
     return mapRelicFailure(relicResult);
   }
 
+  if (
+    typeof relicResult.relicProfileId !== "string" ||
+    !/^[1-9][0-9]*$/.test(relicResult.relicProfileId)
+  ) {
+    return mapRelicFailure({ status: "invalid_relic_response" });
+  }
+
   const calculatedDivision = getIronCladDivision(relicResult.elo, tournament.divisionModelVersion);
   const sourceModel = relicResult.calculationVersion === "relic-highest-1v1-v1"
     ? "legacy_three_v1"
@@ -293,11 +301,12 @@ export async function submitTournamentRegistration(
 
   try {
     registrationResult = await supabase.rpc(
-      "submit_verified_player_registration",
+      "submit_verified_player_registration_with_identity",
       {
         p_profile_id: identity.player.id,
         p_clerk_user_id: userId,
         p_steam_id64: identity.player.steamId64,
+        p_relic_profile_id: relicResult.relicProfileId,
         p_tournament_id: tournament.id,
         p_tournament_bracket_id: tournament.bracket.id,
         p_relic_elo: relicResult.elo,
@@ -766,6 +775,17 @@ function getRegistrationFailure(error: unknown): {
   code: TournamentRegistrationCode;
 } {
   const code = getErrorField(error, "code").toUpperCase();
+
+  if (
+    code === "P0001" &&
+    getErrorField(error, "message") === "RELIC_IDENTITY_CONFLICT"
+  ) {
+    return {
+      message:
+        "Your connected game identity could not be verified. Your previous identity and ELO remain unchanged. Contact an admin for help.",
+      code: "RELIC_IDENTITY_CONFLICT",
+    };
+  }
 
   if (code === "23505") {
     return {

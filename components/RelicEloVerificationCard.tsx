@@ -36,6 +36,7 @@ const RELIC_RESULT_MESSAGE_KEYS = {
   "steam-identity-invalid": "relic.steamIdentityInvalid",
   "profile-not-found": "relic.profileNotFound",
   "steam-identity-mismatch": "relic.steamIdentityMismatch",
+  "identity-conflict": "relic.steamIdentityMismatch",
   "no-rated-data": "relic.noRatedData",
   "provider-unavailable": "relic.providerUnavailable",
   "save-failed": "relic.saveFailed",
