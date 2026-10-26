@@ -1,0 +1,515 @@
+{
+  "phase": 3,
+  "status": "GREEN",
+  "schemaVersion": "ironclad.competition.v1",
+  "scope": "Internal read models only; no public API or deployment",
+  "repository": {
+    "worktree": "C:/Users/pc/Documents/ChatGPT/Website/ironclad-competition-read-models",
+    "branch": "feature/competition-read-models",
+    "base": "b9679dca26416744285dad1cdf1ad44eeb747f87",
+    "latestRemoteMaster": "b9679dca26416744285dad1cdf1ad44eeb747f87",
+    "committed": false,
+    "pushed": false,
+    "merged": false,
+    "deployed": false
+  },
+  "firstGate": {
+    "commit": "b9679dca26416744285dad1cdf1ad44eeb747f87",
+    "ciRun": "40406503066",
+    "conclusion": "success",
+    "successfulJobs": 6,
+    "unitIntegrationTests": 4433,
+    "browserTests": 292,
+    "releaseSafetyTests": 133,
+    "nativeBuild": "passed on verified base; not rerun for this phase"
+  },
+  "environments": {
+    "production": {
+      "project": "nsyjtqpvyxlzyujlbzos",
+      "name": "ironclad-v2",
+      "access": "explicit READ ONLY transactions"
+    },
+    "staging": {
+      "project": "zzbnneprhjicmajpjkdg",
+      "name": "ironclad-staging",
+      "mutations": 0
+    }
+  },
+  "files": [
+    "lib/competition-read-models/shared.ts",
+    "lib/competition-read-models/tournaments.ts",
+    "lib/competition-read-models/players.ts",
+    "tests/unit/lib/competition-read-models/shared.test.ts",
+    "tests/unit/lib/competition-read-models/tournaments.test.ts",
+    "tests/unit/lib/competition-read-models/players.test.ts",
+    "tests/integration/competition-read-models.test.ts",
+    "docs/competition-read-models/README.md",
+    "docs/competition-read-models/verification.json"
+  ],
+  "changes": {
+    "allFilesNew": true,
+    "existingRuntimeFilesModified": 0,
+    "databaseObjects": 0,
+    "migrations": 0,
+    "dependencies": 0,
+    "existingWritersModified": 0,
+    "publicRoutes": 0
+  },
+  "validation": {
+    "newTests": {
+      "shared": 14,
+      "tournament": 41,
+      "player": 56,
+      "actualSelectorComposition": 4,
+      "total": 115
+    },
+    "combined": {
+      "command": "npx vitest run tests/unit/lib/competition-read-models tests/integration/competition-read-models.test.ts tests/unit/lib/division-model.test.ts tests/unit/lib/tournament-division-state.test.ts tests/unit/lib/tournament-division-state-data.test.ts tests/integration/tournament-division-state-authority-contract.test.ts tests/integration/player-dashboard-result-privacy.test.ts tests/integration/tournament-public-projection.test.ts tests/integration/public-player-projection.test.ts tests/integration/player-career-load-scheduling.test.ts tests/integration/leaderboard-scoring-correctness-migration.test.ts tests/integration/competition-history-safe-account-closure-migration.test.ts tests/integration/phase7-raw-leaderboard-read-privacy-migration.test.ts --reporter=dot --reporter=json --outputFile=C:/Users/pc/AppData/Local/Temp/ironclad-competition-read-models-20261027/regression-tests.json",
+      "exitCode": 0,
+      "passedTests": 251,
+      "failedTests": 0,
+      "passedSuites": 32,
+      "passedTestFiles": 15
+    },
+    "lint": {
+      "command": "npm run lint",
+      "exitCode": 0
+    },
+    "types": {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    },
+    "formatter": {
+      "executable": "C:/Users/pc/AppData/Local/npm-cache/_npx/83e71da30ae7cab2/node_modules/prettier/bin/prettier.cjs",
+      "arguments": "--check lib/competition-read-models/*.ts tests/unit/lib/competition-read-models/*.ts tests/integration/competition-read-models.test.ts docs/competition-read-models/README.md docs/competition-read-models/verification.json",
+      "result": "passed"
+    },
+    "whitespace": {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    "independentReviews": 2,
+    "blockingReviewFindings": 0,
+    "productionBuild": {
+      "runForPhase3": false,
+      "reason": "Pure server-only internal modules are not imported by any page or route; verified base automatic CI native build passed."
+    },
+    "liveFixtureTests": {
+      "run": false,
+      "reason": "No database objects or writers changed; focused tests use in-memory SELECT-only fixtures."
+    }
+  },
+  "performance": {
+    "scope": "PostgreSQL single-observation plan probes, not an HTTP/API load benchmark",
+    "probes": [
+      {
+        "name": "htl_tournament",
+        "returnedRows": 1,
+        "executionMs": 1.311,
+        "planningMs": 0.437,
+        "indexes": ["tournaments_slug_unique_idx"],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "htl_tournament_exact_count",
+        "returnedRows": 1,
+        "executionMs": 0.775,
+        "planningMs": 0.37,
+        "indexes": ["tournaments_slug_unique_idx"],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "htl_registrations",
+        "returnedRows": 13,
+        "executionMs": 0.156,
+        "planningMs": 1.062,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "htl_registrations_exact_count",
+        "returnedRows": 1,
+        "executionMs": 0.172,
+        "planningMs": 0.707,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "new_front_participants",
+        "returnedRows": 27,
+        "executionMs": 0.109,
+        "planningMs": 0.701,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "new_front_rounds",
+        "returnedRows": 3,
+        "executionMs": 0.115,
+        "planningMs": 0.518,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "new_front_rounds_exact_count",
+        "returnedRows": 1,
+        "executionMs": 0.158,
+        "planningMs": 0.393,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "new_front_matches",
+        "returnedRows": 7,
+        "executionMs": 0.109,
+        "planningMs": 0.764,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "new_front_matches_exact_count",
+        "returnedRows": 1,
+        "executionMs": 0.13,
+        "planningMs": 0.554,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "relic_identity_not_found",
+        "returnedRows": 0,
+        "executionMs": 1.314,
+        "planningMs": 1.736,
+        "indexes": ["players_coh3_profile_id_unique_idx"],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "relic_identity_exact_count",
+        "returnedRows": 1,
+        "executionMs": 0.132,
+        "planningMs": 0.434,
+        "indexes": ["players_coh3_profile_id_unique_idx"],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "player_registration_page",
+        "returnedRows": 1,
+        "executionMs": 1.444,
+        "planningMs": 1.237,
+        "indexes": ["registrations_pkey"],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "player_registration_page_exact_count",
+        "returnedRows": 1,
+        "executionMs": 0.183,
+        "planningMs": 1.114,
+        "indexes": ["registrations_pkey"],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "new_front_all_published_matches",
+        "returnedRows": 21,
+        "executionMs": 0.106,
+        "planningMs": 0.872,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      },
+      {
+        "name": "new_front_all_published_matches_exact_count",
+        "returnedRows": 1,
+        "executionMs": 0.113,
+        "planningMs": 0.827,
+        "indexes": [],
+        "tempReadBlocks": 0,
+        "tempWrittenBlocks": 0
+      }
+    ],
+    "notes": [
+      "All statements wrapped in explicit BEGIN READ ONLY and COMMIT; no fixture/data/schema writes.",
+      "Exact-count costs measured as independent count(*) queries over the same predicates, not instrumented PostgREST request execution.",
+      "Canonical Relic lookup uses syntactically valid positive identifier 1 solely for an intentional absent-row plan; Production currently has no populated canonical bindings.",
+      "Player-history probe chooses an existing public-event registration profile internally to avoid exporting a private profile ID. Its measured time includes that additional InitPlan.",
+      "THE NEW FRONT participants source query returns 27 raw registration rows, before the selector's approved-cohort/visibility projection; this is not a claim of 27 competitors.",
+      "Planner chose sequential scans for 40 registrations, 9 rounds and 21 matches; relevant bracket/profile indexes exist, but no new index is justified by these current measurements.",
+      "Representative probes do not exercise a populated Production Relic identity, maximum 10-event history, high offsets, large datasets, partner endpoint caching, or network latency."
+    ],
+    "queryBounds": {
+      "tournamentBatchIds": 10,
+      "completeSelectMaxRows": 999,
+      "overflowSentinel": 1000,
+      "historyPageMax": 10,
+      "historyMaxOffset": 10000,
+      "tournamentWithoutPublishedMaxSelects": 6,
+      "tournamentWithPublishedMaxSelects": 10,
+      "playerHiddenOrUnknownSelects": 1,
+      "playerVisibleWithoutEntriesSelects": 3,
+      "playerWithHistoryMaxSelects": 13
+    },
+    "newIndexRequired": false
+  },
+  "productionSafety": {
+    "before": {
+      "observedAt": "2026-10-26T21:55:00.129975+00:00",
+      "tournament": {
+        "slug": "hold-the-line",
+        "status": "registration_open",
+        "registration_enabled": true,
+        "division_model_version": "four_division_v1"
+      },
+      "divisions": [
+        {
+          "name": "Academy",
+          "state": "filling",
+          "approved": 1,
+          "launched": false,
+          "generatedBrackets": 0
+        },
+        {
+          "name": "Challenge",
+          "state": "filling",
+          "approved": 4,
+          "launched": false,
+          "generatedBrackets": 0
+        },
+        {
+          "name": "Main",
+          "state": "filling",
+          "approved": 2,
+          "launched": false,
+          "generatedBrackets": 0
+        },
+        {
+          "name": "Pro",
+          "state": "filling",
+          "approved": 4,
+          "launched": false,
+          "generatedBrackets": 0
+        }
+      ],
+      "registrationsByDivisionStatus": [
+        {
+          "division": "Academy",
+          "status": "approved",
+          "count": 1
+        },
+        {
+          "division": "Challenge",
+          "status": "approved",
+          "count": 4
+        },
+        {
+          "division": "Main",
+          "status": "approved",
+          "count": 2
+        },
+        {
+          "division": "Main",
+          "status": "pending",
+          "count": 1
+        },
+        {
+          "division": "Pro",
+          "status": "approved",
+          "count": 4
+        },
+        {
+          "division": "Pro",
+          "status": "pending",
+          "count": 1
+        }
+      ],
+      "registrations": 13,
+      "uniquePlayers": 13,
+      "approved": 11,
+      "pending": 2,
+      "generatedBrackets": 0,
+      "rounds": 0,
+      "matches": 0,
+      "completedMatches": 0,
+      "officialResults": 0,
+      "reportGroups": 0,
+      "submissions": 0,
+      "replayAttempts": 0,
+      "championshipPathRows": 0,
+      "identity": {
+        "players": 38,
+        "verified_elo": 35,
+        "steam_connected": 36,
+        "persisted_relic_ids": 0,
+        "duplicate_relic_groups": 0,
+        "duplicate_steam_groups": 0
+      },
+      "invalidRelicIds": 0
+    },
+    "after": {
+      "observedAt": "2026-10-26T22:17:00.877584+00:00",
+      "tournament": {
+        "slug": "hold-the-line",
+        "status": "registration_open",
+        "registration_enabled": true,
+        "division_model_version": "four_division_v1"
+      },
+      "divisions": [
+        {
+          "name": "Academy",
+          "state": "filling",
+          "approved": 1,
+          "launched": false,
+          "generatedBrackets": 0
+        },
+        {
+          "name": "Challenge",
+          "state": "filling",
+          "approved": 4,
+          "launched": false,
+          "generatedBrackets": 0
+        },
+        {
+          "name": "Main",
+          "state": "filling",
+          "approved": 2,
+          "launched": false,
+          "generatedBrackets": 0
+        },
+        {
+          "name": "Pro",
+          "state": "filling",
+          "approved": 4,
+          "launched": false,
+          "generatedBrackets": 0
+        }
+      ],
+      "registrationsByDivisionStatus": [
+        {
+          "division": "Academy",
+          "status": "approved",
+          "count": 1
+        },
+        {
+          "division": "Challenge",
+          "status": "approved",
+          "count": 4
+        },
+        {
+          "division": "Main",
+          "status": "approved",
+          "count": 2
+        },
+        {
+          "division": "Main",
+          "status": "pending",
+          "count": 1
+        },
+        {
+          "division": "Pro",
+          "status": "approved",
+          "count": 4
+        },
+        {
+          "division": "Pro",
+          "status": "pending",
+          "count": 1
+        }
+      ],
+      "registrations": 13,
+      "uniquePlayers": 13,
+      "approved": 11,
+      "pending": 2,
+      "generatedBrackets": 0,
+      "rounds": 0,
+      "matches": 0,
+      "completedMatches": 0,
+      "officialResults": 0,
+      "reportGroups": 0,
+      "submissions": 0,
+      "replayAttempts": 0,
+      "championshipPathRows": 0,
+      "identity": {
+        "players": 38,
+        "verified_elo": 35,
+        "steam_connected": 36,
+        "persisted_relic_ids": 0,
+        "duplicate_relic_groups": 0,
+        "duplicate_steam_groups": 0
+      },
+      "invalidRelicIds": 0
+    },
+    "tableCount": 67,
+    "beforeCombinedFingerprint": "e4b45db651de8be18874bc41843a5505",
+    "afterCombinedFingerprint": "e4b45db651de8be18874bc41843a5505",
+    "changedTables": [],
+    "changedCatalogSections": [],
+    "changedHtlFields": [],
+    "phase1Unchanged": true,
+    "phase2WrappersPresent": true,
+    "taskWrites": 0,
+    "taskDdl": 0,
+    "taskFixtures": 0,
+    "backfill": false,
+    "concurrentActivityObserved": false
+  },
+  "security": {
+    "internalLookupOutcomes": ["FOUND_VISIBLE", "HIDDEN", "NOT_FOUND"],
+    "disclosureProjection": "HIDDEN and NOT_FOUND collapse to identical NOT_FOUND; internal candidate coverage removed",
+    "identity": "Exact canonical persisted positive decimal Relic ID only; no provider/alias/Steam fallback",
+    "allowListedOutputsOnly": true,
+    "unpublishedTopologyExcluded": true,
+    "finalPlayerVisibilityRecheck": true,
+    "rawDatabaseRowsExposed": false,
+    "excludes": [
+      "emails",
+      "Clerk IDs",
+      "Steam IDs",
+      "Discord data",
+      "legal records",
+      "IP addresses",
+      "private replay paths or URLs",
+      "admin notes",
+      "internal report payloads",
+      "service credentials"
+    ]
+  },
+  "limitations": [
+    "Aggregate record covers returned entries, never all-career totals or a lifetime win rate.",
+    "Existing Career/leaderboard played-match authority is reused; incomplete per-game proof is not upgraded.",
+    "Multi-query SELECTs are not a transactional snapshot. Detected ownership/state inconsistencies fail closed and may require retry.",
+    "No caching, HTTP API, authentication/token layer or external pagination contract implemented.",
+    "Production currently has no canonical Relic bindings; populated identity paths are covered by in-memory fixtures, without backfill.",
+    "EXPLAIN observations are SQL-only, not an end-to-end latency/load benchmark."
+  ],
+  "releaseBoundary": {
+    "productionReleasePerformed": false,
+    "futureDatabasePrerequisites": "Install and verify any required database prerequisite before application promotion; no prerequisite exists in this phase.",
+    "nextPhase": "Ready for Phase 4 - authenticated, read-only CoH3Stats partner APIs; not started"
+  },
+  "privateLocalEvidenceDirectory": "C:/Users/pc/AppData/Local/Temp/ironclad-competition-read-models-20261027",
+  "evidenceFiles": [
+    "precondition.json",
+    "project-proof.json",
+    "production-before.json",
+    "production-after.json",
+    "production-tables-before.json",
+    "production-tables-after.json",
+    "production-catalog-before.json",
+    "production-catalog-after.json",
+    "comparison.json",
+    "performance.json",
+    "performance.sql",
+    "existing-relevant-indexes.json",
+    "regression-tests.json"
+  ]
+}
