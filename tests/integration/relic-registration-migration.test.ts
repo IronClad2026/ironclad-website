@@ -96,7 +96,7 @@ describe("Relic tournament registration migration contract", () => {
 
     const rpcCalls = [
       ...registrationAction.matchAll(
-        /\.rpc\(\s*"submit_verified_player_registration"\s*,\s*\{([\s\S]*?)\}\s*\)/g
+        /\.rpc\(\s*"submit_verified_player_registration_with_identity"\s*,\s*\{([\s\S]*?)\}\s*\)/g
       ),
     ];
 
@@ -109,6 +109,7 @@ describe("Relic tournament registration migration contract", () => {
       "p_profile_id",
       "p_clerk_user_id",
       "p_steam_id64",
+      "p_relic_profile_id",
       "p_tournament_id",
       "p_tournament_bracket_id",
       "p_relic_elo",

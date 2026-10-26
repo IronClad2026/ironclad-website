@@ -295,7 +295,7 @@ describe("Phase 15A versioned consent and Discord database contract", () => {
     );
     expect(action).toContain("p_age_18_confirmed: input.age18Confirmation");
     const registrationRpcCall = action.match(
-      /\.rpc\(\s*"submit_verified_player_registration"\s*,\s*\{([\s\S]*?)\}\s*\)/
+      /\.rpc\(\s*"submit_verified_player_registration_with_identity"\s*,\s*\{([\s\S]*?)\}\s*\)/
     );
     expect(registrationRpcCall).not.toBeNull();
     expect(

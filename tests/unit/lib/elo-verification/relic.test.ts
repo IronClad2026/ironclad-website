@@ -107,9 +107,67 @@ describe("getIronCladDivision", () => {
 });
 
 describe("selectRelic1v1Elo", () => {
+  it.each([
+    [42, "42"],
+    ["42", "42"],
+    [Number.MAX_SAFE_INTEGER, String(Number.MAX_SAFE_INTEGER)],
+    ["9007199254740992", "9007199254740992"],
+    ["18446744073709551615", "18446744073709551615"],
+  ])("retains canonical profile ID %s without numeric rounding", (profileId, expected) => {
+    const payload = createPayload({
+      statGroups: [createGroup({ members: [createMember({ profile_id: profileId })] })],
+    });
+
+    expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
+      status: "rated",
+      relicProfileId: expected,
+      elo: 1_200,
+    });
+  });
+
+  it.each([
+    0, -1, 1.25, Number.NaN, Number.POSITIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1, null, undefined, "", "0", "042", "1e3",
+    "42.0", " 42", "42 ", "+42", "-42",
+  ])("does not bind invalid profile ID %s or change ELO selection", (profileId) => {
+    const payload = createPayload({
+      statGroups: [createGroup({ members: [createMember({ profile_id: profileId })] })],
+    });
+
+    expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
+      status: "rated",
+      relicProfileId: null,
+      elo: 1_200,
+      faction: "US Forces",
+      division: "Challenge",
+    });
+  });
+
+  it("binds only the exact Steam-owned member and remains stable across alias changes", () => {
+    const payload = createPayload({
+      statGroups: [
+        createGroup({
+          id: OTHER_GROUP_ID,
+          members: [createMember({
+            name: `/steam/${OTHER_STEAM_ID64}`,
+            profile_id: 99,
+            personal_statgroup_id: OTHER_GROUP_ID,
+          })],
+        }),
+        createGroup({ members: [createMember({ alias: "Changed alias" })] }),
+      ],
+    });
+
+    const result = selectRelic1v1Elo(payload, STEAM_ID64);
+    expect(result).toMatchObject({ status: "rated", relicProfileId: "42" });
+    expect(result).not.toHaveProperty("alias");
+    expect(result).not.toHaveProperty("steamId64");
+  });
+
   it("returns the one valid faction with the exact rated contract", () => {
     expect(selectRelic1v1Elo(createPayload(), STEAM_ID64)).toEqual({
       status: "rated",
+      relicProfileId: "42",
       elo: 1_200,
       faction: "US Forces",
       division: "Challenge",
@@ -129,6 +187,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toEqual({
       status: "rated",
+      relicProfileId: "42",
       elo: 1_200,
       faction,
       division: "Challenge",
@@ -147,6 +206,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toEqual({
       status: "rated",
+      relicProfileId: "42",
       elo: 1_420,
       faction: "British Forces",
       division: "Main",
@@ -172,6 +232,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
       status: "rated",
+      relicProfileId: "42",
       elo: 1_300,
       faction: "Wehrmacht",
     });
@@ -195,6 +256,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
       status: "rated",
+      relicProfileId: "42",
       faction: "British Forces",
     });
   });
@@ -217,6 +279,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
       status: "rated",
+      relicProfileId: "42",
       faction: "US Forces",
     });
   });
@@ -239,6 +302,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
       status: "rated",
+      relicProfileId: "42",
       faction: "British Forces",
     });
   });
@@ -253,6 +317,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
       status: "rated",
+      relicProfileId: "42",
       elo: 1_100,
       faction: "US Forces",
     });
@@ -268,6 +333,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
       status: "rated",
+      relicProfileId: "42",
       elo: 1_050,
       faction: "Deutsches Afrikakorps",
     });
@@ -295,6 +361,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
       status: "rated",
+      relicProfileId: "42",
       elo: 1_200,
     });
   });
@@ -322,6 +389,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toMatchObject({
       status: "rated",
+      relicProfileId: "42",
       elo: 1_250,
       faction: "British Forces",
     });
@@ -334,6 +402,7 @@ describe("selectRelic1v1Elo", () => {
 
     expect(selectRelic1v1Elo(payload, STEAM_ID64)).toEqual({
       status: "rated",
+      relicProfileId: "42",
       elo: 0,
       faction: "US Forces",
       division: "Academy",
@@ -560,6 +629,7 @@ describe("getRelic1v1Elo", () => {
     try {
       await expect(getRelic1v1Elo(STEAM_ID64)).resolves.toEqual({
         status: "rated",
+      relicProfileId: "42",
         elo: 1_200,
         faction: "US Forces",
         division: "Challenge",

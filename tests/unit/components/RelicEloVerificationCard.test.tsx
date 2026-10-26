@@ -161,6 +161,139 @@ describe("RelicEloVerificationCard", () => {
     });
   });
 
+  // These deferred responses exercise the client completion contract. They do
+  // not reproduce hosted Server Action transport or route revalidation delays.
+  it("exits pending after a deferred success and retains only the server cooldown", async () => {
+    let resolveRequest: ((value: unknown) => void) | undefined;
+    verifyRelicProfileEloMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRequest = resolve;
+      })
+    );
+    render(
+      <RelicEloVerificationCard
+        {...defaultProps}
+        initialVerification={initialVerification}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh ELO" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Refreshing..." })
+      ).toBeDisabled();
+    });
+    expect(screen.getByText("1,425")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refreshing..." }));
+    expect(verifyRelicProfileEloMock).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      resolveRequest?.({
+        status: "success",
+        code: "verified",
+        message: "Your Relic ELO has been verified.",
+        snapshot: {
+          elo: 1635,
+          faction: "Wehrmacht",
+          division: "Main",
+          calculationVersion: "relic-highest-1v1-v2",
+          verifiedAt: new Date().toISOString(),
+        },
+        refreshAvailableAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("1,635")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Refresh ELO" })
+      ).toBeDisabled();
+      expect(
+        screen.queryByRole("button", { name: "Refreshing..." })
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Wehrmacht")).toBeInTheDocument();
+    expect(screen.getByText("Main")).toBeInTheDocument();
+    expect(screen.getByText("Your Relic ELO has been verified.")).toBeInTheDocument();
+    expect(screen.getByText(/Available again at/)).toBeInTheDocument();
+    expect(screen.queryByText("1,425")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh ELO" }));
+    expect(verifyRelicProfileEloMock).toHaveBeenCalledOnce();
+  });
+
+  it("exits pending after a deferred rejection and permits a successful retry", async () => {
+    let rejectRequest: ((reason: unknown) => void) | undefined;
+    verifyRelicProfileEloMock
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectRequest = reject;
+        })
+      )
+      .mockResolvedValueOnce({
+        status: "success",
+        code: "verified",
+        message: "Your Relic ELO has been verified.",
+        snapshot: {
+          elo: 1490,
+          faction: "US Forces",
+          division: "Main",
+          calculationVersion: "relic-highest-1v1-v2",
+          verifiedAt: new Date().toISOString(),
+        },
+        refreshAvailableAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      });
+    render(
+      <RelicEloVerificationCard
+        {...defaultProps}
+        initialVerification={initialVerification}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh ELO" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Refreshing..." })
+      ).toBeDisabled();
+    });
+
+    await act(async () => {
+      rejectRequest?.(new Error("private-mock-transport-detail"));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Refresh ELO" })
+      ).toBeEnabled();
+      expect(
+        screen.queryByRole("button", { name: "Refreshing..." })
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("ELO verification could not be completed right now.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("1,425")).toBeInTheDocument();
+    expect(screen.getByText("British Forces")).toBeInTheDocument();
+    expect(screen.getByText("Challenge")).toBeInTheDocument();
+    expect(screen.queryByText(/private-mock-transport-detail/)).not.toBeInTheDocument();
+    expect(verifyRelicProfileEloMock).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh ELO" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("1,490")).toBeInTheDocument();
+      expect(screen.getByText("Your Relic ELO has been verified.")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Refresh ELO" })
+      ).toBeDisabled();
+    });
+    expect(verifyRelicProfileEloMock).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("1,425")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("ELO verification could not be completed right now.")
+    ).not.toBeInTheDocument();
+  });
+
   it("replaces the displayed snapshot after a successful refresh", async () => {
     verifyRelicProfileEloMock.mockResolvedValue({
       status: "success",

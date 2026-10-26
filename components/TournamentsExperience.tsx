@@ -4240,6 +4240,7 @@ function getRegistrationResultMessage(
     STEAM_IDENTITY_INVALID: "registrationServer.steamIdentityInvalid",
     RELIC_PROFILE_NOT_FOUND: "registrationServer.relicProfileNotFound",
     STEAM_IDENTITY_MISMATCH: "registrationServer.steamIdentityMismatch",
+    RELIC_IDENTITY_CONFLICT: "registrationServer.steamIdentityMismatch",
     ELO_UNAVAILABLE: "registrationServer.eloUnavailable",
     ELO_VERIFICATION_FAILED: "registrationServer.eloVerificationFailed",
     DIVISION_MISMATCH: "registrationServer.divisionMismatch",

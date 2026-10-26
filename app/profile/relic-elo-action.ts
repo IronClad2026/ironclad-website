@@ -40,6 +40,7 @@ export type RelicEloResultCode =
   | "steam-identity-invalid"
   | "profile-not-found"
   | "steam-identity-mismatch"
+  | "identity-conflict"
   | "no-rated-data"
   | "provider-unavailable"
   | "save-failed"
@@ -211,15 +212,26 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     return mapRelicFailure(relicResult, refreshAvailableAt);
   }
 
+  if (
+    typeof relicResult.relicProfileId !== "string" ||
+    !/^[1-9][0-9]*$/.test(relicResult.relicProfileId)
+  ) {
+    return mapRelicFailure(
+      { status: "invalid_relic_response" },
+      refreshAvailableAt
+    );
+  }
+
   let snapshotUpdate: { data: unknown; error: unknown };
 
   try {
     snapshotUpdate = await supabase.rpc(
-      "save_relic_profile_elo_snapshot",
+      "save_relic_profile_elo_snapshot_with_identity",
       {
         p_player_id: player.id,
         p_clerk_user_id: userId,
         p_steam_id64: steamId64,
+        p_relic_profile_id: relicResult.relicProfileId,
         p_claimed_at: claim.claimedAt,
         p_relic_elo: relicResult.elo,
         p_relic_faction: relicResult.faction,
@@ -239,6 +251,19 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
   const { data: rawSnapshot, error: updateError } = snapshotUpdate;
 
   if (updateError) {
+    if (
+      isRecord(updateError) &&
+      updateError.code === "P0001" &&
+      updateError.message === "RELIC_IDENTITY_CONFLICT"
+    ) {
+      console.error("Relic identity verification conflict.");
+      return errorResult(
+        "Your connected game identity could not be verified. Your previous identity and ELO remain unchanged. Contact an admin for help.",
+        "identity-conflict",
+        refreshAvailableAt
+      );
+    }
+
     console.error("Relic ELO result save failed.");
     return errorResult(
       "Your verified ELO could not be saved. Any previous result remains unchanged.",
@@ -247,7 +272,7 @@ export async function verifyRelicProfileElo(): Promise<RelicEloActionResult> {
     );
   }
 
-  const snapshot = parseSnapshotResult(rawSnapshot);
+  const snapshot = parseSnapshotResult(rawSnapshot, relicResult.relicProfileId);
 
   if (
     !snapshot ||
@@ -460,8 +485,14 @@ function parseClaimRow(value: unknown): ClaimResult {
     : { status: "invalid" };
 }
 
-function parseSnapshot(value: unknown): RelicEloSnapshot | null {
-  if (!isRecord(value)) {
+function parseSnapshot(
+  value: unknown,
+  expectedRelicProfileId: string
+): RelicEloSnapshot | null {
+  if (
+    !isRecord(value) ||
+    value.coh3_profile_id !== expectedRelicProfileId
+  ) {
     return null;
   }
 
@@ -491,12 +522,17 @@ function parseSnapshot(value: unknown): RelicEloSnapshot | null {
   };
 }
 
-function parseSnapshotResult(value: unknown): RelicEloSnapshot | null {
+function parseSnapshotResult(
+  value: unknown,
+  expectedRelicProfileId: string
+): RelicEloSnapshot | null {
   if (Array.isArray(value)) {
-    return value.length === 1 ? parseSnapshot(value[0]) : null;
+    return value.length === 1
+      ? parseSnapshot(value[0], expectedRelicProfileId)
+      : null;
   }
 
-  return parseSnapshot(value);
+  return parseSnapshot(value, expectedRelicProfileId);
 }
 
 function parseTimestamp(value: unknown): string | null {

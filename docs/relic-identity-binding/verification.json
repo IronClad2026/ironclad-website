@@ -1,0 +1,731 @@
+{
+  "environment": {
+    "branch": "feature/persist-relic-profile-id",
+    "baseCommit": "e104e9ee512fd2f775ab3605a75e977110f2864f",
+    "stagingProject": "zzbnneprhjicmajpjkdg",
+    "productionProject": "nsyjtqpvyxlzyujlbzos",
+    "migration": "20261026181023_persisted_verified_relic_identity",
+    "productionWriteAuthorized": false
+  },
+  "production": {
+    "before": {
+      "slug": "hold-the-line",
+      "status": "registration_open",
+      "divisions": [
+        {
+          "id": "ab080604-eb7f-43e1-8eb2-39e37e9ca191",
+          "name": "Academy",
+          "approved": 1,
+          "launched_at": null,
+          "max_players": 8
+        },
+        {
+          "id": "33e031c9-9d98-4524-97f7-444674f407c4",
+          "name": "Challenge",
+          "approved": 4,
+          "launched_at": null,
+          "max_players": 8
+        },
+        {
+          "id": "8660081e-0698-4d1e-bbfb-b8862a014a45",
+          "name": "Main",
+          "approved": 1,
+          "launched_at": null,
+          "max_players": 8
+        },
+        {
+          "id": "ef668d15-cf3e-442a-8b8a-9c8f1615fb09",
+          "name": "Pro",
+          "approved": 2,
+          "launched_at": null,
+          "max_players": 8
+        }
+      ],
+      "read_only": "on",
+      "match_count": 0,
+      "observed_at": "2026-10-26T17:56:58.961714+00:00",
+      "round_count": 0,
+      "tournament_id": "d39c8d59-b133-49d8-aae5-fb0d51e24df2",
+      "unique_players": 10,
+      "submission_count": 0,
+      "match_fingerprint": null,
+      "round_fingerprint": null,
+      "path_summary_count": 0,
+      "registration_count": 10,
+      "registration_counts": [
+        {
+          "name": "Academy",
+          "count": 1,
+          "unique_players": 1,
+          "registration_status": "approved"
+        },
+        {
+          "name": "Challenge",
+          "count": 4,
+          "unique_players": 4,
+          "registration_status": "approved"
+        },
+        {
+          "name": "Main",
+          "count": 1,
+          "unique_players": 1,
+          "registration_status": "approved"
+        },
+        {
+          "name": "Main",
+          "count": 1,
+          "unique_players": 1,
+          "registration_status": "pending"
+        },
+        {
+          "name": "Pro",
+          "count": 2,
+          "unique_players": 2,
+          "registration_status": "approved"
+        },
+        {
+          "name": "Pro",
+          "count": 1,
+          "unique_players": 1,
+          "registration_status": "pending"
+        }
+      ],
+      "division_fingerprint": "0dff5240af84ca7da3c9d010896eb0a5",
+      "game_authority_count": 0,
+      "path_authority_count": 0,
+      "registration_enabled": true,
+      "completed_match_count": 0,
+      "generated_fingerprint": null,
+      "official_result_count": 0,
+      "division_model_version": "four_division_v1",
+      "player_set_fingerprint": "5a77a6e6acaa317ad481c9befc6ad779",
+      "submission_fingerprint": null,
+      "tournament_fingerprint": "c3d8ce0fb3c1a16408be978ccc7d5fdf",
+      "generated_bracket_count": 0,
+      "registration_fingerprint": "d5149013d27aaf180b3d0315f22a0445",
+      "participant_authority_count": 0
+    },
+    "after": {
+      "slug": "hold-the-line",
+      "status": "registration_open",
+      "divisions": [
+        {
+          "id": "ab080604-eb7f-43e1-8eb2-39e37e9ca191",
+          "name": "Academy",
+          "approved": 1,
+          "launched_at": null,
+          "max_players": 8
+        },
+        {
+          "id": "33e031c9-9d98-4524-97f7-444674f407c4",
+          "name": "Challenge",
+          "approved": 4,
+          "launched_at": null,
+          "max_players": 8
+        },
+        {
+          "id": "8660081e-0698-4d1e-bbfb-b8862a014a45",
+          "name": "Main",
+          "approved": 1,
+          "launched_at": null,
+          "max_players": 8
+        },
+        {
+          "id": "ef668d15-cf3e-442a-8b8a-9c8f1615fb09",
+          "name": "Pro",
+          "approved": 2,
+          "launched_at": null,
+          "max_players": 8
+        }
+      ],
+      "read_only": "on",
+      "match_count": 0,
+      "observed_at": "2026-10-26T18:13:32.439334+00:00",
+      "round_count": 0,
+      "tournament_id": "d39c8d59-b133-49d8-aae5-fb0d51e24df2",
+      "unique_players": 11,
+      "submission_count": 0,
+      "match_fingerprint": null,
+      "round_fingerprint": null,
+      "path_summary_count": 0,
+      "registration_count": 11,
+      "registration_counts": [
+        {
+          "name": "Academy",
+          "count": 1,
+          "unique_players": 1,
+          "registration_status": "approved"
+        },
+        {
+          "name": "Challenge",
+          "count": 4,
+          "unique_players": 4,
+          "registration_status": "approved"
+        },
+        {
+          "name": "Main",
+          "count": 1,
+          "unique_players": 1,
+          "registration_status": "approved"
+        },
+        {
+          "name": "Main",
+          "count": 1,
+          "unique_players": 1,
+          "registration_status": "pending"
+        },
+        {
+          "name": "Pro",
+          "count": 2,
+          "unique_players": 2,
+          "registration_status": "approved"
+        },
+        {
+          "name": "Pro",
+          "count": 2,
+          "unique_players": 2,
+          "registration_status": "pending"
+        }
+      ],
+      "division_fingerprint": "0dff5240af84ca7da3c9d010896eb0a5",
+      "game_authority_count": 0,
+      "path_authority_count": 0,
+      "registration_enabled": true,
+      "completed_match_count": 0,
+      "generated_fingerprint": null,
+      "official_result_count": 0,
+      "division_model_version": "four_division_v1",
+      "player_set_fingerprint": "95e6b66610f0dc94f08c609661131179",
+      "submission_fingerprint": null,
+      "tournament_fingerprint": "c3d8ce0fb3c1a16408be978ccc7d5fdf",
+      "generated_bracket_count": 0,
+      "registration_fingerprint": "283bea4a123319c799d15db1483656df",
+      "participant_authority_count": 0
+    },
+    "identityBefore": {
+      "read_only": "on",
+      "observed_at": "2026-10-26T17:57:04.020685+00:00",
+      "verified_elo": 34,
+      "total_players": 37,
+      "closed_players": 0,
+      "public_profiles": 10,
+      "steam_connected": 35,
+      "persisted_relic_ids": 0,
+      "duplicate_relic_groups": 0,
+      "duplicate_steam_groups": 0
+    },
+    "identityAfter": {
+      "read_only": "on",
+      "observed_at": "2026-10-26T18:13:34.567597+00:00",
+      "verified_elo": 34,
+      "total_players": 37,
+      "closed_players": 0,
+      "public_profiles": 10,
+      "steam_connected": 35,
+      "persisted_relic_ids": 0,
+      "duplicate_relic_groups": 0,
+      "duplicate_steam_groups": 0
+    },
+    "activity": {
+      "read_only": "on",
+      "new_registrations": [
+        {
+          "count": 1,
+          "latest": "2026-10-26T18:09:20.285699+00:00",
+          "division": "Pro",
+          "earliest": "2026-10-26T18:09:20.285699+00:00",
+          "registration_status": "pending"
+        }
+      ],
+      "players_updated_in_window": 1,
+      "original_registration_count": 10,
+      "verified_timestamps_in_window": 1,
+      "original_registration_fingerprint": "d5149013d27aaf180b3d0315f22a0445",
+      "updated_players_are_new_registrants": true
+    },
+    "catalogBeforeAndAfterIdentical": true,
+    "changedTableNames": [
+      "players",
+      "registrations"
+    ],
+    "unchangedOtherFingerprints": 12
+  },
+  "staging": {
+    "contract": {
+      "status": "passed",
+      "assertions": [
+        "alias change does not change identity authority",
+        "all persisted Relic identities have canonical positive decimal format",
+        "authenticated client cannot set canonical identity or invoke trusted writer",
+        "bound old registration RPC rejects ELO update without verified identity",
+        "bound player rejects old ELO save without identity context",
+        "changed Steam identity cannot bind identity",
+        "closed fixture cannot rebind through profile verification",
+        "closed fixture cannot register through identity wrapper",
+        "confirmed waitlist atomically preserves existing state and verified binding",
+        "confirmed waitlist restores prior verification context",
+        "cooldown-only claim remains permitted on bound player",
+        "database duplicate rejection leaves complete claimant row unchanged",
+        "database unique partial index rejects duplicate ownership",
+        "declined waitlist prompt does not bind identity or create registration",
+        "duplicate ownership cannot overwrite original owner",
+        "duplicate ownership leaves claimant row unchanged",
+        "duplicate ownership returns same generic conflict",
+        "duplicate registration identity leaves no row or ELO residue",
+        "existing approval update preserves event ELO snapshot",
+        "existing closure boundary clears binding Steam and ELO without bypassing triggers",
+        "existing cooldown claim remains available",
+        "existing Steam uniqueness remains intact",
+        "full Division preserves existing waitlist confirmation prompt",
+        "identity and unchanged ELO snapshot persist together",
+        "invalid canonical ID rejected: ' 42'",
+        "invalid canonical ID rejected: '-1'",
+        "invalid canonical ID rejected: ''",
+        "invalid canonical ID rejected: '+1'",
+        "invalid canonical ID rejected: '0'",
+        "invalid canonical ID rejected: '00'",
+        "invalid canonical ID rejected: '042'",
+        "invalid canonical ID rejected: '1.0'",
+        "invalid canonical ID rejected: '1e3'",
+        "invalid canonical ID rejected: '42 '",
+        "invalid canonical ID rejected: 'abc'",
+        "invalid canonical ID rejected: NULL",
+        "later profile refresh cannot mutate registration snapshots",
+        "legacy and raw write rejection preserves authoritative row",
+        "legacy Main Pro binding uses text without lossy numeric conversion",
+        "mismatch leaves whole player row unchanged",
+        "mismatched registration identity leaves no row or ELO residue",
+        "new profile RPC remains service-role-only",
+        "new registration RPC remains service-role-only",
+        "new verified identity save returns one result",
+        "no duplicate canonical Relic identity exists",
+        "normal origin triggers create ten complete null-binding fixtures",
+        "normal registration fills approved capacity slot 2",
+        "normal registration fills approved capacity slot 3",
+        "normal registration fills approved capacity slot 4",
+        "normal registration fills approved capacity slot 5",
+        "normal registration fills approved capacity slot 6",
+        "normal registration fills approved capacity slot 7",
+        "normal registration fills approved capacity slot 8",
+        "old registration guard atomically rolls back registration legal and ELO rows",
+        "old RPC preserves unbound legacy verification behavior",
+        "profile mismatch restores prior verification context",
+        "profile success restores prior verification context",
+        "raw service update cannot replace verified identity",
+        "registration capacity never launches or generates bracket automatically",
+        "registration conflict restores prior verification context",
+        "registration duplicate identity fails generically",
+        "registration owner Division and immutable ELO facts are unchanged",
+        "registration success restores prior verification context",
+        "registration unexpected identity fails generically",
+        "reverification preserves bound identity across ELO and alias changes",
+        "same identity accepts updated ELO",
+        "same identity reverification is idempotent",
+        "same-owner Steam refresh and privacy toggle preserve identity and ELO",
+        "stale and identity-race attempts leave whole player row unchanged",
+        "stale cooldown claim cannot bind identity",
+        "successful Relic lookup can use existing unique partial index",
+        "synthetic identities start unused",
+        "unexpected identity mismatch returns generic conflict",
+        "verified registration remains pending with existing snapshot",
+        "waitlist confirmation prompt restores prior verification context",
+        "wrong Clerk ownership cannot bind identity"
+      ],
+      "assertionCount": 76,
+      "comparedTables": 67,
+      "lookupNativePlan": {
+        "nodeType": "Index Scan",
+        "indexName": "players_coh3_profile_id_unique_idx",
+        "actualRows": 1,
+        "planningMs": 0.021,
+        "executionMs": 0.014
+      },
+      "originModeTriggers": true,
+      "remainingFixturePlayers": 0,
+      "existingTableDataUnchanged": true,
+      "lookupIndexAvailabilityPlan": {
+        "nodeType": "Index Scan",
+        "indexName": "players_coh3_profile_id_unique_idx",
+        "actualRows": 1,
+        "planningMs": 0.028,
+        "executionMs": 0.015,
+        "forcedIndexAvailabilityCheck": true
+      },
+      "fixtureSubtransactionRolledBack": true,
+      "outerTransactionRollbackRequired": true,
+      "registrationTransactionExercised": true,
+      "realProviderHttpOrSteamOpenIdExercised": false
+    },
+    "integrity": {
+      "migration": {
+        "name": "persisted_verified_relic_identity",
+        "version": "20261026181023"
+      },
+      "read_only": "on",
+      "invalid_ids": 0,
+      "rls_enabled": true,
+      "canonical_constraint": "CHECK (((coh3_profile_id IS NULL) OR (coh3_profile_id ~ '^[1-9][0-9]*$'::text)))",
+      "duplicate_relic_groups": 0,
+      "persisted_ids_after_rollback": 0,
+      "canonical_constraint_validated": true
+    },
+    "permanent14TableFingerprintsIdentical": true,
+    "functionCatalog": [
+      {
+        "proname": "submit_verified_player_registration_with_identity",
+        "nspname": "public",
+        "hash": "3c03d48ab8d3a3dd8d0dad089371c18a",
+        "owner": "postgres",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}"
+      },
+      {
+        "proname": "save_relic_profile_elo_snapshot_with_identity",
+        "nspname": "public",
+        "hash": "416714fb39eb5e83d6aa240c678cf71a",
+        "owner": "postgres",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}"
+      },
+      {
+        "proname": "submit_verified_player_registration",
+        "nspname": "public",
+        "hash": "eab87e0e1ab0529c84a3e58e1851c38f",
+        "owner": "postgres",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}"
+      },
+      {
+        "proname": "protect_player_coh3_profile_id",
+        "nspname": "public",
+        "hash": "d8e7bdd10447c1af2cc2508f3ecd489a",
+        "owner": "postgres",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}"
+      },
+      {
+        "proname": "protect_player_relic_verification",
+        "nspname": "public",
+        "hash": "9171bead73443c870db8f10f438bda1c",
+        "owner": "postgres",
+        "prosecdef": false,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres}"
+      },
+      {
+        "proname": "record_tournament_championship_path_authority",
+        "nspname": "public",
+        "hash": "da46de3f814689ac8a337f3df237a64e",
+        "owner": "postgres",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres}"
+      },
+      {
+        "proname": "save_relic_profile_elo_snapshot",
+        "nspname": "public",
+        "hash": "fd10fbe215d679d1dccc26a76b1f7ab6",
+        "owner": "postgres",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}"
+      },
+      {
+        "proname": "lock_verified_relic_identity",
+        "nspname": "ironclad_private",
+        "hash": "cb0d31a0ab014fba9444000a29bfb5bf",
+        "owner": "postgres",
+        "prosecdef": false,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres}"
+      },
+      {
+        "proname": "has_verified_relic_binding_context",
+        "nspname": "ironclad_private",
+        "hash": "ea5593f644191af336850d34f037d3bf",
+        "owner": "postgres",
+        "prosecdef": false,
+        "proconfig": [
+          "search_path=pg_catalog"
+        ],
+        "acl": "{postgres=X/postgres}"
+      }
+    ],
+    "securityAdvisoryCounts": {
+      "before": [
+        {
+          "name": "rls_enabled_no_policy",
+          "count": 49
+        },
+        {
+          "name": "security_definer_view",
+          "count": 6
+        },
+        {
+          "name": "anon_security_definer_function_executable",
+          "count": 6
+        },
+        {
+          "name": "authenticated_security_definer_function_executable",
+          "count": 36
+        }
+      ],
+      "after": [
+        {
+          "name": "rls_enabled_no_policy",
+          "count": 49
+        },
+        {
+          "name": "security_definer_view",
+          "count": 6
+        },
+        {
+          "name": "anon_security_definer_function_executable",
+          "count": 6
+        },
+        {
+          "name": "authenticated_security_definer_function_executable",
+          "count": 36
+        }
+      ]
+    }
+  },
+  "finalReadOnlyRecheck": {
+    "observedAt": "2026-10-26T18:20:02.568238+00:00",
+    "holdTheLineRegistrations": 11,
+    "unchangedSinceRecordedAfterSnapshot": true,
+    "all383ProductionFunctionHashesAndAclsUnchanged": true,
+    "production14TableFingerprintsUnchangedSinceRecordedAfterSnapshot": true,
+    "migrationFileSha256": "F5C7F74D2B6684235B638B69FC4C4F42E82971C70ADAB95E6578118549365504"
+  },
+  "validation": {
+    "lint": 0,
+    "typecheck": 0,
+    "tests": {
+      "exitCode": 0,
+      "filesPassed": 376,
+      "testsPassed": 4431
+    },
+    "defaultBuild": "Failed: worktree node_modules junction outside Turbopack filesystem root",
+    "webpackBuild": "Compiled and TypeScript passed; page-data collection failed without NEXT_PUBLIC_SUPABASE_URL",
+    "testEnvironmentBuild": {
+      "command": "npm run build -- --webpack",
+      "exitCode": 0,
+      "environment": "Existing playwright.config.ts dummy local test values only; no real credentials or deployment"
+    }
+  },
+  "limitations": [
+    "Waitlist/conflict/private-profile cases use automated and rollback SQL coverage; no extra genuine-account conflicts were fabricated.",
+    "Earlier Refresh ELO response incident remains an unattributed non-reproduced transient; subsequent instrumented real flow completed normally without a behavioral patch.",
+    "One normal Staging consent receipt, notification history row and empty cleanup-job receipt retained with explicit user approval.",
+    "No Production Phase 2 migration, application deployment, backfill, master merge or partner endpoints."
+  ],
+  "status": {
+    "automatedAndDatabase": "GREEN",
+    "releaseAcceptance": "GREEN: real hosted provider verification, same-identity refresh, identity-aware registration and guarded fixture cleanup passed; Production promotion remains unauthorized."
+  },
+  "hostedStagingAcceptance": {
+    "status": "GREEN",
+    "environment": {
+      "stagingProject": "zzbnneprhjicmajpjkdg",
+      "productionReadOnlyProject": "nsyjtqpvyxlzyujlbzos",
+      "stagingCommit": "5f4fcab76b8a53604a34feb6bfc496206221891f",
+      "deployment": "dpl_8Jyer5ixY9Zjh6M6h4P7oafaq6C3",
+      "target": "preview",
+      "emailMode": "disabled",
+      "pushSubscriptions": 0,
+      "configurationChanges": false
+    },
+    "browser": {
+      "realSignedInFlow": true,
+      "agreementsApprovedAtActionTime": true,
+      "successHeading": "Registration submitted",
+      "status": "Pending Admin Review",
+      "pendingCleared": true,
+      "browserErrors": 0,
+      "screenshot": "registration-success.jpg",
+      "cleanupReload": "Original Test 1 approved entry displayed; disposable event absent.",
+      "canonicalIdClientInput": false
+    },
+    "cleanup": {
+      "method": "public.delete_tournament_data",
+      "receipt": {
+        "job_id": "95a4023a-ca7a-414a-8317-fe1beaab09be",
+        "proof_paths": [],
+        "banner_paths": [],
+        "deleted_counts": {
+          "rounds": 0,
+          "matches": 0,
+          "brackets": 1,
+          "standings": 0,
+          "registrations": 1,
+          "storage_files": 0,
+          "generated_brackets": 0,
+          "result_submissions": 0
+        },
+        "tournament_title": "[STAGING ONLY] Phase 2 Relic Registration Acceptance"
+      },
+      "fixtureTournamentRemaining": 0,
+      "fixtureDivisionsRemaining": 0,
+      "fixtureRegistrationRemaining": 0,
+      "retainedLegalReceipts": 1,
+      "retainedNotificationHistory": 1,
+      "retainedEmptyCleanupJobReceipt": 1,
+      "auditRetentionExplicitlyApproved": true,
+      "receiptDeletionAutoReviewRejected": true,
+      "legalMaintenanceBypass": false,
+      "storageObjectsCreated": 0,
+      "competitionRowsCreated": 0,
+      "originalFourRegistrationsRestored": true
+    },
+    "tableComparison": {
+      "tablesCompared": 67,
+      "unchanged": 63,
+      "changed": [
+        {
+          "table": "public.notifications",
+          "before": 783,
+          "after": 784
+        },
+        {
+          "table": "public.players",
+          "before": 52,
+          "after": 52
+        },
+        {
+          "table": "public.registration_acceptances",
+          "before": 37,
+          "after": 38
+        },
+        {
+          "table": "public.tournament_deletion_jobs",
+          "before": 0,
+          "after": 1
+        }
+      ],
+      "explanation": "Only the selected player's existing verification timestamp/update state and approved legal/notification/deletion receipts remain changed. All registrations, tournaments, divisions, bracket/match/result/replay/ranking/badge tables match their original full-row fingerprints."
+    },
+    "otherCases": {
+      "reverification": "Previously passed real hosted same-identity refresh; no cooldown bypass.",
+      "waitlist": "Automated/database only; no extra capacity fixture manufactured.",
+      "duplicateMismatch": "Automated/database only; no genuine account conflicts manufactured.",
+      "privateProfile": "Automated/database only; no established genuine private-bound fixture available."
+    },
+    "tests": {
+      "stagingUnitAndIntegration": {
+        "files": 9,
+        "passed": 287,
+        "commandFile": "validation.json"
+      },
+      "stagingSql": {
+        "passed": 76,
+        "normalTriggers": true,
+        "tableFingerprintsUnchanged": 67,
+        "fixtureResidue": 0,
+        "resultFile": "staging-sql-contract.json"
+      },
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "diffCheck": "PASS",
+      "postCleanup": "PASS: 287 tests/nine files plus lint, typecheck and diff check on unchanged Staging source; exact commands in validation.json.",
+      "productionCandidate": {
+        "files": 9,
+        "passed": 264,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "diffCheck": "PASS",
+        "commandFile": "candidate-validation.json",
+        "stagingOnlyHelperExcluded": true
+      }
+    },
+    "production": {
+      "readOnlyBefore": "2026-10-26T20:54:56.752549Z",
+      "readOnlyAfter": "2026-10-26T21:12:42.974996+00:00",
+      "unchanged": true,
+      "writes": 0,
+      "totalRegistrations": 12,
+      "uniquePlayers": 12,
+      "approved": {
+        "Academy": 1,
+        "Challenge": 4,
+        "Main": 2,
+        "Pro": 4
+      },
+      "pending": {
+        "Academy": 0,
+        "Challenge": 0,
+        "Main": 1,
+        "Pro": 0
+      },
+      "allDivisionsUnlaunched": true,
+      "brackets": 0,
+      "rounds": 0,
+      "matches": 0,
+      "officialResults": 0,
+      "phase1DefinitionUnchanged": true,
+      "phase2WrappersAbsent": true,
+      "evidenceFiles": [
+        "production-before.json",
+        "production-after.json",
+        "comparison.json"
+      ]
+    },
+    "historicalRefreshIncident": {
+      "reproduced": false,
+      "rootCause": "Unattributed transient; not retrospectively proven.",
+      "subsequentRealRefreshPassed": true,
+      "behavioralFix": false,
+      "productionDiagnosticsExcluded": true,
+      "evidenceDirectory": "../ironclad-relic-refresh-trace-20261027"
+    },
+    "productionCandidate": {
+      "worktree": "C:/Users/pc/Documents/ChatGPT/Website/ironclad-relic-binding",
+      "branch": "feature/persist-relic-profile-id",
+      "baseCommit": "e104e9ee512fd2f775ab3605a75e977110f2864f",
+      "migration": "supabase/migrations/20261026181023_persisted_verified_relic_identity.sql",
+      "migrationSha256": "F5C7F74D2B6684235B638B69FC4C4F42E82971C70ADAB95E6578118549365504",
+      "temporaryDiagnostics": false,
+      "stagingSyntheticAdapters": false,
+      "newFunctionalChanges": false,
+      "permanentCompletionTestsPorted": 2,
+      "committed": false,
+      "pushed": false,
+      "merged": false,
+      "deployed": false,
+      "reviewPatch": "production-candidate.patch",
+      "fileManifest": "production-candidate-manifest.json"
+    },
+    "safety": {
+      "productionWrites": 0,
+      "productionMigration": false,
+      "productionDeployment": false,
+      "backfill": false,
+      "coh3statsChanges": false,
+      "newEndpoints": false,
+      "phase1Changes": false,
+      "newDependencies": false,
+      "newEnvironmentVariables": false
+    },
+    "evidenceDirectory": "C:/Users/pc/AppData/Local/Temp/ironclad-relic-registration-acceptance-20261027/"
+  }
+}
