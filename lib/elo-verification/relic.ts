@@ -17,6 +17,7 @@ export type Relic1v1Faction =
 export type RelicEloResult =
   | {
       status: "rated";
+      relicProfileId: string | null;
       elo: number;
       faction: Relic1v1Faction;
       division: IronCladDivision;
@@ -33,6 +34,7 @@ export type RelicEloResult =
 type RelicMember = {
   name: string;
   personalStatGroupId: number;
+  relicProfileId: string | null;
 };
 
 type RelicStatGroup = {
@@ -261,6 +263,7 @@ export function selectRelic1v1Elo(
 
   return {
     status: "rated",
+    relicProfileId: matchingMembers[0].relicProfileId,
     elo: selected.rating,
     faction: selected.faction,
     division: division.division,
@@ -322,6 +325,7 @@ function parseStatGroups(value: unknown): RelicStatGroup[] | null {
       members.push({
         name: rawMember.name,
         personalStatGroupId: rawMember.personal_statgroup_id,
+        relicProfileId: parseRelicProfileId(rawMember.profile_id),
       });
     }
 
@@ -360,6 +364,16 @@ function parseLeaderboardRows(value: unknown): RelicLeaderboardRow[] | null {
 
 function buildSteamProfileName(steamId64: string) {
   return `/steam/${steamId64}`;
+}
+
+function parseRelicProfileId(value: unknown): string | null {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value > 0 ? String(value) : null;
+  }
+
+  return typeof value === "string" && /^[1-9][0-9]*$/.test(value)
+    ? value
+    : null;
 }
 
 function isValidSteamId64(value: unknown): value is string {

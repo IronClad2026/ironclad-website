@@ -35,6 +35,7 @@ import { verifyRelicProfileElo } from "@/app/profile/relic-elo-action";
 const PLAYER_ID = "player-private-id";
 const CLERK_USER_ID = playerIdentity.userId!;
 const STEAM_ID64 = "18446744073709551615";
+const RELIC_PROFILE_ID = "42";
 const OTHER_STEAM_ID64 = "18446744073709551614";
 const CLAIMED_AT = "2026-08-04T02:00:00.000Z";
 const VERIFIED_AT = "2026-08-04T02:00:05.000Z";
@@ -46,6 +47,7 @@ type PlayerState = {
   id: string;
   clerk_user_id: string;
   steam_id64: string | null;
+  coh3_profile_id: string | null;
   current_elo: number | null;
   relic_verified_elo: number | null;
   relic_verified_faction: string | null;
@@ -70,6 +72,8 @@ type VerificationClientOptions = {
   saveError?: boolean;
   conflictOnSave?: boolean;
   serializeEloAsString?: boolean;
+  identityConflictOnSave?: boolean;
+  returnedProfileId?: string | null;
 };
 
 function createPlayer(
@@ -79,6 +83,7 @@ function createPlayer(
     id: PLAYER_ID,
     clerk_user_id: CLERK_USER_ID,
     steam_id64: STEAM_ID64,
+    coh3_profile_id: null,
     current_elo: null,
     relic_verified_elo: null,
     relic_verified_faction: null,
@@ -179,7 +184,7 @@ function createVerificationClient(
         };
       }
 
-      if (name === "save_relic_profile_elo_snapshot") {
+      if (name === "save_relic_profile_elo_snapshot_with_identity") {
         savePayloads.push(args);
 
         if (options.saveError) {
@@ -197,8 +202,20 @@ function createVerificationClient(
           return { data: [], error: null };
         }
 
+        if (
+          options.identityConflictOnSave ||
+          (player.coh3_profile_id !== null &&
+            player.coh3_profile_id !== args.p_relic_profile_id)
+        ) {
+          return {
+            data: null,
+            error: { code: "P0001", message: "RELIC_IDENTITY_CONFLICT" },
+          };
+        }
+
         player = {
           ...player,
+          coh3_profile_id: args.p_relic_profile_id as string,
           current_elo: args.p_relic_elo as number,
           relic_verified_elo: args.p_relic_elo as number,
           relic_verified_faction: args.p_relic_faction as string,
@@ -209,6 +226,9 @@ function createVerificationClient(
           relic_elo_verified_at: VERIFIED_AT,
         };
         const row = {
+          coh3_profile_id: options.returnedProfileId === undefined
+            ? player.coh3_profile_id
+            : options.returnedProfileId,
           current_elo: options.serializeEloAsString
             ? String(player.current_elo)
             : player.current_elo,
@@ -261,6 +281,7 @@ function canClaim(lastAttemptAt: string | null, claimedAt: string) {
 function ratedResult(overrides: Record<string, unknown> = {}) {
   return {
     status: "rated",
+    relicProfileId: RELIC_PROFILE_ID,
     elo: 1_450,
     faction: "Wehrmacht",
     division: "Main / Pro",
@@ -351,12 +372,13 @@ describe("profile Relic ELO verification action", () => {
     expect(getRelic1v1EloMock).toHaveBeenCalledExactlyOnceWith(STEAM_ID64);
     expect(fixture.rpc).toHaveBeenNthCalledWith(
       2,
-      "save_relic_profile_elo_snapshot",
+      "save_relic_profile_elo_snapshot_with_identity",
       {
         p_player_id: PLAYER_ID,
         p_clerk_user_id: CLERK_USER_ID,
         p_steam_id64: STEAM_ID64,
         p_claimed_at: CLAIMED_AT,
+        p_relic_profile_id: RELIC_PROFILE_ID,
         p_relic_elo: 1_450,
         p_relic_faction: "Wehrmacht",
         p_relic_division: "Main / Pro",
@@ -387,11 +409,16 @@ describe("profile Relic ELO verification action", () => {
     expect(serialized).not.toContain(PLAYER_ID);
     expect(serialized).not.toContain(CLERK_USER_ID);
     expect(serialized).not.toContain(STEAM_ID64);
+    expect(result).not.toHaveProperty("relicProfileId");
+    expect(result).not.toHaveProperty("snapshot.relicProfileId");
+    expect(result).not.toHaveProperty("snapshot.coh3_profile_id");
+    expect(fixture.getPlayer()?.coh3_profile_id).toBe(RELIC_PROFILE_ID);
   });
 
   it("refreshes an existing snapshot after the cooldown using a single-row RPC result", async () => {
     const fixture = createVerificationClient({
       player: createVerifiedPlayer({
+        coh3_profile_id: RELIC_PROFILE_ID,
         relic_elo_calculation_version: "legacy-calculation-version",
       }),
       claimShape: "row",
@@ -418,6 +445,7 @@ describe("profile Relic ELO verification action", () => {
       },
     });
     expect(fixture.getPlayer()).toMatchObject({
+      coh3_profile_id: RELIC_PROFILE_ID,
       current_elo: 1_380,
       relic_verified_elo: 1_380,
       relic_verified_faction: "British Forces",
@@ -427,6 +455,69 @@ describe("profile Relic ELO verification action", () => {
     });
     expect(getRelic1v1EloMock).toHaveBeenCalledOnce();
   });
+
+  it.each([null, undefined, "042", "0", "42.0", 42])(
+    "does not save a rated result without a canonical provider identity: %s",
+    async (relicProfileId) => {
+      const fixture = createVerificationClient();
+      createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+      getRelic1v1EloMock.mockResolvedValue(ratedResult({ relicProfileId }));
+
+      expect(await verifyRelicProfileElo()).toMatchObject({
+        status: "unavailable",
+        code: "provider-unavailable",
+      });
+      expect(fixture.savePayloads).toHaveLength(0);
+      expect(fixture.getPlayer()?.coh3_profile_id).toBeNull();
+      expect(fixture.getPlayer()?.current_elo).toBeNull();
+    }
+  );
+
+  it.each(["duplicate", "mismatch"])(
+    "handles a %s binding conflict with the same safe result and preserves authority",
+    async (kind) => {
+      const original = createVerifiedPlayer({
+        coh3_profile_id: kind === "mismatch" ? "314" : null,
+      });
+      const fixture = createVerificationClient({
+        player: original,
+        identityConflictOnSave: kind === "duplicate",
+      });
+      createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+      getRelic1v1EloMock.mockResolvedValue(ratedResult());
+
+      const result = await verifyRelicProfileElo();
+      expect(result).toMatchObject({
+        status: "error",
+        code: "identity-conflict",
+        message: "Your connected game identity could not be verified. Your previous identity and ELO remain unchanged. Contact an admin for help.",
+      });
+      expect(fixture.getPlayer()).toEqual({
+        ...original,
+        relic_elo_last_attempt_at: CLAIMED_AT,
+      });
+      expect(JSON.stringify(result)).not.toContain("314");
+      expect(JSON.stringify(result)).not.toContain("RELIC_IDENTITY_CONFLICT");
+      expect(evaluateProfileBadgesAfterCommitMock).not.toHaveBeenCalled();
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([null, "314"])(
+    "does not confirm a saved snapshot whose returned identity is %s",
+    async (returnedProfileId) => {
+      const fixture = createVerificationClient({ returnedProfileId });
+      createSupabaseAdminClientMock.mockReturnValue(fixture.client);
+      getRelic1v1EloMock.mockResolvedValue(ratedResult());
+
+      expect(await verifyRelicProfileElo()).toMatchObject({
+        status: "error",
+        code: "confirmation-failed",
+      });
+      expect(evaluateProfileBadgesAfterCommitMock).not.toHaveBeenCalled();
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    }
+  );
 
   it("re-reads the claimed attempt after losing a concurrent cooldown race", async () => {
     const fixture = createVerificationClient({
