@@ -176,10 +176,10 @@ describe("active tournament ELO snapshot loading", () => {
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
-  it("uses a scoped admin query only after public visibility was confirmed", async () => {
+  it("uses an active-account-scoped public read without altering registration snapshots", async () => {
     const publicRow = {
       ...activeRows[0],
-      profile: { public_profile_enabled: true },
+      profile: { account_closed_at: null },
     };
     const supabase = createSupabaseQueryMock({ data: [publicRow] });
     createSupabaseAdminClientMock.mockReturnValue(supabase.client);
@@ -198,24 +198,24 @@ describe("active tournament ELO snapshot loading", () => {
       args: ["profile_id", PLAYER_ID],
     });
     expect(supabase.calls).toContainEqual({
-      method: "eq",
-      args: ["profile.public_profile_enabled", true],
+      method: "is",
+      args: ["profile.account_closed_at", null],
     });
     expect(supabase.calls).toContainEqual({
       method: "select",
       args: [
-        "submitted_elo, elo_verified_elo, elo_verified_division, registration_status, waitlist_offer_status, tournament_bracket:tournament_brackets(launched_at), tournament:tournaments!inner(title, status), profile:players!registrations_profile_id_fkey!inner(public_profile_enabled)",
+        "submitted_elo, elo_verified_elo, elo_verified_division, registration_status, waitlist_offer_status, tournament_bracket:tournament_brackets(launched_at), tournament:tournaments!inner(title, status), profile:players!registrations_profile_id_fkey!inner(account_closed_at)",
       ],
     });
     expectActiveFilters(supabase.calls);
   });
 
-  it("rejects a stale opted-out row inside the scoped admin query", async () => {
+  it("rejects a closed player row inside the scoped public read", async () => {
     const supabase = createSupabaseQueryMock({
       data: [
         {
           ...activeRows[0],
-          profile: { public_profile_enabled: false },
+          profile: { account_closed_at: "2026-08-14T00:00:00Z" },
         },
       ],
     });
@@ -225,8 +225,8 @@ describe("active tournament ELO snapshot loading", () => {
       getPublicActiveTournamentEloSnapshots(PLAYER_ID)
     ).resolves.toEqual([]);
     expect(supabase.calls).toContainEqual({
-      method: "eq",
-      args: ["profile.public_profile_enabled", true],
+      method: "is",
+      args: ["profile.account_closed_at", null],
     });
   });
 

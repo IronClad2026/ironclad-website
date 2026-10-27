@@ -17,7 +17,7 @@ export function parseClip(value: unknown): HighlightClip | null {
 }
 export function parseHighlightsState(value: unknown): HighlightsState | null {
   const row = record(value);
-  if (!row || !isShowcaseUuid(row.playerId) || typeof row.enabled !== "boolean" || typeof row.publicProfileEnabled !== "boolean" || !Array.isArray(row.slots) || row.slots.length > 3) return null;
+  if (!row || !isShowcaseUuid(row.playerId) || typeof row.enabled !== "boolean" || !Array.isArray(row.slots) || row.slots.length > 3) return null;
   const slots: HighlightSlot[] = [];
   for (const value of row.slots) {
     const item = record(value);
@@ -27,7 +27,7 @@ export function parseHighlightsState(value: unknown): HighlightsState | null {
     slots.push({ slotNumber: item.slotNumber, displayOrder: item.displayOrder, revision: item.revision, hidden: item.hidden, pendingUploadId: item.pendingUploadId as string | null, clip });
   }
   if (new Set(slots.map((s) => s.slotNumber)).size !== slots.length || new Set(slots.map((s) => s.displayOrder)).size !== slots.length) return null;
-  return { playerId: row.playerId, enabled: row.enabled, publicProfileEnabled: row.publicProfileEnabled, slots: slots.sort((a, b) => a.displayOrder - b.displayOrder) };
+  return { playerId: row.playerId, enabled: row.enabled, slots: slots.sort((a, b) => a.displayOrder - b.displayOrder) };
 }
 export async function getMyCombatHighlights(): Promise<HighlightsState | null> {
   try {

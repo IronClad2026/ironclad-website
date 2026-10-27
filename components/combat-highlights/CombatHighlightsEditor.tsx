@@ -2,7 +2,6 @@
 
 import { lazy, startTransition, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Play, Plus, Video } from "lucide-react";
-import Link from "next/link";
 import ReferenceDialog from "@/components/ui/ReferenceDialog";
 import type { HighlightEditorActions, HighlightResult, HighlightSlot, HighlightsState } from "@/lib/combat-highlights/types";
 import type { PreparedHighlight } from "./media-preparation";
@@ -214,7 +213,6 @@ export default function CombatHighlightsEditor({ initialState, actions }: {
         <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">Share up to three short moments from your Company of Heroes 3 gameplay. Clips appear in the order shown here.</p>
         <p className="mt-2 text-xs leading-5 text-zinc-400">15 seconds · 15 MB · up to 1080p / 60 fps · MP4 or WebM</p>
         {!state.enabled ? <p role="status" className="mt-4 text-sm text-orange-200">{highlightMessage("feature-disabled")}</p> : null}
-        {!state.publicProfileEnabled ? <p className="mt-4 text-sm leading-6 text-zinc-300">Your clips stay hidden while your profile is private. <Link href="/profile" className="inline-flex min-h-11 items-center text-orange-200 underline underline-offset-4">Manage visibility</Link></p> : null}
       </header>
       <div className="mt-5 space-y-4">
         {slots.map((slot, index) => (

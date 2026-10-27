@@ -19,11 +19,10 @@ const snapshot: TournamentParticipantRegistrationSnapshot = {
 const publicPlayerId = "33333333-3333-4333-8333-333333333333";
 
 describe("public tournament participant projection", () => {
-  it("uses immutable registration facts for an opted-in competitor", () => {
+  it("uses immutable registration facts for an active competitor", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
-        publicProfileEnabled: true,
         accountClosedAt: null,
       })
     ).toEqual({
@@ -43,7 +42,6 @@ describe("public tournament participant projection", () => {
       { ...snapshot, submittedElo: 1300, verifiedElo: 1452 },
       {
         playerId: publicPlayerId,
-        publicProfileEnabled: true,
         accountClosedAt: null,
       }
     );
@@ -51,19 +49,18 @@ describe("public tournament participant projection", () => {
     expect(participant.elo).toBe(1452);
   });
 
-  it("keeps factual competition identity but masks an opted-out competitor", () => {
+  it("publishes active competitive identity without a legacy visibility flag", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
-        publicProfileEnabled: false,
         accountClosedAt: null,
       })
     ).toEqual(
       expect.objectContaining({
         name: "HistoricalIGN",
-        profileHref: null,
-        country: null,
-        elo: null,
+        profileHref: `/players/${publicPlayerId}`,
+        country: "AU",
+        elo: 1452,
       })
     );
   });
@@ -72,7 +69,6 @@ describe("public tournament participant projection", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
-        publicProfileEnabled: false,
         accountClosedAt: "2026-08-14T00:00:00.000Z",
       })
     ).toEqual(
@@ -98,11 +94,7 @@ describe("public tournament participant projection", () => {
   });
 
   it("renders and searches masked fields without fake values", () => {
-    const participant = mapPublicTournamentParticipant(snapshot, {
-      playerId: publicPlayerId,
-      publicProfileEnabled: false,
-      accountClosedAt: null,
-    });
+    const participant = mapPublicTournamentParticipant(snapshot, null);
 
     expect(formatTournamentParticipantFact(participant.country)).toBe("—");
     expect(formatTournamentParticipantFact(participant.elo)).toBe("—");

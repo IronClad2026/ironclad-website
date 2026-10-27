@@ -1,5 +1,37 @@
 # Supabase Security Boundaries
 
+## Public competitive profile successor — candidate, not a Production release
+
+The historical audit below describes the earlier opt-in contract. The new
+`20261027181708_public_competitive_profile_read_projections.sql` migration
+supersedes that visibility contract for this candidate: every nonclosed player
+is eligible for `public_player_profiles`, Season, All Time and Champion identity,
+and the public Showcase read projection, regardless of the retained legacy flag.
+Discord still requires its separate opt-in. Closed-account masking, null raw
+avatar URLs, safe column allowlists and private evidence stay intact.
+
+The migration replaces five existing views with explicit definitions and keeps
+their OIDs, `postgres` owner, SELECT grants, column ACLs and security-barrier /
+owner-rights semantics. It does not grant browser roles access to raw leaderboard
+tables, change RLS or mutate business rows. Reviewed precondition hashes reject
+unknown view drift. Separate explicit variants preserve Production's official
+Main/Pro bridge and Staging's older standings source without creating or changing
+competition authority. The legacy column is retained for rollback compatibility.
+
+The user explicitly approved the minimum Combat Highlights read-helper extension.
+The same candidate replaces `public.can_read_public_player_combat_highlight(uuid)`
+and `ironclad_private.combat_highlight_state(uuid)`, preserving their OIDs,
+owners, ACLs, stable/security-definer properties and fixed `pg_catalog` search
+paths. Eligible active-account clips no longer depend on the legacy profile flag;
+feature enablement, upload readiness/verification, current slot, individual hiding
+and closed-account protection remain. The dead owner-state visibility field is
+removed. No upload, moderation, storage, cleanup or other write function changes.
+
+See [impact map](public-competitive-profiles/impact-map.md) and
+[unpublished legal draft](public-competitive-profiles/legal-impact.md). Hosted
+Staging application and acceptance remain pending; the source migration is not
+evidence of Production application.
+
 Updated 8 September 2026 against the focused Phase 1 investigation and source
 `112cad6fac88bead5f2e7444c9ee583a1c1032f0`. The five view definitions and ten
 reviewed privileged function definitions were compared with deployed Production

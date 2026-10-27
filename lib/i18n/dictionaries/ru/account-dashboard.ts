@@ -3,7 +3,7 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "Cloudflare Workers проверяет доступ к загрузке и хранит клипы и изображения предпросмотра в закрытом хранилище R2. Cloudflare также получает метаданные сети и запросов.",
-    highlightProviderVisibility: "Публичное воспроизведение доступно только при включённом публичном профиле.",
+    highlightProviderVisibility: "Подходящие клипы в профилях активных игроков общедоступны. Скрытые клипы и клипы закрытых аккаунтов недоступны для публичного просмотра.",
     highlightProviderDeletion: "Удаление клипа или закрытие аккаунта сразу скрывает клип. Очистка хранилища выполняется асинхронно.",
     highlightProviderPrivacy: "Политика конфиденциальности Cloudflare",
     highlightProviderOpensNewTab: "Открывается в новой вкладке",
@@ -16,11 +16,8 @@ const dictionary = {
     manage: "Настроить витрину",
     backToDashboard: "Вернуться в кабинет",
     publicProfile: "Публичный профиль",
-    privateProfile: "Закрытый профиль",
     publicVisibilityHelp: "Ваша текущая мысль и избранное достижение отображаются в публичном профиле.",
-    privateVisibilityHelp: "Витрина скрыта, пока ваш профиль закрыт.",
     viewPublicProfile: "Открыть публичный профиль",
-    manageVisibility: "Настроить видимость",
     thoughtTitle: "Текущая мысль",
     thoughtHelp: "До 160 символов обычного текста. Эмодзи разрешены; составные эмодзи могут считаться несколькими символами.",
     thoughtPlaceholder: "О чём вы сейчас думаете?",
@@ -49,7 +46,7 @@ const dictionary = {
     removedBadge: "Это достижение больше нельзя разместить на витрине.",
     report: "Сообщить о проблеме",
     adminTitle: "Модерация витрины",
-    adminDescription: "Скройте или восстановите текущую мысль игрока. Настройки конфиденциальности профиля сохраняют силу.",
+    adminDescription: "Скройте или восстановите текущую мысль игрока. Закрытые аккаунты по-прежнему исключены из публичных профилей.",
     playerId: "ID игрока",
     hideThought: "Скрыть мысль",
     restoreThought: "Восстановить мысль",
@@ -119,9 +116,9 @@ const dictionary = {
   },
   snapshots: { open: "Смотреть снимки ELO активных турниров", title: "Снимок ELO турнира", elo: "ELO снимка: {elo}", division: "Дивизион: {division}", locked: "Зафиксировано на время турнира.", notAvailable: "Н/Д" },
   visibility: {
-    public: "Публичный", private: "Закрытый", enabled: "Включено", disabled: "Выключено", publicTitle: "Публичный профиль игрока", publicDescription: "Показывайте в каталоге IronClad разрешённые для публичного отображения данные игрока и аватар. Видимость контакта Discord настраивается отдельно.", updating: "Обновление…", makePrivate: "Сделать закрытым", makePublic: "Сделать публичным",
+    profileRequired: "Заполните профиль игрока перед изменением этой настройки.",
+    public: "Публичный", private: "Закрытый", enabled: "Включено", disabled: "Выключено", updating: "Обновление…",
     discordTitle: "Контакт Discord", discordDescription: "Discord необязателен, но настоятельно рекомендуется для координации. Добавив имя, вы отдельно решаете, показывать ли его в публичном профиле IronClad.", discordMissing: "Контакт Discord недоступен, пока вы не добавите необязательное имя в профиль.", addDiscord: "Добавить Discord в профиль", turnOff: "Выключить", turnOn: "Включить",
-    signInProfile: "Войдите перед изменением видимости публичного профиля.", invalidProfile: "Выберите, включён ли публичный профиль.", profileUpdateFailed: "Не удалось изменить видимость публичного профиля.", profileRequired: "Заполните профиль игрока перед изменением этой настройки.", profileVerifyFailed: "Не удалось проверить видимость публичного профиля.", profileNowPublic: "Ваш профиль игрока теперь публичный.", profileNowPrivate: "Ваш профиль игрока теперь закрытый.",
     signInDiscord: "Войдите перед изменением видимости контакта Discord.", invalidDiscord: "Выберите, должен ли контакт Discord быть публичным.", discordUpdateFailed: "Не удалось изменить видимость контакта Discord.", discordUsernameRequired: "Добавьте необязательное имя Discord в профиль, прежде чем сделать его публичным.", discordNowPublic: "Контакт Discord виден в публичном профиле.", discordNowPrivate: "Контакт Discord больше не отображается в публичном профиле.",
   },
   deleteAccount: {

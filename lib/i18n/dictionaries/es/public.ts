@@ -32,9 +32,9 @@ const dictionary = {
       tournamentsTitle: "Torneos estructurados",
       tournamentsText:
         "Los cuadros, calendarios y novedades de los torneos son fáciles de seguir.",
-      choiceTitle: "Elección del jugador",
+      choiceTitle: "Identidad competitiva",
       choiceText:
-        "Los perfiles públicos y el contacto de Discord solo aparecen cuando el jugador decide compartirlos.",
+        "Los jugadores activos de IronClad tienen perfiles competitivos públicos. El contacto de Discord solo aparece si deciden compartirlo.",
       ready: "LISTO",
       readyText:
         "Torneos, perfiles, jugadores y reglas conectados para el próximo evento competitivo.",
@@ -43,10 +43,10 @@ const dictionary = {
       eyebrow: "Jugadores de IronClad",
       title: "Descubre la plantilla pública",
       description:
-        "Explora a los jugadores que han decidido mostrarse, compara su ELO, consulta perfiles públicos y usa Discord cuando hayan activado el contacto.",
+        "Explora a los jugadores activos de IronClad, compara ELO y consulta sus perfiles competitivos. El contacto de Discord es opcional.",
       directory: "Directorio de jugadores",
       privacy:
-        "Los perfiles públicos solo muestran campos aprobados por cada jugador.",
+        "La información competitiva de los jugadores activos es pública. La información personal de la cuenta sigue siendo privada; el contacto de Discord es opcional.",
       browse: "Explorar jugadores",
     },
     path: {
@@ -146,7 +146,7 @@ const dictionary = {
     description:
       "Explora comandantes públicos de IronClad, puntuaciones ELO, regiones y disponibilidad opcional en Discord.",
     privacy:
-      "Solo se muestran campos aprobados por el jugador. Los perfiles privados no aparecen.",
+      "La información competitiva de los jugadores activos es pública. La información personal de la cuenta sigue siendo privada; el contacto de Discord es opcional.",
     commanders: "Comandantes públicos",
     directorySafe:
       "Los datos del directorio se limitan a los campos del perfil autorizados para mostrarse públicamente.",
@@ -180,7 +180,7 @@ const dictionary = {
     competitiveRecord: "Historial competitivo",
     publicStats: "Estadísticas públicas",
     publicStatsText:
-      "Información competitiva que el jugador ha autorizado a mostrar públicamente en IronClad.",
+      "Información competitiva procedente de los datos públicos de IronClad.",
     tournamentHistory: "Historial de torneos",
     tournamentHistoryText:
       "El historial público de torneos aparecerá cuando haya un resumen apto para publicación.",

@@ -34,6 +34,7 @@ export type CompetitionParticipant = {
   eventElo: number | null;
   registrationStatus: TournamentParticipant["status"];
   profileUrl: string | null;
+  relicProfileId: string | null;
 };
 
 export type CompetitionMatch = {
@@ -174,7 +175,7 @@ type Match = Omit<
 };
 type Privacy = {
   id: string;
-  public_profile_enabled: boolean;
+  coh3_profile_id: string | null;
   account_closed_at: string | null;
 };
 type Closure = {
@@ -374,7 +375,7 @@ async function loadSnapshot(
       ? rows(
           client
             .from("players")
-            .select("id,public_profile_enabled,account_closed_at", {
+            .select("id,coh3_profile_id,account_closed_at", {
               count: "exact",
             })
             .in("id", playerIds)
@@ -680,7 +681,6 @@ export function mapTournamentCompetitionViews(
               player
                 ? {
                     playerId: player.id,
-                    publicProfileEnabled: player.public_profile_enabled,
                     accountClosedAt: player.account_closed_at,
                   }
                 : null,
@@ -693,6 +693,10 @@ export function mapTournamentCompetitionViews(
               profileUrl: participant.profileHref
                 ? IRONCLAD_PUBLIC_ORIGIN + participant.profileHref
                 : null,
+              relicProfileId:
+                player?.account_closed_at === null
+                  ? canonicalRelicId(player.coh3_profile_id)
+                  : null,
             };
           });
         return {
@@ -1028,9 +1032,14 @@ function parseStanding(row: Row): Standing {
 function parsePrivacy(row: Row): Privacy {
   return {
     id: id(row.id),
-    public_profile_enabled: boolean(row.public_profile_enabled),
+    coh3_profile_id: canonicalRelicId(row.coh3_profile_id),
     account_closed_at: nullableTime(row.account_closed_at),
   };
+}
+function canonicalRelicId(value: unknown): string | null {
+  return typeof value === "string" && /^[1-9][0-9]{0,19}$/.test(value)
+    ? value
+    : null;
 }
 function parseClosure(row: Row): Closure {
   return {
