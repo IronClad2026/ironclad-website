@@ -3,7 +3,7 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "Cloudflare Workers는 업로드 권한을 확인하고 클립과 미리보기 이미지를 비공개 R2 저장소에 보관합니다. Cloudflare는 네트워크 및 요청 메타데이터도 수신합니다.",
-    highlightProviderVisibility: "공개 프로필이 활성화된 동안에만 클립을 공개 재생할 수 있습니다.",
+    highlightProviderVisibility: "활성 플레이어 프로필의 공개 조건을 충족하는 클립은 공개됩니다. 숨겨진 클립과 폐쇄된 계정의 클립은 공개 재생할 수 없습니다.",
     highlightProviderDeletion: "클립을 제거하거나 계정을 폐쇄하면 클립이 즉시 숨겨집니다. 저장소 정리는 비동기적으로 진행됩니다.",
     highlightProviderPrivacy: "Cloudflare 개인정보 처리방침",
     highlightProviderOpensNewTab: "새 탭에서 열림",
@@ -16,11 +16,8 @@ const dictionary = {
     manage: "쇼케이스 관리",
     backToDashboard: "대시보드로 돌아가기",
     publicProfile: "공개 프로필",
-    privateProfile: "비공개 프로필",
     publicVisibilityHelp: "지금 드는 생각과 대표 업적이 공개 프로필에 표시됩니다.",
-    privateVisibilityHelp: "프로필이 비공개인 동안 쇼케이스도 숨겨집니다.",
     viewPublicProfile: "공개 프로필 보기",
-    manageVisibility: "공개 설정 관리",
     thoughtTitle: "지금 드는 생각",
     thoughtHelp: "일반 텍스트로 최대 160자까지 작성할 수 있습니다. 이모지도 사용할 수 있으며, 조합형 이모지는 여러 글자로 계산될 수 있습니다.",
     thoughtPlaceholder: "지금 어떤 생각이 드나요?",
@@ -49,7 +46,7 @@ const dictionary = {
     removedBadge: "이 업적은 더 이상 쇼케이스에 표시할 수 없습니다.",
     report: "문제 신고",
     adminTitle: "쇼케이스 콘텐츠 관리",
-    adminDescription: "플레이어의 생각을 숨기거나 다시 표시합니다. 프로필 공개 설정은 계속 적용됩니다.",
+    adminDescription: "플레이어의 생각을 숨기거나 다시 표시합니다. 폐쇄된 계정은 공개 프로필에서 계속 제외됩니다.",
     playerId: "플레이어 ID",
     hideThought: "생각 숨기기",
     restoreThought: "생각 다시 표시",
@@ -83,7 +80,7 @@ const dictionary = {
 
      eyebrow: "경쟁 평점", title: "검증된 프로필 ELO", description: "연결된 Steam 게임 계정으로 현재 Relic 1v1 등급 ELO를 검증하세요.", saveFirst: "ELO를 검증하기 전에 프로필을 저장하세요.", statusUnavailable: "ELO 검증 상태를 일시적으로 확인할 수 없습니다.", connectFirst: "ELO를 검증하기 전에 Steam을 연결하세요.", verifiedElo: "검증된 ELO", verified: "Relic 검증 완료", faction: "진영", division: "디비전", source: "출처", calculationVersion: "계산 버전", lastVerified: "최근 검증", timeUnavailable: "시간을 확인할 수 없음", verify: "ELO 검증", verifying: "검증 중…", refresh: "ELO 새로 고침", refreshing: "새로 고치는 중…", availableAgain: "{time}부터 다시 가능", unexpected: "현재 ELO 검증을 완료할 수 없습니다.", sessionExpired: "세션이 만료되었습니다. ELO를 검증하기 전에 다시 로그인하세요.", authRequired: "ELO를 검증하기 전에 로그인하세요.", serviceUnavailable: "현재 ELO 검증을 시작할 수 없습니다.", profileLoadFailed: "플레이어 프로필을 불러오지 못했습니다.", profileRequired: "ELO를 검증하기 전에 플레이어 프로필을 완성하세요.", steamRequired: "ELO를 검증하기 전에 Steam을 연결하세요.", steamIdentityInvalid: "연결된 Steam 정보를 검증하지 못했습니다. 이전 ELO는 변경되지 않습니다.", cooldown: "{time}부터 ELO를 다시 새로 고칠 수 있습니다.", providerUnavailable: "Relic ELO 검증을 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.", profileNotFound: "이 Steam 계정에 연결된 Company of Heroes 3 프로필을 찾지 못했습니다.", steamIdentityMismatch: "Relic이 연결된 게임 정보를 확인하지 못했습니다. 이전 ELO는 변경되지 않습니다.", noRatedData: "이 프로필에서 1v1 등급 ELO를 찾지 못했습니다.", saveFailed: "검증된 ELO를 저장하지 못했습니다. 이전 결과는 변경되지 않습니다.", confirmationFailed: "검증된 ELO를 확인하지 못했습니다. 페이지를 새로 고친 뒤 다시 시도하세요.", success: "Relic 1v1 ELO가 검증되었습니다." },
   snapshots: { open: "진행 중인 토너먼트 ELO 스냅샷 보기", title: "토너먼트 ELO 스냅샷", elo: "스냅샷 ELO: {elo}", division: "디비전: {division}", locked: "이 토너먼트 기간 동안 고정됩니다.", notAvailable: "해당 없음" },
-  visibility: { public: "공개", private: "비공개", enabled: "사용", disabled: "사용 안 함", publicTitle: "공개 플레이어 프로필", publicDescription: "IronClad 디렉터리에 공개해도 안전한 플레이어 정보와 아바타를 표시합니다. Discord 연락처 공개는 별도 설정입니다.", updating: "업데이트 중…", makePrivate: "비공개로 전환", makePublic: "공개로 전환", discordTitle: "Discord 연락처", discordDescription: "Discord는 선택 사항이지만 경기 조율을 위해 적극 권장합니다. 사용자명을 추가한 뒤 공개 IronClad 프로필에 표시할지 별도로 선택할 수 있습니다.", discordMissing: "플레이어 프로필에 선택 사항인 사용자명을 추가해야 Discord 연락처를 사용할 수 있습니다.", addDiscord: "프로필에 Discord 추가", turnOff: "끄기", turnOn: "켜기", signInProfile: "공개 프로필 설정을 변경하기 전에 로그인하세요.", invalidProfile: "공개 프로필 사용 여부를 선택하세요.", profileUpdateFailed: "공개 프로필 설정을 업데이트하지 못했습니다.", profileRequired: "이 설정을 변경하기 전에 플레이어 프로필을 완성하세요.", profileVerifyFailed: "공개 프로필 설정을 확인하지 못했습니다.", profileNowPublic: "플레이어 프로필이 이제 공개됩니다.", profileNowPrivate: "플레이어 프로필이 이제 비공개입니다.", signInDiscord: "Discord 연락처 공개 설정을 변경하기 전에 로그인하세요.", invalidDiscord: "Discord 연락처 공개 여부를 선택하세요.", discordUpdateFailed: "Discord 연락처 공개 설정을 업데이트하지 못했습니다.", discordUsernameRequired: "공개로 전환하기 전에 선택 사항인 Discord 사용자명을 프로필에 추가하세요.", discordNowPublic: "공개 프로필에 Discord 연락처가 표시됩니다.", discordNowPrivate: "공개 프로필에서 Discord 연락처가 숨겨집니다." },
+  visibility: { public: "공개", private: "비공개", enabled: "사용", disabled: "사용 안 함", updating: "업데이트 중…", discordTitle: "Discord 연락처", discordDescription: "Discord는 선택 사항이지만 경기 조율을 위해 적극 권장합니다. 사용자명을 추가한 뒤 공개 IronClad 프로필에 표시할지 별도로 선택할 수 있습니다.", discordMissing: "플레이어 프로필에 선택 사항인 사용자명을 추가해야 Discord 연락처를 사용할 수 있습니다.", addDiscord: "프로필에 Discord 추가", turnOff: "끄기", turnOn: "켜기", profileRequired: "이 설정을 변경하기 전에 플레이어 프로필을 완성하세요.", signInDiscord: "Discord 연락처 공개 설정을 변경하기 전에 로그인하세요.", invalidDiscord: "Discord 연락처 공개 여부를 선택하세요.", discordUpdateFailed: "Discord 연락처 공개 설정을 업데이트하지 못했습니다.", discordUsernameRequired: "공개로 전환하기 전에 선택 사항인 Discord 사용자명을 프로필에 추가하세요.", discordNowPublic: "공개 프로필에 Discord 연락처가 표시됩니다.", discordNowPrivate: "공개 프로필에서 Discord 연락처가 숨겨집니다." },
   deleteAccount: { eyebrow: "위험 구역", title: "계정 삭제", description: "현재 IronClad 로그인과 프로필 정보, 아바타 및 직접적인 개인 식별자를 영구 삭제합니다. 비공개 계정 연결은 제거되거나 더 이상 개인을 식별하지 않도록 처리됩니다. 공식 토너먼트, 경기, 순위와 챔피언 기록에는 공개적으로 ‘이전 참가자’만 남습니다. 연결된 비공개 리플레이 증거는 승인된 검토를 위해 보존될 수 있습니다.", action: "계정 삭제", permanent: "되돌릴 수 없는 작업", confirmTitle: "IronClad 계정을 삭제하시겠습니까?", close: "계정 삭제 확인 닫기", warning: "이 작업은 되돌릴 수 없습니다. 공식 경쟁 기록이 있다면 등록, 경기 결과, 순위, 챔피언 기록과 연결된 비공개 리플레이 증거가 유지됩니다. 공개 기록에는 ‘이전 참가자’로만 표시되며 비공개 증거는 승인된 검토자에게만 공개됩니다. 공식 기록이 없으면 플레이어 기록이 삭제됩니다.", typeDelete: "확인하려면 DELETE 입력", cancel: "취소", deleting: "계정 삭제 중…", permanentlyDelete: "영구 삭제", sessionExpired: "세션이 만료되었습니다. 삭제하기 전에 다시 로그인하세요.", confirmationInvalid: "계정 삭제를 확인하려면 DELETE를 정확히 입력하세요.", notConfigured: "계정 삭제가 구성되지 않았습니다. IronClad 관리자에게 문의하세요.", avatarFailed: "아바타를 제거하지 못했습니다. Clerk 계정은 삭제되지 않았습니다.", dataFailed: "IronClad 데이터의 계정 종료 처리를 안전하게 완료하지 못했습니다. Clerk 계정은 삭제되지 않았습니다.", clerkFailed: "IronClad 계정 신원 정보는 종료되었지만 Clerk 계정 삭제에 실패했습니다. 관리자에게 문의하세요.", success: "IronClad 계정이 삭제되었습니다." },
   dashboard: {
     competition: {

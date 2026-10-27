@@ -6,10 +6,10 @@ import rankings from "@/lib/i18n/dictionaries/en/public-rankings";
 import shared from "@/lib/i18n/dictionaries/en/public-shared";
 
 describe("focused public fallbacks", () => {
-  it("preserves the complete pre-split English copy and key order", () => {
-    // This performance-only source move must preserve every existing string.
+  it("preserves the complete English copy and key order after the public-profile model change", () => {
+    // Product copy reflects permanent public competitive profiles and optional Discord.
     expect(createHash("sha256").update(JSON.stringify(dictionary)).digest("hex"))
-      .toBe("4fff43041d48129ea70748ff8ac77a1634caf5dbc0088df562e91187460d404e");
+      .toBe("6ef061ba6eeddfc19caa1a18497d05d3e53391e9f68e41216053a384f33fa969");
   });
 
   it("shares the original values while exposing only each client's required namespaces", () => {

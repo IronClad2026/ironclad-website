@@ -38,6 +38,15 @@ ELO ranges, approved counts, separate readiness/generation/publication/launch
 facts, public participants and published official results. Generated but
 unlaunched topology is withheld. Capacity does not mean launched.
 
+Tournament participants include `relicProfileId: string | null`. It is the
+active player's trusted canonical Relic profile ID when one is verified, and
+null otherwise. Active linked players receive their public IronClad
+`/players/{id}` URL, including when no Relic binding exists. The legacy profile
+visibility flag no longer controls competitive identity. Closed competitors
+retain existing anonymization and have no profile URL or Relic correlation.
+This is an additive DTO change; no identity is inferred from event aliases,
+Steam names, URLs or ELO.
+
 ```http
 GET /api/partners/v1/players/123456/tournaments?limit=10&offset=0
 X-Api-Token: <partner credential>
@@ -56,7 +65,8 @@ aggregate a lifetime record. A different all-history contract would need review.
 
 ## Privacy and errors
 
-Hidden/private/closed and unknown player identities return the same 404:
+Closed and unknown player identities return the same 404. An active player with
+an exact canonical binding resolves regardless of the legacy visibility flag:
 
 ```json
 {

@@ -62,6 +62,60 @@ describe("help and legal localization contract", () => {
     ).toBe(8);
   });
 
+  it.each([
+    ["en", [
+      /competitive profiles.*accounts.*not been closed.*public/i,
+      /Discord.*separate opt-in/,
+      /Private replays.*access-controlled/,
+      /Closed accounts.*excluded from public profiles/,
+    ]],
+    ["it", [
+      /profili competitivi.*account non chiusi.*pubblici/,
+      /Discord.*scelta separata.*esplicitamente/,
+      /Replay privati.*controllo degli accessi/,
+      /account chiusi.*esclusi dai profili pubblici/,
+    ]],
+    ["es", [
+      /perfiles competitivos.*cuentas que no se han cerrado.*públicos/,
+      /Discord.*opción independiente.*activar/,
+      /repeticiones privadas.*controles de acceso/,
+      /cuentas cerradas.*excluidas de los perfiles públicos/,
+    ]],
+    ["fr", [
+      /profils compétitifs.*comptes non clôturés.*publics/,
+      /Discord.*option distincte.*activer/,
+      /replays privés.*contrôle d’accès/,
+      /comptes clôturés.*exclus des profils publics/,
+    ]],
+    ["ko", [
+      /종료되지 않은 계정.*경쟁 프로필.*공개/,
+      /Discord.*별도로 선택/,
+      /비공개 리플레이.*접근 통제/,
+      /종료된 계정.*공개 프로필에서 제외/,
+    ]],
+    ["pt-BR", [
+      /perfis competitivos.*contas que não foram encerradas.*públicos/,
+      /Discord.*escolha independente.*ativação/,
+      /Replays privados.*acesso controlado/,
+      /Contas encerradas.*excluídas dos perfis públicos/,
+    ]],
+    ["ru", [
+      /профили незакрытых аккаунтов публичны/,
+      /Discord.*отдельной опцией.*явного включения/,
+      /Приватные Реплеи.*контролем доступа/,
+      /Закрытые аккаунты.*исключены из публичных профилей/,
+    ]],
+    ["zh-CN", [
+      /未关闭账户.*竞技资料.*公开/,
+      /Discord.*单独选择启用/,
+      /私密回放.*访问控制/,
+      /已关闭账户不出现在公开个人资料/,
+    ]],
+  ] as const)("explains public profiles and independent privacy controls in %s", (locale, checks) => {
+    const privacyText = translations[locale].rules.sections.conduct.privacyText;
+    for (const check of checks) expect(privacyText, locale).toMatch(check);
+  });
+
   it("aligns Rulebook and PPA category labels with the Effective legal corpus", () => {
     const corpus = JSON.parse(
       readFileSync(join(root, "content", "legal-corpus.json"), "utf8")

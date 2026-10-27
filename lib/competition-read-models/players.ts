@@ -21,7 +21,6 @@ type Identity = {
   id: string;
   relicProfileId: string | null;
   alias: string | null;
-  publicProfileEnabled: boolean;
   accountClosedAt: string | null;
 };
 
@@ -98,7 +97,7 @@ export type PublicPlayerCompetitionLookup =
   | { outcome: "NOT_FOUND" };
 
 const IDENTITY_COLUMNS =
-  "id,coh3_profile_id,in_game_name,display_name,public_profile_enabled,account_closed_at";
+  "id,coh3_profile_id,in_game_name,display_name,account_closed_at";
 const CANDIDATE_COLUMNS = "id,tournament_id,registration_status,created_at";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -339,14 +338,13 @@ function buildEntry(
 }
 
 function isVisible(identity: Identity) {
-  return identity.publicProfileEnabled && identity.accountClosedAt === null;
+  return identity.accountClosedAt === null;
 }
 
 function parseIdentity(value: unknown): Identity {
   const row = record(value);
   const relicProfileId = row.coh3_profile_id;
   if (relicProfileId !== null && !isCanonicalRelicId(relicProfileId)) invalid();
-  if (typeof row.public_profile_enabled !== "boolean") invalid();
   const alias =
     nullableString(row.in_game_name)?.trim() ||
     nullableString(row.display_name)?.trim() ||
@@ -355,7 +353,6 @@ function parseIdentity(value: unknown): Identity {
     id: uuid(row.id),
     relicProfileId,
     alias,
-    publicProfileEnabled: row.public_profile_enabled,
     accountClosedAt: nullableTimestamp(row.account_closed_at),
   };
 }

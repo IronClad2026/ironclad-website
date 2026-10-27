@@ -54,8 +54,14 @@ execution limit. Each provider deletion has a five-second deadline. Claims, leas
 expiry grace, retry backoff and idempotent deletion retain the existing SQL authority.
 The schedule neither invokes email/notification workers nor adds a paid scheduler.
 
-Visibility disappears immediately on owner deletion, moderation hide, privacy
-restriction or account closure. Physical object deletion can follow asynchronously
+The public competitive profile successor candidate removes the legacy profile
+privacy restriction; this change is pending Staging acceptance and a separately
+approved Production release. Under that candidate, eligible clips on active
+accounts are public regardless of the legacy profile flag. Individual clip hiding,
+moderation, feature readiness and closed-account protections still apply.
+
+Visibility disappears immediately on owner deletion, moderation hide or account
+closure. Physical object deletion can follow asynchronously
 after reservation expiry/grace and retry. Never force those deadlines or remove
 historical/audit records to make a cleanup test pass. The authenticated admin retry
 remains available, and the scheduled drain also runs when no further owner request

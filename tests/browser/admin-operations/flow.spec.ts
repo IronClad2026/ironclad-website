@@ -39,6 +39,15 @@ for (const width of [360, 390, 768, 1024, 1440, 1920, 2560]) {
       await expect(page.getByRole("tabpanel")).toHaveCount(1);
       await expect(page.getByRole("tab", { name: domain, exact: true })).toHaveAttribute("aria-selected", "true");
       await expect(page.locator("main")).toHaveJSProperty("scrollWidth", await page.locator("main").evaluate((element) => element.clientWidth));
+      if (domain === "Players") {
+        const panel = page.getByRole("tabpanel");
+        const current = panel.getByRole("region", { name: "Current state · Now" });
+        await expect(current.locator("dt")).toHaveText([
+          "Retained player records", "Open Player Accounts", "Completed profiles", "Steam-linked Players", "Relic-verified Players",
+        ]);
+        await expect(current.locator("dd")).toHaveText(["120", "112", "104", "101", "96"]);
+        await expect(panel.getByText("Public profiles", { exact: true })).toHaveCount(0);
+      }
       if (domain !== "Matches") {
         const daily = page.getByRole("tabpanel").locator("summary").filter({ hasText: "View daily values" });
         if (await daily.count()) {

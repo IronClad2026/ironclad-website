@@ -70,7 +70,7 @@ the product through an object spread. No new validation package was added.
 | Competition placements                              | Actual `tournament_standings` rank/wins/losses/points; no invented elimination placement                                                                 |
 | Champion                                            | Existing Career final/round-robin derivation, described below                                                                                            |
 | Player lookup                                       | Exact equality on `players.coh3_profile_id`; no alias, Steam nickname or card-URL fallback                                                               |
-| Current public identity                             | Current active opted-in player's in-game/display alias and existing `/players/{id}` link                                                                 |
+| Current public identity                             | Current active player's in-game/display alias and existing `/players/{id}` link                                                                 |
 | Player entries                                      | `registrations.profile_id -> players.id`; eligible public event participation from approved or publicly referenced withdrawn registrations               |
 | Player event alias/ELO                              | Returned public event registration snapshots, never current profile alias/ELO                                                                            |
 | Played-match record                                 | Existing Career/leaderboard predicate over official matches and accepted no-show classification                                                          |
@@ -101,27 +101,34 @@ not create a new prize, award, badge or voiding policy.
 
 | Internal outcome | Meaning                                                                    | Disclosure projection                |
 | ---------------- | -------------------------------------------------------------------------- | ------------------------------------ |
-| `FOUND_VISIBLE`  | Exact canonical binding, active account, `public_profile_enabled === true` | Allow-listed competitive product     |
-| `HIDDEN`         | Binding exists but current privacy/closure disallows correlation           | Same `NOT_FOUND` response as unknown |
+| `FOUND_VISIBLE`  | Exact canonical binding and active account                                 | Allow-listed competitive product     |
+| `HIDDEN`         | Binding exists but account closure disallows correlation                   | Same `NOT_FOUND` response as unknown |
 | `NOT_FOUND`      | No verified canonical binding                                              | `NOT_FOUND`                          |
 
-There is no new partner opt-in policy. The existing public-profile and closure
-boundary is the minimum disclosure policy. The pure disclosure projection is
+Every active IronClad player has a public competitive profile. The legacy
+`public_profile_enabled` column is retained for rollback compatibility but does
+not authorize or prevent competitive disclosure. Account closure remains a
+disclosure boundary. The pure disclosure projection is
 not an endpoint; it also removes internal candidate-pagination coverage.
 
 Account closure normally clears the binding, so closed accounts generally
 resolve as NOT_FOUND. A defensive closed-but-bound row is HIDDEN. An alias change
 or stale ELO does not revoke a stable verified binding. Visibility is checked
-again after history reads; a changed binding, closure or privacy flag fails
+again after history reads; a changed binding or closure fails
 closed. Each SELECT has its own database snapshot; the full multi-query model is
 not a transactional snapshot. Detected join/state inconsistencies fail closed
 and may require a retry during concurrent competition changes. No caching is
 enabled.
 
-Existing public event policy remains distinct from current Relic correlation:
-active private competitors may retain their historical event alias, but no
-profile link or ELO is returned. Closed competitors display `Former Competitor`.
-Other competitors' Relic IDs are never included in tournament participant DTOs.
+Public event facts retain their event alias and ELO snapshot; current profile
+values do not replace those historical facts. Active linked competitors receive
+their public `/players/{id}` URL regardless of the legacy visibility value.
+Tournament participant DTOs include `relicProfileId: string | null`, sourced only
+from the current trusted canonical `players.coh3_profile_id` binding. An unbound
+player still has a public profile URL and a null Relic ID. No alias, URL or rating
+is used to infer an identity. Closed competitors display `Former Competitor`
+with no profile URL, ELO or Relic correlation. Unlinked historical participants
+retain the pre-existing limited event presentation.
 
 Never expose Clerk/Steam identities, emails, Discord data, legal acceptances,
 IP addresses, private avatar/replay paths, signed evidence URLs, provider

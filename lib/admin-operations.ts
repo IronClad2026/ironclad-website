@@ -43,7 +43,6 @@ type PlayerRow = {
   account_closed_at: string | null;
   steam_id64: string | null;
   relic_elo_verified_at: string | null;
-  public_profile_enabled: boolean;
 };
 
 type RegistrationRow = {
@@ -142,7 +141,7 @@ export async function loadAdminOperationsMetrics(
       supabase
         .from("players")
         .select(
-          "id, display_name, created_at, profile_completed, account_closed_at, steam_id64, relic_elo_verified_at, public_profile_enabled",
+          "id, display_name, created_at, profile_completed, account_closed_at, steam_id64, relic_elo_verified_at",
           { count: "exact" }
         )
         .limit(MAX_NARROW_ROWS + 1),
@@ -565,9 +564,6 @@ function buildMetrics(input: {
       completedProfiles: players.filter((row) => row.profile_completed).length,
       steamLinked: players.filter((row) => row.steam_id64 !== null).length,
       relicVerified: players.filter((row) => row.relic_elo_verified_at !== null).length,
-      publicProfiles: players.filter(
-        (row) => row.public_profile_enabled && row.account_closed_at === null
-      ).length,
       newInPeriod: currentPlayers.length,
       growth: calculateAdminOperationsGrowth(
         currentPlayers.length,

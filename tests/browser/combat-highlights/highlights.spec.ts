@@ -144,6 +144,8 @@ for (const width of [320, 1440]) {
   test(`provider disclosure is readable before file selection at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
     const check = await openFixture(page, "surface=editor&count=2");
+    await expect(page.getByText("Your clips stay hidden while your profile is private.")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Manage visibility" })).toHaveCount(0);
     const trigger = page.getByRole("button", { name: "Add clip 3" });
     await trigger.click();
     const dialog = page.getByRole("dialog", { name: "Add Combat Highlight" });
@@ -151,7 +153,7 @@ for (const width of [320, 1440]) {
     const note = dialog.getByRole("note");
     await expect(note).toContainText("Cloudflare Workers checks upload access and stores clips and preview images in private R2 storage.");
     await expect(note).toContainText("Cloudflare also receives network and request metadata.");
-    await expect(note).toContainText("Public playback is available only while your public profile is enabled.");
+    await expect(note).toContainText("Eligible clips on active player profiles are public. Hidden clips and clips from closed accounts are not publicly playable.");
     await expect(note).toContainText("Removing a clip or closing your account hides it immediately. Storage cleanup runs asynchronously.");
     const policy = note.getByRole("link", { name: "Cloudflare privacy policy (Opens in a new tab)" });
     await expect(policy).toHaveAttribute("href", "https://www.cloudflare.com/privacypolicy/");

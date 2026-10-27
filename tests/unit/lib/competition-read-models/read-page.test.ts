@@ -124,8 +124,11 @@ function transport(
         coh3_profile_id: "123456",
         in_game_name: "Public alias",
         display_name: "Public alias",
-        public_profile_enabled: !(options.closedOnRecheck && playerReads > 1),
-        account_closed_at: null,
+        public_profile_enabled: false,
+        account_closed_at:
+          options.closedOnRecheck && playerReads > 1
+            ? "2026-10-27T00:00:00.000Z"
+            : null,
       };
       return new Response(JSON.stringify([row]), {
         status: 200,

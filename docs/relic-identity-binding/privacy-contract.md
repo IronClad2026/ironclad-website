@@ -1,5 +1,23 @@
 # Verified Relic identity: storage and privacy contract
 
+## Public competitive profile successor — Staging implementation
+
+The public competitive profile task supersedes this document's historical
+opt-in disclosure policy for active players. Every active player is publicly
+eligible independently of `players.public_profile_enabled`. The column stays
+for rollback compatibility; this task does not update it or backfill identities.
+Only the trusted canonical `players.coh3_profile_id` may be disclosed as
+`relicProfileId`. Tournament participants receive that ID or null, and active
+linked players receive their public `/players/{id}` URL. The exact canonical
+player-history lookup preserves the final closure/binding recheck. Closed
+accounts remain unavailable and are never reconnected through historical facts.
+
+The remaining text records the Phase 2 policy and implementation evidence at
+that time. It is not the current active-player visibility rule. The identity
+producer, uniqueness, closure scrub, same-owner refresh and write-boundary rules
+are unchanged. Production activation and legal publication require separate
+approval; see [the draft legal impact review](../public-competitive-profiles/legal-impact.md).
+
 This document describes the Phase 2 identity boundary. It does not authorize or
 implement a public partner endpoint, a Production write, a backfill, an account
 recovery flow, or changes to registration history.

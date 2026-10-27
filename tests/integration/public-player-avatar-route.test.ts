@@ -11,8 +11,8 @@ const PLAYER_ID = "11111111-1111-4111-8111-111111111111";
 const OWNER_ID = "user_avatar_owner";
 const SIGNED_URL = `http://127.0.0.1:54321/storage/v1/object/sign/player-avatars/${OWNER_ID}/avatar?token=synthetic.header.signature`;
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-type AvatarPlayer = { avatar_url: string | null; clerk_user_id: string | null; public_profile_enabled: boolean };
-const publicPlayer: AvatarPlayer = { avatar_url: `/players/${PLAYER_ID}/avatar`, clerk_user_id: OWNER_ID, public_profile_enabled: true };
+type AvatarPlayer = { avatar_url: string | null; clerk_user_id: string | null; account_closed_at: string | null; public_profile_enabled?: boolean };
+const publicPlayer: AvatarPlayer = { avatar_url: `/players/${PLAYER_ID}/avatar`, clerk_user_id: OWNER_ID, account_closed_at: null };
 function createAvatarClient({ player, signingError = null, signedUrl = SIGNED_URL, avatar = new Blob([PNG_BYTES], { type: "image/png" }) }: {
   player: AvatarPlayer | null; signingError?: { message: string } | null; signedUrl?: string | null; avatar?: Blob;
 }) {
@@ -41,25 +41,25 @@ describe("bounded private avatar proxy using synthetic local responses", () => {
     const response = await requestAvatar("not-a-uuid"); expect(response.headers.get("Content-Type")).toContain("image/svg+xml"); expectPrivateNoStore(response);
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled(); expect(fetchMock).not.toHaveBeenCalled();
   });
-  it("serves an opted-in player anonymously without exposing its signed URL or path", async () => {
-    const supabase = createAvatarClient({ player: publicPlayer }); createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+  it.each([true, false])("serves an active legacy flag %s player anonymously without exposing its signed URL or path", async legacy => {
+    const supabase = createAvatarClient({ player: { ...publicPlayer, public_profile_enabled: legacy } }); createSupabaseAdminClientMock.mockReturnValue(supabase.client);
     const response = await requestAvatar(); expect(response.headers.get("Content-Type")).toBe("image/png"); expectPrivateNoStore(response);
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(PNG_BYTES); expect(authMock).not.toHaveBeenCalled(); expect(supabase.download).not.toHaveBeenCalled();
     expect(supabase.createSignedUrl).toHaveBeenCalledExactlyOnceWith(`${OWNER_ID}/avatar`, AVATAR_SIGNED_URL_TTL_SECONDS); expect(supabase.storageFrom).toHaveBeenCalledWith("player-avatars");
     expect(fetchMock).toHaveBeenCalledWith(SIGNED_URL, expect.objectContaining({ cache: "no-store", redirect: "error", signal: expect.any(AbortSignal), headers: expect.objectContaining({ "Accept-Encoding": "identity" }) }));
     expect(JSON.stringify(Object.fromEntries(response.headers))).not.toMatch(/token|user_avatar_owner|storage\/v1/);
   });
-  it("makes private and missing profiles indistinguishable without signing or fetching", async () => {
-    const supabase = createAvatarClient({ player: { ...publicPlayer, public_profile_enabled: false } }); createSupabaseAdminClientMock.mockReturnValueOnce(supabase.client); authMock.mockResolvedValueOnce(anonymousIdentity);
+  it("makes closed and missing profiles indistinguishable without signing or fetching", async () => {
+    const supabase = createAvatarClient({ player: { ...publicPlayer, account_closed_at: "2026-08-14T00:00:00Z" } }); createSupabaseAdminClientMock.mockReturnValueOnce(supabase.client); authMock.mockResolvedValueOnce(anonymousIdentity);
     await expectFallback(await requestAvatar()); expect(supabase.createSignedUrl).not.toHaveBeenCalled(); expect(fetchMock).not.toHaveBeenCalled();
   });
-  it("denies another signed-in player before any Storage operation", async () => {
-    const supabase = createAvatarClient({ player: { ...publicPlayer, public_profile_enabled: false } }); createSupabaseAdminClientMock.mockReturnValue(supabase.client); authMock.mockResolvedValue(playerIdentity);
+  it("denies a closed avatar to another signed-in player before any Storage operation", async () => {
+    const supabase = createAvatarClient({ player: { ...publicPlayer, account_closed_at: "2026-08-14T00:00:00Z" } }); createSupabaseAdminClientMock.mockReturnValue(supabase.client); authMock.mockResolvedValue(playerIdentity);
     await expectFallback(await requestAvatar()); expect(supabase.storageFrom).not.toHaveBeenCalled(); expect(fetchMock).not.toHaveBeenCalled();
   });
-  it.each([["owner", { ...playerIdentity, userId: OWNER_ID }], ["admin", adminIdentity]])("allows a private avatar for its %s", async (_label, identity) => {
-    const supabase = createAvatarClient({ player: { ...publicPlayer, public_profile_enabled: false } }); createSupabaseAdminClientMock.mockReturnValue(supabase.client); authMock.mockResolvedValue(identity);
-    const response = await requestAvatar(); expect(response.headers.get("Content-Type")).toBe("image/png"); expectPrivateNoStore(response); expect(supabase.createSignedUrl).toHaveBeenCalledOnce(); expect(supabase.download).not.toHaveBeenCalled();
+  it.each([["owner", { ...playerIdentity, userId: OWNER_ID }], ["admin", adminIdentity]])("keeps a closed avatar hidden from its %s", async (_label, identity) => {
+    const supabase = createAvatarClient({ player: { ...publicPlayer, account_closed_at: "2026-08-14T00:00:00Z" } }); createSupabaseAdminClientMock.mockReturnValueOnce(supabase.client); authMock.mockResolvedValue(identity);
+    await expectFallback(await requestAvatar()); expect(supabase.createSignedUrl).not.toHaveBeenCalled(); expect(supabase.download).not.toHaveBeenCalled();
   });
   it.each([
     ["unsupported MIME", new Blob(["<script>synthetic</script>"], { type: "text/html" })], ["SVG upload", new Blob(["<svg/>"], { type: "image/svg+xml" })],

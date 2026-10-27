@@ -119,6 +119,27 @@ score/winner authority remains `tournament_matches`; replay/report payloads are
 never returned. Direct-reference cancelled/voided history retains its status and
 existing factual authority without inventing new award rules.
 
+Each participant has the following allow-listed shape:
+
+```json
+{
+  "registrationId": "00000000-0000-4000-8000-000000000001",
+  "eventAlias": "Example competitor",
+  "eventElo": 1500,
+  "registrationStatus": "approved",
+  "profileUrl": "https://www.ironcladtournaments.com/players/00000000-0000-4000-8000-000000000002",
+  "relicProfileId": "123456"
+}
+```
+
+`relicProfileId` is additive and nullable. Only an active player's trusted
+canonical `players.coh3_profile_id` is returned. No verified binding means null;
+the public player URL still exists for an active linked player. Closed and
+unlinked participants have no Relic correlation or public profile URL. Existing
+event snapshots remain authoritative. The legacy profile visibility flag has
+no effect on active competitive identity. No identity backfill accompanies this
+change.
+
 ### Player history by canonical Relic ID
 
 `GET /api/partners/v1/players/{relicProfileId}/tournaments`
@@ -130,7 +151,7 @@ account identifier is accepted. IDs remain strings, without lossy conversion.
 
 - Visible canonical binding: 200 with the Phase 3 disclosure projection.
 - Visible player with no returned entries: 200 with an empty `entries` array.
-- Hidden, private, closed or unknown binding: identical 404 `player_not_available`.
+- Closed or unknown binding: identical 404 `player_not_available`.
 - Provider/database failure: generic 500; never disguised as unknown identity.
 
 The `data` product includes public current identity, event alias/ELO snapshots,
@@ -186,10 +207,12 @@ source row is returned or logged.
 
 ## Privacy, historical semantics and side effects
 
-Public profile/closure policy and the final identity visibility recheck come
-from Phase 3. Internal HIDDEN is never an external outcome. Current account
-correlation is separate from historical event facts: private event participants
-retain only existing allowed alias facts; closed competitors are anonymized.
+Every active player has a public competitive profile, including players whose
+legacy `public_profile_enabled` value is false. Exact canonical binding and
+active-account status are rechecked after history reads. Internal HIDDEN is
+never an external outcome. Current account correlation is separate from
+historical event snapshots; closed competitors are anonymized and their Relic
+identity and profile URL are withheld.
 
 Legacy `legacy_three_v1` Main remains Main / Pro. Current `four_division_v1` Main
 and Pro remain distinct. Event alias/ELO snapshots are not replaced by current
@@ -216,7 +239,7 @@ constitute a requests-per-minute limit. No new external infrastructure is added.
 
 All success/error responses use `private, no-store, max-age=0`, CDN no-store
 headers and `Vary: X-Api-Token`. There is no application response/auth cache.
-Player privacy decisions are re-read. No broad CORS header is added; CoH3Stats
+Account closure and canonical bindings are re-read. No broad CORS header is added; CoH3Stats
 must call from its server and keep the credential out of browser JavaScript.
 
 Sanitized telemetry logs partner identifier, constant endpoint label, status,

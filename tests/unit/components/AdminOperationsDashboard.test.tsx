@@ -8,6 +8,21 @@ const traffic = { status: "unavailable", reason: "non-production" } as const;
 afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
 Element.prototype.scrollIntoView = vi.fn();
 describe("Operations hierarchy", () => {
+  it("retains distinct readiness counts without a redundant public-profile metric", () => {
+    const metrics = emptyOperationsMetrics();
+    Object.assign(metrics.players, { total: 10, openAccounts: 8, completedProfiles: 6, steamLinked: 5, relicVerified: 4 });
+    render(<AdminOperationsDashboard metrics={metrics} websiteTraffic={traffic} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Players" }));
+    const panel = screen.getByRole("tabpanel");
+    const current = within(panel).getByRole("region", { name: "Current state · Now" });
+    expect([...current.querySelectorAll("dt")].map((label) => label.textContent)).toEqual([
+      "Retained player records", "Open Player Accounts", "Completed profiles", "Steam-linked Players", "Relic-verified Players",
+    ]);
+    expect([...current.querySelectorAll("dd")].map((value) => value.textContent)).toEqual(["10", "8", "6", "5", "4"]);
+    expect(within(panel).queryByText("Public profiles", { exact: true })).not.toBeInTheDocument();
+    expect(metrics.players).not.toHaveProperty("publicProfiles");
+  });
+
   it("preserves domain coverage, record destinations and truthful terminology", () => {
     const metrics = emptyOperationsMetrics();
     metrics.matches.resultResolution.playerConfirmed = 1;

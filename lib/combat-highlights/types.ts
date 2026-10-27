@@ -20,7 +20,6 @@ export type HighlightSlot = {
 export type HighlightsState = {
   playerId: string;
   enabled: boolean;
-  publicProfileEnabled: boolean;
   slots: HighlightSlot[];
 };
 export type HighlightResult = { ok: boolean; code: string; state?: HighlightsState };

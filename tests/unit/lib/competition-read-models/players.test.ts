@@ -98,6 +98,7 @@ function tournament(number = 2): TournamentCompetitionView {
             eventElo: 1750,
             registrationStatus: "approved",
             profileUrl: `https://www.ironcladtournaments.com/players/${PLAYER_ID}`,
+            relicProfileId: RELIC_ID,
           },
         ],
         bracket: {
@@ -301,21 +302,7 @@ describe("Relic-keyed player competition read model", () => {
   it.each([
     { players: [], outcome: "NOT_FOUND" },
     { players: [identity({ coh3_profile_id: null })], outcome: "NOT_FOUND" },
-    {
-      players: [identity({ public_profile_enabled: false })],
-      outcome: "HIDDEN",
-    },
     { players: [identity({ account_closed_at: DATE })], outcome: "HIDDEN" },
-    {
-      players: [
-        identity({
-          public_profile_enabled: false,
-          in_game_name: null,
-          display_name: null,
-        }),
-      ],
-      outcome: "HIDDEN",
-    },
     {
       players: [
         identity({
@@ -338,6 +325,28 @@ describe("Relic-keyed player competition read model", () => {
     },
   );
 
+  it.each([false, true, null, undefined])(
+    "resolves active canonical identity independently of legacy profile flag %s",
+    async (publicProfileEnabled) => {
+      const fixture = database({
+        players: [identity({ public_profile_enabled: publicProfileEnabled })],
+        current: [identity({ public_profile_enabled: false })],
+      });
+      const player = visible(
+        await loadPlayerCompetitionHistory(fixture.client, RELIC_ID),
+      );
+      expect(player.currentIdentity.profileUrl).toBe(
+        `https://www.ironcladtournaments.com/players/${PLAYER_ID}`,
+      );
+      expect(player.entries[0].eventElo).toBe(1750);
+      expect(
+        fixture.calls.every(
+          (call) => !call.columns?.includes("public_profile_enabled"),
+        ),
+      ).toBe(true);
+    },
+  );
+
   it("makes hidden and unknown externally indistinguishable", () => {
     expect(projectPublicPlayerCompetitionLookup({ outcome: "HIDDEN" })).toEqual(
       { outcome: "NOT_FOUND" },
@@ -349,7 +358,6 @@ describe("Relic-keyed player competition read model", () => {
 
   it.each([
     { current: [] },
-    { current: [identity({ public_profile_enabled: false })] },
     { current: [identity({ account_closed_at: DATE, coh3_profile_id: null })] },
     { current: [identity({ coh3_profile_id: "999" })] },
     {
@@ -363,7 +371,7 @@ describe("Relic-keyed player competition read model", () => {
       ],
     },
   ])(
-    "rechecks privacy and binding after history reads and exposes no details on change",
+    "rechecks closure and binding after history reads and exposes no details on change",
     async ({ current }) => {
       const result = await loadPlayerCompetitionHistory(
         database({ current }).client,
@@ -453,7 +461,6 @@ describe("Relic-keyed player competition read model", () => {
 
   it.each([
     identity({ coh3_profile_id: "01" }),
-    identity({ public_profile_enabled: null }),
     identity({ account_closed_at: "invalid" }),
     identity({ id: "invalid" }),
   ])("fails closed for malformed identity rows", async (row) => {

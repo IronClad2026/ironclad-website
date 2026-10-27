@@ -9,7 +9,9 @@ export type PublicPlayerProfile = {
   country: string | null;
   region: string | null;
   currentElo: number | null;
-  publicProfileEnabled: boolean;
+  // Compatibility for existing contact readers: every returned active profile is public.
+  // This value is derived from the active-only view, never the legacy player flag.
+  publicProfileEnabled: true;
   discordPublicEnabled: boolean;
   discordUsername: string | null;
   hasAvatar: boolean;
@@ -24,7 +26,6 @@ type PublicPlayerProfileRow = {
   country: string | null;
   region: string | null;
   current_elo: number | null;
-  public_profile_enabled: boolean;
   discord_public_enabled: boolean;
   discord_username: string | null;
   has_avatar: boolean;
@@ -39,7 +40,6 @@ const PUBLIC_PLAYER_PROFILE_COLUMNS = [
   "country",
   "region",
   "current_elo",
-  "public_profile_enabled",
   "discord_public_enabled",
   "discord_username",
   "has_avatar",
@@ -55,7 +55,6 @@ export async function getPublicPlayers(): Promise<PublicPlayerProfile[]> {
   const { data, error } = await supabase
     .from("public_player_profiles")
     .select(PUBLIC_PLAYER_PROFILE_COLUMNS)
-    .eq("public_profile_enabled", true)
     .order("current_elo", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
@@ -81,7 +80,6 @@ export async function getPublicPlayerById(
     .from("public_player_profiles")
     .select(PUBLIC_PLAYER_PROFILE_COLUMNS)
     .eq("id", playerId)
-    .eq("public_profile_enabled", true)
     .maybeSingle();
 
   if (error) {
@@ -108,7 +106,7 @@ function mapPublicPlayerProfile(
     country: row.country,
     region: row.region,
     currentElo: row.current_elo,
-    publicProfileEnabled: row.public_profile_enabled,
+    publicProfileEnabled: true,
     discordPublicEnabled,
     discordUsername: discordPublicEnabled ? discordUsername : null,
     hasAvatar: row.has_avatar,
