@@ -29,7 +29,7 @@ function Fixture() {
     Object.assign(metrics.matches.operationalHealth, { openDisputes: 2, underAdminReview: 1, pendingAdminAssistance: 3, overdueMatchActions: 1, expiredConfirmationActions: 1, expiredWaitlistOffers: 1, activeAdminHolds: 2 });
     metrics.registrations.statusGroups = [{ label: "Pending", value: 19 }, { label: "Manual review", value: 11 }, { label: "Approved", value: 63 }];
     metrics.players.total = 120; metrics.players.openAccounts = 112;
-    metrics.players.completedProfiles = 104; metrics.players.steamLinked = 101; metrics.players.relicVerified = 96; metrics.players.publicProfiles = 78;
+    metrics.players.completedProfiles = 104; metrics.players.steamLinked = 101; metrics.players.relicVerified = 96;
     metrics.players.growth = { current: 12, previous: 8, changePercent: 50 };
     metrics.registrations.growth = { current: 25, previous: 20, changePercent: 25 };
     metrics.players.daily = [{ date: "2026-09-01", label: "01 Sep", value: 2 }, { date: "2026-09-02", label: "02 Sep", value: 7 }, { date: "2026-09-07", label: "07 Sep", value: 3 }];

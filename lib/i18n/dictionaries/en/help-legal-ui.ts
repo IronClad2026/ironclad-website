@@ -175,7 +175,7 @@ const dictionary = {
           "Players must use reporting and dispute tools honestly and cooperate with proportionate evidence requests. Admins may review private replays, Match metadata, submitted communications, and other reliable material, but do not require account passwords, authentication codes, or unrestricted access to personal devices.",
         privacyTitle: "Privacy & Public History",
         privacyText:
-          "Optional public-profile visibility is separate from factual competition history. Private replays, Poll records, disputes, and Admin-review material remain access-controlled. Account closure may pseudonymise a history-bearing account rather than erase official brackets, results, and standings.",
+          "Competitive profiles for accounts that have not been closed are public. Discord visibility remains a separate opt-in. Private replays, Poll records, disputes, and Admin-review material remain access-controlled. Closed accounts are excluded from public profiles; account closure may pseudonymise a history-bearing account rather than erase official brackets, results, and standings.",
         mediaTitle: "Streaming & Media",
         mediaText:
           "A permitted personal live stream uses at least a two-minute delay unless a published Event or broadcast instruction requires longer or expressly waives the default. Official broadcast and integrity requirements take priority. Final media and privacy obligations remain subject to the approved governing documents.",

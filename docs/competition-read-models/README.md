@@ -70,7 +70,7 @@ the product through an object spread. No new validation package was added.
 | Competition placements                              | Actual `tournament_standings` rank/wins/losses/points; no invented elimination placement                                                                 |
 | Champion                                            | Existing Career final/round-robin derivation, described below                                                                                            |
 | Player lookup                                       | Exact equality on `players.coh3_profile_id`; no alias, Steam nickname or card-URL fallback                                                               |
-| Current public identity                             | Current active opted-in player's in-game/display alias and existing `/players/{id}` link                                                                 |
+| Current public identity                             | Current active player's in-game/display alias and existing `/players/{id}` link                                                                 |
 | Player entries                                      | `registrations.profile_id -> players.id`; eligible public event participation from approved or publicly referenced withdrawn registrations               |
 | Player event alias/ELO                              | Returned public event registration snapshots, never current profile alias/ELO                                                                            |
 | Played-match record                                 | Existing Career/leaderboard predicate over official matches and accepted no-show classification                                                          |

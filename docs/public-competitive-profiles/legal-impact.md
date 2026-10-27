@@ -159,18 +159,20 @@ Dashboard opt-in/out wording is removed by the application change. Optional
 Discord wording and controls remain. Do not insert a new acceptance checkbox,
 gate, registration control or acceptance record in this task.
 
-The eight `lib/i18n/dictionaries/*/help-legal-ui.ts` rule guides currently
-summarize the Effective documents, including their old optional-profile rule.
-Keep that legal guide text unchanged in this implementation. After separate
-publication approval, replace the English `rules.sections.conduct.privacyText` value
-(the property named `privacyText` in the rule summary) with this proposed text,
-and update the corresponding seven translations together:
+The eight `lib/i18n/dictionaries/*/help-legal-ui.ts` rule guides now describe
+the approved public competitive-profile behavior. The English
+`rules.sections.conduct.privacyText` value and corresponding seven translations
+were updated together in the authorized release cleanup:
 
-> Every active Player has a public competitive profile with supported competitive identity and history. Discord contact visibility remains optional. Private replays, Poll records, disputes and Admin-review material remain access-controlled. Account closure may pseudonymise a history-bearing account as Former Competitor while protecting the closed profile and Relic identity and preserving official brackets, results and standings.
+> Competitive profiles for accounts that have not been closed are public. Discord visibility remains a separate opt-in. Private replays, Poll records, disputes, and Admin-review material remain access-controlled. Closed accounts are excluded from public profiles; account closure may pseudonymise a history-bearing account rather than erase official brackets, results, and standings.
 
-The temporary Staging mismatch between the legal guide's old opt-in summary and
-the new product behavior is a recorded release blocker, not authorization to
-publish revised governing terms through a translated summary.
+Marco's explicit Production release authorization accepts the temporary mismatch
+between this application behavior and the current Effective governing documents
+during the remainder of HOLD THE LINE. The operators will notify users separately.
+This cleanup does not publish or activate successor documents, change required
+versions, invalidate receipts, or trigger account-wide reacceptance. The formal
+legal transition remains a separate post-HOLD THE LINE task; the legal and privacy
+assessment below remains a draft for that task.
 
 ## Existing users, notice and HOLD THE LINE
 

@@ -145,7 +145,6 @@ function fixtureTables(): Record<string, unknown[]> {
       account_closed_at: null,
       steam_id64: "steam-linked",
       relic_elo_verified_at: CURRENT,
-      public_profile_enabled: true,
     },
     {
       id: "profile-open",
@@ -155,7 +154,6 @@ function fixtureTables(): Record<string, unknown[]> {
       account_closed_at: null,
       steam_id64: null,
       relic_elo_verified_at: null,
-      public_profile_enabled: false,
     },
     {
       id: "profile-closed",
@@ -165,7 +163,6 @@ function fixtureTables(): Record<string, unknown[]> {
       account_closed_at: CURRENT,
       steam_id64: "steam-closed",
       relic_elo_verified_at: null,
-      public_profile_enabled: true,
     },
   ];
 
@@ -685,9 +682,9 @@ describe("Admin Operations canonical loader metrics", () => {
       completedProfiles: 2,
       steamLinked: 2,
       relicVerified: 1,
-      publicProfiles: 2,
       newInPeriod: 2,
     });
+    expect(metrics.players).not.toHaveProperty("publicProfiles");
     expect(metrics.players.closedAccounts).toHaveLength(1);
     expect(metrics.players.closedAccounts[0]).toMatchObject({
       primary: "Closed Player",

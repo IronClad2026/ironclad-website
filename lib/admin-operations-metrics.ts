@@ -83,7 +83,6 @@ export type AdminOperationsMetrics = {
     completedProfiles: number;
     steamLinked: number;
     relicVerified: number;
-    publicProfiles: number;
     newInPeriod: number;
     growth: AdminOperationsGrowth;
     daily: AdminOperationsDailyPoint[];

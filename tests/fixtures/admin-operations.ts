@@ -53,7 +53,6 @@ export function emptyOperationsMetrics(): AdminOperationsMetrics {
       completedProfiles: 0,
       steamLinked: 0,
       relicVerified: 0,
-      publicProfiles: 0,
       newInPeriod: 0,
       growth: zeroGrowth,
       daily: [],

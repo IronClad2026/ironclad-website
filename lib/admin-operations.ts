@@ -564,9 +564,6 @@ function buildMetrics(input: {
       completedProfiles: players.filter((row) => row.profile_completed).length,
       steamLinked: players.filter((row) => row.steam_id64 !== null).length,
       relicVerified: players.filter((row) => row.relic_elo_verified_at !== null).length,
-      publicProfiles: players.filter(
-        (row) => row.account_closed_at === null
-      ).length,
       newInPeriod: currentPlayers.length,
       growth: calculateAdminOperationsGrowth(
         currentPlayers.length,

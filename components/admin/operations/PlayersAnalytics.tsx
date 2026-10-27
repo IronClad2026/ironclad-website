@@ -37,10 +37,6 @@ export default function PlayersAnalytics({ metrics }: { metrics: AdminOperations
             label: "Relic-verified Players",
             value: metrics.players.relicVerified,
           },
-          {
-            label: "Public profiles",
-            value: metrics.players.publicProfiles,
-          },
         ]}
       />
 
