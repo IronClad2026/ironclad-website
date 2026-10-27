@@ -60,7 +60,7 @@ function fixture(): TournamentCompetitionSnapshot {
     })),
     privacy: [30, 31].map((n) => ({
       id: uid(n),
-      public_profile_enabled: true,
+      coh3_profile_id: String(123456 + n),
       account_closed_at: null,
     })),
     generatedBrackets: [
@@ -324,7 +324,7 @@ describe("tournament competition read projection", () => {
       bracket: null,
     });
   });
-  it("uses snapshot aliases and optional public facts, never current aliases or identity", () => {
+  it("uses snapshot aliases and ELO with the current trusted canonical binding", () => {
     const result = division();
     expect(result.participants[0]).toEqual({
       registrationId: uid(20),
@@ -332,12 +332,13 @@ describe("tournament competition read projection", () => {
       eventElo: 824,
       registrationStatus: "approved",
       profileUrl: `https://www.ironcladtournaments.com/players/${uid(30)}`,
+      relicProfileId: "123486",
     });
     expect(JSON.stringify(result)).not.toMatch(
-      /steam|clerk|discord|replay|source_metadata|coh3_profile_id|relicProfileId/i,
+      /steam|clerk|discord|replay|source_metadata|coh3_profile_id/i,
     );
   });
-  it("hides a private player's profile link and ELO while retaining event alias", () => {
+  it("publishes active competitive identity regardless of the legacy privacy flag", () => {
     const s = fixture();
     const result = division({
       ...s,
@@ -348,10 +349,30 @@ describe("tournament competition read projection", () => {
     });
     expect(result.participants[0]).toMatchObject({
       eventAlias: "Event alias 20",
-      eventElo: null,
-      profileUrl: null,
+      eventElo: 824,
+      profileUrl: `https://www.ironcladtournaments.com/players/${uid(30)}`,
+      relicProfileId: "123486",
     });
   });
+  it.each([
+    null, "", "0", "01", "+123", " 123", "1e3",
+    "https://example.invalid/123", "1".repeat(21),
+  ])(
+    "does not infer or publish a noncanonical Relic binding %s",
+    (binding) => {
+      const s = fixture();
+      const result = division({
+        ...s,
+        privacy: s.privacy.map((row) => ({ ...row, coh3_profile_id: binding })),
+      });
+      expect(result.participants[0]).toMatchObject({
+        eventAlias: "Event alias 20",
+        eventElo: 824,
+        profileUrl: `https://www.ironcladtournaments.com/players/${uid(30)}`,
+        relicProfileId: null,
+      });
+    },
+  );
   it("pseudonymizes a closed player while keeping the official registration reference", () => {
     const s = fixture();
     const result = division({
@@ -363,6 +384,7 @@ describe("tournament competition read projection", () => {
       eventAlias: "Former Competitor",
       eventElo: null,
       profileUrl: null,
+      relicProfileId: null,
     });
   });
   it("fails closed when a linked player's closure/privacy authority is missing", () => {
@@ -384,6 +406,7 @@ describe("tournament competition read projection", () => {
       eventAlias: "Event alias 20",
       profileUrl: null,
       eventElo: null,
+      relicProfileId: null,
     });
   });
   it("includes withdrawn players referenced by published competition", () => {
@@ -663,7 +686,7 @@ describe("bounded SELECT-only tournament selectors", () => {
       ),
     ).toBe(true);
     expect(db.calls.find((call) => call.table === "players")?.select).toBe(
-      "id,public_profile_enabled,account_closed_at",
+      "id,coh3_profile_id,account_closed_at",
     );
     expect(
       db.calls.find((call) => call.table === "match_result_report_groups")

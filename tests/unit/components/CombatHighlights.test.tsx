@@ -18,7 +18,7 @@ const clip: PublicHighlightClip = {
 };
 const second = { ...clip, uploadId: "clip-two", title: "Holding the line", videoUrl: "https://media.example.test/public/two" };
 const initial = (): HighlightsState => ({
-  playerId: "player-one", enabled: true, publicProfileEnabled: false,
+  playerId: "player-one", enabled: true,
   slots: [
     { slotNumber: 1, displayOrder: 1, revision: 7, hidden: false, clip, pendingUploadId: null },
     { slotNumber: 2, displayOrder: 2, revision: 9, hidden: false, clip: second, pendingUploadId: null },
@@ -92,6 +92,16 @@ describe("public Combat Highlights", () => {
 });
 
 describe("Combat Highlights editor", () => {
+  it("keeps clip hiding visible without offering legacy profile privacy controls", () => {
+    const state = initial();
+    state.slots[0].hidden = true;
+    render(<CombatHighlightsEditor initialState={state} actions={actions()} />);
+    expect(screen.getByText("This clip is hidden from your public profile.")).toBeVisible();
+    expect(screen.queryByText(/clips stay hidden while your profile is private/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Manage visibility" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview A clean flank" })).toBeEnabled();
+  });
+
   it("confirms removal and submits the physical slot revision", async () => {
     const api = actions();
     const updated = initial();
@@ -129,11 +139,13 @@ describe("Combat Highlights editor", () => {
     await waitFor(() => expect(api.reorder).toHaveBeenCalledWith([2, 1, 3], [9, 7, 0]));
   });
 
-  it("does not fetch owner video until requested and revokes its blob preview", async () => {
+  it.each([false, true])("does not fetch owner video until requested and revokes its blob preview (hidden=%s)", async (hidden) => {
     const api = actions();
     vi.mocked(api.preview).mockResolvedValue({ ok: true, code: "saved", videoUrl: "https://private.example.test/owner", clerkToken: "private-session-token" });
     vi.mocked(fetch).mockResolvedValue({ ok: true, blob: async () => new Blob(["clip"], { type: "video/mp4" }) } as Response);
-    const { container } = render(<CombatHighlightsEditor initialState={initial()} actions={api} />);
+    const state = initial();
+    state.slots[0].hidden = hidden;
+    const { container } = render(<CombatHighlightsEditor initialState={state} actions={api} />);
     expect(api.preview).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(container.querySelector("video")).toBeNull();

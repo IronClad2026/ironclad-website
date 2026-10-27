@@ -94,6 +94,8 @@ for (const width of [320, 1440]) {
   test(`editor controls and owner preview work at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     const check = await openFixture(page, "surface=editor&count=2");
+    await expect(page.getByText("Your clips stay hidden while your profile is private.")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Manage visibility" })).toHaveCount(0);
     await noOverflow(page);
     expect(check.mediaRequests).toEqual([]);
     await page.getByRole("button", { name: "Preview A clean flank" }).click();

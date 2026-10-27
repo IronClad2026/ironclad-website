@@ -12,7 +12,7 @@ const clips: PublicHighlightClip[] = ["A clean flank", "Holding the line", "The 
   videoUrl: `${location.origin}/fixture-media/clip-${index + 1}.webm`, posterUrl: null,
 }));
 let state: HighlightsState = {
-  playerId: "fixture-player", enabled: true, publicProfileEnabled: false,
+  playerId: "fixture-player", enabled: true,
   slots: [1, 2, 3].map((slotNumber): HighlightSlot => ({ slotNumber, displayOrder: slotNumber, revision: 1, hidden: false, clip: slotNumber <= count ? clips[slotNumber - 1] : null, pendingUploadId: null })),
 };
 let reservation: ReserveHighlightInput | null = null;

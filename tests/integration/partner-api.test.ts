@@ -153,6 +153,32 @@ describe("authenticated partner route boundary", () => {
       /clerk|email|discord|replay|service_role/,
     );
   });
+  it.each(["123456", null])(
+    "includes the additive canonical participant Relic identity %s and a public player URL",
+    async (relicProfileId) => {
+      const participant = {
+        registrationId: "00000000-0000-4000-8000-000000000001",
+        eventAlias: "Competitor",
+        eventElo: 1500,
+        registrationStatus: "approved",
+        profileUrl: "https://www.ironcladtournaments.com/players/00000000-0000-4000-8000-000000000002",
+        relicProfileId,
+      };
+      mocks.detail.mockResolvedValue({
+        schemaVersion: VERSION,
+        divisions: [{ participants: [participant] }],
+      });
+      const response = await detail(request("tournaments/hold-the-line"), {
+        params: Promise.resolve({ slug: "hold-the-line" }),
+      });
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data.divisions[0].participants[0]).toEqual(participant);
+      expect(JSON.stringify(body)).not.toMatch(
+        /clerk|email|discord|steam|legal_receipt|ip_address|admin_notes|moderation|notification|payload|storage_path|signed_url|service_role|audit/,
+      );
+    },
+  );
   it("withholds unavailable tournaments", async () => {
     mocks.detail.mockResolvedValue(null);
     const response = await detail(request("tournaments/unknown"), {

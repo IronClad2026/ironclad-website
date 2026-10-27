@@ -1020,6 +1020,11 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     )
       .filter((name) => name.endsWith(".sql"))
       .sort();
+    const baselineMigrationNames = migrationNames.filter(
+      (name) => name <= "20261024173736_announcement_rich_documents.sql"
+    );
+    expect(migrationNames.filter((name) => !baselineMigrationNames.includes(name)))
+      .toEqual(["20261027181708_public_competitive_profile_read_projections.sql"]);
 
     const badgeIntegrationMigrationNames = new Set([
       "20260821000000_badge_award_foundation.sql",
@@ -1067,7 +1072,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "20260929032200_four_division_registration_evidence.sql",
       "20261024173736_announcement_rich_documents.sql",
     ]);
-    const platformMigrationNames = migrationNames.filter(
+    const platformMigrationNames = baselineMigrationNames.filter(
       (name) =>
         !badgeIntegrationMigrationNames.has(name) &&
         !postPr5MigrationNames.has(name)
@@ -1086,12 +1091,12 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(migrationTreeSha256(platformMigrationNames.slice(0, -2))).toBe(
       "8a66ada7bd7cae2874b3d4f6919462a1c2f74439850efac5d99aeddb0cf8b7cb"
     );
-    expect(migrationNames).toHaveLength(
+    expect(baselineMigrationNames).toHaveLength(
       platformMigrationNames.length +
         badgeIntegrationMigrationNames.size +
         postPr5MigrationNames.size
     );
-    expect(migrationNames.slice(-26)).toEqual([
+    expect(baselineMigrationNames.slice(-26)).toEqual([
       "20260831133000_staging_badge_cross_division_acceptance.sql",
       "20260831134000_staging_badge_fixture_eligibility_compatibility.sql",
       "20260902100000_unlaunched_event_void_authority.sql",

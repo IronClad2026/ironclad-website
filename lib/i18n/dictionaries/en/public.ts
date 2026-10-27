@@ -32,9 +32,9 @@ const dictionary = {
       tournamentsTitle: "Structured Tournaments",
       tournamentsText:
         "Brackets, schedules, and Tournament updates remain easy to follow.",
-      choiceTitle: "Player choice",
+      choiceTitle: "Competitive identity",
       choiceText:
-        "Public profiles and Discord contact appear only when players choose to share them.",
+        "Active IronClad players have public competitive profiles. Discord contact is shown only when a player opts in.",
       ready: "READY",
       readyText:
         "Tournaments, profiles, players, and rules connected for the next competitive Event.",
@@ -43,9 +43,9 @@ const dictionary = {
       eyebrow: "IronClad Players",
       title: "Discover the Public Roster",
       description:
-        "Browse players who choose to appear publicly, compare ELO, view public profiles, and use Discord contact where a player has opted in.",
+        "Browse active IronClad players, compare ELO, view competitive profiles, and use Discord contact where a player has opted in.",
       directory: "Player directory",
-      privacy: "Public profile details are limited to player-approved fields.",
+      privacy: "Competitive profile information is public for active players. Personal account information stays private; Discord contact is optional.",
       browse: "Browse Players",
     },
     path: {
@@ -144,7 +144,7 @@ const dictionary = {
     description:
       "Browse public IronClad commanders, competitive ELO ratings, regions, and opt-in Discord availability.",
     privacy:
-      "Only player-approved profile fields are shown. Private profiles are not listed.",
+      "Competitive profile information is public for active players. Personal account information stays private; Discord contact is optional.",
     commanders: "Public Commanders",
     directorySafe:
       "Directory data is limited to public-safe player profile fields.",
@@ -178,7 +178,7 @@ const dictionary = {
     competitiveRecord: "Competitive Record",
     publicStats: "Public Stats",
     publicStatsText:
-      "Player-approved competitive information from the public IronClad data boundary.",
+      "Competitive information from the public IronClad data boundary.",
     tournamentHistory: "Tournament History",
     tournamentHistoryText:
       "Public Tournament history will appear here once a public-safe Tournament summary is available.",

@@ -579,27 +579,53 @@ describe("public leaderboard projection", () => {
     ]);
   });
 
-  it("keeps active opted-out competitors in official standings without profile presentation", async () => {
-    const optedOutStanding = {
+  it("preserves upstream competitive identity and stored ELO for legacy-private active players in both scopes", async () => {
+    const activeStanding = {
       ...seasonStanding,
-      player_id: null,
+      player_id: "legacy-private-active-player",
       display_name: "OfficialCommander",
       in_game_name: "OfficialCommander",
-      country: null,
-      region: null,
-      current_elo: null,
-      has_avatar: false,
+      country: "Australia",
+      region: "Oceania",
+      current_elo: 1666,
+      has_avatar: true,
       current_rank: 2,
       display_order: 9,
     };
     const results: Record<string, QueryResult> = {
       leaderboard_current_season: { data: currentSeason, error: null },
       leaderboard_public_season_standings: {
-        data: [optedOutStanding],
+        data: [activeStanding],
         error: null,
       },
-      leaderboard_public_all_time_standings: { data: [], error: null },
-      leaderboard_public_season_champions: { data: [], error: null },
+      leaderboard_public_all_time_standings: {
+        data: [{
+          ...allTimeStanding,
+          player_id: activeStanding.player_id,
+          display_name: activeStanding.display_name,
+          in_game_name: activeStanding.in_game_name,
+          country: activeStanding.country,
+          region: activeStanding.region,
+          current_elo: activeStanding.current_elo,
+          has_avatar: activeStanding.has_avatar,
+        }],
+        error: null,
+      },
+      leaderboard_public_season_champions: {
+        data: [{
+          id: "active-champion",
+          season_id: "season-previous",
+          season_name: "2026 Season 2",
+          player_id: activeStanding.player_id,
+          player_name: activeStanding.in_game_name,
+          country: activeStanding.country,
+          has_avatar: true,
+          bracket_type: "main",
+          final_rank: 1,
+          final_points: 120,
+        }],
+        error: null,
+      },
     };
     fromMock.mockImplementation((table: string) =>
       createQuery(results[table]).query
@@ -609,18 +635,59 @@ describe("public leaderboard projection", () => {
 
     expect(data.seasonStandings).toEqual([
       expect.objectContaining({
-        playerId: null,
+        playerId: "legacy-private-active-player",
         playerName: "OfficialCommander",
         displayName: "OfficialCommander",
-        country: null,
-        region: null,
-        currentElo: null,
-        hasAvatar: false,
-        avatarUrl: null,
+        country: "Australia",
+        region: "Oceania",
+        currentElo: 1666,
+        hasAvatar: true,
+        avatarUrl: "/players/legacy-private-active-player/avatar",
         rank: 2,
         displayOrder: 9,
       }),
     ]);
+    expect(data.allTimeStandings).toEqual([
+      expect.objectContaining({
+        scope: "all_time",
+        playerId: "legacy-private-active-player",
+        playerName: "OfficialCommander",
+        currentElo: 1666,
+        avatarUrl: "/players/legacy-private-active-player/avatar",
+        totalPoints: 24,
+        tournamentWins: allTimeStanding.tournament_wins,
+      }),
+    ]);
+    expect(data.seasonChampions).toEqual([
+      expect.objectContaining({
+        playerId: "legacy-private-active-player",
+        playerName: "OfficialCommander",
+        country: "Australia",
+        avatarUrl: "/players/legacy-private-active-player/avatar",
+        finalRank: 1,
+        finalPoints: 120,
+      }),
+    ]);
+    expect(data.errors).toEqual([]);
+  });
+
+  it("preserves a legitimate null stored ELO while keeping active identity in both scopes", async () => {
+    const results: Record<string, QueryResult> = {
+      leaderboard_current_season: { data: currentSeason, error: null },
+      leaderboard_public_season_standings: {
+        data: [{ ...seasonStanding, current_elo: null }], error: null,
+      },
+      leaderboard_public_all_time_standings: {
+        data: [{ ...allTimeStanding, current_elo: null }], error: null,
+      },
+      leaderboard_public_season_champions: { data: [], error: null },
+    };
+    fromMock.mockImplementation((table: string) => createQuery(results[table]).query);
+    const data = await getPublicLeaderboardData();
+    for (const row of [...data.seasonStandings, ...data.allTimeStandings]) {
+      expect(row).toMatchObject({ playerId: "player-1", currentElo: null });
+    }
+    expect(data.errors).toEqual([]);
   });
 
   it("does not invent a Main / Pro rank when the public projection has no official rank", async () => {

@@ -1,15 +1,9 @@
-import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 const AVATAR_BUCKET = "player-avatars";
 const AVATAR_CACHE_CONTROL = "private, no-store, max-age=0";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-type CustomClaims = {
-  metadata?: {
-    role?: string;
-  };
-};
 const FALLBACK_AVATAR_SVG = `
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="IronClad player avatar">
   <defs>
@@ -45,7 +39,7 @@ export async function GET(
   const supabase = createSupabaseAdminClient();
   const { data: player, error: playerError } = await supabase
     .from("players")
-    .select("clerk_user_id, avatar_url, public_profile_enabled")
+    .select("clerk_user_id, avatar_url, account_closed_at")
     .eq("id", playerId)
     .maybeSingle();
 
@@ -54,19 +48,7 @@ export async function GET(
     return createFallbackAvatarResponse();
   }
 
-  if (!player?.avatar_url || !player.clerk_user_id) {
-    return createFallbackAvatarResponse();
-  }
-
-  let canReadAvatar = player.public_profile_enabled;
-
-  if (!canReadAvatar) {
-    const { userId, sessionClaims } = await auth();
-    const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-    canReadAvatar = player.clerk_user_id === userId || role === "admin";
-  }
-
-  if (!canReadAvatar) {
+  if (!player?.avatar_url || !player.clerk_user_id || player.account_closed_at !== null) {
     return createFallbackAvatarResponse();
   }
 

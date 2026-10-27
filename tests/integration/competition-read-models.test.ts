@@ -90,6 +90,18 @@ function fixture() {
         display_name: "Current Alias",
         current_elo: 999,
         clerk_user_id: "must-not-leak",
+        email: "private-email-must-not-leak",
+        legal_acceptance_receipts: "private-receipt-must-not-leak",
+        ip_address: "private-ip-must-not-leak",
+        admin_notes: "private-admin-must-not-leak",
+        moderation_notes: "private-moderation-must-not-leak",
+        notifications: "private-notification-must-not-leak",
+        steam_verification_payload: "raw-steam-must-not-leak",
+        relic_verification_payload: "raw-relic-must-not-leak",
+        avatar_url: "private-avatar-path-must-not-leak",
+        replay_storage_path: "private-replay-path-must-not-leak",
+        signed_url: "private-signed-url-must-not-leak",
+        audit_metadata: "private-audit-must-not-leak",
       },
       {
         id: uuid(202),
@@ -251,7 +263,10 @@ describe("competition read products together", () => {
       db.requests.filter((request) => request.table === "tournaments"),
     ).toHaveLength(1);
     expect(JSON.stringify(result)).not.toContain("must-not-leak");
-    expect(JSON.stringify(result)).not.toContain("7777777");
+    expect(JSON.stringify(result)).not.toMatch(
+      /clerk|email|legal_acceptance|ip_address|admin_notes|moderation_notes|notifications|verification_payload|avatar_url|storage_path|signed_url|audit_metadata/,
+    );
+    expect(old.matches[0].playerTwoRegistrationId).toBe(uuid(102));
     expect(
       db.requests.some((request) =>
         /clerk|email|discord|proof|admin_notes/.test(request.projection),
@@ -259,7 +274,7 @@ describe("competition read products together", () => {
     ).toBe(false);
   });
 
-  it("retains public event alias without linking a private competitor", async () => {
+  it("links an active legacy-private competitor and publishes only their verified binding", async () => {
     const db = fixture();
     const event = await loadTournamentCompetitionView(
       db.client,
@@ -271,21 +286,93 @@ describe("competition read products together", () => {
       .participants.find((row) => row.registrationId === uuid(102));
     expect(opponent).toMatchObject({
       eventAlias: "Historical Opponent",
-      eventElo: null,
-      profileUrl: null,
+      eventElo: 1600,
+      profileUrl: `https://www.ironcladtournaments.com/players/${uuid(202)}`,
+      relicProfileId: "7777777",
     });
+    for (const participant of event!.divisions.flatMap(
+      (division) => division.participants,
+    )) {
+      expect(Object.keys(participant).sort()).toEqual([
+        "eventAlias",
+        "eventElo",
+        "profileUrl",
+        "registrationId",
+        "registrationStatus",
+        "relicProfileId",
+      ]);
+    }
+    expect(JSON.stringify(event)).not.toContain("must-not-leak");
     expect(
       event!.divisions.find((division) => division.canonicalName === "Main")!
         .bracket!.matches[0].decidedAt,
     ).toBeNull();
   });
 
-  it("never loads history for a private canonical identity", async () => {
+  it("loads factual history for an active legacy-private canonical identity", async () => {
     const db = fixture();
     await expect(
       loadPlayerCompetitionHistory(db.client, "7777777", { now }),
+    ).resolves.toMatchObject({
+      outcome: "FOUND_VISIBLE",
+      player: {
+        relicProfileId: "7777777",
+        currentIdentity: {
+          alias: "Private Alias",
+          profileUrl: `https://www.ironcladtournaments.com/players/${uuid(202)}`,
+        },
+        aggregate: { tournamentsEntered: 1, matchesPlayed: 1, wins: 0, losses: 1 },
+      },
+    });
+    expect(
+      db.requests.some((request) => request.table === "registrations"),
+    ).toBe(true);
+    expect(
+      db.requests.every(
+        (request) => !request.projection.includes("public_profile_enabled"),
+      ),
+    ).toBe(true);
+  });
+
+  it("retains the public profile URL without manufacturing an unbound Relic identity", async () => {
+    const db = fixture();
+    db.tables.players[1].coh3_profile_id = null;
+    const event = await loadTournamentCompetitionView(
+      db.client, "legacy-event", { now },
+    );
+    const opponent = event!.divisions
+      .find((division) => division.canonicalName === "Main")!
+      .participants.find((row) => row.registrationId === uuid(102));
+    expect(opponent).toEqual({
+      registrationId: uuid(102),
+      eventAlias: "Historical Opponent",
+      eventElo: 1600,
+      registrationStatus: "approved",
+      profileUrl: `https://www.ironcladtournaments.com/players/${uuid(202)}`,
+      relicProfileId: null,
+    });
+  });
+
+  it("does not correlate a defensively bound closed competitor", async () => {
+    const db = fixture();
+    db.tables.players[1].account_closed_at = "2026-10-20T00:00:00Z";
+    await expect(
+      loadPlayerCompetitionHistory(db.client, "7777777", { now }),
     ).resolves.toEqual({ outcome: "HIDDEN" });
-    expect(db.requests.map((request) => request.table)).toEqual(["players"]);
+    const event = await loadTournamentCompetitionView(
+      db.client, "legacy-event", { now },
+    );
+    const opponent = event!.divisions
+      .find((division) => division.canonicalName === "Main")!
+      .participants.find((row) => row.registrationId === uuid(102));
+    expect(opponent).toEqual({
+      registrationId: uuid(102),
+      eventAlias: "Former Competitor",
+      eventElo: null,
+      registrationStatus: "approved",
+      profileUrl: null,
+      relicProfileId: null,
+    });
   });
 
   it("does not recover an unbound or closed identity from historical aliases", async () => {

@@ -685,7 +685,7 @@ describe("Admin Operations canonical loader metrics", () => {
       completedProfiles: 2,
       steamLinked: 2,
       relicVerified: 1,
-      publicProfiles: 1,
+      publicProfiles: 2,
       newInPeriod: 2,
     });
     expect(metrics.players.closedAccounts).toHaveLength(1);

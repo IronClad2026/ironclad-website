@@ -25,6 +25,7 @@ type AvatarPlayer = {
   avatar_url: string | null;
   clerk_user_id: string | null;
   public_profile_enabled: boolean;
+  account_closed_at: string | null;
 };
 
 function createAvatarClient({
@@ -92,12 +93,13 @@ describe("public player avatar route", () => {
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
-  it("serves an opted-in player's avatar anonymously without raw-path exposure", async () => {
+  it.each([true, false])("serves an active legacy flag %s player's avatar anonymously without raw-path exposure", async (legacy) => {
     const supabase = createAvatarClient({
       player: {
         avatar_url: `/players/${PLAYER_ID}/avatar`,
         clerk_user_id: OWNER_ID,
-        public_profile_enabled: true,
+        public_profile_enabled: legacy,
+        account_closed_at: null,
       },
     });
     createSupabaseAdminClientMock.mockReturnValue(supabase.client);
@@ -111,12 +113,13 @@ describe("public player avatar route", () => {
     expect(supabase.download).toHaveBeenCalledOnce();
   });
 
-  it("makes a private profile indistinguishable from a missing profile", async () => {
+  it("makes a closed profile indistinguishable from a missing profile", async () => {
     const privateClient = createAvatarClient({
       player: {
         avatar_url: `/players/${PLAYER_ID}/avatar`,
         clerk_user_id: OWNER_ID,
         public_profile_enabled: false,
+        account_closed_at: "2026-10-27T00:00:00Z",
       },
     });
     createSupabaseAdminClientMock.mockReturnValueOnce(privateClient.client);
@@ -137,12 +140,13 @@ describe("public player avatar route", () => {
     expect(missingClient.download).not.toHaveBeenCalled();
   });
 
-  it("does not serve a private avatar to another signed-in player", async () => {
+  it("does not serve a closed avatar to another signed-in player", async () => {
     const supabase = createAvatarClient({
       player: {
         avatar_url: `/players/${PLAYER_ID}/avatar`,
         clerk_user_id: OWNER_ID,
         public_profile_enabled: false,
+        account_closed_at: "2026-10-27T00:00:00Z",
       },
     });
     createSupabaseAdminClientMock.mockReturnValue(supabase.client);
@@ -164,12 +168,13 @@ describe("public player avatar route", () => {
       },
     ],
     ["admin", adminIdentity],
-  ])("serves a private avatar to the %s", async (_name, identity) => {
+  ])("keeps a closed avatar hidden from its %s", async (_name, identity) => {
     const supabase = createAvatarClient({
       player: {
         avatar_url: `/players/${PLAYER_ID}/avatar`,
         clerk_user_id: OWNER_ID,
         public_profile_enabled: false,
+        account_closed_at: "2026-10-27T00:00:00Z",
       },
     });
     createSupabaseAdminClientMock.mockReturnValue(supabase.client);
@@ -177,8 +182,8 @@ describe("public player avatar route", () => {
 
     const response = await requestAvatar();
 
-    expect(response.headers.get("Content-Type")).toBe("image/png");
+    expect(response.headers.get("Content-Type")).toContain("image/svg+xml");
     expectPrivateNoStore(response);
-    expect(supabase.download).toHaveBeenCalledOnce();
+    expect(supabase.download).not.toHaveBeenCalled();
   });
 });

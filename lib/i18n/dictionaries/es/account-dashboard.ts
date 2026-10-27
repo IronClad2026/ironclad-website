@@ -11,11 +11,8 @@ const dictionary = {
     manage: "Gestionar presentación",
     backToDashboard: "Volver al panel",
     publicProfile: "Perfil público",
-    privateProfile: "Perfil privado",
     publicVisibilityHelp: "Tu idea del momento y tu logro destacado aparecen en tu perfil público.",
-    privateVisibilityHelp: "Tu presentación permanece oculta mientras tu perfil sea privado.",
     viewPublicProfile: "Ver perfil público",
-    manageVisibility: "Gestionar visibilidad",
     thoughtTitle: "Idea del momento",
     thoughtHelp: "Hasta 160 caracteres de texto sin formato. Se permiten emojis; los emojis combinados pueden contar como varios caracteres.",
     thoughtPlaceholder: "¿Qué tienes en mente?",
@@ -44,7 +41,7 @@ const dictionary = {
     removedBadge: "Este logro ya no está disponible para destacar.",
     report: "Informar de un problema",
     adminTitle: "Moderación de la presentación",
-    adminDescription: "Oculta o restaura la idea del momento de un jugador. La privacidad del perfil sigue aplicándose.",
+    adminDescription: "Oculta o restaura la idea del momento de un jugador. Las cuentas cerradas siguen excluidas de los perfiles públicos.",
     playerId: "ID del jugador",
     hideThought: "Ocultar idea",
     restoreThought: "Restaurar idea",
@@ -262,12 +259,7 @@ const dictionary = {
     private: "Privado",
     enabled: "Activado",
     disabled: "Desactivado",
-    publicTitle: "Perfil público de jugador",
-    publicDescription:
-      "Muestra en el directorio el avatar y los datos del perfil que has autorizado para su publicación. La visibilidad del contacto de Discord sigue siendo una opción independiente.",
     updating: "Actualizando…",
-    makePrivate: "Hacer privado",
-    makePublic: "Hacer público",
     discordTitle: "Contacto de Discord",
     discordDescription:
       "Discord es opcional, pero recomendable. Si añades un usuario, puedes decidir por separado si aparece en tu perfil público.",
@@ -276,16 +268,8 @@ const dictionary = {
     addDiscord: "Añadir Discord en el perfil",
     turnOff: "Desactivar",
     turnOn: "Activar",
-    signInProfile:
-      "Inicia sesión antes de cambiar la visibilidad del perfil.",
-    invalidProfile: "Elige si el perfil público está activado.",
-    profileUpdateFailed: "No se pudo actualizar la visibilidad del perfil.",
     profileRequired:
       "Completa tu perfil antes de cambiar esta configuración.",
-    profileVerifyFailed:
-      "No se pudo verificar la visibilidad del perfil.",
-    profileNowPublic: "Tu perfil de jugador ahora es público.",
-    profileNowPrivate: "Tu perfil de jugador ahora es privado.",
     signInDiscord:
       "Inicia sesión antes de cambiar la visibilidad de Discord.",
     invalidDiscord: "Elige si el contacto de Discord debe ser público.",

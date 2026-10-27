@@ -110,12 +110,6 @@ const CONDITIONAL_GUARDED_ACTIONS = [
     exemption: "disabling public Discord visibility",
   },
   {
-    path: "app/dashboard/public-profile-actions.ts",
-    action: "updatePublicProfileEnabled",
-    condition: "enabled",
-    exemption: "making a public profile private",
-  },
-  {
     path: "app/dashboard/registration-actions.ts",
     action: "respondToWaitlistOfferAction",
     condition: 'response === "accept"',
@@ -327,8 +321,8 @@ describe("account legal mutation boundary architecture", () => {
       )
     );
 
-    expect(new Set(expected).size).toBe(83);
-    expect(expected).toHaveLength(83);
+    expect(new Set(expected).size).toBe(82);
+    expect(expected).toHaveLength(82);
     expect(actual.sort()).toEqual(expected.sort());
   });
 
@@ -366,8 +360,8 @@ describe("account legal mutation boundary architecture", () => {
     }
   });
 
-  it("keeps the four one-way privacy and withdrawal exemptions conditional", () => {
-    expect(CONDITIONAL_GUARDED_ACTIONS).toHaveLength(4);
+  it("keeps the three one-way privacy and withdrawal exemptions conditional", () => {
+    expect(CONDITIONAL_GUARDED_ACTIONS).toHaveLength(3);
 
     for (const { path, action, condition, exemption } of
       CONDITIONAL_GUARDED_ACTIONS) {

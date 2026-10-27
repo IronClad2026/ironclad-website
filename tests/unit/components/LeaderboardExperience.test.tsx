@@ -416,7 +416,7 @@ describe("LeaderboardExperience", () => {
     expect(within(table).queryByText("Main Progression")).not.toBeInTheDocument();
   });
 
-  it("keeps Career divisions separate and renders opted-out and closed identities safely", () => {
+  it("keeps Career divisions separate with public active identities and protected closed identities", () => {
     const academyRows = [
       standing({
         scope: "all_time",
@@ -430,14 +430,11 @@ describe("LeaderboardExperience", () => {
         scope: "all_time",
         seasonId: null,
         bracketType: "academy",
-        playerId: null,
-        playerName: "Opted Out Commander",
-        displayName: "Opted Out Commander",
-        country: null,
-        region: null,
-        currentElo: null,
-        hasAvatar: false,
-        avatarUrl: null,
+        playerId: "legacy-private-active-player",
+        playerName: "Legacy Private Commander",
+        displayName: "Legacy Private Commander",
+        currentElo: 977,
+        avatarUrl: "/players/legacy-private-active-player/avatar",
         rank: 2,
         displayOrder: 2,
       }),
@@ -509,14 +506,109 @@ describe("LeaderboardExperience", () => {
       "/players/11111111-1111-4111-8111-111111111111"
     );
     expect(
-      within(table).queryByRole("link", { name: /Opted Out Commander/ })
-    ).not.toBeInTheDocument();
-    expect(within(table).getByText("Opted Out Commander")).toBeInTheDocument();
+      within(table).getByRole("link", { name: /Legacy Private Commander/ })
+    ).toHaveAttribute("href", "/players/legacy-private-active-player");
+    expect(within(table).getByRole("row", { name: /Legacy Private Commander/ }))
+      .toHaveTextContent("977");
     expect(within(table).getAllByText("Former Competitor")).toHaveLength(2);
+    expect(within(table).queryByRole("link", { name: /Former Competitor/ }))
+      .not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Challenge Career" }));
     table = screen.getByRole("table");
     expect(within(table).getByText("Challenge Competitor")).toBeInTheDocument();
     expect(within(table).queryByText("Opted In")).not.toBeInTheDocument();
+  });
+
+  it("renders upstream stored ELO and profile links in Current Season and All-Time while null stays Unrated", () => {
+    const rows = [
+      standing({
+        playerId: "legacy-private-active-player",
+        playerName: "Legacy Private Commander",
+        displayName: "Legacy Private Commander",
+        currentElo: 1666,
+      }),
+      standing({
+        playerId: "active-unrated-player",
+        playerName: "Unrated Active Commander",
+        displayName: "Unrated Active Commander",
+        currentElo: null,
+        rank: 2,
+        displayOrder: 2,
+      }),
+      standing({
+        playerId: null,
+        playerName: "Former Competitor",
+        displayName: "Former Competitor",
+        country: null,
+        region: null,
+        currentElo: null,
+        hasAvatar: false,
+        avatarUrl: null,
+        rank: 3,
+        displayOrder: 3,
+      }),
+    ];
+    render(<LeaderboardExperience data={leaderboardData({
+      seasonStandings: rows,
+      allTimeStandings: rows.map((row) => ({
+        ...row, scope: "all_time", seasonId: null,
+      })),
+    })} />);
+
+    for (const scope of ["Current Season", "All-Time"]) {
+      fireEvent.click(screen.getByRole("button", { name: scope }));
+      const table = screen.getByRole("table");
+      const active = within(table).getByRole("row", { name: /Legacy Private Commander/ });
+      expect(active).toHaveTextContent("1,666");
+      expect(within(active).queryByText("Unrated")).not.toBeInTheDocument();
+      expect(within(active).getByRole("link", { name: /Legacy Private Commander/ }))
+        .toHaveAttribute("href", "/players/legacy-private-active-player");
+      const unrated = within(table).getByRole("row", { name: /Unrated Active Commander/ });
+      expect(within(unrated).getByText("Unrated")).toBeInTheDocument();
+      expect(within(unrated).getByRole("link", { name: /Unrated Active Commander/ }))
+        .toHaveAttribute("href", "/players/active-unrated-player");
+      const closed = within(table).getByRole("row", { name: /Former Competitor/ });
+      expect(within(closed).queryByRole("link")).not.toBeInTheDocument();
+      expect(within(closed).getByText("Unrated")).toBeInTheDocument();
+    }
+  });
+
+  it("links an active legacy-private champion while keeping a closed champion anonymous", () => {
+    render(<LeaderboardExperience data={leaderboardData({
+      seasonChampions: [
+        {
+          id: "active-champion",
+          seasonName: "2026 Season 2",
+          bracketType: "main",
+          playerId: "legacy-private-active-player",
+          playerName: "Legacy Private Champion",
+          country: "Australia",
+          hasAvatar: true,
+          avatarUrl: "/players/legacy-private-active-player/avatar",
+          finalRank: 1,
+          finalPoints: 120,
+        },
+        {
+          id: "closed-champion",
+          seasonName: "2025 Season 1",
+          bracketType: "main",
+          playerId: null,
+          playerName: "Former Competitor",
+          country: null,
+          hasAvatar: false,
+          avatarUrl: null,
+          finalRank: 1,
+          finalPoints: 100,
+        },
+      ],
+    })} />);
+    const active = screen.getByRole("link", { name: /Legacy Private Champion/ });
+    expect(active).toHaveAttribute("href", "/players/legacy-private-active-player");
+    expect(active).toHaveTextContent("120");
+    const closed = screen.getByText("Former Competitor");
+    expect(closed.closest("a")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Former Competitor/ }))
+      .not.toBeInTheDocument();
   });
 });

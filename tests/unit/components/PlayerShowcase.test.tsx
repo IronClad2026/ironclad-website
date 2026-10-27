@@ -26,7 +26,6 @@ const state: ShowcaseEditorState = {
   featuredBadgeAwardId: null,
   thoughtHidden: false,
   revision: 4,
-  publicProfileEnabled: true,
   awards: [
     { awardId: "earned-1", slug: "first-victory", unlockedAt: "2026-08-01T00:00:00Z" },
     { awardId: "earned-2", slug: "elite-champion", unlockedAt: null },
@@ -160,13 +159,12 @@ describe("Player Showcase editor", () => {
     expect(screen.queryByText(account.showcase.removedBadge)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: account.showcase.removeBadge })).not.toBeInTheDocument();
   });
-  it("keeps private profiles private and handles an empty earned collection", () => {
+  it("keeps the public profile linked while preserving moderation and an empty earned collection", () => {
     const props = actions();
-    render(<PlayerShowcaseEditor initialState={{ ...state, awards: [], publicProfileEnabled: false, thoughtHidden: true }} {...props} />);
-    expect(screen.getByText(account.showcase.privateProfile)).toBeInTheDocument();
+    render(<PlayerShowcaseEditor initialState={{ ...state, awards: [], thoughtHidden: true }} {...props} />);
+    expect(screen.getByText(account.showcase.publicProfile)).toBeInTheDocument();
     expect(screen.getByText(account.showcase.thoughtHidden)).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: account.showcase.viewPublicProfile })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: account.showcase.manageVisibility })).toHaveAttribute("href", "/dashboard#dashboard-visibility-title");
+    expect(screen.getByRole("link", { name: account.showcase.viewPublicProfile })).toHaveAttribute("href", "/players/fixture-player");
     expect(screen.queryByRole("button", { name: account.showcase.chooseBadge })).not.toBeInTheDocument();
   });
 });

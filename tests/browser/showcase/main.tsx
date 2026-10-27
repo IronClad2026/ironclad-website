@@ -20,7 +20,6 @@ const player: PublicPlayerProfile = {
 const initialState: ShowcaseEditorState = {
   playerId: player.id, currentThought: "Training Wehrmacht this week. Next goal: first Challenge final.",
   featuredBadgeAwardId: "earned-1", thoughtHidden: query.has("hidden"), revision: 1,
-  publicProfileEnabled: !query.has("private"),
   awards: query.has("empty") ? [] : [
     { awardId: "earned-1", slug: "first-victory", unlockedAt: "2026-08-01T00:00:00Z" },
     { awardId: "earned-2", slug: "elite-champion", unlockedAt: null },
