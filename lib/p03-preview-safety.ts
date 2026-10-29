@@ -52,13 +52,14 @@ function isStagingDatabase(value: string): boolean {
 
 function isStagingKey(
   value: string | undefined,
-  role: "anon" | "service_role"
+  role: "anon" | "service_role",
+  requireProjectBoundKeys = false
 ): boolean {
   if (!value || value !== value.trim()) return false;
   const opaquePrefix = role === "anon" ? "sb_publishable_" : "sb_secret_";
   if (value.startsWith(opaquePrefix) && value.length > opaquePrefix.length) {
     // Opaque keys cannot expose a project ref; the exact URL remains mandatory.
-    return true;
+    return !requireProjectBoundKeys;
   }
   const parts = value.split(".");
   if (parts.length !== 3 || parts.some((part) => !/^[A-Za-z0-9_-]+$/.test(part))) {
@@ -74,13 +75,11 @@ function isStagingKey(
   }
 }
 
-/** Fail before build-time application evaluation; never print environment values. */
-export function assertP03PreviewSafety(
-  environment: PreviewEnvironment = process.env
+/** Shared resource validation without changing or inferring branch identity. */
+export function assertStagingPreviewResources(
+  environment: PreviewEnvironment,
+  options: { requireProjectBoundKeys?: boolean } = {}
 ): void {
-  if (environment.VERCEL_ENV !== "preview" ||
-    environment.VERCEL_GIT_COMMIT_REF !== CANDIDATE_BRANCH) return;
-
   const failures: string[] = [];
   if (!isStagingOrigin(environment.NEXT_PUBLIC_SUPABASE_URL)) {
     failures.push("NEXT_PUBLIC_SUPABASE_URL must identify the approved Staging origin");
@@ -93,10 +92,17 @@ export function assertP03PreviewSafety(
   }
   const publishableKey = environment.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     environment.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!isStagingKey(publishableKey, "anon")) {
+  if (!isStagingKey(publishableKey, "anon", options.requireProjectBoundKeys)) {
     failures.push("The effective Supabase public key must be present and its JWT identity must match Staging");
   }
-  if (!isStagingKey(environment.SUPABASE_SERVICE_ROLE_KEY, "service_role")) {
+  if (options.requireProjectBoundKeys) {
+    for (const key of ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] as const) {
+      if (environment[key] !== undefined && !isStagingKey(environment[key], "anon", true)) {
+        failures.push(`${key} must identify the approved Staging anon role`);
+      }
+    }
+  }
+  if (!isStagingKey(environment.SUPABASE_SERVICE_ROLE_KEY, "service_role", options.requireProjectBoundKeys)) {
     failures.push("SUPABASE_SERVICE_ROLE_KEY must be present and its JWT identity must match Staging");
   }
   if (Object.values(environment).some((value) => value?.includes(PRODUCTION_REF))) {
@@ -118,6 +124,16 @@ export function assertP03PreviewSafety(
   // Layout and the reporting loader already require VERCEL_ENV=production
   // before using analytics. No additional public analytics flag is introduced.
   if (failures.length) {
-    throw new Error(`P03 Preview isolation check failed: ${failures.join("; ")}.`);
+    throw new Error(`Staging Preview isolation check failed: ${failures.join("; ")}.`);
   }
+}
+
+/** Fail before build-time application evaluation; never print environment values. */
+export function assertP03PreviewSafety(
+  environment: PreviewEnvironment = process.env
+): void {
+  if (environment.VERCEL_ENV !== "preview" ||
+    environment.VERCEL_GIT_COMMIT_REF !== CANDIDATE_BRANCH) return;
+
+  assertStagingPreviewResources(environment);
 }
