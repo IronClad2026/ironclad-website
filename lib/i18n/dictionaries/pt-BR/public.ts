@@ -11,6 +11,11 @@ const dictionary = {
   },
   regions: { europe: "Europa", northAmerica: "América do Norte", southAmerica: "América do Sul", oceania: "Oceania", asia: "Ásia", middleEast: "Oriente Médio", africa: "África", global: "Global" },
   home: {
+    collaboration: {
+      heading: "Colabore com a IronClad",
+      body: "Recebemos consultas sobre patrocínio, propostas de parceria e ideias de colaboração.",
+      contact: "Fale conosco",
+    },
     hero: { eyebrow: "Eventos competitivos de Company of Heroes 3", title: "Torneios IronClad", description: "Dispute competições 1v1 com divisões verificadas, jogo justo, classificações de carreira permanentes e temporadas Pro de seis eventos.", viewTournaments: "Ver torneios", joinDiscord: "Entrar no Discord (opcional)", launchFormat: "Formato de lançamento", divisionSize: "Tamanho da divisão", integrityModel: "Modelo de integridade", fairPlay: "Jogo justo" },
     command: { label: "Resumo do comando IronClad", online: "Operações online", integrityTitle: "Competição íntegra", integrityText: "Regras claras e análise da administração mantêm a competição justa e organizada.", tournamentsTitle: "Torneios estruturados", tournamentsText: "Chaves, cronogramas e atualizações de torneios são fáceis de acompanhar.", choiceTitle: "Identidade competitiva", choiceText: "Jogadores ativos do IronClad têm perfis competitivos públicos. O contato do Discord só aparece quando o jogador escolhe compartilhá-lo.", ready: "PRONTO", readyText: "Torneios, perfis, jogadores e regras estão prontos para o próximo evento." },
     players: { eyebrow: "Jogadores IronClad", title: "Conheça o elenco", description: "Conheça os jogadores ativos do IronClad, compare ELO e veja seus perfis competitivos. O contato do Discord é opcional.", directory: "Diretório de jogadores", privacy: "As informações competitivas dos jogadores ativos são públicas. Os dados pessoais da conta continuam privados; o contato do Discord é opcional.", browse: "Ver jogadores" },

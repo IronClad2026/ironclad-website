@@ -14,6 +14,11 @@ const dictionary = {
   },
   regions: shared.regions,
   home: {
+    collaboration: {
+      heading: "Collaborate with IronClad",
+      body: "We welcome sponsorship enquiries, partnership proposals, and ideas for collaboration.",
+      contact: "Contact us",
+    },
     hero: {
       eyebrow: "Competitive Company of Heroes 3 Events",
       title: "IronClad Tournaments",
