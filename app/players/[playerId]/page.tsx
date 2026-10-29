@@ -1,13 +1,14 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import PublicPlayerProfileHeader from "@/components/PublicPlayerProfileHeader";
+import PublicPlayerStats from "@/components/PublicPlayerStats";
 import CombatHighlights from "@/components/combat-highlights/CombatHighlights";
+import { getPublicPlayerShowcase } from "@/lib/player-showcase/read";
 import { getPublicCombatHighlights } from "@/lib/combat-highlights/read";
 import { reportHighlight } from "../highlight-actions";
-import PublicPlayerStats from "@/components/PublicPlayerStats";
 import { getPublicActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
 import { getPublicPlayerById } from "@/lib/public-players";
-import { getPublicPlayerShowcase } from "@/lib/player-showcase/read";
+import { getPublicPlayerCompetitionHistory, parsePublicHistoryPage } from "@/lib/public-player-competition";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 type PublicPlayerPageProps = {
   params: Promise<{ playerId: string }>;
+  searchParams: Promise<{ historyPage?: string | string[] }>;
 };
 
 // Share only this render's public profile snapshot between metadata and page.
@@ -48,6 +50,7 @@ export async function generateMetadata({ params }: PublicPlayerPageProps) {
 
 export default async function PublicPlayerProfilePage({
   params,
+  searchParams,
 }: PublicPlayerPageProps) {
   const { playerId } = await params;
   const player = await getPlayerForRequest(playerId);
@@ -57,12 +60,17 @@ export default async function PublicPlayerProfilePage({
   }
 
   const locale = await getRequestLocale();
-  const [activeTournamentEloSnapshots, showcase, badgeDictionary, highlights] = await Promise.all([
-    getPublicActiveTournamentEloSnapshots(player.id),
-    getPublicPlayerShowcase(player.id),
-    loadDictionary(locale, "badges"),
-    getPublicCombatHighlights(player.id),
-  ]);
+  const historyPage = parsePublicHistoryPage((await searchParams).historyPage);
+  const [activeTournamentEloSnapshots, showcase, clips, badgeDictionary, competitionHistory] =
+    await Promise.all([
+      getPublicActiveTournamentEloSnapshots(player.id),
+      getPublicPlayerShowcase(player.id),
+      getPublicCombatHighlights(player.id),
+      loadDictionary(locale, "badges"),
+      getPublicPlayerCompetitionHistory(player.id, historyPage),
+    ]);
+
+  if (competitionHistory.status === "not_found") notFound();
 
   return (
     <main
@@ -77,10 +85,11 @@ export default async function PublicPlayerProfilePage({
       }}
     >
       <PublicPlayerProfileHeader player={player} showcase={showcase} badgeDictionary={badgeDictionary} />
-      <CombatHighlights clips={highlights} report={reportHighlight} />
+      <CombatHighlights clips={clips} report={reportHighlight} />
       <PublicPlayerStats
         player={player}
         activeTournamentEloSnapshots={activeTournamentEloSnapshots}
+        competitionHistory={competitionHistory}
       />
     </main>
   );

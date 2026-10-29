@@ -21,7 +21,7 @@ const player: PublicPlayerProfile = {
 
 describe("focused public profile fallbacks", () => {
   it("preserves the unwrapped English profile and opt-out boundary", () => {
-    render(<><PublicPlayerProfileHeader player={player} /><PublicPlayerStats player={player} activeTournamentEloSnapshots={[]} /></>);
+    render(<><PublicPlayerProfileHeader player={player} /><PublicPlayerStats player={player} activeTournamentEloSnapshots={[]} competitionHistory={{ status: "unavailable" }} /></>);
     expect(screen.getByRole("link", { name: "Back to Players" })).toHaveAttribute("href", "/players");
     expect(screen.getByRole("heading", { name: "Public Stats" })).toBeVisible();
     expect(screen.getByText("Discord contact not available.")).toBeVisible();
@@ -31,7 +31,7 @@ describe("focused public profile fallbacks", () => {
   it.each(SUPPORTED_LOCALES)("preserves the ordinary profile and private contact copy in %s", async (locale) => {
     const dictionaries = await loadDictionaries(locale, ["public", "account-dashboard"] as const);
     const copy = dictionaries.public;
-    render(<LocaleProvider locale={locale} dictionaries={dictionaries}><PublicPlayerProfileHeader player={player} /><PublicPlayerStats player={player} activeTournamentEloSnapshots={[]} /></LocaleProvider>);
+    render(<LocaleProvider locale={locale} dictionaries={dictionaries}><PublicPlayerProfileHeader player={player} /><PublicPlayerStats player={player} activeTournamentEloSnapshots={[]} competitionHistory={{ status: "unavailable" }} /></LocaleProvider>);
     expect(screen.getByRole("link", { name: copy.players.back })).toHaveAttribute("href", "/players");
     expect(screen.getByRole("heading", { name: copy.players.publicStats })).toBeVisible();
     expect(screen.getByText(copy.players.discordUnavailable)).toBeVisible();

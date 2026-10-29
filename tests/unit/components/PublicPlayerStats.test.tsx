@@ -34,6 +34,7 @@ describe("PublicPlayerStats active tournament ELO snapshot", () => {
     render(
       <PublicPlayerStats
         player={player}
+        competitionHistory={{ status: "unavailable" }}
         activeTournamentEloSnapshots={[]}
       />
     );
@@ -50,6 +51,7 @@ describe("PublicPlayerStats active tournament ELO snapshot", () => {
     render(
       <PublicPlayerStats
         player={player}
+        competitionHistory={{ status: "unavailable" }}
         activeTournamentEloSnapshots={[
           {
             tournamentTitle: "IronClad August Open",

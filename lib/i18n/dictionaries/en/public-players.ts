@@ -1,7 +1,9 @@
 import shared from "./public-shared";
+import history from "./public-player-history";
 
 const dictionary = {
   players: {
+    history,
     metadataTitle: "Players Directory | IronClad",
     metadataDescription:
       "Browse public IronClad Company of Heroes 3 player profiles and competitive ratings.",
