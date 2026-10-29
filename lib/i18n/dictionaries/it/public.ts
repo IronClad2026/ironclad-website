@@ -12,6 +12,11 @@ const dictionary = {
   },
   regions: { europe: "Europa", northAmerica: "Nord America", southAmerica: "Sud America", oceania: "Oceania", asia: "Asia", middleEast: "Medio Oriente", africa: "Africa", global: "Globale" },
   home: {
+    collaboration: {
+      heading: "Collabora con IronClad",
+      body: "Accogliamo richieste di sponsorizzazione, proposte di partnership e idee di collaborazione.",
+      contact: "Contattaci",
+    },
     hero: {
       eyebrow: "Eventi competitivi di Company of Heroes 3",
       title: "Tornei IronClad",

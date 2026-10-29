@@ -12,6 +12,11 @@ const dictionary = {
   },
   regions: { europe: "유럽", northAmerica: "북아메리카", southAmerica: "남아메리카", oceania: "오세아니아", asia: "아시아", middleEast: "중동", africa: "아프리카", global: "전 세계" },
   home: {
+    collaboration: {
+      heading: "IronClad와 협력하세요",
+      body: "후원 문의, 파트너십 제안, 협업 아이디어를 환영합니다.",
+      contact: "문의하기",
+    },
     hero: { eyebrow: "Company of Heroes 3 경쟁 이벤트", title: "IronClad 토너먼트", description: "검증된 디비전, 공정한 경기, 영구 커리어 순위와 6개 이벤트로 구성된 Pro 시즌에서 1v1로 경쟁하세요.", viewTournaments: "토너먼트 보기", joinDiscord: "Discord 참가(선택)", launchFormat: "출시 형식", divisionSize: "디비전 규모", integrityModel: "공정성 모델", fairPlay: "공정한 경기" },
     command: { label: "IronClad 지휘 요약", online: "시스템 정상", integrityTitle: "공정한 경쟁", integrityText: "명확한 규칙과 관리자 검토로 공정하고 체계적인 경쟁을 유지합니다.", tournamentsTitle: "체계적인 토너먼트", tournamentsText: "대진표, 일정, 토너먼트 업데이트를 손쉽게 확인할 수 있습니다.", choiceTitle: "경쟁 프로필", choiceText: "활성 IronClad 플레이어는 공개 경쟁 프로필을 가집니다. Discord 연락처는 플레이어가 공개를 선택한 경우에만 표시됩니다.", ready: "준비 완료", readyText: "토너먼트, 프로필, 플레이어와 규칙이 다음 이벤트를 위해 준비되었습니다." },
     players: { eyebrow: "IronClad 플레이어", title: "참가 명단 보기", description: "활성 IronClad 플레이어를 찾아 ELO를 비교하고 경쟁 프로필을 확인하세요. Discord 연락처 공개는 선택 사항입니다.", directory: "플레이어 디렉터리", privacy: "활성 플레이어의 경쟁 정보는 공개됩니다. 개인 계정 정보는 비공개로 유지되며 Discord 연락처 공개는 선택 사항입니다.", browse: "플레이어 보기" },

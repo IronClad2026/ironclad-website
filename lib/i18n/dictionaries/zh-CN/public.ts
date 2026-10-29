@@ -12,6 +12,11 @@ const dictionary = {
   },
   regions: { europe: "欧洲", northAmerica: "北美洲", southAmerica: "南美洲", oceania: "大洋洲", asia: "亚洲", middleEast: "中东", africa: "非洲", global: "全球" },
   home: {
+    collaboration: {
+      heading: "与 IronClad 合作",
+      body: "欢迎赞助咨询、伙伴关系提案及合作创意。",
+      contact: "联系我们",
+    },
     hero: {
       eyebrow: "Company of Heroes 3 竞技赛事",
       title: "IronClad 锦标赛",
