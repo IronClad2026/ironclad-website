@@ -1,6 +1,7 @@
 // Build-configuration helper: imported only by next.config.ts, which runs in
 // ordinary Node before application modules. Do not import this into app code.
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 
 type PreviewEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -53,13 +54,17 @@ function isStagingDatabase(value: string): boolean {
 function isStagingKey(
   value: string | undefined,
   role: "anon" | "service_role",
-  requireProjectBoundKeys = false
+  requireProjectBoundKeys = false,
+  approvedPublishableKeyDigest?: string
 ): boolean {
   if (!value || value !== value.trim()) return false;
   const opaquePrefix = role === "anon" ? "sb_publishable_" : "sb_secret_";
   if (value.startsWith(opaquePrefix) && value.length > opaquePrefix.length) {
-    // Opaque keys cannot expose a project ref; the exact URL remains mandatory.
-    return !requireProjectBoundKeys;
+    // Strict callers require an independently verified public-key fingerprint.
+    // Opaque service-role keys never satisfy that exception.
+    return !requireProjectBoundKeys || (role === "anon" &&
+      /^[a-f0-9]{64}$/.test(approvedPublishableKeyDigest ?? "") &&
+      createHash("sha256").update(value).digest("hex") === approvedPublishableKeyDigest);
   }
   const parts = value.split(".");
   if (parts.length !== 3 || parts.some((part) => !/^[A-Za-z0-9_-]+$/.test(part))) {
@@ -78,7 +83,7 @@ function isStagingKey(
 /** Shared resource validation without changing or inferring branch identity. */
 export function assertStagingPreviewResources(
   environment: PreviewEnvironment,
-  options: { requireProjectBoundKeys?: boolean } = {}
+  options: { requireProjectBoundKeys?: boolean; approvedPublishableKeyDigest?: string } = {}
 ): void {
   const failures: string[] = [];
   if (!isStagingOrigin(environment.NEXT_PUBLIC_SUPABASE_URL)) {
@@ -92,12 +97,12 @@ export function assertStagingPreviewResources(
   }
   const publishableKey = environment.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     environment.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!isStagingKey(publishableKey, "anon", options.requireProjectBoundKeys)) {
-    failures.push("The effective Supabase public key must be present and its JWT identity must match Staging");
+  if (!isStagingKey(publishableKey, "anon", options.requireProjectBoundKeys, options.approvedPublishableKeyDigest)) {
+    failures.push("The effective Supabase public key must be present and identify approved Staging resources");
   }
   if (options.requireProjectBoundKeys) {
     for (const key of ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] as const) {
-      if (environment[key] !== undefined && !isStagingKey(environment[key], "anon", true)) {
+      if (environment[key] !== undefined && !isStagingKey(environment[key], "anon", true, options.approvedPublishableKeyDigest)) {
         failures.push(`${key} must identify the approved Staging anon role`);
       }
     }

@@ -1,6 +1,8 @@
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as stagingPreview from "@/lib/p03-preview-safety";
 import { assertReleasePreviewSafety } from "@/lib/release-preview-safety";
 
 const STAGING_REF = "zzbnneprhjicmajpjkdg";
@@ -59,6 +61,55 @@ describe("Only the two resource-attested feature Previews may build", () => {
     expect(() => assertReleasePreviewSafety(environment)).not.toThrow();
     environment.NEXT_PUBLIC_SUPABASE_ANON_KEY = jwt("anotherproject", "anon");
     expect(() => assertReleasePreviewSafety(environment)).toThrow("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  });
+
+  it("passes only the pinned verified public-key digest to the strict resource validator", () => {
+    const validate = vi.spyOn(stagingPreview, "assertStagingPreviewResources");
+    const environment = safeEnvironment();
+    assertReleasePreviewSafety(environment);
+    expect(validate).toHaveBeenCalledWith(environment, {
+      requireProjectBoundKeys: true,
+      approvedPublishableKeyDigest: "a0314ae03160c84408f67f2a27f136e3cf83427999b2c1888f227e1704ea719d",
+    });
+  });
+
+  it.each(["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"])(
+    "accepts an opaque anon key in %s only with its explicitly verified digest", (key) => {
+      const opaque = "sb_publishable_synthetic-fingerprint-fixture";
+      const approvedPublishableKeyDigest = createHash("sha256").update(opaque).digest("hex");
+      const environment = { ...safeEnvironment(), [key]: opaque };
+      const options = { requireProjectBoundKeys: true, approvedPublishableKeyDigest };
+      expect(() => stagingPreview.assertStagingPreviewResources(environment, options)).not.toThrow();
+      expect(() => stagingPreview.assertStagingPreviewResources(environment, { requireProjectBoundKeys: true })).toThrow();
+      expect(() => stagingPreview.assertStagingPreviewResources(environment, {
+        ...options, approvedPublishableKeyDigest: "0".repeat(64),
+      })).toThrow();
+      expect(() => stagingPreview.assertStagingPreviewResources({
+        ...environment, [key]: `${opaque}-different`,
+      }, options)).toThrow();
+      expect(() => assertReleasePreviewSafety(environment)).toThrow();
+    },
+  );
+
+  it("checks every configured alias and never accepts an opaque service key through the digest exception", () => {
+    const opaque = "sb_publishable_synthetic-fingerprint-fixture";
+    const options = {
+      requireProjectBoundKeys: true,
+      approvedPublishableKeyDigest: createHash("sha256").update(opaque).digest("hex"),
+    };
+    const environment = { ...safeEnvironment(), NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: opaque };
+    expect(() => stagingPreview.assertStagingPreviewResources({
+      ...environment, NEXT_PUBLIC_SUPABASE_ANON_KEY: `${opaque}-different`,
+    }, options)).toThrow("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    expect(() => stagingPreview.assertStagingPreviewResources({
+      ...environment, NEXT_PUBLIC_SUPABASE_ANON_KEY: jwt("anotherproject", "anon"),
+    }, options)).toThrow("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    const serviceKey = "sb_secret_synthetic-fingerprint-fixture";
+    expect(() => stagingPreview.assertStagingPreviewResources({
+      ...safeEnvironment(), SUPABASE_SERVICE_ROLE_KEY: serviceKey,
+    }, {
+      ...options, approvedPublishableKeyDigest: createHash("sha256").update(serviceKey).digest("hex"),
+    })).toThrow("SUPABASE_SERVICE_ROLE_KEY");
   });
 
   it.each([
