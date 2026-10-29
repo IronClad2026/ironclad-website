@@ -40,4 +40,3 @@ const dictionary = {
 } satisfies DictionaryShape<typeof english>;
 
 export default dictionary;
-
