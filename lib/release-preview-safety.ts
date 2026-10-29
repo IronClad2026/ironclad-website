@@ -9,6 +9,10 @@ const STAGING_REVIEW_BRANCHES = new Set([
   "feature/public-player-tournament-history-2026-10",
   "feature/home-collaboration-2026-10",
 ]);
+// Verified 2026-10-29: public key from the guarded Staging Preview passed a
+// read-only HEAD against the approved Staging public projection. No key stored.
+const APPROVED_STAGING_PUBLISHABLE_KEY_SHA256 =
+  "a0314ae03160c84408f67f2a27f136e3cf83427999b2c1888f227e1704ea719d";
 const UNVERIFIED_RESOURCES = [
   "COMBAT_HIGHLIGHTS_SIGNING_PRIVATE_JWK",
   "COMBAT_HIGHLIGHTS_WORKER_URL",
@@ -24,7 +28,10 @@ export function assertReleasePreviewSafety(environment: Environment = process.en
     throw new Error("Release Preview is disabled: isolated Supabase, Clerk, storage and outbound resources have not been verified. Use isolated local validation.");
   }
 
-  assertStagingPreviewResources(environment, { requireProjectBoundKeys: true });
+  assertStagingPreviewResources(environment, {
+    requireProjectBoundKeys: true,
+    approvedPublishableKeyDigest: APPROVED_STAGING_PUBLISHABLE_KEY_SHA256,
+  });
 
   const failures: string[] = [];
   if (environment.COMBAT_HIGHLIGHTS_ENABLED && environment.COMBAT_HIGHLIGHTS_ENABLED !== "false") {
