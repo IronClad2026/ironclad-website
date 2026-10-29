@@ -89,6 +89,16 @@ export type PlayerCompetitionLookup =
   | { outcome: "HIDDEN" }
   | { outcome: "NOT_FOUND" };
 
+export type PlayerIdCompetitionLookup =
+  | {
+      outcome: "FOUND_VISIBLE";
+      player: Omit<PlayerCompetitionHistoryView, "relicProfileId">;
+    }
+  | { outcome: "HIDDEN" }
+  | { outcome: "NOT_FOUND" };
+
+type HistoryOptions = { limit?: number; offset?: number; now?: number };
+
 export type PublicPlayerCompetitionLookup =
   | {
       outcome: "FOUND_VISIBLE";
@@ -109,9 +119,32 @@ const UUID_PATTERN =
 export async function loadPlayerCompetitionHistory(
   client: CompetitionReadClient,
   relicProfileId: string,
-  options: { limit?: number; offset?: number; now?: number } = {},
+  options: HistoryOptions = {},
 ): Promise<PlayerCompetitionLookup> {
   if (!isCanonicalRelicId(relicProfileId)) invalid();
+  const result = await loadHistory(client, "coh3_profile_id", relicProfileId, options);
+  if (result.outcome !== "FOUND_VISIBLE") return result;
+  return { outcome: "FOUND_VISIBLE", player: { ...result.player, relicProfileId } };
+}
+
+/** Same official records and privacy rules for public profile UUID routes.
+ * A stored Relic binding is not required and no identity provider is consulted.
+ */
+export async function loadPlayerCompetitionHistoryByPlayerId(
+  client: CompetitionReadClient,
+  playerId: string,
+  options: HistoryOptions = {},
+): Promise<PlayerIdCompetitionLookup> {
+  if (!UUID_PATTERN.test(playerId)) invalid();
+  return loadHistory(client, "id", playerId, options);
+}
+
+async function loadHistory(
+  client: CompetitionReadClient,
+  identityColumn: "id" | "coh3_profile_id",
+  identityValue: string,
+  options: HistoryOptions,
+): Promise<PlayerIdCompetitionLookup> {
   const limit = options.limit ?? COMPETITION_READ_LIMITS.history;
   const offset = options.offset ?? 0;
   if (
@@ -129,14 +162,15 @@ export async function loadPlayerCompetitionHistory(
     client
       .from("players")
       .select(IDENTITY_COLUMNS, { count: "exact" })
-      .eq("coh3_profile_id", relicProfileId)
+      .eq(identityColumn, identityValue)
       .limit(2),
     1,
     parseIdentity,
   );
   if (initial.length === 0) return { outcome: "NOT_FOUND" };
   const identity = initial[0];
-  if (identity.relicProfileId !== relicProfileId) invalid();
+  if (identity[identityColumn === "id" ? "id" : "relicProfileId"] !== identityValue)
+    invalid();
   if (!isVisible(identity)) return { outcome: "HIDDEN" };
   if (!identity.alias) invalid();
 
@@ -186,8 +220,8 @@ export async function loadPlayerCompetitionHistory(
     return entry ? [entry] : [];
   });
 
-  // Multi-query reads are not a transaction. Recheck the current canonical
-  // binding and visibility before returning any account correlation/history.
+  // Multi-query reads are not a transaction. Recheck current visibility and
+  // the canonical binding (for Relic lookups) before disclosing history.
   const { rows: current } = await readCountedRows(
     client
       .from("players")
@@ -199,7 +233,11 @@ export async function loadPlayerCompetitionHistory(
   );
   if (current.length === 0) return { outcome: "NOT_FOUND" };
   if (current[0].id !== identity.id) invalid();
-  if (current[0].relicProfileId !== relicProfileId || !isVisible(current[0])) {
+  if (
+    (identityColumn === "coh3_profile_id" &&
+      current[0].relicProfileId !== identityValue) ||
+    !isVisible(current[0])
+  ) {
     return { outcome: "HIDDEN" };
   }
   if (!current[0].alias) invalid();
@@ -209,7 +247,6 @@ export async function loadPlayerCompetitionHistory(
     outcome: "FOUND_VISIBLE",
     player: {
       schemaVersion: COMPETITION_SCHEMA_VERSION,
-      relicProfileId,
       currentIdentity: {
         alias: current[0].alias,
         profileUrl: `${IRONCLAD_PUBLIC_ORIGIN}/players/${identity.id}`,

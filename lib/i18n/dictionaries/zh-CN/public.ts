@@ -1,4 +1,5 @@
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/en/public";
+import history from "./public-player-history";
 
 const dictionary = {
   metadata: {
@@ -126,6 +127,7 @@ const dictionary = {
     viewLeaderboard: "查看排行榜",
   },
   players: {
+    history,
     metadataTitle: "玩家目录 | IronClad",
     metadataDescription:
       "浏览 IronClad 的 Company of Heroes 3 公开玩家资料与竞技评分。",

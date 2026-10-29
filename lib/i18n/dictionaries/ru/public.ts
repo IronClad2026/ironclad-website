@@ -1,4 +1,5 @@
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/en/public";
+import history from "./public-player-history";
 
 const dictionary = {
   metadata: {
@@ -120,6 +121,7 @@ const dictionary = {
     viewLeaderboard: "Смотреть таблицу лидеров",
   },
   players: {
+    history,
     metadataTitle: "Каталог игроков | IronClad",
     metadataDescription: "Публичные профили и соревновательные рейтинги игроков Company of Heroes 3 в IronClad.",
     eyebrow: "Состав IronClad",

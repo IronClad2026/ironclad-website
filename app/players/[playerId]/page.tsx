@@ -8,6 +8,7 @@ import { getPublicCombatHighlights } from "@/lib/combat-highlights/read";
 import { reportHighlight } from "../highlight-actions";
 import { getPublicActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
 import { getPublicPlayerById } from "@/lib/public-players";
+import { getPublicPlayerCompetitionHistory, parsePublicHistoryPage } from "@/lib/public-player-competition";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 type PublicPlayerPageProps = {
   params: Promise<{ playerId: string }>;
+  searchParams: Promise<{ historyPage?: string | string[] }>;
 };
 
 // Share only this render's public profile snapshot between metadata and page.
@@ -48,6 +50,7 @@ export async function generateMetadata({ params }: PublicPlayerPageProps) {
 
 export default async function PublicPlayerProfilePage({
   params,
+  searchParams,
 }: PublicPlayerPageProps) {
   const { playerId } = await params;
   const player = await getPlayerForRequest(playerId);
@@ -57,13 +60,17 @@ export default async function PublicPlayerProfilePage({
   }
 
   const locale = await getRequestLocale();
-  const [activeTournamentEloSnapshots, showcase, clips, badgeDictionary] =
+  const historyPage = parsePublicHistoryPage((await searchParams).historyPage);
+  const [activeTournamentEloSnapshots, showcase, clips, badgeDictionary, competitionHistory] =
     await Promise.all([
       getPublicActiveTournamentEloSnapshots(player.id),
       getPublicPlayerShowcase(player.id),
       getPublicCombatHighlights(player.id),
       loadDictionary(locale, "badges"),
+      getPublicPlayerCompetitionHistory(player.id, historyPage),
     ]);
+
+  if (competitionHistory.status === "not_found") notFound();
 
   return (
     <main
@@ -82,6 +89,7 @@ export default async function PublicPlayerProfilePage({
       <PublicPlayerStats
         player={player}
         activeTournamentEloSnapshots={activeTournamentEloSnapshots}
+        competitionHistory={competitionHistory}
       />
     </main>
   );

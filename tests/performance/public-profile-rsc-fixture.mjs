@@ -44,6 +44,10 @@ const mocks = {
   "@/lib/player-showcase/read": { getPublicPlayerShowcase: async () => null },
   "@/lib/combat-highlights/read": { getPublicCombatHighlights: async () => [] },
   "@/lib/active-tournament-elo-snapshots": { getPublicActiveTournamentEloSnapshots: async () => [] },
+  "@/lib/public-player-competition": {
+    getPublicPlayerCompetitionHistory: async () => ({ status: "unavailable" }),
+    parsePublicHistoryPage: () => 1,
+  },
   "../highlight-actions": { reportHighlight: async () => ({ ok: true }) },
   "@/components/PublicPlayerProfileHeader": { default: ({ player }) => React.createElement("p", null, player.displayName) },
   "@/components/PublicPlayerStats": { default: () => null },
@@ -65,7 +69,7 @@ async function renderRequest(rows, { failure = false, metadataId = playerId, bod
     async function Root() {
       outcomes = await Promise.allSettled([
         page.generateMetadata({ params: Promise.resolve({ playerId: metadataId }) }),
-        page.default({ params: Promise.resolve({ playerId: bodyId }) }),
+        page.default({ params: Promise.resolve({ playerId: bodyId }), searchParams: Promise.resolve({}) }),
       ]);
       return React.createElement("section", null,
         outcomes[0].status === "fulfilled" ? outcomes[0].value.title : "metadata-error",

@@ -8,7 +8,10 @@ import shared from "@/lib/i18n/dictionaries/en/public-shared";
 describe("focused public fallbacks", () => {
   it("preserves the complete English copy and key order after the public-profile model change", () => {
     // Product copy reflects permanent public competitive profiles and optional Discord.
-    expect(createHash("sha256").update(JSON.stringify(dictionary)).digest("hex"))
+    // New history copy has its own locale validation; retain every pre-existing value/order.
+    const { history, ...originalPlayers } = dictionary.players;
+    expect(history.scope).toBe("Totals for tournaments on this page");
+    expect(createHash("sha256").update(JSON.stringify({ ...dictionary, players: originalPlayers })).digest("hex"))
       .toBe("6ef061ba6eeddfc19caa1a18497d05d3e53391e9f68e41216053a384f33fa969");
   });
 
