@@ -6,12 +6,16 @@ import rankings from "@/lib/i18n/dictionaries/en/public-rankings";
 import shared from "@/lib/i18n/dictionaries/en/public-shared";
 
 describe("focused public fallbacks", () => {
-  it("preserves the complete English copy and key order after the public-profile model change", () => {
+  it("preserves existing English copy and key order when adding public features", () => {
     // Product copy reflects permanent public competitive profiles and optional Discord.
-    // New history copy has its own locale validation; retain every pre-existing value/order.
-    const { history, ...originalPlayers } = dictionary.players;
-    expect(history.scope).toBe("Totals for tournaments on this page");
-    expect(createHash("sha256").update(JSON.stringify({ ...dictionary, players: originalPlayers })).digest("hex"))
+    // Each new feature has explicit copy/locale tests. Exclude only its new key,
+    // so either focused PR and their combined tree retain the original baseline.
+    const existingCopy = {
+      ...dictionary,
+      home: Object.fromEntries(Object.entries(dictionary.home).filter(([key]) => key !== "collaboration")),
+      players: Object.fromEntries(Object.entries(dictionary.players).filter(([key]) => key !== "history")),
+    };
+    expect(createHash("sha256").update(JSON.stringify(existingCopy)).digest("hex"))
       .toBe("6ef061ba6eeddfc19caa1a18497d05d3e53391e9f68e41216053a384f33fa969");
   });
 
