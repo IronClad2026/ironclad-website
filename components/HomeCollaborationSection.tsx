@@ -22,11 +22,11 @@ export default function HomeCollaborationSection({
         <div className="min-w-0 max-w-2xl">
           <h2
             id="home-collaboration-title"
-            className="text-3xl font-black leading-tight text-white sm:text-4xl"
+            className="text-3xl font-black leading-tight text-white [overflow-wrap:anywhere] sm:text-4xl"
           >
             {copy.heading}
           </h2>
-          <p className="mt-4 text-base leading-7 text-zinc-300">
+          <p className="mt-4 text-base leading-7 text-zinc-300 [overflow-wrap:anywhere]">
             {copy.body}
           </p>
         </div>
@@ -37,7 +37,9 @@ export default function HomeCollaborationSection({
             className="inline-flex min-h-12 w-full items-center justify-center gap-3 border border-orange-400 bg-orange-500 px-6 py-3 text-sm font-black text-black transition-colors hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto lg:w-full"
           >
             <Mail size={18} aria-hidden="true" className="shrink-0" />
-            <span>{copy.contact}</span>
+            <span className="min-w-0 text-center [overflow-wrap:anywhere]">
+              {copy.contact}
+            </span>
             <ArrowRight size={17} aria-hidden="true" className="shrink-0" />
           </a>
           <p className="max-w-full select-text text-sm leading-6 break-all text-zinc-400">
