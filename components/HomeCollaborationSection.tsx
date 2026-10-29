@@ -1,4 +1,4 @@
-import { ArrowRight, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/en/public";
 
 const contactEmail = "ironclad.tournaments@gmail.com";
@@ -34,13 +34,12 @@ export default function HomeCollaborationSection({
         <div className="flex min-w-0 flex-col items-start gap-4 lg:items-center">
           <a
             href={`mailto:${contactEmail}`}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-3 border border-orange-400 bg-orange-500 px-6 py-3 text-sm font-black text-black transition-colors hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto lg:w-full"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-4 py-3 text-sm font-black text-black transition-colors hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto lg:w-full"
           >
             <Mail size={18} aria-hidden="true" className="shrink-0" />
             <span className="min-w-0 text-center [overflow-wrap:anywhere]">
               {copy.contact}
             </span>
-            <ArrowRight size={17} aria-hidden="true" className="shrink-0" />
           </a>
           <p className="max-w-full select-text text-sm leading-6 break-all text-zinc-400">
             {contactEmail}
