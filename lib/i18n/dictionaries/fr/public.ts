@@ -11,6 +11,11 @@ const dictionary = {
   },
   regions: { europe: "Europe", northAmerica: "Amérique du Nord", southAmerica: "Amérique du Sud", oceania: "Océanie", asia: "Asie", middleEast: "Moyen-Orient", africa: "Afrique", global: "Monde" },
   home: {
+    collaboration: {
+      heading: "Collaborez avec IronClad",
+      body: "Nous accueillons les demandes de sponsoring, les propositions de partenariat et les idées de collaboration.",
+      contact: "Contactez-nous",
+    },
     hero: { eyebrow: "Événements compétitifs Company of Heroes 3", title: "Tournois IronClad", description: "Participez à des compétitions 1v1 avec des divisions vérifiées, un jeu équitable, des classements de carrière permanents et des saisons Pro de six événements.", viewTournaments: "Voir les tournois", joinDiscord: "Rejoindre Discord (facultatif)", launchFormat: "Format de lancement", divisionSize: "Taille de la division", integrityModel: "Modèle d’intégrité", fairPlay: "Jeu équitable" },
     command: { label: "Synthèse du commandement IronClad", online: "Opérations en ligne", integrityTitle: "Compétition intègre", integrityText: "Des règles claires et un examen administratif garantissent une compétition équitable et organisée.", tournamentsTitle: "Tournois structurés", tournamentsText: "Les tableaux, calendriers et mises à jour des tournois sont faciles à suivre.", choiceTitle: "Identité compétitive", choiceText: "Les joueurs IronClad actifs ont un profil compétitif public. Le contact Discord apparaît uniquement avec leur accord.", ready: "PRÊT", readyText: "Tournois, profils, joueurs et règles sont prêts pour le prochain événement." },
     players: { eyebrow: "Joueurs IronClad", title: "Découvrez les participants", description: "Découvrez les joueurs IronClad actifs, comparez leur ELO et consultez leurs profils compétitifs. Le contact Discord reste facultatif.", directory: "Annuaire des joueurs", privacy: "Les informations compétitives des joueurs actifs sont publiques. Les informations personnelles du compte restent privées ; le contact Discord est facultatif.", browse: "Voir les joueurs" },

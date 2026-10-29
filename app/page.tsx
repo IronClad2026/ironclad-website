@@ -1,4 +1,5 @@
 import HomeAccountSection from "@/components/HomeAccountSection";
+import HomeCollaborationSection from "@/components/HomeCollaborationSection";
 import LatestNewsSection from "@/components/news/LatestNewsSection";
 import { Suspense } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -99,6 +100,7 @@ export default async function Home() {
       <Suspense fallback={null}>
         <LatestNewsSection copy={copy.news} locale={locale} />
       </Suspense>
+      <HomeCollaborationSection copy={copy.home.collaboration} />
     </main>
   );
 }
