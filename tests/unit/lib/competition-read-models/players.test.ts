@@ -13,6 +13,7 @@ vi.mock("@/lib/competition-read-models/tournaments", () => ({
 
 import {
   loadPlayerCompetitionHistory,
+  loadPlayerCompetitionHistoryByPlayerId,
   projectPublicPlayerCompetitionLookup,
   type PlayerCompetitionLookup,
 } from "@/lib/competition-read-models/players";
@@ -163,6 +164,7 @@ function database(
   } = {},
 ) {
   const calls: Call[] = [];
+  let identityReadCount = 0;
   const from = vi.fn((table: string) => {
     const call: Call = { table, equalities: [], memberships: [], orders: [] };
     calls.push(call);
@@ -216,7 +218,7 @@ function database(
           }).then(resolve, reject);
         let rows = (
           table === "players"
-            ? call.equalities.some(([column]) => column === "id")
+            ? identityReadCount++ > 0
               ? (options.current ?? options.players ?? [identity()])
               : (options.players ?? [identity()])
             : (options.registrations ?? [candidate()])
@@ -261,6 +263,40 @@ function visible(result: PlayerCompetitionLookup) {
 describe("Relic-keyed player competition read model", () => {
   beforeEach(() => {
     loadTournaments.mockResolvedValue([tournament()]);
+  });
+
+  it("uses the same official history by public UUID without a stored Relic binding", async () => {
+    const fixture = database({ players: [identity({ coh3_profile_id: null })] });
+    const result = await loadPlayerCompetitionHistoryByPlayerId(fixture.client, PLAYER_ID);
+    expect(result.outcome).toBe("FOUND_VISIBLE");
+    if (result.outcome !== "FOUND_VISIBLE") throw new Error("Expected visible fixture");
+    expect(result.player).not.toHaveProperty("relicProfileId");
+    expect(result.player.entries[0]).toMatchObject({
+      division: { displayName: "Pro" }, record: { matchesPlayed: 1, wins: 1, losses: 0 },
+    });
+    expect(fixture.calls[0].equalities).toEqual([["id", PLAYER_ID]]);
+    expect(fixture.calls.at(-1)?.equalities).toEqual([["id", PLAYER_ID]]);
+    expect(fixture.calls).toHaveLength(3);
+  });
+
+  it("hides a closed UUID profile before querying any tournament records", async () => {
+    const fixture = database({ players: [identity({ account_closed_at: DATE })] });
+    expect(await loadPlayerCompetitionHistoryByPlayerId(fixture.client, PLAYER_ID)).toEqual({ outcome: "HIDDEN" });
+    expect(fixture.calls).toHaveLength(1);
+    expect(loadTournaments).not.toHaveBeenCalled();
+  });
+
+  it("withholds UUID history when the account closes during the multi-query read", async () => {
+    const fixture = database({ current: [identity({ account_closed_at: DATE })] });
+    expect(await loadPlayerCompetitionHistoryByPlayerId(fixture.client, PLAYER_ID)).toEqual({ outcome: "HIDDEN" });
+    expect(fixture.calls).toHaveLength(3);
+    expect(loadTournaments).toHaveBeenCalledOnce();
+  });
+
+  it("rejects malformed public UUIDs before a query", async () => {
+    const fixture = database();
+    await expect(loadPlayerCompetitionHistoryByPlayerId(fixture.client, "invalid")).rejects.toBeInstanceOf(CompetitionReadError);
+    expect(fixture.calls).toHaveLength(0);
   });
 
   it("resolves the exact canonical text ID and keeps current alias distinct from event snapshots", async () => {

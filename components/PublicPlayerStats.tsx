@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe2, MapPin, Shield, Swords, Trophy, UsersRound } from "lucide-react";
+import { Globe2, MapPin, Shield, Swords } from "lucide-react";
 import ActiveTournamentEloSnapshotIndicator, {
   type ActiveTournamentEloSnapshot,
 } from "@/components/ActiveTournamentEloSnapshotIndicator";
@@ -13,15 +13,19 @@ import {
 import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
 import englishPublicDictionary from "@/lib/i18n/dictionaries/en/public-players";
 import { formatNumber } from "@/lib/i18n/format";
+import PublicPlayerCompetitionHistory from "@/components/PublicPlayerCompetitionHistory";
+import type { PublicPlayerCompetitionHistory as CompetitionHistory } from "@/lib/public-player-competition-types";
 
 type PublicPlayerStatsProps = {
   player: PublicPlayerProfile;
   activeTournamentEloSnapshots: ActiveTournamentEloSnapshot[];
+  competitionHistory: CompetitionHistory;
 };
 
 export default function PublicPlayerStats({
   player,
   activeTournamentEloSnapshots,
+  competitionHistory,
 }: PublicPlayerStatsProps) {
   const t = useOptionalTranslations("public", englishPublicDictionary);
   const locale = useOptionalLocale();
@@ -99,44 +103,8 @@ export default function PublicPlayerStats({
           ))}
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <PlaceholderCard
-            icon={Trophy}
-            title={t("players.tournamentHistory")}
-            description={t("players.tournamentHistoryText")}
-          />
-          <PlaceholderCard
-            icon={UsersRound}
-            title={t("players.matchStatistics")}
-            description={t("players.matchStatisticsText")}
-          />
-        </div>
+        <PublicPlayerCompetitionHistory playerId={player.id} history={competitionHistory} />
       </ScrollReveal>
     </section>
-  );
-}
-
-function PlaceholderCard({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: typeof Trophy;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="group relative overflow-hidden border border-dashed border-orange-400/25 bg-[linear-gradient(145deg,rgba(249,115,22,0.08),rgba(0,0,0,0.72))] p-6 shadow-2xl shadow-black/20 backdrop-blur transition hover:-translate-y-1">
-      <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
-        <div className="absolute inset-x-0 top-0 h-px bg-orange-300/55" />
-      </div>
-      <div className="relative z-10">
-        <div className="flex items-center gap-3 text-orange-300">
-          <Icon size={20} />
-          <h3 className="text-lg font-black text-white">{title}</h3>
-        </div>
-        <p className="mt-3 text-sm leading-6 text-zinc-500">{description}</p>
-      </div>
-    </div>
   );
 }

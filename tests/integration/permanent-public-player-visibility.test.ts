@@ -12,6 +12,10 @@ vi.mock("@/lib/i18n/request", () => ({ getRequestLocale: async () => "en" }));
 vi.mock("@/lib/active-tournament-elo-snapshots", () => ({ getPublicActiveTournamentEloSnapshots: async () => [] }));
 vi.mock("@/lib/player-showcase/read", () => ({ getPublicPlayerShowcase: async () => null }));
 vi.mock("@/lib/combat-highlights/read", () => ({ getPublicCombatHighlights: async () => [] }));
+vi.mock("@/lib/public-player-competition", () => ({
+  getPublicPlayerCompetitionHistory: async () => ({ status: "unavailable" }),
+  parsePublicHistoryPage: () => 1,
+}));
 import { getPublicPlayerById, getPublicPlayers } from "@/lib/public-players";
 import PublicPlayerProfilePage from "@/app/players/[playerId]/page";
 
@@ -50,7 +54,7 @@ describe("permanent public competitive player visibility", () => {
 
   it("renders the active legacy false public page with only competitive player props", async () => {
     client.from.mockImplementation(createSupabaseQueryMock({ data: activeRow }).from);
-    const page = await PublicPlayerProfilePage({ params: Promise.resolve({ playerId: id }) });
+    const page = await PublicPlayerProfilePage({ params: Promise.resolve({ playerId: id }), searchParams: Promise.resolve({}) });
     const playerProps: unknown[] = [];
     function inspect(node: ReactNode): void {
       if (Array.isArray(node)) { node.forEach(inspect); return; }
@@ -67,7 +71,7 @@ describe("permanent public competitive player visibility", () => {
 
   it("keeps a closed or unknown account absent from the active-only public view", async () => {
     client.from.mockImplementation(createSupabaseQueryMock({ data: null }).from);
-    await expect(PublicPlayerProfilePage({ params: Promise.resolve({ playerId: id }) })).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(PublicPlayerProfilePage({ params: Promise.resolve({ playerId: id }), searchParams: Promise.resolve({}) })).rejects.toThrow("NEXT_NOT_FOUND");
     expect(notFound).toHaveBeenCalledOnce();
   });
 

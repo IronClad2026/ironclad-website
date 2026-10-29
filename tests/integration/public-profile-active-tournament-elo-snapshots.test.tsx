@@ -6,6 +6,10 @@ const getPublicPlayerByIdMock = vi.hoisted(() => vi.fn());
 const getPublicActiveTournamentEloSnapshotsMock = vi.hoisted(() => vi.fn());
 const publicPlayerStatsMock = vi.hoisted(() => vi.fn());
 const notFoundMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/public-player-competition", () => ({
+  getPublicPlayerCompetitionHistory: async () => ({ status: "unavailable" }),
+  parsePublicHistoryPage: () => 1,
+}));
 
 vi.mock("next/navigation", () => ({
   notFound: notFoundMock,
@@ -68,6 +72,7 @@ describe("public profile active tournament ELO snapshots", () => {
 
     const page = await PublicPlayerProfilePage({
       params: Promise.resolve({ playerId: PLAYER_ID }),
+      searchParams: Promise.resolve({}),
     });
     const stats = findElementByType(page, publicPlayerStatsMock);
 
@@ -78,6 +83,7 @@ describe("public profile active tournament ELO snapshots", () => {
     expect(stats?.props).toEqual({
       player,
       activeTournamentEloSnapshots,
+      competitionHistory: { status: "unavailable" },
     });
     expect(stats?.props.player).toMatchObject({ currentElo: 1550 });
     expect(stats?.props.activeTournamentEloSnapshots).toEqual([
