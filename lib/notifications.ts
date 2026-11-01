@@ -656,6 +656,15 @@ function buildNotificationHref(
     }
 
     if (row.registration_id) {
+      if (row.tournament_id && isUuid(row.tournament_id) && isUuid(row.registration_id)) {
+        const params = new URLSearchParams({
+          section: "registrations",
+          filter: "all",
+          selected: row.registration_id,
+        });
+        return `/admin/tournaments/${encodeURIComponent(row.tournament_id)}?${params.toString()}`;
+      }
+      // Legacy notices without tournament context use the authenticated resolver.
       return `/admin/registrations?filter=all&selected=${encodeURIComponent(
         row.registration_id
       )}`;

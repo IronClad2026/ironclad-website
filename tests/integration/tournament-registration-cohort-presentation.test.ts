@@ -152,7 +152,13 @@ describe("registration cohort presentation", () => {
 
   it("exposes one administrator closing-time control and division readiness labels", () => {
     const adminRegistrationsSource = readNormalizedSource(
-      "app/admin/registrations/page.tsx"
+      "components/admin/tournaments/AdminTournamentRegistrations.tsx"
+    );
+    const adminWorkspaceSource = readNormalizedSource(
+      "lib/admin-tournament-workspace.ts"
+    );
+    const adminRegistrationLoader = readNormalizedSource(
+      "lib/admin-tournament-registration-workspace.ts"
     );
     const tournamentFormSource = readNormalizedSource(
       "components/admin/tournaments/TournamentEditor.tsx"
@@ -165,24 +171,24 @@ describe("registration cohort presentation", () => {
     );
 
     expect(adminRegistrationsSource).toContain(
-      "data-registration-readiness-summary={group.key}"
+      "Active cohort:"
     );
-    expect(adminRegistrationsSource).toContain(
+    expect(adminWorkspaceSource).toContain(
       "loadTournamentDivisionStates("
     );
     expect(adminRegistrationsSource).toContain(
-      "formatTournamentDivisionState(readiness.divisionState)"
+      "formatTournamentDivisionState(summary.divisionState)"
     );
-    expect(adminRegistrationsSource).toContain(
-      "getEffectiveTournamentDivisionState("
+    expect(adminRegistrationLoader).toContain(
+      "cohortSummaries"
     );
     expect(adminRegistrationsSource).not.toContain('" · READY"');
     expect(adminRegistrationsSource).not.toContain('" · LAUNCHED / LOCKED"');
     expect(adminRegistrationsSource).toContain(
-      "data-registration-fifo-summary={group.key}"
+      "FIFO"
     );
     expect(adminRegistrationsSource).toContain(
-      "Vacancy offers remain transactional and follow Division FIFO."
+      "waitlist"
     );
     expect(tournamentFormSource).toContain(
       'label="Registration Closes (optional)"'

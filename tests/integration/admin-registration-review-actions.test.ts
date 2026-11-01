@@ -1,377 +1,140 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { HttpResponse, http } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mockServer } from "@/tests/mocks/server";
 
-const adminPageSource = readFileSync(
-  resolve(process.cwd(), "app/admin/registrations/page.tsx"),
-  "utf8"
-);
-const registrationActionsSource = readFileSync(
-  resolve(process.cwd(), "app/admin/registration-actions.ts"),
-  "utf8"
-);
-const reviewRowsSource = readFileSync(
-  resolve(process.cwd(), "components/AdminRegistrationReviewRows.tsx"),
-  "utf8"
-);
+const authMock = vi.hoisted(() => vi.fn());
+const revalidateMock = vi.hoisted(() => vi.fn());
+const notifyMock = vi.hoisted(() => vi.fn());
+vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("next/cache", () => ({ revalidatePath: revalidateMock }));
+vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(`REDIRECT:${href}`); } }));
+vi.mock("@/lib/notifications", () => ({ createInAppNotification: notifyMock }));
+import { updateRegistrationStatus, approveSelectedRegistrations, deleteSelectedRegistrations } from "@/app/admin/registration-actions";
 
-function sliceSource(source: string, startMarker: string, endMarker: string) {
-  const start = source.indexOf(startMarker);
-  const end = source.indexOf(endMarker, start + startMarker.length);
-
-  if (start < 0 || end < 0) {
-    throw new Error(
-      `Unable to find source slice from ${startMarker} to ${endMarker}.`
-    );
+const A = "10000000-0000-4000-8000-000000000001";
+const B = "10000000-0000-4000-8000-000000000002";
+const ONE = "30000000-0000-4000-8000-000000000001";
+const TWO = "30000000-0000-4000-8000-000000000002";
+const OTHER = "30000000-0000-4000-8000-000000000003";
+const MISSING = "30000000-0000-4000-8000-000000000009";
+const endpoint = "http://127.0.0.1:54321/rest/v1";
+type Row = { id: string; tournament_id: string; registration_status: string; clerk_user_id: string; player_name: string; tournament_title: string; bracket_name: string; tournament_bracket_id: string };
+let rows: Row[];
+let reads: URL[];
+const rpcMock = vi.fn();
+function form(ids = [ONE], tournament: string | null = A) {
+  const data = new FormData();
+  for (const id of ids) data.append("registrationId", id);
+  data.set("nextStatus", "approved");
+  data.set("activeFilter", "pending");
+  if (tournament !== null) {
+    data.set("workspaceTournamentId", tournament);
+    data.set("workspaceSection", "registrations");
+    data.set("workspacePage", "2");
   }
-
-  return source.slice(start, end);
+  return data;
 }
-
-function compact(source: string) {
-  return source.replace(/\s+/g, " ").trim();
+function filter(rows: Row[], params: URLSearchParams) {
+  return rows.filter((row) => [...params].every(([key, value]) => {
+    if (key === "tournament_id") return value === `eq.${row.tournament_id}`;
+    if (key === "id") return value.startsWith("eq.") ? value === `eq.${row.id}` : value.slice(4, -1).split(",").includes(row.id);
+    return true;
+  }));
 }
-
-function registrationUpdatePayloads(source: string) {
-  return [...source.matchAll(/\.from\(\s*"registrations"\s*\)\s*\.update\(\{([\s\S]*?)\}\)\s*\.eq/g)].map(
-    (match) => compact(match[1])
+beforeEach(() => {
+  authMock.mockResolvedValue({ userId: "user_admin", sessionClaims: { metadata: { role: "admin" } } });
+  reads = [];
+  rows = [[ONE, A], [TWO, A], [OTHER, B]].map(([id, tournament_id]) => ({
+    id, tournament_id, registration_status: "pending", clerk_user_id: "user_same_player",
+    player_name: "Same player", tournament_title: "Cup", bracket_name: "Academy",
+    tournament_bracket_id: "20000000-0000-4000-8000-000000000001",
+  }));
+  rpcMock.mockImplementation((name: string, body: Record<string, unknown>) => {
+    const ids = (body.p_registration_ids ?? [body.p_registration_id]) as string[];
+    if (ids.some((id) => !rows.some((row) => row.id === id && row.tournament_id === body.p_tournament_id))) {
+      return HttpResponse.json({ message: "scope mismatch", code: "22023" }, { status: 400 });
+    }
+    for (const row of rows) if (ids.includes(row.id)) row.registration_status = String(body.p_registration_status ?? "approved");
+    return HttpResponse.json(name === "approve_tournament_registrations_scoped"
+      ? ids.map((registration_id) => ({ registration_id, error_message: null })) : []);
+  });
+  mockServer.use(
+    http.get(`${endpoint}/registrations`, ({ request }) => {
+      const url = new URL(request.url); reads.push(url);
+      return HttpResponse.json(filter(rows, url.searchParams));
+    }),
+    http.get(`${endpoint}/notifications`, () => HttpResponse.json([])),
+    http.post(`${endpoint}/rpc/:name`, async ({ params, request }) => rpcMock(String(params.name), await request.json())),
   );
-}
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
+});
 
-function rpcNames(source: string) {
-  return [...source.matchAll(/\.rpc\(\s*"([^"]+)"/g)].map(
-    (match) => match[1]
-  );
-}
-
-const notificationBuilder = sliceSource(
-  registrationActionsSource,
-  "function buildRegistrationStatusNotification(",
-  "export async function updateRegistrationStatus("
-);
-const updateRegistrationStatusAction = sliceSource(
-  registrationActionsSource,
-  "export async function updateRegistrationStatus(",
-  "export async function deleteSelectedRegistrations("
-);
-const deleteSelectedRegistrationsAction = sliceSource(
-  registrationActionsSource,
-  "export async function deleteSelectedRegistrations(",
-  "export async function approveSelectedRegistrations("
-);
-const approveSelectedRegistrationsAction = registrationActionsSource.slice(
-  registrationActionsSource.indexOf(
-    "export async function approveSelectedRegistrations("
-  )
-);
-const selectedRegistrationModal = sliceSource(
-  adminPageSource,
-  "{selectedRegistration && (",
-  "    </main>"
-);
-const directStatusAction = sliceSource(
-  reviewRowsSource,
-  "function DirectStatusAction(",
-  "function MenuLink("
-);
-const menuActions = sliceSource(
-  reviewRowsSource,
-  "function getMenuActions(",
-  "function EvidenceValue("
-);
-describe("admin registration review action contracts", () => {
-  it("keeps registration mutations authoritative in one action module", () => {
-    const compactPage = compact(adminPageSource);
-    const compactActions = compact(registrationActionsSource);
-
-    expect(compactPage).toContain(
-      'from "@/app/admin/registration-actions"'
-    );
-    expect(adminPageSource).not.toContain(
-      "async function updateRegistrationStatus("
-    );
-    expect(adminPageSource).not.toContain(
-      "async function deleteSelectedRegistrations("
-    );
-    expect(adminPageSource).not.toContain(
-      "async function approveSelectedRegistrations("
-    );
-    expect(compactActions).toContain(
-      "export async function updateRegistrationStatus(formData: FormData)"
-    );
-    expect(compactActions).toContain(
-      "export async function deleteSelectedRegistrations(formData: FormData)"
-    );
-    expect(compactActions).toContain(
-      "export async function approveSelectedRegistrations(formData: FormData)"
-    );
+describe("tournament-scoped registration Server Actions", () => {
+  it.each([null, "player"])("rejects non-admin callers (%s) before reads", async (role) => {
+    authMock.mockResolvedValue({ userId: role ? "user_player" : null, sessionClaims: { metadata: { role } } });
+    await expect(updateRegistrationStatus(form())).rejects.toThrow("Unauthorized");
+    await expect(approveSelectedRegistrations(form())).rejects.toThrow("Unauthorized");
+    await expect(deleteSelectedRegistrations(form())).rejects.toThrow("Unauthorized");
+    expect(reads).toHaveLength(0); expect(rpcMock).not.toHaveBeenCalled();
   });
-
-  it("accepts only a fixed UUID-scoped registration workspace return path", () => {
-    const compactActions = compact(registrationActionsSource);
-
-    expect(compactActions).toContain(
-      'formData.get("workspaceTournamentId")'
-    );
-    expect(compactActions).toContain('formData.get("workspaceSection")');
-    expect(compactActions).toContain(
-      'section !== "registrations" && section !== "players-waitlist"'
-    );
-    expect(compactActions).toContain("!isUuid(tournamentId)");
-    expect(compactActions).toContain(
-      "`/admin/tournaments/${workspaceContext.tournamentId}`"
-    );
-    expect(compactActions).toContain(': "/admin/registrations";');
-    expect(compactActions).toContain('revalidatePath("/admin")');
-    expect(compactActions).toContain(
-      'revalidatePath("/admin/registrations")'
-    );
-    expect(compactActions).toContain(
-      "revalidatePath(`/admin/tournaments/${workspaceContext.tournamentId}`)"
-    );
-    expect(compactActions).toContain('params.set("filter", filter)');
-    expect(compactActions).toContain('params.set("selected", selected)');
-    expect(compactActions).toContain('params.set("notice", notice)');
-    expect(compactActions).toContain('params.set("detail", detail)');
-    expect(compactActions).toContain('params.set("focus", focus)');
-    expect(compactActions).not.toContain("returnTo");
-    expect(compactActions).not.toContain("redirectUrl");
+  it.each([updateRegistrationStatus, approveSelectedRegistrations, deleteSelectedRegistrations])("old forms without context fail safely", async (action) => {
+    await expect(action(form([ONE], null))).rejects.toThrow("registration-scope-required");
+    expect(reads).toHaveLength(0); expect(rpcMock).not.toHaveBeenCalled();
   });
-
-  it("excludes launched-division history from active FIFO queue projections", () => {
-    const compactAdminPage = compact(adminPageSource);
-
-    expect(compactAdminPage).toContain(
-      "const isBracketWaitlistOpen = (bracketId: string | null) => bracketId !== null && bracketMetaById.get(bracketId)?.launchedAt === null && bracketMetaById.get(bracketId)?.isTournamentTerminal === false;"
-    );
-    expect(
-      [...adminPageSource.matchAll(/isBracketWaitlistOpen\(/g)]
-    ).toHaveLength(3);
-    expect(adminPageSource).toMatch(
-      /registrationOrderInputs\.filter\(\s*\(\{\s*tournamentBracketId\s*\}\)\s*=>\s*isBracketWaitlistOpen\(tournamentBracketId\)\s*\)/
-    );
+  it("rejects a forged individual target from the other tournament", async () => {
+    await expect(updateRegistrationStatus(form([OTHER]))).rejects.toThrow("registration-scope-mismatch");
+    expect(reads[0].searchParams.get("tournament_id")).toBe(`eq.${A}`);
+    expect(rpcMock).not.toHaveBeenCalled(); expect(notifyMock).not.toHaveBeenCalled();
+    expect(rows[2].registration_status).toBe("pending");
   });
-
-  it("keeps every existing decision and private-note control in one workflow", () => {
-    const compactAction = compact(updateRegistrationStatusAction);
-    const compactModal = compact(selectedRegistrationModal);
-    const compactDirectAction = compact(directStatusAction);
-    const compactMenuActions = compact(menuActions);
-
-    expect(compactAction).toContain(
-      'const validStatuses: RegistrationStatus[] = [ "pending", "manual_review", "approved", "rejected", "waitlisted", ];'
-    );
-    expect(compactModal).toContain('name="adminNotes"');
-    expect(compactModal).toContain("Save Private Note");
-    expect(compactModal).toContain(
-      'name="nextStatus" value={selectedRegistration.status}'
-    );
-
-    for (const status of [
-      "approved",
-      "rejected",
-      "manual_review",
-    ]) {
-      expect(compactModal).toContain(`name="nextStatus" value="${status}"`);
-    }
-
-    expect(compactMenuActions).toContain('nextStatus: "approved"');
-    expect(compactMenuActions).toContain('label: "Reject"');
-    expect(compactMenuActions).toContain('focus: "manual_review"');
-    expect(compactMenuActions).not.toContain('focus: "waitlist"');
-    expect(compactMenuActions).not.toContain("Move to Waitlist");
-    expect(compactMenuActions).not.toContain("Move Back to Waitlist");
-    expect(compactMenuActions).toContain('label: "Edit Private Note"');
-    expect(compactMenuActions).not.toContain("Promote to Participant");
-    expect(compactMenuActions).toContain('if (status === "waitlisted")');
-    const waitlistedActions = sliceSource(
-      compactMenuActions,
-      'if (status === "waitlisted")',
-      'if (status === "approved")'
-    );
-    expect(waitlistedActions).not.toContain("approveAction");
-    expect(waitlistedActions).not.toContain("manualReviewAction");
-    expect(waitlistedActions).not.toContain("returnPendingAction");
-    expect(compactModal).toContain('status === "waitlisted"');
-    expect(compactModal).not.toContain('"Approve From Waitlist"');
-    expect(compactModal).toContain(
-      "A waitlisted player cannot be promoted by an administrator."
-    );
-    expect(compactDirectAction).toContain(
-      "<form action={updateRegistrationStatusAction}"
-    );
-    expect(compactDirectAction).toContain(
-      'name="adminNotes" value={registration.privateAdminNote ?? ""}'
-    );
+  it.each([[ONE, OTHER], [ONE, MISSING]])("validates the entire bulk selection before any mutation: %j", async (...ids) => {
+    await expect(approveSelectedRegistrations(form(ids))).rejects.toThrow("registration-scope-mismatch");
+    expect(rpcMock).not.toHaveBeenCalled(); expect(rows.every((row) => row.registration_status === "pending")).toBe(true);
   });
-
-  it("makes terminal notes read-only and bulk approval selection-aware", () => {
-    const approveSelectedControl = readFileSync(
-      resolve(
-        process.cwd(),
-        "components/AdminRegistrationApproveSelected.tsx"
-      ),
-      "utf8"
-    );
-    const compactModal = compact(selectedRegistrationModal);
-
-    expect(approveSelectedControl).toContain(
-      "disabled={selectedCount === 0}"
-    );
-    expect(approveSelectedControl).toContain(
-      "getSelectableRegistrationInputs(formId, name, scope)"
-    );
-    expect(compactModal).toContain(
-      "readOnly={selectedRegistrationIsTerminal}"
-    );
-    expect(compactModal).toContain(
-      "disabled={selectedRegistrationIsTerminal}"
-    );
-    expect(compactModal).toContain(
-      "private administrator notes remain available in read-only form."
-    );
-    expect(compactModal).toContain(
-      "registration decisions and private administrator notes are read-only."
-    );
+  it.each([{ ids: [ONE, "bad-id"] }, { ids: [] }, { ids: Array(101).fill(ONE) as string[] }])("rejects malformed, empty or oversized batches without dropping targets", async ({ ids }) => {
+    await expect(approveSelectedRegistrations(form(ids))).rejects.toThrow("registration-bulk-failed");
+    expect(reads).toHaveLength(0); expect(rpcMock).not.toHaveBeenCalled();
   });
-
-  it("limits review mutations to status and the private administrator note", () => {
-    const individualPayloads = registrationUpdatePayloads(
-      updateRegistrationStatusAction
-    );
-    const bulkPayloads = registrationUpdatePayloads(
-      approveSelectedRegistrationsAction
-    );
-
-    expect(individualPayloads).toEqual([]);
-    expect(bulkPayloads).toEqual([]);
-    expect(rpcNames(updateRegistrationStatusAction)).toEqual([
-      "review_tournament_registration",
-    ]);
-    expect(rpcNames(approveSelectedRegistrationsAction)).toEqual([
-      "review_tournament_registration",
-    ]);
-
-    const mutationPayloads = [...individualPayloads, ...bulkPayloads].join(
-      " "
-    );
-    for (const immutableSnapshotField of [
-      "submitted_elo",
-      "elo_verified_elo",
-      "elo_highest_faction",
-      "elo_checked_at",
-      "elo_verification_source",
-      "elo_verified_division",
-      "elo_calculation_version",
-      "created_at",
-      "tournament_id",
-      "tournament_bracket_id",
-    ]) {
-      expect(mutationPayloads).not.toContain(immutableSnapshotField);
-    }
+  it("uses the scoped authority for a valid individual decision", async () => {
+    await expect(updateRegistrationStatus(form())).rejects.toThrow("notice=saved");
+    expect(rpcMock).toHaveBeenCalledWith("review_tournament_registration_scoped", {
+      p_tournament_id: A, p_registration_id: ONE, p_registration_status: "approved", p_admin_notes: null,
+    });
+    expect(rows[2].registration_status).toBe("pending");
+    expect(notifyMock).not.toHaveBeenCalled(); // canonical approval trigger remains authoritative
   });
-
-  it("bulk-approves only pending or manual-review rows and reports stale selections", () => {
-    const compactBulk = compact(approveSelectedRegistrationsAction);
-
-    expect(compactBulk).toContain(
-      'registration.registration_status !== "pending" && registration.registration_status !== "manual_review"'
-    );
-    expect(compactBulk).toContain("registration is already approved");
-    expect(compactBulk).toContain(
-      "rejected registrations require individual administrator review"
-    );
-    expect(compactBulk).toContain(
-      'approvedCount > 0 ? "registration-bulk-partial" : "registration-bulk-failed"'
-    );
-    expect(compactBulk).toContain('notice: "registration-bulk-failed"');
+  it("sends the complete same-tournament batch once and preserves pagination", async () => {
+    await expect(approveSelectedRegistrations(form([ONE, TWO]))).rejects.toThrow(`REDIRECT:/admin/tournaments/${A}?section=registrations&page=2`);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("approve_tournament_registrations_scoped", { p_tournament_id: A, p_registration_ids: [ONE, TWO] });
+    expect(rows[2].registration_status).toBe("pending");
   });
-
-  it("keeps ordinary deletion unavailable and restricts cleanup to terminal rows", () => {
-    const compactDelete = compact(deleteSelectedRegistrationsAction);
-    const compactPage = compact(adminPageSource);
-
-    expect(compactPage).not.toContain("Delete Selected");
-    expect(compactDelete).toContain(
-      'registration.registration_status !== "rejected" && registration.registration_status !== "withdrawn"'
-    );
-    expect(compactDelete).toContain(
-      'notice: "registration-delete-blocked"'
-    );
+  it("reports domain-rule failures separately after complete scope validation", async () => {
+    rpcMock.mockReturnValue(HttpResponse.json([{ registration_id: ONE, error_message: null }, { registration_id: TWO, error_message: "bracket is full" }]));
+    await expect(approveSelectedRegistrations(form([ONE, TWO]))).rejects.toThrow("registration-bulk-partial");
   });
-
-  it("does not generate, publish, or start competition as a review side effect", () => {
-    const reviewActions = compact(
-      `${updateRegistrationStatusAction}\n${approveSelectedRegistrationsAction}`
-    );
-
-    expect(rpcNames(updateRegistrationStatusAction)).toEqual([
-      "review_tournament_registration",
-    ]);
-    expect(rpcNames(approveSelectedRegistrationsAction)).toEqual([
-      "review_tournament_registration",
-    ]);
-
-    for (const forbiddenEffect of [
-      'from("generated_brackets")',
-      'from("tournaments")',
-      "generateTournamentBracket",
-      "generate_tournament_bracket",
-      "saveBracketAssignments",
-      "save_bracket_assignments",
-      "publishTournamentBracket",
-      "startTournament",
-      'status: "in_progress"',
-      'status = "in_progress"',
-    ]) {
-      expect(reviewActions).not.toContain(forbiddenEffect);
-    }
+  it("does not fall back to an unscoped RPC when the new migration is unavailable", async () => {
+    rpcMock.mockReturnValue(HttpResponse.json({ message: "function missing" }, { status: 404 }));
+    await expect(updateRegistrationStatus(form())).rejects.toThrow("save-failed");
+    expect(rpcMock).toHaveBeenCalledTimes(1); expect(notifyMock).not.toHaveBeenCalled();
   });
-
-  it("leaves approval notification creation to the canonical database trigger", () => {
-    const compactNotifications = compact(notificationBuilder);
-    const notificationCall = sliceSource(
-      updateRegistrationStatusAction,
-      "const notification = buildRegistrationStatusNotification({",
-      "  const { error } = await supabase.rpc("
-    );
-
-    expect(compactNotifications).not.toContain("registration.approved");
-    expect(compactNotifications).not.toContain("Registration Approved");
-    expect(approveSelectedRegistrationsAction).not.toContain(
-      "buildRegistrationStatusNotification"
-    );
-    expect(registrationActionsSource).not.toContain(
-      "createInAppNotifications"
-    );
-
-    expect(notificationCall).not.toContain("adminNotes");
-    expect(notificationCall).not.toContain("admin_notes");
+  it("retains required review notes and keeps them out of player notifications", async () => {
+    const data = form(); data.set("nextStatus", "manual_review");
+    await expect(updateRegistrationStatus(data)).rejects.toThrow("note-required");
+    expect(rpcMock).not.toHaveBeenCalled();
+    data.set("adminNotes", "private evidence");
+    await expect(updateRegistrationStatus(data)).rejects.toThrow("notice=saved");
+    expect(notifyMock).toHaveBeenCalledOnce();
+    expect(JSON.stringify(notifyMock.mock.calls)).not.toContain("private evidence");
   });
-
-  it("preserves generic notifications for unrelated review states without private context", () => {
-    const compactNotifications = compact(notificationBuilder);
-
-    expect(compactNotifications).toContain(
-      "Your registration for ${tournamentTitle} has been rejected."
-    );
-    expect(compactNotifications).toContain(
-      "Your registration for ${tournamentTitle} is currently under manual review."
-    );
-    expect(compactNotifications).toContain(
-      "You have been added to the waitlist for ${tournamentTitle}."
-    );
-    expect(compactNotifications).toContain(
-      "eventKey: rejectionEventKey"
-    );
-    expect(compact(updateRegistrationStatusAction)).toContain(
-      "`registration:${currentRegistration.id}:rejected:${rejectionCycle}`"
-    );
-    expect(compact(updateRegistrationStatusAction)).not.toContain(
-      "eventKey: `registration:${registration.id}:waitlisted`"
-    );
-    expect(compactNotifications.toLowerCase()).not.toContain("admin_notes");
-    expect(compactNotifications).not.toContain("adminNotes");
-    expect(compactNotifications).not.toContain("privateAdminNote");
+  it("allows the authority to enforce withdrawn finality and same-state private notes", async () => {
+    rows[0].registration_status = "withdrawn";
+    const data = form(); data.set("nextStatus", "withdrawn"); data.set("adminNotes", "history note");
+    await expect(updateRegistrationStatus(data)).rejects.toThrow("notice=saved");
+    expect(rpcMock).toHaveBeenCalledWith("review_tournament_registration_scoped", expect.objectContaining({p_registration_status: "withdrawn"}));
+  });
+  it("retains old deletion action as a non-destructive failure", async () => {
+    await expect(deleteSelectedRegistrations(form([ONE, OTHER]))).rejects.toThrow("registration-delete-blocked");
+    expect(reads).toHaveLength(0); expect(rpcMock).not.toHaveBeenCalled();
   });
 });

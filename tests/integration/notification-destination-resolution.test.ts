@@ -147,11 +147,30 @@ describe("notification destination ownership resolution", () => {
       "/admin/tournaments/tournament-1?section=matches&match=match-1&room=" + roomId
     );
   });
-  it("routes an Admin registration notification to the global registrations workspace", async () => {
+  it("routes an Admin registration notification with explicit tournament context to that workspace", async () => {
+    const tournamentId = "44444444-4444-4444-8444-444444444444";
+    const registrationId = "55555555-5555-4555-8555-555555555555";
+    const supabase = createSupabaseQueryMock({
+      data: destinationRow({
+        recipient_role: "admin", tournament_id: tournamentId,
+        registration_id: registrationId, match_id: null,
+      }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    await expect(resolveNotificationDestination(NOTIFICATION_ID, "admin")).resolves.toBe(
+      `/admin/tournaments/${tournamentId}?section=registrations&filter=all&selected=${registrationId}`
+    );
+    expect(supabase.calls).toContainEqual({ method: "eq", args: ["recipient_role", "admin"] });
+    expect(supabase.calls.map((call) => call.method)).not.toContain("update");
+    expect(supabase.calls.map((call) => call.method)).not.toContain("delete");
+  });
+
+  it.each([null, "malformed-tournament"])("routes a legacy Admin registration notification through the authorized resolver: %s", async (tournamentId) => {
     const supabase = createSupabaseQueryMock({
       data: destinationRow({
         recipient_role: "admin",
-        tournament_id: null,
+        tournament_id: tournamentId,
         registration_id: "registration-1",
         match_id: null,
       }),
@@ -163,6 +182,18 @@ describe("notification destination ownership resolution", () => {
     ).resolves.toBe(
       "/admin/registrations?filter=all&selected=registration-1"
     );
+  });
+
+  it("sends malformed registration identity through the safe legacy resolver even with tournament context", async () => {
+    const supabase = createSupabaseQueryMock({
+      data: destinationRow({
+        recipient_role: "admin", tournament_id: "44444444-4444-4444-8444-444444444444",
+        registration_id: "not-a-registration", match_id: null,
+      }),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+    await expect(resolveNotificationDestination(NOTIFICATION_ID, "admin"))
+      .resolves.toBe("/admin/registrations?filter=all&selected=not-a-registration");
   });
 
   it("routes a Badge unlock notification to the authenticated collection", async () => {

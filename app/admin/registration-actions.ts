@@ -32,11 +32,14 @@ type AdminNotice =
   | "registration-locked"
   | "registration-bulk-approved"
   | "registration-bulk-partial"
-  | "registration-bulk-failed";
+  | "registration-bulk-failed"
+  | "registration-scope-required"
+  | "registration-scope-mismatch";
 type WorkspaceSection = "registrations" | "players-waitlist";
 type WorkspaceRedirectContext = {
   tournamentId: string;
   section: WorkspaceSection;
+  page: number;
 };
 
 function getSafeFilter(filter?: string): FilterStatus {
@@ -66,7 +69,7 @@ function getWorkspaceRedirectContext(
 ): WorkspaceRedirectContext | null {
   const tournamentId = String(
     formData.get("workspaceTournamentId") || ""
-  ).trim();
+  ).trim().toLowerCase();
   const section = String(formData.get("workspaceSection") || "").trim();
 
   if (
@@ -79,6 +82,10 @@ function getWorkspaceRedirectContext(
   return {
     tournamentId,
     section,
+    page: /^\d+$/.test(String(formData.get("workspacePage") ?? "1")) &&
+      Number.isSafeInteger(Number(formData.get("workspacePage") ?? 1)) &&
+      Number(formData.get("workspacePage") ?? 1) > 0
+      ? Number(formData.get("workspacePage") ?? 1) : 1,
   };
 }
 
@@ -102,6 +109,7 @@ function buildHref(
 
   if (workspaceContext) {
     params.set("section", workspaceContext.section);
+    params.set("page", String(workspaceContext.page));
   }
 
   params.set("filter", filter);
@@ -273,7 +281,10 @@ export async function updateRegistrationStatus(formData: FormData) {
   await requireCurrentAccountLegalAcceptance();
 
   const workspaceContext = getWorkspaceRedirectContext(formData);
-  const registrationId = String(formData.get("registrationId") || "");
+  if (!workspaceContext) {
+    redirect(buildHref({ filter: "all", notice: "registration-scope-required" }, null));
+  }
+  const registrationId = String(formData.get("registrationId") || "").trim().toLowerCase();
   const nextStatus = String(
     formData.get("nextStatus") || ""
   ) as RegistrationStatus;
@@ -289,9 +300,10 @@ export async function updateRegistrationStatus(formData: FormData) {
     "approved",
     "rejected",
     "waitlisted",
+    "withdrawn",
   ];
 
-  if (!registrationId || !validStatuses.includes(nextStatus)) {
+  if (!isUuid(registrationId) || !validStatuses.includes(nextStatus)) {
     redirect(
       buildHref(
         {
@@ -340,6 +352,7 @@ export async function updateRegistrationStatus(formData: FormData) {
         "id, registration_status, tournament_bracket_id, clerk_user_id, player_name, tournament_id, tournament_title, bracket_name"
       )
       .eq("id", registrationId)
+      .eq("tournament_id", workspaceContext.tournamentId)
       .maybeSingle();
 
   if (registrationLookupError || !currentRegistration) {
@@ -352,7 +365,7 @@ export async function updateRegistrationStatus(formData: FormData) {
         {
           filter: activeFilter,
           selected: selected || registrationId,
-          notice: "save-failed",
+          notice: "registration-scope-mismatch",
         },
         workspaceContext
       )
@@ -373,6 +386,7 @@ export async function updateRegistrationStatus(formData: FormData) {
         .eq("recipient_clerk_user_id", currentRegistration.clerk_user_id)
         .eq("type", "registration.rejected")
         .eq("registration_id", currentRegistration.id)
+        .eq("tournament_id", workspaceContext.tournamentId)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
         .limit(1)
@@ -407,7 +421,8 @@ export async function updateRegistrationStatus(formData: FormData) {
     rejectionEventKey,
   });
 
-  const { error } = await supabase.rpc("review_tournament_registration", {
+  const { error } = await supabase.rpc("review_tournament_registration_scoped", {
+    p_tournament_id: workspaceContext.tournamentId,
     p_registration_id: registrationId,
     p_registration_status: nextStatus,
     p_admin_notes: adminNotes || null,
@@ -458,378 +473,82 @@ export async function updateRegistrationStatus(formData: FormData) {
   );
 }
 
+// Retain the exported action for already-open forms. Registration history is
+// preserved; this workspace has no destructive registration-cleanup operation.
 export async function deleteSelectedRegistrations(formData: FormData) {
   "use server";
-
   const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") {
+  if (!userId || (sessionClaims as CustomClaims | null)?.metadata?.role !== "admin") {
     throw new Error("Unauthorized");
   }
-
   await requireCurrentAccountLegalAcceptance();
-
   const workspaceContext = getWorkspaceRedirectContext(formData);
-  const activeFilter = getSafeFilter(
-    String(formData.get("activeFilter") || "all")
-  );
-  const registrationIds = [
-    ...new Set(
-      formData
-        .getAll("registrationId")
-        .map((value) => String(value))
-        .filter(isUuid)
-    ),
-  ].slice(0, 100);
-
-  if (registrationIds.length === 0) {
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice: "registration-delete-failed",
-        },
-        workspaceContext
-      )
-    );
-  }
-
-  const supabase = createSupabaseAdminClient();
-  const { data: registrationsForDelete, error: lookupError } = await supabase
-    .from("registrations")
-    .select("id, registration_status, tournament_bracket_id")
-    .in("id", registrationIds);
-
-  if (
-    lookupError ||
-    !registrationsForDelete ||
-    registrationsForDelete.length !== registrationIds.length
-  ) {
-    console.error("Registration delete lookup failed:", lookupError?.message);
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice: "registration-delete-failed",
-        },
-        workspaceContext
-      )
-    );
-  }
-
-  const hasHistoricalRegistration = registrationsForDelete.some(
-    (registration) =>
-      registration.registration_status !== "rejected" &&
-      registration.registration_status !== "withdrawn"
-  );
-
-  if (hasHistoricalRegistration) {
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice: "registration-delete-blocked",
-        },
-        workspaceContext
-      )
-    );
-  }
-
-  const approvedBracketIds = [
-    ...new Set(
-      registrationsForDelete
-        .filter(
-          (registration) =>
-            registration.registration_status === "approved" &&
-            registration.tournament_bracket_id
-        )
-        .map((registration) => registration.tournament_bracket_id as string)
-    ),
-  ];
-
-  const conflictQueries = [
-    approvedBracketIds.length > 0
-      ? supabase
-          .from("generated_brackets")
-          .select("id")
-          .in("tournament_bracket_id", approvedBracketIds)
-          .limit(1)
-      : null,
-    supabase
-      .from("tournament_matches")
-      .select("id")
-      .in("player_one_registration_id", registrationIds)
-      .limit(1),
-    supabase
-      .from("tournament_matches")
-      .select("id")
-      .in("player_two_registration_id", registrationIds)
-      .limit(1),
-    supabase
-      .from("tournament_matches")
-      .select("id")
-      .in("winner_registration_id", registrationIds)
-      .limit(1),
-    supabase
-      .from("tournament_standings")
-      .select("registration_id")
-      .in("registration_id", registrationIds)
-      .limit(1),
-    supabase
-      .from("match_result_submissions")
-      .select("id")
-      .in("submitted_by_registration_id", registrationIds)
-      .limit(1),
-    supabase
-      .from("match_result_submissions")
-      .select("id")
-      .in("claimed_winner_registration_id", registrationIds)
-      .limit(1),
-    supabase
-      .from("match_result_report_groups")
-      .select("id")
-      .in("submitted_by_registration_id", registrationIds)
-      .limit(1),
-    supabase
-      .from("match_result_report_groups")
-      .select("id")
-      .in("opponent_registration_id", registrationIds)
-      .limit(1),
-    supabase
-      .from("match_result_report_groups")
-      .select("id")
-      .in("winner_registration_id", registrationIds)
-      .limit(1),
-  ].filter((query) => query !== null);
-
-  const conflictResults = await Promise.all(conflictQueries);
-  const conflictError = conflictResults.find((result) => result.error)?.error;
-  const hasConflict = conflictResults.some(
-    (result) => (result.data ?? []).length > 0
-  );
-
-  if (conflictError) {
-    console.error("Registration delete conflict check failed:", conflictError);
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice: "registration-delete-failed",
-        },
-        workspaceContext
-      )
-    );
-  }
-
-  if (hasConflict) {
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice: "registration-delete-blocked",
-        },
-        workspaceContext
-      )
-    );
-  }
-
-  const { error } = await supabase
-    .from("registrations")
-    .delete()
-    .in("id", registrationIds);
-
-  if (error) {
-    console.error("Registration delete failed:", error.message);
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice: "registration-delete-failed",
-        },
-        workspaceContext
-      )
-    );
-  }
-
-  revalidateRegistrationPaths(workspaceContext, true);
-
-  redirect(
-    buildHref(
-      {
-        filter: activeFilter,
-        notice: "registration-deleted",
-      },
-      workspaceContext
-    )
-  );
+  redirect(buildHref({
+    filter: getSafeFilter(String(formData.get("activeFilter") || "all")),
+    notice: workspaceContext ? "registration-delete-blocked" : "registration-scope-required",
+    detail: "Registration history cannot be deleted here. Open the tournament to review its registrations.",
+  }, workspaceContext));
 }
 
 export async function approveSelectedRegistrations(formData: FormData) {
   "use server";
-
   const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") {
+  if (!userId || (sessionClaims as CustomClaims | null)?.metadata?.role !== "admin") {
     throw new Error("Unauthorized");
   }
-
   await requireCurrentAccountLegalAcceptance();
-
   const workspaceContext = getWorkspaceRedirectContext(formData);
-  const activeFilter = getSafeFilter(
-    String(formData.get("activeFilter") || "all")
-  );
-  const registrationIds = [
-    ...new Set(
-      formData
-        .getAll("registrationId")
-        .map((value) => String(value))
-        .filter(isUuid)
-    ),
-  ].slice(0, 100);
-
-  if (registrationIds.length === 0) {
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice: "registration-bulk-failed",
-          detail: "Select at least one registration to approve.",
-        },
-        workspaceContext
-      )
-    );
+  const activeFilter = getSafeFilter(String(formData.get("activeFilter") || "all"));
+  if (!workspaceContext) {
+    redirect(buildHref({ filter: activeFilter, notice: "registration-scope-required" }, null));
   }
-
+  const submitted = formData.getAll("registrationId");
+  if (submitted.length === 0 || submitted.length > 100 ||
+      submitted.some((value) => typeof value !== "string" || !isUuid(value))) {
+    redirect(buildHref({ filter: activeFilter, notice: "registration-bulk-failed",
+      detail: "Select between 1 and 100 valid registrations from this tournament. Nothing was changed.",
+    }, workspaceContext));
+  }
+  const registrationIds = [...new Set((submitted as string[]).map((id) => id.toLowerCase()))];
   const supabase = createSupabaseAdminClient();
-  const { data: registrationsForApproval, error: lookupError } = await supabase
+  // Validate the complete selection before invoking any mutation. The RPC
+  // repeats this validation under locks, including missing and foreign targets.
+  const { data: registrations, error: lookupError } = await supabase
     .from("registrations")
-    .select(
-      "id, player_name, registration_status, created_at, clerk_user_id, tournament_id, tournament_title, bracket_name"
-    )
+    .select("id, player_name")
+    .eq("tournament_id", workspaceContext.tournamentId)
     .in("id", registrationIds);
-
-  if (lookupError || !registrationsForApproval) {
-    console.error("Registration bulk approval lookup failed:", lookupError);
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice: "registration-bulk-failed",
-          detail: "Selected registrations could not be loaded.",
-        },
-        workspaceContext
-      )
-    );
+  if (lookupError || !registrations || registrations.length !== registrationIds.length) {
+    redirect(buildHref({ filter: activeFilter, notice: "registration-scope-mismatch",
+      detail: "The selection no longer belongs to this tournament. Reopen its registrations and select again. Nothing was changed.",
+    }, workspaceContext));
   }
-
-  const registrationsById = new Map(
-    registrationsForApproval.map((registration) => [
-      registration.id,
-      registration,
-    ])
-  );
-  const failures = registrationIds
-    .filter((registrationId) => !registrationsById.has(registrationId))
-    .map((registrationId) => `${registrationId}: registration not found`);
-  const orderedRegistrations = [...registrationsForApproval].sort(
-    (left, right) => {
-      const leftTime = new Date(left.created_at ?? "").getTime();
-      const rightTime = new Date(right.created_at ?? "").getTime();
-
-      return (
-        (Number.isFinite(leftTime) ? leftTime : 0) -
-          (Number.isFinite(rightTime) ? rightTime : 0) ||
-        left.id.localeCompare(right.id)
-      );
-    }
-  );
+  const { data, error } = await supabase.rpc("approve_tournament_registrations_scoped", {
+    p_tournament_id: workspaceContext.tournamentId,
+    p_registration_ids: registrationIds,
+  });
+  if (error || !Array.isArray(data) || data.length !== registrationIds.length ||
+      new Set(data.map((row) => row.registration_id)).size !== registrationIds.length ||
+      data.some((row) => !registrationIds.includes(row.registration_id) ||
+        (row.error_message !== null && typeof row.error_message !== "string"))) {
+    redirect(buildHref({ filter: activeFilter, notice: "registration-bulk-failed",
+      detail: "The approval result could not be confirmed. Refresh this tournament before retrying.",
+    }, workspaceContext));
+  }
+  const labels = new Map(registrations.map((row) => [row.id, row.player_name || row.id]));
+  const failures: string[] = [];
   let approvedCount = 0;
-
-  for (const registration of orderedRegistrations) {
-    if (registration.registration_status === "approved") {
-      failures.push(
-        `${registration.player_name || registration.id}: registration is already approved`
-      );
-      continue;
-    }
-
-    if (registration.registration_status === "waitlisted") {
-      failures.push(
-        `${registration.player_name || registration.id}: the player must accept a FIFO spot offer before administrator approval`
-      );
-      continue;
-    }
-
-    if (registration.registration_status === "withdrawn") {
-      failures.push(
-        `${registration.player_name || registration.id}: withdrawal is final for this tournament`
-      );
-      continue;
-    }
-
-    if (registration.registration_status === "rejected") {
-      failures.push(
-        `${registration.player_name || registration.id}: rejected registrations require individual administrator review`
-      );
-      continue;
-    }
-
-    if (
-      registration.registration_status !== "pending" &&
-      registration.registration_status !== "manual_review"
-    ) {
-      failures.push(
-        `${registration.player_name || registration.id}: registration is not eligible for bulk approval`
-      );
-      continue;
-    }
-
-    const { error } = await supabase.rpc("review_tournament_registration", {
-      p_registration_id: registration.id,
-      p_registration_status: "approved",
-      p_admin_notes: null,
-    });
-
-    if (error) {
-      failures.push(
-        `${registration.player_name || registration.id}: ${describeRegistrationUpdateFailure(
-          error.message
-        )}`
-      );
-    } else {
-      approvedCount += 1;
-    }
+  for (const row of data) {
+    if (row.error_message === null) approvedCount += 1;
+    else failures.push(`${labels.get(row.registration_id)}: ${describeRegistrationUpdateFailure(row.error_message)}`);
   }
-
   revalidateRegistrationPaths(workspaceContext, true);
-
-  if (failures.length > 0) {
-    redirect(
-      buildHref(
-        {
-          filter: activeFilter,
-          notice:
-            approvedCount > 0
-              ? "registration-bulk-partial"
-              : "registration-bulk-failed",
-          detail: buildBulkApprovalDetail(failures, approvedCount),
-        },
-        workspaceContext
-      )
-    );
-  }
-
-  redirect(
-    buildHref(
-      {
-        filter: "approved",
-        notice: "registration-bulk-approved",
-        detail: `${approvedCount} registration(s) approved.`,
-      },
-      workspaceContext
-    )
-  );
+  redirect(buildHref({
+    filter: failures.length ? activeFilter : "approved",
+    notice: failures.length
+      ? approvedCount > 0 ? "registration-bulk-partial" : "registration-bulk-failed"
+      : "registration-bulk-approved",
+    detail: failures.length ? buildBulkApprovalDetail(failures, approvedCount)
+      : `${approvedCount} registration(s) approved.`,
+  }, workspaceContext));
 }

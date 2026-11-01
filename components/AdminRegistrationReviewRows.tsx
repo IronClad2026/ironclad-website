@@ -52,6 +52,7 @@ export default function AdminRegistrationReviewRows({
   returnHref = "/admin/registrations",
   workspaceTournamentId,
   workspaceSection,
+  workspacePage,
 }: {
   registrations: AdminRegistrationReviewRow[];
   activeFilter: FilterStatus;
@@ -63,6 +64,7 @@ export default function AdminRegistrationReviewRows({
   returnHref?: string;
   workspaceTournamentId?: string;
   workspaceSection?: "registrations" | "players-waitlist";
+  workspacePage?: number;
 }) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -321,6 +323,7 @@ export default function AdminRegistrationReviewRows({
               returnHref={returnHref}
               workspaceTournamentId={workspaceTournamentId}
               workspaceSection={workspaceSection}
+              workspacePage={workspacePage}
               onClose={() => setMenu(null)}
             />,
             document.body
@@ -523,6 +526,7 @@ function RegistrationContextMenu({
   returnHref,
   workspaceTournamentId,
   workspaceSection,
+  workspacePage,
   onClose,
   menuRef,
 }: {
@@ -533,6 +537,7 @@ function RegistrationContextMenu({
   returnHref: string;
   workspaceTournamentId?: string;
   workspaceSection?: "registrations" | "players-waitlist";
+  workspacePage?: number;
   onClose: () => void;
   menuRef: RefObject<HTMLDivElement | null>;
 }) {
@@ -567,6 +572,7 @@ function RegistrationContextMenu({
               updateRegistrationStatusAction={updateRegistrationStatusAction}
               workspaceTournamentId={workspaceTournamentId}
               workspaceSection={workspaceSection}
+              workspacePage={workspacePage}
               onSubmitStart={onClose}
             />
           ) : (
@@ -595,6 +601,7 @@ function DirectStatusAction({
   updateRegistrationStatusAction,
   workspaceTournamentId,
   workspaceSection,
+  workspacePage,
   onSubmitStart,
 }: {
   action: Extract<MenuAction, { kind: "direct" }>;
@@ -603,6 +610,7 @@ function DirectStatusAction({
   updateRegistrationStatusAction: (formData: FormData) => void | Promise<void>;
   workspaceTournamentId?: string;
   workspaceSection?: "registrations" | "players-waitlist";
+  workspacePage?: number;
   onSubmitStart: () => void;
 }) {
   return (
@@ -628,6 +636,9 @@ function DirectStatusAction({
           name="workspaceSection"
           value={workspaceSection}
         />
+      )}
+      {workspacePage && (
+        <input type="hidden" name="workspacePage" value={workspacePage} />
       )}
       <input
         type="hidden"

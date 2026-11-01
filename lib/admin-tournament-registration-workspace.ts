@@ -2,6 +2,7 @@ import { requireDivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
+import { cache } from "react";
 import {
   buildAdminRegistrationEvidence,
   buildRegistrationOrderMap,
@@ -66,8 +67,8 @@ export type AdminTournamentRegistrationCohortSummary = {
 
 export type AdminTournamentRegistrationWorkspaceData = {
   rows: AdminRegistrationReviewRow[];
-  allRows: AdminRegistrationReviewRow[];
   selectedRegistration: AdminRegistrationReviewRow | null;
+  selectedRegistrationUnavailable: boolean;
   selectedRegistrationIsTerminal: boolean;
   activeFilter: AdminTournamentRegistrationFilter;
   counts: Record<AdminTournamentRegistrationStatusKey, number>;
@@ -80,7 +81,85 @@ export type AdminTournamentRegistrationWorkspaceData = {
     offerStatus: AdminWaitlistOfferStatus | null;
   }>;
   hasBulkApprovableRegistration: boolean;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  filteredCount: number;
 };
+
+type RegistrationSummaryRow = Pick<
+  SupabaseRegistration,
+  | "id"
+  | "tournament_id"
+  | "tournament_bracket_id"
+  | "registration_status"
+  | "created_at"
+  | "waitlist_offer_status"
+>;
+
+const REGISTRATION_SELECT =
+  "id, player_name, country, submitted_elo, elo_verified_elo, elo_highest_faction, elo_checked_at, elo_verification_source, elo_verified_division, elo_calculation_version, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name, waitlist_offer_status";
+const REGISTRATION_SUMMARY_SELECT =
+  "id, tournament_id, tournament_bracket_id, registration_status, created_at, waitlist_offer_status";
+const PAGE_SIZE = 25;
+const SUMMARY_BATCH_SIZE = 500;
+
+// Request-local reuse keeps the header and registration workspace on the same
+// complete, narrow projection. Advance by the returned length, since the API's
+// configured row cap can be smaller than the requested batch.
+export const loadAdminTournamentRegistrationSummary = cache(
+  async (tournamentIdInput: string): Promise<RegistrationSummaryRow[]> => {
+    await requireAdmin();
+    const tournamentId = tournamentIdInput.toLowerCase();
+    if (!isUuid(tournamentId)) throw new Error("Invalid Tournament.");
+
+    const supabase = createSupabaseAdminClient();
+    const rows: RegistrationSummaryRow[] = [];
+    const ids = new Set<string>();
+    let total: number | null = null;
+
+    do {
+      const result = await supabase
+        .from("registrations")
+        .select(REGISTRATION_SUMMARY_SELECT, { count: "exact" })
+        .eq("tournament_id", tournamentId)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(rows.length, rows.length + SUMMARY_BATCH_SIZE - 1);
+
+      if (
+        result.error ||
+        !Array.isArray(result.data) ||
+        !Number.isSafeInteger(result.count) ||
+        result.count! < 0 ||
+        (total !== null && result.count !== total)
+      ) {
+        throwRegistrationLoadError();
+      }
+      total = result.count!;
+      const batch = result.data as RegistrationSummaryRow[];
+      if (
+        (batch.length === 0 && rows.length < total) ||
+        rows.length + batch.length > total
+      ) {
+        throwRegistrationLoadError();
+      }
+      for (const row of batch) {
+        if (
+          row.tournament_id !== tournamentId ||
+          ids.has(row.id) ||
+          !ALL_FILTERS.slice(1).includes(row.registration_status)
+        ) {
+          throwRegistrationLoadError();
+        }
+        ids.add(row.id);
+        rows.push(row);
+      }
+    } while (rows.length < total);
+
+    return rows;
+  }
+);
 
 export type AdminTournamentRegistrationStatusKey =
   | "all"
@@ -115,13 +194,6 @@ export function getSafeAdminTournamentRegistrationFilter(
     return "all";
   }
 
-  if (
-    section === "registrations" &&
-    candidate === "waitlisted"
-  ) {
-    return "all";
-  }
-
   return candidate;
 }
 
@@ -132,10 +204,12 @@ export async function loadAdminTournamentRegistrationWorkspace(
     filter,
     section,
     selectedRegistrationId,
+    page: requestedPage,
   }: {
     filter?: string;
     section: AdminTournamentRegistrationSection;
     selectedRegistrationId?: string;
+    page?: string;
   }
 ): Promise<AdminTournamentRegistrationWorkspaceData> {
   await requireAdmin();
@@ -144,22 +218,71 @@ export async function loadAdminTournamentRegistrationWorkspace(
     section
   );
   const supabase = createSupabaseAdminClient();
-  const registrationResult = await supabase
-    .from("registrations")
-    .select(
-      "id, player_name, country, submitted_elo, elo_verified_elo, elo_highest_faction, elo_checked_at, elo_verification_source, elo_verified_division, elo_calculation_version, registration_status, admin_notes, created_at, tournament_id, tournament_bracket_id, tournament_title, bracket_name, waitlist_offer_status"
-    )
-    .eq("tournament_id", tournament.id)
-    .order("created_at", { ascending: true });
-
-  if (registrationResult.error || !Array.isArray(registrationResult.data)) {
-    console.error("Admin Tournament registration workspace load failed.", {
-      operation: "load-tournament-registrations",
-    });
-    throw new Error("Tournament registrations could not be loaded.");
+  const registrations = await loadAdminTournamentRegistrationSummary(
+    tournament.id
+  );
+  const counts = createCounts(registrations, section);
+  const filteredCount = counts[activeFilter];
+  const pageCount = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+  const page = Math.min(getSafePage(requestedPage), pageCount);
+  const offset = (page - 1) * PAGE_SIZE;
+  const expectedPageLength = Math.min(PAGE_SIZE, filteredCount - offset);
+  const expectedPage = registrations.filter((row) =>
+    activeFilter !== "all"
+      ? row.registration_status === activeFilter
+      : section !== "players-waitlist" ||
+        row.registration_status === "approved" ||
+        row.registration_status === "waitlisted"
+  ).slice(offset, offset + expectedPageLength);
+  const pageRegistrations: SupabaseRegistration[] = [];
+  while (pageRegistrations.length < expectedPageLength) {
+    let query = supabase
+      .from("registrations")
+      .select(REGISTRATION_SELECT, { count: "exact" })
+      .eq("tournament_id", tournament.id);
+    if (activeFilter !== "all") {
+      query = query.eq("registration_status", activeFilter);
+    } else if (section === "players-waitlist") {
+      query = query.in("registration_status", ["approved", "waitlisted"]);
+    }
+    const result = await query
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(offset + pageRegistrations.length, offset + expectedPageLength - 1);
+    if (
+      result.error ||
+      !Array.isArray(result.data) ||
+      result.count !== filteredCount ||
+      result.data.length === 0 ||
+      result.data.length > expectedPageLength - pageRegistrations.length ||
+      result.data.some((row, index) => {
+        const expected = expectedPage[pageRegistrations.length + index];
+        return row.tournament_id !== tournament.id ||
+          row.id !== expected?.id ||
+          row.registration_status !== expected.registration_status ||
+          row.tournament_bracket_id !== expected.tournament_bracket_id ||
+          row.created_at !== expected.created_at ||
+          row.waitlist_offer_status !== expected.waitlist_offer_status;
+      })
+    ) {
+      throwRegistrationLoadError();
+    }
+    pageRegistrations.push(...(result.data as SupabaseRegistration[]));
   }
-
-  const registrations = registrationResult.data as SupabaseRegistration[];
+  const selectedResult =
+    selectedRegistrationId && isUuid(selectedRegistrationId)
+      ? await supabase
+          .from("registrations")
+          .select(REGISTRATION_SELECT)
+          .eq("tournament_id", tournament.id)
+          .eq("id", selectedRegistrationId)
+          .maybeSingle()
+      : null;
+  if (selectedResult?.error) throwRegistrationLoadError();
+  const selectedRecord = (selectedResult?.data ?? null) as SupabaseRegistration | null;
+  if (selectedRecord && selectedRecord.tournament_id !== tournament.id) {
+    throwRegistrationLoadError();
+  }
   const brackets = tournament.tournament_brackets ?? [];
   const divisionStateByBracket = new Map(
     divisionStates.flatMap((division) =>
@@ -248,60 +371,50 @@ export async function loadAdminTournamentRegistrationWorkspace(
       divisionState,
     };
   });
-  const allRows = registrations
-    .map((registration): AdminRegistrationReviewRow => ({
-      registrationId: registration.id,
-      tournamentId: registration.tournament_id,
-      privateAdminNote: registration.admin_notes,
-      isDivisionLaunched: Boolean(
-        registration.tournament_bracket_id &&
-          bracketMetaById.get(registration.tournament_bracket_id)?.launchedAt
-      ),
-      ...buildAdminRegistrationEvidence({
-        playerDisplayName: registration.player_name,
-        tournamentName: registration.tournament_title || tournament.title,
-        selectedBracket:
-          registration.bracket_name ||
-          (registration.tournament_bracket_id
-            ? bracketMetaById.get(registration.tournament_bracket_id)?.name ?? ""
-            : ""),
-        submittedElo: registration.submitted_elo,
-        verifiedElo: registration.elo_verified_elo,
-        verifiedDivision: registration.elo_verified_division,
-        verifiedFaction: registration.elo_highest_faction,
-        verificationSource: registration.elo_verification_source,
-        verificationCheckedAt: registration.elo_checked_at,
-        eligibilityRulesVersion: registration.elo_calculation_version,
-        status: registration.registration_status,
-        registeredAt: registration.created_at,
-        waitlistPosition: waitlistPositionById.get(registration.id) ?? null,
-        registrationOrder: registrationOrderById.get(registration.id) ?? null,
-        waitlistOfferStatus: registration.waitlist_offer_status,
-      }),
-    }))
-    .sort(compareRegistrationRows);
-  const sectionRows = allRows.filter((row) =>
-    section === "players-waitlist"
-      ? row.status === "approved" || row.status === "waitlisted"
-      : row.status !== "waitlisted"
-  );
-  const rows =
-    activeFilter === "all"
-      ? sectionRows
-      : sectionRows.filter((row) => row.status === activeFilter);
-  const selectedRegistration =
-    allRows.find((row) => row.registrationId === selectedRegistrationId) ??
-    null;
+  const mapRegistration = (
+    registration: SupabaseRegistration
+  ): AdminRegistrationReviewRow => ({
+    registrationId: registration.id,
+    tournamentId: registration.tournament_id,
+    privateAdminNote: registration.admin_notes,
+    isDivisionLaunched: Boolean(
+      registration.tournament_bracket_id &&
+        bracketMetaById.get(registration.tournament_bracket_id)?.launchedAt
+    ),
+    ...buildAdminRegistrationEvidence({
+      playerDisplayName: registration.player_name,
+      tournamentName: registration.tournament_title || tournament.title,
+      selectedBracket:
+        registration.bracket_name ||
+        (registration.tournament_bracket_id
+          ? bracketMetaById.get(registration.tournament_bracket_id)?.name ?? ""
+          : ""),
+      submittedElo: registration.submitted_elo,
+      verifiedElo: registration.elo_verified_elo,
+      verifiedDivision: registration.elo_verified_division,
+      verifiedFaction: registration.elo_highest_faction,
+      verificationSource: registration.elo_verification_source,
+      verificationCheckedAt: registration.elo_checked_at,
+      eligibilityRulesVersion: registration.elo_calculation_version,
+      status: registration.registration_status,
+      registeredAt: registration.created_at,
+      waitlistPosition: waitlistPositionById.get(registration.id) ?? null,
+      registrationOrder: registrationOrderById.get(registration.id) ?? null,
+      waitlistOfferStatus: registration.waitlist_offer_status,
+    }),
+  });
+  const rows = pageRegistrations.map(mapRegistration);
+  const selectedRegistration = selectedRecord
+    ? mapRegistration(selectedRecord)
+    : null;
   const terminal =
     tournament.status === "cancelled" || tournament.status === "voided";
-  const counts = createCounts(allRows, section);
-  const waitlistNotices = registrations
+  const waitlistNotices = pageRegistrations
     .filter(
       (registration) =>
         registration.registration_status === "waitlisted" &&
         registration.tournament_bracket_id !== null
     )
-    .sort(compareWaitlistedRegistrations)
     .map((registration) => ({
       id: registration.id,
       playerName: registration.player_name || "Player",
@@ -315,13 +428,19 @@ export async function loadAdminTournamentRegistrationWorkspace(
 
   return {
     rows,
-    allRows,
     selectedRegistration,
+    selectedRegistrationUnavailable: Boolean(
+      selectedRegistrationId && !selectedRegistration
+    ),
     selectedRegistrationIsTerminal: terminal,
     activeFilter,
     counts,
     cohortSummaries,
     waitlistNotices,
+    page,
+    pageSize: PAGE_SIZE,
+    pageCount,
+    filteredCount,
     hasBulkApprovableRegistration: rows.some(
       (registration) =>
         !terminal &&
@@ -333,49 +452,42 @@ export async function loadAdminTournamentRegistrationWorkspace(
 }
 
 function createCounts(
-  rows: AdminRegistrationReviewRow[],
+  rows: RegistrationSummaryRow[],
   section: AdminTournamentRegistrationSection
 ) {
   const visible = rows.filter((row) =>
     section === "players-waitlist"
-      ? row.status === "approved" || row.status === "waitlisted"
-      : row.status !== "waitlisted"
+      ? row.registration_status === "approved" ||
+        row.registration_status === "waitlisted"
+      : true
   );
   return {
     all: visible.length,
-    pending: visible.filter((row) => row.status === "pending").length,
-    manual_review: visible.filter((row) => row.status === "manual_review")
+    pending: visible.filter((row) => row.registration_status === "pending").length,
+    manual_review: visible.filter((row) => row.registration_status === "manual_review")
       .length,
-    approved: visible.filter((row) => row.status === "approved").length,
-    rejected: visible.filter((row) => row.status === "rejected").length,
-    waitlisted: visible.filter((row) => row.status === "waitlisted").length,
-    withdrawn: visible.filter((row) => row.status === "withdrawn").length,
+    approved: visible.filter((row) => row.registration_status === "approved").length,
+    rejected: visible.filter((row) => row.registration_status === "rejected").length,
+    waitlisted: visible.filter((row) => row.registration_status === "waitlisted").length,
+    withdrawn: visible.filter((row) => row.registration_status === "withdrawn").length,
   };
 }
 
-function compareRegistrationRows(
-  left: AdminRegistrationReviewRow,
-  right: AdminRegistrationReviewRow
-) {
-  return (
-    (left.selectedBracket ?? "").localeCompare(right.selectedBracket ?? "") ||
-    (left.registrationOrder ?? Number.MAX_SAFE_INTEGER) -
-      (right.registrationOrder ?? Number.MAX_SAFE_INTEGER) ||
-    left.registrationId.localeCompare(right.registrationId)
-  );
+function getSafePage(value?: string) {
+  if (!value || !/^[1-9]\d*$/.test(value)) return 1;
+  const page = Number(value);
+  return Number.isSafeInteger(page) ? page : 1;
 }
 
-function compareWaitlistedRegistrations(
-  left: SupabaseRegistration,
-  right: SupabaseRegistration
-) {
-  const leftTime = new Date(left.created_at).getTime();
-  const rightTime = new Date(right.created_at).getTime();
-  return (
-    (Number.isFinite(leftTime) ? leftTime : 0) -
-      (Number.isFinite(rightTime) ? rightTime : 0) ||
-    left.id.localeCompare(right.id)
-  );
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function throwRegistrationLoadError(): never {
+  console.error("Admin Tournament registration workspace load failed.", {
+    operation: "load-tournament-registrations",
+  });
+  throw new Error("Tournament registrations could not be loaded. Refresh to try again.");
 }
 
 async function requireAdmin() {

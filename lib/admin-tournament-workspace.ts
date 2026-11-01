@@ -9,6 +9,7 @@ import {
   type Coh3MapRow,
 } from "@/lib/coh3-maps";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { loadAdminTournamentRegistrationSummary } from "@/lib/admin-tournament-registration-workspace";
 import type { TournamentDivisionStateResolution } from "@/lib/tournament-division-state";
 import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
 import {
@@ -124,22 +125,10 @@ export async function loadAdminTournamentWorkspace(tournamentId: string) {
   tournament.tournament_brackets = sortBrackets(
     tournament.tournament_brackets ?? [], requireDivisionModelVersion(tournament.division_model_version)
   );
-  const [registrationResult, divisionStatesByTournament] = await Promise.all([
-    supabase
-      .from("registrations")
-      .select("registration_status, tournament_bracket_id")
-      .eq("tournament_id", tournamentId),
+  const [registrations, divisionStatesByTournament] = await Promise.all([
+    loadAdminTournamentRegistrationSummary(tournament.id),
     loadTournamentDivisionStates(supabase, [tournament]),
   ]);
-
-  if (registrationResult.error) {
-    console.error("Admin Tournament workspace summary load failed.", {
-      operation: "load-tournament-workspace-summary",
-    });
-    throw new Error("Tournament management data could not be loaded.");
-  }
-
-  const registrations = registrationResult.data ?? [];
   const divisionStates = divisionStatesByTournament.get(tournament.id);
 
   if (!divisionStates) {
