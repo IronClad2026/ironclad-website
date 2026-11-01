@@ -8,6 +8,7 @@ function source(path: string) {
 
 const adminPage = source("app/admin/page.tsx");
 const registrationsPage = source("app/admin/registrations/page.tsx");
+const tournamentRegistrations = source("components/admin/tournaments/AdminTournamentRegistrations.tsx");
 const systemPage = source("app/admin/system/page.tsx");
 const eloActions = source("app/admin/elo-verification-actions.ts");
 const leaderboardActions = source("app/admin/leaderboard-actions.ts");
@@ -31,9 +32,11 @@ describe("Admin System & Recovery route contract", () => {
     expect(adminPage).not.toContain("tournament_bracket_map_pool_entries");
     expect(adminPage).not.toContain("AdminRegistrationReviewRows");
 
-    expect(registrationsPage).toContain("AdminRegistrationReviewRows");
-    expect(registrationsPage).toContain("approveSelectedRegistrations");
-    expect(registrationsPage).toContain('id="registration-review"');
+    expect(registrationsPage).not.toContain("AdminRegistrationReviewRows");
+    expect(registrationsPage).not.toContain("approveSelectedRegistrations");
+    expect(registrationsPage).toContain("Choose a Tournament");
+    expect(tournamentRegistrations).toContain("AdminRegistrationReviewRows");
+    expect(tournamentRegistrations).toContain("approveSelectedRegistrations");
     expect(adminPage).toContain("InAppNotificationCenter");
     expect(adminPage).toContain("bracketNoticeMessages");
     expect(adminPage).toContain("Open Tournament workspace");

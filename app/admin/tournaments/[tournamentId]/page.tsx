@@ -50,6 +50,7 @@ type TournamentWorkspacePageProps = {
     filter?: string;
     focus?: string;
     notice?: string;
+    page?: string;
     section?: string;
     selected?: string;
     match?: string;
@@ -176,6 +177,7 @@ async function renderWorkspaceSection({
         filter?: string;
         focus?: string;
         notice?: string;
+        page?: string;
         selected?: string;
       match?: string;
       room?: string;
@@ -230,11 +232,12 @@ async function renderWorkspaceSection({
         filter: query?.filter,
         section,
         selectedRegistrationId: query?.selected,
+        page: query?.page,
       }
     );
     return (
       <AdminTournamentRegistrations
-        key={`${tournament.id}:${section}`}
+        key={`${tournament.id}:${section}:${data.activeFilter}:${data.page}`}
         data={data}
         detail={query?.detail}
         focus={getRegistrationFocus(query?.focus)}

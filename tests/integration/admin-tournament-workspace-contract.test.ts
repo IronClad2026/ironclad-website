@@ -347,7 +347,7 @@ const capabilities: Capability[] = [
       {
         file: "registrations",
         includes: [
-          '["all", "pending", "manual_review", "approved", "rejected", "withdrawn"]',
+          '["all", "pending", "manual_review", "approved", "rejected", "waitlisted", "withdrawn"]',
           "aria-current={data.activeFilter === filter ? \"page\" : undefined}",
         ],
       },
@@ -410,7 +410,7 @@ const capabilities: Capability[] = [
       },
       {
         file: "registrationActions",
-        includes: ['rpc("review_tournament_registration"'],
+        includes: ['rpc("review_tournament_registration_scoped"'],
       },
     ],
   },
@@ -958,7 +958,8 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.actions.match(/rpc\("launch_tournament_division"/g)).toHaveLength(1);
     expect(source.actions.match(/rpc\("delete_tournament_data"/g)).toHaveLength(1);
     expect(source.mapPoolActions.match(/rpc\(/g)).toHaveLength(2);
-    expect(source.registrationActions.match(/rpc\("review_tournament_registration"/g)).toHaveLength(2);
+    expect(source.registrationActions.match(/rpc\("review_tournament_registration_scoped"/g)).toHaveLength(1);
+    expect(source.registrationActions.match(/rpc\("approve_tournament_registrations_scoped"/g)).toHaveLength(1);
     expect(source.mediaActions).not.toContain(".rpc(");
     for (const action of [
       "createTournamentMedia",
