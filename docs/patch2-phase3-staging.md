@@ -173,3 +173,96 @@ below after those operations; preparation alone is not deployment or acceptance.
 
 Hosted conversation creation/replies, admin browser actions and access-denial
 results are still pending at this initial release checkpoint.
+
+### Active-account fix and hosted player acceptance
+
+The account-closure follow-up was independently reviewed and applied as Staging
+receipt `20261102195541 / patch2_private_assistance_active_actor`. Readback
+confirmed the strict active-Player check, creation OFF, no private messages yet,
+and the unchanged push block before acceptance resumed. Implementation follow-up
+commit is `951662c`; guarded acceptance tooling/fixtures are separately committed
+as `1d878c782a183f45e81408f6d6d795264a576dac`, also deployed READY through the normal
+Staging branch workflow. No application-code change required repeating its
+unchanged build/test results; the migration allowlist test passed again.
+
+The two new cancelled fixtures are tagged
+`patch3-staging-assistance-20261103-v1-a` and `-b`. The complete factory request
+first passed with rollback; an alias-shadowing SQL error was corrected during
+that safe rehearsal before any commit. The committed factory source SHA-256 is
+`51fb22a6ef71051a3e50757c6448feec23c730217d73b7e9b4ddcb7ab2a94f06`.
+Both tournaments launch/allocate one canonical room and cancel in the same
+transaction, preserving recorded deadlines but exposing no live tournament at
+commit. All sixteen registrations are canonical synthetic manual-review
+snapshots; no consent, provider verification, replay, result or assistance body
+is manufactured. Existing application/private/Storage rows passed transaction
+digest checks. Repeatable-read checks establish preservation by this transaction,
+not an absence of unrelated concurrent external activity.
+
+| Fixture | Tournament | Match / room |
+| --- | --- | --- |
+| A: TestAcademy1 / TestAcademy2 | `f57d9890-5ac1-4c81-a966-f7c9324c937f` | Match `5131a673-4df4-4530-8f35-969997e2a5ec`; room `18640aaf-ce50-4f34-ad14-1ca5906b223a` |
+| B: TestAcademy1 / TestAcademy3 | `87ca54d4-e6a7-4a49-b348-a4230b9a9476` | Match `5ad14749-7fbf-4811-bfaa-4e4a892aed9e`; room `68004246-962d-4982-ba86-2baeb85acec7` |
+
+The reviewed API runner used only the existing protected Staging environment in
+memory, exact project/issuer guards and permanent synthetic registry proof. The
+create run passed 126 assertions, with four temporary Clerk Development sessions
+created and all four revoked. A separate creation-OFF run passed 103 assertions,
+again revoking all four temporary sessions. These are real signed player JWTs
+accepted by hosted Supabase, not local claim shims or admin impersonation.
+They cover four separate opponent/requester conversations, the same player in
+two tournaments, simultaneous creates, exact nonce retries, replies, forged
+tournament/queue/status targets, opponent/outsider/anonymous denial and closed
+raw-table access. Admin browser behavior is not established by those API tests.
+
+The real signed-in TestAcademy1 website also read A's private transcript and sent
+a reply while creation was OFF. A matching independent readback proved exactly
+one saved message, an Open request and zero eligible delivery events. After
+creation resumed, the browser submitted the required initial message from the
+existing dedicated cancelled replay-fixture room, creating request
+`357577d7-45fc-4587-b587-88df2e4d2ac9`. Its match, room and tournament row hashes
+remained identical, with zero reports and zero upload attempts. No existing
+replay/chat/history row was changed; this is an additive private support record.
+
+An already-open old browser still showed the previous textless help widget.
+Its actual request failed safely; readback confirmed identical legacy/shared
+request digests and only the single intended new private case in that room.
+Its old error copy is generic; reopening help loads the message-required flow.
+The older match view was already readonly after the prior deliberate fixture
+cancellation; no blocked upload method was retried.
+
+The attempted browser viewport override did not take effect (measured width
+remained 1507px despite requesting 390px), so this is **not** counted as a passed
+phone-width or physical-phone test. The override was reset. Physical-phone and
+the carried-forward replay/second-admin tests remain outstanding.
+
+### Working test links
+
+- [Staging home](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app)
+- [A assistance queue](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/admin/tournaments/f57d9890-5ac1-4c81-a966-f7c9324c937f?section=assistance)
+- [B assistance queue](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/admin/tournaments/87ca54d4-e6a7-4a49-b348-a4230b9a9476?section=assistance)
+- [A shared inbox](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/admin/tournaments/f57d9890-5ac1-4c81-a966-f7c9324c937f?section=notifications)
+- [B shared inbox](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/admin/tournaments/87ca54d4-e6a7-4a49-b348-a4230b9a9476?section=notifications)
+- [A TestAcademy1 conversation](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/assistance/86c6c249-14f3-4dc0-bcad-7b100437dc51?tournament=f57d9890-5ac1-4c81-a966-f7c9324c937f)
+- [B TestAcademy1 conversation](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/assistance/b09f68d1-3c46-455e-b836-c3d25e49b344?tournament=87ca54d4-e6a7-4a49-b348-a4230b9a9476)
+- [Historical-match request created through the website](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/assistance/357577d7-45fc-4587-b587-88df2e4d2ac9?tournament=b75f6539-2271-417a-8338-51694a698e20)
+- [Retained legacy requests in original synthetic inbox A](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/admin/notifications/legacy-assistance?kind=tournament&tournamentId=a5e1146d-883b-4d96-9840-fa9abd6a3120)
+
+Player links require their requester session or an authorized active admin.
+The queue and inbox links require an admin. A and B each have two private
+conversations; opponents must not see each other's conversation.
+
+The existing synthetic player was signed out through Clerk's normal UI after
+player checks, and the previously authorized existing admin email was submitted
+to the normal Staging sign-in form. Clerk's Development email-code page is
+waiting for a fresh code. No role, credential or dashboard configuration changed;
+admin sessions were not manufactured through a backend API. Signing in on a
+phone alone does not grant this working browser access. The human may provide
+the current code or complete the queue checks directly from those phone links.
+
+At the waiting checkpoint, five modern cases/eight messages exist. All eight
+assistance notices are explicitly tagged as this synthetic run, generic, and
+have no eligible email/push delivery. Earlier fixture source notices were already
+suppressed before commit. No unrelated event, subscription or queue was cleared.
+New requests are enabled on Staging; existing conversations remain available
+when that switch is turned off. Admin reply/notification/status browser acceptance
+remains pending until the admin login completes; local SQL coverage is separate.

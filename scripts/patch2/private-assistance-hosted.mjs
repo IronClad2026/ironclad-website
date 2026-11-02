@@ -34,6 +34,10 @@ let manifest;
 let phase;
 let failed = false;
 let realClerkPlayerRpc = false;
+function safeRequestIds(value) {
+  if (!value || typeof value !== "object") return null;
+  return Object.fromEntries(["aRequester", "aOpponent", "bRequester", "bOpponent"].filter((key) => typeof value[key] === "string" && UUID.test(value[key])).map((key) => [key, value[key]]));
+}
 function verify(condition, label) { step = label; if (!condition) throw new Error("CHECK_FAILED"); checks++; }
 function success(result, label) { verify(!result.error && result.data !== null, label); return result.data; }
 function denied(result, label) { verify(result.error?.code === "42501", label); }
@@ -206,6 +210,6 @@ try {
     try { await client.removeAllChannels(); await client.realtime.disconnect(); }
     catch { failed = true; }
   }
-  console.log(JSON.stringify({ result: failed ? "FAILED" : "PASS", phase: phase ?? null, runTag: manifest?.runTag ?? null, projectRef: STAGING, checksPassed: checks, temporarySessionsCreated: sessions.length, temporarySessionsRevoked: revoked, requests: requests ?? null, realClerkPlayerRpc, realClerkAdminTest: false, browserTest: false, deliveryConfigurationAttestedByRootOnly: true }));
+  console.log(JSON.stringify({ result: failed ? "FAILED" : "PASS", phase: phase === "create" || phase === "off" ? phase : null, runTag: typeof manifest?.runTag === "string" && /^patch3-staging-assistance-\d{8}-v\d+$/.test(manifest.runTag) ? manifest.runTag : null, projectRef: STAGING, checksPassed: checks, temporarySessionsCreated: sessions.length, temporarySessionsRevoked: revoked, requests: safeRequestIds(requests), realClerkPlayerRpc, realClerkAdminTest: false, browserTest: false, deliveryConfigurationAttestedByRootOnly: true }));
   if (failed) process.exitCode = 1;
 }
