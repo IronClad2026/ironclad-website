@@ -1025,7 +1025,11 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       (name) => name <= "20261024173736_announcement_rich_documents.sql"
     );
     expect(migrationNames.filter((name) => !baselineMigrationNames.includes(name)))
-      .toEqual(["20261027181708_public_competitive_profile_read_projections.sql"]);
+      .toEqual([
+        "20261027181708_public_competitive_profile_read_projections.sql",
+        "20261101220837_patch2_scoped_registration_review.sql",
+        "20261101230355_patch2_admin_inbox_legacy_assistance.sql",
+      ]);
 
     const badgeIntegrationMigrationNames = new Set([
       "20260821000000_badge_award_foundation.sql",
@@ -1143,7 +1147,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "cc5cd5b040b6a63b59e0cc03f7f7e454c4f1f57f11d7e005af99405e97c06ffb"
     );
     expect(normalizedSha256(read(".env.example"))).toBe(
-      "a36a452c337407aa53c29a8499cb1658023caed00bd41b605859d07ce166dbd4"
+      "df333b2554f79526a26de3f1dd65afb112c21d2c73e4cbb5d45a8da164dd56fe"
     );
 
     expect(
