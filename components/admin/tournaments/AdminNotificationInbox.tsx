@@ -86,10 +86,10 @@ function InboxView({ data: initialData, baseHref, title }: Props) {
         Reading or removing a notification does not resolve an assistance request.
       </p>
       <Link href={data.scope.kind === "tournament"
-        ? `/admin/notifications/legacy-assistance?kind=tournament&tournamentId=${data.scope.tournamentId}`
+        ? `/admin/tournaments/${data.scope.tournamentId}?section=assistance`
         : "/admin/notifications/legacy-assistance?kind=unassigned"}
         className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-orange-200 underline underline-offset-4">
-        {data.scope.kind === "tournament" ? "Open legacy assistance requests for this tournament" : "Legacy assistance with no tournament"}
+        {data.scope.kind === "tournament" ? "Open assistance for this tournament" : "Legacy assistance with no tournament"}
       </Link>
       <div className="mt-4 flex flex-wrap gap-4 text-sm text-zinc-300">
         <span>Total: <strong>{data.totalCount}</strong></span>

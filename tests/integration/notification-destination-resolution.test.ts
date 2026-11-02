@@ -26,6 +26,22 @@ function destinationRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("notification destination ownership resolution", () => {
+  it.each(["admin", "player"] as const)("routes private assistance through its request under %s ownership", async (scope) => {
+    const tournamentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const assistanceRequestId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const supabase = createSupabaseQueryMock({ data: destinationRow({ recipient_role: scope,
+      type: "assistance.admin_replied", tournament_id: tournamentId, metadata: { assistanceRequestId } }) });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+    await expect(resolveNotificationDestination(NOTIFICATION_ID, scope, scope === "player" ? "owner" : null)).resolves.toBe(
+      scope === "admin" ? `/admin/tournaments/${tournamentId}?section=assistance&selected=${assistanceRequestId}`
+        : `/assistance/${assistanceRequestId}?tournament=${tournamentId}`);
+  });
+  it.each([{}, { assistanceRequestId: "bad" }])("never falls back to a shared room for malformed private assistance metadata", async (metadata) => {
+    const supabase = createSupabaseQueryMock({ data: destinationRow({ recipient_role: "player", type: "assistance.admin_replied",
+      tournament_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", metadata }) });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+    await expect(resolveNotificationDestination(NOTIFICATION_ID, "player", "owner")).resolves.toBeNull();
+  });
   beforeEach(() => {
     createSupabaseAdminClientMock.mockReset();
     vi.spyOn(console, "error").mockImplementation(() => undefined);

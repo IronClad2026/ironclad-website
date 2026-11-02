@@ -1024,6 +1024,22 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     const baselineMigrationNames = migrationNames.filter(
       (name) => name <= "20260923062127_match_room_retention_and_privacy.sql"
     );
+    expect(migrationNames.filter((name) => !baselineMigrationNames.includes(name)))
+      .toEqual([
+        "20261001032942_production_showcase_authority.sql",
+        "20261001032957_production_combat_highlights_authority.sql",
+        "20261001032959_production_private_match_room_realtime.sql",
+        "20261001033000_production_versioned_competition_authority.sql",
+        "20261001033001_production_versioned_accounting_badges.sql",
+        "20261001040810_production_retire_legacy_creation.sql",
+        "20261013184857_production_legacy_main_pro_event_one.sql",
+        "20261024173736_announcement_rich_documents.sql",
+        "20261026181023_persisted_verified_relic_identity.sql",
+        "20261027181708_public_competitive_profile_read_projections.sql",
+        "20261101220837_patch2_scoped_registration_review.sql",
+        "20261101230355_patch2_admin_inbox_legacy_assistance.sql",
+        "20261102192200_patch2_private_assistance_conversations.sql",
+      ]);
 
     const badgeIntegrationMigrationNames = new Set([
       "20260821000000_badge_award_foundation.sql",

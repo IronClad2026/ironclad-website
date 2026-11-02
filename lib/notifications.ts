@@ -564,6 +564,13 @@ function buildNotificationHref(
   row: NotificationRow,
   scope: NotificationScope
 ): string | null {
+  if (row.type.startsWith("assistance.")) {
+    const requestId = row.metadata?.assistanceRequestId;
+    if (!row.tournament_id || !isUuid(row.tournament_id) || typeof requestId !== "string" || !isUuid(requestId)) return null;
+    return scope === "admin"
+      ? `/admin/tournaments/${row.tournament_id}?section=assistance&selected=${requestId}`
+      : `/assistance/${requestId}?tournament=${row.tournament_id}`;
+  }
   if (row.type === "match.message_received") {
     const roomId = row.metadata?.roomId;
     // Missing or malformed immutable context must never open a replacement room.

@@ -23,14 +23,9 @@ export async function requestMatchAdminAssistance(input: MutateMatchRoomAssistan
   const denied = await authorizeAssistance();
   if (denied) return denied;
   if (!isMutateRoomAssistanceInput(input)) return { ok: false, code: "invalid_request" };
-  try {
-    await requireCurrentAccountLegalAcceptance();
-  } catch {
-    return { ok: false, code: "legal_required" };
-  }
-  return callAssistance("request_match_room_assistance", {
-    p_room_id: input.roomId, p_expected_request_version: input.expectedRequestVersion,
-  }, input.roomId);
+  // This old endpoint has no initial message or private requester context.
+  // Already-open clients must reopen help to use the private request form.
+  return { ok: false, code: "invalid_request" };
 }
 
 export async function resolveMatchAdminAssistance(input: MutateMatchRoomAssistanceInput): Promise<MatchRoomActionResult<MatchRoomAssistance>> {

@@ -177,6 +177,8 @@ const dictionary = {
     opponentSubmittedMessage: "报告的赛果正在由管理员审核。打开此消息可查看报告。",
   },
   server: {
+    privateAssistanceReplyTitle: "管理员已回复私密协助请求",
+    privateAssistanceReplyMessage: "IronClad 管理员已回复。请打开你的私密对话。",
     matchMessageReceivedTitle: "对局聊天室有新消息",
     matchMessageReceivedMessage: "您的对局聊天室中有新消息。",
     loadError: "无法加载通知。",

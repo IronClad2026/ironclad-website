@@ -189,6 +189,8 @@ const dictionary = {
       "O resultado informado está em análise pela administração. Abra esta mensagem para ver o relatório.",
   },
   server: {
+    privateAssistanceReplyTitle: "Resposta da administração à ajuda privada",
+    privateAssistanceReplyMessage: "Um administrador da IronClad respondeu. Abra sua conversa privada.",
     matchMessageReceivedTitle: "Nova mensagem na sala da partida",
     matchMessageReceivedMessage: "Você tem novas mensagens na sala da sua partida.",
     loadError: "Não foi possível carregar as notificações.",

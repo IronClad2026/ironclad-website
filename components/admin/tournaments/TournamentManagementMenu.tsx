@@ -7,6 +7,7 @@ import {
   Film,
   GitBranch,
   LayoutDashboard,
+  LifeBuoy,
   Map,
   Menu,
   Pencil,
@@ -31,6 +32,7 @@ export type TournamentManagementSection =
   | "edit"
   | "registrations"
   | "notifications"
+  | "assistance"
   | "players-waitlist"
   | "bracket"
   | "matches"
@@ -61,6 +63,7 @@ export const TOURNAMENT_MANAGEMENT_SECTIONS: readonly TournamentManagementMenuIt
       section: "players-waitlist",
     },
     { icon: Bell, label: "Notifications", section: "notifications" },
+    { icon: LifeBuoy, label: "Assistance", section: "assistance" },
     { icon: GitBranch, label: "Bracket", section: "bracket" },
     { icon: Swords, label: "Matches / Results", section: "matches" },
     { icon: Film, label: "Replay Archive", section: "replays" },
