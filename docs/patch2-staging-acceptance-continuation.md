@@ -5,6 +5,10 @@ This continuation adds Staging test data and evidence only. The runtime source,
 two applied migrations and separate Production candidate `688759c9b4766327a86ece665dbb9bcd320fbee9`
 remain unchanged. No Production operation is authorized.
 
+This is the `e35a18f` admin-acceptance snapshot. See the
+[3 November replay continuation](patch2-staging-replay-acceptance.md) for the
+approved session switch, retained synthetic match/chat and current upload status.
+
 ## Working links
 
 [Staging website](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app) · [Application sign-in](https://ironclad-website-git-staging-ironclad-tournaments.vercel.app/sign-in)

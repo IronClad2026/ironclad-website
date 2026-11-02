@@ -41,8 +41,8 @@ do $$
 declare
   -- ROOT REVIEW GATES: these record human/operator observations, not database
   -- proof of Vercel configuration, Clerk sessions, files or browser behaviour.
-  v_browser_ready_at constant timestamptz := null;
-  v_email_disabled_verified_at constant timestamptz := '2026-11-02T03:24:44Z';
+  v_browser_ready_at constant timestamptz := '2026-11-02T18:24:56Z';
+  v_email_disabled_verified_at constant timestamptz := '2026-11-02T18:23:45Z';
   v_relation record; v_identity text; v_keys jsonb; v_digest text; v_tag text;
 begin
   select tag into strict v_tag from patch2_replay_run;
