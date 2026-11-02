@@ -1,5 +1,9 @@
 # Patch 2 Staging activation evidence
 
+Historical evidence for the abandoned separate-Preview workflow. The user's
+established Staging workflow supersedes those restrictions; current deployment,
+migration and acceptance results are in [the Staging release record](patch2-established-staging-release.md).
+
 Controlled-release refresh: **BLOCKED**, with no push, deployment or remote
 migration. The existing shared Staging worker has push enabled in all 50 latest
 successful runtime summaries (latest `2026-11-01 23:55:00 UTC`). Shared

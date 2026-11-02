@@ -1,5 +1,9 @@
 # Patch 2 controlled Staging release record
 
+Historical record for the abandoned separate-Preview workflow. See
+[the established Staging release record](patch2-established-staging-release.md)
+for the later user authorization, deployed source and actual migration receipts.
+
 Release status: blocked before remote writes. The release instruction authorizes
 a feature push, protected Preview and only the two named Staging migrations
 after isolation and compatibility pass. Shared configuration and Production
