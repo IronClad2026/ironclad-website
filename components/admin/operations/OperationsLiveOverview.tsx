@@ -22,7 +22,7 @@ export default function OperationsLiveOverview({ metrics, navigation }: { metric
     disputes: { title: "Recent dispute records", dateLabel: "Disputed / created", rows: metrics.matches.who.disputed },
     "admin-review": { title: "Recent Admin review records", dateLabel: "Recorded", rows: metrics.matches.who.underReview },
     "overdue-matches": { title: "Recent overdue Match records", dateLabel: "Deadline", rows: metrics.matches.who.overdue },
-    "admin-assistance": { title: "Recent assistance requests", dateLabel: "Requested", rows: metrics.matches.who.adminAssistance },
+    "admin-assistance": { title: "Earlier assistance records", dateLabel: "Requested", rows: metrics.matches.who.adminAssistance },
   };
   return (
     <>
@@ -38,6 +38,7 @@ export default function OperationsLiveOverview({ metrics, navigation }: { metric
         </div>
       </header>
       {navigation}
+      <p className="mb-4 text-sm text-zinc-400">The assistance metric below covers earlier shared-room and legacy requests. <Link href="/admin/tournaments" className="inline-flex min-h-11 items-center text-orange-200 underline">Open a tournament&apos;s Assistance section for private conversations.</Link></p>
       <section id="operations-overview" aria-labelledby="operations-overview-title" className="scroll-mt-32">
         <h2 id="operations-overview-title" className="mb-3 text-sm font-semibold text-zinc-300">Current operations <span className="font-normal text-zinc-400">· Now</span></h2>
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">

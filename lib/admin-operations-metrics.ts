@@ -644,11 +644,11 @@ export function buildAdminOperationsAttention(
     },
     {
       key: "admin-assistance",
-      label: "Admin Assistance",
+      label: "Earlier assistance",
       count: counts.pendingAdminAssistance,
       tone: "warning",
       href: "/admin/operations#match-issues",
-      description: "Visible Player requests for Admin Assistance.",
+      description: "Earlier shared-room and legacy requests. Open a tournament's Assistance section for private conversations.",
     },
     {
       key: "overdue-matches",

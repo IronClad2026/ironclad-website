@@ -5,6 +5,10 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { loadAdminTournamentMediaWorkspace } from "@/app/admin/tournaments/media-actions";
 import AdminNotificationInbox from "@/components/admin/tournaments/AdminNotificationInbox";
+import AdminPrivateAssistance from "@/components/admin/tournaments/AdminPrivateAssistance";
+import LegacyRoomAssistance from "@/components/admin/tournaments/LegacyRoomAssistance";
+import { getAdminPrivateAssistanceQueue } from "@/app/admin/tournaments/assistance-actions";
+import { isAssistanceFilter, isAssistanceUuid } from "@/lib/private-assistance";
 import { isAdminNotificationInboxEnabled, loadAdminNotificationInbox } from "@/lib/admin-notification-inbox";
 import AdminBracketManagement from "@/components/AdminBracketManagement";
 import AdminTournamentMapPools from "@/components/AdminTournamentMapPools";
@@ -58,6 +62,8 @@ type TournamentWorkspacePageProps = {
     selected?: string;
     match?: string;
     room?: string;
+    legacyPage?: string;
+    legacyResolved?: string;
   }>;
 };
 
@@ -66,6 +72,7 @@ const VALID_SECTIONS = new Set<TournamentManagementSection>([
   "edit",
   "registrations",
   "notifications",
+  "assistance",
   "players-waitlist",
   "bracket",
   "matches",
@@ -185,16 +192,36 @@ async function renderWorkspaceSection({
         selected?: string;
       match?: string;
       room?: string;
+      legacyPage?: string;
+      legacyResolved?: string;
       }
     | undefined;
   section: TournamentManagementSection;
   summary: AdminTournamentWorkspaceSummary;
   tournament: AdminTournamentWorkspaceRow;
 }): Promise<ReactNode> {
+  if (section === "assistance") {
+    const result = await getAdminPrivateAssistanceQueue({
+      tournamentId: tournament.id,
+      filter: isAssistanceFilter(query?.filter) ? query.filter : "all",
+      page: /^\d{1,9}$/.test(query?.page ?? "") ? Math.max(1, Number(query?.page)) : 1,
+      selectedId: isAssistanceUuid(query?.selected) ? query.selected : null,
+    });
+    return <>
+      {result.ok ? <AdminPrivateAssistance key={tournament.id} data={result.data} tournamentTitle={tournament.title} /> : (
+        <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
+          <p>Private assistance could not be loaded. Outstanding requests have not been treated as an empty queue.</p>
+          <Link href={`/admin/tournaments/${tournament.id}?section=assistance`} className="inline-flex min-h-11 items-center text-orange-200 underline">Reopen assistance</Link>
+        </section>
+      )}
+      <LegacyRoomAssistance tournamentId={tournament.id} page={query?.legacyPage} includeResolved={query?.legacyResolved === "1"} />
+    </>;
+  }
   if (section === "notifications") {
     if (!isAdminNotificationInboxEnabled()) return (
       <section className="rounded-2xl border border-amber-500/25 p-5 text-sm text-amber-100">
         <p role="status">The scoped admin inbox is turned off in this environment. Existing notifications remain saved.</p>
+        <Link href={`/admin/tournaments/${tournament.id}?section=assistance`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open assistance for this tournament</Link>
         <Link href={`/admin/notifications/legacy-assistance?kind=tournament&tournamentId=${tournament.id}`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open legacy assistance requests for this tournament</Link>
       </section>
     );

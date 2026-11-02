@@ -191,6 +191,8 @@ const dictionary = {
       "The reported result is under administrator review. Open this message to inspect the report.",
   },
   server: {
+    privateAssistanceReplyTitle: "Admin reply to private assistance",
+    privateAssistanceReplyMessage: "An IronClad admin replied. Open your private conversation.",
     matchMessageReceivedTitle: "New Match Room message",
     matchMessageReceivedMessage: "You have new messages in your Match Room.",
     loadError: "Notifications could not be loaded.",

@@ -40,6 +40,11 @@ export function localizePlayerNotificationCopy(
     input.tournamentTitle?.trim() || dictionary.server.tournamentFallback;
 
   switch (input.type) {
+    case "assistance.admin_replied":
+      return {
+        title: dictionary.server.privateAssistanceReplyTitle,
+        message: dictionary.server.privateAssistanceReplyMessage,
+      };
     case "badge.unlocked": {
       const badge = getLocalizedBadgeDefinition(
         badgesDictionary,
