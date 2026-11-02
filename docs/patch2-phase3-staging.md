@@ -59,7 +59,7 @@ languages. Existing optional opponent Discord-contact privacy is unchanged.
 
 ## Migration and release order
 
-Only new migration:
+First new migration:
 `supabase/migrations/20261102192200_patch2_private_assistance_conversations.sql`.
 It extends assistance, adds private message/RPC/ACL/retention integration and a
 default-off database creation switch. It does not grant push delivery, change
@@ -74,6 +74,20 @@ and verify the READY build's exact commit/configuration. Enable only
 `platform_settings.private_assistance_new_requests_enabled` on Staging after the
 off-state checks. No new environment variable, credential binding, service,
 dependency or scheduler is required.
+
+The reviewed additive follow-up
+`20261102195256_patch2_private_assistance_active_actor.sql` restores the existing
+match-room active-account rule for every private RPC, including admin reads.
+Admins need an active linked Player record; complete-profile, match participation,
+Steam/ELO verification or legal acceptance for reads are not additional conditions.
+Normal account closure deletes or pseudonymizes that link, so a still-valid Clerk
+admin token must be denied immediately by the database. The first migration is
+already applied and remains byte-for-byte unchanged. Follow-up SHA-256:
+`cee0d9264ae7ee2942df66d91b7e7e3bb72b6b731af697bd488ed5beb939c435`.
+The local runner applies both files and passes **25 actual PostgreSQL check
+groups**, including missing, closed, deleted and pseudonymized admin identities.
+This checks modeled final closure shapes, not the complete prior Storage/Clerk
+deletion chain. New Staging requests remain OFF until this follow-up is applied.
 
 ## Safe fallback
 
@@ -124,3 +138,38 @@ frozen migration input; no hosted application is implied by this checkpoint.
 
 Deployment, migration receipt/hash and hosted acceptance evidence are recorded
 below after those operations; preparation alone is not deployment or acceptance.
+
+### Initial Staging release — 2 November 2026, 19:45 UTC
+
+- Reviewed implementation commit: `f4836c3c8cd177084b394b8a6887dc366a189816`.
+- The one new migration was applied successfully to **Staging only** as receipt
+  `20261102194457 / patch2_private_assistance_conversations`, at the frozen hash
+  above. The earlier two Patch 2 migrations were not replayed.
+- Existing four legacy requests and one shared request passed exact before/after
+  row-digest checks. The preserved underlying purge/closure function bodies match
+  their preflight hashes. No private message existed at migration completion.
+- Normal `staging` fast-forward push triggered READY deployment
+  `dpl_Ckuaoe7YuGaPXAt4z3KZnuu7Mp3G`, immutable URL
+  https://ironclad-website-k24q1g20x-ironclad-tournaments.vercel.app,
+  alias https://ironclad-website-git-staging-ironclad-tournaments.vercel.app.
+  Vercel reports the exact implementation commit and `staging` ref, with a
+  nonproduction target. No Production branch/configuration was changed.
+- The real TestAcademy1 browser displayed the new help choices in retained match
+  history with creation OFF, the confirmed Discord link/instructions and a
+  readonly copyable reference. After enabling the database switch on Staging,
+  the initial-message form appeared through component polling without a page
+  refresh; blank submission remained disabled.
+- `TRANSACTIONAL_EMAIL_MODE` remains disabled on Preview / staging. Push claim
+  ACL remains `{postgres=X/postgres}` and its body hash remains
+  `5d2f52d80bc91a3ffdd632d702a10eff55aa20d57f602ab2ad3958b34196e115`.
+  Private `match-proofs` Storage and all four existing cron jobs remain intact.
+  Actual push delivery is intentionally untested while disabled.
+- The Supabase advisor reports the expected deny-all table RLS/no-policy INFO
+  and authenticated SECDEF-entrypoint warnings for private assistance. Explicit
+  authorization and grants are tested; no anonymous private entrypoint is
+  granted. Its existing public-view SECDEF findings are unrelated to this
+  migration, which creates no views. See the
+  [Supabase RLS advisor explanation](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+
+Hosted conversation creation/replies, admin browser actions and access-denial
+results are still pending at this initial release checkpoint.
