@@ -4,6 +4,11 @@ This record supersedes the separate feature-Preview and credential-bootstrap
 instructions in the earlier Patch 2 planning documents for Staging only.
 Production is not authorized and has not changed.
 
+This is the original `085bceb` release snapshot. See
+[the acceptance continuation](patch2-staging-acceptance-continuation.md) for
+subsequent retained registration fixtures, authenticated admin/mobile tests and
+the current replay-test status. The original results below remain dated evidence.
+
 ## Source and ownership
 
 Production candidate `688759c9b4766327a86ece665dbb9bcd320fbee9` and its Phase 1
