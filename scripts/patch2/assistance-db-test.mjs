@@ -23,6 +23,8 @@ const childEnvironment = Object.fromEntries(Object.entries(process.env).filter((
   !/^(?:PG|DATABASE_|POSTGRES|SUPABASE|NEXT_PUBLIC_SUPABASE|CLERK|NEXT_PUBLIC_CLERK)/i.test(key)));
 const migrationPath = "supabase/migrations/20261102192200_patch2_private_assistance_conversations.sql";
 const migration = await readFile(resolve(ROOT, migrationPath), "utf8");
+const actorMigrationPath = "supabase/migrations/20261102195256_patch2_private_assistance_active_actor.sql";
+const actorMigration = await readFile(resolve(ROOT, actorMigrationPath), "utf8");
 const digest = (v) => createHash("sha256").update(typeof v === "string" ? v : JSON.stringify(v)).digest("hex");
 const sources = [];
 async function authority(path, name) {
@@ -55,10 +57,10 @@ const deployedClosureSource = await authority("supabase/migrations/2026091923583
 const closureBodyHash = digest(deployedClosureSource.slice(deployedClosureSource.indexOf("$$") + 2, deployedClosureSource.lastIndexOf("$$")));
 assert.equal(closureBodyHash, "fb39aeb7be5ad82e02b315b93bc96e0bb25468ca8e1ceba71e3703e695e178ea", "Deployed closure wrapper/source body mismatch");
 const report = { target: `fresh PostgreSQL17 ${HOST}:${PORT}`, migration: migrationPath,
-  migrationSha256: digest(migration), actualAuthoritySources: sources, checks: [], limitations: [
+  migrationSha256: digest(migration), actorMigration: actorMigrationPath, actorMigrationSha256: digest(actorMigration), actualAuthoritySources: sources, checks: [], limitations: [
     "Actual new migration, Phase2 legacy/inbox migration, current legal guard, retention locks/state/purge and notification initializers execute on a minimal local domain schema, not a full Supabase rehearsal.",
     "Local auth.role/auth.jwt claim shims do not verify real Clerk signatures, login, browsers, PostgREST or provider credentials.",
-    "Underlying account deletion is a fixture stand-in; the new provenance-scrubbing wrapper executes, but the complete pre-existing account deletion/Storage chain requires separate hosted review.",
+    "Underlying account deletion is a fixture stand-in modeling the deployed final deletion/pseudonymization identity shapes; the actual new provenance-scrubbing wrapper and actor guard execute, but the complete pre-existing account deletion/Storage chain requires separate hosted review.",
     "No normal chat/result/deadline/replay authority, Storage bytes, providers, cron or remote resources execute; protected domain rows are compared for unintended change.",
   ] };
 let postgres, database, failure, log = ""; const clients = new Set();
@@ -116,6 +118,8 @@ try {
   assert.equal(report.loadedAuthorityBodyHashes.length, 7); report.actualClosureSourceBodyHash = closureBodyHash;
   await database.query("create trigger actual_email_initializer before insert on public.notifications for each row execute function public.initialize_transactional_email_state(); create trigger actual_push_initializer before insert on public.notifications for each row execute function public.initialize_web_push_state()");
   await database.query(migration); report.migrationApplied = true;
+  assert.equal(digest(migration), "2eedac3923c0645e5133e14590c700b36357bbb2b17db6a0f80807d41bfeb922", "Applied migration must remain byte-for-byte unchanged");
+  await database.query(actorMigration); report.actorMigrationApplied = true;
   baseline = await domain();
   await test("default-off flag, explicit signed actor boundary and old textless fail-closed", async () => {
     await claim(); assert.equal((await query("select public.get_private_assistance_context($1) value", [R1])).canCreate, false);
@@ -147,12 +151,13 @@ try {
     await claim(); foreign = await open(R2, randomUUID(), "Other tournament issue"); assert.equal(foreign.request.tournamentId, T2);
     await owner(); assert.equal(await query("select count(*)::int value from ironclad_private.match_room_retention_cases where closed_at is null and case_kind='support'"), 3);
   });
-  await test("admin reads work without Player profile; explicit tournament rejects foreign targets", async () => {
-    await claim("local_admin_without_profile", "admin"); const q = await queue(); assert.equal(q.counts.all, 2);
+  await test("active admin without a participant registration can read; missing Player and foreign tournament deny", async () => {
+    await claim("local_admin_without_profile", "admin"); await error(queue(), "42501");
+    await error(read(first.request.id, T1), "42501"); await error(reply(first.request.id, randomUUID(), "No active operator", T1), "42501");
+    await claim("local_admin", "admin"); const q = await queue(); assert.equal(q.counts.all, 2);
     assert.equal((await read(first.request.id, T1)).messages.length, 1); await error(read(first.request.id), "42501");
     await error(read(first.request.id, T2), "42501"); assert.equal((await queue(T1, "all", 1, foreign.request.id)).selectedRequest, null);
-    await error(reply(first.request.id, randomUUID(), "Requires active operator", T1), "42501");
-    await claim("local_admin", "admin"); await error(status(first.request.id, "resolved", 1, T2), "42501");
+    await error(status(first.request.id, "resolved", 1, T2), "42501");
     await error(reply(first.request.id, randomUUID(), "Wrong tournament", T2), "42501");
   });
   await test("admin reply is private/site-only and moves to In progress, bounded cursor stays ordered", async () => {
@@ -332,7 +337,32 @@ try {
     assert.ok(await query("select count(*)::int value from public.assistance_messages where author_player_id=$1 and body is not null", [P2]));
     await claim("local_p2"); await error(read(second.request.id), "42501");
   });
+  await test("matching closed Player cannot retain private access through an admin JWT", async () => {
+    await claim("local_admin_closed", "admin");
+    await error(queue(), "42501"); await error(read(first.request.id, T1), "42501");
+    await error(reply(first.request.id, randomUUID(), "Closed admin reply", T1), "42501");
+    await error(status(first.request.id, "resolved", 1), "42501");
+    await error(query("select public.list_legacy_room_assistance($1,1,true) value", [T1]), "42501");
+  });
+  await test("old admin JWT loses all access after underlying closure deletes its unreferenced Player", async () => {
+    await claim("local_admin", "admin", database, "service_role"); await query("select public.close_ironclad_player_account('local_admin2') value");
+    await owner(); assert.equal(await query("select count(*)::int value from public.players where clerk_user_id='local_admin2'"), 0);
+    await claim("local_admin2", "admin"); await error(queue(), "42501"); await error(read(first.request.id, T1), "42501");
+    await error(reply(first.request.id, randomUUID(), "Deleted admin identity", T1), "42501");
+    await error(status(first.request.id, "resolved", 1), "42501");
+  });
+  await test("old admin JWT loses access when historical closure pseudonymizes its Clerk identity", async () => {
+    // The earlier real new-wrapper call closed fictional local_p2. Its
+    // underlying fixture stand-in models the deployed archived identity shape;
+    // these assertions test the ACTUAL helper, never a full-closure claim.
+    await owner(); assert.equal(await query("select count(*)::int value from public.players where clerk_user_id='local_p2'"), 0);
+    assert.equal(await query("select count(*)::int value from public.players where id=$1 and clerk_user_id like 'closed-player-%' and account_closed_at is not null", [P2]), 1);
+    await claim("local_p2", "admin"); await error(queue(), "42501"); await error(read(second.request.id, T1), "42501");
+    await error(reply(second.request.id, randomUUID(), "Pseudonymized admin identity", T1), "42501");
+    await error(query("select public.get_private_assistance_context($1) value", [R1]), "42501");
+  });
   assert.equal(digest(await readFile(resolve(ROOT, migrationPath), "utf8")), report.migrationSha256, "Migration changed during execution; rerun snapshot");
+  assert.equal(digest(await readFile(resolve(ROOT, actorMigrationPath), "utf8")), report.actorMigrationSha256, "Actor migration changed during execution; rerun snapshot");
   report.passed = true;
 } catch (e) { failure = e; report.passed = false; report.failure = e.message; report.errorCode = e.code; report.errorContext = e.where; }
 finally {
