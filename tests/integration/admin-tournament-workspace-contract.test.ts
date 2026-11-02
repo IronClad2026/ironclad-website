@@ -758,7 +758,7 @@ const capabilities: Capability[] = [
       {
         file: "admin",
         includes: [
-          "InAppNotificationCenter",
+          "/admin/notifications",
           'href: "/admin/maps"',
           'href: "/admin/polls"',
           'href: "/admin/announcements"',

@@ -1,8 +1,11 @@
 import { requireDivisionModelVersion } from "@/lib/division-model";
 import { auth } from "@clerk/nextjs/server";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { loadAdminTournamentMediaWorkspace } from "@/app/admin/tournaments/media-actions";
+import AdminNotificationInbox from "@/components/admin/tournaments/AdminNotificationInbox";
+import { isAdminNotificationInboxEnabled, loadAdminNotificationInbox } from "@/lib/admin-notification-inbox";
 import AdminBracketManagement from "@/components/AdminBracketManagement";
 import AdminTournamentMapPools from "@/components/AdminTournamentMapPools";
 import TournamentFormDraft from "@/components/TournamentFormDraft";
@@ -62,6 +65,7 @@ const VALID_SECTIONS = new Set<TournamentManagementSection>([
   "overview",
   "edit",
   "registrations",
+  "notifications",
   "players-waitlist",
   "bracket",
   "matches",
@@ -187,6 +191,31 @@ async function renderWorkspaceSection({
   summary: AdminTournamentWorkspaceSummary;
   tournament: AdminTournamentWorkspaceRow;
 }): Promise<ReactNode> {
+  if (section === "notifications") {
+    if (!isAdminNotificationInboxEnabled()) return (
+      <section className="rounded-2xl border border-amber-500/25 p-5 text-sm text-amber-100">
+        <p role="status">The scoped admin inbox is turned off in this environment. Existing notifications remain saved.</p>
+        <Link href={`/admin/notifications/legacy-assistance?kind=tournament&tournamentId=${tournament.id}`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open legacy assistance requests for this tournament</Link>
+      </section>
+    );
+    let data = null;
+    try {
+      data = await loadAdminNotificationInbox(
+        { kind: "tournament", tournamentId: tournament.id },
+        { page: query?.page, filter: query?.filter, selected: query?.selected }
+      );
+    } catch {
+      console.error("Tournament notification inbox load failed.");
+    }
+    if (!data) return (
+      <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
+        <p>This tournament inbox could not be loaded. Its notification state has not been treated as empty.</p>
+        <Link href={`/admin/tournaments/${tournament.id}?section=notifications`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Reopen tournament inbox</Link>
+      </section>
+    );
+    return <AdminNotificationInbox data={data} title={`${tournament.title} — Notifications`}
+      baseHref={`/admin/tournaments/${tournament.id}?section=notifications`} />;
+  }
   if (section === "overview") {
     return <TournamentOverview summary={summary} tournament={tournament} />;
   }

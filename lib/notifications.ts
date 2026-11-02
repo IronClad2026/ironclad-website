@@ -53,7 +53,7 @@ export type NotificationCreateInput = {
   metadata?: Record<string, unknown>;
 };
 
-type NotificationRow = {
+export type NotificationRow = {
   id: string;
   recipient_role: NotificationScope | null;
   type: string;
@@ -73,6 +73,10 @@ type NotificationRow = {
 
 const NOTIFICATION_SELECT =
   "id, recipient_role, type, title, message, actor_display_name, tournament_id, tournament_title, registration_id, match_id, report_group_id, event_key, metadata, read_at, created_at";
+
+// An admin team event may also carry an actor/recipient identity. That identity
+// never turns it into a player-owned inbox record.
+const PLAYER_NOTIFICATION_ROLE_FILTER = "recipient_role.is.null,recipient_role.neq.admin";
 
 export async function createInAppNotification(
   input: NotificationCreateInput
@@ -171,6 +175,7 @@ export async function loadPlayerNotifications(
       .from("notifications")
       .select(NOTIFICATION_SELECT)
       .eq("recipient_clerk_user_id", clerkUserId)
+      .or(PLAYER_NOTIFICATION_ROLE_FILTER)
       .is("in_app_hidden_at", null)
       .order("created_at", { ascending: false })
       .limit(limit),
@@ -178,11 +183,13 @@ export async function loadPlayerNotifications(
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("recipient_clerk_user_id", clerkUserId)
+      .or(PLAYER_NOTIFICATION_ROLE_FILTER)
       .is("in_app_hidden_at", null),
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("recipient_clerk_user_id", clerkUserId)
+      .or(PLAYER_NOTIFICATION_ROLE_FILTER)
       .is("in_app_hidden_at", null)
       .is("read_at", null),
     loadDictionary(locale, "notifications"),
@@ -227,63 +234,13 @@ export async function loadPlayerNotifications(
   };
 }
 
-export async function loadAdminNotifications(
-  limit = 8
-): Promise<NotificationLoadResult> {
-  const supabase = createSupabaseAdminClient();
-  const [notificationResult, totalResult, unreadResult] = await Promise.all([
-    supabase
-      .from("notifications")
-      .select(NOTIFICATION_SELECT)
-      .eq("recipient_role", "admin")
-      .is("in_app_hidden_at", null)
-      .order("created_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("recipient_role", "admin")
-      .is("in_app_hidden_at", null),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("recipient_role", "admin")
-      .is("in_app_hidden_at", null)
-      .is("read_at", null),
-  ]);
-
-  const loadError =
-    notificationResult.error ?? totalResult.error ?? unreadResult.error;
-  const counts = getValidNotificationCounts(
-    totalResult.count,
-    unreadResult.count
-  );
-  const invalidResponse =
-    !Array.isArray(notificationResult.data) || counts === null;
-
-  if (loadError || invalidResponse) {
-    logNotificationFailure(
-      "load-admin",
-      loadError ?? { code: "INVALID_RESPONSE" }
-    );
-    return {
-      notifications: [],
-      totalCount: 0,
-      unreadCount: 0,
-      error: "Notifications could not be loaded.",
-    };
-  }
-
+/** @deprecated Use the authenticated, explicitly scoped Admin inbox loader. */
+export async function loadAdminNotifications(): Promise<NotificationLoadResult> {
   return {
-    notifications: (notificationResult.data as NotificationRow[]).map(
-      (notification) => mapNotification(notification, "admin")
-    ),
-    totalCount: counts.totalCount,
-    unreadCount: counts.unreadCount,
-    error: null,
+    notifications: [], totalCount: 0, unreadCount: 0,
+    error: "Open a tournament Notifications workspace or choose a scoped Admin inbox.",
   };
 }
-
 function getValidNotificationCounts(total: unknown, unread: unknown) {
   if (
     !Number.isSafeInteger(total) ||
@@ -308,6 +265,8 @@ export async function loadUnreadNotificationCount({
   scope: NotificationScope;
   clerkUserId?: string | null;
 }): Promise<number | null> {
+  // Admin scope here is only the existing shared-team badge total. Operational
+  // inbox reads and action targets always use the scoped Admin inbox RPCs.
   if (scope === "player" && !clerkUserId) {
     return null;
   }
@@ -322,7 +281,7 @@ export async function loadUnreadNotificationCount({
   if (scope === "admin") {
     query.eq("recipient_role", "admin");
   } else {
-    query.eq("recipient_clerk_user_id", clerkUserId);
+    query.eq("recipient_clerk_user_id", clerkUserId).or(PLAYER_NOTIFICATION_ROLE_FILTER);
   }
 
   const { count, error } = await query;
@@ -356,7 +315,7 @@ export async function resolveNotificationDestination(
   if (scope === "admin") {
     query.eq("recipient_role", "admin");
   } else {
-    query.eq("recipient_clerk_user_id", clerkUserId?.trim() ?? "");
+    query.eq("recipient_clerk_user_id", clerkUserId?.trim() ?? "").or(PLAYER_NOTIFICATION_ROLE_FILTER);
   }
 
   const { data, error } = await query.maybeSingle();
@@ -364,6 +323,8 @@ export async function resolveNotificationDestination(
     if (error) logNotificationFailure("resolve-destination", error);
     return null;
   }
+
+  if (scope === "player" && data.recipient_role === "admin") return null;
 
   return buildNotificationHref(data, scope);
 }
@@ -377,6 +338,7 @@ export async function markNotificationRead({
   scope: NotificationScope;
   clerkUserId?: string | null;
 }) {
+  if (scope === "admin") return false;
   const supabase = createSupabaseAdminClient();
   const query = supabase
     .from("notifications")
@@ -384,11 +346,7 @@ export async function markNotificationRead({
     .eq("id", notificationId)
     .is("read_at", null);
 
-  if (scope === "admin") {
-    query.eq("recipient_role", "admin");
-  } else {
-    query.eq("recipient_clerk_user_id", clerkUserId ?? "");
-  }
+  query.eq("recipient_clerk_user_id", clerkUserId ?? "").or(PLAYER_NOTIFICATION_ROLE_FILTER);
 
   const { error } = await query;
 
@@ -409,6 +367,7 @@ export async function markNotificationsRead({
   scope: NotificationScope;
   clerkUserId?: string | null;
 }) {
+  if (scope === "admin") return false;
   const ids = [...new Set(notificationIds)].filter(Boolean).slice(0, 100);
 
   if (ids.length === 0) {
@@ -422,11 +381,7 @@ export async function markNotificationsRead({
     .in("id", ids)
     .is("read_at", null);
 
-  if (scope === "admin") {
-    query.eq("recipient_role", "admin");
-  } else {
-    query.eq("recipient_clerk_user_id", clerkUserId ?? "");
-  }
+  query.eq("recipient_clerk_user_id", clerkUserId ?? "").or(PLAYER_NOTIFICATION_ROLE_FILTER);
 
   const { error } = await query;
 
@@ -445,17 +400,14 @@ export async function markAllNotificationsRead({
   scope: NotificationScope;
   clerkUserId?: string | null;
 }) {
+  if (scope === "admin") return false;
   const supabase = createSupabaseAdminClient();
   const query = supabase
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .is("read_at", null);
 
-  if (scope === "admin") {
-    query.eq("recipient_role", "admin");
-  } else {
-    query.eq("recipient_clerk_user_id", clerkUserId ?? "");
-  }
+  query.eq("recipient_clerk_user_id", clerkUserId ?? "").or(PLAYER_NOTIFICATION_ROLE_FILTER);
 
   const { error } = await query;
 
@@ -476,6 +428,7 @@ export async function deleteNotifications({
   scope: NotificationScope;
   clerkUserId?: string | null;
 }) {
+  if (scope === "admin") return false;
   const ids = [...new Set(notificationIds)].filter(Boolean).slice(0, 100);
 
   if (ids.length === 0) {
@@ -496,13 +449,8 @@ export async function deleteNotifications({
     .in("id", ids)
     .is("event_key", null);
 
-  if (scope === "admin") {
-    canonicalQuery.eq("recipient_role", "admin");
-    legacyQuery.eq("recipient_role", "admin");
-  } else {
-    canonicalQuery.eq("recipient_clerk_user_id", clerkUserId ?? "");
-    legacyQuery.eq("recipient_clerk_user_id", clerkUserId ?? "");
-  }
+  canonicalQuery.eq("recipient_clerk_user_id", clerkUserId ?? "").or(PLAYER_NOTIFICATION_ROLE_FILTER);
+  legacyQuery.eq("recipient_clerk_user_id", clerkUserId ?? "").or(PLAYER_NOTIFICATION_ROLE_FILTER);
 
   const [{ error: canonicalError }, { error: legacyError }] =
     await Promise.all([canonicalQuery, legacyQuery]);
@@ -515,7 +463,7 @@ export async function deleteNotifications({
   return true;
 }
 
-function mapNotification(
+export function mapNotification(
   row: NotificationRow,
   scope: NotificationScope,
   dictionary?: NotificationsDictionary,

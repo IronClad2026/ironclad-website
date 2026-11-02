@@ -37,7 +37,9 @@ describe("Admin System & Recovery route contract", () => {
     expect(registrationsPage).toContain("Choose a Tournament");
     expect(tournamentRegistrations).toContain("AdminRegistrationReviewRows");
     expect(tournamentRegistrations).toContain("approveSelectedRegistrations");
-    expect(adminPage).toContain("InAppNotificationCenter");
+    expect(adminPage).not.toContain("InAppNotificationCenter");
+    expect(adminPage).toContain('href="/admin/notifications"');
+    expect(source("app/admin/tournaments/[tournamentId]/page.tsx")).toContain("AdminNotificationInbox");
     expect(adminPage).toContain("bracketNoticeMessages");
     expect(adminPage).toContain("Open Tournament workspace");
   });

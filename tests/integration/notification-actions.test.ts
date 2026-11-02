@@ -112,7 +112,10 @@ describe("notification Server Action mutation results", () => {
     });
   });
 
-  it("returns the authoritative global Admin count after server-side authorization", async () => {
+  it.each([
+    markInAppNotificationRead, markVisibleInAppNotificationsRead,
+    markAllInAppNotificationsRead, deleteSelectedInAppNotifications,
+  ])("fails closed for an already-open legacy Admin inbox without a scoped action", async (action) => {
     authMock.mockResolvedValue({
       userId: "user_notification_admin",
       sessionClaims: { metadata: { role: "admin" } },
@@ -120,18 +123,15 @@ describe("notification Server Action mutation results", () => {
     loadUnreadNotificationCountMock.mockResolvedValue(11);
 
     await expect(
-      markAllInAppNotificationsRead(formData("admin"))
-    ).resolves.toEqual({ ok: true, unreadCount: 11 });
+      action(formData("admin", ["notification-one"]))
+    ).resolves.toEqual({ ok: false, code: "unavailable", message: expect.stringContaining("selected tournament") });
 
-    expect(markAllNotificationsReadMock).toHaveBeenCalledWith({
-      scope: "admin",
-      clerkUserId: null,
-    });
-    expect(loadUnreadNotificationCountMock).toHaveBeenCalledWith({
-      scope: "admin",
-      clerkUserId: null,
-    });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
+    expect(markNotificationReadMock).not.toHaveBeenCalled();
+    expect(markNotificationsReadMock).not.toHaveBeenCalled();
+    expect(markAllNotificationsReadMock).not.toHaveBeenCalled();
+    expect(deleteNotificationsMock).not.toHaveBeenCalled();
+    expect(loadUnreadNotificationCountMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it("denies a browser-selected Admin scope to a non-Admin", async () => {

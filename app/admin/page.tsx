@@ -13,9 +13,7 @@ import {
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import InAppNotificationCenter from "@/components/InAppNotificationCenter";
 import type { AdminRegistrationStatus } from "@/lib/admin-registration-review";
-import { loadAdminNotifications } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   formatTournamentDivisionState,
@@ -204,7 +202,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const supabase = createSupabaseAdminClient();
-  const [registrationResult, tournamentResult, adminNotifications] =
+  const [registrationResult, tournamentResult] =
     await Promise.all([
       supabase.from("registrations").select("registration_status"),
       supabase
@@ -213,7 +211,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           "id, division_model_version, title, status, created_at, tournament_brackets(id, name, launched_at)"
         )
         .order("created_at", { ascending: false }),
-      loadAdminNotifications(50),
     ]);
 
   if (registrationResult.error) {
@@ -521,25 +518,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           )}
         </section>
 
-        <div className="relative z-0 max-w-4xl">
-          <InAppNotificationCenter
-            key={[
-              adminNotifications.unreadCount,
-              ...adminNotifications.notifications.map(
-                (notification) =>
-                  `${notification.id}:${notification.readAt ?? ""}`
-              ),
-            ].join("|")}
-            scope="admin"
-            title="Admin Notification Center"
-            description="Recent registration, match result, and dispute events that need administrative awareness."
-            emptyMessage="New registrations, submitted results, and disputes will appear here."
-            notifications={adminNotifications.notifications}
-            totalCount={adminNotifications.totalCount}
-            unreadCount={adminNotifications.unreadCount}
-            error={adminNotifications.error}
-          />
-        </div>
+        <section aria-label="Admin notification inboxes" className="max-w-4xl rounded-3xl border border-orange-500/25 bg-white/[0.03] p-6">
+          <h2 className="text-2xl font-black text-white">Admin notifications</h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-400">Choose a tournament to open its shared admin inbox. Platform and legacy notifications have separate inboxes.</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/admin/notifications" className="inline-flex min-h-11 items-center rounded-xl border border-orange-400/40 px-4 text-sm font-bold text-orange-200">Choose a tournament inbox</Link>
+            <Link href="/admin/notifications?kind=platform" className="inline-flex min-h-11 items-center px-2 text-sm text-zinc-300">Platform notifications</Link>
+            <Link href="/admin/notifications?kind=unassigned" className="inline-flex min-h-11 items-center px-2 text-sm text-zinc-300">Legacy / unassigned notifications</Link>
+          </div>
+        </section>
       </div>
     </main>
   );
