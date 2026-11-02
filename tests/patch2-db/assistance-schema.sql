@@ -37,9 +37,18 @@ create table public.account_legal_acceptances(clerk_user_id text,terms_document_
 -- This is only the underlying account-storage stand-in; the new closure wrapper
 -- is actual migration SQL. Complete prior multi-step account closure remains a
 -- separately reviewed hosted integration boundary, never a claimed local pass.
+-- Model both observed final identity shapes: a historically referenced player
+-- is pseudonymized; an unreferenced player is deleted. Provider/Storage cleanup
+-- and the complete deployed closure chain are intentionally not represented.
 create function public.close_ironclad_player_account(p_clerk_user_id text) returns jsonb
-language plpgsql security definer set search_path=pg_catalog as $$ begin
-  update public.players set account_closed_at=clock_timestamp() where clerk_user_id=p_clerk_user_id;
+language plpgsql security definer set search_path=pg_catalog as $$ declare v_player uuid; begin
+  select id into v_player from public.players where clerk_user_id=p_clerk_user_id;
+  if exists(select 1 from public.registrations where profile_id=v_player) then
+    update public.players set account_closed_at=clock_timestamp(),clerk_user_id='closed-player-'||id::text
+      where id=v_player;
+  else
+    delete from public.players where id=v_player;
+  end if;
   return jsonb_build_object('localUnderlyingClosure',true);
 end $$;
 create function public.request_match_room_assistance(uuid,bigint default 0) returns jsonb language sql as $$ select '{}'::jsonb $$;
