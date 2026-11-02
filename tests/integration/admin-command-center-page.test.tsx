@@ -112,7 +112,7 @@ describe("Admin Command Center and global Registrations authorization", () => {
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
-  it("loads compact summary data, central Division states, and the Admin Notification Center", async () => {
+  it("loads compact summaries and links to separate inboxes without loading global notifications", async () => {
     const registrationSelect = vi.fn().mockResolvedValue({
       data: [
         { registration_status: "pending" },
@@ -171,15 +171,11 @@ describe("Admin Command Center and global Registrations authorization", () => {
       supabase,
       tournamentRows
     );
-    expect(loadAdminNotificationsMock).toHaveBeenCalledExactlyOnceWith(50);
-    expect(notificationCenter?.props).toMatchObject({
-      scope: "admin",
-      title: "Admin Notification Center",
-      notifications: [],
-      totalCount: 0,
-      unreadCount: 0,
-      error: null,
-    });
+    expect(loadAdminNotificationsMock).not.toHaveBeenCalled();
+    expect(notificationCenter).toBeNull();
+    expect(textContent(page)).toContain("Choose a tournament inbox");
+    expect(textContent(page)).toContain("Platform notifications");
+    expect(textContent(page)).toContain("Legacy / unassigned notifications");
     expect(textContent(page)).toContain("Academy Bracket: Filling — 1/8");
     expect(textContent(page)).toContain("Challenge Bracket: Disabled");
     expect(textContent(page)).toContain("Main / Pro Bracket: Disabled");

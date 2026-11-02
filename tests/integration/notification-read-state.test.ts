@@ -44,20 +44,12 @@ describe("notification read-state filtering", () => {
     );
   });
 
-  it("scopes an admin update to admin notifications", async () => {
-    const supabase = createSupabaseQueryMock();
-    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
-
-    await expect(
-      markAllNotificationsRead({ scope: "admin" })
-    ).resolves.toBe(true);
-
-    expect(supabase.calls).toEqual(
-      expect.arrayContaining([
-        { method: "eq", args: ["recipient_role", "admin"] },
-        { method: "is", args: ["read_at", null] },
-      ])
-    );
+  it("rejects every direct contextless admin mutation before service-role access", async () => {
+    await expect(markNotificationRead({ scope: "admin", notificationId: "notification" })).resolves.toBe(false);
+    await expect(markNotificationsRead({ scope: "admin", notificationIds: ["notification"] })).resolves.toBe(false);
+    await expect(markAllNotificationsRead({ scope: "admin" })).resolves.toBe(false);
+    await expect(deleteNotifications({ scope: "admin", notificationIds: ["notification"] })).resolves.toBe(false);
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
   it("deduplicates notification IDs and limits a mutation to 100 rows", async () => {

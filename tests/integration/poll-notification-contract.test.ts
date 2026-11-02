@@ -68,7 +68,7 @@ function createNotificationProjectionClient(row: Record<string, unknown>) {
     from: vi.fn(() => {
       const query = {} as Query;
       let result: Result = { count: null, data: [row], error: null };
-      for (const method of ["eq", "is", "limit", "order"] as const) {
+      for (const method of ["eq", "or", "is", "limit", "order"] as const) {
         query[method] = () => query;
       }
       query.select = (...args: unknown[]) => {

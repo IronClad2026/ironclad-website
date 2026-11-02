@@ -28,7 +28,7 @@ type MockQueryResult = {
 
 function thenableQuery(result: MockQueryResult, rejection?: unknown) {
   const query: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "is", "or", "limit"]) {
+  for (const method of ["select", "eq", "in", "is", "or", "limit"]) {
     query[method] = vi.fn(() => query);
   }
   query.then = (

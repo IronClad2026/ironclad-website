@@ -12,6 +12,7 @@ const supportedQueryMethods = [
   "is",
   "maybeSingle",
   "not",
+  "or",
   "order",
   "select",
   "update",

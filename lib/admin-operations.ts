@@ -110,9 +110,16 @@ type AssistanceRow = {
   metadata?: Record<string, unknown> | null;
 };
 
-type LegacyAssistanceRow = Omit<AssistanceRow, "source"> & {
-  event_key: string | null;
-  in_app_hidden_at: string | null;
+type LegacyAssistanceRow = {
+  id: string;
+  tournament_id: string | null;
+  created_at: string;
+  legacy_resolution_unknown: boolean;
+  notification: {
+    actor_display_name: string | null;
+    tournament_title: string | null;
+    match_id: string | null;
+  } | null;
 };
 
 type QueryResult = {
@@ -193,18 +200,15 @@ export async function loadAdminOperationsMetrics(
         .limit(MAX_NARROW_ROWS + 1),
       supabase.rpc("list_match_room_assistance_requests", { p_limit: MAX_NARROW_ROWS })
         .then(({ data, error }) => assistanceQueueResult(data, error)),
-      // Pre-room requests use notification dismissal as their queue state.
-      // Filter exact room metadata below, including Phase 2 backfill notices.
+      // Durable legacy request status is independent of inbox visibility.
       supabase
-        .from("notifications")
+        .from("assistance_requests")
         .select(
-          "id, actor_display_name, tournament_id, tournament_title, match_id, created_at, metadata, event_key, in_app_hidden_at",
+          "id, tournament_id, created_at, legacy_resolution_unknown, notification:notifications!assistance_requests_source_notification_id_fkey(actor_display_name,tournament_title,match_id)",
           { count: "exact" }
         )
-        .eq("recipient_role", "admin")
-        .eq("type", "match.admin_assistance_requested")
-        .is("in_app_hidden_at", null)
-        .or("event_key.is.null,event_key.not.like.match-room:%")
+        .eq("source_kind", "legacy_notification")
+        .in("status", ["open", "in_progress"])
         .limit(MAX_NARROW_ROWS + 1),
     ]);
 
@@ -220,8 +224,14 @@ export async function loadAdminOperationsMetrics(
     const assistance: AssistanceRow[] = [
       ...exactRows<AssistanceRow>(results[9]),
       ...exactRows<LegacyAssistanceRow>(results[10])
-        .filter(isUnscopedLegacyAssistance)
-        .map((row) => ({ ...row, source: "legacy" as const })),
+        .map((row) => ({
+          id: row.id, tournament_id: row.tournament_id, created_at: row.created_at,
+          actor_display_name: row.notification?.actor_display_name ?? null,
+          tournament_title: row.notification?.tournament_title ?? null,
+          match_id: row.notification?.match_id ?? null,
+          metadata: { legacyResolutionUnknown: row.legacy_resolution_unknown },
+          source: "legacy" as const,
+        })),
     ];
 
     return buildMetrics({
@@ -323,7 +333,6 @@ function buildMetrics(input: {
       .map((row) => row.match_id)
   );
   const matchById = new Map(matches.map((row) => [row.id, row]));
-  const allMatchById = new Map(allMatches.map((row) => [row.id, row]));
   // Neither a reset nor unavailable Match context resolves an assistance request.
   const activeAssistance = assistance;
   const matchTournamentId = (match: MatchRow): string | null => {
@@ -726,23 +735,17 @@ function buildMetrics(input: {
           activeAssistance
             .map((row) => {
               if (row.source === "legacy") {
-                const match = row.match_id ? allMatchById.get(row.match_id) : undefined;
-                const tournamentId = match ? matchTournamentId(match) : null;
-                const tournament = tournamentId ? tournamentById.get(tournamentId) : undefined;
-                const params = match && tournament ? new URLSearchParams({
-                  section: "matches", match: match.id,
-                }) : null;
+                const params = new URLSearchParams({ kind: row.tournament_id ? "tournament" : "unassigned" });
+                if (row.tournament_id) params.set("tournamentId", row.tournament_id);
                 return {
                   id: row.id,
                   primary: "Legacy assistance request",
-                  secondary: tournament?.title ?? "Match unavailable",
+                  secondary: row.tournament_title ?? "Unassigned legacy record",
                   meta: "Requested by " + (row.actor_display_name?.trim() || "Player") +
-                    (params ? " · Review this Match, then dismiss the legacy notification in Notifications."
-                      : " · Review and dismiss the legacy notification in the Admin Notification Center."),
+                    (row.metadata?.legacyResolutionUnknown ? " · Prior resolution unknown; review required."
+                      : " · Review and update the request status separately from its notification."),
                   timestamp: row.created_at,
-                  href: params && tournamentId
-                    ? "/admin/tournaments/" + encodeURIComponent(tournamentId) + "?" + params.toString()
-                    : "/admin",
+                  href: "/admin/notifications/legacy-assistance?" + params.toString(),
                 };
               }
               const item = matchWho(row.match_id as string, row.created_at, "Admin Assistance · " + (row.actor_display_name?.trim() || "Player"));
@@ -854,15 +857,6 @@ function sentenceCase(value: string): string {
 
 function roundRate(numerator: number, denominator: number): number {
   return Math.round((numerator / denominator) * 1000) / 10;
-}
-
-/** A malformed old hint cannot identify a room; retain its safe Match-only path. */
-function isUnscopedLegacyAssistance(row: LegacyAssistanceRow): boolean {
-  const roomId = row.metadata?.roomId;
-  const hasRoomId = typeof roomId === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(roomId);
-  return row.in_app_hidden_at === null &&
-    !row.event_key?.startsWith("match-room:") && !hasRoomId;
 }
 
 /** Canonical operational state; notification read/dismissal never resolves a request. */

@@ -20,6 +20,7 @@ const expectedSections = [
   ["Edit Tournament", "edit"],
   ["Registrations", "registrations"],
   ["Players / Waitlist", "players-waitlist"],
+  ["Notifications", "notifications"],
   ["Bracket", "bracket"],
   ["Matches / Results", "matches"],
   ["Replay Archive", "replays"],

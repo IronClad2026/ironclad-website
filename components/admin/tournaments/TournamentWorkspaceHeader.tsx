@@ -121,6 +121,7 @@ const TOURNAMENT_MANAGEMENT_LABELS: Record<
   overview: "Overview",
   edit: "Edit Tournament",
   registrations: "Registrations",
+  notifications: "Notifications",
   "players-waitlist": "Players / Waitlist",
   bracket: "Bracket",
   matches: "Matches / Results",

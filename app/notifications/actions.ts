@@ -27,7 +27,7 @@ type CustomClaims = {
 
 export type NotificationMutationResult =
   | { ok: true; unreadCount: number }
-  | { ok: false; code: "unavailable" };
+  | { ok: false; code: "unavailable"; message?: string };
 
 type NotificationPushFailureCode =
   | "authentication_required"
@@ -65,6 +65,12 @@ export type WebPushSubscriptionOwnershipResult =
 const unavailableResult = (): NotificationMutationResult => ({
   ok: false,
   code: "unavailable",
+});
+
+const adminScopeRequiredResult = (): NotificationMutationResult => ({
+  ok: false,
+  code: "unavailable",
+  message: "Open the selected tournament's Notifications workspace or the scoped Admin inbox before changing notifications.",
 });
 
 export async function getNotificationPushConfiguration(): Promise<NotificationPushConfigurationResult> {
@@ -232,6 +238,8 @@ export async function markInAppNotificationRead(
     return unavailableResult();
   }
 
+  if (scope === "admin") return adminScopeRequiredResult();
+
   await requireCurrentAccountLegalAcceptance();
 
   const notificationId = String(formData.get("notificationId") ?? "");
@@ -263,6 +271,8 @@ export async function markVisibleInAppNotificationsRead(
     return unavailableResult();
   }
 
+  if (scope === "admin") return adminScopeRequiredResult();
+
   await requireCurrentAccountLegalAcceptance();
 
   const notificationIds = formData
@@ -293,6 +303,8 @@ export async function markAllInAppNotificationsRead(
     return unavailableResult();
   }
 
+  if (scope === "admin") return adminScopeRequiredResult();
+
   await requireCurrentAccountLegalAcceptance();
 
   const updated = await markAllNotificationsRead({
@@ -317,9 +329,7 @@ export async function deleteSelectedInAppNotifications(
     return unavailableResult();
   }
 
-  if (scope === "admin") {
-    await requireCurrentAccountLegalAcceptance();
-  }
+  if (scope === "admin") return adminScopeRequiredResult();
 
   const notificationIds = formData
     .getAll("notificationId")

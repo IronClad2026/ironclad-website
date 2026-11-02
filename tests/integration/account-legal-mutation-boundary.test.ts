@@ -21,6 +21,7 @@ const ALWAYS_GUARDED_ACTIONS = {
     "deleteLeaderboardRecalculationRunRecords",
   ],
   "app/admin/maps/actions.ts": ["saveCoh3Map"],
+  "app/admin/notifications/legacy-assistance/actions.ts": ["setLegacyAssistanceStatus"],
   "app/admin/polls/actions.ts": [
     "savePollDraft",
     "deletePollDraft",
@@ -90,6 +91,9 @@ const ALWAYS_GUARDED_ACTIONS = {
 } as const;
 
 const DELEGATED_GUARDED_ACTIONS = [
+  { path: "app/admin/notifications/actions.ts", action: "markSelectedAdminNotificationsRead", delegate: "mutateInbox" },
+  { path: "app/admin/notifications/actions.ts", action: "markAllAdminNotificationsRead", delegate: "mutateInbox" },
+  { path: "app/admin/notifications/actions.ts", action: "dismissSelectedAdminNotifications", delegate: "mutateInbox" },
   {
     path: "app/admin/tournaments/actions.ts",
     action: "cancelTournamentAction",
@@ -115,12 +119,6 @@ const CONDITIONAL_GUARDED_ACTIONS = [
     condition: 'response === "accept"',
     exemption: "declining a waitlist offer",
   },
-  {
-    path: "app/notifications/actions.ts",
-    action: "deleteSelectedInAppNotifications",
-    condition: 'scope === "admin"',
-    exemption: "a player deleting their own notifications",
-  },
 ] as const;
 
 const FULL_MUTATION_EXEMPTIONS = {
@@ -133,7 +131,8 @@ const FULL_MUTATION_EXEMPTIONS = {
     "withdrawTournamentRegistrationAction",
     "respondToTournamentDivisionInvitationAction",
   ],
-  "app/notifications/actions.ts": ["deleteWebPushSubscription"],
+  // Legacy admin deletion is disabled; only player-owned dismissal remains here.
+  "app/notifications/actions.ts": ["deleteWebPushSubscription", "deleteSelectedInAppNotifications"],
   "app/tournaments/match-actions.ts": ["cleanupPreparedReplayUploads"],
 } as const;
 
@@ -321,16 +320,16 @@ describe("account legal mutation boundary architecture", () => {
       )
     );
 
-    expect(new Set(expected).size).toBe(82);
-    expect(expected).toHaveLength(82);
+    expect(new Set(expected).size).toBe(86);
+    expect(expected).toHaveLength(86);
     expect(actual.sort()).toEqual(expected.sort());
   });
 
-  it("guards all 59 ordinary authenticated mutations", () => {
+  it("guards all 63 ordinary authenticated mutations", () => {
     const directlyGuarded = flattenedInventory(ALWAYS_GUARDED_ACTIONS);
 
-    expect(directlyGuarded).toHaveLength(57);
-    expect(DELEGATED_GUARDED_ACTIONS).toHaveLength(2);
+    expect(directlyGuarded).toHaveLength(58);
+    expect(DELEGATED_GUARDED_ACTIONS).toHaveLength(5);
 
     for (const [path, actions] of Object.entries(ALWAYS_GUARDED_ACTIONS)) {
       const source = parseSource(path);
@@ -360,8 +359,8 @@ describe("account legal mutation boundary architecture", () => {
     }
   });
 
-  it("keeps the three one-way privacy and withdrawal exemptions conditional", () => {
-    expect(CONDITIONAL_GUARDED_ACTIONS).toHaveLength(3);
+  it("keeps the two one-way privacy and withdrawal exemptions conditional", () => {
+    expect(CONDITIONAL_GUARDED_ACTIONS).toHaveLength(2);
 
     for (const { path, action, condition, exemption } of
       CONDITIONAL_GUARDED_ACTIONS) {
@@ -379,7 +378,7 @@ describe("account legal mutation boundary architecture", () => {
   });
 
   it("keeps cleanup, legal, privacy, language, and read-only exemptions unguarded", () => {
-    expect(flattenedInventory(FULL_MUTATION_EXEMPTIONS)).toHaveLength(7);
+    expect(flattenedInventory(FULL_MUTATION_EXEMPTIONS)).toHaveLength(8);
     expect(flattenedInventory(LEGAL_AND_PRIVACY_EXEMPTIONS)).toHaveLength(4);
     expect(flattenedInventory(READ_ONLY_ACTIONS)).toHaveLength(9);
 
