@@ -25,22 +25,32 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("room assistance lifecycle controls", () => {
-  it("loads durable state, requests once and preserves adjacent form drafts", async () => {
+  it("reads legacy request history without creation or reopening and preserves adjacent drafts", async () => {
+    state = { ...state, status: "requested", requestVersion: 2, requestedAt: "2026-09-20T01:00:00Z" };
     render(<><textarea aria-label="Result draft" defaultValue="unsaved result" /><MatchRoomAssistanceControls roomId={ROOM} /></>);
     await tick();
-    fireEvent.click(screen.getByRole("button", { name: "Request Admin Assistance" })); await tick();
-    expect(mocks.request).toHaveBeenCalledWith({ roomId: ROOM, expectedRequestVersion: 0 });
+    expect(mocks.read).toHaveBeenCalledWith({ roomId: ROOM });
+    expect(screen.getByRole("status")).toHaveTextContent("Assistance requested");
     expect(screen.queryByRole("button", { name: "Request Admin Assistance" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Result draft")).toHaveValue("unsaved result");
     expect(screen.queryByRole("button", { name: /^Resolve assistance$/i })).not.toBeInTheDocument();
+    state = { ...state, status: "resolved", resolvedAt: "2026-09-20T01:01:00Z" };
+    fireEvent.focus(window); await tick();
+    expect(screen.getByRole("status")).toHaveTextContent("Assistance resolved");
+    expect(screen.queryByRole("button", { name: /Request assistance again|Reopen/i })).not.toBeInTheDocument();
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Result draft")).toHaveValue("unsaved result");
   });
-  it("resolves only with the authoritative capability and reopens using the current version", async () => {
+  it("resolves an earlier request with its authoritative capability and keeps reopening retired", async () => {
     state = { ...state, status: "requested", requestVersion: 4, requestedAt: "2026-09-20T01:00:00Z", canResolve: true };
     render(<MatchRoomAssistanceControls roomId={ROOM} admin />); await tick();
     fireEvent.click(screen.getByRole("button", { name: /^Resolve assistance$/i })); await tick();
     expect(mocks.resolve).toHaveBeenCalledWith({ roomId: ROOM, expectedRequestVersion: 4 });
-    fireEvent.click(screen.getByRole("button", { name: /Reopen/i })); await tick();
-    expect(mocks.request).toHaveBeenCalledWith({ roomId: ROOM, expectedRequestVersion: 4 });
+    expect(screen.getByRole("status")).toHaveTextContent("Assistance resolved");
+    expect(screen.queryByRole("button", { name: /^Resolve assistance$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Request assistance again|Reopen/i })).not.toBeInTheDocument();
+    expect(mocks.request).not.toHaveBeenCalled();
   });
   it("admin display props do not manufacture a resolve capability", async () => {
     state = { ...state, status: "requested", requestVersion: 1, requestedAt: "2026-09-20T01:00:00Z" };
@@ -48,12 +58,18 @@ describe("room assistance lifecycle controls", () => {
     expect(screen.queryByRole("button", { name: /^Resolve assistance$/i })).not.toBeInTheDocument();
   });
   it("keeps retries at the same version after an unconfirmed failure", async () => {
-    mocks.request.mockRejectedValueOnce(new Error("lost response"));
-    render(<MatchRoomAssistanceControls roomId={ROOM} />); await tick();
-    fireEvent.click(screen.getByRole("button", { name: "Request Admin Assistance" })); await tick();
+    state = { ...state, status: "requested", requestVersion: 4, requestedAt: "2026-09-20T01:00:00Z", canResolve: true };
+    mocks.resolve.mockRejectedValueOnce(new Error("lost response"));
+    render(<MatchRoomAssistanceControls roomId={ROOM} admin />); await tick();
+    fireEvent.click(screen.getByRole("button", { name: /^Resolve assistance$/i })); await tick();
     expect(screen.getByRole("alert")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Request Admin Assistance" })); await tick();
-    expect(mocks.request.mock.calls[0]).toEqual(mocks.request.mock.calls[1]);
+    fireEvent.click(screen.getByRole("button", { name: /^Resolve assistance$/i })); await tick();
+    expect(mocks.resolve).toHaveBeenCalledTimes(2);
+    expect(mocks.resolve.mock.calls[0]).toEqual([{ roomId: ROOM, expectedRequestVersion: 4 }]);
+    expect(mocks.resolve.mock.calls[1]).toEqual(mocks.resolve.mock.calls[0]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Assistance resolved");
+    expect(mocks.request).not.toHaveBeenCalled();
   });
   it("polls communication only, pauses hidden and refreshes on focus", async () => {
     render(<MatchRoomAssistanceControls roomId={ROOM} />); await tick();
@@ -69,13 +85,14 @@ describe("room assistance lifecycle controls", () => {
   it("does not show another room's assistance while a prior request is in flight", async () => {
     let complete!: (value: unknown) => void;
     mocks.read.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
-    const view = render(<MatchRoomAssistanceControls roomId={ROOM} />); await tick();
+    const view = render(<MatchRoomAssistanceControls roomId={ROOM} admin />); await tick();
     const other = "33333333-3333-4333-8333-333333333333";
-    state = { ...state, roomId: other };
-    view.rerender(<MatchRoomAssistanceControls roomId={other} />); await tick();
+    state = { ...state, roomId: other, status: "requested", requestVersion: 3, requestedAt: "2026-09-20T01:00:00Z", canResolve: true };
+    view.rerender(<MatchRoomAssistanceControls roomId={other} admin />); await tick();
     await act(async () => complete({ ok: true, data: { ...state, roomId: ROOM, status: "requested", requestVersion: 9 } }));
-    fireEvent.click(screen.getByRole("button", { name: "Request Admin Assistance" })); await tick();
-    expect(mocks.request).toHaveBeenCalledWith({ roomId: other, expectedRequestVersion: 0 });
+    fireEvent.click(screen.getByRole("button", { name: /^Resolve assistance$/i })); await tick();
+    expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith({ roomId: other, expectedRequestVersion: 3 });
+    expect(mocks.request).not.toHaveBeenCalled();
   });
   it("fails closed on denied history instead of keeping a resolve button", async () => {
     state = { ...state, status: "requested", requestVersion: 1, requestedAt: "2026-09-20T01:00:00Z", canResolve: true };

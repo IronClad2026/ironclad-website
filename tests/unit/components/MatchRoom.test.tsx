@@ -4,7 +4,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MatchRoom from "@/components/MatchRoom";
 import * as actions from "@/app/tournaments/room-actions";
-import * as translationActions from "@/lib/chat-translation-client";
 import { getMatchRoomCopy } from "@/lib/i18n/match-room";
 import { MATCH_ROOM_READ_ACKNOWLEDGED_EVENT } from "@/lib/match-room-unread-events";
 import type { MatchRoom as Room, MatchRoomHistory, MatchRoomMessage } from "@/lib/match-room";
@@ -23,10 +22,6 @@ vi.mock("@/app/tournaments/room-actions", () => ({
   markMatchRoomRead: vi.fn(),
   sendMatchRoomMessage: vi.fn(),
   sendAdminMatchRoomMessage: vi.fn(),
-}));
-vi.mock("@/lib/chat-translation-client", () => ({
-  translateMatchChatMessage: vi.fn(),
-  validateMatchChatTranslations: vi.fn(),
 }));
 
 const id = (n: number) => `d19a0000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -85,8 +80,6 @@ function setTailVisible(log: HTMLElement, visible: boolean) {
 }
 
 beforeEach(() => {
-  vi.mocked(translationActions.validateMatchChatTranslations).mockResolvedValue({ ok: true, data: { enabled: false, messages: [] } });
-  vi.mocked(translationActions.translateMatchChatMessage).mockResolvedValue({ ok: false, code: "unavailable" });
   authState.getToken.mockResolvedValue(null);
   authState.userId = "player";
   authState.sessionId = "session";

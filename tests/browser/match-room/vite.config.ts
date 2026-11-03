@@ -11,7 +11,6 @@ export default defineConfig({
     { find: "@/app/tournaments/room-actions", replacement: runtime },
     { find: "@/app/tournaments/room-unread-actions", replacement: runtime },
     { find: "@/app/tournaments/support-actions", replacement: runtime },
-    { find: "@/lib/chat-translation-client", replacement: runtime },
     ...["@/lib/supabase-browser", "@clerk/nextjs"]
       .map((find) => ({ find, replacement: realtimeRuntime })),
     ...["@/app/tournaments/match-actions", "next/navigation"]

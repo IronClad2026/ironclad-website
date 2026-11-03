@@ -27,9 +27,6 @@ export const finalizeMatchResult = fixtureAction;
 // boundaries synthetic; the dedicated room fixture covers their behavior.
 export const resolveMatchRoom = async () => ({ ok: true as const, data: { room: null } });
 const unavailableRoomAction = async () => ({ ok: false as const, code: "unavailable" as const });
-// This fixture never exercises translation or imports the real provider action.
-export const validateMatchChatTranslations = unavailableRoomAction;
-export const translateMatchChatMessage = unavailableRoomAction;
 export const getMatchRoomHistory = unavailableRoomAction;
 export const getMatchRoomEarlierHistory = unavailableRoomAction;
 export const markMatchRoomRead = unavailableRoomAction;
