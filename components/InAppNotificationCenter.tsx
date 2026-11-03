@@ -417,10 +417,18 @@ export default function InAppNotificationCenter({
   const handlePlayerNotificationClick = (notification: InAppNotification) => {
     if (pending) return;
 
+    // Private links are projected and validated on the server. A missing link
+    // must not mark the notice read or fall back to a shared tournament view.
+    if (notification.type === "assistance.admin_replied" && !notification.href) {
+      setMutationError(t("dashboard.actions.updateFailed"));
+      return;
+    }
+
     if (
       isPlayerMatchConfirmationNotification(notification) ||
       isPlayerWaitlistOfferNotification(notification) ||
       notification.type.startsWith("match.") ||
+      notification.type === "assistance.admin_replied" ||
       notification.type === "poll.published" ||
       notification.type === "poll.decision_published"
     ) {
