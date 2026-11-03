@@ -42,6 +42,14 @@ dependency, metadata, action stub or migration from that cancelled phase was
 included. This local fixture test does not establish real replay upload or
 Storage acceptance.
 
+`324c375` is a second separate test-only repair for
+`tests/unit/components/MatchRoomAssistanceControls.test.tsx`. Four stale tests
+still expected retired textless request/reopening buttons. The repaired suite
+now checks durable legacy history, authorized resolution, same-version resolution
+retry, old-room response isolation and absence of creation/reopening controls.
+No application component or runtime changed. The identical file was verified
+in both the Staging cleanup and this local review worktree.
+
 ## Integration boundaries
 
 The sole cherry-pick conflict was the historical migration contract in
@@ -93,6 +101,9 @@ supplies inert loopback values and blocks outbound networking.
 - Both repaired legacy-assistance browser cases passed at **375 and 390 pixels**
   using isolated synthetic loopback fixtures. No hosted requests or real replay
   upload occurred.
+- The separately repaired legacy assistance control suite passed **7/7** in
+  each worktree, adding a suite that was not part of the earlier 307 checks.
+  Earlier unchanged lint/type/build results are reused for this test-only repair.
 - Verified four exact migration blobs, preserved original candidate and absence
   of the cancelled phase's source, dependencies, environment keys and migration.
 - Full lint passed with two pre-existing unused catch-variable warnings in the
