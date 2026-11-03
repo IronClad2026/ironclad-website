@@ -266,3 +266,26 @@ suppressed before commit. No unrelated event, subscription or queue was cleared.
 New requests are enabled on Staging; existing conversations remain available
 when that switch is turned off. Admin reply/notification/status browser acceptance
 remains pending until the admin login completes; local SQL coverage is separate.
+
+### Remaining-acceptance review: player notification link
+
+The independent source review of `e1aa047` found that the player notification
+center did not include `assistance.admin_replied` among notifications that open
+their related page. The server already projected the exact private conversation
+URL, but clicking that notice only marked it read. This was a source finding;
+the pending admin login had not yet produced a browser-observed admin reply.
+
+The scoped correction adds that exact event type to the existing navigation
+handler, shared by the collapsed dashboard preview and expanded inbox. A missing
+private URL now leaves the notice unread, displays the existing localized error,
+and does not fall back to a shared tournament page. Server recipient filtering,
+UUID-based relative URL projection and private conversation authorization remain
+the authority. No schema, configuration, dependency or registration change is
+required.
+
+Independent review approved the actual diff. Ten new component regressions cover
+both presentations, unread/already-read notices, missing links and a failed read
+mutation. The five related notification/navigation suites passed 96 tests.
+Full lint, TypeScript and the network-blocked placeholder-credential Next build
+passed. Unchanged database/hosted acceptance evidence above is reused; these
+local checks do not establish the remaining real admin/requester browser flow.
