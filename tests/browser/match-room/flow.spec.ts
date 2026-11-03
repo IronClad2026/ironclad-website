@@ -164,7 +164,7 @@ for (const width of [375, 390]) {
     await page.screenshot({ path: testInfo.outputPath("earlier-" + width + ".png"), fullPage: true });
   });
 
-  test("assistance request, duplicate, explicit resolution and reopen at " + width + "px", async ({ page }, testInfo) => {
+  test("legacy assistance history, duplicate fixture, supported resolution and retired creation at " + width + "px", async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/tests/browser/match-room/");
     await page.getByRole("button", { name: "Won", exact: true }).click();
@@ -172,22 +172,25 @@ for (const width of [375, 390]) {
     await page.getByLabel("Game 1 replay", { exact: true }).setInputFiles({
       name: "assistance-draft.rec", mimeType: "application/octet-stream", buffer: Buffer.from("fixture"),
     });
-    const request = page.getByRole("button", { name: "Request Admin Assistance", exact: true });
-    await expect(request).toBeVisible();
-    expect((await request.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await request.click();
+    await expect(page.getByRole("button", { name: "Request Admin Assistance", exact: true })).toHaveCount(0);
+    // Phase3 retired textless creation. Seed an earlier request using the
+    // existing synthetic fixture transport, then exercise supported legacy UI.
+    await page.evaluate(async () => { await window.matchRoomFixture.duplicateRequest(); window.dispatchEvent(new Event("focus")); });
     await expect(page.getByText("Assistance requested", { exact: true })).toBeVisible();
     await page.evaluate(() => window.matchRoomFixture.duplicateRequest());
     expect(await page.evaluate(() => window.matchRoomFixture.snapshot().assistanceMutations)).toBe(1);
     await page.evaluate(() => window.matchRoomFixture.setViewer("admin"));
-    await page.getByRole("button", { name: "Resolve assistance", exact: true }).click();
+    const resolve = page.getByRole("button", { name: "Resolve assistance", exact: true });
+    await expect(resolve).toBeVisible();
+    expect((await resolve.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await resolve.click();
     await expect(page.getByText("Assistance resolved", { exact: true })).toBeVisible();
     await page.evaluate(() => window.matchRoomFixture.setViewer("player"));
-    await page.getByRole("button", { name: "Request assistance again", exact: true }).click();
-    await expect(page.getByText("Assistance requested", { exact: true })).toBeVisible();
+    await expect(page.getByText("Assistance resolved", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Request assistance again", exact: true })).toHaveCount(0);
     const snapshot = await page.evaluate(() => window.matchRoomFixture.snapshot());
-    expect(snapshot.assistance.requestVersion).toBe(2);
-    expect(snapshot.assistanceMutations).toBe(3);
+    expect(snapshot.assistance.requestVersion).toBe(1);
+    expect(snapshot.assistanceMutations).toBe(2);
     expect(snapshot.count).toBe(2);
     await expect(page.getByRole("combobox", { name: "Score", exact: true })).toHaveValue("2-1");
     await expect(page.getByText("assistance-draft.rec", { exact: true })).toBeVisible();
