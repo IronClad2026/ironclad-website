@@ -81,6 +81,10 @@ function room(): MatchRoom {
   };
 }
 const forbidden = () => ({ ok: false as const, code: "forbidden" as const });
+// Existing room regressions keep translation unavailable. Never compile its
+// real Server Actions/provider credentials into this isolated browser fixture.
+export const validateMatchChatTranslations = async () => ({ ok: false as const, code: "unavailable" as const });
+export const translateMatchChatMessage = async () => ({ ok: false as const, code: "unavailable" as const });
 export async function resolveMatchRoom(input: { matchId: string }) {
   if (scenario === "visibility") return visibilityTransport.resolve(input);
   reload(); resolveCalls++;

@@ -1,0 +1,108 @@
+import type { Locale } from "@/lib/i18n/config";
+
+const en = {
+  title: "Chat translation",
+  readingLanguage: "Read messages in",
+  sourceLanguage: "Original language for individual translation",
+  automaticSource: "Detect from the message",
+  automatic: "Automatically translate new incoming messages",
+  automaticNotice: "Applies to new opponent messages after you turn it on. The original language is detected from each message.",
+  translate: "Translate",
+  translating: "Translating…",
+  translated: "Automatic translation",
+  showOriginal: "Show original",
+  info: "About automatic translation",
+  notice: "Automatic translation may contain mistakes. Check the original message and confirm important details, especially match dates and times.",
+  unavailable: "Translation is unavailable. You can still read and send original messages.",
+  source_required: "The original language is unclear. Choose its language above and try again.",
+  same_language: "This message is already in the selected reading language.",
+  busy: "This translation is being prepared. Try again shortly.",
+  rate_limited: "Too many translation requests. Try again shortly.",
+  quota_exhausted: "The free translation allowance is used up. Original chat remains available.",
+  redacted: "This message is no longer available.",
+  denied: "This conversation is no longer available to this account.",
+  variantNotice: "Chinese output may use either script. Portuguese output is general Portuguese and may differ from Brazilian usage.",
+};
+
+export type ChatTranslationCopy = { [K in keyof typeof en]: string };
+
+const COPY: Record<Locale, ChatTranslationCopy> = {
+  en,
+  it: {
+    title: "Traduzione della chat", readingLanguage: "Leggi i messaggi in", sourceLanguage: "Lingua originale per la traduzione singola",
+    automaticSource: "Rileva dal messaggio", automatic: "Traduci automaticamente i nuovi messaggi ricevuti",
+    automaticNotice: "Si applica ai nuovi messaggi dell’avversario dopo l’attivazione. La lingua originale viene rilevata da ogni messaggio.", translate: "Traduci", translating: "Traduzione…",
+    translated: "Traduzione automatica", showOriginal: "Mostra originale", info: "Informazioni sulla traduzione automatica",
+    notice: "La traduzione automatica può contenere errori. Controlla il messaggio originale e conferma i dettagli importanti, soprattutto le date e gli orari delle partite.",
+    unavailable: "La traduzione non è disponibile. Puoi comunque leggere e inviare i messaggi originali.",
+    source_required: "La lingua originale non è chiara. Selezionala sopra e riprova.", same_language: "Questo messaggio è già nella lingua di lettura selezionata.",
+    busy: "La traduzione è in preparazione. Riprova tra poco.", rate_limited: "Troppe richieste di traduzione. Riprova tra poco.",
+    quota_exhausted: "La quota gratuita di traduzione è esaurita. La chat originale resta disponibile.", redacted: "Questo messaggio non è più disponibile.",
+    denied: "Questa conversazione non è più disponibile per questo account.",
+    variantNotice: "Il cinese può usare entrambi i sistemi di scrittura. Il portoghese è generico e può differire dall’uso brasiliano.",
+  },
+  "zh-CN": {
+    title: "聊天翻译", readingLanguage: "消息阅读语言", sourceLanguage: "单条翻译的原文语言", automaticSource: "根据消息检测",
+    automatic: "自动翻译新收到的消息", automaticNotice: "开启后，仅适用于对手发送的新消息。系统会根据每条消息检测原文语言。", translate: "翻译", translating: "正在翻译…",
+    translated: "自动翻译", showOriginal: "显示原文", info: "关于自动翻译",
+    notice: "自动翻译可能存在错误。请查看原始消息并确认重要细节，尤其是比赛日期和时间。",
+    unavailable: "翻译暂不可用。你仍可阅读和发送原始消息。", source_required: "无法确定原文语言。请在上方选择原文语言后重试。",
+    same_language: "此消息已使用所选的阅读语言。", busy: "正在准备此翻译。请稍后重试。", rate_limited: "翻译请求过多。请稍后重试。",
+    quota_exhausted: "免费翻译额度已用完。原始聊天仍可正常使用。", redacted: "此消息已不可用。", denied: "此账号已无法访问该对话。",
+    variantNotice: "中文翻译结果可能使用简体或繁体。葡萄牙语结果为通用葡萄牙语，可能与巴西用法不同。",
+  },
+  ru: {
+    title: "Перевод чата", readingLanguage: "Язык чтения сообщений", sourceLanguage: "Исходный язык для отдельного перевода", automaticSource: "Определить по сообщению",
+    automatic: "Автоматически переводить новые входящие сообщения", automaticNotice: "Применяется к новым сообщениям соперника после включения. Исходный язык определяется по каждому сообщению.",
+    translate: "Перевести", translating: "Перевод…", translated: "Автоматический перевод", showOriginal: "Показать оригинал", info: "Об автоматическом переводе",
+    notice: "Автоматический перевод может содержать ошибки. Проверьте исходное сообщение и уточните важные детали, особенно даты и время матчей.",
+    unavailable: "Перевод недоступен. Вы по-прежнему можете читать и отправлять исходные сообщения.", source_required: "Язык оригинала неясен. Выберите его выше и повторите попытку.",
+    same_language: "Это сообщение уже на выбранном языке чтения.", busy: "Перевод готовится. Повторите попытку чуть позже.", rate_limited: "Слишком много запросов на перевод. Повторите попытку чуть позже.",
+    quota_exhausted: "Бесплатный лимит перевода исчерпан. Исходный чат по-прежнему доступен.", redacted: "Это сообщение больше недоступно.", denied: "Этому аккаунту больше недоступна эта переписка.",
+    variantNotice: "Китайский перевод может использовать упрощённые или традиционные иероглифы. Португальский перевод может отличаться от бразильского варианта.",
+  },
+  es: {
+    title: "Traducción del chat", readingLanguage: "Leer mensajes en", sourceLanguage: "Idioma original para traducción individual", automaticSource: "Detectar a partir del mensaje",
+    automatic: "Traducir automáticamente los nuevos mensajes entrantes", automaticNotice: "Se aplica a los nuevos mensajes del rival después de activarlo. El idioma original se detecta a partir de cada mensaje.",
+    translate: "Traducir", translating: "Traduciendo…", translated: "Traducción automática", showOriginal: "Mostrar original", info: "Acerca de la traducción automática",
+    notice: "La traducción automática puede contener errores. Revisa el mensaje original y confirma los detalles importantes, especialmente las fechas y horas de las partidas.",
+    unavailable: "La traducción no está disponible. Puedes seguir leyendo y enviando mensajes originales.", source_required: "El idioma original no está claro. Elígelo arriba e inténtalo de nuevo.",
+    same_language: "Este mensaje ya está en el idioma de lectura seleccionado.", busy: "Se está preparando esta traducción. Inténtalo de nuevo en breve.", rate_limited: "Demasiadas solicitudes de traducción. Inténtalo de nuevo en breve.",
+    quota_exhausted: "Se ha agotado la cuota gratuita de traducción. El chat original sigue disponible.", redacted: "Este mensaje ya no está disponible.", denied: "Esta conversación ya no está disponible para esta cuenta.",
+    variantNotice: "El chino puede aparecer en escritura simplificada o tradicional. El portugués es general y puede diferir del uso brasileño.",
+  },
+  "pt-BR": {
+    title: "Tradução do chat", readingLanguage: "Ler mensagens em", sourceLanguage: "Idioma original para tradução individual", automaticSource: "Detectar pela mensagem",
+    automatic: "Traduzir automaticamente novas mensagens recebidas", automaticNotice: "Aplica-se às novas mensagens do adversário após a ativação. O idioma original é detectado a partir de cada mensagem.",
+    translate: "Traduzir", translating: "Traduzindo…", translated: "Tradução automática", showOriginal: "Mostrar original", info: "Sobre a tradução automática",
+    notice: "A tradução automática pode conter erros. Confira a mensagem original e confirme os detalhes importantes, especialmente as datas e os horários das partidas.",
+    unavailable: "A tradução está indisponível. Você ainda pode ler e enviar as mensagens originais.", source_required: "O idioma original não está claro. Escolha o idioma acima e tente novamente.",
+    same_language: "Esta mensagem já está no idioma de leitura selecionado.", busy: "Esta tradução está sendo preparada. Tente novamente em instantes.", rate_limited: "Muitas solicitações de tradução. Tente novamente em instantes.",
+    quota_exhausted: "A cota gratuita de tradução acabou. O chat original continua disponível.", redacted: "Esta mensagem não está mais disponível.", denied: "Esta conversa não está mais disponível para esta conta.",
+    variantNotice: "O chinês pode usar escrita simplificada ou tradicional. O português é geral e pode diferir do português brasileiro.",
+  },
+  ko: {
+    title: "채팅 번역", readingLanguage: "메시지를 읽을 언어", sourceLanguage: "개별 번역의 원문 언어", automaticSource: "메시지에서 감지",
+    automatic: "새로 받은 메시지 자동 번역", automaticNotice: "켜진 이후 상대가 보내는 새 메시지에 적용됩니다. 각 메시지에서 원문 언어를 감지합니다.", translate: "번역", translating: "번역 중…",
+    translated: "자동 번역", showOriginal: "원문 보기", info: "자동 번역 안내",
+    notice: "자동 번역에는 오류가 있을 수 있습니다. 원문 메시지를 확인하고 중요한 세부 사항, 특히 경기 날짜와 시간을 확인하세요.",
+    unavailable: "번역을 사용할 수 없습니다. 원문 메시지는 계속 읽고 보낼 수 있습니다.", source_required: "원문 언어가 명확하지 않습니다. 위에서 언어를 선택하고 다시 시도하세요.",
+    same_language: "이 메시지는 이미 선택한 읽기 언어로 작성되어 있습니다.", busy: "번역을 준비 중입니다. 잠시 후 다시 시도하세요.", rate_limited: "번역 요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
+    quota_exhausted: "무료 번역 한도를 모두 사용했습니다. 원문 채팅은 계속 사용할 수 있습니다.", redacted: "이 메시지는 더 이상 사용할 수 없습니다.", denied: "이 계정은 더 이상 이 대화에 접근할 수 없습니다.",
+    variantNotice: "중국어 번역은 간체 또는 번체를 사용할 수 있습니다. 포르투갈어 번역은 일반 포르투갈어이며 브라질 용법과 다를 수 있습니다.",
+  },
+  fr: {
+    title: "Traduction du chat", readingLanguage: "Lire les messages en", sourceLanguage: "Langue originale pour la traduction individuelle", automaticSource: "Détecter à partir du message",
+    automatic: "Traduire automatiquement les nouveaux messages reçus", automaticNotice: "S’applique aux nouveaux messages de l’adversaire après activation. La langue originale est détectée à partir de chaque message.",
+    translate: "Traduire", translating: "Traduction…", translated: "Traduction automatique", showOriginal: "Afficher l’original", info: "À propos de la traduction automatique",
+    notice: "La traduction automatique peut contenir des erreurs. Vérifiez le message original et confirmez les détails importants, surtout les dates et heures des matchs.",
+    unavailable: "La traduction est indisponible. Vous pouvez toujours lire et envoyer les messages originaux.", source_required: "La langue originale est incertaine. Choisissez-la ci-dessus et réessayez.",
+    same_language: "Ce message est déjà dans la langue de lecture choisie.", busy: "Cette traduction est en préparation. Réessayez dans un instant.", rate_limited: "Trop de demandes de traduction. Réessayez dans un instant.",
+    quota_exhausted: "Le quota gratuit de traduction est épuisé. Le chat original reste disponible.", redacted: "Ce message n’est plus disponible.", denied: "Cette conversation n’est plus accessible à ce compte.",
+    variantNotice: "Le chinois peut utiliser l’écriture simplifiée ou traditionnelle. Le portugais est général et peut différer de l’usage brésilien.",
+  },
+};
+
+export function getChatTranslationCopy(locale: Locale): ChatTranslationCopy {
+  return COPY[locale];
+}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@clerk/nextjs";
 import useMatchRoomRealtime from "@/components/useMatchRoomRealtime";
+import { MatchChatTranslationProvider, MatchChatTranslationControls, MatchChatTranslatedMessage } from "@/components/MatchChatTranslation";
 import {
   getMatchRoomHistory,
   getMatchRoomEarlierHistory,
@@ -421,7 +422,8 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
       {!loaded && <p role="status" className="mt-4 text-sm text-zinc-400">{copy.loading}</p>}
       {loaded && !room && !loadError && <p className="mt-4 text-sm text-zinc-400">{copy.noRoom}</p>}
       {history && room && (
-        <>
+        <MatchChatTranslationProvider active={!admin} roomId={room.id} viewerRegistrationId={room.viewerRegistrationId} messages={history.messages}>
+          {!admin && <MatchChatTranslationControls />}
           {hasEarlier && (
             <div className="mt-3 space-y-2">
               <p className="text-xs text-zinc-500">{copy.historyNotice}</p>
@@ -462,7 +464,8 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
                     {formatDateTime(message.createdAt, locale, { kind: "local" }, { dateStyle: "short", timeStyle: "short" })}
                   </time>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{message.body}</p>
+                {!admin && message.senderKind === "player" ? <MatchChatTranslatedMessage message={message} /> :
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{message.body}</p>}
               </article>
             ))}
             <div ref={transcriptTail} aria-hidden="true" data-match-room-tail className="h-px" />
@@ -502,7 +505,7 @@ function MatchRoomSession({ matchId, roomId, participants, admin = false, footer
           )}
           {sendError && <p role="alert" className="mt-3 text-sm text-amber-300">{errorText(sendError)}</p>}
           {footer && <div className="mt-4 border-t border-zinc-800 pt-4">{footer(room)}</div>}
-        </>
+        </MatchChatTranslationProvider>
       )}
     </section>
   );

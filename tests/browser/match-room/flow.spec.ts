@@ -1,6 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 const FIRST_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const SECOND_ROOM_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+/** Reading a message requires viewing the actual latest transcript, not merely
+ * mounting the room or locating text below the newly added controls. */
+async function viewLatestTranscript(log: Locator) {
+  const tail = log.locator("[data-match-room-tail]");
+  await tail.scrollIntoViewIfNeeded();
+  await expect(tail).toBeInViewport();
+}
 test.beforeEach(async ({ page }) => {
   await page.route("**/*", route => new URL(route.request().url()).hostname === "127.0.0.1" ? route.continue() : route.abort());
 });
@@ -13,6 +21,7 @@ for (const width of [375,390]) {
     const second = page.getByTestId("second-room");
     await expect(first.getByText("First room unread message")).toBeInViewport();
     await expect(second.getByText("Second room unread message")).not.toBeInViewport();
+    await viewLatestTranscript(first.getByRole("log"));
     await expect.poll(() => page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId).room.lastReadSequence, FIRST_ROOM_ID)).toBe(1);
     const unseen = await page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId), SECOND_ROOM_ID);
     expect(unseen.room.lastReadSequence).toBe(0);
@@ -31,8 +40,7 @@ for (const width of [375,390]) {
     expect(polled.episode).toBe(unseen.episode);
     expect(polled.pushStatus).toBe("pending");
 
-    await second.getByRole("log").scrollIntoViewIfNeeded();
-    await expect(second.locator("[data-match-room-tail]")).toBeInViewport();
+    await viewLatestTranscript(second.getByRole("log"));
     await expect.poll(() => page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId).room.lastReadSequence, SECOND_ROOM_ID)).toBe(2);
     const seen = await page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId), SECOND_ROOM_ID);
     expect(seen.episode).toBeNull();
@@ -49,8 +57,7 @@ for (const width of [375,390]) {
       Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    await first.getByRole("log").scrollIntoViewIfNeeded();
-    await expect(first.locator("[data-match-room-tail]")).toBeInViewport();
+    await viewLatestTranscript(first.getByRole("log"));
     await page.clock.runFor(10_000);
     const hidden = await page.evaluate((roomId) => window.matchRoomVisibilityFixture.snapshot(roomId), FIRST_ROOM_ID);
     expect(hidden.room.lastReadSequence).toBe(1);
@@ -132,8 +139,9 @@ for (const width of [375, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/tests/browser/match-room/?scenario=history");
     await expect(page.getByText(/^History message 125 /)).toBeVisible();
-    await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().lastRead)).toBe(125);
     const log = page.getByRole("log");
+    await viewLatestTranscript(log);
+    await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().lastRead)).toBe(125);
     await log.evaluate((element) => { element.scrollTop = 100; element.dispatchEvent(new Event("scroll")); });
     const anchor = await log.evaluate((element) => {
       const top = element.getBoundingClientRect().top;
@@ -164,7 +172,7 @@ for (const width of [375, 390]) {
     await page.screenshot({ path: testInfo.outputPath("earlier-" + width + ".png"), fullPage: true });
   });
 
-  test("assistance request, duplicate, explicit resolution and reopen at " + width + "px", async ({ page }, testInfo) => {
+  test("legacy assistance history, duplicate fixture, supported resolution and retired creation at " + width + "px", async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/tests/browser/match-room/");
     await page.getByRole("button", { name: "Won", exact: true }).click();
@@ -172,22 +180,25 @@ for (const width of [375, 390]) {
     await page.getByLabel("Game 1 replay", { exact: true }).setInputFiles({
       name: "assistance-draft.rec", mimeType: "application/octet-stream", buffer: Buffer.from("fixture"),
     });
-    const request = page.getByRole("button", { name: "Request Admin Assistance", exact: true });
-    await expect(request).toBeVisible();
-    expect((await request.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await request.click();
+    await expect(page.getByRole("button", { name: "Request Admin Assistance", exact: true })).toHaveCount(0);
+    // Phase3 retired textless creation. Seed an earlier request using the
+    // existing synthetic fixture transport, then exercise supported legacy UI.
+    await page.evaluate(async () => { await window.matchRoomFixture.duplicateRequest(); window.dispatchEvent(new Event("focus")); });
     await expect(page.getByText("Assistance requested", { exact: true })).toBeVisible();
     await page.evaluate(() => window.matchRoomFixture.duplicateRequest());
     expect(await page.evaluate(() => window.matchRoomFixture.snapshot().assistanceMutations)).toBe(1);
     await page.evaluate(() => window.matchRoomFixture.setViewer("admin"));
-    await page.getByRole("button", { name: "Resolve assistance", exact: true }).click();
+    const resolve = page.getByRole("button", { name: "Resolve assistance", exact: true });
+    await expect(resolve).toBeVisible();
+    expect((await resolve.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await resolve.click();
     await expect(page.getByText("Assistance resolved", { exact: true })).toBeVisible();
     await page.evaluate(() => window.matchRoomFixture.setViewer("player"));
-    await page.getByRole("button", { name: "Request assistance again", exact: true }).click();
-    await expect(page.getByText("Assistance requested", { exact: true })).toBeVisible();
+    await expect(page.getByText("Assistance resolved", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Request assistance again", exact: true })).toHaveCount(0);
     const snapshot = await page.evaluate(() => window.matchRoomFixture.snapshot());
-    expect(snapshot.assistance.requestVersion).toBe(2);
-    expect(snapshot.assistanceMutations).toBe(3);
+    expect(snapshot.assistance.requestVersion).toBe(1);
+    expect(snapshot.assistanceMutations).toBe(2);
     expect(snapshot.count).toBe(2);
     await expect(page.getByRole("combobox", { name: "Score", exact: true })).toHaveValue("2-1");
     await expect(page.getByText("assistance-draft.rec", { exact: true })).toBeVisible();
@@ -219,6 +230,7 @@ test("two synthetic users return through a generic notification to the pinned ro
   await opponent.getByRole("link", { name: "New Match Room message", exact: true }).click();
   await expect(opponent).toHaveURL(/room=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
   await expect(opponent.getByText(body, { exact: true })).toBeVisible();
+  await viewLatestTranscript(opponent.getByRole("log"));
   await expect.poll(() => opponent.evaluate(() => window.matchRoomFixture.snapshot().episode)).toBeNull();
   expect(await opponent.evaluate(() => window.matchRoomFixture.snapshot().resolveCalls)).toBe(0);
   const reply = "PRIVATE fixture reply from opponent";
@@ -230,6 +242,7 @@ test("two synthetic users return through a generic notification to the pinned ro
   expect(await opponent.evaluate(() => window.matchRoomFixture.snapshot().episode)).toBeNull();
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.getByText(reply, { exact: true })).toBeVisible();
+  await viewLatestTranscript(page.getByRole("log"));
   await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().episode)).toBeNull();
   const replied = await page.evaluate(() => window.matchRoomFixture.snapshot());
   expect(replied.lastRead).toBe(replied.count);
@@ -258,6 +271,7 @@ for (const width of [375, 390]) {
 
     await page.getByRole("button", { name: "Open fixture room", exact: true }).click();
     await expect(page.getByText("Opponent ready for the Match.", { exact: true })).toBeInViewport();
+    await viewLatestTranscript(page.getByRole("log"));
     await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().lastRead)).toBe(2);
     // The fake clock has not advanced ten seconds: this must use the genuine
     // successful read acknowledgement event, then authoritative re-projection.
@@ -282,11 +296,14 @@ test("a message arriving during a read acknowledgement remains unread until its 
   await expect(summary).toHaveText("generic");
   await page.evaluate(() => window.matchRoomFixture.raceNextRead("Unread message that arrived during acknowledgement"));
   await page.getByRole("button", { name: "Open fixture room", exact: true }).click();
+  await viewLatestTranscript(page.getByRole("log"));
   await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().lastRead)).toBe(2);
   expect(await page.evaluate(() => window.matchRoomFixture.snapshot().count)).toBe(3);
   await expect(summary).toHaveText("opponent");
   await expect(page.getByText("Unread message that arrived during acknowledgement", { exact: true })).toHaveCount(0);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByText("Unread message that arrived during acknowledgement", { exact: true })).toBeAttached();
+  await viewLatestTranscript(page.getByRole("log"));
   await expect(page.getByText("Unread message that arrived during acknowledgement", { exact: true })).toBeInViewport();
   await expect.poll(() => page.evaluate(() => window.matchRoomFixture.snapshot().lastRead)).toBe(3);
   await expect(summary).toHaveText("none");

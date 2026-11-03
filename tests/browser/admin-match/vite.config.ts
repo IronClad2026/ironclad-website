@@ -12,6 +12,7 @@ export default defineConfig({
         "@/app/tournaments/match-actions",
         "@/app/tournaments/room-actions",
         "@/app/tournaments/support-actions",
+        "@/lib/chat-translation-client",
         "@/app/admin/tournaments/deadline-actions",
         "@/lib/supabase-browser",
         "@clerk/nextjs",
