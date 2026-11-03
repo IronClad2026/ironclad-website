@@ -289,3 +289,94 @@ mutation. The five related notification/navigation suites passed 96 tests.
 Full lint, TypeScript and the network-blocked placeholder-credential Next build
 passed. Unchanged database/hosted acceptance evidence above is reused; these
 local checks do not establish the remaining real admin/requester browser flow.
+
+### Completed remaining website acceptance — 3 November 2026
+
+The stable Staging URL was independently read back as READY deployment
+`dpl_4u3xnzfQyPtfWbTDSaUj87srtTZP`, exact commit
+`a0d15ad9587524353c718bd8c6e52a124a843157`, branch `staging`, non-Production
+target. This includes the separately reviewed notification-link correction above.
+The existing authorized admin completed normal Clerk Development verification;
+no admin session was manufactured and no role or identity configuration changed.
+Verification codes were not saved in this record, files or Git.
+
+Actual browser checks passed:
+
+- A showed only its two separate private conversations. The admin sent one
+  tagged synthetic reply to TestAcademy1's request `86c6c249-14f3-4dc0-bcad-7b100437dc51`.
+  Independent readback found exactly one admin message, sequence 5/version 5,
+  and In progress. A reload and its selected-request deep link showed the saved
+  message. Explicit Open, In progress and Resolved saves each persisted across
+  reloads; independent reads recorded Open/version 6 and Resolved/version 8,
+  while the reloaded website confirmed the intermediate In progress save.
+  Status saves did not add messages.
+- The different, unanswered TestAcademy2 request
+  `d5b86b25-502d-427e-ab4b-6e5c353c5e4c` stayed Open/version 1/sequence 1.
+  Its notice `74c8803c-7982-41d9-bb9f-2da0ed9e94ce` was marked read and then
+  removed using the selected tournament inbox's actual individual controls.
+  The UI explicitly reported that these changes affect all administrators.
+  After each operation, full request/message digests remained identical.
+  The retained notification gained `read_at` and `in_app_hidden_at`; it was not
+  deleted. The Open assistance filter still showed the unanswered conversation,
+  and its original message remained readable after removal.
+- TestAcademy1 signed in through the normal Development test-account flow.
+  Its dashboard displayed the generic notice “Admin reply to private assistance” /
+  “An IronClad admin replied. Open your private conversation.” Clicking the actual
+  collapsed dashboard notice opened the exact A request/tournament URL, rather
+  than merely marking it read. Notice `d1032637-1f2d-4cc8-8cec-85792cf2867c`
+  belongs to the authenticated requester, and independent readback confirmed
+  its read state. No private reply text appeared in the notice.
+- The requester saw the admin reply and Resolved status, then sent one tagged
+  follow-up through the website. It saved exactly once, reopened the same request
+  to Open/version 9/sequence 6, and remained visible after reload. The new generic
+  admin notice is `e0916488-5d7d-4442-923b-c1424ecce7c5`.
+- Privacy was checked in both directions through the running website:
+  TestAcademy1 could not read TestAcademy2's conversation, and the separately
+  signed-in TestAcademy2 could not read TestAcademy1's conversation. Both showed
+  generic unavailability with zero transcript/log and reply controls. TestAcademy2
+  could still open its own Open conversation and original message after its inbox
+  notice had been removed. Signed-out access redirected to the accepted
+  Development Clerk sign-in without displaying a transcript. Broader outsider,
+  anonymous, forged-scope and raw-table denial retain the earlier signed-hosted
+  API evidence; no separate outsider browser login is claimed here.
+- B's website queue still showed its own two Open conversations. Full-row digests
+  of B requests, messages and notifications remained identical to the pre-action
+  baseline. A/B registration, match and room digests were also identical. The
+  unanswered A request/message digests and known legacy/shared-request digests
+  likewise remained identical.
+
+The final readback found all ten modern synthetic assistance notices tagged and
+zero eligible/claimed synthetic deliveries. Their new website-only events retain
+NULL push/email delivery status, so later restoring push claim permission does
+not itself make these events pending. Staging `TRANSACTIONAL_EMAIL_MODE` remains
+disabled. Push claim ACL remains `{postgres=X/postgres}` and its body SHA-256
+remains `5d2f52d80bc91a3ffdd632d702a10eff55aa20d57f602ab2ad3958b34196e115`.
+No delivery permission was restored; all four existing cron jobs remain active,
+global notification delivery claim count was zero, and `match-proofs` remains
+private. Actual email/push delivery is deliberately untested while blocked.
+
+The code and migrations did not change during these browser checks. Earlier
+241-test/25-PostgreSQL-group and signed-hosted player evidence is reused; the
+notification fix's 106 focused checks, lint, TypeScript and isolated build remain
+applicable. Full Clerk/Storage account closure was not rerun: the local privacy
+tests model final closure states and do not claim that hosted destructive chain.
+No replay upload method was retried. No partner fixture, Production branch,
+Production database or environment binding was changed. The separate Production
+candidate remains `688759c9b4766327a86ece665dbb9bcd320fbee9`.
+
+Outstanding Production release checks remain consolidated:
+
+1. Actual replay chooser upload, persistence, authorized byte download/comparison
+   and signed-out/nonparticipant restrictions. The working-PC Chrome extension's
+   file-URL permission is unconfirmed and the prior alternative browser was
+   unavailable. Resume only with that permission or a supported permitted method,
+   using a fresh reportable synthetic match; the retained replay fixture is
+   cancelled and must not be reopened for this test.
+2. A second distinct authorized admin login to confirm shared team state.
+3. Physical-phone interaction with assistance and inbox controls. The earlier
+   viewport override did not change its measured width and is not phone evidence.
+
+The browser was left on TestAcademy2's own unanswered conversation. Admin queue
+and inbox links above require an admin session; private links require their actual
+requester or an authorized active admin. No new migration, environment variable
+or dependency was added or changed for this acceptance completion.
