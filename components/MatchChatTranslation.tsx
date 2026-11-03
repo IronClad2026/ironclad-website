@@ -350,8 +350,18 @@ export function MatchChatTranslationControls() {
     const closeOutside = (event: PointerEvent) => {
       if (event.target instanceof Node && !infoContainer.current?.contains(event.target)) setInfoOpen(false);
     };
+    const closeEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // Capture before the surrounding workspace's Escape handler, including
+      // hover-open notices when keyboard focus is still in a chat/result draft.
+      event.preventDefault(); event.stopPropagation(); setInfoOpen(false);
+    };
     document.addEventListener("pointerdown", closeOutside);
-    return () => document.removeEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeEscape, true);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeEscape, true);
+    };
   }, [infoOpen]);
   if (!context) return null;
   const { copy } = context;
@@ -363,7 +373,7 @@ export function MatchChatTranslationControls() {
         onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setInfoOpen(false); }}>
         <button type="button" aria-label={copy.info} aria-expanded={infoOpen} aria-controls={infoId}
           aria-describedby={infoOpen ? infoId : undefined} onFocus={() => setInfoOpen(true)}
-          onClick={() => setInfoOpen(true)} onKeyDown={(event) => { if (event.key === "Escape") setInfoOpen(false); }}
+          onClick={() => setInfoOpen(true)}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-sm text-zinc-400 hover:text-orange-300 focus-visible:outline-2 focus-visible:outline-orange-400">ⓘ</button>
         <div id={infoId} role="note" hidden={!infoOpen}
           className="absolute left-3 right-3 top-14 z-20 max-w-md rounded-lg border border-zinc-700 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-200 shadow-xl">{copy.notice}</div>

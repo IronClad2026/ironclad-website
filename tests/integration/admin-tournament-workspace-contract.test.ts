@@ -1031,6 +1031,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261101230355_patch2_admin_inbox_legacy_assistance.sql",
         "20261102192200_patch2_private_assistance_conversations.sql",
         "20261102195256_patch2_private_assistance_active_actor.sql",
+        "20261103024129_patch2_match_chat_translation.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([
@@ -1141,15 +1142,17 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "8e97337efc36276797b3e98ff45bbdbd893533b0ffa13486e0f4bac83e911fd6"
     );
     // P04 News authorizes the parsers; the announcement editor adds only the
-    // three approved, exact-pinned Tiptap packages and their resolved graph.
+    // three approved, exact-pinned Tiptap packages. Patch 2 Phase 4 adds only
+    // exact-pinned Franc/OpenCC and their resolved graph, plus server-only
+    // disabled-by-default translation environment examples.
     expect(normalizedSha256(read("package.json"))).toBe(
-      "c4746ee51402c2bb8195b873c4c331761e257f0be4e76daea7a615bc6d6826f5"
+      "88ced97d202dcb6b95bab707a14e88e70deaead97243d2688d746ecf20100e83"
     );
     expect(normalizedSha256(read("package-lock.json"))).toBe(
-      "cc5cd5b040b6a63b59e0cc03f7f7e454c4f1f57f11d7e005af99405e97c06ffb"
+      "ef448c762bb36d551f140071c121563cbf08e60265359e451f3720a94813860b"
     );
     expect(normalizedSha256(read(".env.example"))).toBe(
-      "df333b2554f79526a26de3f1dd65afb112c21d2c73e4cbb5d45a8da164dd56fe"
+      "a2744ce3565e5ac9c5fa53c3079133a20c447e1bf1b4e67e5c912c43a0de30c3"
     );
 
     expect(

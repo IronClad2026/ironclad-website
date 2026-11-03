@@ -298,6 +298,46 @@ describe("Match chat translation", () => {
     expect(info).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("does not close the surrounding Match Workspace when Escape dismisses the notice", async () => {
+    const closeWorkspace = vi.fn();
+    window.addEventListener("keydown", closeWorkspace);
+    try {
+      render(<Fixture />);
+      await ready();
+      const info = screen.getByRole("button", { name: copy.info });
+      fireEvent.focus(info);
+      expect(info).toHaveAttribute("aria-expanded", "true");
+      fireEvent.keyDown(info, { key: "Escape" });
+      expect(info).toHaveAttribute("aria-expanded", "false");
+      expect(closeWorkspace).not.toHaveBeenCalled();
+      expect(screen.getByRole("textbox", { name: "Unrelated draft" })).toHaveValue("Unfinished result / replay draft");
+    } finally {
+      window.removeEventListener("keydown", closeWorkspace);
+    }
+  });
+
+  it("dismisses a hover-open notice with Escape while focus remains in a draft", async () => {
+    const closeWorkspace = vi.fn();
+    window.addEventListener("keydown", closeWorkspace);
+    try {
+      render(<Fixture />);
+      await ready();
+      const draft = screen.getByRole("textbox", { name: "Unrelated draft" });
+      const info = screen.getByRole("button", { name: copy.info });
+      fireEvent.focus(draft);
+      fireEvent.mouseEnter(info.parentElement!);
+      expect(info).toHaveAttribute("aria-expanded", "true");
+      fireEvent.keyDown(draft, { key: "Escape" });
+      expect(info).toHaveAttribute("aria-expanded", "false");
+      expect(closeWorkspace).not.toHaveBeenCalled();
+      expect(draft).toHaveValue("Unfinished result / replay draft");
+      fireEvent.keyDown(draft, { key: "Escape" });
+      expect(closeWorkspace).toHaveBeenCalledOnce();
+    } finally {
+      window.removeEventListener("keydown", closeWorkspace);
+    }
+  });
+
   it("does not mount translation controls or actions for admin chat", async () => {
     render(<Fixture active={false} />);
     expect(screen.getByText(body)).toBeVisible();
