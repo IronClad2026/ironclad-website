@@ -850,12 +850,15 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
   });
 
   it("authorizes every route and server loader before privileged access", () => {
-    for (const key of ["list", "newRoute", "workspace"] as const) {
+    for (const key of ["list", "workspace"] as const) {
       const page = compact(source[key]);
-      expect(page, key).toContain("const { userId, sessionClaims } = await auth()");
-      expect(page, key).toContain('role !== "admin"');
-      expect(page, key).toContain('redirect("/")');
+      expect(page, key).toContain("await hasAdminPageAccess(");
+      expect(page, key).toContain("return <AdminAccessRequired />");
     }
+    // The separate creation page keeps its existing independent authorization.
+    expect(compact(source.newRoute)).toContain("const { userId, sessionClaims } = await auth()");
+    expect(compact(source.newRoute)).toContain('role !== "admin"');
+    expect(compact(source.newRoute)).toContain('redirect("/")');
 
     for (const key of [
       "workspaceData",
