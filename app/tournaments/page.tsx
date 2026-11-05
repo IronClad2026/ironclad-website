@@ -591,11 +591,13 @@ export default async function TournamentsPage({
     return <TournamentEmptyState t={t} />;
   }
 
-  const tournamentPolls = await loadTournamentPollsForRequest(
-    tournaments.map((tournament) => tournament.id),
-    Boolean(userId)
-  );
-  const matchResultData = await loadMatchResultData();
+  const [tournamentPolls, matchResultData] = await Promise.all([
+    loadTournamentPollsForRequest(
+      tournaments.map((tournament) => tournament.id),
+      Boolean(userId)
+    ),
+    loadMatchResultData(),
+  ]);
 
   if (
     matchResultData.error ||

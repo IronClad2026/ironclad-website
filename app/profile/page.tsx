@@ -200,62 +200,86 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   > = [];
 
   if (profile) {
-    activeTournamentEloSnapshots =
-      await getOwnActiveTournamentEloSnapshots(supabase, userId);
+    // Independent owner-scoped reads run together. Preserve the Staging
+    // synthetic authority check and keep protected fields server-only.
+    const [snapshots, protectedStatus] = await Promise.all([
+      getOwnActiveTournamentEloSnapshots(supabase, userId),
+      (async () => {
+        const status: {
+          steamConnected: boolean;
+          steamStatusAvailable: boolean;
+          initialVerification: RelicVerification | null;
+          initialRefreshAvailableAt: string | null;
+          syntheticEligibility: { elo: number; division: string } | null;
+        } = {
+          steamConnected: false,
+          steamStatusAvailable: true,
+          initialVerification: null,
+          initialRefreshAvailableAt: null,
+          syntheticEligibility: null,
+        };
+        try {
+          const admin = createSupabaseAdminClient();
+          const { data: protectedProfileData, error: protectedProfileError } =
+            await admin
+              .from("players")
+              .select(
+                "steam_id64, relic_verified_elo, relic_verified_faction, relic_verified_division, relic_elo_calculation_version, relic_elo_verified_at, relic_elo_last_attempt_at"
+              )
+              .eq("clerk_user_id", userId)
+              .maybeSingle();
 
-    try {
-      const admin = createSupabaseAdminClient();
-      const { data: protectedProfileData, error: protectedProfileError } =
-        await admin
-          .from("players")
-          .select(
-            "steam_id64, relic_verified_elo, relic_verified_faction, relic_verified_division, relic_elo_calculation_version, relic_elo_verified_at, relic_elo_last_attempt_at"
-          )
-          .eq("clerk_user_id", userId)
-          .maybeSingle();
-
-      if (protectedProfileError) {
-        steamStatusAvailable = false;
-        console.error("Protected profile status lookup failed.");
-      } else {
-        const protectedProfile =
-          (protectedProfileData as ProtectedProfileData | null) ?? null;
-
-        const steamId64 = protectedProfile?.steam_id64;
-        const version = protectedProfile?.relic_elo_calculation_version;
-        const syntheticIdentity = typeof steamId64 === "string" && isReservedSyntheticSteamIdentity(steamId64);
-        const syntheticEvidence = typeof version === "string" &&
-          (version.startsWith("staging-synthetic-") || version === "phase4-staging-fixture-v1");
-        if (syntheticIdentity || syntheticEvidence) {
-          // A reserved identifier alone is never proof. The same pinned Staging
-          // registry authority used by registration must validate this tuple.
-          const effective = typeof steamId64 === "string" ? await getEffectiveRegistrationViewerRelic({
-            supabase: admin,
-            identity: { playerId: profile.id, clerkUserId: userId, steamId64 },
-            persisted: {
-              elo: protectedProfile?.relic_verified_elo,
-              faction: protectedProfile?.relic_verified_faction,
-              division: protectedProfile?.relic_verified_division,
-              calculationVersion: version,
-            },
-          }) : null;
-          if (effective?.source === "staging_synthetic" && typeof effective.elo === "number") {
-            syntheticEligibility = { elo: effective.elo, division: effective.division };
+          if (protectedProfileError) {
+            status.steamStatusAvailable = false;
+            console.error("Protected profile status lookup failed.");
           } else {
-            steamStatusAvailable = false;
+            const protectedProfile =
+              (protectedProfileData as ProtectedProfileData | null) ?? null;
+
+            const steamId64 = protectedProfile?.steam_id64;
+            const version = protectedProfile?.relic_elo_calculation_version;
+            const syntheticIdentity = typeof steamId64 === "string" && isReservedSyntheticSteamIdentity(steamId64);
+            const syntheticEvidence = typeof version === "string" &&
+              (version.startsWith("staging-synthetic-") || version === "phase4-staging-fixture-v1");
+            if (syntheticIdentity || syntheticEvidence) {
+              // A reserved identifier alone is never proof. The same pinned Staging
+              // registry authority used by registration must validate this tuple.
+              const effective = typeof steamId64 === "string" ? await getEffectiveRegistrationViewerRelic({
+                supabase: admin,
+                identity: { playerId: profile.id, clerkUserId: userId, steamId64 },
+                persisted: {
+                  elo: protectedProfile?.relic_verified_elo,
+                  faction: protectedProfile?.relic_verified_faction,
+                  division: protectedProfile?.relic_verified_division,
+                  calculationVersion: version,
+                },
+              }) : null;
+              if (effective?.source === "staging_synthetic" && typeof effective.elo === "number") {
+                status.syntheticEligibility = { elo: effective.elo, division: effective.division };
+              } else {
+                status.steamStatusAvailable = false;
+              }
+            } else {
+              status.steamConnected = typeof steamId64 === "string" && steamId64.length > 0;
+              status.initialVerification = getRelicVerification(protectedProfile);
+              status.initialRefreshAvailableAt = getRefreshAvailableAt(
+                protectedProfile?.relic_elo_last_attempt_at ?? null
+              );
+            }
           }
-        } else {
-          steamConnected = typeof steamId64 === "string" && steamId64.length > 0;
-          initialVerification = getRelicVerification(protectedProfile);
-          initialRefreshAvailableAt = getRefreshAvailableAt(
-            protectedProfile?.relic_elo_last_attempt_at ?? null
-          );
+        } catch {
+          status.steamStatusAvailable = false;
+          console.error("Protected profile status is not configured.");
         }
-      }
-    } catch {
-      steamStatusAvailable = false;
-      console.error("Protected profile status is not configured.");
-    }
+        return status;
+      })(),
+    ]);
+    activeTournamentEloSnapshots = snapshots;
+    steamConnected = protectedStatus.steamConnected;
+    steamStatusAvailable = protectedStatus.steamStatusAvailable;
+    initialVerification = protectedStatus.initialVerification;
+    initialRefreshAvailableAt = protectedStatus.initialRefreshAvailableAt;
+    syntheticEligibility = protectedStatus.syntheticEligibility;
   }
 
   const profileComplete = profile?.profile_completed === true;

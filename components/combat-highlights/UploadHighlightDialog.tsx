@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import ReferenceDialog from "@/components/ui/ReferenceDialog";
 import type { HighlightSlot } from "@/lib/combat-highlights/types";
-import { HighlightMediaError, prepareHighlight, type PreparedHighlight } from "./media";
+import { prepareHighlight, type PreparedHighlight } from "./media-preparation";
+import { HighlightMediaError } from "./media-transfer";
 import { HIGHLIGHT_BUTTON, highlightMessage } from "./presentation";
 
 export default function UploadHighlightDialog({
@@ -46,7 +46,6 @@ export default function UploadHighlightDialog({
   }
 
   return (
-    <ReferenceDialog title={slot.clip ? "Replace Combat Highlight" : "Add Combat Highlight"} closeLabel={busy ? "Cancel upload" : "Close clip upload"} onClose={onClose} size="compact">
       <form onSubmit={(event) => {
         event.preventDefault();
         if (prepared && !busy && !checking && title.trim() && declaration) {
@@ -91,6 +90,5 @@ export default function UploadHighlightDialog({
           <button type="button" onClick={onClose} className={HIGHLIGHT_BUTTON}>{busy ? "Cancel upload" : "Cancel"}</button>
         </div>
       </form>
-    </ReferenceDialog>
   );
 }
