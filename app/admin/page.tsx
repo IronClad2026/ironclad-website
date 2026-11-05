@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import {
   Activity,
   ClipboardCheck,
@@ -13,6 +12,8 @@ import {
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AdminAccessRequired from "@/components/admin/AdminAccessRequired";
+import { hasAdminPageAccess } from "@/lib/admin-page-access";
 import type { AdminRegistrationStatus } from "@/lib/admin-registration-review";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
@@ -25,12 +26,6 @@ import type {
   TournamentBracketName,
   TournamentStatus,
 } from "@/lib/tournaments";
-
-type CustomClaims = {
-  metadata?: {
-    role?: string;
-  };
-};
 
 type LegacyRegistrationNotice =
   | "note-required"
@@ -188,14 +183,11 @@ function formatStatus(status: string) {
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") {
-    redirect("/");
+  const params = await searchParams;
+  if (!(await hasAdminPageAccess("/admin", params))) {
+    return <AdminAccessRequired />;
   }
 
-  const params = await searchParams;
   const legacyRegistrationRedirect = getLegacyRegistrationRedirect(params);
   if (legacyRegistrationRedirect) {
     redirect(legacyRegistrationRedirect);

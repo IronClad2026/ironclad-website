@@ -1,8 +1,9 @@
 import { requireDivisionModelVersion } from "@/lib/division-model";
-import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import AdminAccessRequired from "@/components/admin/AdminAccessRequired";
+import { hasAdminPageAccess } from "@/lib/admin-page-access";
 import { loadAdminTournamentMediaWorkspace } from "@/app/admin/tournaments/media-actions";
 import AdminNotificationInbox from "@/components/admin/tournaments/AdminNotificationInbox";
 import AdminPrivateAssistance from "@/components/admin/tournaments/AdminPrivateAssistance";
@@ -39,12 +40,6 @@ import {
   type AdminTournamentWorkspaceSummary,
   type AdminTournamentWorkspaceRow,
 } from "@/lib/admin-tournament-workspace";
-
-type CustomClaims = {
-  metadata?: {
-    role?: string;
-  };
-};
 
 type TournamentWorkspacePageProps = {
   params: Promise<{
@@ -86,14 +81,11 @@ export default async function TournamentWorkspacePage({
   params,
   searchParams,
 }: TournamentWorkspacePageProps) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") {
-    redirect("/");
+  const [{ tournamentId }, query] = await Promise.all([params, searchParams]);
+  if (!(await hasAdminPageAccess(`/admin/tournaments/${tournamentId}`, query))) {
+    return <AdminAccessRequired />;
   }
 
-  const [{ tournamentId }, query] = await Promise.all([params, searchParams]);
   if (!isUuid(tournamentId)) {
     notFound();
   }

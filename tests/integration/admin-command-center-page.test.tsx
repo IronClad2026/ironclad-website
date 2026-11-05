@@ -1,4 +1,5 @@
 import { isValidElement, type ElementType, type ReactElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -8,6 +9,9 @@ import {
 } from "@/tests/fixtures/auth";
 
 const authMock = vi.hoisted(() => vi.fn());
+const redirectToSignInMock = vi.hoisted(() => vi.fn(({ returnBackUrl }: { returnBackUrl: string }) => {
+  throw new Error(`CLERK_SIGN_IN:${returnBackUrl}`);
+}));
 const redirectMock = vi.hoisted(() =>
   vi.fn((href: string) => {
     throw new Error(`NEXT_REDIRECT:${href}`);
@@ -57,11 +61,16 @@ describe("Admin Command Center and global Registrations authorization", () => {
     ["signed-out", anonymousIdentity],
     ["non-Admin", playerIdentity],
   ])("denies a %s identity before either route loads private data", async (_, identity) => {
-    authMock.mockResolvedValue(identity);
+    authMock.mockResolvedValue({ ...identity, redirectToSignIn: redirectToSignInMock });
 
-    await expect(AdminPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
-      "NEXT_REDIRECT:/"
-    );
+    if (identity.userId) {
+      const page = await AdminPage({ searchParams: Promise.resolve({}) });
+      expect(renderToStaticMarkup(page)).toContain("Administrator access required");
+    } else {
+      await expect(AdminPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+        "CLERK_SIGN_IN:/admin"
+      );
+    }
     await expect(
       AdminRegistrationsPage({ searchParams: Promise.resolve({}) })
     ).rejects.toThrow("NEXT_REDIRECT:/");

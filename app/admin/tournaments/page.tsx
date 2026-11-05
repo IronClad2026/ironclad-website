@@ -1,8 +1,9 @@
 import { requireDivisionModelVersion, type DivisionModelVersion } from "@/lib/division-model";
-import { auth } from "@clerk/nextjs/server";
 import { ChevronLeft, Plus, Trophy } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import AdminAccessRequired from "@/components/admin/AdminAccessRequired";
+import { hasAdminPageAccess } from "@/lib/admin-page-access";
 import { retryTournamentStorageCleanup } from "@/app/admin/tournaments/actions";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
@@ -19,12 +20,6 @@ import {
   type TournamentBracketName,
   type TournamentStatus,
 } from "@/lib/tournaments";
-
-type CustomClaims = {
-  metadata?: {
-    role?: string;
-  };
-};
 
 type AdminTournamentsPageProps = {
   searchParams?: Promise<{
@@ -55,14 +50,10 @@ type AdminTournamentListRow = {
 export default async function AdminTournamentsPage({
   searchParams,
 }: AdminTournamentsPageProps) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") {
-    redirect("/");
-  }
-
   const params = await searchParams;
+  if (!(await hasAdminPageAccess("/admin/tournaments", params))) {
+    return <AdminAccessRequired />;
+  }
 
   if (params?.selected) {
     const section = params.edit === "1" ? "edit" : "overview";
