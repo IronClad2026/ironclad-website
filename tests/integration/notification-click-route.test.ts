@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const resolveNotificationDestinationMock = vi.hoisted(() => vi.fn());
+const hasCurrentPatch2AdminAccessMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/lib/patch2-admin-access", () => ({ hasCurrentPatch2AdminAccess: hasCurrentPatch2AdminAccessMock }));
 vi.mock("@/lib/notifications", () => ({
   resolveNotificationDestination: resolveNotificationDestinationMock,
 }));
@@ -31,6 +33,7 @@ async function expectRedirect(response: Response, destination: string) {
 
 describe("trusted notification click route", () => {
   beforeEach(() => {
+    hasCurrentPatch2AdminAccessMock.mockResolvedValue(true);
     authMock.mockResolvedValue({
       userId: PLAYER_ID,
       sessionClaims: { metadata: { role: "player" } },
@@ -40,13 +43,26 @@ describe("trusted notification click route", () => {
     );
   });
 
-  it("redirects a signed-out caller to sign-in without looking up a row", async () => {
+  it("preserves only a validated resolver target through sign-in", async () => {
     authMock.mockResolvedValue({ userId: null, sessionClaims: null });
 
-    const response = await GET(request());
-    await expectRedirect(response, "/sign-in");
+    const click = new URL(request().url);
+    click.searchParams.set("redirect_url", "https://evil.example");
+    const response = await GET(new Request(click));
+    const returnTo = new URLSearchParams({ redirect_url: request().url });
+    await expectRedirect(response, `/sign-in?${returnTo}`);
     expect(resolveNotificationDestinationMock).not.toHaveBeenCalled();
   });
+
+  it.each([["player", "invalid"], ["unknown", NOTIFICATION_ID]])(
+    "omits an invalid signed-out return target (%s, %s)",
+    async (scope, notificationId) => {
+      authMock.mockResolvedValue({ userId: null, sessionClaims: null });
+
+      await expectRedirect(await GET(request(scope, notificationId)), "/sign-in");
+      expect(resolveNotificationDestinationMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("rechecks a Player notification against the authenticated Clerk owner", async () => {
     const response = await GET(request());
@@ -62,6 +78,7 @@ describe("trusted notification click route", () => {
   it("allows the global Admin scope only for a current Admin", async () => {
     authMock.mockResolvedValue({
       userId: "user_click_admin",
+      sessionId: "session_click_admin",
       sessionClaims: { metadata: { role: "admin" } },
     });
     resolveNotificationDestinationMock.mockResolvedValue(
@@ -76,6 +93,18 @@ describe("trusted notification click route", () => {
       "admin",
       null
     );
+  });
+
+  it("denies admin destinations after the current Clerk authority is lost", async () => {
+    authMock.mockResolvedValue({
+      userId: "user_click_admin",
+      sessionId: "session_click_admin",
+      sessionClaims: { metadata: { role: "admin" } },
+    });
+    hasCurrentPatch2AdminAccessMock.mockResolvedValue(false);
+
+    await expectRedirect(await GET(request("admin")), "/dashboard");
+    expect(resolveNotificationDestinationMock).not.toHaveBeenCalled();
   });
 
   it("denies a browser-selected Admin scope to a non-Admin", async () => {

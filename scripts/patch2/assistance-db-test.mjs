@@ -21,30 +21,31 @@ const DATA = resolve(RUN, "data"), passwordFile = resolve(RUN, "init-password");
 const password = randomBytes(32).toString("base64url");
 const childEnvironment = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
   !/^(?:PG|DATABASE_|POSTGRES|SUPABASE|NEXT_PUBLIC_SUPABASE|CLERK|NEXT_PUBLIC_CLERK)/i.test(key)));
+const readSql = async (path) => (await readFile(resolve(ROOT, path), "utf8")).replace(/\r\n/g, "\n");
 const migrationPath = "supabase/migrations/20261102192200_patch2_private_assistance_conversations.sql";
-const migration = await readFile(resolve(ROOT, migrationPath), "utf8");
+const migration = await readSql(migrationPath);
 const actorMigrationPath = "supabase/migrations/20261102195256_patch2_private_assistance_active_actor.sql";
-const actorMigration = await readFile(resolve(ROOT, actorMigrationPath), "utf8");
+const actorMigration = await readSql(actorMigrationPath);
 const digest = (v) => createHash("sha256").update(typeof v === "string" ? v : JSON.stringify(v)).digest("hex");
 const sources = [];
 async function authority(path, name) {
-  const source = (await readFile(resolve(ROOT, path), "utf8")).replace(/\r\n/g, "\n");
+  const source = await readSql(path);
   const start = source.search(new RegExp(`create(?: or replace)? function ${name.replaceAll(".", "\\.")}\\(`, "i"));
   assert.ok(start >= 0, `Missing actual authority ${name}`);
   const end = source.indexOf("$$;", start); assert.ok(end > start);
   const sql = source.slice(start, end + 3); sources.push({ path, name, sha256: digest(sql) }); return sql;
 }
-const foundation = "supabase/migrations/20260928030127_match_room_staging_foundation.sql";
+const retentionMigration = "supabase/migrations/20260923062127_match_room_retention_and_privacy.sql";
 const authorities = await Promise.all([
-  authority(foundation, "ironclad_private.match_room_privacy_actor"),
-  authority(foundation, "ironclad_private.lock_match_room_privacy"),
-  authority(foundation, "ironclad_private.match_room_retention_state"),
-  authority(foundation, "public.purge_match_room_retention"),
+  authority(retentionMigration, "ironclad_private.match_room_privacy_actor"),
+  authority(retentionMigration, "ironclad_private.lock_match_room_privacy"),
+  authority(retentionMigration, "ironclad_private.match_room_retention_state"),
+  authority(retentionMigration, "public.purge_match_room_retention"),
   authority("supabase/migrations/20260908052210_member_rpc_current_account_acceptance.sql", "ironclad_private.require_current_account_legal_acceptance"),
   authority("supabase/migrations/20260810162000_transactional_email_notifications.sql", "public.initialize_transactional_email_state"),
   authority("supabase/migrations/20260919235836_match_room_phase_three.sql", "public.initialize_web_push_state"),
 ]);
-const expectedStagingBodyHashes = {
+const expectedSharedBodyHashes = {
   lock_match_room_privacy: "986e045cd47fa712a86705216e220b6ae368f941483a9b223fa629b8da671e7c",
   match_room_privacy_actor: "ad5407f98497bf9bbc872ca080d28d4b57ad64f037377da3488a64c240b5d6e2",
   match_room_retention_state: "c87ea163be6f2d24c2dcb08aa35e1b89ce77e96a6b29428d2e4993d82ceb7b5b",
@@ -113,12 +114,12 @@ try {
   await database.query(await readFile(resolve(ROOT, "tests/patch2-db/assistance-schema.sql"), "utf8"));
   await database.query(await readFile(resolve(ROOT, "supabase/migrations/20261101230355_patch2_admin_inbox_legacy_assistance.sql"), "utf8"));
   for (const sql of authorities) await database.query(sql);
-  report.loadedAuthorityBodyHashes = (await database.query("select p.proname name,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex') sha256 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname=any($1::text[]) and n.nspname in('public','ironclad_private') order by name", [Object.keys(expectedStagingBodyHashes)])).rows;
-  for (const row of report.loadedAuthorityBodyHashes) assert.equal(row.sha256, expectedStagingBodyHashes[row.name], `Current Staging/source authority mismatch: ${row.name}`);
+  report.loadedAuthorityBodyHashes = (await database.query("select p.proname name,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex') sha256 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname=any($1::text[]) and n.nspname in('public','ironclad_private') order by name", [Object.keys(expectedSharedBodyHashes)])).rows;
+  for (const row of report.loadedAuthorityBodyHashes) assert.equal(row.sha256, expectedSharedBodyHashes[row.name], `Shared Production/Staging authority mismatch: ${row.name}`);
   assert.equal(report.loadedAuthorityBodyHashes.length, 7); report.actualClosureSourceBodyHash = closureBodyHash;
   await database.query("create trigger actual_email_initializer before insert on public.notifications for each row execute function public.initialize_transactional_email_state(); create trigger actual_push_initializer before insert on public.notifications for each row execute function public.initialize_web_push_state()");
   await database.query(migration); report.migrationApplied = true;
-  assert.equal(digest(migration), "2eedac3923c0645e5133e14590c700b36357bbb2b17db6a0f80807d41bfeb922", "Applied migration must remain byte-for-byte unchanged");
+  assert.equal(digest(migration), "2eedac3923c0645e5133e14590c700b36357bbb2b17db6a0f80807d41bfeb922", "Applied migration's committed LF bytes must remain unchanged");
   await database.query(actorMigration); report.actorMigrationApplied = true;
   baseline = await domain();
   await test("default-off flag, explicit signed actor boundary and old textless fail-closed", async () => {
@@ -361,8 +362,8 @@ try {
     await error(reply(second.request.id, randomUUID(), "Pseudonymized admin identity", T1), "42501");
     await error(query("select public.get_private_assistance_context($1) value", [R1]), "42501");
   });
-  assert.equal(digest(await readFile(resolve(ROOT, migrationPath), "utf8")), report.migrationSha256, "Migration changed during execution; rerun snapshot");
-  assert.equal(digest(await readFile(resolve(ROOT, actorMigrationPath), "utf8")), report.actorMigrationSha256, "Actor migration changed during execution; rerun snapshot");
+  assert.equal(digest(await readSql(migrationPath)), report.migrationSha256, "Migration changed during execution; rerun snapshot");
+  assert.equal(digest(await readSql(actorMigrationPath)), report.actorMigrationSha256, "Actor migration changed during execution; rerun snapshot");
   report.passed = true;
 } catch (e) { failure = e; report.passed = false; report.failure = e.message; report.errorCode = e.code; report.errorContext = e.where; }
 finally {

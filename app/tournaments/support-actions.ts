@@ -2,26 +2,31 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
+import { isAccountLegalAcceptanceRpcError } from "@/lib/account-legal-rpc-error";
+import { authorizePrivateAssistance, callPrivateAssistanceRpc } from "@/lib/private-assistance-server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 import { getPublicPlayerById } from "@/lib/public-players";
 import { getMatchRoomHistory } from "@/app/tournaments/room-actions";
 import {
   isRecord, isUuid, isRoomAssistanceInput, isMutateRoomAssistanceInput, parseRoomAssistance,
   type MatchRoomAssistance, type MatchRoomAssistanceInput, type MutateMatchRoomAssistanceInput,
 } from "@/lib/match-room-assistance";
-import type { MatchRoomActionFailure, MatchRoomActionResult } from "@/lib/match-room";
+import type { MatchRoomActionResult } from "@/lib/match-room";
 
 export async function getMatchRoomAssistance(input: MatchRoomAssistanceInput): Promise<MatchRoomActionResult<MatchRoomAssistance>> {
-  const denied = await authorizeAssistance();
-  if (denied) return denied;
+  const actor = await authorizePrivateAssistance();
+  if (!actor.ok) return actor;
   if (!isRoomAssistanceInput(input)) return { ok: false, code: "invalid_request" };
-  return callAssistance("get_match_room_assistance", { p_room_id: input.roomId }, input.roomId);
+  return callAssistance(actor.data, "get_match_room_assistance", { p_room_id: input.roomId }, input.roomId);
 }
 
 export async function requestMatchAdminAssistance(input: MutateMatchRoomAssistanceInput): Promise<MatchRoomActionResult<MatchRoomAssistance>> {
-  const denied = await authorizeAssistance();
-  if (denied) return denied;
+  try {
+    const { userId } = await auth();
+    if (!userId) return { ok: false, code: "auth_required" };
+  } catch {
+    return { ok: false, code: "auth_required" };
+  }
   if (!isMutateRoomAssistanceInput(input)) return { ok: false, code: "invalid_request" };
   // This old endpoint has no initial message or private requester context.
   // Already-open clients must reopen help to use the private request form.
@@ -29,37 +34,31 @@ export async function requestMatchAdminAssistance(input: MutateMatchRoomAssistan
 }
 
 export async function resolveMatchAdminAssistance(input: MutateMatchRoomAssistanceInput): Promise<MatchRoomActionResult<MatchRoomAssistance>> {
-  const denied = await authorizeAssistance(true);
-  if (denied) return denied;
+  const actor = await authorizePrivateAssistance(true);
+  if (!actor.ok) return actor;
   if (!isMutateRoomAssistanceInput(input) || input.expectedRequestVersion < 1) return { ok: false, code: "invalid_request" };
   try {
     await requireCurrentAccountLegalAcceptance();
   } catch {
     return { ok: false, code: "legal_required" };
   }
-  return callAssistance("resolve_match_room_assistance", {
+  return callAssistance(actor.data, "resolve_match_room_assistance", {
     p_room_id: input.roomId, p_expected_request_version: input.expectedRequestVersion,
   }, input.roomId);
 }
 
-async function authorizeAssistance(admin = false): Promise<MatchRoomActionFailure | null> {
+async function callAssistance(
+  actor: Parameters<typeof callPrivateAssistanceRpc>[0],
+  operation: "get_match_room_assistance" | "resolve_match_room_assistance",
+  args: Record<string, string | number>,
+  roomId: string,
+): Promise<MatchRoomActionResult<MatchRoomAssistance>> {
   try {
-    const { userId, sessionClaims } = await auth();
-    if (!userId) return { ok: false, code: "auth_required" };
-    if (admin && (sessionClaims as { metadata?: { role?: unknown } } | null)?.metadata?.role !== "admin") {
-      return { ok: false, code: "forbidden" };
-    }
-    return null;
-  } catch {
-    return { ok: false, code: "auth_required" };
-  }
-}
-
-async function callAssistance(name: string, args: Record<string, string | number>, roomId: string): Promise<MatchRoomActionResult<MatchRoomAssistance>> {
-  try {
-    const client = await createAuthenticatedSupabaseClient();
-    const { data, error } = await client.rpc(name, args);
+    const { data, error } = await callPrivateAssistanceRpc(actor, operation, args);
     if (error) {
+      if (isAccountLegalAcceptanceRpcError(error)) {
+        return { ok: false, code: error.message === "ACCOUNT_LEGAL_ACCEPTANCE_REQUIRED" ? "legal_required" : "unavailable" };
+      }
       if (error.code === "P0001" && error.message === "MATCH_ROOM_DISABLED") return { ok: false, code: "disabled" };
       if (error.code === "42501") return { ok: false, code: "forbidden" };
       if (error.code === "22023") return { ok: false, code: "invalid_request" };

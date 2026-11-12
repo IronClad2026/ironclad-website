@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPrivateAssistanceContext, openPrivateAssistance, readPrivateAssistance, replyPrivateAssistance } from "@/app/tournaments/private-assistance-actions";
 import { getAdminPrivateAssistanceQueue, setPrivateAssistanceStatus } from "@/app/admin/tournaments/assistance-actions";
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), rpc: vi.fn(), legal: vi.fn(), client: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), rpc: vi.fn(), legal: vi.fn(), client: vi.fn(), currentAdmin: vi.fn() }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
-vi.mock("@/lib/supabase-server", () => ({ createAuthenticatedSupabaseClient: mocks.client }));
+vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: mocks.client }));
+vi.mock("@/lib/patch2-admin-access", () => ({ hasCurrentPatch2AdminAccess: mocks.currentAdmin }));
 vi.mock("@/lib/account-legal-mutation-guard", () => ({ requireCurrentAccountLegalAcceptance: mocks.legal }));
 const T = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const ROOM = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -20,9 +21,10 @@ const history = { requestId: ID, tournamentId: T, afterSequence: 0, limit: 50 };
 const reply = { requestId: ID, tournamentId: T, clientMessageId: CLIENT, body: "Help" };
 const queue = { tournamentId: T, filter: "all" as const, page: 1, selectedId: null };
 beforeEach(() => {
-  mocks.auth.mockResolvedValue({ userId: "trusted-player", sessionClaims: {} });
+  mocks.auth.mockResolvedValue({ userId: "trusted-player", sessionId: "synthetic-session", sessionClaims: {} });
+  mocks.currentAdmin.mockResolvedValue(false);
   mocks.legal.mockResolvedValue(undefined);
-  mocks.client.mockResolvedValue({ rpc: mocks.rpc });
+  mocks.client.mockReturnValue({ rpc: mocks.rpc });
   mocks.rpc.mockResolvedValue({ data: mutation, error: null });
 });
 describe("private assistance authenticated action boundary", () => {
@@ -30,7 +32,7 @@ describe("private assistance authenticated action boundary", () => {
     mocks.auth.mockResolvedValue({ userId: null });
     expect(await openPrivateAssistance(opening)).toEqual({ ok: false, code: "auth_required" });
     expect(mocks.client).not.toHaveBeenCalled();
-    mocks.auth.mockResolvedValue({ userId: "player", sessionClaims: {} });
+    mocks.auth.mockResolvedValue({ userId: "player", sessionId: "synthetic-session", sessionClaims: {} });
     expect(await getAdminPrivateAssistanceQueue(queue)).toEqual({ ok: false, code: "forbidden" });
     expect(await setPrivateAssistanceStatus({ requestId: ID, tournamentId: T, status: "resolved", expectedVersion: 1 })).toEqual({ ok: false, code: "forbidden" });
   });
@@ -39,10 +41,12 @@ describe("private assistance authenticated action boundary", () => {
     expect(await openPrivateAssistance(input as typeof opening)).toEqual({ ok: false, code: "invalid_request" });
     expect(mocks.client).not.toHaveBeenCalled();
   });
-  it("sends only room, stable client message identity and initial text to the authenticated RPC", async () => {
+  it("dispatches validated creation with the server-derived actor", async () => {
     expect(await openPrivateAssistance(opening)).toEqual({ ok: true, data: mutation });
-    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("open_private_assistance", {
-      p_room_id: ROOM, p_client_message_id: CLIENT, p_body: message.body,
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("call_patch2_private_assistance", {
+      p_operation: "open_private_assistance",
+      p_arguments: { p_room_id: ROOM, p_client_message_id: CLIENT, p_body: message.body },
+      p_actor_clerk_user_id: "trusted-player", p_actor_is_admin: false,
     });
   });
   it("checks legal acceptance for writes but retains read access", async () => {
@@ -59,12 +63,30 @@ describe("private assistance authenticated action boundary", () => {
   });
   it("passes explicit tournament context for history/replies and refuses contextless old clients", async () => {
     await replyPrivateAssistance(reply);
-    expect(mocks.rpc).toHaveBeenCalledWith("reply_private_assistance", {
-      p_request_id: ID, p_tournament_id: T, p_client_message_id: CLIENT, p_body: "Help",
+    expect(mocks.rpc).toHaveBeenCalledWith("call_patch2_private_assistance", {
+      p_operation: "reply_private_assistance",
+      p_arguments: { p_request_id: ID, p_tournament_id: T, p_client_message_id: CLIENT, p_body: "Help" },
+      p_actor_clerk_user_id: "trusted-player", p_actor_is_admin: false,
     });
     mocks.rpc.mockClear();
     expect(await readPrivateAssistance({ ...history, tournamentId: undefined } as unknown as typeof history)).toEqual({ ok: false, code: "invalid_request" });
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("rechecks current admin authority for both shared conversation actions and the admin queue", async () => {
+    const claims = { metadata: { role: "admin" } };
+    mocks.auth.mockResolvedValue({ userId: "trusted-staff", sessionId: "synthetic-staff-session", sessionClaims: claims });
+    await expect(readPrivateAssistance(history)).resolves.toEqual({ ok: false, code: "forbidden" });
+    await expect(replyPrivateAssistance(reply)).resolves.toEqual({ ok: false, code: "forbidden" });
+    await expect(getAdminPrivateAssistanceQueue(queue)).resolves.toEqual({ ok: false, code: "forbidden" });
+    expect(mocks.currentAdmin).toHaveBeenCalledWith("trusted-staff", claims, "synthetic-staff-session", true);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    mocks.currentAdmin.mockResolvedValue(true);
+    await expect(replyPrivateAssistance(reply)).resolves.toEqual({ ok: true, data: mutation });
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("call_patch2_private_assistance", expect.objectContaining({
+      p_operation: "reply_private_assistance",
+      p_actor_clerk_user_id: "trusted-staff",
+      p_actor_is_admin: true,
+    }));
   });
   it.each([["42501", "forbidden"], ["40001", "conflict"], ["23505", "conflict"], ["22023", "invalid_request"]])("maps %s without leaking a database error", async (code, expected) => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "PRIVATE_BODY" } });

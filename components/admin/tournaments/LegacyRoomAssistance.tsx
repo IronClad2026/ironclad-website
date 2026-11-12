@@ -8,10 +8,10 @@ type LegacyRooms = { requests: LegacyRoom[]; totalCount: number; page: number; p
 export default async function LegacyRoomAssistance({ tournamentId, page = "1", includeResolved = false }: {
   tournamentId: string; page?: string; includeResolved?: boolean;
 }) {
-  const denied = await authorizePrivateAssistance(true);
-  if (denied) return null;
+  const actor = await authorizePrivateAssistance(true);
+  if (!actor.ok) return null;
   const requestedPage = /^\d{1,9}$/.test(page) ? Math.max(1, Number(page)) : 1;
-  const result = await callPrivateAssistance<LegacyRooms>("list_legacy_room_assistance", {
+  const result = await callPrivateAssistance<LegacyRooms>(actor.data, "list_legacy_room_assistance", {
     p_tournament_id: tournamentId, p_page: requestedPage, p_include_resolved: includeResolved,
   }, (value) => {
     if (!isAssistanceRecord(value) || value.tournamentId !== tournamentId || value.includeResolved !== includeResolved ||

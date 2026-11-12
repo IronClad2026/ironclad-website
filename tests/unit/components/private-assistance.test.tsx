@@ -38,6 +38,24 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("private assistance player controls", () => {
+  it("shows loading while Clerk starts and keeps private data behind the session gate", async () => {
+    mocks.auth.isLoaded = false;
+    const view = render(<>
+      <PrivateMatchAssistance roomId={ROOM} />
+      <AssistanceConversation requestId={REQUEST} tournamentId={TOUR} />
+      <AdminPrivateAssistance data={queue} tournamentTitle="Tournament A" />
+    </>);
+    expect(screen.getAllByText("Loading assistance…")).toHaveLength(3);
+    expect(screen.queryByText("Private original")).not.toBeInTheDocument();
+    expect(mocks.context).not.toHaveBeenCalled();
+    expect(mocks.read).not.toHaveBeenCalled();
+
+    mocks.auth.isLoaded = true;
+    view.rerender(<AssistanceConversation requestId={REQUEST} tournamentId={TOUR} />);
+    await tick();
+    expect(screen.getByText("Private original")).toBeInTheDocument();
+  });
+
   it("requires a body, preserves adjacent drafts, and keeps Discord unavailable until verified", async () => {
     render(<><textarea aria-label="Unfinished result" defaultValue="result draft" /><input aria-label="Replay draft" type="file" /><PrivateMatchAssistance roomId={ROOM} /></>); await tick();
     fireEvent.click(screen.getByRole("button", { name: "Message IronClad admins" }));

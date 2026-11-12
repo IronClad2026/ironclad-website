@@ -13,6 +13,10 @@ const rpcMock = vi.hoisted(() => vi.fn());
 const createClientMock = vi.hoisted(() => vi.fn());
 const legalMock = vi.hoisted(() => vi.fn());
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(authMock);
+});
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: createClientMock }));
 vi.mock("@/lib/account-legal-mutation-guard", () => ({ requireCurrentAccountLegalAcceptance: legalMock }));
 

@@ -4,6 +4,10 @@ import { setLegacyAssistanceStatus } from "@/app/admin/notifications/legacy-assi
 
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), rpc: vi.fn(), legal: vi.fn(), client: vi.fn() }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(mocks.auth);
+});
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: mocks.client }));
 vi.mock("@/lib/account-legal-mutation-guard", () => ({ requireCurrentAccountLegalAcceptance: mocks.legal }));
 vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error("redirect:" + path); } }));

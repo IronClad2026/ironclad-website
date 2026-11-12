@@ -1,6 +1,7 @@
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
+import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 
 type AdminPageQuery = Record<string, string | string[] | undefined>;
 
@@ -40,10 +41,10 @@ export function buildAdminPageReturnPath(pathname: string, query?: AdminPageQuer
 
 /** This page gate supplements, and does not replace, authorization in privileged loaders and actions. */
 export async function hasAdminPageAccess(pathname: string, query?: AdminPageQuery): Promise<boolean> {
-  const { userId, sessionClaims, redirectToSignIn } = await auth();
+  const { userId, sessionClaims, sessionId, redirectToSignIn } = await auth();
   if (!userId) {
     return redirectToSignIn({ returnBackUrl: buildAdminPageReturnPath(pathname, query) });
   }
 
-  return (sessionClaims as { metadata?: { role?: unknown } } | null)?.metadata?.role === "admin";
+  return hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId);
 }

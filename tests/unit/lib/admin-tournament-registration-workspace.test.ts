@@ -10,6 +10,10 @@ import type { TournamentDivisionStateResolution } from "@/lib/tournament-divisio
 
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), createClient: vi.fn() }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(mocks.auth);
+});
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: mocks.createClient }));
 vi.mock("@/lib/tournaments", () => ({
   getTournamentBracketDisplayName: (name: string) => name,
@@ -54,25 +58,26 @@ type QueryCall = {
   orders: string[];
   range: [number, number] | null;
   single: boolean;
+  head: boolean;
 };
 
 // Execute the recorded predicates and ranges against isolated fixtures. A
 // deliberately tiny provider cap catches pagination that stops on short pages
 // or advances by the requested batch size instead of the returned row count.
-function database(records: Registration[], cap = 7, failAfter?: number, beforeRead?: (call: QueryCall) => void) {
+function database(records: Registration[], cap = 7, failAfter?: number, beforeRead?: (call: QueryCall) => string | void) {
   const calls: QueryCall[] = [];
   const from = vi.fn(() => {
-    const call: QueryCall = { columns: "", equals: [], includes: [], orders: [], range: null, single: false };
+    const call: QueryCall = { columns: "", equals: [], includes: [], orders: [], range: null, single: false, head: false };
     calls.push(call);
     const query = {
-      select(columns: string) { call.columns = columns; return query; },
+      select(columns: string, options?: { head?: boolean }) { call.columns = columns; call.head = options?.head === true; return query; },
       eq(column: string, value: unknown) { call.equals.push([column, value]); return query; },
       in(column: string, values: unknown[]) { call.includes.push([column, values]); return query; },
       order(column: string) { call.orders.push(column); return query; },
       range(start: number, end: number) { call.range = [start, end]; return query; },
       maybeSingle() { call.single = true; return query; },
-      then(resolve: (result: { data: Registration[] | Registration | null; count: number; error: { message: string } | null }) => unknown) {
-        beforeRead?.(call);
+      then(resolve: (result: { data: Registration[] | Registration | null; count: number; error: { message: string; code?: string } | null }) => unknown) {
+        const rangeError = beforeRead?.(call);
         let rows = records.filter((row) => {
           const record = row as Record<string, unknown>;
           return call.equals.every(([key, value]) => record[key] === value)
@@ -87,8 +92,10 @@ function database(records: Registration[], cap = 7, failAfter?: number, beforeRe
         });
         const count = rows.length;
         if (call.range) rows = rows.slice(call.range[0], Math.min(call.range[1] + 1, call.range[0] + cap));
-        const error = failAfter !== undefined && calls.length > failAfter ? { message: "Unavailable" } : null;
-        return Promise.resolve(resolve({ data: call.single ? (rows[0] ? { ...rows[0] } : null) : rows.map((row) => ({ ...row })), count, error }));
+        const error = rangeError ? { message: "Range error", code: rangeError }
+          : failAfter !== undefined && calls.length > failAfter ? { message: "Unavailable" } : null;
+        const data = call.head ? null : call.single ? (rows[0] ? { ...rows[0] } : null) : rows.map((row) => ({ ...row }));
+        return Promise.resolve(resolve({ data, count, error }));
       },
     };
     return query;
@@ -115,19 +122,81 @@ beforeEach(() => {
 });
 
 describe("tournament registration workspace reads", () => {
-  it.each([0, 7])("rejects a count-preserving status swap after %i page rows", async (afterRows) => {
+  it.each([0, 7])("restarts the scoped read after a count-preserving status swap after %i page rows", async (afterRows) => {
     const records = Array.from({ length: 40 }, (_, index) => registration(index + 1, index < 30 ? "pending" : "approved"));
     let swapped = false;
-    database(records, 7, undefined, (call) => {
+    const db = database(records, 7, undefined, (call) => {
       if (!swapped && call.columns.includes("admin_notes") && call.range?.[0] === afterRows) {
         records[afterRows].registration_status = "approved";
         records[30].registration_status = "pending";
         swapped = true;
       }
     });
+    const result = await loadAdminTournamentRegistrationWorkspace(tournament(), divisions, { section: "registrations", filter: "pending" });
+
+    expect(result.counts.pending).toBe(30);
+    expect(result.rows.map((row) => row.registrationId)).toEqual(records.filter((row) => row.registration_status === "pending").slice(0, 25).map((row) => row.id));
+    expect(db.calls.filter((call) => !call.columns.includes("admin_notes") && call.range?.[0] === 0)).toHaveLength(2);
+    expect(db.calls.every((call) => call.equals.some(([key, value]) => key === "tournament_id" && value === TOURNAMENT_A))).toBe(true);
+  });
+
+  it("recomputes counts and clamps a page that disappears during the read", async () => {
+    const records = Array.from({ length: 26 }, (_, index) => registration(index + 1, "pending"));
+    const db = database(records, 500, undefined, (call) => {
+      if (call.columns.includes("admin_notes") && call.range?.[0] === 25) {
+        records[25].registration_status = "approved";
+        return "PGRST103";
+      }
+    });
+    const result = await loadAdminTournamentRegistrationWorkspace(tournament(), divisions, { section: "registrations", filter: "pending", page: "2" });
+
+    expect(result).toMatchObject({ counts: { all: 26, pending: 25, approved: 1 }, page: 1, pageCount: 1, filteredCount: 25 });
+    expect(result.rows.map((row) => row.registrationId)).toEqual(records.slice(0, 25).map((row) => row.id));
+    expect(db.calls.filter((call) => call.columns.includes("admin_notes")).map((call) => call.range)).toEqual([[25, 25], [0, 24]]);
+  });
+
+  it("restarts when a requested detail changes after the page was loaded", async () => {
+    const records = [registration(1, "pending"), registration(2, "approved")];
+    const db = database(records, 7, undefined, (call) => {
+      if (call.single) records[1].registration_status = "rejected";
+    });
+    const result = await loadAdminTournamentRegistrationWorkspace(tournament(), divisions, { section: "registrations", filter: "pending", selectedRegistrationId: records[1].id });
+
+    expect(result).toMatchObject({ counts: { approved: 0, pending: 1, rejected: 1 }, selectedRegistration: { status: "rejected" } });
+    expect(db.calls.filter((call) => call.single)).toHaveLength(2);
+  });
+
+  it("restarts when the count-only check finds a new match for an empty filter", async () => {
+    const records = [registration(1, "approved")];
+    const db = database(records, 7, undefined, (call) => {
+      if (call.head) records[0].registration_status = "pending";
+    });
+    const result = await loadAdminTournamentRegistrationWorkspace(tournament(), divisions, { section: "registrations", filter: "pending" });
+
+    expect(result).toMatchObject({ counts: { approved: 0, pending: 1 }, filteredCount: 1 });
+    expect(result.rows.map((row) => row.registrationId)).toEqual([records[0].id]);
+    expect(db.calls.filter((call) => call.head)).toHaveLength(1);
+  });
+
+  it("fails closed after one retry if scoped data keeps changing", async () => {
+    const records = [registration(1, "pending"), registration(2, "approved")];
+    const db = database(records, 7, undefined, (call) => {
+      if (call.columns.includes("admin_notes")) {
+        [records[0].registration_status, records[1].registration_status] = [records[1].registration_status, records[0].registration_status];
+      }
+    });
     vi.spyOn(console, "error").mockImplementation(() => undefined);
+
     await expect(loadAdminTournamentRegistrationWorkspace(tournament(), divisions, { section: "registrations", filter: "pending" })).rejects.toThrow("could not be loaded");
-    expect(swapped).toBe(true);
+    expect(db.calls).toHaveLength(4);
+  });
+
+  it("does not retry an unrelated provider failure", async () => {
+    const db = database([registration(1, "pending")], 7, 1);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(loadAdminTournamentRegistrationWorkspace(tournament(), divisions, { section: "registrations", filter: "pending" })).rejects.toThrow("could not be loaded");
+    expect(db.calls).toHaveLength(2);
   });
   it.each(STATUSES)("filters %s on the server and keeps complete six-status counts across provider caps", async (status) => {
     const records = Array.from({ length: 72 }, (_, index) => registration(index + 1));
@@ -195,13 +264,29 @@ describe("tournament registration workspace reads", () => {
     const db = database([]);
     const result = await loadAdminTournamentRegistrationWorkspace(tournament(), divisions, { section: "registrations", page: "8" });
     expect(result).toMatchObject({ rows: [], page: 1, pageCount: 1, filteredCount: 0, selectedRegistration: null });
-    expect(db.calls).toHaveLength(1);
+    expect(db.calls).toHaveLength(2);
+    expect(db.calls[1].head).toBe(true);
   });
 
   it("fails closed instead of showing a partial summary when a later capped batch fails", async () => {
-    database(Array.from({ length: 20 }, (_, index) => registration(index + 1)), 7, 1);
+    const db = database(Array.from({ length: 20 }, (_, index) => registration(index + 1)), 7, 1);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     await expect(loadAdminTournamentRegistrationSummary(TOURNAMENT_A)).rejects.toThrow("could not be loaded");
+    expect(db.calls).toHaveLength(2);
+  });
+
+  it("restarts the standalone summary after a count drift between capped batches", async () => {
+    const records = Array.from({ length: 8 }, (_, index) => registration(index + 1));
+    let added = false;
+    const db = database(records, 7, undefined, (call) => {
+      if (!added && call.range?.[0] === 7) {
+        records.push(registration(9));
+        added = true;
+      }
+    });
+    const result = await loadAdminTournamentRegistrationSummary(TOURNAMENT_A);
+    expect(result.map((row) => row.id)).toEqual(records.map((row) => row.id));
+    expect(db.calls.map((call) => call.range?.[0])).toEqual([0, 7, 0, 7]);
   });
 
   it("normalizes UUID casing before checking returned tournament associations", async () => {

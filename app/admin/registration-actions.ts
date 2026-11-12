@@ -1,6 +1,5 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireCurrentAccountLegalAcceptance } from "@/lib/account-legal-mutation-guard";
@@ -9,13 +8,8 @@ import {
   type NotificationCreateInput,
 } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireCurrentPatch2Admin } from "@/lib/patch2-admin-access";
 import type { AdminRegistrationStatus } from "@/lib/admin-registration-review";
-
-type CustomClaims = {
-  metadata?: {
-    role?: string;
-  };
-};
 
 type RegistrationStatus = AdminRegistrationStatus;
 type FilterStatus = "all" | RegistrationStatus;
@@ -271,12 +265,7 @@ function buildRegistrationStatusNotification({
 export async function updateRegistrationStatus(formData: FormData) {
   "use server";
 
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") {
-    throw new Error("Unauthorized");
-  }
+  const userId = await requireCurrentPatch2Admin();
 
   await requireCurrentAccountLegalAcceptance();
 
@@ -477,10 +466,7 @@ export async function updateRegistrationStatus(formData: FormData) {
 // preserved; this workspace has no destructive registration-cleanup operation.
 export async function deleteSelectedRegistrations(formData: FormData) {
   "use server";
-  const { userId, sessionClaims } = await auth();
-  if (!userId || (sessionClaims as CustomClaims | null)?.metadata?.role !== "admin") {
-    throw new Error("Unauthorized");
-  }
+  await requireCurrentPatch2Admin();
   await requireCurrentAccountLegalAcceptance();
   const workspaceContext = getWorkspaceRedirectContext(formData);
   redirect(buildHref({
@@ -492,10 +478,7 @@ export async function deleteSelectedRegistrations(formData: FormData) {
 
 export async function approveSelectedRegistrations(formData: FormData) {
   "use server";
-  const { userId, sessionClaims } = await auth();
-  if (!userId || (sessionClaims as CustomClaims | null)?.metadata?.role !== "admin") {
-    throw new Error("Unauthorized");
-  }
+  await requireCurrentPatch2Admin();
   await requireCurrentAccountLegalAcceptance();
   const workspaceContext = getWorkspaceRedirectContext(formData);
   const activeFilter = getSafeFilter(String(formData.get("activeFilter") || "all"));

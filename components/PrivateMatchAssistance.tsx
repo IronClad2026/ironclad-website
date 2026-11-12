@@ -18,7 +18,8 @@ import {
 export default function PrivateMatchAssistance({ roomId }: { roomId: string }) {
   const { isLoaded, userId, sessionId } = useAuth();
   const copy = getPrivateAssistanceCopy(useOptionalLocale());
-  if (!isLoaded || !userId) return <p role="status" className="text-sm text-zinc-400">{copy.unavailable}</p>;
+  if (!isLoaded) return <p role="status" className="text-sm text-zinc-400">{copy.loading}</p>;
+  if (!userId) return <p role="status" className="text-sm text-zinc-400">{copy.unavailable}</p>;
   return <PrivateAssistanceSession key={`${userId}:${sessionId}:${roomId}`} roomId={roomId} />;
 }
 

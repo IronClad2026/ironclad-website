@@ -1,6 +1,6 @@
 import "server-only";
 
-import { auth } from "@clerk/nextjs/server";
+import { requireCurrentPatch2Admin } from "@/lib/patch2-admin-access";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type LegacyAssistanceRequest = {
@@ -19,11 +19,7 @@ export type LegacyAssistanceRequest = {
 };
 
 export async function requireLegacyAssistanceAdmin() {
-  const { userId, sessionClaims } = await auth();
-  if (!userId || (sessionClaims as { metadata?: { role?: string } } | null)?.metadata?.role !== "admin") {
-    throw new Error("Unauthorized");
-  }
-  return userId;
+  return requireCurrentPatch2Admin();
 }
 
 export function parseLegacyAssistanceScope(kind: unknown, tournament: unknown): string | null {

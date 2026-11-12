@@ -30,7 +30,9 @@ describe("tournament registration route boundaries", () => {
     const lookupIndex = legacyPage.indexOf('.from("registrations")');
     expect(authIndex).toBeGreaterThanOrEqual(0);
     expect(lookupIndex).toBeGreaterThan(authIndex);
-    expect(legacyPage).toContain('role !== "admin"');
+    const guardIndex = legacyPage.indexOf("await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)");
+    expect(guardIndex).toBeGreaterThan(authIndex);
+    expect(lookupIndex).toBeGreaterThan(guardIndex);
     expect(legacyPage).toContain('.select("id, tournament_id")');
     expect(legacyPage).toContain('.eq("id", selected)');
     expect(legacyPage).not.toContain("player_name");

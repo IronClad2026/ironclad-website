@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 
 type LegacyRegistrationQuery = {
   filter?: string | string[];
@@ -84,9 +85,8 @@ export default async function AdminRegistrationsPage({
 }: {
   searchParams?: Promise<LegacyRegistrationQuery>;
 }) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as { metadata?: { role?: string } } | null)?.metadata?.role;
-  if (!userId || role !== "admin") redirect("/");
+  const { userId, sessionClaims, sessionId } = await auth();
+  if (!await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)) redirect("/");
 
   const query = await searchParams;
   const selected = typeof query?.selected === "string" ? query.selected.toLowerCase() : undefined;

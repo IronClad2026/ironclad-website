@@ -31,6 +31,8 @@ function migrationTreeSha256(names: string[]) {
 const source = {
   actions: read("app/admin/tournaments/actions.ts"),
   admin: read("app/admin/page.tsx"),
+  adminPageAccess: read("lib/admin-page-access.ts"),
+  patch2AdminAccess: read("lib/patch2-admin-access.ts"),
   announcements: read("app/announcements/page.tsx"),
   announcementsAdmin: read("app/admin/announcements/page.tsx"),
   banner: read("components/TournamentBannerPicker.tsx"),
@@ -855,6 +857,10 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       expect(page, key).toContain("await hasAdminPageAccess(");
       expect(page, key).toContain("return <AdminAccessRequired />");
     }
+    expect(source.adminPageAccess).toContain("await auth()");
+    expect(source.adminPageAccess).toContain("hasCurrentPatch2AdminAccess(");
+    expect(source.patch2AdminAccess).toContain("import \"server-only\"");
+    expect(source.patch2AdminAccess).toContain("export async function requireCurrentPatch2Admin(");
     // The separate creation page keeps its existing independent authorization.
     expect(compact(source.newRoute)).toContain("const { userId, sessionClaims } = await auth()");
     expect(compact(source.newRoute)).toContain('role !== "admin"');
@@ -866,7 +872,9 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "matchWorkspace",
     ] as const) {
       expect(compact(source[key]), key).toContain('import "server-only"');
-      expect(compact(source[key]), key).toContain("await auth()");
+      expect(compact(source[key]), key).toContain(
+        key === "registrationWorkspace" ? "await requireCurrentPatch2Admin()" : "await auth()"
+      );
     }
 
     expect(source.workspace).toContain("if (!isUuid(tournamentId))");
@@ -1018,7 +1026,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.experience).toContain('activeTab === "announcements"');
   });
 
-  it("preserves the Production migration boundary and dependency versions with additive release tooling", () => {
+  it("preserves the Production migration boundary and pins reviewed dependency versions", () => {
     const migrationNames = readdirSync(
       resolve(process.cwd(), "supabase/migrations")
     )
@@ -1043,6 +1051,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261101230355_patch2_admin_inbox_legacy_assistance.sql",
         "20261102192200_patch2_private_assistance_conversations.sql",
         "20261102195256_patch2_private_assistance_active_actor.sql",
+        "20261113000000_patch2_private_assistance_server_boundary.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([
@@ -1138,7 +1147,8 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     );
     const lock = JSON.parse(read("package-lock.json"));
     for (const [name, version] of Object.entries({
-      next: "16.3.3", react: "19.2.4", "react-dom": "19.2.4",
+      next: "16.4.5", "eslint-config-next": "16.4.5", sharp: "0.35.5",
+      react: "19.2.4", "react-dom": "19.2.4",
       "@clerk/nextjs": "7.3.7", "@supabase/supabase-js": "2.106.1",
     })) {
       expect(lock.packages[`node_modules/${name}`].version).toBe(version);

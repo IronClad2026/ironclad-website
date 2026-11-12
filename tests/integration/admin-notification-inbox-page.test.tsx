@@ -5,6 +5,10 @@ import type { AdminInboxScope } from "@/lib/admin-notification-inbox";
 
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), createClient: vi.fn(), load: vi.fn(), enabled: vi.fn() }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(mocks.auth);
+});
 vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(`REDIRECT:${href}`); } }));
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: mocks.createClient }));
 vi.mock("@/lib/admin-notification-inbox", () => ({ loadAdminNotificationInbox: mocks.load, isAdminNotificationInboxEnabled: mocks.enabled }));

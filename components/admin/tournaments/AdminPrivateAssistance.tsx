@@ -18,7 +18,8 @@ export default function AdminPrivateAssistance(props: Props) {
   const role = (sessionClaims as { metadata?: { role?: unknown } } | undefined | null)?.metadata?.role;
   // This clears private client state promptly when identity changes. Every
   // underlying read and action independently authorizes the actual caller.
-  if (!isLoaded || !userId || role !== "admin") return <p role="status" className="text-sm text-zinc-400">{copy.unavailable}</p>;
+  if (!isLoaded) return <p role="status" className="text-sm text-zinc-400">{copy.loading}</p>;
+  if (!userId || role !== "admin") return <p role="status" className="text-sm text-zinc-400">{copy.unavailable}</p>;
   return <AdminAssistanceSession key={`${userId}:${sessionId}:${props.data.tournamentId}`} {...props} />;
 }
 
