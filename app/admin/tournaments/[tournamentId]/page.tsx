@@ -29,7 +29,10 @@ import TournamentOverview from "@/components/admin/tournaments/TournamentOvervie
 import TournamentWorkspaceHeader from "@/components/admin/tournaments/TournamentWorkspaceHeader";
 import { loadAdminTournamentMatchWorkspace } from "@/lib/admin-tournament-match-workspace";
 import { loadAdminTournamentReplayArchive } from "@/lib/admin-replay-archive";
-import { loadAdminTournamentRegistrationWorkspace } from "@/lib/admin-tournament-registration-workspace";
+import {
+  loadAdminTournamentRegistrationWorkspace,
+  type AdminTournamentRegistrationWorkspaceData,
+} from "@/lib/admin-tournament-registration-workspace";
 import {
   isAdminTournamentWorkspaceTerminal,
   loadAdminTournamentBracketWorkspaceData,
@@ -96,8 +99,17 @@ export default async function TournamentWorkspacePage({
   }
 
   const section = getSection(query?.section);
+  const registrationData = section === "registrations" || section === "players-waitlist"
+    ? await loadAdminTournamentRegistrationWorkspace(workspace.tournament, workspace.summary.divisionStates, {
+        filter: query?.filter,
+        section,
+        selectedRegistrationId: query?.selected,
+        page: query?.page,
+      })
+    : null;
   const content = await renderWorkspaceSection({
     query,
+    registrationData,
     section,
     summary: workspace.summary,
     tournament: workspace.tournament,
@@ -108,7 +120,9 @@ export default async function TournamentWorkspacePage({
       <section className="mx-auto max-w-7xl">
         <TournamentWorkspaceHeader
           activeSection={section}
-          summary={workspace.summary}
+          summary={registrationData
+            ? { ...workspace.summary, approvedPlayers: registrationData.counts.approved }
+            : workspace.summary}
           tournament={workspace.tournament}
         />
         {section === "overview" && query?.notice === "saved" && (
@@ -168,6 +182,7 @@ function WorkspaceNotice({
 
 async function renderWorkspaceSection({
   query,
+  registrationData,
   section,
   summary,
   tournament,
@@ -188,6 +203,7 @@ async function renderWorkspaceSection({
       legacyResolved?: string;
       }
     | undefined;
+  registrationData: AdminTournamentRegistrationWorkspaceData | null;
   section: TournamentManagementSection;
   summary: AdminTournamentWorkspaceSummary;
   tournament: AdminTournamentWorkspaceRow;
@@ -272,21 +288,11 @@ async function renderWorkspaceSection({
     );
   }
 
-  if (section === "registrations" || section === "players-waitlist") {
-    const data = await loadAdminTournamentRegistrationWorkspace(
-      tournament,
-      summary.divisionStates,
-      {
-        filter: query?.filter,
-        section,
-        selectedRegistrationId: query?.selected,
-        page: query?.page,
-      }
-    );
+  if (registrationData && (section === "registrations" || section === "players-waitlist")) {
     return (
       <AdminTournamentRegistrations
-        key={`${tournament.id}:${section}:${data.activeFilter}:${data.page}`}
-        data={data}
+        key={`${tournament.id}:${section}:${registrationData.activeFilter}:${registrationData.page}`}
+        data={registrationData}
         detail={query?.detail}
         focus={getRegistrationFocus(query?.focus)}
         notice={query?.notice}

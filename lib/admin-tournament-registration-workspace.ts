@@ -1,7 +1,6 @@
 import { requireDivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
-import { auth } from "@clerk/nextjs/server";
 import { cache } from "react";
 import {
   buildAdminRegistrationEvidence,
@@ -13,16 +12,11 @@ import {
   type AdminWaitlistOfferStatus,
 } from "@/lib/admin-registration-review";
 import type { AdminTournamentWorkspaceRow } from "@/lib/admin-tournament-workspace";
+import { requireCurrentPatch2Admin } from "@/lib/patch2-admin-access";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import type { TournamentDivisionStateResolution } from "@/lib/tournament-division-state";
 import { isActiveReviewCohortStatus } from "@/lib/tournament-registration-cohort";
 import { getTournamentBracketDisplayName } from "@/lib/tournaments";
-
-type CustomClaims = {
-  metadata?: {
-    role?: string;
-  };
-};
 
 export type AdminTournamentRegistrationFilter =
   | "all"
@@ -104,6 +98,8 @@ const REGISTRATION_SUMMARY_SELECT =
 const PAGE_SIZE = 25;
 const SUMMARY_BATCH_SIZE = 500;
 
+class RegistrationSnapshotChanged extends Error {}
+
 // Request-local reuse keeps the header and registration workspace on the same
 // complete, narrow projection. Advance by the returned length, since the API's
 // configured row cap can be smaller than the requested batch.
@@ -114,59 +110,57 @@ export const loadAdminTournamentRegistrationSummary = cache(
     if (!isUuid(tournamentId)) throw new Error("Invalid Tournament.");
 
     const supabase = createSupabaseAdminClient();
-    const rows: RegistrationSummaryRow[] = [];
-    const ids = new Set<string>();
-    let total: number | null = null;
-
-    do {
-      const result = await supabase
-        .from("registrations")
-        .select(REGISTRATION_SUMMARY_SELECT, { count: "exact" })
-        .eq("tournament_id", tournamentId)
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true })
-        .range(rows.length, rows.length + SUMMARY_BATCH_SIZE - 1);
-
-      if (
-        result.error ||
-        !Array.isArray(result.data) ||
-        !Number.isSafeInteger(result.count) ||
-        result.count! < 0 ||
-        (total !== null && result.count !== total)
-      ) {
-        throwRegistrationLoadError();
-      }
-      total = result.count!;
-      const batch = result.data as RegistrationSummaryRow[];
-      if (
-        (batch.length === 0 && rows.length < total) ||
-        rows.length + batch.length > total
-      ) {
-        throwRegistrationLoadError();
-      }
-      for (const row of batch) {
-        if (
-          row.tournament_id !== tournamentId ||
-          ids.has(row.id) ||
-          !ALL_FILTERS.slice(1).includes(row.registration_status)
-        ) {
-          throwRegistrationLoadError();
-        }
-        ids.add(row.id);
-        rows.push(row);
-      }
-    } while (rows.length < total);
-
-    return rows;
+    return retryRegistrationSnapshot(() => readRegistrationSummary(supabase, tournamentId));
   }
 );
+
+async function readRegistrationSummary(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  tournamentId: string
+): Promise<RegistrationSummaryRow[]> {
+  const rows: RegistrationSummaryRow[] = [];
+  const ids = new Set<string>();
+  let total: number | null = null;
+
+  do {
+    const { data, count, error } = await supabase
+      .from("registrations")
+      .select(REGISTRATION_SUMMARY_SELECT, { count: "exact" })
+      .eq("tournament_id", tournamentId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(rows.length, rows.length + SUMMARY_BATCH_SIZE - 1);
+
+    // A previously valid nonzero offset can outlive its rows after a concurrent write.
+    if (rows.length > 0 && error?.code === "PGRST103") {
+      throw new RegistrationSnapshotChanged();
+    }
+    const batch = data as RegistrationSummaryRow[];
+    if (error || !Array.isArray(batch) || !isRegistrationCount(count) ||
+      !isScopedRegistrationBatch(batch, tournamentId)) {
+      throwRegistrationLoadError();
+    }
+    if ((total !== null && count !== total) || batch.some((row) => ids.has(row.id))) {
+      throw new RegistrationSnapshotChanged();
+    }
+    total = count;
+    if ((batch.length === 0 && rows.length < total) || rows.length + batch.length > total) {
+      throwRegistrationLoadError();
+    }
+    for (const row of batch) {
+      ids.add(row.id);
+      rows.push(row);
+    }
+  } while (rows.length < total);
+
+  return rows;
+}
 
 export type AdminTournamentRegistrationStatusKey =
   | "all"
   | AdminRegistrationStatus;
 
-const ALL_FILTERS: readonly AdminTournamentRegistrationFilter[] = [
-  "all",
+const REGISTRATION_STATUSES: readonly AdminRegistrationStatus[] = [
   "pending",
   "manual_review",
   "approved",
@@ -174,6 +168,7 @@ const ALL_FILTERS: readonly AdminTournamentRegistrationFilter[] = [
   "waitlisted",
   "withdrawn",
 ];
+const ALL_FILTERS: readonly AdminTournamentRegistrationFilter[] = ["all", ...REGISTRATION_STATUSES];
 
 export function getSafeAdminTournamentRegistrationFilter(
   filter: string | undefined,
@@ -218,71 +213,20 @@ export async function loadAdminTournamentRegistrationWorkspace(
     section
   );
   const supabase = createSupabaseAdminClient();
-  const registrations = await loadAdminTournamentRegistrationSummary(
-    tournament.id
-  );
-  const counts = createCounts(registrations, section);
-  const filteredCount = counts[activeFilter];
-  const pageCount = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
-  const page = Math.min(getSafePage(requestedPage), pageCount);
-  const offset = (page - 1) * PAGE_SIZE;
-  const expectedPageLength = Math.min(PAGE_SIZE, filteredCount - offset);
-  const expectedPage = registrations.filter((row) =>
-    activeFilter !== "all"
-      ? row.registration_status === activeFilter
-      : section !== "players-waitlist" ||
-        row.registration_status === "approved" ||
-        row.registration_status === "waitlisted"
-  ).slice(offset, offset + expectedPageLength);
-  const pageRegistrations: SupabaseRegistration[] = [];
-  while (pageRegistrations.length < expectedPageLength) {
-    let query = supabase
-      .from("registrations")
-      .select(REGISTRATION_SELECT, { count: "exact" })
-      .eq("tournament_id", tournament.id);
-    if (activeFilter !== "all") {
-      query = query.eq("registration_status", activeFilter);
-    } else if (section === "players-waitlist") {
-      query = query.in("registration_status", ["approved", "waitlisted"]);
-    }
-    const result = await query
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(offset + pageRegistrations.length, offset + expectedPageLength - 1);
-    if (
-      result.error ||
-      !Array.isArray(result.data) ||
-      result.count !== filteredCount ||
-      result.data.length === 0 ||
-      result.data.length > expectedPageLength - pageRegistrations.length ||
-      result.data.some((row, index) => {
-        const expected = expectedPage[pageRegistrations.length + index];
-        return row.tournament_id !== tournament.id ||
-          row.id !== expected?.id ||
-          row.registration_status !== expected.registration_status ||
-          row.tournament_bracket_id !== expected.tournament_bracket_id ||
-          row.created_at !== expected.created_at ||
-          row.waitlist_offer_status !== expected.waitlist_offer_status;
-      })
-    ) {
-      throwRegistrationLoadError();
-    }
-    pageRegistrations.push(...(result.data as SupabaseRegistration[]));
-  }
-  const selectedResult =
-    selectedRegistrationId && isUuid(selectedRegistrationId)
-      ? await supabase
-          .from("registrations")
-          .select(REGISTRATION_SELECT)
-          .eq("tournament_id", tournament.id)
-          .eq("id", selectedRegistrationId)
-          .maybeSingle()
-      : null;
-  if (selectedResult?.error) throwRegistrationLoadError();
-  const selectedRecord = (selectedResult?.data ?? null) as SupabaseRegistration | null;
-  if (selectedRecord && selectedRecord.tournament_id !== tournament.id) {
-    throwRegistrationLoadError();
-  }
+  const snapshot = await retryRegistrationSnapshot(async (retry) => {
+    const registrations = retry
+      ? await readRegistrationSummary(supabase, tournament.id)
+      : await loadAdminTournamentRegistrationSummary(tournament.id);
+    return readRegistrationWorkspaceSnapshot(supabase, tournament, registrations, {
+      activeFilter,
+      section,
+      selectedRegistrationId,
+      requestedPage,
+    });
+  });
+  const {
+    registrations, counts, filteredCount, pageCount, page, pageRegistrations, selectedRecord,
+  } = snapshot;
   const brackets = tournament.tournament_brackets ?? [];
   const divisionStateByBracket = new Map(
     divisionStates.flatMap((division) =>
@@ -451,6 +395,135 @@ export async function loadAdminTournamentRegistrationWorkspace(
   };
 }
 
+async function readRegistrationWorkspaceSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  tournament: AdminTournamentWorkspaceRow,
+  registrations: RegistrationSummaryRow[],
+  { activeFilter, section, selectedRegistrationId, requestedPage }: {
+    activeFilter: AdminTournamentRegistrationFilter;
+    section: AdminTournamentRegistrationSection;
+    selectedRegistrationId?: string;
+    requestedPage?: string;
+  }
+) {
+  const counts = createCounts(registrations, section);
+  const filteredCount = counts[activeFilter];
+  const pageCount = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+  const page = Math.min(getSafePage(requestedPage), pageCount);
+  const offset = (page - 1) * PAGE_SIZE;
+  const expectedPage = registrations.filter((row) =>
+    matchesRegistrationFilter(row.registration_status, section, activeFilter)
+  ).slice(offset, offset + PAGE_SIZE);
+  const pageRegistrations: SupabaseRegistration[] = [];
+  const isEmpty = expectedPage.length === 0;
+
+  // Even an empty summary page gets one count check so a newly matching row
+  // cannot silently turn an old zero into the current page's result.
+  do {
+    const table = supabase.from("registrations");
+    let query = (isEmpty
+      ? table.select("id", { count: "exact", head: true })
+      : table.select(REGISTRATION_SELECT, { count: "exact" }))
+      .eq("tournament_id", tournament.id);
+    if (activeFilter !== "all") {
+      query = query.eq("registration_status", activeFilter);
+    } else if (section === "players-waitlist") {
+      query = query.in("registration_status", ["approved", "waitlisted"]);
+    }
+    const start = offset + pageRegistrations.length;
+    const { data, count, error } = await query
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(start, Math.max(start, offset + expectedPage.length - 1));
+
+    if (start > 0 && error?.code === "PGRST103") {
+      throw new RegistrationSnapshotChanged();
+    }
+    if (error || !isRegistrationCount(count)) throwRegistrationLoadError();
+    if (isEmpty) {
+      if (count !== filteredCount) throw new RegistrationSnapshotChanged();
+      break;
+    }
+
+    const batch = data as SupabaseRegistration[];
+    if (!Array.isArray(batch) || batch.length > expectedPage.length - pageRegistrations.length ||
+      !isScopedRegistrationBatch(batch, tournament.id) ||
+      !batch.every((row) => matchesRegistrationFilter(row.registration_status, section, activeFilter))) {
+      throwRegistrationLoadError();
+    }
+    if (count !== filteredCount || batch.some((row, index) =>
+      !matchesRegistrationSummary(row, expectedPage[pageRegistrations.length + index])
+    )) {
+      throw new RegistrationSnapshotChanged();
+    }
+    if (batch.length === 0) throwRegistrationLoadError();
+    pageRegistrations.push(...batch);
+  } while (pageRegistrations.length < expectedPage.length);
+
+  let selectedRecord: SupabaseRegistration | null = null;
+  if (selectedRegistrationId && isUuid(selectedRegistrationId)) {
+    const id = selectedRegistrationId.toLowerCase();
+    const selectedResult = await supabase
+      .from("registrations")
+      .select(REGISTRATION_SELECT)
+      .eq("tournament_id", tournament.id)
+      .eq("id", id)
+      .maybeSingle();
+    selectedRecord = selectedResult.data as SupabaseRegistration | null;
+    if (selectedResult.error || (selectedRecord &&
+      (selectedRecord.id !== id || !isScopedRegistrationBatch([selectedRecord], tournament.id)))) {
+      throwRegistrationLoadError();
+    }
+    const expected = registrations.find((row) => row.id === id);
+    if (selectedRecord ? !matchesRegistrationSummary(selectedRecord, expected) : expected) {
+      throw new RegistrationSnapshotChanged();
+    }
+  }
+
+  return { registrations, counts, filteredCount, pageCount, page, pageRegistrations, selectedRecord };
+}
+
+function matchesRegistrationFilter(
+  status: AdminRegistrationStatus,
+  section: AdminTournamentRegistrationSection,
+  filter: AdminTournamentRegistrationFilter
+) {
+  if (filter !== "all") return status === filter;
+  return section !== "players-waitlist" || status === "approved" || status === "waitlisted";
+}
+
+function isRegistrationCount(count: number | null): count is number {
+  return count !== null && Number.isSafeInteger(count) && count >= 0;
+}
+
+function isScopedRegistrationBatch(batch: RegistrationSummaryRow[], tournamentId: string) {
+  return batch.every((row) =>
+    row?.tournament_id === tournamentId && isUuid(row.id) && REGISTRATION_STATUSES.includes(row.registration_status)
+  ) && new Set(batch.map((row) => row.id)).size === batch.length;
+}
+
+function matchesRegistrationSummary(row: RegistrationSummaryRow, expected?: RegistrationSummaryRow) {
+  return expected !== undefined && row.id === expected.id &&
+    row.registration_status === expected.registration_status &&
+    row.tournament_bracket_id === expected.tournament_bracket_id &&
+    row.created_at === expected.created_at &&
+    row.waitlist_offer_status === expected.waitlist_offer_status;
+}
+
+async function retryRegistrationSnapshot<T>(read: (retry: boolean) => Promise<T>): Promise<T> {
+  try {
+    return await read(false);
+  } catch (error) {
+    if (!(error instanceof RegistrationSnapshotChanged)) throw error;
+  }
+  try {
+    return await read(true);
+  } catch (error) {
+    if (error instanceof RegistrationSnapshotChanged) throwRegistrationLoadError();
+    throw error;
+  }
+}
+
 function createCounts(
   rows: RegistrationSummaryRow[],
   section: AdminTournamentRegistrationSection
@@ -479,8 +552,9 @@ function getSafePage(value?: string) {
   return Number.isSafeInteger(page) ? page : 1;
 }
 
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function throwRegistrationLoadError(): never {
@@ -491,9 +565,5 @@ function throwRegistrationLoadError(): never {
 }
 
 async function requireAdmin() {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-  if (!userId || role !== "admin") {
-    throw new Error("Unauthorized");
-  }
+  await requireCurrentPatch2Admin();
 }

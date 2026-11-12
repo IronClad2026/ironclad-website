@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const loadUnreadNotificationCountMock = vi.hoisted(() => vi.fn());
+const hasCurrentPatch2AdminAccessMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/lib/patch2-admin-access", () => ({ hasCurrentPatch2AdminAccess: hasCurrentPatch2AdminAccessMock }));
 vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
 }));
@@ -250,11 +252,13 @@ describe("Web Push notification Server Actions", () => {
     });
   });
 
-  it("infers the global Admin unread scope only from current Clerk claims", async () => {
+  it("loads the shared unread count only after checking current admin authority", async () => {
     authMock.mockResolvedValue({
       userId: ADMIN_ID,
+      sessionId: "synthetic-admin-session",
       sessionClaims: { metadata: { role: "admin" } },
     });
+    hasCurrentPatch2AdminAccessMock.mockResolvedValue(true);
     loadUnreadNotificationCountMock.mockResolvedValue(9);
 
     await expect(loadAuthoritativeNotificationUnreadCount()).resolves.toEqual({
@@ -265,6 +269,18 @@ describe("Web Push notification Server Actions", () => {
       scope: "admin",
       clerkUserId: null,
     });
+    expect(hasCurrentPatch2AdminAccessMock).toHaveBeenCalledWith(ADMIN_ID, { metadata: { role: "admin" } }, "synthetic-admin-session");
+  });
+
+  it("withholds the shared unread count when Clerk no longer authorizes the admin", async () => {
+    authMock.mockResolvedValue({
+      userId: ADMIN_ID,
+      sessionId: "synthetic-admin-session",
+      sessionClaims: { metadata: { role: "admin" } },
+    });
+    hasCurrentPatch2AdminAccessMock.mockResolvedValue(false);
+    await expect(loadAuthoritativeNotificationUnreadCount()).resolves.toEqual({ ok: false, code: "authentication_required" });
+    expect(loadUnreadNotificationCountMock).not.toHaveBeenCalled();
   });
 
   it("does not invent a badge count after a trusted count failure", async () => {

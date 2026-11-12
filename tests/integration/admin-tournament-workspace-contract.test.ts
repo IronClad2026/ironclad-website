@@ -31,6 +31,8 @@ function migrationTreeSha256(names: string[]) {
 const source = {
   actions: read("app/admin/tournaments/actions.ts"),
   admin: read("app/admin/page.tsx"),
+  adminPageAccess: read("lib/admin-page-access.ts"),
+  patch2AdminAccess: read("lib/patch2-admin-access.ts"),
   announcements: read("app/announcements/page.tsx"),
   announcementsAdmin: read("app/admin/announcements/page.tsx"),
   banner: read("components/TournamentBannerPicker.tsx"),
@@ -855,6 +857,10 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       expect(page, key).toContain("await hasAdminPageAccess(");
       expect(page, key).toContain("return <AdminAccessRequired />");
     }
+    expect(source.adminPageAccess).toContain("await auth()");
+    expect(source.adminPageAccess).toContain("hasCurrentPatch2AdminAccess(");
+    expect(source.patch2AdminAccess).toContain("import \"server-only\"");
+    expect(source.patch2AdminAccess).toContain("export async function requireCurrentPatch2Admin(");
     // The separate creation page keeps its existing independent authorization.
     expect(compact(source.newRoute)).toContain("const { userId, sessionClaims } = await auth()");
     expect(compact(source.newRoute)).toContain('role !== "admin"');
@@ -866,7 +872,9 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "matchWorkspace",
     ] as const) {
       expect(compact(source[key]), key).toContain('import "server-only"');
-      expect(compact(source[key]), key).toContain("await auth()");
+      expect(compact(source[key]), key).toContain(
+        key === "registrationWorkspace" ? "await requireCurrentPatch2Admin()" : "await auth()"
+      );
     }
 
     expect(source.workspace).toContain("if (!isUuid(tournamentId))");
@@ -1018,7 +1026,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.experience).toContain('activeTab === "announcements"');
   });
 
-  it("preserves the PR 5 migration boundary, dependencies, and environment contract", () => {
+  it("preserves the Staging migration boundary, reviewed dependencies, and environment contract", () => {
     const migrationNames = readdirSync(
       resolve(process.cwd(), "supabase/migrations")
     )
@@ -1037,6 +1045,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         // Already applied only to Staging. Phase 4 is cancelled; retain its
         // additive, disabled schema history rather than rewriting migrations.
         "20261103024129_patch2_match_chat_translation.sql",
+        "20261113000000_patch2_private_assistance_server_boundary.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([
@@ -1146,13 +1155,12 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     ).toBe(
       "8e97337efc36276797b3e98ff45bbdbd893533b0ffa13486e0f4bac83e911fd6"
     );
-    // P04 News authorizes the parsers; the announcement editor adds only the
-    // three approved, exact-pinned Tiptap packages and their resolved graph.
+    // Pin the manifest and resolved graph after the reviewed security upgrades.
     expect(normalizedSha256(read("package.json"))).toBe(
-      "c4746ee51402c2bb8195b873c4c331761e257f0be4e76daea7a615bc6d6826f5"
+      "80f24788e48ef25cc3483dbd44b27c0ef453e3ddc2337c085037077a5d1860b2"
     );
     expect(normalizedSha256(read("package-lock.json"))).toBe(
-      "cc5cd5b040b6a63b59e0cc03f7f7e454c4f1f57f11d7e005af99405e97c06ffb"
+      "65c7c419f874ea259e81ef50593f415b5202e0f16a1f5be52f0fc89cec2dd912"
     );
     expect(normalizedSha256(read(".env.example"))).toBe(
       "df333b2554f79526a26de3f1dd65afb112c21d2c73e4cbb5d45a8da164dd56fe"

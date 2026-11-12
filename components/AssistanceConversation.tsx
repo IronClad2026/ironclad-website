@@ -38,7 +38,8 @@ function visible() {
 export default function AssistanceConversation(props: Props) {
   const { isLoaded, userId, sessionId } = useAuth();
   const copy = getPrivateAssistanceCopy(useOptionalLocale());
-  if (!isLoaded || !userId) return <p role="status" className="text-sm text-zinc-400">{copy.unavailable}</p>;
+  if (!isLoaded) return <p role="status" className="text-sm text-zinc-400">{copy.loading}</p>;
+  if (!userId) return <p role="status" className="text-sm text-zinc-400">{copy.unavailable}</p>;
   return <ConversationSession key={`${userId}:${sessionId}:${props.tournamentId}:${props.requestId}`} {...props} />;
 }
 

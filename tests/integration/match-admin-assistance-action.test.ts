@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), admin: vi.fn(), rpc: vi.fn(), authenticated: vi.fn(), history: vi.fn(), legal: vi.fn(), profile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), admin: vi.fn(), rpc: vi.fn(), history: vi.fn(), legal: vi.fn(), profile: vi.fn() }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(mocks.auth);
+});
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: mocks.admin }));
-vi.mock("@/lib/supabase-server", () => ({ createAuthenticatedSupabaseClient: mocks.authenticated }));
 vi.mock("@/app/tournaments/room-actions", () => ({ getMatchRoomHistory: mocks.history }));
 vi.mock("@/lib/account-legal-mutation-guard", () => ({ requireCurrentAccountLegalAcceptance: mocks.legal }));
 vi.mock("@/lib/public-players", () => ({ getPublicPlayerById: mocks.profile }));
@@ -24,12 +27,11 @@ function client() {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.auth.mockResolvedValue({ userId: "user_original", sessionClaims: {} });
+  mocks.auth.mockResolvedValue({ userId: "user_original", sessionId: "synthetic-session", sessionClaims: {} });
   mocks.legal.mockResolvedValue(undefined);
   mocks.history.mockResolvedValue({ ok: true, data: { room } });
-  mocks.authenticated.mockResolvedValue({ rpc: mocks.rpc });
   mocks.rpc.mockResolvedValue({ data: requested, error: null });
-  mocks.admin.mockReturnValue(client());
+  mocks.admin.mockReturnValue({ ...client(), rpc: mocks.rpc });
 });
 
 describe("retained shared room assistance compatibility", () => {
@@ -41,19 +43,26 @@ describe("retained shared room assistance compatibility", () => {
   it("still authenticates old requests before returning guidance", async () => {
     mocks.auth.mockResolvedValue({ userId: null });
     expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: "auth_required" });
-    expect(mocks.authenticated).not.toHaveBeenCalled();
+    expect(mocks.admin).not.toHaveBeenCalled();
   });
   it("reads original shared history without a mutation legal guard", async () => {
     expect((await getMatchRoomAssistance({ roomId: ROOM })).ok).toBe(true);
-    expect(mocks.rpc).toHaveBeenCalledWith("get_match_room_assistance", { p_room_id: ROOM });
+    expect(mocks.rpc).toHaveBeenCalledWith("call_patch2_private_assistance", {
+      p_operation: "get_match_room_assistance", p_arguments: { p_room_id: ROOM },
+      p_actor_clerk_user_id: "user_original", p_actor_is_admin: false,
+    });
     expect(mocks.legal).not.toHaveBeenCalled();
   });
   it("preserves admin-only resolution of the original shared record", async () => {
     expect(await resolveMatchAdminAssistance({ ...input, expectedRequestVersion: 1 })).toEqual({ ok: false, code: "forbidden" });
-    mocks.auth.mockResolvedValue({ userId: "admin_actor", sessionClaims: { metadata: { role: "admin" } } });
+    mocks.auth.mockResolvedValue({ userId: "admin_actor", sessionId: "synthetic-admin-session", sessionClaims: { metadata: { role: "admin" } } });
     mocks.rpc.mockResolvedValue({ data: { ...requested, status: "resolved", resolvedAt: "2026-09-20T01:01:00.000Z" }, error: null });
     expect((await resolveMatchAdminAssistance({ ...input, expectedRequestVersion: 1 })).ok).toBe(true);
-    expect(mocks.rpc).toHaveBeenCalledWith("resolve_match_room_assistance", { p_room_id: ROOM, p_expected_request_version: 1 });
+    expect(mocks.rpc).toHaveBeenCalledWith("call_patch2_private_assistance", {
+      p_operation: "resolve_match_room_assistance",
+      p_arguments: { p_room_id: ROOM, p_expected_request_version: 1 },
+      p_actor_clerk_user_id: "admin_actor", p_actor_is_admin: true,
+    });
     expect(mocks.legal).toHaveBeenCalledOnce();
   });
   it.each([["42501", "forbidden"], ["40001", "stale_room"], ["22023", "invalid_request"], ["other", "unavailable"]])("maps retained read errors %s safely", async (code, expected) => {

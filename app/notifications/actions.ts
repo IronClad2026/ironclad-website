@@ -11,6 +11,7 @@ import {
   markNotificationsRead,
   type NotificationScope,
 } from "@/lib/notifications";
+import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { loadWebPushConfig } from "@/lib/web-push/config";
 import {
@@ -207,6 +208,9 @@ export async function loadAuthoritativeNotificationUnreadCount(): Promise<Notifi
   const scope: NotificationScope = isAdmin(identity.sessionClaims)
     ? "admin"
     : "player";
+  if (scope === "admin" && !await hasCurrentPatch2AdminAccess(identity.userId, identity.sessionClaims, identity.sessionId)) {
+    return { ok: false, code: "authentication_required" };
+  }
   let unreadCount: number | null;
 
   try {
@@ -380,13 +384,15 @@ function isAdmin(claims: CustomClaims | null) {
 async function loadNotificationIdentity(): Promise<{
   userId: string;
   sessionClaims: CustomClaims | null;
+  sessionId: string | null;
 } | null> {
   try {
-    const { userId, sessionClaims } = await auth();
+    const { userId, sessionClaims, sessionId } = await auth();
     return userId
       ? {
           userId,
           sessionClaims: sessionClaims as CustomClaims | null,
+          sessionId,
         }
       : null;
   } catch {

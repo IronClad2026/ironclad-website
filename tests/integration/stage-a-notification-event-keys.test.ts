@@ -24,6 +24,10 @@ const matchActions = read("app/tournaments/match-actions.ts");
 const dashboardActions = read("app/dashboard/actions.ts");
 const adminRegistrationActions = read("app/admin/registration-actions.ts");
 const assistanceAction = read("app/tournaments/support-actions.ts");
+const privateAssistanceAction = read("app/tournaments/private-assistance-actions.ts");
+const patch2AssistanceMigration = read(
+  "supabase/migrations/20261102192200_patch2_private_assistance_conversations.sql"
+);
 const phaseThreeMigrationName = readdirSync(resolve(process.cwd(), "supabase/migrations"))
   .find((name) => name.endsWith("_match_room_phase_three.sql"));
 if (!phaseThreeMigrationName) throw new Error("Phase 3 migration is missing");
@@ -65,7 +69,7 @@ describe("Stage A canonical notification event keys", () => {
     );
   });
 
-  it("keeps all three future Admin Push-important producers deterministic", () => {
+  it("keeps dispute and assistance notification keys deterministic and retires textless requests", () => {
     const disputeProducer = compact(matchResultTrustMigration);
     const assistanceProducer = compact(assistanceAction);
 
@@ -87,9 +91,8 @@ describe("Stage A canonical notification event keys", () => {
     expect(compact(dashboardActions)).not.toContain(
       "await notifynoshowreporterofresponse("
     );
-    expect(assistanceProducer).toContain(
-      'callAssistance("request_match_room_assistance"'
-    );
+    expect(assistanceProducer).not.toContain('callAssistance("request_match_room_assistance"');
+    expect(compact(privateAssistanceAction)).toContain('callPrivateAssistance(actor.data, "open_private_assistance"');
     expect(assistanceProducer).not.toContain("createInAppNotification");
     const roomAssistanceProducer = compact(sliceSource(
       phaseThreeMigration,
@@ -103,6 +106,15 @@ describe("Stage A canonical notification event keys", () => {
     expect(roomAssistanceProducer).toContain("'roomId', p_room_id");
     expect(roomAssistanceProducer).toContain("'requestVersion', v_version");
     expect(roomAssistanceProducer).not.toContain("in_app_hidden_at");
+    const privateProducer = compact(sliceSource(
+      patch2AssistanceMigration,
+      "create function ironclad_private.private_assistance_notify(",
+      "create function public.open_private_assistance("
+    ));
+    expect(privateProducer).toContain("'assistance.requester_message'");
+    expect(privateProducer).toContain("'assistance.admin_replied'");
+    expect(privateProducer).toContain("'private-assistance:'||p_message");
+    expect(patch2AssistanceMigration).toContain("MESSAGE_REQUIRED: open private assistance");
   });
 
   it("does not add event keys to the two Admin in-site-only producers", () => {

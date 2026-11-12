@@ -10,13 +10,13 @@ import { authorizePrivateAssistance, callPrivateAssistance } from "@/lib/private
 import { VERIFIED_DISCORD_TICKET_URL } from "@/lib/support";
 
 export async function getPrivateAssistanceContext(input: { roomId: string }): Promise<AssistanceResult<AssistanceContext>> {
-  const denied = await authorizePrivateAssistance();
-  if (denied) return { ok: false, code: denied };
+  const actor = await authorizePrivateAssistance();
+  if (!actor.ok) return actor;
   if (!isAssistanceRecord(input) || !hasAssistanceKeys(input, ["roomId"]) || !isAssistanceUuid(input.roomId)) {
     return { ok: false, code: "invalid_request" };
   }
   const roomId = input.roomId.toLowerCase();
-  return callPrivateAssistance("get_private_assistance_context", { p_room_id: roomId }, (value) => {
+  return callPrivateAssistance(actor.data, "get_private_assistance_context", { p_room_id: roomId }, (value) => {
     if (!isAssistanceRecord(value)) return null;
     const parsed = parseAssistanceContext({ ...value, discordUrl: VERIFIED_DISCORD_TICKET_URL });
     return parsed?.room.roomId === roomId ? parsed : null;
@@ -24,15 +24,15 @@ export async function getPrivateAssistanceContext(input: { roomId: string }): Pr
 }
 
 export async function openPrivateAssistance(input: AssistanceOpenInput): Promise<AssistanceResult<AssistanceMutation>> {
-  const denied = await authorizePrivateAssistance(false, true);
-  if (denied) return { ok: false, code: denied };
+  const actor = await authorizePrivateAssistance(false, true);
+  if (!actor.ok) return actor;
   if (!isAssistanceRecord(input) || !hasAssistanceKeys(input, ["roomId", "clientMessageId", "body"]) ||
     !isAssistanceUuid(input.roomId) || !isAssistanceUuid(input.clientMessageId) || !isAssistanceBody(input.body)) {
     return { ok: false, code: "invalid_request" };
   }
   const roomId = input.roomId.toLowerCase();
   const clientMessageId = input.clientMessageId.toLowerCase();
-  return callPrivateAssistance("open_private_assistance", {
+  return callPrivateAssistance(actor.data, "open_private_assistance", {
     p_room_id: roomId, p_client_message_id: clientMessageId, p_body: input.body.trim(),
   }, (value) => {
     const parsed = parseAssistanceMutation(value);
@@ -41,8 +41,8 @@ export async function openPrivateAssistance(input: AssistanceOpenInput): Promise
 }
 
 export async function readPrivateAssistance(input: AssistanceHistoryInput): Promise<AssistanceResult<AssistanceConversation>> {
-  const denied = await authorizePrivateAssistance();
-  if (denied) return { ok: false, code: denied };
+  const actor = await authorizePrivateAssistance();
+  if (!actor.ok) return actor;
   if (!isAssistanceRecord(input) || !hasAssistanceKeys(input, ["requestId", "tournamentId", "afterSequence", "limit"]) ||
     !isAssistanceUuid(input.requestId) || !isAssistanceUuid(input.tournamentId) ||
     !Number.isSafeInteger(input.afterSequence) || input.afterSequence < 0 ||
@@ -51,7 +51,7 @@ export async function readPrivateAssistance(input: AssistanceHistoryInput): Prom
   }
   const requestId = input.requestId.toLowerCase();
   const tournamentId = input.tournamentId.toLowerCase();
-  return callPrivateAssistance("read_private_assistance", {
+  return callPrivateAssistance(actor.data, "read_private_assistance", {
     p_request_id: requestId, p_tournament_id: tournamentId,
     p_after_sequence: input.afterSequence, p_limit: input.limit,
   }, (value) => {
@@ -62,8 +62,8 @@ export async function readPrivateAssistance(input: AssistanceHistoryInput): Prom
 }
 
 export async function replyPrivateAssistance(input: AssistanceReplyInput): Promise<AssistanceResult<AssistanceMutation>> {
-  const denied = await authorizePrivateAssistance(false, true);
-  if (denied) return { ok: false, code: denied };
+  const actor = await authorizePrivateAssistance(false, true);
+  if (!actor.ok) return actor;
   if (!isAssistanceRecord(input) || !hasAssistanceKeys(input, ["requestId", "tournamentId", "clientMessageId", "body"]) ||
     !isAssistanceUuid(input.requestId) || !isAssistanceUuid(input.tournamentId) ||
     !isAssistanceUuid(input.clientMessageId) || !isAssistanceBody(input.body)) {
@@ -72,7 +72,7 @@ export async function replyPrivateAssistance(input: AssistanceReplyInput): Promi
   const requestId = input.requestId.toLowerCase();
   const tournamentId = input.tournamentId.toLowerCase();
   const clientMessageId = input.clientMessageId.toLowerCase();
-  return callPrivateAssistance("reply_private_assistance", {
+  return callPrivateAssistance(actor.data, "reply_private_assistance", {
     p_request_id: requestId, p_tournament_id: tournamentId,
     p_client_message_id: clientMessageId, p_body: input.body.trim(),
   }, (value) => {

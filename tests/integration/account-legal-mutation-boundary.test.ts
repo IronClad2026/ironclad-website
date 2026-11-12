@@ -87,7 +87,7 @@ const ALWAYS_GUARDED_ACTIONS = {
     "resetAdminMatch",
     "reviewMatchResult",
   ],
-  "app/tournaments/support-actions.ts": ["requestMatchAdminAssistance", "resolveMatchAdminAssistance"],
+  "app/tournaments/support-actions.ts": ["resolveMatchAdminAssistance"],
 } as const;
 
 const DELEGATED_GUARDED_ACTIONS = [
@@ -134,6 +134,8 @@ const FULL_MUTATION_EXEMPTIONS = {
   // Legacy admin deletion is disabled; only player-owned dismissal remains here.
   "app/notifications/actions.ts": ["deleteWebPushSubscription", "deleteSelectedInAppNotifications"],
   "app/tournaments/match-actions.ts": ["cleanupPreparedReplayUploads"],
+  // Retired textless creation only rejects old clients and makes no write.
+  "app/tournaments/support-actions.ts": ["requestMatchAdminAssistance"],
 } as const;
 
 const LEGAL_AND_PRIVACY_EXEMPTIONS = {
@@ -146,6 +148,8 @@ const LEGAL_AND_PRIVACY_EXEMPTIONS = {
 } as const;
 
 const READ_ONLY_ACTIONS = {
+  "app/tournaments/private-assistance-actions.ts": ["getPrivateAssistanceContext", "readPrivateAssistance"],
+  "app/admin/tournaments/assistance-actions.ts": ["getAdminPrivateAssistanceQueue"],
   "app/tournaments/support-actions.ts": ["getMatchRoomOpponentDiscord", "getMatchRoomAssistance"],
   "app/admin/polls/actions.ts": [
     "loadAdminPollSnapshot",
@@ -161,6 +165,12 @@ const READ_ONLY_ACTIONS = {
     "loadAuthoritativeNotificationUnreadCount",
   ],
 } as const;
+
+const PRIVATE_ASSISTANCE_MUTATIONS = [
+  { path: "app/tournaments/private-assistance-actions.ts", action: "openPrivateAssistance", requireAdmin: false },
+  { path: "app/tournaments/private-assistance-actions.ts", action: "replyPrivateAssistance", requireAdmin: false },
+  { path: "app/admin/tournaments/assistance-actions.ts", action: "setPrivateAssistanceStatus", requireAdmin: true },
+] as const;
 
 type ActionMap = Readonly<Record<string, readonly string[]>>;
 
@@ -306,6 +316,7 @@ describe("account legal mutation boundary architecture", () => {
       ...DELEGATED_GUARDED_ACTIONS.map(
         ({ path, action }) => `${path}#${action}`
       ),
+      ...PRIVATE_ASSISTANCE_MUTATIONS.map(({ path, action }) => `${path}#${action}`),
       ...CONDITIONAL_GUARDED_ACTIONS.map(
         ({ path, action }) => `${path}#${action}`
       ),
@@ -320,15 +331,15 @@ describe("account legal mutation boundary architecture", () => {
       )
     );
 
-    expect(new Set(expected).size).toBe(86);
-    expect(expected).toHaveLength(86);
+    expect(new Set(expected).size).toBe(92);
+    expect(expected).toHaveLength(92);
     expect(actual.sort()).toEqual(expected.sort());
   });
 
-  it("guards all 63 ordinary authenticated mutations", () => {
+  it("guards all 65 ordinary authenticated mutations", () => {
     const directlyGuarded = flattenedInventory(ALWAYS_GUARDED_ACTIONS);
 
-    expect(directlyGuarded).toHaveLength(58);
+    expect(directlyGuarded).toHaveLength(57);
     expect(DELEGATED_GUARDED_ACTIONS).toHaveLength(5);
 
     for (const [path, actions] of Object.entries(ALWAYS_GUARDED_ACTIONS)) {
@@ -357,6 +368,23 @@ describe("account legal mutation boundary architecture", () => {
       expect(delegateCalls, `${path}#${delegate}`).toHaveLength(1);
       expect(ts.isAwaitExpression(delegateCalls[0].parent)).toBe(true);
     }
+
+    const assistance = parseSource("lib/private-assistance-server.ts");
+    const authority = functionDeclaration(assistance, "authorizePrivateAssistance");
+    const assistanceGuard = guardCalls(authority);
+    expect(importsGuard(assistance)).toBe(true);
+    expect(assistanceGuard).toHaveLength(1);
+    expect(ts.isAwaitExpression(assistanceGuard[0].parent)).toBe(true);
+    expect(nearestGuardCondition(assistance, authority, assistanceGuard[0])).toBe("mutation");
+    for (const { path, action, requireAdmin } of PRIVATE_ASSISTANCE_MUTATIONS) {
+      const source = parseSource(path);
+      const body = functionDeclaration(source, action).body!.getText(source);
+      const authorization = body.indexOf(`await authorizePrivateAssistance(${requireAdmin}, true)`);
+      const dispatch = body.indexOf("callPrivateAssistance(actor.data,");
+      expect(authorization, action).toBeGreaterThanOrEqual(0);
+      expect(dispatch, action).toBeGreaterThan(authorization);
+      expect(body.slice(authorization, dispatch), action).toContain("if (!actor.ok) return actor");
+    }
   });
 
   it("keeps the two one-way privacy and withdrawal exemptions conditional", () => {
@@ -378,9 +406,9 @@ describe("account legal mutation boundary architecture", () => {
   });
 
   it("keeps cleanup, legal, privacy, language, and read-only exemptions unguarded", () => {
-    expect(flattenedInventory(FULL_MUTATION_EXEMPTIONS)).toHaveLength(8);
+    expect(flattenedInventory(FULL_MUTATION_EXEMPTIONS)).toHaveLength(9);
     expect(flattenedInventory(LEGAL_AND_PRIVACY_EXEMPTIONS)).toHaveLength(4);
-    expect(flattenedInventory(READ_ONLY_ACTIONS)).toHaveLength(9);
+    expect(flattenedInventory(READ_ONLY_ACTIONS)).toHaveLength(12);
 
     for (const inventory of [
       FULL_MUTATION_EXEMPTIONS,

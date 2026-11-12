@@ -6,6 +6,10 @@ const authMock = vi.hoisted(() => vi.fn());
 const revalidateMock = vi.hoisted(() => vi.fn());
 const notifyMock = vi.hoisted(() => vi.fn());
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(authMock);
+});
 vi.mock("next/cache", () => ({ revalidatePath: revalidateMock }));
 vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(`REDIRECT:${href}`); } }));
 vi.mock("@/lib/notifications", () => ({ createInAppNotification: notifyMock }));

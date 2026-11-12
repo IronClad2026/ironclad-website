@@ -3,15 +3,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import AdminNotificationInbox from "@/components/admin/tournaments/AdminNotificationInbox";
 import { isAdminNotificationInboxEnabled, loadAdminNotificationInbox } from "@/lib/admin-notification-inbox";
+import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 type Query = { kind?: string; page?: string; filter?: string; selected?: string };
 type TournamentChoice = { id: string; title: string; status: string };
 
 export default async function AdminNotificationsPage({ searchParams }: { searchParams?: Promise<Query> }) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as { metadata?: { role?: string } } | null)?.metadata?.role;
-  if (!userId || role !== "admin") redirect("/");
+  const { userId, sessionClaims, sessionId } = await auth();
+  if (!await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)) redirect("/");
   const query = await searchParams;
   if (!isAdminNotificationInboxEnabled()) return (
     <main className="min-h-screen bg-black px-4 pt-28 pb-16 text-white sm:px-6">

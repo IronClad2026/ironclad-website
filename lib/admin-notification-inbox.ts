@@ -1,7 +1,7 @@
 import "server-only";
 
-import { auth } from "@clerk/nextjs/server";
 import { mapNotification, type InAppNotification, type NotificationRow } from "@/lib/notifications";
+import { requireCurrentPatch2Admin } from "@/lib/patch2-admin-access";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type AdminInboxScope =
@@ -35,15 +35,13 @@ export function isAdminNotificationInboxEnabled(): boolean {
   return process.env.PATCH2_ADMIN_INBOX_ENABLED === "true";
 }
 
-/** Every entry point using service-role inbox RPCs repeats the Clerk guard. */
+/** Every entry point using service-role inbox RPCs verifies current admin authority. */
 export async function requireAdminNotificationInbox(): Promise<void> {
   try {
-    const { userId, sessionClaims } = await auth();
-    if (userId && (sessionClaims as { metadata?: { role?: unknown } } | null)?.metadata?.role === "admin") return;
+    await requireCurrentPatch2Admin();
   } catch {
-    // Identity-provider failures expose no upstream details to inbox clients.
+    throw new Error("Administrator access is required.");
   }
-  throw new Error("Administrator access is required.");
 }
 
 export function normalizeAdminInboxScope(scope: AdminInboxScope): AdminInboxScope {

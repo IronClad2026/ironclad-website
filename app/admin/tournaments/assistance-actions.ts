@@ -8,8 +8,8 @@ import {
 import { authorizePrivateAssistance, callPrivateAssistance } from "@/lib/private-assistance-server";
 
 export async function getAdminPrivateAssistanceQueue(input: AssistanceQueueInput): Promise<AssistanceResult<AssistanceAdminQueue>> {
-  const denied = await authorizePrivateAssistance(true);
-  if (denied) return { ok: false, code: denied };
+  const actor = await authorizePrivateAssistance(true);
+  if (!actor.ok) return actor;
   if (!isAssistanceRecord(input) || !hasAssistanceKeys(input, ["tournamentId", "filter", "page", "selectedId"]) ||
     !isAssistanceUuid(input.tournamentId) || !isAssistanceFilter(input.filter) ||
     !Number.isSafeInteger(input.page) || input.page < 1 || input.page > 2147483647 ||
@@ -18,7 +18,7 @@ export async function getAdminPrivateAssistanceQueue(input: AssistanceQueueInput
   }
   const tournamentId = input.tournamentId.toLowerCase();
   const selectedId = input.selectedId?.toLowerCase() ?? null;
-  return callPrivateAssistance("list_admin_private_assistance", {
+  return callPrivateAssistance(actor.data, "list_admin_private_assistance", {
     p_tournament_id: tournamentId, p_status: input.filter, p_page: input.page, p_selected_id: selectedId,
   }, (value) => {
     const parsed = parseAssistanceQueue(value, tournamentId);
@@ -28,8 +28,8 @@ export async function getAdminPrivateAssistanceQueue(input: AssistanceQueueInput
 }
 
 export async function setPrivateAssistanceStatus(input: AssistanceStatusInput): Promise<AssistanceResult<{ request: AssistanceRequest; changed: boolean }>> {
-  const denied = await authorizePrivateAssistance(true, true);
-  if (denied) return { ok: false, code: denied };
+  const actor = await authorizePrivateAssistance(true, true);
+  if (!actor.ok) return actor;
   if (!isAssistanceRecord(input) || !hasAssistanceKeys(input, ["requestId", "tournamentId", "status", "expectedVersion"]) ||
     !isAssistanceUuid(input.requestId) || !isAssistanceUuid(input.tournamentId) || !isAssistanceStatus(input.status) ||
     !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1) {
@@ -37,7 +37,7 @@ export async function setPrivateAssistanceStatus(input: AssistanceStatusInput): 
   }
   const requestId = input.requestId.toLowerCase();
   const tournamentId = input.tournamentId.toLowerCase();
-  return callPrivateAssistance("set_private_assistance_status", {
+  return callPrivateAssistance(actor.data, "set_private_assistance_status", {
     p_tournament_id: tournamentId, p_request_id: requestId, p_status: input.status, p_expected_version: input.expectedVersion,
   }, (value) => {
     if (!isAssistanceRecord(value) || typeof value.changed !== "boolean") return null;

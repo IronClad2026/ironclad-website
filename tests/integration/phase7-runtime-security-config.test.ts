@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
+import { imageOptimizerTransform } from "next/dist/server/image-optimizer/transform";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import nextConfig from "@/next.config";
 import { MAX_AVATAR_UPLOAD_SIZE_BYTES } from "@/lib/avatar";
 
-const SELECTED_NEXT_PATCH = "16.3.3";
-const SELECTED_SHARP_PATCH = "0.35.4";
+const SELECTED_NEXT_PATCH = "16.4.5";
+const SELECTED_SHARP_PATCH = "0.35.5";
 const MEBIBYTE_BYTES = 1024 * 1024;
 const NEXT_REQUEST_LIMIT_BYTES = 4_400_000;
 const VERCEL_FUNCTION_PAYLOAD_CEILING_BYTES = 4_500_000;
@@ -65,7 +67,7 @@ function createMaximumValidProfileForm() {
 }
 
 describe("Phase 7 runtime security and Server Action payload contract", () => {
-  it("pins the newest stable patched Next 16.3.x release and matching ESLint config", () => {
+  it("pins the reviewed patched Next release and matching ESLint config", () => {
     const manifest = readJson<PackageManifest>("package.json");
     const lock = readJson<PackageLock>("package-lock.json");
 
@@ -99,20 +101,27 @@ describe("Phase 7 runtime security and Server Action payload contract", () => {
     ]);
   });
 
-  it("keeps the patched AVIF bypass ahead of the compatible Sharp runtime", () => {
+  it("uses patched libheif and librsvg with Next's compatible Sharp runtime", () => {
     const nextManifest = readJson<NextPackageManifest>(
       "node_modules/next/package.json"
     );
-    const imageOptimizer = readFileSync(
-      "node_modules/next/dist/server/image-optimizer.js",
-      "utf8"
-    );
+    expect(nextManifest.optionalDependencies.sharp).toBe(`^${SELECTED_SHARP_PATCH}`);
+    expect(sharp.versions.sharp).toBe(SELECTED_SHARP_PATCH);
+    // This Next release uses the patched decoders instead of the old temporary AVIF bypass.
+    expect(sharp.versions.heif).toBe("1.23.5");
+    expect(sharp.versions.rsvg).toBe("2.63.2");
+  });
 
-    expect(nextManifest.optionalDependencies.sharp).toBe("^0.35.3");
-    expect(imageOptimizer).toMatch(
-      /const BYPASS_TYPES = \[[\s\S]*?HEIC,[\s\S]*?AVIF[\s\S]*?\];/
-    );
-    expect(imageOptimizer).not.toContain("VipsForeignLoadHeif");
+  it("rejects an SVG with a misleading AVIF marker before decoding", async () => {
+    const buffer = Buffer.from('<!--ftypavif--><svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+    const images = { minimumCacheTTL: 60, ...nextConfig.images };
+    expect(images.dangerouslyAllowSVG).not.toBe(true);
+
+    await expect(imageOptimizerTransform(
+      { buffer, contentType: "image/avif", cacheControl: null, etag: "test-svg" },
+      { href: "/test-avatar.avif", width: 64, quality: 75, mimeType: "image/webp" },
+      { experimental: {}, images: { minimumCacheTTL: images.minimumCacheTTL, dangerouslyAllowSVG: false } },
+    )).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining("image type is not allowed") });
   });
 
   it("keeps the application avatar boundary at exactly 4 MiB", () => {

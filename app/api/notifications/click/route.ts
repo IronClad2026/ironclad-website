@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 
 import {
   resolveNotificationDestination,
@@ -20,26 +21,36 @@ const PRIVATE_NO_STORE_HEADERS = {
 } as const;
 
 export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  const notificationId = params.get("notificationId") ?? "";
+  const requestedScope = params.get("scope");
   let userId: string | null;
+  let sessionId: string | null;
   let claims: CustomClaims | null;
 
   try {
     const identity = await auth();
     userId = identity.userId;
+    sessionId = identity.sessionId;
     claims = identity.sessionClaims as CustomClaims | null;
   } catch {
     return safeRedirect(request, "/sign-in");
   }
 
   if (!userId) {
-    return safeRedirect(request, "/sign-in");
+    if (!isUuid(notificationId) || (requestedScope !== "player" && requestedScope !== "admin")) {
+      return safeRedirect(request, "/sign-in");
+    }
+    const click = new URL("/api/notifications/click", request.url);
+    click.search = new URLSearchParams({ notificationId, scope: requestedScope }).toString();
+    const signIn = new URLSearchParams({ redirect_url: click.toString() });
+    return safeRedirect(request, `/sign-in?${signIn}`);
   }
 
   const isAdmin = claims?.metadata?.role === "admin";
-  const fallback = isAdmin ? "/admin" : "/dashboard";
-  const url = new URL(request.url);
-  const notificationId = url.searchParams.get("notificationId") ?? "";
-  const scope = deriveAuthorizedScope(url.searchParams.get("scope"), isAdmin);
+  const canUseAdminScope = isAdmin && await hasCurrentPatch2AdminAccess(userId, claims, sessionId);
+  const fallback = canUseAdminScope ? "/admin" : "/dashboard";
+  const scope = deriveAuthorizedScope(requestedScope, canUseAdminScope);
 
   if (!isUuid(notificationId) || !scope) {
     return safeRedirect(request, fallback);
