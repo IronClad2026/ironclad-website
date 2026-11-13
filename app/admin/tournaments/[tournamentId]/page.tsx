@@ -85,7 +85,8 @@ export default async function TournamentWorkspacePage({
   searchParams,
 }: TournamentWorkspacePageProps) {
   const [{ tournamentId }, query] = await Promise.all([params, searchParams]);
-  if (!(await hasAdminPageAccess(`/admin/tournaments/${tournamentId}`, query))) {
+  const workspacePath = `/admin/tournaments/${tournamentId}`;
+  if (!(await hasAdminPageAccess(workspacePath, query))) {
     return <AdminAccessRequired />;
   }
 
@@ -93,12 +94,22 @@ export default async function TournamentWorkspacePage({
     notFound();
   }
 
-  const workspace = await loadAdminTournamentWorkspace(tournamentId);
+  const section = getSection(query?.section);
+  const [workspace, independentContent] = await Promise.all([
+    loadAdminTournamentWorkspace(tournamentId),
+    section === "assistance" || section === "notifications"
+      ? loadCommunicationSection(tournamentId.toLowerCase(), section, query)
+      : null,
+  ]);
   if (!workspace) {
     notFound();
   }
+  // A communication query can finish before the workspace. Check closure
+  // again before returning data if account access changed during that wait.
+  if (independentContent && !(await hasAdminPageAccess(workspacePath, query))) {
+    return <AdminAccessRequired />;
+  }
 
-  const section = getSection(query?.section);
   const registrationData = section === "registrations" || section === "players-waitlist"
     ? await loadAdminTournamentRegistrationWorkspace(workspace.tournament, workspace.summary.divisionStates, {
         filter: query?.filter,
@@ -107,7 +118,7 @@ export default async function TournamentWorkspacePage({
         page: query?.page,
       })
     : null;
-  const content = await renderWorkspaceSection({
+  const content = independentContent ? independentContent(workspace.tournament.title) : await renderWorkspaceSection({
     query,
     registrationData,
     section,
@@ -138,6 +149,56 @@ export default async function TournamentWorkspacePage({
       </section>
     </main>
   );
+}
+
+async function loadCommunicationSection(
+  tournamentId: string,
+  section: "assistance" | "notifications",
+  query: Awaited<TournamentWorkspacePageProps["searchParams"]>
+): Promise<(tournamentTitle: string) => ReactNode> {
+  const baseHref = `/admin/tournaments/${tournamentId}?section=${section}`;
+  if (section === "assistance") {
+    const [result, legacy] = await Promise.all([
+      getAdminPrivateAssistanceQueue({
+        tournamentId,
+        filter: isAssistanceFilter(query?.filter) ? query.filter : "all",
+        page: /^\d{1,9}$/.test(query?.page ?? "") ? Math.max(1, Number(query?.page)) : 1,
+        selectedId: isAssistanceUuid(query?.selected) ? query.selected : null,
+      }),
+      LegacyRoomAssistance({ tournamentId, page: query?.legacyPage, includeResolved: query?.legacyResolved === "1" }),
+    ]);
+    return (tournamentTitle) => <>
+      {result.ok ? <AdminPrivateAssistance key={tournamentId} data={result.data} tournamentTitle={tournamentTitle} /> : (
+        <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
+          <p>Private assistance could not be loaded. Outstanding requests have not been treated as an empty queue.</p>
+          <Link href={baseHref} className="inline-flex min-h-11 items-center text-orange-200 underline">Reopen assistance</Link>
+        </section>
+      )}
+      {legacy}
+    </>;
+  }
+  if (!isAdminNotificationInboxEnabled()) return () => (
+    <section className="rounded-2xl border border-amber-500/25 p-5 text-sm text-amber-100">
+      <p role="status">The scoped admin inbox is turned off in this environment. Existing notifications remain saved.</p>
+      <Link href={`/admin/tournaments/${tournamentId}?section=assistance`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open assistance for this tournament</Link>
+      <Link href={`/admin/notifications/legacy-assistance?kind=tournament&tournamentId=${tournamentId}`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open legacy assistance requests for this tournament</Link>
+    </section>
+  );
+  try {
+    const data = await loadAdminNotificationInbox(
+      { kind: "tournament", tournamentId },
+      { page: query?.page, filter: query?.filter, selected: query?.selected }
+    );
+    return (tournamentTitle) => <AdminNotificationInbox data={data} title={`${tournamentTitle} — Notifications`} baseHref={baseHref} />;
+  } catch {
+    console.error("Tournament notification inbox load failed.");
+    return () => (
+      <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
+        <p>This tournament inbox could not be loaded. Its notification state has not been treated as empty.</p>
+        <Link href={baseHref} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Reopen tournament inbox</Link>
+      </section>
+    );
+  }
 }
 
 function WorkspaceNotice({
@@ -208,49 +269,6 @@ async function renderWorkspaceSection({
   summary: AdminTournamentWorkspaceSummary;
   tournament: AdminTournamentWorkspaceRow;
 }): Promise<ReactNode> {
-  if (section === "assistance") {
-    const result = await getAdminPrivateAssistanceQueue({
-      tournamentId: tournament.id,
-      filter: isAssistanceFilter(query?.filter) ? query.filter : "all",
-      page: /^\d{1,9}$/.test(query?.page ?? "") ? Math.max(1, Number(query?.page)) : 1,
-      selectedId: isAssistanceUuid(query?.selected) ? query.selected : null,
-    });
-    return <>
-      {result.ok ? <AdminPrivateAssistance key={tournament.id} data={result.data} tournamentTitle={tournament.title} /> : (
-        <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
-          <p>Private assistance could not be loaded. Outstanding requests have not been treated as an empty queue.</p>
-          <Link href={`/admin/tournaments/${tournament.id}?section=assistance`} className="inline-flex min-h-11 items-center text-orange-200 underline">Reopen assistance</Link>
-        </section>
-      )}
-      <LegacyRoomAssistance tournamentId={tournament.id} page={query?.legacyPage} includeResolved={query?.legacyResolved === "1"} />
-    </>;
-  }
-  if (section === "notifications") {
-    if (!isAdminNotificationInboxEnabled()) return (
-      <section className="rounded-2xl border border-amber-500/25 p-5 text-sm text-amber-100">
-        <p role="status">The scoped admin inbox is turned off in this environment. Existing notifications remain saved.</p>
-        <Link href={`/admin/tournaments/${tournament.id}?section=assistance`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open assistance for this tournament</Link>
-        <Link href={`/admin/notifications/legacy-assistance?kind=tournament&tournamentId=${tournament.id}`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open legacy assistance requests for this tournament</Link>
-      </section>
-    );
-    let data = null;
-    try {
-      data = await loadAdminNotificationInbox(
-        { kind: "tournament", tournamentId: tournament.id },
-        { page: query?.page, filter: query?.filter, selected: query?.selected }
-      );
-    } catch {
-      console.error("Tournament notification inbox load failed.");
-    }
-    if (!data) return (
-      <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
-        <p>This tournament inbox could not be loaded. Its notification state has not been treated as empty.</p>
-        <Link href={`/admin/tournaments/${tournament.id}?section=notifications`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Reopen tournament inbox</Link>
-      </section>
-    );
-    return <AdminNotificationInbox data={data} title={`${tournament.title} — Notifications`}
-      baseHref={`/admin/tournaments/${tournament.id}?section=notifications`} />;
-  }
   if (section === "overview") {
     return <TournamentOverview summary={summary} tournament={tournament} />;
   }

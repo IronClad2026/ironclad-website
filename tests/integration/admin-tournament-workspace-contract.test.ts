@@ -915,7 +915,8 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     const workspace = compact(source.workspace);
     const actions = compact(source.actions);
 
-    expect(workspace).toContain("const content = await renderWorkspaceSection({");
+    expect(workspace).toContain("await renderWorkspaceSection({");
+    expect(workspace).toContain('section === "assistance" || section === "notifications"');
     expect(source.workspace.split("{content}")).toHaveLength(2);
     for (const section of [
       "overview",

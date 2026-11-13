@@ -8,6 +8,7 @@ const redirectToSignInMock = vi.hoisted(() => vi.fn(() => {
 }));
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const loadWorkspaceMock = vi.hoisted(() => vi.fn());
+const loadInboxMock = vi.hoisted(() => vi.fn());
 const redirectMock = vi.hoisted(() => vi.fn((path: string) => {
   throw new Error(`NEXT_REDIRECT:${path}`);
 }));
@@ -22,6 +23,10 @@ vi.mock("@/lib/patch2-admin-access", async () => {
 });
 vi.mock("next/navigation", () => ({ redirect: redirectMock, notFound: notFoundMock }));
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: createSupabaseAdminClientMock }));
+vi.mock("@/lib/admin-notification-inbox", () => ({
+  isAdminNotificationInboxEnabled: () => true,
+  loadAdminNotificationInbox: loadInboxMock,
+}));
 vi.mock("@/lib/admin-tournament-workspace", () => ({
   loadAdminTournamentWorkspace: loadWorkspaceMock,
   isAdminTournamentWorkspaceTerminal: vi.fn(),
@@ -135,6 +140,25 @@ describe("admin page authentication and access guidance", () => {
     await expect(TournamentWorkspacePage({ params: Promise.resolve({ tournamentId: "invalid" }) }))
       .rejects.toThrow("NEXT_NOT_FOUND");
     expect(loadWorkspaceMock).not.toHaveBeenCalled();
+  });
+
+  it("starts the inbox while workspace data is pending and withholds it if closure completes", async () => {
+    const open = { userId: "local_admin", sessionClaims: { metadata: { role: "admin" } } };
+    authMock.mockResolvedValueOnce(open).mockResolvedValue({
+      ...open, sessionClaims: { metadata: { role: "player" } },
+    });
+    let resolveWorkspace!: (value: object) => void;
+    const pendingWorkspace = new Promise<object>((resolve) => { resolveWorkspace = resolve; });
+    loadWorkspaceMock.mockReturnValue(pendingWorkspace);
+    loadInboxMock.mockResolvedValue({});
+
+    const page = routes[2].run({ section: "notifications" });
+    await vi.waitFor(() => expect(loadInboxMock).toHaveBeenCalledOnce());
+    expect(loadWorkspaceMock).toHaveBeenCalledOnce();
+    resolveWorkspace({ tournament: { id: TOURNAMENT_ID, title: "Fixture" } });
+
+    expect(renderToStaticMarkup(await page)).toContain("Administrator access required");
+    expect(authMock).toHaveBeenCalledTimes(2);
   });
 });
 
