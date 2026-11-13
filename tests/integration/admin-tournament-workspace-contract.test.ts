@@ -1168,7 +1168,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "65c7c419f874ea259e81ef50593f415b5202e0f16a1f5be52f0fc89cec2dd912"
     );
     expect(normalizedSha256(read(".env.example"))).toBe(
-      "df333b2554f79526a26de3f1dd65afb112c21d2c73e4cbb5d45a8da164dd56fe"
+      "9b0ac3d6eade4e9054c94e53fbcf3cec00637faf16b9aa39db75e9afe4a81cc9"
     );
 
     expect(
