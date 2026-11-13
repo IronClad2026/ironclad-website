@@ -6,6 +6,12 @@ The privileged command verifies the acting user's current Clerk admin role;
 the service-only RPC also requires that actor's active database profile. Public,
 anonymous and ordinary authenticated callers cannot invoke these RPCs.
 
+After the Patch 2 verified-staff and privacy-operator migrations, private
+assistance locate, export and redaction and the combined Match Room purge also
+require a current verified staff grant for the acting account. Use the existing
+trusted service-role caller and confirm the configured actor has both the grant
+and an active Player before running maintenance.
+
 ## Approved retention and operational ownership
 
 The authorized tournament/privacy administrator reviews the bounded retention

@@ -81,12 +81,16 @@ const staffHash = sha(staffSql);
 const legacyRegistrationFile = "20261113071907_patch2_retire_legacy_registration_writes.sql";
 const legacyRegistrationSql = (await readFile(resolve(ROOT, "supabase/migrations", legacyRegistrationFile), "utf8")).replace(/\r\n/g, "\n");
 const legacyRegistrationHash = sha(legacyRegistrationSql);
+const privacyOperatorFile = "20261113072932_patch2_verify_private_assistance_privacy_operators.sql";
+const privacyOperatorSql = (await readFile(resolve(ROOT, "supabase/migrations", privacyOperatorFile), "utf8")).replace(/\r\n/g, "\n");
+const privacyOperatorHash = sha(privacyOperatorSql);
 const report = { target: `${HOST}:${PORT} fresh disposable PostgreSQL17`, snapshotSha256: SNAPSHOT_SHA,
   policySupplementSha256: sha(policyRaw), fidelitySupplementSha256: sha(fidelityRaw),
   snapshotCapturedThrough: snapshot.capturedThrough,
   migrations: [...frozenMigrations.map(({ file, sha256 }) => ({ file, sha256 })), { file: boundaryFile, sha256: boundaryHash },
     { file: closureFile, sha256: closureHash }, { file: staffFile, sha256: staffHash },
-    { file: legacyRegistrationFile, sha256: legacyRegistrationHash }], checks: [], warnings: [], limitations: [
+    { file: legacyRegistrationFile, sha256: legacyRegistrationHash },
+    { file: privacyOperatorFile, sha256: privacyOperatorHash }], checks: [], warnings: [], limitations: [
     "Only catalog metadata is copied. All test records are fictional local historical snapshots; no Production/user records or secrets are read.",
     "All seven current closure functions and the real history predicate execute unchanged, with the captured actual constraints, foreign keys and triggers installed.",
     "Fixture preparation precedes trigger installation, with real constraints enforced; no guard/trigger is disabled during the closure tests.",
@@ -631,6 +635,39 @@ try {
     await rejected(dispatch("list_admin_private_assistance", queueArgs, staffOnly, true), "42501", /Account access is unavailable/);
   });
 
+  const privacyCalls = (actor) => [
+    ["locate_private_assistance_subject", "uuid,integer,text", [PEER, 10, actor]],
+    ["export_private_assistance_subject", "uuid,uuid,bigint,integer,text", [PEER, requesterRequest, 0, 10, actor]],
+    ["redact_private_assistance_messages", "uuid,uuid,uuid[],text", [PEER, requesterRequest, [id(299)], actor]],
+    ["purge_match_room_retention", "uuid[],text", [[ROOM], actor]],
+  ];
+  const runPrivacy = (operation, client = database) => {
+    const [name, signature, args] = operation;
+    const parameters = signature.split(",").map((type, index) => `$${index + 1}::${type}`);
+    return client.query(`select public.${name}(${parameters.join(",")}) value`, args).then(result => result.rows[0].value);
+  };
+
+  await test("private assistance privacy RPCs preserve operator access and deny unverified or browser actors", async () => {
+    await owner();
+    await database.query(privacyOperatorSql);
+    for (const [name, signature] of privacyCalls(activeAdmin)) {
+      assert.equal(await sql("select has_function_privilege('service_role',$1,'EXECUTE') value", [`ironclad_private.${name}(${signature})`]), false);
+    }
+    await database.query("select set_config('request.jwt.claim.role','',false), set_config('request.jwt.claims','{}',false)");
+    await rejected(runPrivacy(privacyCalls(activeAdmin)[0]), "42501", /Trusted Patch 2 server required/);
+    await claim(operator, true, "service_role");
+    for (const actor of ["local_unverified_historical_staff", staffOnly, requester]) {
+      for (const operation of privacyCalls(actor)) await rejected(runPrivacy(operation), "42501", /Verified active privacy operator required/);
+    }
+    const [locate, exportData, redact, purge] = privacyCalls(activeAdmin);
+    assert.ok((await runPrivacy(locate)).requests.some(request => request.requestId === requesterRequest));
+    assert.ok((await runPrivacy(exportData)).messages.some(message => message.body === "LOCAL verified staff reply"));
+    await rejected(runPrivacy(redact), "42501", /Redaction scope/);
+    assert.equal((await runPrivacy(purge)).privateAssistanceMessagesDeleted, 0);
+    await claim(activeAdmin, true);
+    for (const operation of privacyCalls(activeAdmin)) await rejected(runPrivacy(operation), "42501");
+  });
+
   await test("normal closure revokes stale staff and player sessions after every successful outcome", async () => {
     // No Clerk identity or token is revoked by this database test. Continued
     // trusted calls with the same actor model a session surviving Clerk failure.
@@ -651,6 +688,7 @@ try {
       await rejected(sql("select public.set_legacy_assistance_status($1,$2,'resolved',1,$3) value",
         [noticeId, T, sub]), "42501");
       await rejected(dispatch("list_admin_private_assistance", queueArgs, sub, true), "42501", /Account access is unavailable/);
+      for (const operation of privacyCalls(sub)) await rejected(runPrivacy(operation), "42501", /Verified active privacy operator required/);
       await claim(sub, true);
       await rejected(insertPlayer(sub), "42501", /Account access is unavailable/);
       await owner();
@@ -744,39 +782,46 @@ try {
     }
   });
 
-  await test("verified staff revocation takes effect for a guarded write already waiting for the lock", async () => {
+  await test("staff revocation stops a waiting inbox write and private-assistance export", async () => {
     const concurrent = "local_revoked_staff";
     await owner();
+    await insertPlayer(concurrent);
     await grantStaff(concurrent);
     const other = await connect("patch2_staff_revocation");
+    const exportClient = await connect("patch2_privacy_revocation");
     try {
       await claim(operator, true, "service_role");
-      assert.equal(await state(concurrent), "verified-staff");
+      assert.equal(await state(concurrent), "verified-active-player");
       await claim(operator, true, "service_role", other);
-      const backend = (await other.query("select pg_backend_pid() pid")).rows[0].pid;
+      await claim(operator, true, "service_role", exportClient);
+      const backends = await Promise.all([other, exportClient].map(async client =>
+        (await client.query("select pg_backend_pid() pid")).rows[0].pid));
       await owner();
       await database.query("begin");
       await revokeStaff(concurrent);
-      let outcome;
-      const queued = other.query(mutate, [T, "read_all", [], concurrent]).then(
-        () => { outcome = { error: null }; }, (error) => { outcome = { error }; },
-      );
+      let completed = 0;
+      const queued = Promise.allSettled([
+        other.query(mutate, [T, "read_all", [], concurrent]).finally(() => { completed++; }),
+        runPrivacy(privacyCalls(concurrent)[1], exportClient).finally(() => { completed++; }),
+      ]);
       for (let attempt = 0; attempt < 30; attempt++) {
-        assert.equal(outcome, undefined, "Guarded action completed before staff revocation committed");
-        if (await sql(`select exists (select from pg_locks
-          where pid=$1 and locktype='advisory' and not granted) value`, [backend])) break;
-        assert.ok(attempt < 29, "Guarded action did not wait for staff revocation");
+        assert.equal(completed, 0, "Guarded action completed before staff revocation committed");
+        if (await sql(`select count(distinct pid)::int value from pg_locks
+          where pid=any($1::integer[]) and locktype='advisory' and not granted`, [backends]) === 2) break;
+        assert.ok(attempt < 29, "Both guarded actions must wait for staff revocation");
         await delay(30);
       }
       await database.query("commit");
-      await queued;
-      assert.equal(outcome?.error?.code, "42501");
+      const outcomes = await queued;
+      assert.deepEqual(outcomes.map(outcome => outcome.status === "rejected" && outcome.reason.code), ["42501", "42501"]);
       await claim(operator, true, "service_role");
       assert.equal(await state(concurrent), "denied");
     } finally {
       await database.query("rollback");
       await other.end();
       clients.delete(other);
+      await exportClient.end();
+      clients.delete(exportClient);
     }
   });
 
@@ -792,6 +837,7 @@ try {
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", closureFile), "utf8")).replace(/\r\n/g, "\n")), closureHash);
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", staffFile), "utf8")).replace(/\r\n/g, "\n")), staffHash);
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", legacyRegistrationFile), "utf8")).replace(/\r\n/g, "\n")), legacyRegistrationHash);
+  assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", privacyOperatorFile), "utf8")).replace(/\r\n/g, "\n")), privacyOperatorHash);
   assert.ok(!report.warnings.some(w => /WarnSendingBroadcastMessage/.test(w)), "Actual Realtime send swallowed an error");
   report.passed = true;
 } catch (e) { failure = e; report.passed = false; report.failure = e.message; report.errorCode = e.code; report.errorContext = e.where; report.errorPosition = e.position; report.stage = stage; }
