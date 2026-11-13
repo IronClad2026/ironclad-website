@@ -220,7 +220,7 @@ export async function loadAdminTournamentRegistrationWorkspace(
   const snapshot = await retryRegistrationSnapshot(async (retry) => {
     const registrations = retry
       ? await readRegistrationSummary(supabase, tournament.id)
-      : await loadAdminTournamentRegistrationSummary(tournament.id);
+      : await readCachedRegistrationSummary(tournament.id);
     return readRegistrationWorkspaceSnapshot(supabase, tournament, registrations, {
       activeFilter,
       section,
