@@ -119,7 +119,7 @@ describe.each([
     fireEvent.click(renderNotification(expanded, { href }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(ERROR);
-    expect(screen.getByText(TITLE)).toBeVisible();
+    await waitFor(() => expect(screen.getByRole("button", { name: new RegExp(TITLE, "i") })).toBeVisible());
     expect(screen.getByText("1 total · 1 unread")).toBeInTheDocument();
     expect(markReadMock).not.toHaveBeenCalled();
     expect(pushMock).not.toHaveBeenCalled();
