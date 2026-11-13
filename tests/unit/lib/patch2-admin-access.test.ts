@@ -64,6 +64,14 @@ describe("current Patch 2 administrator access", () => {
     await expect(hasCurrentPatch2AdminAccess(USER, CLAIMS, SESSION, true)).resolves.toBe(false);
   });
 
+  it("uses verified account states without widening private assistance access", async () => {
+    mocks.abortSignal.mockResolvedValueOnce({ data: "verified-active-player", error: null })
+      .mockResolvedValue({ data: "verified-staff", error: null });
+    await expect(hasCurrentPatch2AdminAccess(USER, CLAIMS, SESSION, true)).resolves.toBe(true);
+    await expect(hasCurrentPatch2AdminAccess(USER, CLAIMS, SESSION)).resolves.toBe(true);
+    await expect(hasCurrentPatch2AdminAccess(USER, CLAIMS, SESSION, true)).resolves.toBe(false);
+  });
+
   it("rechecks durable state and denies a previously authorized staff session after closure", async () => {
     mocks.abortSignal.mockResolvedValueOnce({ data: "no-player", error: null })
       .mockResolvedValueOnce({ data: "denied", error: null });

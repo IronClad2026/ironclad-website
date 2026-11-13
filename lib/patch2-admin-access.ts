@@ -6,7 +6,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 const LOOKUP_TIMEOUT_MS = 4_000;
 
-// Deduplicate Clerk lookups within a render. Closure state stays uncached.
+// Deduplicate Clerk lookups within a render. Database authority stays uncached.
 const hasCurrentClerkAdminAuthority = cache(async (userId: string, sessionId: string): Promise<boolean> => {
   try {
     const clerk = await clerkClient();
@@ -53,7 +53,12 @@ export async function hasCurrentPatch2AdminAccess(
     const account = await createSupabaseAdminClient().rpc("get_patch2_admin_account_state", {
       p_clerk_user_id: userId,
     }).abortSignal(AbortSignal.timeout(LOOKUP_TIMEOUT_MS));
-    return !account.error && (account.data === "active-player" || (!requirePlayer && account.data === "no-player"));
+    // Support both database versions during the Staging cutover. The verified
+    // database returns "denied" for any account without a current grant.
+    return !account.error && (
+      account.data === "verified-active-player" || account.data === "active-player" ||
+      (!requirePlayer && (account.data === "verified-staff" || account.data === "no-player"))
+    );
   } catch {
     return false;
   }
