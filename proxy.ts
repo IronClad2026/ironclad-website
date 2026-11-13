@@ -41,7 +41,7 @@ export default clerkMiddleware(async (auth, request) => {
   if (!userId) return NextResponse.next({ request: { headers: requestHeaders } });
 
   const notice = await loadPublicGamingProfileNotice(userId);
-  if (notice === "required" || notice === "unavailable") {
+  if (notice.status === "required" || notice.status === "unavailable") {
     if (isPageRead && isNoticeAccessDocument(pathname)) {
       requestHeaders.set(NOTICE_LAYOUT_HEADER, "public-document");
       return NextResponse.next({ request: { headers: requestHeaders } });
@@ -53,7 +53,7 @@ export default clerkMiddleware(async (auth, request) => {
       });
     }
     return NextResponse.json({ error: "Public gaming profile acknowledgement required." }, {
-      status: notice === "required" ? 403 : 503,
+      status: notice.status === "required" ? 403 : 503,
       headers: { "Cache-Control": "private, no-store" },
     });
   }

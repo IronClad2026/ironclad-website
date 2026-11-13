@@ -2,9 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import {
   isPublicProfileNoticeInstalled,
+  isPublicProfileNoticeVersion,
   noticeReturnPath,
   PUBLIC_PROFILE_NOTICE_PATH,
-  PUBLIC_PROFILE_NOTICE_VERSION,
 } from "@/lib/public-gaming-profile-notice";
 import { savePublicGamingProfileNotice } from "@/lib/public-gaming-profile-notice-server";
 
@@ -29,13 +29,14 @@ export async function POST(request: Request) {
     return backToNotice(currentUrl, "/", "required");
   }
   const versions = form.getAll("noticeVersion");
+  const version = versions[0];
   const checked = form.getAll("acknowledged");
   const returnTo = noticeReturnPath(form.get("returnTo"));
-  if (versions.length !== 1 || versions[0] !== PUBLIC_PROFILE_NOTICE_VERSION ||
+  if (versions.length !== 1 || !isPublicProfileNoticeVersion(version) ||
       checked.length !== 1 || checked[0] !== "yes") {
     return backToNotice(currentUrl, returnTo, "required");
   }
-  if (!await savePublicGamingProfileNotice(userId)) {
+  if (!await savePublicGamingProfileNotice(userId, version)) {
     return backToNotice(currentUrl, returnTo, "unavailable");
   }
   return NextResponse.redirect(new URL(returnTo, currentUrl), { status: 303, headers: HEADERS });

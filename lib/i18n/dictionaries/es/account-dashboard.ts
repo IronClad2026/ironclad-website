@@ -3,7 +3,7 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "Cloudflare Workers comprueba el acceso a las subidas y almacena los clips y las imágenes de vista previa en R2 privado. Cloudflare también recibe metadatos de red y de las solicitudes.",
-    highlightProviderVisibility: "Los clips aptos de los perfiles de jugadores activos son públicos. Los clips ocultos y los de cuentas cerradas no se pueden reproducir públicamente.",
+    highlightProviderVisibility: "Los visitantes pueden reproducir los clips aptos mientras tu perfil sea público. Las restricciones del perfil y la moderación de clips también se aplican a la reproducción.",
     highlightProviderDeletion: "Eliminar un clip o cerrar tu cuenta lo oculta de inmediato. La limpieza del almacenamiento se realiza de forma asíncrona.",
     highlightProviderPrivacy: "Política de privacidad de Cloudflare",
     highlightProviderOpensNewTab: "Se abre en una pestaña nueva",
@@ -12,11 +12,11 @@ const dictionary = {
     latestEmpty: "No hay ninguna idea guardada.",
     conflictResolved: "Se ha cargado la última versión guardada. Tu idea sin guardar se ha conservado. Revísala antes de guardarla.",
     title: "Presentación del jugador",
-    description: "Dale un toque personal a tu perfil público con una idea del momento y un logro conseguido.",
+    description: "Elige una idea del momento y un logro conseguido para tu escaparate.",
     manage: "Gestionar presentación",
     backToDashboard: "Volver al panel",
     publicProfile: "Perfil público",
-    publicVisibilityHelp: "Tu idea del momento y tu logro destacado aparecen en tu perfil público.",
+    publicVisibilityHelp: "Si tu perfil es público, los visitantes pueden ver tu logro destacado y tu idea del momento si es visible.",
     viewPublicProfile: "Ver perfil público",
     thoughtTitle: "Idea del momento",
     thoughtHelp: "Hasta 160 caracteres de texto sin formato. Se permiten emojis; los emojis combinados pueden contar como varios caracteres.",

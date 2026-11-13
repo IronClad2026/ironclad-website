@@ -177,6 +177,7 @@ type Privacy = {
   id: string;
   coh3_profile_id: string | null;
   account_closed_at: string | null;
+  profile_public: boolean;
 };
 type Closure = {
   tournament_bracket_id: string;
@@ -374,8 +375,8 @@ async function loadSnapshot(
     playerIds.length
       ? rows(
           client
-            .from("players")
-            .select("id,coh3_profile_id,account_closed_at", {
+            .from("gaming_profile_disclosure")
+            .select("id,coh3_profile_id,account_closed_at,profile_public", {
               count: "exact",
             })
             .in("id", playerIds)
@@ -684,6 +685,7 @@ export function mapTournamentCompetitionViews(
                     accountClosedAt: player.account_closed_at,
                   }
                 : null,
+              player?.profile_public === true,
             );
             return {
               registrationId: participant.registrationId,
@@ -694,7 +696,7 @@ export function mapTournamentCompetitionViews(
                 ? IRONCLAD_PUBLIC_ORIGIN + participant.profileHref
                 : null,
               relicProfileId:
-                player?.account_closed_at === null
+                player?.account_closed_at === null && player.profile_public === true
                   ? canonicalRelicId(player.coh3_profile_id)
                   : null,
             };
@@ -1034,6 +1036,7 @@ function parsePrivacy(row: Row): Privacy {
     id: id(row.id),
     coh3_profile_id: canonicalRelicId(row.coh3_profile_id),
     account_closed_at: nullableTime(row.account_closed_at),
+    profile_public: row.profile_public === true,
   };
 }
 function canonicalRelicId(value: unknown): string | null {

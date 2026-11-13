@@ -228,7 +228,9 @@ export async function loadAdminTournamentMatchWorkspace(
           ? {
               accountClosedAt: player.account_closed_at,
             }
-          : null
+          : null,
+        // This workspace has already authorized staff to review registration facts.
+        true
       );
 
       bracketParticipants.push(participant);

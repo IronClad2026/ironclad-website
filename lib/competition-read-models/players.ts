@@ -22,6 +22,7 @@ type Identity = {
   relicProfileId: string | null;
   alias: string | null;
   accountClosedAt: string | null;
+  profilePublic: boolean;
 };
 
 type HistoryCandidate = {
@@ -107,7 +108,7 @@ export type PublicPlayerCompetitionLookup =
   | { outcome: "NOT_FOUND" };
 
 const IDENTITY_COLUMNS =
-  "id,coh3_profile_id,in_game_name,display_name,account_closed_at";
+  "id,coh3_profile_id,in_game_name,display_name,account_closed_at,profile_public";
 const CANDIDATE_COLUMNS = "id,tournament_id,registration_status,created_at";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -160,7 +161,7 @@ async function loadHistory(
 
   const { rows: initial } = await readCountedRows(
     client
-      .from("players")
+      .from("gaming_profile_disclosure")
       .select(IDENTITY_COLUMNS, { count: "exact" })
       .eq(identityColumn, identityValue)
       .limit(2),
@@ -224,7 +225,7 @@ async function loadHistory(
   // the canonical binding (for Relic lookups) before disclosing history.
   const { rows: current } = await readCountedRows(
     client
-      .from("players")
+      .from("gaming_profile_disclosure")
       .select(IDENTITY_COLUMNS, { count: "exact" })
       .eq("id", identity.id)
       .limit(2),
@@ -375,7 +376,7 @@ function buildEntry(
 }
 
 function isVisible(identity: Identity) {
-  return identity.accountClosedAt === null;
+  return identity.accountClosedAt === null && identity.profilePublic;
 }
 
 function parseIdentity(value: unknown): Identity {
@@ -391,6 +392,7 @@ function parseIdentity(value: unknown): Identity {
     relicProfileId,
     alias,
     accountClosedAt: nullableTimestamp(row.account_closed_at),
+    profilePublic: row.profile_public === true,
   };
 }
 

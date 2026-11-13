@@ -1,4 +1,8 @@
 export const PUBLIC_PROFILE_NOTICE_VERSION = "public-gaming-profile-v1";
+export const PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION = "public-gaming-profile-v2";
+export type PublicProfileNoticeVersion =
+  | typeof PUBLIC_PROFILE_NOTICE_VERSION
+  | typeof PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION;
 export const PUBLIC_PROFILE_NOTICE_PATH = "/account/public-profile-notice";
 export const ACCOUNT_CLOSE_PATH = "/account/close";
 export const PUBLIC_PROFILE_NOTICE_SAVE_PATH = "/api/account/public-profile-notice";
@@ -6,6 +10,10 @@ export const ACCOUNT_CLOSE_SAVE_PATH = "/api/account/close";
 export const NOTICE_LAYOUT_HEADER = "x-ironclad-notice-layout";
 
 const DOCUMENT_PATHS = new Set(["/privacy", "/terms", "/rules", "/rules/public-gaming-profile"]);
+
+export function isPublicProfileNoticeVersion(version: unknown): version is PublicProfileNoticeVersion {
+  return version === PUBLIC_PROFILE_NOTICE_VERSION || version === PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION;
+}
 
 export function isPublicProfileNoticeInstalled() {
   return process.env.PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED === "true";

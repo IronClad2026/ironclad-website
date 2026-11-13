@@ -162,10 +162,13 @@ export type TournamentParticipantPrivacyState = {
 
 export function mapPublicTournamentParticipant(
   registration: TournamentParticipantRegistrationSnapshot,
-  privacy: TournamentParticipantPrivacyState
+  privacy: TournamentParticipantPrivacyState,
+  profilePublic: boolean
 ): TournamentParticipant {
   const isClosed = privacy?.accountClosedAt != null;
-  const showOptionalFacts = privacy?.accountClosedAt === null;
+  // Historical aliases survive restrictions. Optional profile facts require a
+  // positive disclosure decision for this audience and an open account.
+  const showOptionalFacts = privacy?.accountClosedAt === null && profilePublic === true;
   const profileHref =
     showOptionalFacts && privacy?.playerId
       ? `/players/${privacy.playerId}`

@@ -24,7 +24,7 @@ describe("public tournament participant projection", () => {
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
         accountClosedAt: null,
-      })
+      }, true)
     ).toEqual({
       registrationId: snapshot.registrationId,
       name: "HistoricalIGN",
@@ -43,7 +43,8 @@ describe("public tournament participant projection", () => {
       {
         playerId: publicPlayerId,
         accountClosedAt: null,
-      }
+      },
+      true
     );
 
     expect(participant.elo).toBe(1452);
@@ -54,7 +55,7 @@ describe("public tournament participant projection", () => {
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
         accountClosedAt: null,
-      })
+      }, true)
     ).toEqual(
       expect.objectContaining({
         name: "HistoricalIGN",
@@ -70,7 +71,7 @@ describe("public tournament participant projection", () => {
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
         accountClosedAt: "2026-08-14T00:00:00.000Z",
-      })
+      }, true)
     ).toEqual(
       expect.objectContaining({
         registrationId: snapshot.registrationId,
@@ -83,7 +84,7 @@ describe("public tournament participant projection", () => {
   });
 
   it("fails closed on optional facts when privacy state is unavailable", () => {
-    expect(mapPublicTournamentParticipant(snapshot, null)).toEqual(
+    expect(mapPublicTournamentParticipant(snapshot, null, true)).toEqual(
       expect.objectContaining({
         name: "HistoricalIGN",
         profileHref: null,
@@ -94,7 +95,7 @@ describe("public tournament participant projection", () => {
   });
 
   it("renders and searches masked fields without fake values", () => {
-    const participant = mapPublicTournamentParticipant(snapshot, null);
+    const participant = mapPublicTournamentParticipant(snapshot, null, false);
 
     expect(formatTournamentParticipantFact(participant.country)).toBe("—");
     expect(formatTournamentParticipantFact(participant.elo)).toBe("—");
@@ -103,5 +104,16 @@ describe("public tournament participant projection", () => {
     );
     expect(tournamentParticipantMatchesQuery(participant, "null")).toBe(false);
     expect(tournamentParticipantMatchesQuery(participant, "0")).toBe(false);
+  });
+
+  it("retains the event alias and entry while withholding optional facts for an active restricted profile", () => {
+    expect(mapPublicTournamentParticipant(snapshot, { playerId: publicPlayerId, accountClosedAt: null }, false)).toMatchObject({
+      registrationId: snapshot.registrationId,
+      name: "HistoricalIGN",
+      status: "approved",
+      profileHref: null,
+      country: null,
+      elo: null,
+    });
   });
 });

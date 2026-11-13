@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { supabaseUrl } from "@/lib/supabase-config";
 import { AVATAR_SIGNED_URL_TTL_SECONDS, isExpectedAvatarSignedUrl, readBoundedAvatar } from "@/lib/avatar-proxy";
@@ -39,26 +40,18 @@ export async function GET(
   }
 
   const supabase = createSupabaseAdminClient();
-  const { data: player, error: playerError } = await supabase
-    .from("players")
-    .select("clerk_user_id, avatar_url, account_closed_at")
-    .eq("id", playerId)
-    .maybeSingle();
-
-  if (playerError) {
-    console.error("Public player avatar lookup failed:", playerError);
-    return createFallbackAvatarResponse();
-  }
-
-  if (!player?.avatar_url || !player.clerk_user_id || player.account_closed_at !== null) {
-    return createFallbackAvatarResponse();
-  }
-
   try {
-    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(player.clerk_user_id)) return createFallbackAvatarResponse();
+    const { userId } = await auth();
+    const { data: ownerId, error: targetError } = await supabase.rpc("get_gaming_profile_avatar_target", {
+      p_player_id: playerId,
+      p_viewer_subject: userId,
+    }).abortSignal(AbortSignal.timeout(4_000));
+    if (targetError || typeof ownerId !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(ownerId)) {
+      return createFallbackAvatarResponse();
+    }
     const { data, error } = await supabase.storage.from(AVATAR_BUCKET)
-      .createSignedUrl(`${player.clerk_user_id}/avatar`, AVATAR_SIGNED_URL_TTL_SECONDS);
-    if (error || !data?.signedUrl || !isExpectedAvatarSignedUrl(data.signedUrl, supabaseUrl, player.clerk_user_id)) return createFallbackAvatarResponse();
+      .createSignedUrl(`${ownerId}/avatar`, AVATAR_SIGNED_URL_TTL_SECONDS);
+    if (error || !data?.signedUrl || !isExpectedAvatarSignedUrl(data.signedUrl, supabaseUrl, ownerId)) return createFallbackAvatarResponse();
     const avatar = await readBoundedAvatar(data.signedUrl, request.signal);
     if (!avatar) return createFallbackAvatarResponse();
     return new Response(avatar.bytes, { headers: {

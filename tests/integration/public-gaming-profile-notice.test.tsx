@@ -40,6 +40,7 @@ import {
   PUBLIC_PROFILE_NOTICE_PATH,
   PUBLIC_PROFILE_NOTICE_SAVE_PATH,
   PUBLIC_PROFILE_NOTICE_VERSION,
+  PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION,
 } from "@/lib/public-gaming-profile-notice";
 
 const origin = "https://test.ironclad.invalid";
@@ -70,7 +71,7 @@ beforeEach(() => {
   vi.stubEnv("PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED", "true");
   mocks.auth.mockResolvedValue(identity);
   mocks.locale.mockResolvedValue("en");
-  mocks.state.mockResolvedValue("required");
+  mocks.state.mockResolvedValue({ status: "required", version: PUBLIC_PROFILE_NOTICE_VERSION });
   mocks.save.mockResolvedValue(true);
   mocks.protect.mockResolvedValue(undefined);
 });
@@ -102,12 +103,24 @@ describe("public gaming profile acknowledgement UI", () => {
   });
 
   it("shows retry and closure controls without offering a write during outage", async () => {
-    mocks.state.mockResolvedValue("unavailable");
+    mocks.state.mockResolvedValue({ status: "unavailable" });
     render(await PublicProfileNoticePage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByRole("alert")).toBeVisible();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Try again" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Close account" })).toBeVisible();
+  });
+
+  it.each(SUPPORTED_LOCALES)("renders the current transition copy and untouched checkbox in %s", async (locale) => {
+    mocks.locale.mockResolvedValue(locale);
+    mocks.state.mockResolvedValue({ status: "required", version: PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION });
+    const copy = getPublicGamingProfileNoticeCopy(locale, PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION);
+    render(await PublicProfileNoticePage({ searchParams: Promise.resolve({ returnTo: "/profile" }) }));
+    expect(screen.getByText(copy.legacyVisibility!)).toBeVisible();
+    const checkbox = screen.getByRole("checkbox", { name: copy.checkbox });
+    expect(checkbox).toBeRequired();
+    expect(checkbox).not.toBeChecked();
+    expect(new FormData(checkbox.closest("form")!).get("noticeVersion")).toBe(PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION);
   });
 });
 
@@ -119,7 +132,20 @@ describe("acknowledgement form and closure escape", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(origin + "/admin?section=inbox");
     expect(response.headers.get("cache-control")).toContain("no-store");
-    expect(mocks.save).toHaveBeenCalledWith(identity.userId);
+    expect(mocks.save).toHaveBeenCalledWith(identity.userId, PUBLIC_PROFILE_NOTICE_VERSION);
+  });
+
+  it("uses the version acknowledged in the browser so the database can reject stale forms", async () => {
+    const form = checked("/profile");
+    form.set("noticeVersion", PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION);
+    const response = await save(post(PUBLIC_PROFILE_NOTICE_SAVE_PATH, form));
+    expect(response.headers.get("location")).toBe(origin + "/profile");
+    expect(mocks.save).toHaveBeenLastCalledWith(identity.userId, PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION);
+
+    mocks.save.mockResolvedValueOnce(false);
+    const stale = await save(post(PUBLIC_PROFILE_NOTICE_SAVE_PATH, checked("/profile")));
+    expect(stale.headers.get("location")).toContain("error=unavailable");
+    expect(mocks.save).toHaveBeenLastCalledWith(identity.userId, PUBLIC_PROFILE_NOTICE_VERSION);
   });
 
   it.each(["unchecked", "duplicate", "stale"] as const)("rejects %s submissions before writing", async (type) => {
@@ -201,10 +227,16 @@ describe("live-site request boundary using simulated Clerk authority", () => {
   });
 
   it.each(["satisfied", "inactive"])("keeps protected navigation working when %s", async (state) => {
-    mocks.state.mockResolvedValue(state);
+    mocks.state.mockResolvedValue({ status: state, version: PUBLIC_PROFILE_NOTICE_VERSION });
     const response = await invokeProxy("/dashboard");
     expect(response?.headers.get("x-middleware-next")).toBe("1");
     expect(response?.headers.get("x-middleware-request-" + NOTICE_LAYOUT_HEADER)).toBeNull();
+  });
+
+  it("requires a fresh acknowledgement when the transition version is pending", async () => {
+    mocks.state.mockResolvedValue({ status: "required", version: PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION });
+    expect((await invokeProxy("/profile", "POST"))?.status).toBe(403);
+    expect((await invokeProxy("/profile"))?.headers.get("location")).toContain(PUBLIC_PROFILE_NOTICE_PATH);
   });
 
   it.each(["//evil.invalid", "/\\evil.invalid", "/%2Fevil.invalid", "/account/public-profile-notice", "/api/account/close", "/sign-in"])(

@@ -49,3 +49,17 @@ test("narrow touch view exposes notice and controls without horizontal scrolling
     await context.close();
   }
 });
+
+test("transition disclosure posts its own version and leaves publication a separate choice", async ({ page }) => {
+  await page.goto(path + "?notice=v2", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText(/If your profile was off.*Acknowledging this notice does not change your visibility/)).toBeVisible();
+  const checkbox = page.getByRole("checkbox", { name: "I acknowledge how IronClad displays gaming profiles and official tournament information." });
+  await expect(checkbox).not.toBeChecked();
+  await checkbox.check();
+  const submitted = page.waitForRequest("**/api/account/public-profile-notice");
+  await page.route("**/api/account/public-profile-notice", route => route.fulfill({ status: 204 }));
+  await page.getByRole("button", { name: "Acknowledge and continue" }).click();
+  const body = new URLSearchParams((await submitted).postData() ?? "");
+  expect(body.get("noticeVersion")).toBe("public-gaming-profile-v2");
+  expect([...body.keys()].sort()).toEqual(["acknowledged", "noticeVersion", "returnTo"]);
+});

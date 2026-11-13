@@ -1,31 +1,33 @@
 import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { PUBLIC_PROFILE_NOTICE_VERSION } from "@/lib/public-gaming-profile-notice";
+import { isPublicProfileNoticeVersion, type PublicProfileNoticeVersion } from "@/lib/public-gaming-profile-notice";
 
-type NoticeState = "inactive" | "required" | "satisfied" | "unavailable";
+export type NoticeState =
+  | { status: "inactive" | "unavailable" }
+  | { status: "required" | "satisfied"; version: PublicProfileNoticeVersion };
 
 export async function loadPublicGamingProfileNotice(userId: string): Promise<NoticeState> {
   try {
     const result = await createSupabaseAdminClient()
       .rpc("get_public_gaming_profile_notice_state", { p_subject: userId })
       .abortSignal(AbortSignal.timeout(4000));
-    if (result.error || !result.data || typeof result.data !== "object") return "unavailable";
-    if (result.data.version === null && result.data.satisfied === true) return "inactive";
-    if (result.data.version !== PUBLIC_PROFILE_NOTICE_VERSION) return "unavailable";
-    if (result.data.satisfied === true) return "satisfied";
-    return result.data.satisfied === false ? "required" : "unavailable";
+    if (result.error || !result.data || typeof result.data !== "object") return { status: "unavailable" };
+    const { version, satisfied } = result.data;
+    if (version === null && satisfied === true) return { status: "inactive" };
+    if (!isPublicProfileNoticeVersion(version) || typeof satisfied !== "boolean") return { status: "unavailable" };
+    return { status: satisfied ? "satisfied" : "required", version };
   } catch {
-    return "unavailable";
+    return { status: "unavailable" };
   }
 }
 
-export async function savePublicGamingProfileNotice(userId: string): Promise<boolean> {
+export async function savePublicGamingProfileNotice(userId: string, version: PublicProfileNoticeVersion): Promise<boolean> {
   try {
     const result = await createSupabaseAdminClient()
       .rpc("acknowledge_public_gaming_profile_notice", {
         p_subject: userId,
-        p_expected_version: PUBLIC_PROFILE_NOTICE_VERSION,
+        p_expected_version: version,
       })
       .abortSignal(AbortSignal.timeout(4000));
     return !result.error && typeof result.data === "string" && Number.isFinite(Date.parse(result.data));

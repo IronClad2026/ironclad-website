@@ -117,7 +117,7 @@ function transport(
       method,
       prefer: new Headers(init?.headers).get("prefer"),
     });
-    if (url.pathname === "/rest/v1/players" && method === "GET") {
+    if (url.pathname === "/rest/v1/gaming_profile_disclosure" && method === "GET") {
       playerReads++;
       const row = {
         id: playerId,
@@ -125,6 +125,7 @@ function transport(
         in_game_name: "Public alias",
         display_name: "Public alias",
         public_profile_enabled: false,
+        profile_public: true,
         account_closed_at:
           options.closedOnRecheck && playerReads > 1
             ? "2026-10-27T00:00:00.000Z"

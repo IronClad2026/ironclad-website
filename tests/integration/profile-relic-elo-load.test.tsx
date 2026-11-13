@@ -1,13 +1,15 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { playerIdentity } from "@/tests/fixtures/auth";
 import { loadDictionary } from "@/lib/i18n/loaders";
+import GamingProfilePublicationCard from "@/components/GamingProfilePublicationCard";
 
 const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
 const getOwnActiveTournamentEloSnapshotsMock = vi.hoisted(() => vi.fn());
 const redirectMock = vi.hoisted(() => vi.fn());
+const deleteAccountSectionMock = vi.hoisted(() => vi.fn());
 const playerProfileFormMock = vi.hoisted(() => vi.fn());
 const relicEloVerificationCardMock = vi.hoisted(() => vi.fn());
 
@@ -20,7 +22,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/components/DeleteAccountSection", () => ({
-  default: vi.fn(),
+  default: deleteAccountSectionMock,
 }));
 
 vi.mock("@/components/PlayerProfileForm", () => ({
@@ -163,6 +165,8 @@ describe("profile Relic ELO protected load", () => {
     );
   });
 
+  afterEach(() => vi.unstubAllEnvs());
+
   it("measures 30 delayed profile loads while retaining safe fields and caller scope", async () => {
     vi.useFakeTimers();
     try {
@@ -209,6 +213,51 @@ describe("profile Relic ELO protected load", () => {
     expect(findElementByType(page, relicEloVerificationCardMock)?.props).toMatchObject({ hasPlayer: false, initialVerification: null });
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
     expect(getOwnActiveTournamentEloSnapshotsMock).not.toHaveBeenCalled();
+  });
+
+  it("withholds the new profile form while publication status fails, keeping account closure available", async () => {
+    vi.stubEnv("PATCH2_GAMING_PROFILE_PUBLICATION_ENABLED", "true");
+    const profile = createSingleRowClient(null);
+    const rpc = vi.fn()
+      .mockReturnValueOnce({ abortSignal: vi.fn().mockResolvedValue({ data: null, error: { code: "57014" } }) })
+      .mockReturnValueOnce({ abortSignal: vi.fn().mockResolvedValue({
+        data: { mode: "new", public: true, revision: 0, objectionOpen: false },
+        error: null,
+      }) });
+    createAuthenticatedSupabaseClientMock.mockResolvedValue({ ...profile.client, rpc });
+
+    const failure = await ProfilePage({ searchParams: Promise.resolve({}) });
+    expect(findElementByType(failure, playerProfileFormMock)).toBeNull();
+    expect(findElementByType(failure, deleteAccountSectionMock)).not.toBeNull();
+    expect(JSON.stringify(failure)).toContain("Refresh the page and try again.");
+
+    const retry = await ProfilePage({ searchParams: Promise.resolve({}) });
+    expect(findElementByType(retry, GamingProfilePublicationCard)?.props.publication)
+      .toEqual({ mode: "new", public: true, revision: 0, objectionOpen: false });
+    expect(findElementByType(retry, playerProfileFormMock)).not.toBeNull();
+  });
+
+  it("leaves the new profile form available when the publication RPC successfully returns no state", async () => {
+    vi.stubEnv("PATCH2_GAMING_PROFILE_PUBLICATION_ENABLED", "true");
+    const profile = createSingleRowClient(null);
+    const rpc = vi.fn().mockReturnValue({ abortSignal: vi.fn().mockResolvedValue({ data: null, error: null }) });
+    createAuthenticatedSupabaseClientMock.mockResolvedValue({ ...profile.client, rpc });
+
+    const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    expect(findElementByType(page, GamingProfilePublicationCard)).toBeNull();
+    expect(findElementByType(page, playerProfileFormMock)).not.toBeNull();
+  });
+
+  it("keeps existing profile edits available while the optional publication state fails", async () => {
+    vi.stubEnv("PATCH2_GAMING_PROFILE_PUBLICATION_ENABLED", "true");
+    const profile = createSingleRowClient(profileRow);
+    const rpc = vi.fn().mockReturnValue({ abortSignal: vi.fn().mockRejectedValue(new Error("fixture outage")) });
+    createAuthenticatedSupabaseClientMock.mockResolvedValue({ ...profile.client, rpc });
+    createSupabaseAdminClientMock.mockReturnValue(createSingleRowClient(protectedProfileRow).client);
+
+    const page = await ProfilePage({ searchParams: Promise.resolve({}) });
+    expect(findElementByType(page, GamingProfilePublicationCard)).toBeNull();
+    expect(findElementByType(page, playerProfileFormMock)?.props.profile).toEqual(profileRow);
   });
 
   it("retains own snapshots when protected status acquisition fails", async () => {

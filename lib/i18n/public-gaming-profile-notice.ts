@@ -1,8 +1,10 @@
 import type { Locale } from "@/lib/i18n/config";
+import { PUBLIC_PROFILE_NOTICE_VERSION, PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION, type PublicProfileNoticeVersion } from "@/lib/public-gaming-profile-notice";
 
 type NoticeCopy = {
   title: string;
   publicFields: string;
+  legacyVisibility?: string;
   contact: string;
   privateFields: string;
   checkbox: string;
@@ -211,6 +213,54 @@ const COPY = {
   },
 } satisfies Record<Locale, NoticeCopy>;
 
-export function getPublicGamingProfileNoticeCopy(locale: Locale): NoticeCopy {
-  return COPY[locale];
+const TRANSITION_COPY = {
+  en: {
+    publicFields: "Visitors can see public IronClad gaming profiles without signing in. A public profile can show a display name, in-game name, country, competitive region, rating, avatar and published Showcase content. Official tournament records can show participation, results, standings and competition history.",
+    legacyVisibility: "Gaming profiles created under the current Terms after the policy takes effect are public. Existing profiles keep their previous visibility treatment. If your profile was off, your earlier choice is unclear or a privacy objection is open, your full profile stays restricted. Acknowledging this notice does not change your visibility.",
+    checkbox: "I acknowledge how IronClad displays gaming profiles and official tournament information.",
+  },
+  it: {
+    publicFields: "Chiunque può vedere i profili di gioco pubblici di IronClad senza accedere. Un profilo pubblico può mostrare il nome visualizzato, il nome di gioco, il paese, la regione competitiva, il punteggio, l’avatar e i contenuti pubblicati nella vetrina. I registri ufficiali dei tornei possono mostrare la partecipazione, i risultati, le classifiche e la cronologia competitiva.",
+    legacyVisibility: "I profili creati secondo le Condizioni attuali dopo l’entrata in vigore dell’informativa sono pubblici. Per i profili esistenti restano valide le regole di visibilità già applicate. Se avevi disattivato il profilo pubblico, se la tua scelta precedente non è chiara o se una tua opposizione per motivi di privacy è ancora in esame, l’accesso al tuo profilo completo resta limitato. La presa d’atto non cambia la visibilità del tuo profilo.",
+    checkbox: "Prendo atto di come IronClad mostra i profili di gioco e le informazioni ufficiali sui tornei.",
+  },
+  "zh-CN": {
+    publicFields: "访客无需登录即可查看 IronClad 的公开游戏资料。公开资料可能显示显示名称、游戏内名称、国家或地区、竞技赛区、评分、头像以及已发布的展示内容。官方赛事记录可能显示参赛情况、赛果、排名和比赛历史。",
+    legacyVisibility: "政策生效后依据现行条款创建的游戏资料会公开。现有资料会保留原有的可见性安排。如果你之前关闭了公开资料、我们无法确认你之前的选择，或者你提出的隐私异议尚未处理完毕，你的完整资料将继续限制公开。确认此通知不会更改资料的可见性。",
+    checkbox: "我已知悉 IronClad 如何展示游戏资料和官方赛事信息。",
+  },
+  ru: {
+    publicFields: "Посетители могут просматривать публичные игровые профили IronClad без входа в аккаунт. В публичном профиле могут отображаться имя, игровой псевдоним, страна, соревновательный регион, рейтинг, аватар и опубликованные материалы витрины. В официальных записях турниров могут отображаться участие, результаты, позиции в таблицах и история соревнований.",
+    legacyVisibility: "Игровые профили, созданные по действующим Условиям после вступления политики в силу, являются публичными. Для существующих профилей сохраняется прежний порядок видимости. Если вы отключили публичный профиль, ваш прежний выбор неизвестен или ваше возражение по поводу конфиденциальности ещё рассматривается, доступ к полному профилю остаётся ограниченным. Подтверждение ознакомления не меняет видимость профиля.",
+    checkbox: "Подтверждаю, что ознакомился с тем, как IronClad показывает игровые профили и официальную информацию о турнирах.",
+  },
+  es: {
+    publicFields: "Los visitantes pueden ver los perfiles de juego públicos de IronClad sin iniciar sesión. Un perfil público puede mostrar el nombre visible, el nombre en el juego, el país, la región competitiva, la puntuación, el avatar y el contenido publicado en la sección de destacados. Los registros oficiales de torneos pueden mostrar participación, resultados, clasificaciones e historial competitivo.",
+    legacyVisibility: "Los perfiles creados según las Condiciones vigentes tras la entrada en vigor de la política son públicos. Los perfiles existentes conservan su régimen de visibilidad previo. Si desactivaste el perfil público, no se conoce tu elección anterior o tienes una objeción de privacidad pendiente, el acceso a tu perfil completo seguirá restringido. Confirmar que has leído este aviso no cambia la visibilidad.",
+    checkbox: "Confirmo que he leído cómo IronClad muestra los perfiles de juego y la información oficial de los torneos.",
+  },
+  "pt-BR": {
+    publicFields: "Visitantes podem ver os perfis de jogo públicos do IronClad sem fazer login. Um perfil público pode mostrar o nome de exibição, o nome no jogo, o país, a região competitiva, a classificação, o avatar e o conteúdo publicado na vitrine. Os registros oficiais de torneios podem mostrar participação, resultados, tabelas de classificação e histórico competitivo.",
+    legacyVisibility: "Os perfis criados sob os Termos vigentes depois que a política entrar em vigor são públicos. Os perfis existentes mantêm o tratamento de visibilidade anterior. Se você desativou o perfil público, sua escolha anterior não é conhecida ou há uma objeção de privacidade pendente, o acesso ao seu perfil completo permanece restrito. Confirmar a leitura deste aviso não muda a visibilidade do seu perfil.",
+    checkbox: "Confirmo que li como o IronClad exibe os perfis de jogo e as informações oficiais dos torneios.",
+  },
+  ko: {
+    publicFields: "방문자는 로그인하지 않고 IronClad의 공개 게임 프로필을 볼 수 있습니다. 공개 프로필에는 표시 이름, 게임 내 이름, 국가, 경쟁 지역, 레이팅, 아바타, 공개한 쇼케이스 콘텐츠가 표시될 수 있습니다. 공식 대회 기록에는 참가 여부, 경기 결과, 순위 및 대회 이력이 표시될 수 있습니다.",
+    legacyVisibility: "정책 시행 후 현행 이용약관에 따라 생성한 게임 프로필은 공개됩니다. 기존 프로필에는 이전 공개 범위가 유지됩니다. 공개 프로필을 꺼 두었거나, 이전 선택을 확인할 수 없거나, 개인정보 공개에 대한 이의 제기가 처리 중이면 전체 프로필의 공개가 계속 제한됩니다. 이 안내를 확인해도 프로필 공개 범위는 바뀌지 않습니다.",
+    checkbox: "IronClad가 게임 프로필과 공식 대회 정보를 어떻게 표시하는지 확인했습니다.",
+  },
+  fr: {
+    publicFields: "Les visiteurs peuvent consulter les profils de jeu publics d’IronClad sans se connecter. Un profil public peut afficher le nom d’affichage, le nom en jeu, le pays, la région de compétition, la cote, l’avatar et les contenus publiés dans la vitrine. Les archives officielles des tournois peuvent afficher la participation, les résultats, les classements et l’historique des compétitions.",
+    legacyVisibility: "Les profils créés sous les Conditions actuelles après l’entrée en vigueur de la politique sont publics. Les profils existants conservent leur régime de visibilité. Si vous aviez désactivé le profil public, si votre choix antérieur reste inconnu ou si une opposition liée à la confidentialité est en cours d’examen, l’accès à votre profil complet reste limité. Confirmer la lecture de cet avis ne change pas la visibilité du profil.",
+    checkbox: "Je reconnais avoir pris connaissance de la façon dont IronClad affiche les profils de jeu et les informations officielles des tournois.",
+  },
+} satisfies Record<Locale, Pick<NoticeCopy, "publicFields" | "legacyVisibility" | "checkbox">>;
+
+export function getPublicGamingProfileNoticeCopy(
+  locale: Locale,
+  version: PublicProfileNoticeVersion = PUBLIC_PROFILE_NOTICE_VERSION,
+): NoticeCopy {
+  return version === PUBLIC_PROFILE_TRANSITION_NOTICE_VERSION
+    ? { ...COPY[locale], ...TRANSITION_COPY[locale] }
+    : COPY[locale];
 }

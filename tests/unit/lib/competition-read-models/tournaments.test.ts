@@ -62,6 +62,7 @@ function fixture(): TournamentCompetitionSnapshot {
       id: uid(n),
       coh3_profile_id: String(123456 + n),
       account_closed_at: null,
+      profile_public: true,
     })),
     generatedBrackets: [
       {
@@ -593,7 +594,7 @@ function database(
     tournaments: s.tournaments,
     tournament_brackets: s.divisions,
     registrations: s.registrations,
-    players: s.privacy,
+    gaming_profile_disclosure: s.privacy,
     generated_brackets: s.generatedBrackets,
     bracket_rounds: s.rounds,
     tournament_matches: s.matches.map((row) => ({
@@ -685,8 +686,8 @@ describe("bounded SELECT-only tournament selectors", () => {
         (call) => call.limit === 1000 && !call.select?.includes("*"),
       ),
     ).toBe(true);
-    expect(db.calls.find((call) => call.table === "players")?.select).toBe(
-      "id,coh3_profile_id,account_closed_at",
+    expect(db.calls.find((call) => call.table === "gaming_profile_disclosure")?.select).toBe(
+      "id,coh3_profile_id,account_closed_at,profile_public",
     );
     expect(
       db.calls.find((call) => call.table === "match_result_report_groups")

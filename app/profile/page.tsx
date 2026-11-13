@@ -3,16 +3,19 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import PlayerProfileForm from "@/components/PlayerProfileForm";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
+import GamingProfilePublicationCard from "@/components/GamingProfilePublicationCard";
 import RelicEloVerificationCard from "@/components/RelicEloVerificationCard";
 import SteamConnectionCard from "@/components/SteamConnectionCard";
 import { getOwnActiveTournamentEloSnapshots } from "@/lib/active-tournament-elo-snapshots";
 import { getIronCladDivision } from "@/lib/elo-verification/divisions";
+import { isGamingProfilePublicationUiEnabled, readGamingProfilePublication } from "@/lib/gaming-profile-publication-server";
 import {
   type PlayerProfile,
 } from "@/lib/player-profile";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 import { loadDictionary } from "@/lib/i18n/loaders";
+import { getGamingProfilePublicationCopy } from "@/lib/i18n/gaming-profile-publication";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
 
@@ -173,19 +176,24 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const steamConnectionResult = getSteamConnectionResult(steam);
   const supabase = await createAuthenticatedSupabaseClient();
 
-  const { data, error } = await supabase
-    .from("players")
-    .select(
-      "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, country, region, timezone, avatar_url, bio, profile_completed, created_at, updated_at"
-    )
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
+  const [{ data, error }, publicationRead] = await Promise.all([
+    supabase
+      .from("players")
+      .select(
+        "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, country, region, timezone, avatar_url, bio, profile_completed, created_at, updated_at"
+      )
+      .eq("clerk_user_id", userId)
+      .maybeSingle(),
+    isGamingProfilePublicationUiEnabled() ? readGamingProfilePublication(supabase) : null,
+  ]);
 
   if (error) {
     console.error("Player profile load error:", error);
   }
 
   const profile = (data ?? null) as ProfilePagePlayer | null;
+  const publication = publicationRead?.publication;
+  const profileUnavailable = Boolean(error) || (!profile && publicationRead?.status === "unavailable");
   let steamConnected = false;
   let steamStatusAvailable = true;
   let initialVerification: RelicVerification | null = null;
@@ -297,36 +305,40 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
         </div>
 
-        {error ? (
-          <div className="mt-8 border border-red-500/30 bg-red-500/10 p-5 text-red-300 shadow-2xl shadow-black/30 backdrop-blur">
-            {t("profilePage.loadError")}
-          </div>
-        ) : (
-          <div className="mt-8">
-            <PlayerProfileForm
-              profile={profile}
-              verifiedCurrentElo={initialVerification?.elo ?? null}
-              activeTournamentEloSnapshots={activeTournamentEloSnapshots}
-            />
+        <div className="mt-8">
+          {profileUnavailable ? (
+            <div role="alert" className="border border-red-500/30 bg-red-500/10 p-5 text-red-300 shadow-2xl shadow-black/30 backdrop-blur">
+              {t("profilePage.loadError")}
+            </div>
+          ) : (
+            <>
+              {publication && (profile || publication.mode === "new") && (
+                <GamingProfilePublicationCard publication={publication} copy={getGamingProfilePublicationCopy(locale)} hasProfile={Boolean(profile)} />
+              )}
+              <PlayerProfileForm
+                profile={profile}
+                verifiedCurrentElo={initialVerification?.elo ?? null}
+                activeTournamentEloSnapshots={activeTournamentEloSnapshots}
+              />
 
-            <SteamConnectionCard
-              connected={steamConnected}
-              hasPlayer={Boolean(profile)}
-              result={steamConnectionResult}
-              statusAvailable={steamStatusAvailable}
-            />
+              <SteamConnectionCard
+                connected={steamConnected}
+                hasPlayer={Boolean(profile)}
+                result={steamConnectionResult}
+                statusAvailable={steamStatusAvailable}
+              />
 
-            <RelicEloVerificationCard
-              hasPlayer={Boolean(profile)}
-              steamConnected={steamConnected}
-              statusAvailable={steamStatusAvailable}
-              initialVerification={initialVerification}
-              initialRefreshAvailableAt={initialRefreshAvailableAt}
-            />
-
-            <DeleteAccountSection />
-          </div>
-        )}
+              <RelicEloVerificationCard
+                hasPlayer={Boolean(profile)}
+                steamConnected={steamConnected}
+                statusAvailable={steamStatusAvailable}
+                initialVerification={initialVerification}
+                initialRefreshAvailableAt={initialRefreshAvailableAt}
+              />
+            </>
+          )}
+          <DeleteAccountSection />
+        </div>
       </section>
     </main>
   );

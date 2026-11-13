@@ -3,7 +3,7 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "Cloudflare Workers는 업로드 권한을 확인하고 클립과 미리보기 이미지를 비공개 R2 저장소에 보관합니다. Cloudflare는 네트워크 및 요청 메타데이터도 수신합니다.",
-    highlightProviderVisibility: "활성 플레이어 프로필의 공개 조건을 충족하는 클립은 공개됩니다. 숨겨진 클립과 폐쇄된 계정의 클립은 공개 재생할 수 없습니다.",
+    highlightProviderVisibility: "프로필이 공개되어 있으면 방문자가 조건을 충족하는 클립을 재생할 수 있습니다. 프로필 공개 제한과 클립 검토 결과는 재생에도 적용됩니다.",
     highlightProviderDeletion: "클립을 제거하거나 계정을 폐쇄하면 클립이 즉시 숨겨집니다. 저장소 정리는 비동기적으로 진행됩니다.",
     highlightProviderPrivacy: "Cloudflare 개인정보 처리방침",
     highlightProviderOpensNewTab: "새 탭에서 열림",
@@ -12,11 +12,11 @@ const dictionary = {
     latestEmpty: "저장된 생각이 없습니다.",
     conflictResolved: "최근 저장된 버전을 불러왔습니다. 아직 저장하지 않은 생각은 그대로 유지됩니다. 저장하기 전에 확인하세요.",
     title: "플레이어 쇼케이스",
-    description: "지금 드는 생각과 획득한 업적 하나로 공개 프로필에 개성을 더하세요.",
+    description: "쇼케이스에 표시할 지금 드는 생각과 획득한 업적 하나를 선택하세요.",
     manage: "쇼케이스 관리",
     backToDashboard: "대시보드로 돌아가기",
     publicProfile: "공개 프로필",
-    publicVisibilityHelp: "지금 드는 생각과 대표 업적이 공개 프로필에 표시됩니다.",
+    publicVisibilityHelp: "프로필이 공개되어 있으면 방문자가 대표 업적과 공개 상태인 지금 드는 생각을 볼 수 있습니다.",
     viewPublicProfile: "공개 프로필 보기",
     thoughtTitle: "지금 드는 생각",
     thoughtHelp: "일반 텍스트로 최대 160자까지 작성할 수 있습니다. 이모지도 사용할 수 있으며, 조합형 이모지는 여러 글자로 계산될 수 있습니다.",

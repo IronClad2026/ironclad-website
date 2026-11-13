@@ -3,7 +3,7 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "O Cloudflare Workers verifica o acesso ao envio e armazena clipes e imagens de prévia no R2 privado. A Cloudflare também recebe metadados de rede e das solicitações.",
-    highlightProviderVisibility: "Os clipes elegíveis nos perfis de jogadores ativos são públicos. Clipes ocultos e clipes de contas encerradas não podem ser reproduzidos publicamente.",
+    highlightProviderVisibility: "Os visitantes podem reproduzir os clipes elegíveis enquanto seu perfil estiver público. As restrições do perfil e a moderação dos clipes também se aplicam à reprodução.",
     highlightProviderDeletion: "Remover um clipe ou encerrar sua conta o oculta imediatamente. A limpeza do armazenamento ocorre de forma assíncrona.",
     highlightProviderPrivacy: "Política de privacidade da Cloudflare",
     highlightProviderOpensNewTab: "Abre em uma nova aba",
@@ -12,11 +12,11 @@ const dictionary = {
     latestEmpty: "Nenhum pensamento salvo.",
     conflictResolved: "A última versão salva foi carregada. Seu pensamento ainda não salvo foi mantido. Revise-o antes de salvar.",
     title: "Destaques do jogador",
-    description: "Deixe seu perfil público com a sua cara: compartilhe um pensamento e destaque uma conquista.",
+    description: "Escolha um pensamento do momento e uma conquista obtida para sua vitrine.",
     manage: "Gerenciar destaques",
     backToDashboard: "Voltar ao painel",
     publicProfile: "Perfil público",
-    publicVisibilityHelp: "Seu pensamento do momento e sua conquista em destaque aparecem no perfil público.",
+    publicVisibilityHelp: "Quando seu perfil estiver público, os visitantes poderão ver a conquista em destaque e seu pensamento do momento, se estiver visível.",
     viewPublicProfile: "Ver perfil público",
     thoughtTitle: "Pensamento do momento",
     thoughtHelp: "Até 160 caracteres de texto simples. Emojis são permitidos; emojis combinados podem contar como vários caracteres.",
