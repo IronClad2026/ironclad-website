@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import LegalDocumentPage from "@/components/legal/LegalDocumentPage";
+import StagingProfilePolicyReviewLink from "@/components/legal/StagingProfilePolicyReviewLink";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 
@@ -18,5 +19,10 @@ export default async function PrivacyPage() {
   const locale = await getRequestLocale();
   const copy = await loadDictionary(locale, "help-legal-ui");
 
-  return <LegalDocumentPage copy={copy} kind="privacy" locale={locale} />;
+  return (
+    <>
+      <LegalDocumentPage copy={copy} kind="privacy" locale={locale} />
+      <StagingProfilePolicyReviewLink />
+    </>
+  );
 }
