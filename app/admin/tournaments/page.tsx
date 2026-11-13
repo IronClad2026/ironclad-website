@@ -99,6 +99,10 @@ export default async function AdminTournamentsPage({
   );
   const pendingCleanupJobs = pendingCleanupResult.data ?? [];
 
+  if (!(await hasAdminPageAccess("/admin/tournaments", params))) {
+    return <AdminAccessRequired />;
+  }
+
   return (
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32">
       <section className="mx-auto max-w-7xl">

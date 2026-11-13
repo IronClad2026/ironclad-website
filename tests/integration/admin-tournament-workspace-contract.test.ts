@@ -873,7 +873,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     ] as const) {
       expect(compact(source[key]), key).toContain('import "server-only"');
       expect(compact(source[key]), key).toContain(
-        key === "registrationWorkspace" ? "await requireCurrentPatch2Admin()" : "await auth()"
+        key === "matchWorkspace" ? "await auth()" : "await requireCurrentPatch2Admin()"
       );
     }
 
@@ -1054,6 +1054,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261102195256_patch2_private_assistance_active_actor.sql",
         "20261113000000_patch2_private_assistance_server_boundary.sql",
         "20261113010000_patch2_durable_account_closure.sql",
+        "20261113045827_patch2_verified_staff_access.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([

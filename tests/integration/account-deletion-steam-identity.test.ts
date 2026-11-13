@@ -227,7 +227,7 @@ describe("Steam identity account-deletion regression", () => {
   it("revokes staff-only Patch 2 access when Clerk deletion fails and the session still looks active", async () => {
     const subject = adminIdentity.userId!;
     const sessionId = "sess_staff_only_closure";
-    let state = "no-player";
+    let state = "verified-staff";
     const deletion = createAccountDeletionClient({ closureData: { outcome: "not_found" } });
     const deleteUser = vi.fn(async () => { throw new Error("Clerk unavailable"); });
     const getUser = vi.fn(async () => ({

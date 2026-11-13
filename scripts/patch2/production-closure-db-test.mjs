@@ -74,11 +74,14 @@ const boundaryHash = sha(boundarySql);
 const closureFile = "20261113010000_patch2_durable_account_closure.sql";
 const closureSql = (await readFile(resolve(ROOT, "supabase/migrations", closureFile), "utf8")).replace(/\r\n/g, "\n");
 const closureHash = sha(closureSql);
+const staffFile = "20261113045827_patch2_verified_staff_access.sql";
+const staffSql = (await readFile(resolve(ROOT, "supabase/migrations", staffFile), "utf8")).replace(/\r\n/g, "\n");
+const staffHash = sha(staffSql);
 const report = { target: `${HOST}:${PORT} fresh disposable PostgreSQL17`, snapshotSha256: SNAPSHOT_SHA,
   policySupplementSha256: sha(policyRaw), fidelitySupplementSha256: sha(fidelityRaw),
   snapshotCapturedThrough: snapshot.capturedThrough,
   migrations: [...frozenMigrations.map(({ file, sha256 }) => ({ file, sha256 })), { file: boundaryFile, sha256: boundaryHash },
-    { file: closureFile, sha256: closureHash }], checks: [], warnings: [], limitations: [
+    { file: closureFile, sha256: closureHash }, { file: staffFile, sha256: staffHash }], checks: [], warnings: [], limitations: [
     "Only catalog metadata is copied. All test records are fictional local historical snapshots; no Production/user records or secrets are read.",
     "All seven current closure functions and the real history predicate execute unchanged, with the captured actual constraints, foreign keys and triggers installed.",
     "Fixture preparation precedes trigger installation, with real constraints enforced; no guard/trigger is disabled during the closure tests.",
@@ -551,14 +554,45 @@ try {
     [sub],
   );
   const marker = "select count(*)::int value from ironclad_private.patch2_closed_accounts where subject_digest=sha256(convert_to($1,'UTF8'))";
+  const grantStaff = (sub, client = database) => client.query(
+    `insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+      values (sha256(convert_to($1,'UTF8')),'LOCAL verified staff fixture')`, [sub],
+  );
+  const revokeStaff = (sub, client = database) => client.query(
+    `update ironclad_private.patch2_staff_authorizations set revoked_at=now()
+      where subject_digest=sha256(convert_to($1,'UTF8'))`, [sub],
+  );
 
-  await test("never-closed staff without a Player retain their previous inbox, legacy and registration privileges", async () => {
+  stage = "apply verified staff authority after the durable closure guard";
+  await owner();
+  await database.query(staffSql);
+  await grantStaff(activeAdmin);
+
+  await test("a historical unverified staff identity cannot regain authority by creating a Player", async () => {
+    const unknown = "local_unverified_historical_staff";
+    await claim(operator, true, "service_role");
+    assert.equal(await state(unknown), "denied");
+    await rejected(sql(inbox, [...inboxArguments, unknown]), "42501");
+    await claim(unknown, true);
+    await insertPlayer(unknown);
+    await claim(operator, true, "service_role");
+    assert.equal(await state(unknown), "denied");
+    await rejected(sql(inbox, [...inboxArguments, unknown]), "42501");
+    await rejected(sql(mutate, [T, "read_all", [], unknown]), "42501");
+    await rejected(sql(review, [registrationTournament, registrationId, "LOCAL forged note", unknown]), "42501");
+    await rejected(dispatch("list_admin_private_assistance", queueArgs, unknown, true), "42501");
+    await owner();
+  });
+
+  await test("verified staff without a Player retain their previous inbox, legacy and registration privileges", async () => {
+    await grantStaff(staffOnly);
+    await grantStaff(removable);
     await insertPlayer(removable);
     await database.query(`insert into public.notifications(id,recipient_role,type,title,message,tournament_id)
       values($1,'admin','match.admin_assistance_requested','LOCAL legacy request','LOCAL synthetic body',$2)`, [noticeId, T]);
     await claim(operator, true, "service_role");
-    assert.equal(await state(staffOnly), "no-player");
-    assert.equal(await state(removable), "active-player");
+    assert.equal(await state(staffOnly), "verified-staff");
+    assert.equal(await state(removable), "verified-active-player");
     assert.equal((await sql(inbox, [...inboxArguments, staffOnly])).selectedNotification.id, noticeId);
     assert.equal(await sql(mutate, [T, "read", [noticeId], staffOnly]), 1);
     const readNotice = (await sql(inbox, [...inboxArguments, activeAdmin])).selectedNotification;
@@ -572,7 +606,7 @@ try {
     assert.equal(await sql(review, [registrationTournament, registrationId, "LOCAL guard rehearsal note", staffOnly]), "approved");
     const result = await database.query(bulk, [registrationTournament, [registrationId], staffOnly]);
     assert.deepEqual(result.rows, [{ registration_id: registrationId, error_message: "registration is already approved" }]);
-    await rejected(dispatch("list_admin_private_assistance", queueArgs, staffOnly, true), "42501", /Active assistance account/);
+    await rejected(dispatch("list_admin_private_assistance", queueArgs, staffOnly, true), "42501", /Account access is unavailable/);
   });
 
   await test("normal closure revokes stale staff and player sessions after every successful outcome", async () => {
@@ -622,9 +656,15 @@ try {
       cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) privilege`), true);
     assert.equal(await sql(`select relrowsecurity value from pg_class
       where oid='ironclad_private.patch2_closed_accounts'::regclass`), true);
+    assert.equal(await sql(`select bool_and(not has_table_privilege(role_name,'ironclad_private.patch2_staff_authorizations',privilege)) value
+      from unnest(array['anon','authenticated','service_role']) role_name
+      cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) privilege`), true);
+    assert.equal(await sql(`select relrowsecurity value from pg_class
+      where oid='ironclad_private.patch2_staff_authorizations'::regclass`), true);
     await claim(operator, true, "service_role");
     await rejected(sql("select public.mutate_admin_notification_inbox('tournament',$1,'read_all',null) value", [T]), "42501");
     await rejected(sql(marker, [staffOnly]), "42501");
+    await rejected(grantStaff("local_unverified_self_grant"), "42501");
     await claim(staffOnly, true);
     await rejected(sql("select public.get_patch2_admin_account_state($1) value", [staffOnly]), "42501");
     await rejected(sql(inbox, [...inboxArguments, staffOnly]), "42501");
@@ -635,13 +675,14 @@ try {
   await test("closure rollback leaves the account active; a waiting upsert sees a committed closure", async () => {
     const concurrent = "local_closure_concurrent";
     await owner(); await insertPlayer(concurrent);
+    await grantStaff(concurrent);
     const other = await connect("patch2_concurrent_profile");
     try {
       await claim(operator, true, "service_role");
       await database.query("begin");
       assert.equal((await sql("select public.close_ironclad_player_account($1) value", [concurrent])).outcome, "deleted");
       await database.query("rollback");
-      assert.equal(await state(concurrent), "active-player");
+      assert.equal(await state(concurrent), "verified-active-player");
       // The captured catalog does not restore column-specific SELECT grants
       // needed by an authenticated ON CONFLICT update. Exercise the trigger
       // with the existing service-role table grants, without changing grants.
@@ -681,9 +722,46 @@ try {
     }
   });
 
+  await test("verified staff revocation takes effect for a guarded write already waiting for the lock", async () => {
+    const concurrent = "local_revoked_staff";
+    await owner();
+    await grantStaff(concurrent);
+    const other = await connect("patch2_staff_revocation");
+    try {
+      await claim(operator, true, "service_role");
+      assert.equal(await state(concurrent), "verified-staff");
+      await claim(operator, true, "service_role", other);
+      const backend = (await other.query("select pg_backend_pid() pid")).rows[0].pid;
+      await owner();
+      await database.query("begin");
+      await revokeStaff(concurrent);
+      let outcome;
+      const queued = other.query(mutate, [T, "read_all", [], concurrent]).then(
+        () => { outcome = { error: null }; }, (error) => { outcome = { error }; },
+      );
+      for (let attempt = 0; attempt < 30; attempt++) {
+        assert.equal(outcome, undefined, "Guarded action completed before staff revocation committed");
+        if (await sql(`select exists (select from pg_locks
+          where pid=$1 and locktype='advisory' and not granted) value`, [backend])) break;
+        assert.ok(attempt < 29, "Guarded action did not wait for staff revocation");
+        await delay(30);
+      }
+      await database.query("commit");
+      await queued;
+      assert.equal(outcome?.error?.code, "42501");
+      await claim(operator, true, "service_role");
+      assert.equal(await state(concurrent), "denied");
+    } finally {
+      await database.query("rollback");
+      await other.end();
+      clients.delete(other);
+    }
+  });
+
   for (const m of frozenMigrations) assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", m.file), "utf8")).replace(/\r\n/g, "\n")), m.sha256);
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", boundaryFile), "utf8")).replace(/\r\n/g, "\n")), boundaryHash);
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", closureFile), "utf8")).replace(/\r\n/g, "\n")), closureHash);
+  assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", staffFile), "utf8")).replace(/\r\n/g, "\n")), staffHash);
   assert.ok(!report.warnings.some(w => /WarnSendingBroadcastMessage/.test(w)), "Actual Realtime send swallowed an error");
   report.passed = true;
 } catch (e) { failure = e; report.passed = false; report.failure = e.message; report.errorCode = e.code; report.errorContext = e.where; report.errorPosition = e.position; report.stage = stage; }
