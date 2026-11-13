@@ -108,6 +108,12 @@ const DELEGATED_GUARDED_ACTIONS = [
 
 const CONDITIONAL_GUARDED_ACTIONS = [
   {
+    path: "app/dashboard/public-profile-actions.ts",
+    action: "updatePublicProfileEnabled",
+    condition: "enabled",
+    exemption: "disabling optional public profile visibility",
+  },
+  {
     path: "app/dashboard/actions.ts",
     action: "updateDiscordPublicEnabled",
     condition: "enabled",
@@ -331,8 +337,8 @@ describe("account legal mutation boundary architecture", () => {
       )
     );
 
-    expect(new Set(expected).size).toBe(92);
-    expect(expected).toHaveLength(92);
+    expect(new Set(expected).size).toBe(93);
+    expect(expected).toHaveLength(93);
     expect(actual.sort()).toEqual(expected.sort());
   });
 
@@ -387,8 +393,8 @@ describe("account legal mutation boundary architecture", () => {
     }
   });
 
-  it("keeps the two one-way privacy and withdrawal exemptions conditional", () => {
-    expect(CONDITIONAL_GUARDED_ACTIONS).toHaveLength(2);
+  it("keeps the one-way privacy and withdrawal exemptions conditional", () => {
+    expect(CONDITIONAL_GUARDED_ACTIONS).toHaveLength(3);
 
     for (const { path, action, condition, exemption } of
       CONDITIONAL_GUARDED_ACTIONS) {

@@ -28,7 +28,7 @@ const SNAPSHOT_SELECT = [
   "tournament_bracket:tournament_brackets(launched_at)",
   "tournament:tournaments!inner(title, status)",
 ].join(", ");
-const PUBLIC_SNAPSHOT_SELECT = `${SNAPSHOT_SELECT}, profile:players!registrations_profile_id_fkey!inner(account_closed_at)`;
+const PUBLIC_SNAPSHOT_SELECT = `${SNAPSHOT_SELECT}, profile:players!registrations_profile_id_fkey!inner(account_closed_at, public_profile_enabled)`;
 
 type SnapshotQueryClient = Pick<SupabaseClient, "from">;
 
@@ -59,9 +59,11 @@ type ActiveSnapshotRow = {
   profile?:
     | {
         account_closed_at: unknown;
+        public_profile_enabled: unknown;
       }
     | Array<{
         account_closed_at: unknown;
+        public_profile_enabled: unknown;
       }>
     | null;
 };
@@ -117,7 +119,7 @@ async function loadActiveTournamentEloSnapshots(
       .in("tournament.status", [...ACTIVE_TOURNAMENT_STATUSES]);
 
     if (requirePublicProfile) {
-      query = query.is("profile.account_closed_at", null);
+      query = query.is("profile.account_closed_at", null).eq("profile.public_profile_enabled", true);
     }
 
     const { data, error } = await query;
@@ -165,7 +167,7 @@ function mapActiveTournamentEloSnapshot(
     : row.tournament_bracket;
 
   if (
-    (requirePublicProfile && profile?.account_closed_at !== null) ||
+    (requirePublicProfile && (profile?.account_closed_at !== null || profile.public_profile_enabled !== true)) ||
     typeof row.registration_status !== "string" ||
     !ACTIVE_REGISTRATION_STATUSES.includes(
       row.registration_status as (typeof ACTIVE_REGISTRATION_STATUSES)[number]

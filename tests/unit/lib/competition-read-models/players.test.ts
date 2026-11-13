@@ -325,27 +325,17 @@ describe("Relic-keyed player competition read model", () => {
     },
   );
 
-  it.each([false, true, null, undefined])(
-    "resolves active canonical identity independently of legacy profile flag %s",
-    async (publicProfileEnabled) => {
-      const fixture = database({
-        players: [identity({ public_profile_enabled: publicProfileEnabled })],
-        current: [identity({ public_profile_enabled: false })],
-      });
-      const player = visible(
-        await loadPlayerCompetitionHistory(fixture.client, RELIC_ID),
-      );
-      expect(player.currentIdentity.profileUrl).toBe(
-        `https://www.ironcladtournaments.com/players/${PLAYER_ID}`,
-      );
-      expect(player.entries[0].eventElo).toBe(1750);
-      expect(
-        fixture.calls.every(
-          (call) => !call.columns?.includes("public_profile_enabled"),
-        ),
-      ).toBe(true);
-    },
-  );
+  it("denies a private canonical identity before querying tournament history", async () => {
+    const fixture = database({ players: [identity({ public_profile_enabled: false })] });
+    await expect(loadPlayerCompetitionHistory(fixture.client, RELIC_ID)).resolves.toEqual({ outcome: "HIDDEN" });
+    expect(fixture.calls).toHaveLength(1);
+  });
+
+  it("rechecks the opt-in before returning a profile when it changed during a read", async () => {
+    const fixture = database({ current: [identity({ public_profile_enabled: false })] });
+    await expect(loadPlayerCompetitionHistory(fixture.client, RELIC_ID)).resolves.toEqual({ outcome: "HIDDEN" });
+    expect(fixture.calls.filter((call) => call.table === "players")).toHaveLength(2);
+  });
 
   it("makes hidden and unknown externally indistinguishable", () => {
     expect(projectPublicPlayerCompetitionLookup({ outcome: "HIDDEN" })).toEqual(

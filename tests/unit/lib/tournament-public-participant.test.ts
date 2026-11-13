@@ -23,6 +23,7 @@ describe("public tournament participant projection", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
+        publicProfileEnabled: true,
         accountClosedAt: null,
       })
     ).toEqual({
@@ -42,6 +43,7 @@ describe("public tournament participant projection", () => {
       { ...snapshot, submittedElo: 1300, verifiedElo: 1452 },
       {
         playerId: publicPlayerId,
+        publicProfileEnabled: true,
         accountClosedAt: null,
       }
     );
@@ -49,18 +51,20 @@ describe("public tournament participant projection", () => {
     expect(participant.elo).toBe(1452);
   });
 
-  it("publishes active competitive identity without a legacy visibility flag", () => {
+  it("preserves the factual roster alias and status for a private profile", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
+        publicProfileEnabled: false,
         accountClosedAt: null,
       })
     ).toEqual(
       expect.objectContaining({
         name: "HistoricalIGN",
-        profileHref: `/players/${publicPlayerId}`,
-        country: "AU",
-        elo: 1452,
+        profileHref: null,
+        country: null,
+        elo: null,
+        status: "approved",
       })
     );
   });
@@ -69,6 +73,7 @@ describe("public tournament participant projection", () => {
     expect(
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
+        publicProfileEnabled: true,
         accountClosedAt: "2026-08-14T00:00:00.000Z",
       })
     ).toEqual(

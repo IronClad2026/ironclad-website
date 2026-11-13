@@ -193,14 +193,14 @@ describe("Player Showcase private editor projection", () => {
       status: "success",
       state: {
         playerId: PLAYER, currentThought: "GGs", featuredBadgeAwardId: AWARD,
-        thoughtHidden: false, revision: 3,
+        thoughtHidden: false, revision: 3, publicProfileEnabled: true,
         awards: [{ awardId: AWARD, slug: "ironclad-recruit", unlockedAt: "2026-08-01T12:00:00Z" }],
       },
     });
     expect(fixture.playerQuery.calls).toEqual(expect.arrayContaining([
       { method: "eq", args: ["clerk_user_id", "clerk-owner"] },
       { method: "eq", args: ["id", PLAYER] },
-      { method: "select", args: ["id"] },
+      { method: "select", args: ["id, public_profile_enabled"] },
     ]));
     expect(fixture.awardQuery.calls).toEqual(expect.arrayContaining([
       { method: "eq", args: ["player_id", PLAYER] },
@@ -210,10 +210,10 @@ describe("Player Showcase private editor projection", () => {
     expect(JSON.stringify(result)).not.toContain("PRIVATE_");
   });
 
-  it("keeps owner editing available independently of the legacy profile flag", async () => {
+  it("keeps owner editing available for a private profile", async () => {
     makeEditorClient({ player: { id: PLAYER, public_profile_enabled: false } });
     await expect(getMyPlayerShowcase()).resolves.toMatchObject({
-      status: "success", state: { currentThought: "GGs" },
+      status: "success", state: { currentThought: "GGs", publicProfileEnabled: false },
     });
   });
 

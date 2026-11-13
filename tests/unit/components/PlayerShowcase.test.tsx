@@ -22,6 +22,7 @@ vi.mock("@/components/ScrollReveal", () => ({ default: ({ children }: { children
 
 const state: ShowcaseEditorState = {
   playerId: "fixture-player",
+  publicProfileEnabled: true,
   currentThought: "Ready for the next match.",
   featuredBadgeAwardId: null,
   thoughtHidden: false,
@@ -166,6 +167,13 @@ describe("Player Showcase editor", () => {
     expect(screen.getByText(account.showcase.thoughtHidden)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: account.showcase.viewPublicProfile })).toHaveAttribute("href", "/players/fixture-player");
     expect(screen.queryByRole("button", { name: account.showcase.chooseBadge })).not.toBeInTheDocument();
+  });
+
+  it("keeps a private Showcase editable without presenting a public link", () => {
+    render(<PlayerShowcaseEditor initialState={{ ...state, publicProfileEnabled: false }} {...actions()} />);
+    expect(screen.getByText(account.showcase.privateProfile)).toBeVisible();
+    expect(screen.queryByRole("link", { name: account.showcase.viewPublicProfile })).toBeNull();
+    expect(screen.getByRole("textbox")).toHaveValue(state.currentThought);
   });
 });
 

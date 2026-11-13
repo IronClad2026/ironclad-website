@@ -13,6 +13,7 @@ export type ShowcaseEditorState = {
   thoughtHidden: boolean;
   revision: number;
   awards: OwnedShowcaseBadge[];
+  publicProfileEnabled: boolean;
 };
 export type ShowcaseMessageCode =
   | "thoughtSaved" | "badgeSaved" | "moderationSaved"

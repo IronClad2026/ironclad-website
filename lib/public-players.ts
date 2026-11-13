@@ -9,8 +9,7 @@ export type PublicPlayerProfile = {
   country: string | null;
   region: string | null;
   currentElo: number | null;
-  // Compatibility for existing contact readers: every returned active profile is public.
-  // This value is derived from the active-only view, never the legacy player flag.
+  // The public projection and the query both require the player's opt-in.
   publicProfileEnabled: true;
   discordPublicEnabled: boolean;
   discordUsername: string | null;
@@ -55,6 +54,7 @@ export async function getPublicPlayers(): Promise<PublicPlayerProfile[]> {
   const { data, error } = await supabase
     .from("public_player_profiles")
     .select(PUBLIC_PLAYER_PROFILE_COLUMNS)
+    .eq("public_profile_enabled", true)
     .order("current_elo", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
@@ -80,6 +80,7 @@ export async function getPublicPlayerById(
     .from("public_player_profiles")
     .select(PUBLIC_PLAYER_PROFILE_COLUMNS)
     .eq("id", playerId)
+    .eq("public_profile_enabled", true)
     .maybeSingle();
 
   if (error) {

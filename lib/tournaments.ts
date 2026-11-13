@@ -157,6 +157,7 @@ export type TournamentParticipantRegistrationSnapshot = {
 
 export type TournamentParticipantPrivacyState = {
   playerId?: string;
+  publicProfileEnabled?: boolean;
   accountClosedAt: string | null;
 } | null;
 
@@ -165,7 +166,8 @@ export function mapPublicTournamentParticipant(
   privacy: TournamentParticipantPrivacyState
 ): TournamentParticipant {
   const isClosed = privacy?.accountClosedAt != null;
-  const showOptionalFacts = privacy?.accountClosedAt === null;
+  const showOptionalFacts =
+    !isClosed && privacy?.publicProfileEnabled === true;
   const profileHref =
     showOptionalFacts && privacy?.playerId
       ? `/players/${privacy.playerId}`

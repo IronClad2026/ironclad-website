@@ -93,12 +93,12 @@ describe("public player avatar route", () => {
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
-  it.each([true, false])("serves an active legacy flag %s player's avatar anonymously without raw-path exposure", async (legacy) => {
+  it("serves an opted-in player's avatar anonymously without raw-path exposure", async () => {
     const supabase = createAvatarClient({
       player: {
         avatar_url: `/players/${PLAYER_ID}/avatar`,
         clerk_user_id: OWNER_ID,
-        public_profile_enabled: legacy,
+        public_profile_enabled: true,
         account_closed_at: null,
       },
     });
@@ -111,6 +111,20 @@ describe("public player avatar route", () => {
     expect(await response.text()).toBe("avatar-bytes");
     expect(authMock).not.toHaveBeenCalled();
     expect(supabase.download).toHaveBeenCalledOnce();
+  });
+
+  it("allows only the owner to preview their private avatar", async () => {
+    const supabase = createAvatarClient({
+      player: { avatar_url: `/players/${PLAYER_ID}/avatar`, clerk_user_id: OWNER_ID, public_profile_enabled: false, account_closed_at: null },
+    });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+    authMock.mockResolvedValueOnce(playerIdentity);
+    expect((await requestAvatar()).headers.get("Content-Type")).toContain("image/svg+xml");
+    expect(supabase.download).not.toHaveBeenCalled();
+    authMock.mockResolvedValueOnce({ ...playerIdentity, userId: OWNER_ID });
+    const response = await requestAvatar();
+    expectPrivateNoStore(response);
+    expect(await response.text()).toBe("avatar-bytes");
   });
 
   it("makes a closed profile indistinguishable from a missing profile", async () => {

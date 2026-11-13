@@ -35,6 +35,9 @@ vi.mock("@/components/PlayerDivisionInvitations", () => ({
 vi.mock("@/components/PlayerRegistrationActions", () => ({
   default: () => <div data-dashboard-surface="registration-actions" />,
 }));
+vi.mock("@/components/PublicProfileVisibilityCard", () => ({
+  default: () => <section data-profile-visibility-control="public-profile" />,
+}));
 vi.mock("@/components/DiscordContactVisibilityCard", () => ({
   default: () => <section data-profile-visibility-control="discord" />,
 }));
@@ -177,8 +180,8 @@ describe("Player Dashboard information hierarchy", () => {
 
     expect(
       document.querySelectorAll("[data-profile-visibility-control]")
-    ).toHaveLength(1);
-    expect(document.querySelector('[data-profile-visibility-control="public-profile"]')).toBeNull();
+    ).toHaveLength(2);
+    expect(document.querySelector('[data-profile-visibility-control="public-profile"]')).not.toBeNull();
     expect(document.querySelector('[data-profile-visibility-control="discord"]')).not.toBeNull();
     expect(
       screen.getByRole("link", { name: "View/Edit Profile" })

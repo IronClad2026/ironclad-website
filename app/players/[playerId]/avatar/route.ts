@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 const AVATAR_BUCKET = "player-avatars";
@@ -39,7 +40,7 @@ export async function GET(
   const supabase = createSupabaseAdminClient();
   const { data: player, error: playerError } = await supabase
     .from("players")
-    .select("clerk_user_id, avatar_url, account_closed_at")
+    .select("clerk_user_id, avatar_url, account_closed_at, public_profile_enabled")
     .eq("id", playerId)
     .maybeSingle();
 
@@ -50,6 +51,14 @@ export async function GET(
 
   if (!player?.avatar_url || !player.clerk_user_id || player.account_closed_at !== null) {
     return createFallbackAvatarResponse();
+  }
+
+  if (player.public_profile_enabled !== true) {
+    try {
+      if ((await auth()).userId !== player.clerk_user_id) return createFallbackAvatarResponse();
+    } catch {
+      return createFallbackAvatarResponse();
+    }
   }
 
   const { data: avatar, error: avatarError } = await supabase.storage

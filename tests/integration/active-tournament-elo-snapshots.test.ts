@@ -176,10 +176,10 @@ describe("active tournament ELO snapshot loading", () => {
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
-  it("uses an active-account-scoped public read without altering registration snapshots", async () => {
+  it("uses an opted-in active-account-scoped public read without altering registration snapshots", async () => {
     const publicRow = {
       ...activeRows[0],
-      profile: { account_closed_at: null },
+      profile: { account_closed_at: null, public_profile_enabled: true },
     };
     const supabase = createSupabaseQueryMock({ data: [publicRow] });
     createSupabaseAdminClientMock.mockReturnValue(supabase.client);
@@ -198,24 +198,28 @@ describe("active tournament ELO snapshot loading", () => {
       args: ["profile_id", PLAYER_ID],
     });
     expect(supabase.calls).toContainEqual({
+      method: "eq",
+      args: ["profile.public_profile_enabled", true],
+    });
+    expect(supabase.calls).toContainEqual({
       method: "is",
       args: ["profile.account_closed_at", null],
     });
     expect(supabase.calls).toContainEqual({
       method: "select",
       args: [
-        "submitted_elo, elo_verified_elo, elo_verified_division, registration_status, waitlist_offer_status, tournament_bracket:tournament_brackets(launched_at), tournament:tournaments!inner(title, status), profile:players!registrations_profile_id_fkey!inner(account_closed_at)",
+        "submitted_elo, elo_verified_elo, elo_verified_division, registration_status, waitlist_offer_status, tournament_bracket:tournament_brackets(launched_at), tournament:tournaments!inner(title, status), profile:players!registrations_profile_id_fkey!inner(account_closed_at, public_profile_enabled)",
       ],
     });
     expectActiveFilters(supabase.calls);
   });
 
-  it("rejects a closed player row inside the scoped public read", async () => {
+  it.each(["2026-08-14T00:00:00Z", null])("rejects a private player row (closed at %s) inside the public read", async (closedAt) => {
     const supabase = createSupabaseQueryMock({
       data: [
         {
           ...activeRows[0],
-          profile: { account_closed_at: "2026-08-14T00:00:00Z" },
+          profile: { account_closed_at: closedAt, public_profile_enabled: closedAt !== null },
         },
       ],
     });
