@@ -2,6 +2,7 @@ import { getDivisionDisplayName, requireDivisionModelVersion, type DivisionModel
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
+import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 
 import {
   AdminOperationsMetricsError,
@@ -33,7 +34,6 @@ import {
 } from "@/lib/admin-operations-metrics";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
-type CustomClaims = { metadata?: { role?: string } };
 
 type PlayerRow = {
   id: string;
@@ -134,10 +134,8 @@ const RECENT_LIMIT = 8;
 export async function loadAdminOperationsMetrics(
   periodKey: AdminOperationsPeriod
 ): Promise<AdminOperationsMetrics | null> {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") return null;
+  const { userId, sessionClaims, sessionId } = await auth();
+  if (!await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)) return null;
 
   const now = new Date();
   const period = resolveAdminOperationsPeriod(periodKey, now);
@@ -234,6 +232,7 @@ export async function loadAdminOperationsMetrics(
         })),
     ];
 
+    if (!await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)) return null;
     return buildMetrics({
       period,
       now,

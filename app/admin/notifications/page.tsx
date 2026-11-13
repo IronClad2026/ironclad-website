@@ -88,6 +88,7 @@ export default async function AdminNotificationsPage({ searchParams }: { searchP
     unavailable = true;
   }
 
+  if (!await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)) redirect("/");
   return (
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-16 text-white sm:px-6 sm:pt-32">
       <div className="mx-auto max-w-5xl">

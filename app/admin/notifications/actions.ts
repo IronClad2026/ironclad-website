@@ -28,8 +28,9 @@ async function mutateInbox(
   formData: FormData,
   action: "read" | "read_all" | "dismiss"
 ): Promise<AdminInboxMutationResult> {
+  let actorClerkUserId: string;
   try {
-    await requireAdminNotificationInbox();
+    actorClerkUserId = await requireAdminNotificationInbox();
   } catch {
     return { ok: false, message: "Administrator access is required." };
   }
@@ -76,7 +77,8 @@ async function mutateInbox(
   }
 
   try {
-    const { data, error } = await createSupabaseAdminClient().rpc("mutate_admin_notification_inbox", {
+    const { data, error } = await createSupabaseAdminClient().rpc("mutate_admin_notification_inbox_as_admin", {
+      p_actor_clerk_user_id: actorClerkUserId,
       p_scope: scope.kind,
       p_tournament_id: scope.kind === "tournament" ? scope.tournamentId : null,
       p_action: action, p_ids: ids,

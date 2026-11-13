@@ -59,7 +59,7 @@ beforeEach(() => {
       return HttpResponse.json({ message: "scope mismatch", code: "22023" }, { status: 400 });
     }
     for (const row of rows) if (ids.includes(row.id)) row.registration_status = String(body.p_registration_status ?? "approved");
-    return HttpResponse.json(name === "approve_tournament_registrations_scoped"
+    return HttpResponse.json(name === "approve_tournament_registrations_scoped_as_admin"
       ? ids.map((registration_id) => ({ registration_id, error_message: null })) : []);
   });
   mockServer.use(
@@ -101,7 +101,8 @@ describe("tournament-scoped registration Server Actions", () => {
   });
   it("uses the scoped authority for a valid individual decision", async () => {
     await expect(updateRegistrationStatus(form())).rejects.toThrow("notice=saved");
-    expect(rpcMock).toHaveBeenCalledWith("review_tournament_registration_scoped", {
+    expect(rpcMock).toHaveBeenCalledWith("review_tournament_registration_scoped_as_admin", {
+      p_actor_clerk_user_id: "user_admin",
       p_tournament_id: A, p_registration_id: ONE, p_registration_status: "approved", p_admin_notes: null,
     });
     expect(rows[2].registration_status).toBe("pending");
@@ -110,7 +111,7 @@ describe("tournament-scoped registration Server Actions", () => {
   it("sends the complete same-tournament batch once and preserves pagination", async () => {
     await expect(approveSelectedRegistrations(form([ONE, TWO]))).rejects.toThrow(`REDIRECT:/admin/tournaments/${A}?section=registrations&page=2`);
     expect(rpcMock).toHaveBeenCalledTimes(1);
-    expect(rpcMock).toHaveBeenCalledWith("approve_tournament_registrations_scoped", { p_tournament_id: A, p_registration_ids: [ONE, TWO] });
+    expect(rpcMock).toHaveBeenCalledWith("approve_tournament_registrations_scoped_as_admin", { p_actor_clerk_user_id: "user_admin", p_tournament_id: A, p_registration_ids: [ONE, TWO] });
     expect(rows[2].registration_status).toBe("pending");
   });
   it("reports domain-rule failures separately after complete scope validation", async () => {
@@ -135,7 +136,7 @@ describe("tournament-scoped registration Server Actions", () => {
     rows[0].registration_status = "withdrawn";
     const data = form(); data.set("nextStatus", "withdrawn"); data.set("adminNotes", "history note");
     await expect(updateRegistrationStatus(data)).rejects.toThrow("notice=saved");
-    expect(rpcMock).toHaveBeenCalledWith("review_tournament_registration_scoped", expect.objectContaining({p_registration_status: "withdrawn"}));
+    expect(rpcMock).toHaveBeenCalledWith("review_tournament_registration_scoped_as_admin", expect.objectContaining({p_registration_status: "withdrawn"}));
   });
   it("retains old deletion action as a non-destructive failure", async () => {
     await expect(deleteSelectedRegistrations(form([ONE, OTHER]))).rejects.toThrow("registration-delete-blocked");

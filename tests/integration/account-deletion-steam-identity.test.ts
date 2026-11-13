@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  adminIdentity,
   anonymousIdentity,
   playerIdentity,
 } from "@/tests/fixtures/auth";
@@ -18,6 +19,7 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 
 import { deleteIronCladAccount } from "@/app/profile/delete-account-action";
+import { requireCurrentPatch2Admin } from "@/lib/patch2-admin-access";
 
 function createAccountDeletionClient({
   avatarError = null,
@@ -220,5 +222,37 @@ describe("Steam identity account-deletion regression", () => {
 
     expect(deletion.rpc).toHaveBeenCalledOnce();
     expect(deleteUser).toHaveBeenCalledWith(playerIdentity.userId);
+  });
+
+  it("revokes staff-only Patch 2 access when Clerk deletion fails and the session still looks active", async () => {
+    const subject = adminIdentity.userId!;
+    const sessionId = "sess_staff_only_closure";
+    let state = "no-player";
+    const deletion = createAccountDeletionClient({ closureData: { outcome: "not_found" } });
+    const deleteUser = vi.fn(async () => { throw new Error("Clerk unavailable"); });
+    const getUser = vi.fn(async () => ({
+      id: subject, publicMetadata: { role: "admin" }, banned: false, locked: false,
+    }));
+    const getSession = vi.fn(async () => ({
+      id: sessionId, userId: subject, status: "active", expireAt: Date.now() + 60_000,
+    }));
+    const accountState = vi.fn(async () => ({ data: state, error: null }));
+    const rpc = vi.fn((operation: string, args: { p_clerk_user_id: string }) => {
+      expect(args.p_clerk_user_id).toBe(subject);
+      if (operation === "get_patch2_admin_account_state") return { abortSignal: accountState };
+      expect(operation).toBe("close_ironclad_player_account");
+      state = "denied";
+      return deletion.rpc();
+    });
+    authMock.mockResolvedValue({ ...adminIdentity, sessionId });
+    clerkClientMock.mockResolvedValue({ users: { deleteUser, getUser }, sessions: { getSession } });
+    createSupabaseAdminClientMock.mockReturnValue({ ...deletion.client, rpc });
+
+    await expect(requireCurrentPatch2Admin()).resolves.toBe(subject);
+    await expect(deleteIronCladAccount({ status: "idle", message: "" }, deletionFormData()))
+      .resolves.toMatchObject({ status: "error", code: "clerk-failed" });
+    await expect(requireCurrentPatch2Admin()).rejects.toThrow("Unauthorized");
+    expect(deleteUser).toHaveBeenCalledExactlyOnceWith(subject);
+    expect(accountState).toHaveBeenCalledTimes(2);
   });
 });

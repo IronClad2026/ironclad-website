@@ -68,6 +68,9 @@ export async function GET(request: Request) {
     destination = null;
   }
 
+  if (scope === "admin" && !await hasCurrentPatch2AdminAccess(userId, claims, sessionId)) {
+    return safeRedirect(request, "/dashboard");
+  }
   return safeRedirect(
     request,
     isSafeRelativeDestination(destination) ? destination : fallback

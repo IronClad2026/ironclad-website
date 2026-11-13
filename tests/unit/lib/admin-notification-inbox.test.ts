@@ -53,7 +53,8 @@ describe("scoped Admin notification inbox snapshots", () => {
     const row = adminInboxRow({ recipient_clerk_user_id: "PRIVATE_RECIPIENT", actor_clerk_user_id: "PRIVATE_ACTOR" });
     rpcMock.mockResolvedValue({ data: adminInboxSnapshot([row], { selectedNotification: row }), error: null });
     const data = await loadAdminNotificationInbox({ kind: "tournament", tournamentId: TOURNAMENT }, { selected: NOTICE.toUpperCase() });
-    expect(rpcMock).toHaveBeenCalledExactlyOnceWith("read_admin_notification_inbox", {
+    expect(rpcMock).toHaveBeenCalledExactlyOnceWith("read_admin_notification_inbox_as_admin", {
+      p_actor_clerk_user_id: "admin_a",
       p_scope: "tournament", p_tournament_id: TOURNAMENT, p_page: 1,
       p_unread_only: false, p_selected_id: NOTICE,
     });
@@ -71,7 +72,7 @@ describe("scoped Admin notification inbox snapshots", () => {
     }), error: null });
     const data = await loadAdminNotificationInbox({ kind: "tournament", tournamentId: tournamentId.toUpperCase() }, { page: "2", filter: "unread" });
     expect(data).toMatchObject({ scope: { kind: "tournament", tournamentId }, page: 2, pageCount: 2, filter: "unread" });
-    expect(rpcMock).toHaveBeenCalledWith("read_admin_notification_inbox", expect.objectContaining({ p_page: 2, p_unread_only: true, p_tournament_id: tournamentId }));
+    expect(rpcMock).toHaveBeenCalledWith("read_admin_notification_inbox_as_admin", expect.objectContaining({ p_page: 2, p_unread_only: true, p_tournament_id: tournamentId }));
   });
 
   it.each([
@@ -82,7 +83,7 @@ describe("scoped Admin notification inbox snapshots", () => {
     rpcMock.mockResolvedValue({ data: adminInboxSnapshot([adminInboxRow({ tournament_id: null, metadata })]), error: null });
     const data = await loadAdminNotificationInbox({ kind });
     expect(data.scope).toEqual({ kind });
-    expect(rpcMock).toHaveBeenCalledWith("read_admin_notification_inbox", expect.objectContaining({ p_scope: kind, p_tournament_id: null }));
+    expect(rpcMock).toHaveBeenCalledWith("read_admin_notification_inbox_as_admin", expect.objectContaining({ p_scope: kind, p_tournament_id: null }));
   });
 
   it.each([
