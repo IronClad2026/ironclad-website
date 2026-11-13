@@ -167,37 +167,49 @@ async function loadCommunicationSection(
       }),
       LegacyRoomAssistance({ tournamentId, page: query?.legacyPage, includeResolved: query?.legacyResolved === "1" }),
     ]);
-    return (tournamentTitle) => <>
-      {result.ok ? <AdminPrivateAssistance key={tournamentId} data={result.data} tournamentTitle={tournamentTitle} /> : (
-        <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
-          <p>Private assistance could not be loaded. Outstanding requests have not been treated as an empty queue.</p>
-          <Link href={baseHref} className="inline-flex min-h-11 items-center text-orange-200 underline">Reopen assistance</Link>
-        </section>
-      )}
-      {legacy}
-    </>;
+    return function renderAssistance(tournamentTitle) {
+      return (
+        <>
+          {result.ok ? <AdminPrivateAssistance key={tournamentId} data={result.data} tournamentTitle={tournamentTitle} /> : (
+            <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
+              <p>Private assistance could not be loaded. Outstanding requests have not been treated as an empty queue.</p>
+              <Link href={baseHref} className="inline-flex min-h-11 items-center text-orange-200 underline">Reopen assistance</Link>
+            </section>
+          )}
+          {legacy}
+        </>
+      );
+    };
   }
-  if (!isAdminNotificationInboxEnabled()) return () => (
-    <section className="rounded-2xl border border-amber-500/25 p-5 text-sm text-amber-100">
-      <p role="status">The scoped admin inbox is turned off in this environment. Existing notifications remain saved.</p>
-      <Link href={`/admin/tournaments/${tournamentId}?section=assistance`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open assistance for this tournament</Link>
-      <Link href={`/admin/notifications/legacy-assistance?kind=tournament&tournamentId=${tournamentId}`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open legacy assistance requests for this tournament</Link>
-    </section>
-  );
+  if (!isAdminNotificationInboxEnabled()) {
+    return function renderDisabledInbox() {
+      return (
+        <section className="rounded-2xl border border-amber-500/25 p-5 text-sm text-amber-100">
+          <p role="status">The scoped admin inbox is turned off in this environment. Existing notifications remain saved.</p>
+          <Link href={`/admin/tournaments/${tournamentId}?section=assistance`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open assistance for this tournament</Link>
+          <Link href={`/admin/notifications/legacy-assistance?kind=tournament&tournamentId=${tournamentId}`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open legacy assistance requests for this tournament</Link>
+        </section>
+      );
+    };
+  }
   try {
     const data = await loadAdminNotificationInbox(
       { kind: "tournament", tournamentId },
       { page: query?.page, filter: query?.filter, selected: query?.selected }
     );
-    return (tournamentTitle) => <AdminNotificationInbox data={data} title={`${tournamentTitle} — Notifications`} baseHref={baseHref} />;
+    return function renderInbox(tournamentTitle) {
+      return <AdminNotificationInbox data={data} title={`${tournamentTitle} — Notifications`} baseHref={baseHref} />;
+    };
   } catch {
     console.error("Tournament notification inbox load failed.");
-    return () => (
-      <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
-        <p>This tournament inbox could not be loaded. Its notification state has not been treated as empty.</p>
-        <Link href={baseHref} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Reopen tournament inbox</Link>
-      </section>
-    );
+    return function renderInboxError() {
+      return (
+        <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
+          <p>This tournament inbox could not be loaded. Its notification state has not been treated as empty.</p>
+          <Link href={baseHref} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Reopen tournament inbox</Link>
+        </section>
+      );
+    };
   }
 }
 
