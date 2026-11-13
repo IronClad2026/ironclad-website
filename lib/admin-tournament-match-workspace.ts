@@ -230,7 +230,7 @@ export async function loadAdminTournamentMatchWorkspace(
             }
           : null,
         // This workspace has already authorized staff to review registration facts.
-        true
+        { profilePublic: true, optionalPublic: true }
       );
 
       bracketParticipants.push(participant);

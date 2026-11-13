@@ -15,11 +15,19 @@ afterEach(cleanup);
 describe("gaming-profile publication control", () => {
   it("shows the future public profile disclosure before creation without a choice form", () => {
     render(<GamingProfilePublicationCard copy={copy} hasProfile={false}
-      publication={{ mode: "new", public: true, revision: 0, objectionOpen: false }} />);
+      publication={{ mode: "new", public: false, revision: 0, objectionOpen: false }} />);
 
     expect(screen.getByText(copy.newProfileDisclosure)).toBeVisible();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("offers an optional publication choice after the new profile exists", () => {
+    render(<GamingProfilePublicationCard copy={copy} hasProfile
+      publication={{ mode: "new", public: false, revision: 1, objectionOpen: false }} />);
+
+    expect(screen.getByRole("checkbox", { name: copy.confirmationLabel })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: copy.publish })).toBeVisible();
   });
 
   it("requires an unticked publication confirmation for a protected legacy profile", () => {

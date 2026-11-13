@@ -14,6 +14,7 @@ vi.mock("@/components/ScrollReveal", () => ({ default: ({ children }: { children
 const commander: PublicPlayerProfile = {
   id: "11111111-1111-4111-8111-111111111111", displayName: "Commander Alpha", playerName: "Alpha",
   country: "Australia", region: "Oceania", currentElo: 1450, publicProfileEnabled: true,
+  optionalProfileEnabled: true,
   discordPublicEnabled: false, discordUsername: null, hasAvatar: false, avatarUrl: null,
   createdAt: "2026-01-01T00:00:00.000Z",
 };

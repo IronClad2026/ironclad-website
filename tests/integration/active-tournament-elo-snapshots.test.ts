@@ -185,7 +185,7 @@ describe("active tournament ELO snapshot loading", () => {
     createSupabaseAdminClientMock.mockReturnValue(supabase.client);
 
     await expect(
-      getPublicActiveTournamentEloSnapshots(PLAYER_ID)
+      getPublicActiveTournamentEloSnapshots(PLAYER_ID, true)
     ).resolves.toEqual([
       {
         tournamentTitle: "IronClad August Open",
@@ -222,7 +222,7 @@ describe("active tournament ELO snapshot loading", () => {
     createSupabaseAdminClientMock.mockReturnValue(supabase.client);
 
     await expect(
-      getPublicActiveTournamentEloSnapshots(PLAYER_ID)
+      getPublicActiveTournamentEloSnapshots(PLAYER_ID, true)
     ).resolves.toEqual([]);
     expect(supabase.calls).toContainEqual({
       method: "is",
@@ -232,10 +232,22 @@ describe("active tournament ELO snapshot loading", () => {
 
   it("does not create an admin client for an invalid public player ID", async () => {
     await expect(
-      getPublicActiveTournamentEloSnapshots("not-a-uuid")
+      getPublicActiveTournamentEloSnapshots("not-a-uuid", true)
     ).resolves.toEqual([]);
 
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves approved ELO but withholds pending and waitlisted snapshots from the core profile", async () => {
+    const supabase = createSupabaseQueryMock({
+      data: activeRows.slice(0, 4).map(row => ({ ...row, profile: { account_closed_at: null } })),
+    });
+    createSupabaseAdminClientMock.mockReturnValue(supabase.client);
+
+    await expect(getPublicActiveTournamentEloSnapshots(PLAYER_ID, false)).resolves.toEqual([
+      { tournamentTitle: "IronClad August Open", elo: 1475, division: "Main / Pro" },
+    ]);
+    expect(supabase.calls).toContainEqual({ method: "in", args: ["registration_status", ["approved"]] });
   });
 
   it("fails closed when the snapshot query fails", async () => {

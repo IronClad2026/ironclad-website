@@ -35,6 +35,7 @@ function identity(overrides: Record<string, unknown> = {}) {
     public_profile_enabled: true,
     account_closed_at: null,
     profile_public: true,
+    optional_public: true,
     ...overrides,
   };
 }
@@ -298,6 +299,12 @@ describe("Relic-keyed player competition read model", () => {
     const fixture = database({ players: [identity({ profile_public: profilePublic })] });
     expect(await loadPlayerCompetitionHistoryByPlayerId(fixture.client, PLAYER_ID)).toEqual({ outcome: "HIDDEN" });
     expect(loadTournaments).not.toHaveBeenCalled();
+  });
+
+  it("allows UUID history while denying optional Relic lookup for the same core profile", async () => {
+    const fixture = database({ players: [identity({ optional_public: false })] });
+    expect(await loadPlayerCompetitionHistory(fixture.client, RELIC_ID)).toEqual({ outcome: "HIDDEN" });
+    expect(await loadPlayerCompetitionHistoryByPlayerId(fixture.client, PLAYER_ID)).toMatchObject({ outcome: "FOUND_VISIBLE" });
   });
 
   it("rejects malformed public UUIDs before a query", async () => {

@@ -17,6 +17,7 @@ const snapshot: TournamentParticipantRegistrationSnapshot = {
   bracketName: "Main / Pro Bracket",
 };
 const publicPlayerId = "33333333-3333-4333-8333-333333333333";
+const publicDetails = { profilePublic: true, optionalPublic: true };
 
 describe("public tournament participant projection", () => {
   it("uses immutable registration facts for an active competitor", () => {
@@ -24,7 +25,7 @@ describe("public tournament participant projection", () => {
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
         accountClosedAt: null,
-      }, true)
+      }, publicDetails)
     ).toEqual({
       registrationId: snapshot.registrationId,
       name: "HistoricalIGN",
@@ -44,7 +45,7 @@ describe("public tournament participant projection", () => {
         playerId: publicPlayerId,
         accountClosedAt: null,
       },
-      true
+      publicDetails
     );
 
     expect(participant.elo).toBe(1452);
@@ -55,7 +56,7 @@ describe("public tournament participant projection", () => {
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
         accountClosedAt: null,
-      }, true)
+      }, publicDetails)
     ).toEqual(
       expect.objectContaining({
         name: "HistoricalIGN",
@@ -71,7 +72,7 @@ describe("public tournament participant projection", () => {
       mapPublicTournamentParticipant(snapshot, {
         playerId: publicPlayerId,
         accountClosedAt: "2026-08-14T00:00:00.000Z",
-      }, true)
+      }, publicDetails)
     ).toEqual(
       expect.objectContaining({
         registrationId: snapshot.registrationId,
@@ -84,7 +85,7 @@ describe("public tournament participant projection", () => {
   });
 
   it("fails closed on optional facts when privacy state is unavailable", () => {
-    expect(mapPublicTournamentParticipant(snapshot, null, true)).toEqual(
+    expect(mapPublicTournamentParticipant(snapshot, null, publicDetails)).toEqual(
       expect.objectContaining({
         name: "HistoricalIGN",
         profileHref: null,
@@ -95,7 +96,7 @@ describe("public tournament participant projection", () => {
   });
 
   it("renders and searches masked fields without fake values", () => {
-    const participant = mapPublicTournamentParticipant(snapshot, null, false);
+    const participant = mapPublicTournamentParticipant(snapshot, null, { profilePublic: false, optionalPublic: false });
 
     expect(formatTournamentParticipantFact(participant.country)).toBe("—");
     expect(formatTournamentParticipantFact(participant.elo)).toBe("—");
@@ -106,11 +107,20 @@ describe("public tournament participant projection", () => {
     expect(tournamentParticipantMatchesQuery(participant, "0")).toBe(false);
   });
 
-  it("retains the event alias and entry while withholding optional facts for an active restricted profile", () => {
-    expect(mapPublicTournamentParticipant(snapshot, { playerId: publicPlayerId, accountClosedAt: null }, false)).toMatchObject({
+  it("retains event ELO and the public profile link while withholding optional country", () => {
+    expect(mapPublicTournamentParticipant(snapshot, { playerId: publicPlayerId, accountClosedAt: null }, { profilePublic: true, optionalPublic: false })).toMatchObject({
       registrationId: snapshot.registrationId,
       name: "HistoricalIGN",
       status: "approved",
+      profileHref: `/players/${publicPlayerId}`,
+      country: null,
+      elo: 1452,
+    });
+  });
+
+  it("preserves event history when the core profile is restricted", () => {
+    expect(mapPublicTournamentParticipant(snapshot, { playerId: publicPlayerId, accountClosedAt: null }, { profilePublic: false, optionalPublic: false })).toMatchObject({
+      name: "HistoricalIGN",
       profileHref: null,
       country: null,
       elo: null,

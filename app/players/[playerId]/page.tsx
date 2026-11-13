@@ -63,9 +63,9 @@ export default async function PublicPlayerProfilePage({
   const historyPage = parsePublicHistoryPage((await searchParams).historyPage);
   const [activeTournamentEloSnapshots, showcase, clips, badgeDictionary, competitionHistory] =
     await Promise.all([
-      getPublicActiveTournamentEloSnapshots(player.id),
-      getPublicPlayerShowcase(player.id),
-      getPublicCombatHighlights(player.id),
+      getPublicActiveTournamentEloSnapshots(player.id, player.optionalProfileEnabled),
+      player.optionalProfileEnabled ? getPublicPlayerShowcase(player.id) : null,
+      player.optionalProfileEnabled ? getPublicCombatHighlights(player.id) : [],
       loadDictionary(locale, "badges"),
       getPublicPlayerCompetitionHistory(player.id, historyPage),
     ]);

@@ -29,7 +29,7 @@ export default function GamingProfilePublicationCard({
       <p className="mt-2 text-sm font-semibold text-zinc-100">
         {hasProfile ? (current.public ? copy.publicationStatus : copy.privateStatus) : copy.newProfileDisclosure}
       </p>
-      {current.mode === "legacy" && (
+      {hasProfile && (
         <>
           <p className="mt-2 text-sm leading-6 text-zinc-300">{copy.legacyDescription}</p>
           {current.objectionOpen && <p className="mt-2 text-sm text-amber-200">{copy.objectionStatus}</p>}

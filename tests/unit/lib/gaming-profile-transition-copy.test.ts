@@ -17,17 +17,19 @@ describe("gaming profile transition copy", () => {
     expect(transition.checkbox).not.toBe(publication.confirmationLabel);
     expect(transition.privateFields).toBe(original.privateFields);
     expect(transition.contact).toBe(original.contact);
-    expect(publication.newProfileDisclosure).toContain("Discord");
+    expect(publication.description).toContain("Discord");
+    expect(publication.newProfileDisclosure).not.toBe(publication.description);
     expect(publication.keepPrivate).not.toBe(publication.publish);
   });
 
-  it("explains the existing profile protections without changing historical visibility at sign-in", () => {
+  it("distinguishes public core, optional sharing and a recorded objection", () => {
     const notice = getPublicGamingProfileNoticeCopy("en", "public-gaming-profile-v2");
     const publication = getGamingProfilePublicationCopy("en");
 
-    expect(notice.legacyVisibility).toMatch(/was off.*unclear.*objection.*does not change your visibility/i);
+    expect(notice.publicFields).toMatch(/core gaming profiles.*current ELO.*roster ELO/i);
+    expect(notice.legacyVisibility).toMatch(/existing and new.*separate permission.*objection.*does not grant permission/i);
     expect(publication.description).toContain("published separately");
-    expect(publication.confirmationLabel).toMatch(/^I choose to publish/);
+    expect(publication.confirmationLabel).toMatch(/^I choose to share the optional details/);
     expect(publication.objectionStatus).toContain("while we review a privacy objection");
   });
 });

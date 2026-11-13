@@ -75,11 +75,11 @@ def build_review_corpus():
 
     info = blocks("privacy", "3")
     info[4]["items"][info[4]["items"].index("profile visibility settings;")] = (
-        "historical profile visibility settings, applicable publication choices, and the minimum evidence needed to administer the existing-profile transition;"
+        "historical profile visibility settings, optional profile disclosure choices and the minimum evidence needed to apply those choices or review an individual restriction;"
     )
     info[6]["items"].insert(4, "verified canonical Relic profile identifier;")
     info.insert(14, paragraph(
-        "The gaming-profile notice receipt records a protected reference to the authenticated account, the notice version and the acknowledgement time. A separate publication record can identify the applicable policy version and the current choice for an existing profile."
+        "The gaming-profile notice receipt records a protected reference to the authenticated account, the notice version and the acknowledgement time. Separate records can identify optional disclosure choices, verified prior permission and individual restrictions."
     ))
     purposes = blocks("privacy", "5")[0]
     purposes["text"] = purposes["text"].replace("create and maintain profiles;", "create and maintain public gaming profiles and private account management under the applicable visibility rules;").replace("publish factual Competition History;", "publish factual Competition History and, where applicable, connect verified public profile identity through supported competition integrations;")
@@ -90,20 +90,18 @@ def build_review_corpus():
         line for line in text.splitlines() if line.startswith("Avatar files stay in private Storage.")
     ))]
     verification = blocks("privacy", "9")
-    verification.insert(-1, paragraph(
-        "Where trusted verification establishes a canonical Relic profile identifier, IronClad records the binding. The authorized CoH3Stats integration can receive verified identity information and a public IronClad profile link within the scope described in section 15. IronClad does not assign guessed identifiers."
-    ))
+    verification.insert(-1, paragraph(clause("**Section 9, verification and integration.**")))
     public = blocks("privacy", "14")
     public[0]["text"] = clause("**Section 14, public information.**")
-    public[1]["text"] = "A restriction on optional profile details or account closure leaves factual Competition History subject to the rules for each event."
+    public[1]["text"] = "Withdrawing an optional disclosure choice, restricting a gaming profile or closing an Account leaves factual Competition History subject to the rules for each event."
     public.pop(3)  # Its indexing warning is incorporated into the new opening paragraph.
     recipients = blocks("privacy", "15")[1]["items"]
     recipients.insert(next(index for index, item in enumerate(recipients) if item.startswith("Relic:")) + 1,
-                      "CoH3Stats: authorized read-only access to supported competition data, including a verified canonical Relic profile identifier and the IronClad profile link for eligible public profiles. This integration has no authority to verify eligibility or change competition records.")
+                      "CoH3Stats: authorized read-only access to supported competition data. The integration may receive the verified canonical Relic profile identifier and its public IronClad profile link when the profile is public and the optional disclosure choice or verified prior permission covers that use. The Relic identifier does not appear on public pages. This integration has no authority to verify eligibility or change competition records.")
     rights = blocks("privacy", "20")
-    rights[0]["text"] = rights[0]["text"].replace("changes to public-profile or public-Discord settings", "changes to an existing-profile publication choice or public-Discord settings")
-    rights[6]["text"] = rights[6]["text"].replace("Withdrawing public-profile, Discord or media permission", "Withdrawing an existing-profile publication choice, public Discord or media permission")
-    rights.insert(2, paragraph("An unresolved privacy objection restricts full-profile publication while IronClad reviews it. The outcome is recorded separately from any acknowledgement."))
+    rights[0]["text"] = rights[0]["text"].replace("changes to public-profile or public-Discord settings", "changes to optional profile disclosure or public-Discord settings")
+    rights[6]["text"] = rights[6]["text"].replace("Withdrawing public-profile, Discord or media permission", "Withdrawing permission for optional profile details, public Discord or media")
+    rights.insert(2, paragraph("An unresolved, recorded privacy objection restricts the individual gaming profile while IronClad reviews it. The outcome is recorded separately from any acknowledgement."))
 
     corpus.update(effectiveDate=None, effectiveDateDisplay="TBD", activationDatePolicy="Draft for review. No effective date has been assigned.")
     return corpus

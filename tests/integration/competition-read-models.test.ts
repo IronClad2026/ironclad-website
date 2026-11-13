@@ -87,6 +87,7 @@ function fixture() {
         public_profile_enabled: true,
         account_closed_at: null,
         profile_public: true,
+        optional_public: true,
         in_game_name: "Current Alias",
         display_name: "Current Alias",
         current_elo: 999,
@@ -110,6 +111,7 @@ function fixture() {
         public_profile_enabled: false,
         account_closed_at: null,
         profile_public: true,
+        optional_public: true,
         in_game_name: "Private Alias",
         display_name: "Private Alias",
       },
@@ -387,13 +389,12 @@ describe("competition read products together", () => {
     expect(db.requests).toHaveLength(1);
   });
 
-  it("keeps a restricted player's official event result while hiding optional identity and eligibility", async () => {
+  it("keeps official history, core links and event ELO while hiding optional Relic correlation", async () => {
     const db = fixture();
     const restricted = db.tables.gaming_profile_disclosure[1];
-    restricted.profile_public = false;
+    restricted.optional_public = false;
     restricted.coh3_profile_id = null;
     restricted.display_name = null;
-    restricted.in_game_name = null;
 
     await expect(loadPlayerCompetitionHistory(db.client, "7777777", { now }))
       .resolves.toEqual({ outcome: "NOT_FOUND" });
@@ -402,9 +403,9 @@ describe("competition read products together", () => {
     expect(main.participants.find((row) => row.registrationId === uuid(102))).toEqual({
       registrationId: uuid(102),
       eventAlias: "Historical Opponent",
-      eventElo: null,
+      eventElo: 1600,
       registrationStatus: "approved",
-      profileUrl: null,
+      profileUrl: `https://www.ironcladtournaments.com/players/${uuid(202)}`,
       relicProfileId: null,
     });
     expect(main.bracket?.matches.some((match) => match.playerTwoRegistrationId === uuid(102))).toBe(true);

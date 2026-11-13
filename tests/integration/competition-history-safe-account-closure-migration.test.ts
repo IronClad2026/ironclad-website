@@ -413,7 +413,7 @@ describe("competition-history-safe account closure migration", () => {
         {
           accountClosedAt: "2026-08-14T00:00:00.000Z",
         },
-        true
+        { profilePublic: true, optionalPublic: true }
       )
     ).toEqual(
       expect.objectContaining({

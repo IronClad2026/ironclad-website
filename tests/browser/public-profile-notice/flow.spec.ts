@@ -52,7 +52,7 @@ test("narrow touch view exposes notice and controls without horizontal scrolling
 
 test("transition disclosure posts its own version and leaves publication a separate choice", async ({ page }) => {
   await page.goto(path + "?notice=v2", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/If your profile was off.*Acknowledging this notice does not change your visibility/)).toBeVisible();
+  await expect(page.getByText(/existing and new profiles.*Acknowledging this notice does not grant permission to share optional details/)).toBeVisible();
   const checkbox = page.getByRole("checkbox", { name: "I acknowledge how IronClad displays gaming profiles and official tournament information." });
   await expect(checkbox).not.toBeChecked();
   await checkbox.check();

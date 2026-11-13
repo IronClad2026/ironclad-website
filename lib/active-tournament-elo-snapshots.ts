@@ -83,7 +83,8 @@ export async function getOwnActiveTournamentEloSnapshots(
 }
 
 export async function getPublicActiveTournamentEloSnapshots(
-  playerId: string
+  playerId: string,
+  includeOptionalDetails: boolean
 ): Promise<ActiveTournamentEloSnapshot[]> {
   if (!UUID_PATTERN.test(playerId)) {
     return [];
@@ -94,7 +95,8 @@ export async function getPublicActiveTournamentEloSnapshots(
       createSupabaseAdminClient(),
       "profile_id",
       playerId,
-      true
+      true,
+      includeOptionalDetails
     );
   } catch {
     console.error("Active tournament ELO snapshot load failed.");
@@ -106,14 +108,18 @@ async function loadActiveTournamentEloSnapshots(
   supabase: SnapshotQueryClient,
   identityColumn: "clerk_user_id" | "profile_id",
   identityValue: string,
-  requirePublicProfile: boolean
+  requirePublicProfile: boolean,
+  includeOptionalDetails = false
 ): Promise<ActiveTournamentEloSnapshot[]> {
   try {
+    const registrationStatuses = requirePublicProfile && !includeOptionalDetails
+      ? ["approved"]
+      : [...ACTIVE_REGISTRATION_STATUSES];
     let query = supabase
       .from("registrations")
       .select(requirePublicProfile ? PUBLIC_SNAPSHOT_SELECT : SNAPSHOT_SELECT)
       .eq(identityColumn, identityValue)
-      .in("registration_status", [...ACTIVE_REGISTRATION_STATUSES])
+      .in("registration_status", registrationStatuses)
       .in("tournament.status", [...ACTIVE_TOURNAMENT_STATUSES]);
 
     if (requirePublicProfile) {
@@ -129,7 +135,7 @@ async function loadActiveTournamentEloSnapshots(
 
     return ((data ?? []) as unknown as ActiveSnapshotRow[])
       .map((row) =>
-        mapActiveTournamentEloSnapshot(row, requirePublicProfile)
+        mapActiveTournamentEloSnapshot(row, requirePublicProfile, registrationStatuses)
       )
       .filter(
         (snapshot): snapshot is ActiveTournamentEloSnapshot =>
@@ -146,7 +152,8 @@ async function loadActiveTournamentEloSnapshots(
 
 function mapActiveTournamentEloSnapshot(
   row: ActiveSnapshotRow,
-  requirePublicProfile: boolean
+  requirePublicProfile: boolean,
+  registrationStatuses: readonly string[]
 ): ActiveTournamentEloSnapshot | null {
   const tournament = Array.isArray(row.tournament)
     ? row.tournament.length === 1
@@ -167,9 +174,7 @@ function mapActiveTournamentEloSnapshot(
   if (
     (requirePublicProfile && profile?.account_closed_at !== null) ||
     typeof row.registration_status !== "string" ||
-    !ACTIVE_REGISTRATION_STATUSES.includes(
-      row.registration_status as (typeof ACTIVE_REGISTRATION_STATUSES)[number]
-    ) ||
+    !registrationStatuses.includes(row.registration_status) ||
     (row.registration_status === "waitlisted" &&
       (tournamentBracket?.launched_at !== null ||
         (row.waitlist_offer_status !== null &&

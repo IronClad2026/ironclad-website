@@ -126,6 +126,7 @@ function transport(
         display_name: "Public alias",
         public_profile_enabled: false,
         profile_public: true,
+        optional_public: true,
         account_closed_at:
           options.closedOnRecheck && playerReads > 1
             ? "2026-10-27T00:00:00.000Z"

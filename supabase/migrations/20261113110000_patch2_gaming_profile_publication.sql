@@ -22,7 +22,7 @@ insert into ironclad_private.gaming_profile_publication_policy default values;
 create table ironclad_private.gaming_profile_publications (
   player_id uuid not null references public.players(id) on delete cascade,
   revision bigint not null check (revision > 0),
-  publication_basis text check (publication_basis in ('new-profile', 'legacy-choice', 'documented-legacy')),
+  publication_basis text check (publication_basis in ('player-choice', 'documented-legacy')),
   verification_reference text check (verification_reference ~ '^[a-zA-Z0-9._:-]{3,120}$'),
   objection_open boolean not null default false,
   updated_at timestamptz not null default clock_timestamp(),
@@ -35,16 +35,18 @@ alter table ironclad_private.gaming_profile_publications enable row level securi
 revoke all on ironclad_private.gaming_profile_publication_policy, ironclad_private.gaming_profile_publications
   from public, anon, authenticated, service_role;
 
--- The latest decision overrides all prior decisions. Rankings and tournament
--- records use this projection to mask optional facts, never to drop results.
+-- Core identity remains public for active players regardless of the historic
+-- profile flag. Optional fields have their own publication decision.
 create view ironclad_private.gaming_profile_visibility with (security_barrier = true) as
 select player.id,
+  policy.activated_at is not null as policy_active,
+  player.account_closed_at is null and not coalesce(choice.objection_open, false) as profile_public,
   player.account_closed_at is null and not coalesce(choice.objection_open, false) and
-    (policy.activated_at is null or choice.publication_basis is not null) as profile_public
+    ((policy.activated_at is null and choice.revision is null) or choice.publication_basis is not null) as optional_public
 from public.players player
 cross join ironclad_private.gaming_profile_publication_policy policy
 left join lateral (
-  select history.publication_basis, history.objection_open
+  select history.revision, history.publication_basis, history.objection_open
   from ironclad_private.gaming_profile_publications history
   where history.player_id = player.id
   order by history.revision desc limit 1
@@ -54,9 +56,11 @@ revoke all on ironclad_private.gaming_profile_visibility from public, anon, auth
 create view public.gaming_profile_disclosure with (security_barrier = true, security_invoker = false) as
 select player.id, player.clerk_user_id, player.account_closed_at,
   case when visibility.profile_public then player.in_game_name end as in_game_name,
-  case when visibility.profile_public then player.display_name end as display_name,
-  case when visibility.profile_public then player.coh3_profile_id end as coh3_profile_id,
-  coalesce(visibility.profile_public, false) as profile_public
+  case when visibility.optional_public then player.display_name
+    when visibility.profile_public then player.in_game_name end as display_name,
+  case when visibility.optional_public then player.coh3_profile_id end as coh3_profile_id,
+  coalesce(visibility.profile_public, false) as profile_public,
+  coalesce(visibility.optional_public, false) as optional_public
 from public.players player
 left join ironclad_private.gaming_profile_visibility visibility on visibility.id = player.id;
 revoke all on public.gaming_profile_disclosure from public, anon, authenticated, service_role;
@@ -114,12 +118,12 @@ returns boolean language sql stable set search_path = pg_catalog as $$
 $$;
 revoke all on function ironclad_private.accepted_gaming_profile_policy(text) from public, anon, authenticated, service_role;
 
-create function ironclad_private.record_new_gaming_profile_publication()
+create function ironclad_private.require_gaming_profile_creation_acceptance()
 returns trigger language plpgsql security definer set search_path = pg_catalog as $$
 declare
   v_activated_at timestamptz;
 begin
-  -- Profile upserts that update an existing row cannot create this receipt.
+  -- Ordinary profile updates do not repeat this first-creation check.
   if auth.role() = 'authenticated' and auth.jwt()->>'sub' = new.clerk_user_id
     and new.account_closed_at is null then
     select activated_at into strict v_activated_at from ironclad_private.gaming_profile_publication_policy
@@ -129,16 +133,14 @@ begin
       if not ironclad_private.accepted_gaming_profile_policy(new.clerk_user_id) then
         raise exception 'Gaming profile policy acceptance is required' using errcode = '42501';
       end if;
-      insert into ironclad_private.gaming_profile_publications (player_id, revision, publication_basis)
-        values (new.id, 1, 'new-profile');
     end if;
   end if;
   return new;
 end;
 $$;
-revoke all on function ironclad_private.record_new_gaming_profile_publication() from public, anon, authenticated, service_role;
-create trigger players_record_new_gaming_profile_publication
-  after insert on public.players for each row execute function ironclad_private.record_new_gaming_profile_publication();
+revoke all on function ironclad_private.require_gaming_profile_creation_acceptance() from public, anon, authenticated, service_role;
+create trigger players_require_gaming_profile_creation_acceptance
+  after insert on public.players for each row execute function ironclad_private.require_gaming_profile_creation_acceptance();
 
 create function public.get_my_gaming_profile_publication()
 returns jsonb language plpgsql stable security definer set search_path = pg_catalog as $$
@@ -156,12 +158,12 @@ begin
   select id into v_player_id from public.players where clerk_user_id = v_subject and account_closed_at is null;
   if v_player_id is null then
     if not ironclad_private.accepted_gaming_profile_policy(v_subject) then return null; end if;
-    return jsonb_build_object('mode', 'new', 'public', true, 'revision', 0, 'objectionOpen', false);
+    return jsonb_build_object('mode', 'new', 'public', false, 'revision', 0, 'objectionOpen', false);
   end if;
   select * into v_choice from ironclad_private.gaming_profile_publications
     where player_id = v_player_id order by revision desc limit 1;
   return jsonb_build_object(
-    'mode', case when v_choice.publication_basis = 'new-profile' then 'new' else 'legacy' end,
+    'mode', 'legacy',
     'public', v_choice.publication_basis is not null and not coalesce(v_choice.objection_open, false),
     'revision', coalesce(v_choice.revision, 0),
     'objectionOpen', coalesce(v_choice.objection_open, false)
@@ -197,20 +199,22 @@ begin
   if v_player_id is null then return false; end if;
   select * into v_choice from ironclad_private.gaming_profile_publications
     where player_id = v_player_id order by revision desc limit 1;
-  if coalesce(v_choice.revision, 0) <> p_expected_revision or v_choice.publication_basis = 'new-profile'
+  if coalesce(v_choice.revision, 0) <> p_expected_revision
     or (p_public and v_choice.objection_open) then return false; end if;
   if p_public = (v_choice.publication_basis is not null) then return true; end if;
 
   insert into ironclad_private.gaming_profile_publications (player_id, revision, publication_basis)
-    values (v_player_id, p_expected_revision + 1, case when p_public then 'legacy-choice' end);
+    values (v_player_id, p_expected_revision + 1, case when p_public then 'player-choice' end);
   return true;
 end;
 $$;
 revoke all on function public.set_my_legacy_gaming_profile_publication(boolean,bigint) from public, anon, authenticated, service_role;
 grant execute on function public.set_my_legacy_gaming_profile_publication(boolean,bigint) to authenticated;
 
+-- The evidence reference for verify-legacy must cover the complete optional
+-- bundle, including partner correlation. A legacy flag alone is insufficient.
 -- Record only supported historical elections or a verified objection event.
--- Resolving an objection leaves the profile restricted pending a fresh choice.
+-- Resolving an objection restores core only; optional publication stays off.
 create function ironclad_private.record_gaming_profile_publication_review(
   p_player_id uuid, p_expected_revision bigint, p_action text, p_reference text
 )
@@ -250,7 +254,7 @@ returns text language sql stable security definer set search_path = pg_catalog a
   join ironclad_private.gaming_profile_visibility visibility on visibility.id = player.id
   where auth.role() = 'service_role' and player.id = p_player_id
     and player.avatar_url is not null and player.account_closed_at is null
-    and (visibility.profile_public or player.clerk_user_id = p_viewer_subject);
+    and (visibility.optional_public or player.clerk_user_id = p_viewer_subject);
 $$;
 revoke all on function public.get_gaming_profile_avatar_target(uuid,text) from public, anon, authenticated, service_role;
 grant execute on function public.get_gaming_profile_avatar_target(uuid,text) to service_role;
@@ -319,7 +323,8 @@ with (security_barrier = true, security_invoker = false) as
         END AS player_id,
         CASE
             WHEN player.account_closed_at IS NOT NULL THEN 'Former Competitor'::text
-            WHEN visibility.profile_public THEN player.display_name
+            WHEN visibility.optional_public THEN player.display_name
+            WHEN visibility.profile_public THEN player.in_game_name
             ELSE coalesce(historical.competition_alias, 'Competitor'::text)
         END AS display_name,
         CASE
@@ -328,7 +333,7 @@ with (security_barrier = true, security_invoker = false) as
             ELSE coalesce(historical.competition_alias, 'Competitor'::text)
         END AS in_game_name,
         CASE
-            WHEN visibility.profile_public THEN player.country
+            WHEN visibility.optional_public THEN player.country
             ELSE NULL::text
         END AS country,
         CASE
@@ -339,7 +344,7 @@ with (security_barrier = true, security_invoker = false) as
             WHEN visibility.profile_public THEN player.current_elo
             ELSE NULL::integer
         END AS current_elo,
-    visibility.profile_public AND player.avatar_url IS NOT NULL AS has_avatar,
+    visibility.optional_public AND player.avatar_url IS NOT NULL AS has_avatar,
     NULL::text AS avatar_url,
     all_time.bracket_type,
     all_time.total_points,
@@ -370,23 +375,22 @@ with (security_barrier = true, security_invoker = false) as
 
 create or replace view public.public_player_profiles
 with (security_barrier = true, security_invoker = false) as
- SELECT id,
-    display_name,
-    in_game_name AS player_name,
-    country,
-    region,
-    current_elo,
+ SELECT player.id,
+    CASE WHEN visibility.optional_public THEN player.display_name ELSE player.in_game_name END AS display_name,
+    player.in_game_name AS player_name,
+    CASE WHEN visibility.optional_public THEN player.country END AS country,
+    player.region,
+    player.current_elo,
     true AS public_profile_enabled,
-    discord_public_enabled,
-        CASE
-            WHEN discord_public_enabled THEN discord_username
-            ELSE NULL::text
-        END AS discord_username,
-    avatar_url IS NOT NULL AS has_avatar,
+    player.discord_public_enabled,
+    CASE WHEN player.discord_public_enabled THEN player.discord_username END AS discord_username,
+    visibility.optional_public AND player.avatar_url IS NOT NULL AS has_avatar,
     NULL::text AS avatar_url,
-    created_at
-   FROM players player
-  WHERE player.id IN (SELECT id FROM ironclad_private.gaming_profile_visibility WHERE profile_public);
+    CASE WHEN NOT visibility.policy_active THEN player.created_at END AS created_at,
+    visibility.optional_public AS optional_profile_enabled
+   FROM public.players player
+     JOIN ironclad_private.gaming_profile_visibility visibility ON visibility.id = player.id
+  WHERE visibility.profile_public;
 
 create or replace view public.public_player_showcases
 with (security_barrier = true, security_invoker = false) as
@@ -404,7 +408,7 @@ with (security_barrier = true, security_invoker = false) as
      JOIN players player ON player.id = showcase.player_id
      LEFT JOIN player_badge_awards award ON award.id = showcase.featured_badge_award_id AND award.player_id = showcase.player_id AND (award.badge_slug = ANY (ARRAY['ironclad-recruit'::text, 'first-deployment'::text, 'first-victory'::text, 'battle-tested'::text, 'rising-through-the-ranks'::text, 'first-campaign'::text, 'iron-regular'::text, 'tournament-veteran'::text, 'season-campaigner'::text, 'reliable-competitor'::text, 'five-victories'::text, 'ten-victories'::text, 'twenty-five-victories'::text, 'iron-streak'::text, 'unbroken'::text, 'clean-sweep'::text, 'comeback-commander'::text, 'giant-slayer'::text, 'giant-hunter'::text, 'flawless-campaign'::text, 'first-advance'::text, 'semifinalist'::text, 'finalist'::text, 'academy-champion'::text, 'challenge-champion'::text, 'elite-champion'::text, 'double-champion'::text, 'triple-crown'::text, 'season-podium'::text, 'season-champion'::text]))
   WHERE player_showcase_enabled()
-    AND player.id IN (SELECT id FROM ironclad_private.gaming_profile_visibility WHERE profile_public);
+    AND player.id IN (SELECT id FROM ironclad_private.gaming_profile_visibility WHERE optional_public);
 
 do $projection$
 begin
@@ -429,7 +433,8 @@ with (security_barrier = true, security_invoker = false) as
         END AS player_id,
         CASE
             WHEN player.account_closed_at IS NOT NULL THEN 'Former Competitor'::text
-            WHEN visibility.profile_public THEN player.display_name
+            WHEN visibility.optional_public THEN player.display_name
+            WHEN visibility.profile_public THEN player.in_game_name
             ELSE coalesce(historical.competition_alias, 'Competitor'::text)
         END AS display_name,
         CASE
@@ -438,7 +443,7 @@ with (security_barrier = true, security_invoker = false) as
             ELSE coalesce(historical.competition_alias, 'Competitor'::text)
         END AS in_game_name,
         CASE
-            WHEN visibility.profile_public THEN player.country
+            WHEN visibility.optional_public THEN player.country
             ELSE NULL::text
         END AS country,
         CASE
@@ -449,7 +454,7 @@ with (security_barrier = true, security_invoker = false) as
             WHEN visibility.profile_public THEN player.current_elo
             ELSE NULL::integer
         END AS current_elo,
-    visibility.profile_public AND player.avatar_url IS NOT NULL AS has_avatar,
+    visibility.optional_public AND player.avatar_url IS NOT NULL AS has_avatar,
     NULL::text AS avatar_url,
     season_stats.bracket_type,
     season_stats.total_points,
@@ -546,7 +551,8 @@ with (security_barrier = true, security_invoker = false) as
         END AS player_id,
         CASE
             WHEN player.account_closed_at IS NOT NULL THEN 'Former Competitor'::text
-            WHEN visibility.profile_public THEN player.display_name
+            WHEN visibility.optional_public THEN player.display_name
+            WHEN visibility.profile_public THEN player.in_game_name
             ELSE coalesce(historical.competition_alias, 'Competitor'::text)
         END AS display_name,
         CASE
@@ -555,7 +561,7 @@ with (security_barrier = true, security_invoker = false) as
             ELSE coalesce(historical.competition_alias, 'Competitor'::text)
         END AS in_game_name,
         CASE
-            WHEN visibility.profile_public THEN player.country
+            WHEN visibility.optional_public THEN player.country
             ELSE NULL::text
         END AS country,
         CASE
@@ -566,7 +572,7 @@ with (security_barrier = true, security_invoker = false) as
             WHEN visibility.profile_public THEN player.current_elo
             ELSE NULL::integer
         END AS current_elo,
-    visibility.profile_public AND player.avatar_url IS NOT NULL AS has_avatar,
+    visibility.optional_public AND player.avatar_url IS NOT NULL AS has_avatar,
     NULL::text AS avatar_url,
     season_stats.bracket_type,
     season_stats.total_points,
@@ -634,10 +640,10 @@ with (security_barrier = true, security_invoker = false) as
             ELSE coalesce(historical.competition_alias, 'Competitor'::text)
         END AS player_name,
         CASE
-            WHEN visibility.profile_public THEN player.country
+            WHEN visibility.optional_public THEN player.country
             ELSE NULL::text
         END AS country,
-    visibility.profile_public AND player.avatar_url IS NOT NULL AS has_avatar,
+    visibility.optional_public AND player.avatar_url IS NOT NULL AS has_avatar,
     champion.final_rank,
     champion.final_points,
     champion.created_at
@@ -674,10 +680,10 @@ with (security_barrier = true, security_invoker = false) as
             ELSE coalesce(historical.competition_alias, 'Competitor'::text)
         END AS player_name,
         CASE
-            WHEN visibility.profile_public THEN player.country
+            WHEN visibility.optional_public THEN player.country
             ELSE NULL::text
         END AS country,
-    visibility.profile_public AND player.avatar_url IS NOT NULL AS has_avatar,
+    visibility.optional_public AND player.avatar_url IS NOT NULL AS has_avatar,
     champion.final_rank,
     champion.final_points,
     champion.created_at
@@ -697,7 +703,7 @@ end;
 $projection$;
 
 comment on view public.public_player_profiles is
-  'Public gaming profile allowlist. Closed accounts and restricted profiles are excluded. Discord is independently optional.';
+  'Public competitive identity for active players. Optional details are filtered separately. Discord has its own setting.';
 
 CREATE OR REPLACE FUNCTION public.can_read_public_player_combat_highlight(p_upload_id uuid)
  RETURNS boolean
@@ -711,7 +717,7 @@ AS $function$
       and s.slot_number=u.slot_number and s.current_upload_id=u.id
     join ironclad_private.gaming_profile_visibility visibility on visibility.id=s.player_id
     where u.id=p_upload_id and u.state='ready' and u.verified is not null
-      and s.hidden_at is null and visibility.profile_public
+      and s.hidden_at is null and visibility.optional_public
   );
 $function$
 ;

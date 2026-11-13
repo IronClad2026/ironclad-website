@@ -181,6 +181,19 @@ async function catalog(db) {
     from pg_class c where c.relnamespace='public'::regnamespace and c.relname=any($1) order by c.relname`, [projectionNames])).rows;
 }
 
+function assertProjectionCompatibility(before, after) {
+  assert.deepEqual(after.map(row => ({ ...row, columns: row.columns.slice(0, before.find(previous => previous.relname === row.relname).columns.length) })), before);
+  for (const row of after) {
+    const previous = before.find(item => item.relname === row.relname);
+    const added = row.columns.slice(previous.columns.length);
+    if (row.relname === "public_player_profiles") {
+      assert.deepEqual(added, [["optional_profile_enabled", "16", -1, null]]);
+    } else {
+      assert.deepEqual(added, []);
+    }
+  }
+}
+
 async function exercise(db, shape, migration, database) {
   const { oldOff, oldOn, documented, closed, objected, prospect, wrongDocs, noReceipt, untrusted, marker, wrongDigest, inFlight } = names;
   const priorCatalog = await catalog(db);
@@ -189,7 +202,7 @@ async function exercise(db, shape, migration, database) {
     from public.leaderboard_public_season_standings order by current_rank`)).rows;
   await db.query(migration);
   await check(shape, "pre-activation public surfaces and catalog compatibility", async () => {
-    assert.deepEqual(await catalog(db), priorCatalog);
+    assertProjectionCompatibility(priorCatalog, await catalog(db));
     assert.deepEqual((await db.query("select id,public_profile_enabled,discord_public_enabled from public.players order by id")).rows, before);
     await actor(db, "anon");
     assert.deepEqual(await visibleIds(db), [oldOff, oldOn, documented, objected].map(id));
@@ -199,11 +212,32 @@ async function exercise(db, shape, migration, database) {
     await assert.rejects(db.query("select * from public.players"), { code: "42501" });
     await actor(db, "service_role");
     assert.ok(await avatar(db, oldOff));
-    const unchanged = await first(db, "select in_game_name,display_name,coh3_profile_id,profile_public from public.gaming_profile_disclosure where clerk_user_id=$1", [player(oldOff)]);
-    assert.deepEqual(unchanged, { in_game_name: "competition-alias-1", display_name: "optional-display-1", coh3_profile_id: "901", profile_public: true });
+    const unchanged = await first(db, "select in_game_name,display_name,coh3_profile_id,profile_public,optional_public from public.gaming_profile_disclosure where clerk_user_id=$1", [player(oldOff)]);
+    assert.deepEqual(unchanged, { in_game_name: "competition-alias-1", display_name: "optional-display-1", coh3_profile_id: "901", profile_public: true, optional_public: true });
     await actor(db, "postgres");
     await assert.rejects(activate(db), { code: "55000" });
     await assert.rejects(db.query(`insert into public.platform_settings values('public_gaming_profile_notice','{"enabled":true,"version":"public-gaming-profile-v2"}')`), { code: "55000" });
+  });
+  await check(shape, "resolved pre-activation objection restores only core profile fields", async () => {
+    assert.equal(await review(db, oldOn, 0, "open-objection"), true);
+    await actor(db, "anon");
+    assert.equal((await db.query("select id from public.public_player_profiles where id=$1", [id(oldOn)])).rowCount, 0);
+    assert.equal(await highlight(db, oldOn), false);
+    await actor(db, "postgres");
+    assert.equal(await review(db, oldOn, 1, "resolve-objection"), true);
+    await actor(db, "anon");
+    const restored = await profile(db, oldOn);
+    assert.equal(restored.display_name, `competition-alias-${oldOn}`);
+    assert.equal(restored.region, "OCE");
+    assert.equal(restored.current_elo, 1550);
+    assert.equal(restored.optional_profile_enabled, false);
+    assert.equal(restored.country, null);
+    assert.equal(restored.has_avatar, false);
+    assert.equal(await highlight(db, oldOn), false);
+    await actor(db, "service_role");
+    assert.equal(await avatar(db, oldOn), null);
+    assert.equal((await first(db, "select coh3_profile_id from public.gaming_profile_disclosure where id=$1", [id(oldOn)])).coh3_profile_id, null);
+    await actor(db, "postgres");
   });
 
   await versions(db);
@@ -240,12 +274,25 @@ async function exercise(db, shape, migration, database) {
     assert.equal((await first(db, "select count(*)::int value from public.account_legal_acceptances")).value, 0);
     assert.deepEqual((await db.query("select id,public_profile_enabled,discord_public_enabled from public.players order by id")).rows, before);
     await actor(db, "anon");
-    assert.deepEqual(await visibleIds(db), []);
+    assert.deepEqual(await visibleIds(db), [oldOff, oldOn, documented, objected].map(id));
+    for (const n of [oldOff, oldOn, documented, objected]) {
+      const row = await profile(db, n);
+      assert.equal(row.public_profile_enabled, true);
+      assert.equal(row.optional_profile_enabled, false);
+      assert.equal(row.display_name, `competition-alias-${n}`);
+      assert.equal(row.player_name, `competition-alias-${n}`);
+      assert.equal(row.current_elo, 1550);
+      assert.equal(row.region, "OCE");
+      assert.equal(row.country, null);
+      assert.equal(row.has_avatar, false);
+      assert.equal(row.created_at, null);
+      assert.equal(row.discord_username, n === documented ? null : "fixture-discord");
+    }
     await assert.rejects(db.query("select * from public.gaming_profile_disclosure"), { code: "42501" });
     await assert.rejects(db.query("select * from ironclad_private.gaming_profile_publications"), { code: "42501" });
     await assert.rejects(activate(db), { code: "42501" });
     await actor(db, "authenticated", oldOn);
-    assert.deepEqual(await state(db), { mode: "legacy", public: false, revision: 0, objectionOpen: false });
+    assert.deepEqual(await state(db), { mode: "legacy", public: false, revision: 2, objectionOpen: false });
     await assert.rejects(db.query("insert into ironclad_private.gaming_profile_publications(player_id,publication_basis) values($1,'legacy-choice')", [id(oldOn)]), { code: "42501" });
     await actor(db, "service_role");
     await assert.rejects(activate(db), { code: "42501" });
@@ -268,10 +315,10 @@ async function exercise(db, shape, migration, database) {
         await assert.rejects(db.query("select * from public.gaming_profile_disclosure"), { code: "42501" });
       }
     }
-    assert.deepEqual((await db.query("select id,clerk_user_id,account_closed_at,profile_public from public.gaming_profile_disclosure where clerk_user_id=$1", [player(oldOff)])).rows,
-      [{ id: id(oldOff), clerk_user_id: player(oldOff), account_closed_at: null, profile_public: false }]);
-    assert.deepEqual((await db.query("select id,coh3_profile_id,account_closed_at,profile_public from public.gaming_profile_disclosure where id=$1", [id(oldOff)])).rows,
-      [{ id: id(oldOff), coh3_profile_id: null, account_closed_at: null, profile_public: false }]);
+    assert.deepEqual((await db.query("select id,clerk_user_id,account_closed_at,profile_public,optional_public from public.gaming_profile_disclosure where clerk_user_id=$1", [player(oldOff)])).rows,
+      [{ id: id(oldOff), clerk_user_id: player(oldOff), account_closed_at: null, profile_public: true, optional_public: false }]);
+    assert.deepEqual((await db.query("select id,coh3_profile_id,account_closed_at,profile_public,optional_public from public.gaming_profile_disclosure where id=$1", [id(oldOff)])).rows,
+      [{ id: id(oldOff), coh3_profile_id: null, account_closed_at: null, profile_public: true, optional_public: false }]);
     assert.equal((await db.query("select id,coh3_profile_id,in_game_name,display_name,account_closed_at,profile_public from public.gaming_profile_disclosure where coh3_profile_id=$1", ["901"])).rowCount, 0);
     assert.equal((await first(db, "select id from public.gaming_profile_disclosure where coh3_profile_id=$1", ["903"])).id, id(documented));
     const unchangedAdmin = await first(db, "select profile_id,player_name,registration_status from public.registrations where id=$1", [id(510)]);
@@ -279,12 +326,14 @@ async function exercise(db, shape, migration, database) {
   });
   await check(shape, "direct media, avatar and REST projections share eligibility", async () => {
     await actor(db, "anon");
-    assert.deepEqual(await visibleIds(db), [id(documented)]);
+    assert.deepEqual(await visibleIds(db), [oldOff, oldOn, documented].map(id));
     const shown = await profile(db, documented);
     assert.equal(shown.public_profile_enabled, true);
+    assert.equal(shown.optional_profile_enabled, true);
     assert.equal(shown.discord_username, null);
     assert.equal(shown.has_avatar, true);
     assert.equal(shown.avatar_url, null);
+    assert.equal(shown.created_at, null);
     assert.equal((await db.query("select player_id from public.public_player_showcases")).rows[0].player_id, id(documented));
     for (const n of [oldOff, oldOn, closed, objected]) {
       assert.equal(await highlight(db, n), false);
@@ -293,8 +342,8 @@ async function exercise(db, shape, migration, database) {
     assert.equal(await highlight(db, documented), true);
     assert.equal((await first(db, "select public.get_public_player_combat_highlights($1) value", [id(documented)])).value.length, 1);
     await actor(db, "service_role");
-    const gated = await first(db, "select profile_public,coh3_profile_id,display_name from public.gaming_profile_disclosure where id=$1", [id(oldOff)]);
-    assert.deepEqual(gated, { profile_public: false, coh3_profile_id: null, display_name: null });
+    const gated = await first(db, "select profile_public,optional_public,coh3_profile_id,in_game_name from public.gaming_profile_disclosure where id=$1", [id(oldOff)]);
+    assert.deepEqual(gated, { profile_public: true, optional_public: false, coh3_profile_id: null, in_game_name: "competition-alias-1" });
     assert.equal((await first(db, "select profile_public from public.gaming_profile_disclosure where id=$1", [id(documented)])).profile_public, true);
     assert.ok(await avatar(db, documented));
     assert.equal(await avatar(db, oldOff), null);
@@ -314,21 +363,22 @@ async function exercise(db, shape, migration, database) {
     for (const view of ["leaderboard_public_all_time_standings", "leaderboard_public_season_standings"]) {
       const rows = (await db.query(`select player_id,country,region,current_elo,has_avatar,avatar_url from public.${view}`)).rows;
       assert.equal(rows.length, 5);
-      assert.deepEqual(rows.filter(row => row.player_id).map(row => row.player_id), [id(documented)]);
+      assert.deepEqual(rows.filter(row => row.player_id).map(row => row.player_id).sort(), [oldOff, oldOn, documented].map(id));
       assert.ok(rows.filter(row => !row.player_id).every(row => row.country === null && row.region === null && row.current_elo === null && !row.has_avatar && row.avatar_url === null));
+      assert.ok(rows.filter(row => row.player_id === id(oldOff) || row.player_id === id(oldOn)).every(row => row.country === null && row.region === "OCE" && row.current_elo === 1550 && !row.has_avatar && row.avatar_url === null));
     }
     const champions = (await db.query("select player_id,country,has_avatar,final_rank,final_points from public.leaderboard_public_season_champions")).rows;
     assert.equal(champions.length, 5);
     assert.ok(champions.every(row => row.final_rank === 1 && row.final_points === 11));
-    assert.deepEqual(champions.filter(row => row.player_id).map(row => row.player_id), [id(documented)]);
+    assert.deepEqual(champions.filter(row => row.player_id).map(row => row.player_id).sort(), [oldOff, oldOn, documented].map(id));
     assert.ok(champions.filter(row => !row.player_id).every(row => row.country === null && !row.has_avatar));
     const seasonNames = (await db.query("select display_name,in_game_name from public.leaderboard_public_season_standings order by current_rank")).rows;
-    assert.deepEqual(seasonNames, ["Official event alias", "Competitor", "competition-alias-3", "Former Competitor", "Objected event alias"]
+    assert.deepEqual(seasonNames, ["competition-alias-1", "competition-alias-2", "competition-alias-3", "Former Competitor", "Objected event alias"]
       .map((name, index) => ({ display_name: index === 2 ? "optional-display-3" : name, in_game_name: name })));
     const allTimeNames = (await db.query("select in_game_name from public.leaderboard_public_all_time_standings order by display_order")).rows;
-    assert.deepEqual(allTimeNames.map(row => row.in_game_name), ["Later official alias", "Competitor", "competition-alias-3", "Former Competitor", "Objected event alias"]);
+    assert.deepEqual(allTimeNames.map(row => row.in_game_name), ["competition-alias-1", "competition-alias-2", "competition-alias-3", "Former Competitor", "Objected event alias"]);
     const championNames = (await db.query("select player_name from public.leaderboard_public_season_champions order by player_name")).rows;
-    assert.deepEqual(new Set(championNames.map(row => row.player_name)), new Set(["Later official alias", "Competitor", "competition-alias-3", "Former Competitor", "Objected event alias"]));
+    assert.deepEqual(new Set(championNames.map(row => row.player_name)), new Set(["competition-alias-1", "competition-alias-2", "competition-alias-3", "Former Competitor", "Objected event alias"]));
   });
 
   await check(shape, "first authenticated profile upsert requires exact legal documents and digest", async () => {
@@ -343,6 +393,7 @@ async function exercise(db, shape, migration, database) {
     await db.query("insert into ironclad_private.patch2_closed_accounts(subject_digest) values(sha256(convert_to($1,'UTF8')))", [player(marker)]);
     await db.query("grant insert on public.players to authenticated, service_role; grant select (clerk_user_id, in_game_name), update (in_game_name) on public.players to authenticated;");
     await actor(db, "authenticated", prospect);
+    assert.deepEqual(await state(db), { mode: "new", public: false, revision: 0, objectionOpen: false });
     await createPlayer(db, prospect, { upsert: true });
     await actor(db, "authenticated", oldOff);
     await createPlayer(db, oldOff, { upsert: true });
@@ -353,10 +404,19 @@ async function exercise(db, shape, migration, database) {
       await assert.rejects(createPlayer(db, n, { upsert: true }), { code: "42501" });
     }
     await actor(db, "anon");
-    assert.deepEqual(await visibleIds(db), [id(documented), id(prospect)]);
+    assert.deepEqual(await visibleIds(db), [oldOff, oldOn, documented, prospect, untrusted].map(id));
+    for (const n of [prospect, untrusted]) {
+      const row = await profile(db, n);
+      assert.equal(row.optional_profile_enabled, false);
+      assert.equal(row.country, null);
+      assert.equal(row.has_avatar, false);
+    }
     await actor(db, "authenticated", prospect);
-    assert.deepEqual(await state(db), { mode: "new", public: true, revision: 1, objectionOpen: false });
-    assert.equal(await setPublication(db, false, 1), false);
+    assert.deepEqual(await state(db), { mode: "legacy", public: false, revision: 0, objectionOpen: false });
+    assert.equal(await setPublication(db, true, 0), true);
+    assert.equal((await state(db)).public, true);
+    assert.equal(await setPublication(db, false, 1), true);
+    assert.equal((await state(db)).public, false);
     await actor(db, "authenticated", oldOff);
     assert.equal((await state(db)).public, false);
   });
@@ -391,14 +451,16 @@ async function exercise(db, shape, migration, database) {
     assert.deepEqual((await db.query("select id,public_profile_enabled,discord_public_enabled from public.players where id <= $1 order by id", [id(objected)])).rows, before);
     const history = (await db.query("select revision, publication_basis from ironclad_private.gaming_profile_publications where player_id=$1 order by revision", [id(oldOff)])).rows;
     assert.equal(history.length, 2);
-    assert.deepEqual(history.map(row => row.publication_basis), ["legacy-choice", null]);
+    assert.deepEqual(history.map(row => row.publication_basis), ["player-choice", null]);
     await actor(db, "service_role");
     await assert.rejects(db.query("update ironclad_private.gaming_profile_publications set objection_open=true where player_id=$1", [id(oldOff)]), { code: "42501" });
     await actor(db, "anon");
-    assert.deepEqual(await visibleIds(db), [id(documented), id(prospect)]);
+    assert.deepEqual(await visibleIds(db), [oldOff, oldOn, documented, objected, prospect, untrusted].map(id));
+    assert.equal((await profile(db, objected)).optional_profile_enabled, false);
+    assert.equal((await profile(db, objected)).discord_username, "fixture-discord");
   });
 
-  await check(shape, "documented legacy owner can unpublish without accepting the successors", async () => {
+  await check(shape, "owner can withdraw optional publication without accepting the successors", async () => {
     await actor(db, "postgres");
     assert.equal((await first(db, "select count(*)::int value from public.account_legal_acceptances where clerk_user_id=$1", [player(documented)])).value, 0);
     await actor(db, "authenticated", documented);
@@ -407,7 +469,9 @@ async function exercise(db, shape, migration, database) {
     assert.deepEqual(await state(db), { mode: "legacy", public: false, revision: 2, objectionOpen: false });
     await assert.rejects(setPublication(db, true, 2), { code: "42501", message: "ACCOUNT_LEGAL_ACCEPTANCE_REQUIRED" });
     await actor(db, "anon");
-    assert.deepEqual(await visibleIds(db), [id(prospect)]);
+    assert.deepEqual(await visibleIds(db), [oldOff, oldOn, documented, objected, prospect, untrusted].map(id));
+    assert.equal((await profile(db, documented)).optional_profile_enabled, false);
+    assert.equal((await profile(db, documented)).current_elo, 1550);
     assert.equal(await highlight(db, documented), false);
     await actor(db, "postgres");
     assert.deepEqual((await db.query(`select revision,publication_basis from ironclad_private.gaming_profile_publications

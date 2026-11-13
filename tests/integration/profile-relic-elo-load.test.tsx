@@ -221,7 +221,7 @@ describe("profile Relic ELO protected load", () => {
     const rpc = vi.fn()
       .mockReturnValueOnce({ abortSignal: vi.fn().mockResolvedValue({ data: null, error: { code: "57014" } }) })
       .mockReturnValueOnce({ abortSignal: vi.fn().mockResolvedValue({
-        data: { mode: "new", public: true, revision: 0, objectionOpen: false },
+        data: { mode: "new", public: false, revision: 0, objectionOpen: false },
         error: null,
       }) });
     createAuthenticatedSupabaseClientMock.mockResolvedValue({ ...profile.client, rpc });
@@ -233,7 +233,7 @@ describe("profile Relic ELO protected load", () => {
 
     const retry = await ProfilePage({ searchParams: Promise.resolve({}) });
     expect(findElementByType(retry, GamingProfilePublicationCard)?.props.publication)
-      .toEqual({ mode: "new", public: true, revision: 0, objectionOpen: false });
+      .toEqual({ mode: "new", public: false, revision: 0, objectionOpen: false });
     expect(findElementByType(retry, playerProfileFormMock)).not.toBeNull();
   });
 

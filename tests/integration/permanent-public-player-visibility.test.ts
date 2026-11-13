@@ -24,6 +24,7 @@ const activeRow = {
   id, display_name: "Competitive Commander", player_name: "LegacyPrivateCommander",
   country: "Australia", region: "Oceania", current_elo: 1450,
   public_profile_enabled: false, discord_public_enabled: false,
+  optional_profile_enabled: true,
   discord_username: "PRIVATE_DISCORD", has_avatar: true,
   avatar_url: "PRIVATE_STORAGE_PATH", created_at: "2026-01-01T00:00:00.000Z",
   email: "PRIVATE_EMAIL", clerk_user_id: "PRIVATE_CLERK_ID", legal_receipts: "PRIVATE_LEGAL_RECEIPTS",
@@ -53,7 +54,7 @@ describe("permanent public competitive player visibility", () => {
   });
 
   it("renders the active legacy false public page with only competitive player props", async () => {
-    client.from.mockImplementation(createSupabaseQueryMock({ data: activeRow }).from);
+    client.from.mockImplementation(createSupabaseQueryMock({ data: { ...activeRow, optional_profile_enabled: false } }).from);
     const page = await PublicPlayerProfilePage({ params: Promise.resolve({ playerId: id }), searchParams: Promise.resolve({}) });
     const playerProps: unknown[] = [];
     function inspect(node: ReactNode): void {
@@ -64,7 +65,10 @@ describe("permanent public competitive player visibility", () => {
     }
     inspect(page);
     expect(playerProps).toHaveLength(2);
-    expect(playerProps).toEqual(expect.arrayContaining([expect.objectContaining({ id, currentElo: 1450 })]));
+    expect(playerProps).toEqual(expect.arrayContaining([expect.objectContaining({
+      id, currentElo: 1450, displayName: activeRow.player_name, optionalProfileEnabled: false,
+      country: null, hasAvatar: false, createdAt: null,
+    })]));
     expect(JSON.stringify(playerProps)).not.toContain("PRIVATE_");
     expect(notFound).not.toHaveBeenCalled();
   });

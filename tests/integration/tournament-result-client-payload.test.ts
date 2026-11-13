@@ -375,6 +375,7 @@ function createPageClient(
       playerId?: string;
       publicProfileEnabled?: boolean;
       profilePublic?: boolean;
+      optionalPublic?: boolean;
     }
   > = {},
   viewerEloVerificationSource: string | null = "relic",
@@ -499,6 +500,7 @@ function createPageClient(
       in_game_name: profile?.inGameName ?? registration.player_name,
       public_profile_enabled: profile?.publicProfileEnabled ?? true,
       profile_public: profile?.profilePublic ?? true,
+      optional_public: profile?.optionalPublic ?? true,
     };
   });
   const results: Record<string, QueryResult> = {
@@ -934,7 +936,7 @@ describe("tournament Client Component result payload", () => {
     ).mock.calls[0];
 
     expect(selectedColumns).toBe(
-      "id, clerk_user_id, account_closed_at, profile_public"
+      "id, clerk_user_id, account_closed_at, profile_public, optional_public"
     );
     expect(participant).toEqual(
       expect.objectContaining({
@@ -1026,18 +1028,18 @@ describe("tournament Client Component result payload", () => {
     expect(serializePrivacyValue(tournament.participants)).not.toContain("1605");
   });
 
-  it("renders the approved event entry without optional fields when publication is restricted", async () => {
+  it("keeps the approved event entry, public profile and event ELO when optional details are withheld", async () => {
     const { props } = await loadClientProps({
       admin: false,
-      participantProfiles: { [SECRET_PLAYER_ID]: { profilePublic: false, publicProfileEnabled: true } },
+      participantProfiles: { [SECRET_PLAYER_ID]: { profilePublic: true, optionalPublic: false, publicProfileEnabled: true } },
     });
     const [tournament] = props.tournaments as Array<{ participants: Array<{ name: string }> }>;
     expect(tournament.participants.find((entry) => entry.name === "Safe Viewer")).toMatchObject({
       registrationId: VIEWER_REGISTRATION_ID,
       status: "approved",
-      profileHref: null,
+      profileHref: `/players/${VIEWER_REGISTRATION_ID}`,
       country: null,
-      elo: null,
+      elo: 1500,
     });
   });
 

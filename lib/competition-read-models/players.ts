@@ -23,6 +23,7 @@ type Identity = {
   alias: string | null;
   accountClosedAt: string | null;
   profilePublic: boolean;
+  optionalPublic: boolean;
 };
 
 type HistoryCandidate = {
@@ -108,7 +109,7 @@ export type PublicPlayerCompetitionLookup =
   | { outcome: "NOT_FOUND" };
 
 const IDENTITY_COLUMNS =
-  "id,coh3_profile_id,in_game_name,display_name,account_closed_at,profile_public";
+  "id,coh3_profile_id,in_game_name,display_name,account_closed_at,profile_public,optional_public";
 const CANDIDATE_COLUMNS = "id,tournament_id,registration_status,created_at";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -172,7 +173,7 @@ async function loadHistory(
   const identity = initial[0];
   if (identity[identityColumn === "id" ? "id" : "relicProfileId"] !== identityValue)
     invalid();
-  if (!isVisible(identity)) return { outcome: "HIDDEN" };
+  if (!isVisible(identity, identityColumn)) return { outcome: "HIDDEN" };
   if (!identity.alias) invalid();
 
   // One registration per event is a database invariant. A sentinel supplies
@@ -237,7 +238,7 @@ async function loadHistory(
   if (
     (identityColumn === "coh3_profile_id" &&
       current[0].relicProfileId !== identityValue) ||
-    !isVisible(current[0])
+    !isVisible(current[0], identityColumn)
   ) {
     return { outcome: "HIDDEN" };
   }
@@ -375,8 +376,9 @@ function buildEntry(
   };
 }
 
-function isVisible(identity: Identity) {
-  return identity.accountClosedAt === null && identity.profilePublic;
+function isVisible(identity: Identity, identityColumn: "id" | "coh3_profile_id") {
+  return identity.accountClosedAt === null && identity.profilePublic &&
+    (identityColumn === "id" || identity.optionalPublic);
 }
 
 function parseIdentity(value: unknown): Identity {
@@ -393,6 +395,7 @@ function parseIdentity(value: unknown): Identity {
     alias,
     accountClosedAt: nullableTimestamp(row.account_closed_at),
     profilePublic: row.profile_public === true,
+    optionalPublic: row.optional_public === true,
   };
 }
 

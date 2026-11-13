@@ -163,14 +163,13 @@ export type TournamentParticipantPrivacyState = {
 export function mapPublicTournamentParticipant(
   registration: TournamentParticipantRegistrationSnapshot,
   privacy: TournamentParticipantPrivacyState,
-  profilePublic: boolean
+  disclosure: { profilePublic: boolean; optionalPublic: boolean }
 ): TournamentParticipant {
   const isClosed = privacy?.accountClosedAt != null;
-  // Historical aliases survive restrictions. Optional profile facts require a
-  // positive disclosure decision for this audience and an open account.
-  const showOptionalFacts = privacy?.accountClosedAt === null && profilePublic === true;
+  const showProfile = privacy?.accountClosedAt === null && disclosure.profilePublic === true;
+  const showOptionalFacts = showProfile && disclosure.optionalPublic === true;
   const profileHref =
-    showOptionalFacts && privacy?.playerId
+    showProfile && privacy?.playerId
       ? `/players/${privacy.playerId}`
       : null;
 
@@ -179,7 +178,7 @@ export function mapPublicTournamentParticipant(
     name: isClosed ? "Former Competitor" : registration.playerName,
     profileHref,
     country: showOptionalFacts ? registration.country : null,
-    elo: showOptionalFacts
+    elo: showProfile
       ? (registration.verifiedElo ?? registration.submittedElo)
       : null,
     status: registration.status,

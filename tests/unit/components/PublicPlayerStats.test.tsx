@@ -18,6 +18,7 @@ const player: PublicPlayerProfile = {
   region: "Oceania",
   currentElo: 1550,
   publicProfileEnabled: true,
+  optionalProfileEnabled: true,
   discordPublicEnabled: false,
   discordUsername: null,
   hasAvatar: false,

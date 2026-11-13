@@ -63,6 +63,7 @@ function fixture(): TournamentCompetitionSnapshot {
       coh3_profile_id: String(123456 + n),
       account_closed_at: null,
       profile_public: true,
+      optional_public: true,
     })),
     generatedBrackets: [
       {
@@ -687,7 +688,7 @@ describe("bounded SELECT-only tournament selectors", () => {
       ),
     ).toBe(true);
     expect(db.calls.find((call) => call.table === "gaming_profile_disclosure")?.select).toBe(
-      "id,coh3_profile_id,account_closed_at,profile_public",
+      "id,coh3_profile_id,account_closed_at,profile_public,optional_public",
     );
     expect(
       db.calls.find((call) => call.table === "match_result_report_groups")
