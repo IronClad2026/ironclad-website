@@ -104,12 +104,6 @@ export default async function TournamentWorkspacePage({
   if (!workspace) {
     notFound();
   }
-  // A communication query can finish before the workspace. Check closure
-  // again before returning data if account access changed during that wait.
-  if (independentContent && !(await hasAdminPageAccess(workspacePath, query))) {
-    return <AdminAccessRequired />;
-  }
-
   const registrationData = section === "registrations" || section === "players-waitlist"
     ? await loadAdminTournamentRegistrationWorkspace(workspace.tournament, workspace.summary.divisionStates, {
         filter: query?.filter,
@@ -125,6 +119,12 @@ export default async function TournamentWorkspacePage({
     summary: workspace.summary,
     tournament: workspace.tournament,
   });
+
+  // Scoped data can finish loading at different times. Keep it out of the
+  // response if closure or revocation committed during any of those reads.
+  if (!(await hasAdminPageAccess(workspacePath, query))) {
+    return <AdminAccessRequired />;
+  }
 
   return (
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-24 pb-20 text-white sm:px-6 sm:pt-28">

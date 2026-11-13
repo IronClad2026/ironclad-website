@@ -160,6 +160,23 @@ describe("admin page authentication and access guidance", () => {
     expect(renderToStaticMarkup(await page)).toContain("Administrator access required");
     expect(authMock).toHaveBeenCalledTimes(2);
   });
+
+  it("withholds the tournament summary if staff authorization changes while it loads", async () => {
+    const session = { userId: "local_admin", sessionClaims: { metadata: { role: "admin" } } };
+    authMock.mockResolvedValueOnce(session).mockResolvedValue({
+      ...session, sessionClaims: { metadata: { role: "player" } },
+    });
+    loadWorkspaceMock.mockResolvedValue({
+      tournament: { id: TOURNAMENT_ID, title: "Synthetic protected title" },
+      summary: { pendingRegistrations: 5 },
+    });
+
+    const markup = renderToStaticMarkup(await routes[2].run({ section: "overview" }));
+
+    expect(markup).toContain("Administrator access required");
+    expect(markup).not.toContain("Synthetic protected title");
+    expect(authMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("safe internal admin sign-in return paths", () => {
