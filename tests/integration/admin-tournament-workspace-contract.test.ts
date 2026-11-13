@@ -1056,6 +1056,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261113010000_patch2_durable_account_closure.sql",
         "20261113045827_patch2_verified_staff_access.sql",
         "20261113050025_patch2_public_gaming_profile_acknowledgement.sql",
+        "20261113071907_patch2_retire_legacy_registration_writes.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([

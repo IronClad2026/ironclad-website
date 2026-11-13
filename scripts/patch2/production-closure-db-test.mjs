@@ -40,6 +40,7 @@ assert.equal(sha(policyRaw), "098a0764f421139468a699b1b3f835b1b7d2f93bed0997e3a9
 assert.equal(sha(fidelityRaw), "4c3b5c7643c2df41e08a368559f1307a07498362f8bdcf7d4b51c0e450b4f062");
 const policySnapshot = JSON.parse(policyRaw), fidelity = JSON.parse(fidelityRaw);
 const legacyFunctionSources = [
+  ["20260806130000_phase4_withdrawal_waitlist_division_launch.sql", "public", "withdraw_tournament_registration", "uuid", "e1531331876ac1f6fe0acf24d4a783bb54f6ad553f52af0ad3748757736ceedc", true],
   ["20260919011425_match_room_phase_one.sql", "ironclad_private", "match_room_access", "uuid,text", "58cf564413ba1a9eee1cda58ddfd7205f4a32cd26114fab49bd21ab27b5d8b0a"],
   ["20260919235836_match_room_phase_three.sql", "ironclad_private", "finish_match_room_notification", "uuid,boolean", "dc86c684dca36c8314d3bd4373318d2e6fbc5d6ed26008554befd268fb1610e4"],
   ["20260919235836_match_room_phase_three.sql", "public", "get_match_room_assistance", "uuid", "c12c4fdb161b69700bdf3e09e3e678f258a16cdaae927d2c127b9d70131428bd", true],
@@ -77,11 +78,15 @@ const closureHash = sha(closureSql);
 const staffFile = "20261113045827_patch2_verified_staff_access.sql";
 const staffSql = (await readFile(resolve(ROOT, "supabase/migrations", staffFile), "utf8")).replace(/\r\n/g, "\n");
 const staffHash = sha(staffSql);
+const legacyRegistrationFile = "20261113071907_patch2_retire_legacy_registration_writes.sql";
+const legacyRegistrationSql = (await readFile(resolve(ROOT, "supabase/migrations", legacyRegistrationFile), "utf8")).replace(/\r\n/g, "\n");
+const legacyRegistrationHash = sha(legacyRegistrationSql);
 const report = { target: `${HOST}:${PORT} fresh disposable PostgreSQL17`, snapshotSha256: SNAPSHOT_SHA,
   policySupplementSha256: sha(policyRaw), fidelitySupplementSha256: sha(fidelityRaw),
   snapshotCapturedThrough: snapshot.capturedThrough,
   migrations: [...frozenMigrations.map(({ file, sha256 }) => ({ file, sha256 })), { file: boundaryFile, sha256: boundaryHash },
-    { file: closureFile, sha256: closureHash }, { file: staffFile, sha256: staffHash }], checks: [], warnings: [], limitations: [
+    { file: closureFile, sha256: closureHash }, { file: staffFile, sha256: staffHash },
+    { file: legacyRegistrationFile, sha256: legacyRegistrationHash }], checks: [], warnings: [], limitations: [
     "Only catalog metadata is copied. All test records are fictional local historical snapshots; no Production/user records or secrets are read.",
     "All seven current closure functions and the real history predicate execute unchanged, with the captured actual constraints, foreign keys and triggers installed.",
     "Fixture preparation precedes trigger installation, with real constraints enforced; no guard/trigger is disabled during the closure tests.",
@@ -568,6 +573,23 @@ try {
   await database.query(staffSql);
   await grantStaff(activeAdmin);
 
+  await test("the database rejects old registration review and delete paths before they can touch records", async () => {
+    const obsoleteReview = "select * from public.review_tournament_registration($1,'rejected',null)";
+    const directDelete = "delete from public.registrations where id=$1";
+    assert.equal(await sql("select has_function_privilege('service_role','public.review_tournament_registration(uuid,text,text)','EXECUTE') value"), true);
+    assert.equal(await sql("select has_table_privilege('service_role','public.registrations','DELETE') value"), true);
+    const before = await field("public.registrations", "id", registrationId, "registration_status");
+    await database.query(legacyRegistrationSql);
+    assert.equal(await sql("select has_table_privilege('postgres','public.registrations','DELETE') value"), true);
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      await claim(operator, true, role);
+      await rejected(database.query(obsoleteReview, [registrationId]), "42501");
+      await rejected(database.query(directDelete, [registrationId]), "42501");
+    }
+    await owner();
+    assert.equal(await field("public.registrations", "id", registrationId, "registration_status"), before);
+  });
+
   await test("a historical unverified staff identity cannot regain authority by creating a Player", async () => {
     const unknown = "local_unverified_historical_staff";
     await claim(operator, true, "service_role");
@@ -758,10 +780,18 @@ try {
     }
   });
 
+  await test("the same approved registration can still be withdrawn by its player", async () => {
+    await claim("local_closure_pending");
+    assert.equal(await sql("select registration_status value from public.withdraw_tournament_registration($1)", [registrationId]), "withdrawn");
+    await owner();
+    assert.equal(await field("public.registrations", "id", registrationId, "registration_status"), "withdrawn");
+  });
+
   for (const m of frozenMigrations) assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", m.file), "utf8")).replace(/\r\n/g, "\n")), m.sha256);
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", boundaryFile), "utf8")).replace(/\r\n/g, "\n")), boundaryHash);
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", closureFile), "utf8")).replace(/\r\n/g, "\n")), closureHash);
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", staffFile), "utf8")).replace(/\r\n/g, "\n")), staffHash);
+  assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", legacyRegistrationFile), "utf8")).replace(/\r\n/g, "\n")), legacyRegistrationHash);
   assert.ok(!report.warnings.some(w => /WarnSendingBroadcastMessage/.test(w)), "Actual Realtime send swallowed an error");
   report.passed = true;
 } catch (e) { failure = e; report.passed = false; report.failure = e.message; report.errorCode = e.code; report.errorContext = e.where; report.errorPosition = e.position; report.stage = stage; }
