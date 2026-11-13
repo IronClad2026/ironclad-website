@@ -38,19 +38,22 @@ async function verify(name, execute) {
   checks.push(name);
 }
 let processHandle;
+let serverLog = "";
 let db;
 let digest;
 let failure;
 
 try {
   await mkdir(run, { recursive: true });
-  await writeFile(passwordFile, password, { flag: "wx" });
-  const init = spawnSync(resolve(pg, "initdb.exe"), ["-D", data, "-U", "postgres", "--auth=scram-sha-256", "--pwfile", passwordFile, "--no-sync"], {
+  await writeFile(passwordFile, password + "\n", { flag: "wx" });
+  const init = spawnSync(resolve(pg, "initdb.exe"), ["-D", data, "-U", "postgres", "--auth=scram-sha-256", "--pwfile", passwordFile, "--encoding=UTF8", "--locale=C", "--no-instructions"], {
     windowsHide: true, encoding: "utf8", timeout: 60000,
   });
   assert.equal(init.status, 0, init.stderr);
   await unlink(passwordFile);
-  processHandle = spawn(resolve(pg, "postgres.exe"), ["-D", data, "-h", host, "-p", String(port), "-c", "unix_socket_directories="], { windowsHide: true, stdio: "ignore" });
+  processHandle = spawn(resolve(pg, "postgres.exe"), ["-D", data, "-h", host, "-p", String(port), "-c", "unix_socket_directories=", "-c", "max_connections=12", "-c", "shared_buffers=32MB"], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  processHandle.stdout.on("data", (chunk) => { serverLog += chunk; });
+  processHandle.stderr.on("data", (chunk) => { serverLog += chunk; });
   for (let attempt = 0; attempt < 20; attempt++) {
     const pending = postgres();
     try {
@@ -180,6 +183,7 @@ try {
     if (stop.status !== 0 && !failure) failure = new Error("Disposable PostgreSQL did not stop");
   }
   await writeFile(resolve(run, "report.json"), JSON.stringify({ passed: !failure, checks, digest }, null, 2) + "\n").catch(() => {});
+  await writeFile(resolve(run, "postgres.log"), serverLog).catch(() => {});
 }
 if (failure) throw failure;
 console.log(JSON.stringify({ passed: true, checks, digest, report: resolve(run, "report.json") }, null, 2));
