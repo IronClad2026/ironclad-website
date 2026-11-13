@@ -412,7 +412,7 @@ const capabilities: Capability[] = [
       },
       {
         file: "registrationActions",
-        includes: ['rpc("review_tournament_registration_scoped"'],
+        includes: ['rpc("review_tournament_registration_scoped_as_admin"'],
       },
     ],
   },
@@ -969,8 +969,8 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.actions.match(/rpc\("launch_tournament_division"/g)).toHaveLength(1);
     expect(source.actions.match(/rpc\("delete_tournament_data"/g)).toHaveLength(1);
     expect(source.mapPoolActions.match(/rpc\(/g)).toHaveLength(2);
-    expect(source.registrationActions.match(/rpc\("review_tournament_registration_scoped"/g)).toHaveLength(1);
-    expect(source.registrationActions.match(/rpc\("approve_tournament_registrations_scoped"/g)).toHaveLength(1);
+    expect(source.registrationActions.match(/rpc\("review_tournament_registration_scoped_as_admin"/g)).toHaveLength(1);
+    expect(source.registrationActions.match(/rpc\("approve_tournament_registrations_scoped_as_admin"/g)).toHaveLength(1);
     expect(source.mediaActions).not.toContain(".rpc(");
     for (const action of [
       "createTournamentMedia",
@@ -1052,6 +1052,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261102192200_patch2_private_assistance_conversations.sql",
         "20261102195256_patch2_private_assistance_active_actor.sql",
         "20261113000000_patch2_private_assistance_server_boundary.sql",
+        "20261113010000_patch2_durable_account_closure.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([
