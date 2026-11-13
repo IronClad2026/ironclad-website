@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   ChevronRight,
   Globe2,
@@ -51,14 +52,21 @@ export default function PublicPlayerCard({ player }: PublicPlayerCardProps) {
         <div
           role="img"
           aria-label={t("players.avatarLabel", { name: displayName })}
-          className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-orange-400/35 bg-black/55 bg-cover bg-center shadow-[0_0_24px_rgba(249,115,22,0.16)]"
-          style={
-            player.avatarUrl
-              ? { backgroundImage: `url("${player.avatarUrl}")` }
-              : undefined
-          }
+          className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-orange-400/35 bg-black/55 shadow-[0_0_24px_rgba(249,115,22,0.16)]"
         >
-          {!player.avatarUrl && <UserRound size={34} className="text-zinc-600" />}
+          {player.avatarUrl ? (
+            <Image
+              src={player.avatarUrl}
+              alt=""
+              fill
+              sizes="80px"
+              loading="lazy"
+              unoptimized
+              className="object-cover"
+            />
+          ) : (
+            <UserRound size={34} className="text-zinc-600" />
+          )}
         </div>
 
         <div className="min-w-0 flex-1">
