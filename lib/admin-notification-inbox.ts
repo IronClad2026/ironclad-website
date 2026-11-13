@@ -36,9 +36,9 @@ export function isAdminNotificationInboxEnabled(): boolean {
 }
 
 /** Every entry point using service-role inbox RPCs verifies current admin authority. */
-export async function requireAdminNotificationInbox(): Promise<void> {
+export async function requireAdminNotificationInbox(): Promise<string> {
   try {
-    await requireCurrentPatch2Admin();
+    return await requireCurrentPatch2Admin();
   } catch {
     throw new Error("Administrator access is required.");
   }
@@ -78,7 +78,7 @@ export async function loadAdminNotificationInbox(
   scopeInput: AdminInboxScope,
   options: AdminInboxOptions = {}
 ): Promise<AdminInboxData> {
-  await requireAdminNotificationInbox();
+  const actorClerkUserId = await requireAdminNotificationInbox();
   if (!isAdminNotificationInboxEnabled()) {
     throw new Error("The scoped Admin inbox is currently disabled. Please try again later.");
   }
@@ -86,7 +86,8 @@ export async function loadAdminNotificationInbox(
   const query = normalizeAdminInboxOptions(options);
   let payload: unknown;
   try {
-    const result = await createSupabaseAdminClient().rpc("read_admin_notification_inbox", {
+    const result = await createSupabaseAdminClient().rpc("read_admin_notification_inbox_as_admin", {
+      p_actor_clerk_user_id: actorClerkUserId,
       p_scope: scope.kind,
       p_tournament_id: scope.kind === "tournament" ? scope.tournamentId : null,
       p_page: query.page,

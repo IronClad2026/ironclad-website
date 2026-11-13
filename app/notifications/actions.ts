@@ -223,6 +223,9 @@ export async function loadAuthoritativeNotificationUnreadCount(): Promise<Notifi
     unreadCount = null;
   }
 
+  if (scope === "admin" && !await hasCurrentPatch2AdminAccess(identity.userId, identity.sessionClaims, identity.sessionId)) {
+    return { ok: false, code: "authentication_required" };
+  }
   return unreadCount === null
     ? { ok: false, code: "unavailable" }
     : { ok: true, unreadCount };

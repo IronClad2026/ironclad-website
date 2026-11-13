@@ -36,7 +36,8 @@ describe("durable assistance fallback while scoped inbox rollout is disabled", (
     expect(html).toContain("Retained unanswered legacy request");
     expect(html).toContain("Prior resolution unknown");
     expect(html).toContain("Save request status");
-    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("read_legacy_assistance_queue", {
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("read_legacy_assistance_queue_as_admin", {
+      p_actor_clerk_user_id: "trusted-admin",
       p_tournament_id: tournamentId, p_page: 1, p_include_resolved: false,
     });
 
@@ -49,7 +50,7 @@ describe("durable assistance fallback while scoped inbox rollout is disabled", (
       p_id: ID, p_tournament_id: tournamentId, p_status: "in_progress",
       p_expected_version: 2, p_admin_clerk_id: "trusted-admin",
     });
-    expect(mocks.rpc.mock.calls.every(([name]) => name === "read_legacy_assistance_queue" || name === "set_legacy_assistance_status")).toBe(true);
+    expect(mocks.rpc.mock.calls.every(([name]) => name === "read_legacy_assistance_queue_as_admin" || name === "set_legacy_assistance_status")).toBe(true);
   });
 
   it("still authorizes a fallback page before any data access when the rollout switch is off", async () => {

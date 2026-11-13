@@ -29,12 +29,13 @@ export function parseLegacyAssistanceScope(kind: unknown, tournament: unknown): 
 }
 
 export async function loadLegacyAssistanceQueue(tournamentId: string | null, page = 1, includeResolved = false) {
-  await requireLegacyAssistanceAdmin();
+  const actorClerkUserId = await requireLegacyAssistanceAdmin();
   if ((tournamentId !== null && !isUuid(tournamentId)) || !Number.isSafeInteger(page) || page < 1 || page > 2147483647) {
     throw new Error("Invalid assistance context.");
   }
   const canonicalTournamentId = tournamentId?.toLowerCase() ?? null;
-  const { data, error } = await createSupabaseAdminClient().rpc("read_legacy_assistance_queue", {
+  const { data, error } = await createSupabaseAdminClient().rpc("read_legacy_assistance_queue_as_admin", {
+    p_actor_clerk_user_id: actorClerkUserId,
     p_tournament_id: canonicalTournamentId, p_page: page, p_include_resolved: includeResolved,
   });
   if (error || !data || !Array.isArray(data.requests) || !Number.isSafeInteger(data.totalCount) || data.totalCount < 0 ||

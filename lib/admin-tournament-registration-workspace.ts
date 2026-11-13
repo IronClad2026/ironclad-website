@@ -103,16 +103,20 @@ class RegistrationSnapshotChanged extends Error {}
 // Request-local reuse keeps the header and registration workspace on the same
 // complete, narrow projection. Advance by the returned length, since the API's
 // configured row cap can be smaller than the requested batch.
-export const loadAdminTournamentRegistrationSummary = cache(
-  async (tournamentIdInput: string): Promise<RegistrationSummaryRow[]> => {
-    await requireAdmin();
-    const tournamentId = tournamentIdInput.toLowerCase();
-    if (!isUuid(tournamentId)) throw new Error("Invalid Tournament.");
+const readCachedRegistrationSummary = cache(async (tournamentId: string) => {
+  const supabase = createSupabaseAdminClient();
+  return retryRegistrationSnapshot(() => readRegistrationSummary(supabase, tournamentId));
+});
 
-    const supabase = createSupabaseAdminClient();
-    return retryRegistrationSnapshot(() => readRegistrationSummary(supabase, tournamentId));
-  }
-);
+export async function loadAdminTournamentRegistrationSummary(tournamentIdInput: string): Promise<RegistrationSummaryRow[]> {
+  await requireAdmin();
+  const tournamentId = tournamentIdInput.toLowerCase();
+  if (!isUuid(tournamentId)) throw new Error("Invalid Tournament.");
+
+  const registrations = await readCachedRegistrationSummary(tournamentId);
+  await requireAdmin();
+  return registrations;
+}
 
 async function readRegistrationSummary(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
@@ -370,6 +374,7 @@ export async function loadAdminTournamentRegistrationWorkspace(
       offerStatus: registration.waitlist_offer_status,
     }));
 
+  await requireAdmin();
   return {
     rows,
     selectedRegistration,

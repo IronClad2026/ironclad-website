@@ -410,7 +410,8 @@ export async function updateRegistrationStatus(formData: FormData) {
     rejectionEventKey,
   });
 
-  const { error } = await supabase.rpc("review_tournament_registration_scoped", {
+  const { error } = await supabase.rpc("review_tournament_registration_scoped_as_admin", {
+    p_actor_clerk_user_id: userId,
     p_tournament_id: workspaceContext.tournamentId,
     p_registration_id: registrationId,
     p_registration_status: nextStatus,
@@ -478,7 +479,7 @@ export async function deleteSelectedRegistrations(formData: FormData) {
 
 export async function approveSelectedRegistrations(formData: FormData) {
   "use server";
-  await requireCurrentPatch2Admin();
+  const actorClerkUserId = await requireCurrentPatch2Admin();
   await requireCurrentAccountLegalAcceptance();
   const workspaceContext = getWorkspaceRedirectContext(formData);
   const activeFilter = getSafeFilter(String(formData.get("activeFilter") || "all"));
@@ -506,7 +507,8 @@ export async function approveSelectedRegistrations(formData: FormData) {
       detail: "The selection no longer belongs to this tournament. Reopen its registrations and select again. Nothing was changed.",
     }, workspaceContext));
   }
-  const { data, error } = await supabase.rpc("approve_tournament_registrations_scoped", {
+  const { data, error } = await supabase.rpc("approve_tournament_registrations_scoped_as_admin", {
+    p_actor_clerk_user_id: actorClerkUserId,
     p_tournament_id: workspaceContext.tournamentId,
     p_registration_ids: registrationIds,
   });

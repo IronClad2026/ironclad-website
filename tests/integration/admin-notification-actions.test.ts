@@ -74,10 +74,12 @@ describe("scoped Admin inbox Server Actions", () => {
       .mockResolvedValueOnce({ data: adminInboxSnapshot([adminInboxRow()], { selectedNotification: adminInboxRow() }), error: null });
     const result = await action(data);
     expect(result).toMatchObject({ ok: true, data: { scope: { kind: "tournament", tournamentId: TOURNAMENT }, selectedNotification: { id: NOTICE } } });
-    expect(rpcMock.mock.calls[0]).toEqual(["mutate_admin_notification_inbox", {
+    expect(rpcMock.mock.calls[0]).toEqual(["mutate_admin_notification_inbox_as_admin", {
+      p_actor_clerk_user_id: "admin_a",
       p_scope: "tournament", p_tournament_id: TOURNAMENT, p_action: operation, p_ids: [NOTICE],
     }]);
-    expect(rpcMock.mock.calls[1]).toEqual(["read_admin_notification_inbox", {
+    expect(rpcMock.mock.calls[1]).toEqual(["read_admin_notification_inbox_as_admin", {
+      p_actor_clerk_user_id: "admin_a",
       p_scope: "tournament", p_tournament_id: TOURNAMENT, p_page: 1, p_unread_only: false, p_selected_id: NOTICE,
     }]);
     expect(legalMock).toHaveBeenCalledOnce();
@@ -88,7 +90,8 @@ describe("scoped Admin inbox Server Actions", () => {
     completeMutation();
     const result = await markAllAdminNotificationsRead(form(undefined, []));
     expect(result.ok).toBe(true);
-    expect(rpcMock.mock.calls[0]).toEqual(["mutate_admin_notification_inbox", {
+    expect(rpcMock.mock.calls[0]).toEqual(["mutate_admin_notification_inbox_as_admin", {
+      p_actor_clerk_user_id: "admin_a",
       p_scope: "tournament", p_tournament_id: TOURNAMENT, p_action: "read_all", p_ids: [],
     }]);
   });
@@ -97,7 +100,7 @@ describe("scoped Admin inbox Server Actions", () => {
     completeMutation(adminInboxRow({ tournament_id: null, metadata: kind === "platform" ? { adminInboxScope: "platform" } : {} }));
     const result = await dismissSelectedAdminNotifications(form({ kind }));
     expect(result).toMatchObject({ ok: true, data: { scope: { kind } } });
-    expect(rpcMock.mock.calls[0][1]).toEqual({ p_scope: kind, p_tournament_id: null, p_action: "dismiss", p_ids: [NOTICE] });
+    expect(rpcMock.mock.calls[0][1]).toEqual({ p_actor_clerk_user_id: "admin_a", p_scope: kind, p_tournament_id: null, p_action: "dismiss", p_ids: [NOTICE] });
   });
 
   it("deduplicates valid UUIDs case-insensitively after validating every target", async () => {
@@ -191,6 +194,7 @@ describe("scoped Admin inbox Server Actions", () => {
       .mockResolvedValueOnce({ userId: "admin_b", sessionClaims: { metadata: { role: "admin" } } });
     const result = await markSelectedAdminNotificationsRead(form());
     expect(result).toMatchObject({ ok: true, data: { unreadCount: 0, notifications: [{ readAt: row.read_at }] } });
-    expect(JSON.stringify(rpcMock.mock.calls)).not.toMatch(/admin_a|admin_b|clerk_user_id/);
+    expect(rpcMock.mock.calls.map(([, args]) => args.p_actor_clerk_user_id)).toEqual(["admin_a", "admin_b"]);
+    expect(rpcMock.mock.calls.map(([, args]) => args.p_tournament_id)).toEqual([TOURNAMENT, TOURNAMENT]);
   });
 });

@@ -118,7 +118,10 @@ export default async function AdminRegistrationsPage({
     }
   }
   // Next.js redirects throw; keep them outside lookup error handling.
-  if (destination) redirect(destination);
+  if (destination) {
+    if (!await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)) redirect("/");
+    redirect(destination);
+  }
 
   let tournaments: TournamentChoice[] = [];
   let choicesUnavailable = false;
@@ -138,6 +141,7 @@ export default async function AdminRegistrationsPage({
     choicesUnavailable = true;
   }
 
+  if (!await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)) redirect("/");
   const scopeNotice = query?.notice === "registration-scope-required" ||
     query?.notice === "registration-scope-mismatch";
 

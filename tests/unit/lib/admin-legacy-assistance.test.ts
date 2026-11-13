@@ -45,7 +45,8 @@ describe("durable legacy assistance boundary", () => {
   });
   it("reads only the selected scope with exact queue counts", async () => {
     expect((await loadLegacyAssistanceQueue(T)).totalCount).toBe(1);
-    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("read_legacy_assistance_queue", {
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("read_legacy_assistance_queue_as_admin", {
+      p_actor_clerk_user_id: "trusted-admin",
       p_tournament_id: T, p_page: 1, p_include_resolved: false,
     });
   });

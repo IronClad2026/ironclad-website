@@ -4,32 +4,21 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { cache } from "react";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
-type AdminAccount = "active-player" | "no-player" | "denied";
 const LOOKUP_TIMEOUT_MS = 4_000;
 
-// React's request cache deduplicates repeated checks within a server render.
-// Each new request still reads the current Clerk role and session status.
-const readAdminAccount = cache(async (userId: string, sessionId: string): Promise<AdminAccount> => {
+// Deduplicate Clerk lookups within a render. Closure state stays uncached.
+const hasCurrentClerkAdminAuthority = cache(async (userId: string, sessionId: string): Promise<boolean> => {
   try {
     const clerk = await clerkClient();
     const authority = await readClerkAuthority(clerk, userId, sessionId);
-    if (!authority) return "denied";
+    if (!authority) return false;
     const [user, session] = authority;
     if (user.id !== userId || user.publicMetadata.role !== "admin" || user.banned || user.locked ||
       session.id !== sessionId || session.userId !== userId || session.status !== "active" ||
-      !Number.isFinite(session.expireAt) || session.expireAt <= Date.now()) return "denied";
-
-    // This service-role lookup reads only the verified caller's closure status.
-    const player = await createSupabaseAdminClient().from("players")
-      .select("account_closed_at")
-      .eq("clerk_user_id", userId)
-      .abortSignal(AbortSignal.timeout(LOOKUP_TIMEOUT_MS))
-      .maybeSingle();
-    if (player.error) return "denied";
-    if (player.data === null) return "no-player";
-    return player.data.account_closed_at === null ? "active-player" : "denied";
+      !Number.isFinite(session.expireAt) || session.expireAt <= Date.now()) return false;
+    return true;
   } catch {
-    return "denied";
+    return false;
   }
 });
 
@@ -59,8 +48,15 @@ export async function hasCurrentPatch2AdminAccess(
 ): Promise<boolean> {
   const role = (sessionClaims as { metadata?: { role?: unknown } } | null)?.metadata?.role;
   if (!userId || !sessionId || role !== "admin") return false;
-  const account = await readAdminAccount(userId, sessionId);
-  return account === "active-player" || (!requirePlayer && account === "no-player");
+  if (!await hasCurrentClerkAdminAuthority(userId, sessionId)) return false;
+  try {
+    const account = await createSupabaseAdminClient().rpc("get_patch2_admin_account_state", {
+      p_clerk_user_id: userId,
+    }).abortSignal(AbortSignal.timeout(LOOKUP_TIMEOUT_MS));
+    return !account.error && (account.data === "active-player" || (!requirePlayer && account.data === "no-player"));
+  } catch {
+    return false;
+  }
 }
 
 export async function requireCurrentPatch2Admin(): Promise<string> {

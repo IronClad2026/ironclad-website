@@ -14,6 +14,8 @@ values
  ('00000000-0000-4000-8000-000000000103','local_closure_admin','LOCAL Admin','LOCAL Admin','AU','OCE','Australia/Sydney',null,null,null),
  ('00000000-0000-4000-8000-000000000104','local_closure_peer','LOCAL Peer','LOCAL Peer','AU','OCE','Australia/Sydney',null,null,null),
  ('00000000-0000-4000-8000-000000000106','local_closure_admin2','LOCAL Admin Two','LOCAL Admin Two','AU','OCE','Australia/Sydney',null,null,null);
+insert into public.players(id,clerk_user_id,display_name,in_game_name,current_elo,profile_completed)
+values('00000000-0000-4000-8000-000000000107','local_closure_pending','LOCAL Pending','LOCAL Pending',700,true);
 insert into public.profiles(clerk_user_id) values('local_closure_history'),('local_closure_delete');
 
 insert into public.tournaments(id,title,slug,format,status,description,banner_image_url,prize_pool,registration_enabled,
@@ -21,14 +23,20 @@ insert into public.tournaments(id,title,slug,format,status,description,banner_im
 values('00000000-0000-4000-8000-000000000201','LOCAL closure historical tournament','local-closure-historical','1v1','cancelled',
  'Fictional local historical fixture; no tournament or game was played.','','',false,
  now()-interval '26 months','LOCAL historical snapshot','local_fixture_operator');
+insert into public.tournaments(id,title,slug,format,status,description,banner_image_url,prize_pool,registration_enabled)
+values('00000000-0000-4000-8000-000000000270','LOCAL open closure tournament','local-closure-open','1v1','registration_open',
+ 'Fictional registration-review fixture.','','',true);
 insert into public.tournament_brackets(id,tournament_id,name,elo_rules,max_players,launched_at)
-values('00000000-0000-4000-8000-000000000202','00000000-0000-4000-8000-000000000201','Academy','0-1099 ELO',8,now()-interval '27 months');
+values('00000000-0000-4000-8000-000000000202','00000000-0000-4000-8000-000000000201','Academy','0-1099 ELO',8,now()-interval '27 months'),
+ ('00000000-0000-4000-8000-000000000271','00000000-0000-4000-8000-000000000270','Academy','0-1099 ELO',8,null);
 insert into public.registrations(id,profile_id,clerk_user_id,player_name,tournament_title,bracket_name,
  tournament_id,tournament_bracket_id,registration_status,elo_status,submitted_elo)
 values('00000000-0000-4000-8000-000000000206','00000000-0000-4000-8000-000000000101','local_closure_history','LOCAL History',
  'LOCAL closure historical tournament','Academy Bracket','00000000-0000-4000-8000-000000000201','00000000-0000-4000-8000-000000000202','approved','manual_review',700),
  ('00000000-0000-4000-8000-000000000207','00000000-0000-4000-8000-000000000104','local_closure_peer','LOCAL Peer',
- 'LOCAL closure historical tournament','Academy Bracket','00000000-0000-4000-8000-000000000201','00000000-0000-4000-8000-000000000202','approved','manual_review',700);
+ 'LOCAL closure historical tournament','Academy Bracket','00000000-0000-4000-8000-000000000201','00000000-0000-4000-8000-000000000202','approved','manual_review',700),
+ ('00000000-0000-4000-8000-000000000272','00000000-0000-4000-8000-000000000107','local_closure_pending','LOCAL Pending',
+ 'LOCAL open closure tournament','Academy Bracket','00000000-0000-4000-8000-000000000270','00000000-0000-4000-8000-000000000271','pending','manual_review',700);
 insert into public.generated_brackets(id,tournament_bracket_id,format,participant_count,slot_count,generated_by)
 values('00000000-0000-4000-8000-000000000203','00000000-0000-4000-8000-000000000202','single_elimination',2,8,'local_closure_history');
 insert into public.bracket_rounds(id,generated_bracket_id,round_number,name)

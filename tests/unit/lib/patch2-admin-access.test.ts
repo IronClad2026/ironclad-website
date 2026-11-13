@@ -3,7 +3,7 @@ import { hasCurrentPatch2AdminAccess, requireCurrentPatch2Admin } from "@/lib/pa
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(), clerk: vi.fn(), getUser: vi.fn(), getSession: vi.fn(),
-  admin: vi.fn(), from: vi.fn(), select: vi.fn(), eq: vi.fn(), abortSignal: vi.fn(), maybeSingle: vi.fn(),
+  admin: vi.fn(), rpc: vi.fn(), abortSignal: vi.fn(),
 }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth, clerkClient: mocks.clerk }));
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: mocks.admin }));
@@ -19,12 +19,9 @@ beforeEach(() => {
   mocks.clerk.mockResolvedValue({ users: { getUser: mocks.getUser }, sessions: { getSession: mocks.getSession } });
   mocks.getUser.mockResolvedValue(activeUser);
   mocks.getSession.mockResolvedValue(activeSession());
-  mocks.admin.mockReturnValue({ from: mocks.from });
-  mocks.from.mockReturnValue({ select: mocks.select });
-  mocks.select.mockReturnValue({ eq: mocks.eq });
-  mocks.eq.mockReturnValue({ abortSignal: mocks.abortSignal });
-  mocks.abortSignal.mockReturnValue({ maybeSingle: mocks.maybeSingle });
-  mocks.maybeSingle.mockResolvedValue({ data: { account_closed_at: null }, error: null });
+  mocks.admin.mockReturnValue({ rpc: mocks.rpc });
+  mocks.rpc.mockReturnValue({ abortSignal: mocks.abortSignal });
+  mocks.abortSignal.mockResolvedValue({ data: "active-player", error: null });
 });
 
 describe("current Patch 2 administrator access", () => {
@@ -36,13 +33,13 @@ describe("current Patch 2 administrator access", () => {
     expect(mocks.admin).not.toHaveBeenCalled();
   });
 
-  it("looks up the current Clerk user and session before checking the caller's Player status", async () => {
+  it("looks up the current Clerk user and session before checking durable account state", async () => {
     await expect(requireCurrentPatch2Admin()).resolves.toBe(USER);
     expect(mocks.getUser).toHaveBeenCalledExactlyOnceWith(USER);
     expect(mocks.getSession).toHaveBeenCalledExactlyOnceWith(SESSION);
-    expect(mocks.from).toHaveBeenCalledExactlyOnceWith("players");
-    expect(mocks.select).toHaveBeenCalledExactlyOnceWith("account_closed_at");
-    expect(mocks.eq).toHaveBeenCalledExactlyOnceWith("clerk_user_id", USER);
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("get_patch2_admin_account_state", {
+      p_clerk_user_id: USER,
+    });
   });
 
   it.each([
@@ -62,13 +59,21 @@ describe("current Patch 2 administrator access", () => {
   });
 
   it("allows staff without a Player on the scoped inbox and registration pages only", async () => {
-    mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
+    mocks.abortSignal.mockResolvedValue({ data: "no-player", error: null });
     await expect(hasCurrentPatch2AdminAccess(USER, CLAIMS, SESSION)).resolves.toBe(true);
     await expect(hasCurrentPatch2AdminAccess(USER, CLAIMS, SESSION, true)).resolves.toBe(false);
   });
 
-  it("denies a linked closed Player even while Clerk is active", async () => {
-    mocks.maybeSingle.mockResolvedValue({ data: { account_closed_at: "2026-11-13T00:00:00Z" }, error: null });
+  it("rechecks durable state and denies a previously authorized staff session after closure", async () => {
+    mocks.abortSignal.mockResolvedValueOnce({ data: "no-player", error: null })
+      .mockResolvedValueOnce({ data: "denied", error: null });
+    await expect(requireCurrentPatch2Admin()).resolves.toBe(USER);
+    await expect(requireCurrentPatch2Admin()).rejects.toThrow("Unauthorized");
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails closed for an unknown database response", async () => {
+    mocks.abortSignal.mockResolvedValue({ data: "unknown", error: null });
     await expect(requireCurrentPatch2Admin()).rejects.toThrow("Unauthorized");
   });
 
@@ -76,7 +81,7 @@ describe("current Patch 2 administrator access", () => {
     mocks.getUser.mockRejectedValueOnce(new Error("private Clerk response"));
     await expect(requireCurrentPatch2Admin()).rejects.toThrow("Unauthorized");
     expect(mocks.admin).not.toHaveBeenCalled();
-    mocks.maybeSingle.mockResolvedValue({ data: null, error: { message: "private database response" } });
+    mocks.abortSignal.mockResolvedValue({ data: null, error: { message: "private database response" } });
     await expect(requireCurrentPatch2Admin()).rejects.toThrow("Unauthorized");
   });
 });

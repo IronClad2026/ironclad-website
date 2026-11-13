@@ -71,10 +71,14 @@ const frozenMigrations = await Promise.all(snapshot.frozenMigrations.map(async (
 const boundaryFile = "20261113000000_patch2_private_assistance_server_boundary.sql";
 const boundarySql = (await readFile(resolve(ROOT, "supabase/migrations", boundaryFile), "utf8")).replace(/\r\n/g, "\n");
 const boundaryHash = sha(boundarySql);
+const closureFile = "20261113010000_patch2_durable_account_closure.sql";
+const closureSql = (await readFile(resolve(ROOT, "supabase/migrations", closureFile), "utf8")).replace(/\r\n/g, "\n");
+const closureHash = sha(closureSql);
 const report = { target: `${HOST}:${PORT} fresh disposable PostgreSQL17`, snapshotSha256: SNAPSHOT_SHA,
   policySupplementSha256: sha(policyRaw), fidelitySupplementSha256: sha(fidelityRaw),
   snapshotCapturedThrough: snapshot.capturedThrough,
-  migrations: [...frozenMigrations.map(({ file, sha256 }) => ({ file, sha256 })), { file: boundaryFile, sha256: boundaryHash }], checks: [], warnings: [], limitations: [
+  migrations: [...frozenMigrations.map(({ file, sha256 }) => ({ file, sha256 })), { file: boundaryFile, sha256: boundaryHash },
+    { file: closureFile, sha256: closureHash }], checks: [], warnings: [], limitations: [
     "Only catalog metadata is copied. All test records are fictional local historical snapshots; no Production/user records or secrets are read.",
     "All seven current closure functions and the real history predicate execute unchanged, with the captured actual constraints, foreign keys and triggers installed.",
     "Fixture preparation precedes trigger installation, with real constraints enforced; no guard/trigger is disabled during the closure tests.",
@@ -96,12 +100,12 @@ async function connect(name = "production_closure_local") {
   clients.add(c); c.on("notice", n => { if (n.severity === "WARNING") report.warnings.push(n.message); }); return c;
 }
 async function sql(s, p = []) { return (await database.query(s, p)).rows[0]?.value; }
-async function owner() { await database.query("reset role"); }
-async function claim(sub, admin = false, role = "authenticated") {
-  await owner(); assert.ok(["authenticated", "service_role", "anon"].includes(role));
-  await database.query("select set_config('request.jwt.claim.role',$1,false),set_config('request.jwt.claims',$2,false)",
+async function owner(client = database) { await client.query("reset role"); }
+async function claim(sub, admin = false, role = "authenticated", client = database) {
+  await owner(client); assert.ok(["authenticated", "service_role", "anon"].includes(role));
+  await client.query("select set_config('request.jwt.claim.role',$1,false),set_config('request.jwt.claims',$2,false)",
     [role, JSON.stringify({ role, sub, metadata: { role: admin ? "admin" : "player" } })]);
-  await database.query(`set role ${role}`);
+  await client.query(`set role ${role}`);
 }
 async function rejected(op, code, pattern) { await assert.rejects(op, e => {
   assert.equal(e.code, code); if (pattern) assert.match(e.message, pattern); return true;
@@ -241,8 +245,17 @@ try {
   postgres = spawn(resolve(BIN, "postgres.exe"), ["-D", DATA, "-h", HOST, "-p", String(PORT), "-c", "unix_socket_directories=", "-c", "max_connections=12", "-c", "shared_buffers=32MB"],
     { cwd: WORKSPACE, env: childEnvironment, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   postgres.stdout.on("data", c => { log += c; }); postgres.stderr.on("data", c => { log += c; });
-  for (let i = 0; i < 100; i++) { if (postgres.exitCode !== null) throw Error("Disposable PostgreSQL exited before readiness");
-    try { database = await connect(); break; } catch { await delay(100); } }
+  let readinessError;
+  for (let i = 0; i < 100; i++) {
+    if (postgres.exitCode !== null) throw Error("Disposable PostgreSQL exited before readiness");
+    try { database = await connect(); break; }
+    catch (error) {
+      readinessError = error;
+      if (error.code === "EACCES" || error.code === "EPERM") throw error;
+      await delay(100);
+    }
+  }
+  if (!database && readinessError) throw readinessError;
   assert.ok(database, "Disposable database did not become ready");
   const identity = (await database.query("select host(inet_server_addr()) host,inet_server_port() port,current_user,current_setting('listen_addresses') listen,current_setting('data_directory') directory,version() version")).rows[0];
   assert.equal(identity.host, HOST); assert.equal(identity.port, PORT); assert.equal(identity.listen, HOST);
@@ -509,6 +522,10 @@ try {
     assert.equal(await sql("select count(*)::int value from realtime.messages where event='invalidate' and payload->>'roomId'=$1", [ROOM]), 2);
   });
 
+  stage = "apply durable closure guard after the five reviewed migrations";
+  await owner();
+  await database.query(closureSql);
+
   await test("normal closure still preserves the conversation behind the new server boundary", async () => {
     assert.equal((await close(requester)).outcome, "pseudonymized");
     await rejected(dispatch("read_private_assistance", readArguments(requesterRequest), requester, false), "42501");
@@ -519,8 +536,154 @@ try {
     assert.equal(await sql("select count(*)::int value from public.assistance_messages where actor_clerk_user_id=$1", [requester]), 0);
   });
 
+  const staffOnly = "local_closure_staff_only", removable = "local_closure_new_player";
+  const operator = "local_trusted_dispatcher";
+  const registrationTournament = id(270), registrationId = id(272), noticeId = id(261);
+  const inboxArguments = [T, noticeId];
+  const inbox = "select public.read_admin_notification_inbox_as_admin('tournament',$1,1,false,$2,$3) value";
+  const legacyQueue = "select public.read_legacy_assistance_queue_as_admin($1,1,true,$2) value";
+  const mutate = "select public.mutate_admin_notification_inbox_as_admin('tournament',$1,$2,$3,$4) value";
+  const review = "select registration_status value from public.review_tournament_registration_scoped_as_admin($1,$2,'approved',$3,$4)";
+  const bulk = "select * from public.approve_tournament_registrations_scoped_as_admin($1,$2,$3)";
+  const state = (sub) => sql("select public.get_patch2_admin_account_state($1) value", [sub]);
+  const insertPlayer = (sub, client = database) => client.query(
+    "insert into public.players(clerk_user_id,display_name,in_game_name,country,region,timezone) values($1,'LOCAL Synthetic','LOCAL Synthetic','AU','OCE','Australia/Sydney')",
+    [sub],
+  );
+  const marker = "select count(*)::int value from ironclad_private.patch2_closed_accounts where subject_digest=sha256(convert_to($1,'UTF8'))";
+
+  await test("never-closed staff without a Player retain their previous inbox, legacy and registration privileges", async () => {
+    await insertPlayer(removable);
+    await database.query(`insert into public.notifications(id,recipient_role,type,title,message,tournament_id)
+      values($1,'admin','match.admin_assistance_requested','LOCAL legacy request','LOCAL synthetic body',$2)`, [noticeId, T]);
+    await claim(operator, true, "service_role");
+    assert.equal(await state(staffOnly), "no-player");
+    assert.equal(await state(removable), "active-player");
+    assert.equal((await sql(inbox, [...inboxArguments, staffOnly])).selectedNotification.id, noticeId);
+    assert.equal(await sql(mutate, [T, "read", [noticeId], staffOnly]), 1);
+    const readNotice = (await sql(inbox, [...inboxArguments, activeAdmin])).selectedNotification;
+    assert.ok(readNotice.read_at);
+    assert.equal(await sql(mutate, [T, "dismiss", [noticeId], staffOnly]), 1);
+    assert.equal((await sql(inbox, [...inboxArguments, activeAdmin])).selectedNotification, null);
+    const request = (await sql(legacyQueue, [T, staffOnly])).requests.find(row => row.source_notification_id === noticeId);
+    assert.equal(request.status, "open");
+    assert.equal(await sql("select public.set_legacy_assistance_status($1,$2,'in_progress',$3,$4) value",
+      [request.id, T, request.version, staffOnly]), true);
+    assert.equal(await sql(review, [registrationTournament, registrationId, "LOCAL guard rehearsal note", staffOnly]), "approved");
+    const result = await database.query(bulk, [registrationTournament, [registrationId], staffOnly]);
+    assert.deepEqual(result.rows, [{ registration_id: registrationId, error_message: "registration is already approved" }]);
+    await rejected(dispatch("list_admin_private_assistance", queueArgs, staffOnly, true), "42501", /Active assistance account/);
+  });
+
+  await test("normal closure revokes stale staff and player sessions after every successful outcome", async () => {
+    // No Clerk identity or token is revoked by this database test. Continued
+    // trusted calls with the same actor model a session surviving Clerk failure.
+    assert.equal((await close(staffOnly)).outcome, "not_found");
+    assert.equal((await close(removable)).outcome, "deleted");
+    assert.equal((await close(activeAdmin)).outcome, "deleted");
+    const historical = requester; // Pseudonymized by the guarded closure above.
+    await owner();
+    for (const sub of [staffOnly, removable, activeAdmin, historical]) {
+      assert.equal(await sql(marker, [sub]), 1);
+      await claim(operator, true, "service_role");
+      assert.equal(await state(sub), "denied");
+      await rejected(sql(inbox, [...inboxArguments, sub]), "42501");
+      await rejected(sql(legacyQueue, [T, sub]), "42501");
+      await rejected(sql(mutate, [T, "read_all", [], sub]), "42501");
+      await rejected(sql(review, [registrationTournament, registrationId, "LOCAL forged note", sub]), "42501");
+      await rejected(database.query(bulk, [registrationTournament, [registrationId], sub]), "42501");
+      await rejected(sql("select public.set_legacy_assistance_status($1,$2,'resolved',1,$3) value",
+        [noticeId, T, sub]), "42501");
+      await rejected(dispatch("list_admin_private_assistance", queueArgs, sub, true), "42501", /Account access is unavailable/);
+      await claim(sub, true);
+      await rejected(insertPlayer(sub), "42501", /Account access is unavailable/);
+      await owner();
+    }
+    assert.equal((await close(removable)).outcome, "not_found");
+    await owner();
+    assert.equal(await sql(marker, [removable]), 1);
+    assert.equal(await field("public.registrations", "id", registrationId, "admin_notes"), "LOCAL guard rehearsal note");
+    assert.equal(await sql("select count(*)::int value from public.players where clerk_user_id=any($1)", [[staffOnly, removable, activeAdmin, historical]]), 0);
+  });
+
+  await test("older actorless authorities and raw browser writes stay closed", async () => {
+    const legacySignatures = [
+      "public.review_tournament_registration_scoped(uuid,uuid,text,text)",
+      "public.approve_tournament_registrations_scoped(uuid,uuid[])",
+      "public.read_admin_notification_inbox(text,uuid,integer,boolean,uuid)",
+      "public.mutate_admin_notification_inbox(text,uuid,text,uuid[])",
+      "public.read_legacy_assistance_queue(uuid,integer,boolean)",
+    ];
+    await owner();
+    assert.equal(await sql(`select bool_and(not has_function_privilege('service_role',signature,'EXECUTE')) value
+      from unnest($1::text[]) signature`, [legacySignatures]), true);
+    assert.equal(await sql(`select bool_and(not has_table_privilege(role_name,'ironclad_private.patch2_closed_accounts',privilege)) value
+      from unnest(array['anon','authenticated','service_role']) role_name
+      cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) privilege`), true);
+    assert.equal(await sql(`select relrowsecurity value from pg_class
+      where oid='ironclad_private.patch2_closed_accounts'::regclass`), true);
+    await claim(operator, true, "service_role");
+    await rejected(sql("select public.mutate_admin_notification_inbox('tournament',$1,'read_all',null) value", [T]), "42501");
+    await rejected(sql(marker, [staffOnly]), "42501");
+    await claim(staffOnly, true);
+    await rejected(sql("select public.get_patch2_admin_account_state($1) value", [staffOnly]), "42501");
+    await rejected(sql(inbox, [...inboxArguments, staffOnly]), "42501");
+    await rejected(sql(mutate, [T, "read_all", [], staffOnly]), "42501");
+    await rejected(sql("select public.close_ironclad_player_account($1) value", [staffOnly]), "42501");
+  });
+
+  await test("closure rollback leaves the account active; a waiting upsert sees a committed closure", async () => {
+    const concurrent = "local_closure_concurrent";
+    await owner(); await insertPlayer(concurrent);
+    const other = await connect("patch2_concurrent_profile");
+    try {
+      await claim(operator, true, "service_role");
+      await database.query("begin");
+      assert.equal((await sql("select public.close_ironclad_player_account($1) value", [concurrent])).outcome, "deleted");
+      await database.query("rollback");
+      assert.equal(await state(concurrent), "active-player");
+      // The captured catalog does not restore column-specific SELECT grants
+      // needed by an authenticated ON CONFLICT update. Exercise the trigger
+      // with the existing service-role table grants, without changing grants.
+      await claim(concurrent, true, "service_role", other);
+      const profileBackend = (await other.query("select pg_backend_pid() pid")).rows[0].pid;
+      await database.query("begin");
+      assert.equal((await sql("select public.close_ironclad_player_account($1) value", [concurrent])).outcome, "deleted");
+      const attemptedUpsert = other.query(`insert into public.players(clerk_user_id,display_name,in_game_name,country,region,timezone)
+        values($1,'LOCAL Synthetic','LOCAL Synthetic','AU','OCE','Australia/Sydney')
+        on conflict(clerk_user_id) do update set display_name=excluded.display_name`, [concurrent]);
+      let attemptedOutcome;
+      const attemptedResult = attemptedUpsert.then(
+        () => { attemptedOutcome = { error: null }; },
+        (error) => { attemptedOutcome = { error }; },
+      );
+      // Confirm the insert actually waits behind the transaction's identity
+      // lock. Otherwise a broken test could pass only on post-commit timing.
+      for (let attempt = 0; attempt < 30; attempt++) {
+        assert.equal(attemptedOutcome, undefined,
+          `Profile upsert finished before closure committed: ${attemptedOutcome?.error?.message ?? "succeeded"}`);
+        const isWaiting = await sql(`select exists (select from pg_locks
+          where pid=$1 and locktype='advisory' and not granted) value`, [profileBackend]);
+        if (isWaiting) break;
+        assert.ok(attempt < 29, "profile recreation did not wait behind closure");
+        await delay(30);
+      }
+      await database.query("commit");
+      await attemptedResult;
+      const { error } = attemptedOutcome;
+      assert.equal(error?.code, "42501");
+      assert.match(error.message, /Account access is unavailable/);
+      assert.equal(await state(concurrent), "denied");
+    } finally {
+      await database.query("rollback");
+      await other.end();
+      clients.delete(other);
+    }
+  });
+
   for (const m of frozenMigrations) assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", m.file), "utf8")).replace(/\r\n/g, "\n")), m.sha256);
   assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", boundaryFile), "utf8")).replace(/\r\n/g, "\n")), boundaryHash);
+  assert.equal(sha((await readFile(resolve(ROOT, "supabase/migrations", closureFile), "utf8")).replace(/\r\n/g, "\n")), closureHash);
   assert.ok(!report.warnings.some(w => /WarnSendingBroadcastMessage/.test(w)), "Actual Realtime send swallowed an error");
   report.passed = true;
 } catch (e) { failure = e; report.passed = false; report.failure = e.message; report.errorCode = e.code; report.errorContext = e.where; report.errorPosition = e.position; report.stage = stage; }

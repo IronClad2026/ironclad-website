@@ -8,8 +8,14 @@ import {
 
 const authMock = vi.hoisted(() => vi.fn());
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
+const adminAccessMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  const fixture = createPatch2AdminAccessFixture(authMock);
+  return { ...fixture, hasCurrentPatch2AdminAccess: adminAccessMock.mockImplementation(fixture.hasCurrentPatch2AdminAccess) };
+});
 vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
 }));
@@ -55,6 +61,7 @@ describe("Admin Operations loader authorization and failure isolation", () => {
   beforeEach(() => {
     authMock.mockReset();
     createSupabaseAdminClientMock.mockReset();
+    adminAccessMock.mockClear();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
@@ -67,6 +74,19 @@ describe("Admin Operations loader authorization and failure isolation", () => {
     await expect(loadAdminOperationsMetrics("30d")).resolves.toBeNull();
 
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("withholds data from an unchanged admin session once closure commits", async () => {
+    authMock.mockResolvedValue(adminIdentity);
+    adminAccessMock.mockResolvedValueOnce(false);
+    await expect(loadAdminOperationsMetrics("30d")).resolves.toBeNull();
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
+
+    adminClientWithResult({ data: [], error: null, count: 0 });
+    adminAccessMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    await expect(loadAdminOperationsMetrics("30d")).resolves.toBeNull();
+    expect(createSupabaseAdminClientMock).toHaveBeenCalledOnce();
+    expect(adminAccessMock).toHaveBeenCalledTimes(3);
   });
 
   it("constructs the trusted client only after an Admin identity is proven", async () => {
