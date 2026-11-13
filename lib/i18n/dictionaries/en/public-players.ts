@@ -10,7 +10,7 @@ const dictionary = {
     description:
       "Browse public IronClad commanders, competitive ELO ratings, regions, and opt-in Discord availability.",
     privacy:
-      "Only player-approved profile fields are shown. Private profiles are not listed.",
+      "Competitive profile information is public for active players. Personal account information stays private; Discord contact is optional.",
     commanders: "Public Commanders",
     directorySafe:
       "Directory data is limited to public-safe player profile fields.",
@@ -44,7 +44,7 @@ const dictionary = {
     competitiveRecord: "Competitive Record",
     publicStats: "Public Stats",
     publicStatsText:
-      "Player-approved competitive information from the public IronClad data boundary.",
+      "Competitive information from the public IronClad data boundary.",
     tournamentHistory: "Tournament History",
     tournamentHistoryText:
       "Public Tournament history will appear here once a public-safe Tournament summary is available.",

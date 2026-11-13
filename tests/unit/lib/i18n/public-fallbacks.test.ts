@@ -6,9 +6,10 @@ import rankings from "@/lib/i18n/dictionaries/en/public-rankings";
 import shared from "@/lib/i18n/dictionaries/en/public-shared";
 
 describe("focused public fallbacks", () => {
-  it("preserves Staging English copy and key order with public-profile opt-in restored", () => {
+  it("preserves the complete pre-split Staging English copy and key order", () => {
+    // This performance-only source move must preserve every existing string.
     expect(createHash("sha256").update(JSON.stringify(dictionary)).digest("hex"))
-      .toBe("5f25928c67a66de2260ac17d56ec799d424afa0a96199bba592b09db03d76b99");
+      .toBe("55e0f3d06832b4150933f8a398ff48be1734b0acc14a193a19db2f4d220331fb");
   });
 
   it("shares the original values while exposing only each client's required namespaces", () => {

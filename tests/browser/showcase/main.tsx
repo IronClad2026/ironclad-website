@@ -18,7 +18,7 @@ const player: PublicPlayerProfile = {
   avatarUrl: null, hasAvatar: false, createdAt: "2026-08-01T00:00:00Z",
 };
 const initialState: ShowcaseEditorState = {
-  playerId: player.id, publicProfileEnabled: !query.has("private"), currentThought: "Training Wehrmacht this week. Next goal: first Challenge final.",
+  playerId: player.id, currentThought: "Training Wehrmacht this week. Next goal: first Challenge final.",
   featuredBadgeAwardId: "earned-1", thoughtHidden: query.has("hidden"), revision: 1,
   awards: query.has("empty") ? [] : [
     { awardId: "earned-1", slug: "first-victory", unlockedAt: "2026-08-01T00:00:00Z" },

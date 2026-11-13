@@ -58,7 +58,6 @@ type RegistrationRow = {
 
 type PlayerPrivacyRow = {
   clerk_user_id: string;
-  public_profile_enabled: boolean;
   account_closed_at: string | null;
 };
 
@@ -186,7 +185,7 @@ export async function loadAdminTournamentMatchWorkspace(
         ? await supabase
             .from("players")
             .select(
-              "clerk_user_id, public_profile_enabled, account_closed_at"
+              "clerk_user_id, account_closed_at"
             )
             .in("clerk_user_id", clerkUserIds)
         : { data: [], error: null };
@@ -227,7 +226,6 @@ export async function loadAdminTournamentMatchWorkspace(
         },
         player
           ? {
-              publicProfileEnabled: player.public_profile_enabled,
               accountClosedAt: player.account_closed_at,
             }
           : null

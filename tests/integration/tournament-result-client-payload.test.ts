@@ -1038,7 +1038,7 @@ describe("tournament Client Component result payload", () => {
     ).mock.calls[0];
 
     expect(selectedColumns).toBe(
-      "id, clerk_user_id, public_profile_enabled, account_closed_at"
+      "id, clerk_user_id, account_closed_at"
     );
     expect(participant).toEqual(
       expect.objectContaining({
@@ -1055,7 +1055,7 @@ describe("tournament Client Component result payload", () => {
     expect(serializePrivacyValue(tournament.participants)).not.toContain("1605");
   });
 
-  it("preserves the factual roster without optional fields for a private profile", async () => {
+  it("publishes active competition identity regardless of the legacy privacy flag", async () => {
     const { props } = await loadClientProps({
       admin: false,
       participantProfiles: {
@@ -1077,9 +1077,9 @@ describe("tournament Client Component result payload", () => {
     expect(participant).toEqual(
       expect.objectContaining({
         name: "Safe Viewer",
-        profileHref: null,
-        country: null,
-        elo: null,
+        profileHref: `/players/${VIEWER_REGISTRATION_ID}`,
+        country: "Australia",
+        elo: 1500,
       })
     );
     expect(serializePrivacyValue(tournament.participants)).not.toContain(

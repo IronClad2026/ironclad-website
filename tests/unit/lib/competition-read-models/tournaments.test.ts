@@ -61,7 +61,6 @@ function fixture(): TournamentCompetitionSnapshot {
     privacy: [30, 31].map((n) => ({
       id: uid(n),
       coh3_profile_id: String(123456 + n),
-      public_profile_enabled: true,
       account_closed_at: null,
     })),
     generatedBrackets: [
@@ -339,7 +338,7 @@ describe("tournament competition read projection", () => {
       /steam|clerk|discord|replay|source_metadata|coh3_profile_id/i,
     );
   });
-  it("preserves the factual roster alias without optional profile and Relic identity", () => {
+  it("publishes active competitive identity regardless of the legacy privacy flag", () => {
     const s = fixture();
     const result = division({
       ...s,
@@ -350,9 +349,9 @@ describe("tournament competition read projection", () => {
     });
     expect(result.participants[0]).toMatchObject({
       eventAlias: "Event alias 20",
-      eventElo: null,
-      profileUrl: null,
-      relicProfileId: null,
+      eventElo: 824,
+      profileUrl: `https://www.ironcladtournaments.com/players/${uid(30)}`,
+      relicProfileId: "123486",
     });
   });
   it.each([
@@ -687,7 +686,7 @@ describe("bounded SELECT-only tournament selectors", () => {
       ),
     ).toBe(true);
     expect(db.calls.find((call) => call.table === "players")?.select).toBe(
-      "id,coh3_profile_id,public_profile_enabled,account_closed_at",
+      "id,coh3_profile_id,account_closed_at",
     );
     expect(
       db.calls.find((call) => call.table === "match_result_report_groups")

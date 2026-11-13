@@ -69,7 +69,7 @@ test("badge detail has native keyboard dismissal and restores focus", async ({ p
 test("editor saves badge while retaining draft and saves thought afterward", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const errors = await openFixture(page, "surface=editor&private=1");
-  await expect(page.getByRole("link", { name: "View Public Profile" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "View Public Profile" })).toHaveAttribute("href", "/players/fixture-public-player");
   await page.getByRole("textbox").fill("GGs everyone 😎");
   await page.getByRole("button", { name: "Change achievement" }).click();
   await page.getByRole("button", { name: "Showcase Elite Champion" }).click();

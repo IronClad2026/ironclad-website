@@ -416,7 +416,7 @@ export default async function TournamentsPage({
     playerIds.length > 0
       ? await supabase
           .from("players")
-          .select("id, clerk_user_id, public_profile_enabled, account_closed_at")
+          .select("id, clerk_user_id, account_closed_at")
           .in("clerk_user_id", playerIds)
       : { data: [], error: null };
 
@@ -435,7 +435,6 @@ export default async function TournamentsPage({
       playerResult.data as {
         id: string;
         clerk_user_id: string;
-        public_profile_enabled: boolean;
         account_closed_at: string | null;
       }[]
     ).map((player) => [player.clerk_user_id, player])
@@ -517,7 +516,6 @@ export default async function TournamentsPage({
       player
         ? {
             playerId: player.id,
-            publicProfileEnabled: player.public_profile_enabled,
             accountClosedAt: player.account_closed_at,
           }
         : null

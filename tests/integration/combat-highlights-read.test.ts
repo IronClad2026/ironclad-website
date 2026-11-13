@@ -19,7 +19,7 @@ const privateFields = {
   signed_url: "https://storage.example.test/private?token=private-token", security_metadata: "private-security",
 };
 const state = () => ({
-  playerId, enabled: true, publicProfileEnabled: true,
+  playerId, enabled: true,
   slots: [{ slotNumber: 1, displayOrder: 1, revision: 7, hidden: true, clip, pendingUploadId: null }],
 });
 
@@ -29,16 +29,10 @@ beforeEach(() => {
 });
 
 describe("Combat Highlights read contracts", () => {
-  it("loads the current owner state including profile visibility", async () => {
+  it("loads the current owner state without a competitive visibility setting", async () => {
     mocks.ownerRpc.mockResolvedValue({ data: state(), error: null });
     expect(await getMyCombatHighlights()).toEqual(state());
     expect(mocks.ownerRpc).toHaveBeenCalledWith("get_my_player_combat_highlights");
-  });
-
-  it("keeps owner editing available with the older response and treats an absent opt-in as private", () => {
-    const { publicProfileEnabled, ...legacy } = state();
-    expect(publicProfileEnabled).toBe(true);
-    expect(parseHighlightsState(legacy)).toEqual({ ...legacy, publicProfileEnabled: false });
   });
 
   it("preserves owner-only hidden clip preview state while excluding private metadata", () => {
@@ -46,7 +40,7 @@ describe("Combat Highlights read contracts", () => {
     input.slots[0] = { ...input.slots[0], ...privateFields, clip: { ...clip, ...privateFields } };
     const result = parseHighlightsState(input);
     expect(result).toEqual(state());
-    expect(Object.keys(result!)).toEqual(["playerId", "enabled", "publicProfileEnabled", "slots"]);
+    expect(Object.keys(result!)).toEqual(["playerId", "enabled", "slots"]);
     for (const value of Object.values(privateFields)) expect(JSON.stringify(result)).not.toContain(value);
   });
 

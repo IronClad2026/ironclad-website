@@ -274,7 +274,7 @@ describe("competition read products together", () => {
     ).toBe(false);
   });
 
-  it("preserves factual tournament results without linking a private competitor", async () => {
+  it("links an active legacy-private competitor and publishes only their verified binding", async () => {
     const db = fixture();
     const event = await loadTournamentCompetitionView(
       db.client,
@@ -286,9 +286,9 @@ describe("competition read products together", () => {
       .participants.find((row) => row.registrationId === uuid(102));
     expect(opponent).toMatchObject({
       eventAlias: "Historical Opponent",
-      eventElo: null,
-      profileUrl: null,
-      relicProfileId: null,
+      eventElo: 1600,
+      profileUrl: `https://www.ironcladtournaments.com/players/${uuid(202)}`,
+      relicProfileId: "7777777",
     });
     for (const participant of event!.divisions.flatMap(
       (division) => division.participants,
@@ -309,18 +309,34 @@ describe("competition read products together", () => {
     ).toBeNull();
   });
 
-  it("keeps a private canonical identity out of the profile-specific endpoint", async () => {
+  it("loads factual history for an active legacy-private canonical identity", async () => {
     const db = fixture();
     await expect(
       loadPlayerCompetitionHistory(db.client, "7777777", { now }),
-    ).resolves.toEqual({ outcome: "HIDDEN" });
-    expect(db.requests.some((request) => request.table === "registrations")).toBe(false);
+    ).resolves.toMatchObject({
+      outcome: "FOUND_VISIBLE",
+      player: {
+        relicProfileId: "7777777",
+        currentIdentity: {
+          alias: "Private Alias",
+          profileUrl: `https://www.ironcladtournaments.com/players/${uuid(202)}`,
+        },
+        aggregate: { tournamentsEntered: 1, matchesPlayed: 1, wins: 0, losses: 1 },
+      },
+    });
+    expect(
+      db.requests.some((request) => request.table === "registrations"),
+    ).toBe(true);
+    expect(
+      db.requests.every(
+        (request) => !request.projection.includes("public_profile_enabled"),
+      ),
+    ).toBe(true);
   });
 
   it("retains the public profile URL without manufacturing an unbound Relic identity", async () => {
     const db = fixture();
     db.tables.players[1].coh3_profile_id = null;
-    db.tables.players[1].public_profile_enabled = true;
     const event = await loadTournamentCompetitionView(
       db.client, "legacy-event", { now },
     );

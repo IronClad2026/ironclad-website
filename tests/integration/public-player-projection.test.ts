@@ -54,7 +54,7 @@ describe("public-player projection", () => {
       .toBe(
         "id, display_name, player_name, country, region, current_elo, discord_public_enabled, discord_username, has_avatar, avatar_url, created_at"
       );
-    expect(supabase.calls).toContainEqual({
+    expect(supabase.calls).not.toContainEqual({
       method: "eq",
       args: ["public_profile_enabled", true],
     });
@@ -183,7 +183,7 @@ describe("public-player projection", () => {
       method: "eq",
       args: ["id", publicRow.id],
     });
-    expect(supabase.calls).toContainEqual({
+    expect(supabase.calls).not.toContainEqual({
       method: "eq",
       args: ["public_profile_enabled", true],
     });

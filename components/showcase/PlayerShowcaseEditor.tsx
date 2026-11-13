@@ -2,7 +2,7 @@
 
 import { startTransition, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye } from "lucide-react";
 import BadgeArtwork from "@/components/badges/BadgeArtwork";
 import { localizeBadgeItem } from "@/components/badges/badgeUi";
 import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
@@ -135,20 +135,17 @@ export default function PlayerShowcaseEditor({
           <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">{t("showcase.title")}</h1>
           <p className="mt-3 text-sm leading-6 text-zinc-400">{t("showcase.description")}</p>
         </div>
-        {initialState.publicProfileEnabled ? (
-          <Link href={`/players/${initialState.playerId}`} className={secondaryButton}>{t("showcase.viewPublicProfile")}</Link>
-        ) : null}
+        <Link href={`/players/${initialState.playerId}`} className={secondaryButton}>{t("showcase.viewPublicProfile")}</Link>
       </div>
 
       <div className="mt-5 flex flex-wrap items-start justify-between gap-3 border-l-2 border-zinc-500 bg-white/[0.025] px-4 py-3">
         <div className="min-w-0 max-w-2xl">
           <p className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-            {initialState.publicProfileEnabled ? <Eye size={16} aria-hidden="true" /> : <EyeOff size={16} aria-hidden="true" />}
-            {t(initialState.publicProfileEnabled ? "showcase.publicProfile" : "showcase.privateProfile")}
+            <Eye size={16} aria-hidden="true" />
+            {t("showcase.publicProfile")}
           </p>
-          <p className="mt-1 text-xs leading-5 text-zinc-400">{t(initialState.publicProfileEnabled ? "showcase.publicVisibilityHelp" : "showcase.privateVisibilityHelp")}</p>
+          <p className="mt-1 text-xs leading-5 text-zinc-400">{t("showcase.publicVisibilityHelp")}</p>
         </div>
-        <Link href="/dashboard#dashboard-visibility-title" className="inline-flex min-h-11 items-center text-sm font-semibold text-zinc-300 underline decoration-white/25 underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300">{t("showcase.manageVisibility")}</Link>
       </div>
 
       {canReviewConflict ? (

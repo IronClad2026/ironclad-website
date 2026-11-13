@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
-import PublicProfileVisibilityCard from "@/components/PublicProfileVisibilityCard";
 import PlayerDivisionInvitations from "@/components/PlayerDivisionInvitations";
 import PollsAndDecisions from "@/components/PollsAndDecisions";
 import { acknowledgeBadgeReveal } from "@/app/dashboard/badge-reveal-actions";
@@ -79,7 +78,7 @@ export default async function PlayerDashboardPage() {
       supabase
         .from("players")
         .select(
-          "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, public_profile_enabled, discord_public_enabled, created_at, updated_at"
+          "id, clerk_user_id, display_name, in_game_name, discord_username, steam_username, coh3_player_card_url, country, region, timezone, current_elo, avatar_url, bio, profile_completed, discord_public_enabled, created_at, updated_at"
         )
         .eq("clerk_user_id", userId)
         .maybeSingle(),
@@ -290,7 +289,6 @@ export default async function PlayerDashboardPage() {
               {t("dashboard.utilities.title")}
             </h2>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <PublicProfileVisibilityCard initialEnabled={Boolean(profile.public_profile_enabled)} />
               <DiscordContactVisibilityCard
                 initialEnabled={Boolean(profile.discord_public_enabled)}
                 hasDiscordUsername={Boolean(profile.discord_username?.trim())}

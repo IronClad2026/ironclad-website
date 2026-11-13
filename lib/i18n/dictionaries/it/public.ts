@@ -32,9 +32,9 @@ const dictionary = {
       tournamentsTitle: "Tornei strutturati",
       tournamentsText:
         "Tabelloni, programmi e aggiornamenti dei Tornei restano facili da seguire.",
-      choiceTitle: "Scelta del Giocatore",
+      choiceTitle: "Identità competitiva",
       choiceText:
-        "I Profili pubblici e il contatto Discord compaiono solo quando i Giocatori scelgono di condividerli.",
+        "I giocatori IronClad attivi hanno profili competitivi pubblici. Il contatto Discord appare solo se il giocatore sceglie di condividerlo.",
       ready: "PRONTO",
       readyText:
         "Tornei, Profili, Giocatori e regole sono collegati per il prossimo Evento competitivo.",
@@ -43,9 +43,9 @@ const dictionary = {
       eyebrow: "Giocatori IronClad",
       title: "Scopri il roster pubblico",
       description:
-        "Esplora i Giocatori che scelgono di apparire pubblicamente, confronta l’ELO, visualizza i Profili pubblici e usa il contatto Discord quando un Giocatore vi ha acconsentito.",
+        "Esplora i giocatori IronClad attivi, confronta l’ELO e visita i profili competitivi. Il contatto Discord è facoltativo.",
       directory: "Elenco dei Giocatori",
-      privacy: "I dettagli del Profilo pubblico sono limitati ai campi approvati dal Giocatore.",
+      privacy: "Le informazioni competitive dei giocatori attivi sono pubbliche. I dati personali dell’account restano privati; il contatto Discord è facoltativo.",
       browse: "Esplora i Giocatori",
     },
     path: {
@@ -144,7 +144,7 @@ const dictionary = {
     description:
       "Esplora i comandanti pubblici di IronClad, le valutazioni ELO competitive, le regioni e la disponibilità facoltativa su Discord.",
     privacy:
-      "Vengono mostrati solo i campi del Profilo approvati dal Giocatore. I Profili privati non sono elencati.",
+      "Le informazioni competitive dei giocatori attivi sono pubbliche. I dati personali dell’account restano privati; il contatto Discord è facoltativo.",
     commanders: "Comandanti pubblici",
     directorySafe:
       "I dati dell’elenco sono limitati ai campi sicuri e pubblici dei Profili dei Giocatori.",
@@ -178,7 +178,7 @@ const dictionary = {
     competitiveRecord: "Storico competitivo",
     publicStats: "Statistiche pubbliche",
     publicStatsText:
-      "Informazioni competitive approvate dal Giocatore provenienti dal perimetro dei dati pubblici di IronClad.",
+      "Informazioni competitive dal sistema pubblico IronClad.",
     tournamentHistory: "Storico dei Tornei",
     tournamentHistoryText:
       "Lo storico pubblico dei Tornei comparirà qui quando sarà disponibile un riepilogo del Torneo sicuro per la pubblicazione.",

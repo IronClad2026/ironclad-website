@@ -47,7 +47,7 @@ export async function getPlayerShowcaseEnabled(): Promise<boolean> {
   }
 }
 
-// Missing migrations, private/closed parents and optional Showcase failures never
+// Missing migrations, closed parents and optional Showcase failures never
 // become a dependency of the existing profile or competition read paths.
 export async function getPublicPlayerShowcase(playerId: string): Promise<PublicPlayerShowcase | null> {
   if (!isShowcaseUuid(playerId) || !await getPlayerShowcaseEnabled()) return null;
@@ -88,7 +88,7 @@ export async function getMyPlayerShowcase(): Promise<ShowcaseEditorLoad> {
     const owner = parseShowcaseOwnerState(data);
     if (!owner) return { status: "error", code: "unavailable" };
     const { data: player, error: playerError } = await client.from("players")
-      .select("id, public_profile_enabled")
+      .select("id")
       .eq("clerk_user_id", userId).eq("id", owner.playerId).maybeSingle();
     if (playerError) return { status: "error", code: "unavailable" };
     if (!player) return { status: "error", code: "profileRequired" };
@@ -106,7 +106,7 @@ export async function getMyPlayerShowcase(): Promise<ShowcaseEditorLoad> {
     }
     return {
       status: "success",
-      state: { ...owner, awards, publicProfileEnabled: player.public_profile_enabled === true },
+      state: { ...owner, awards },
     };
   } catch {
     return { status: "error", code: "unavailable" };

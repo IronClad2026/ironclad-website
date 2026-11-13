@@ -14,7 +14,7 @@ import { cancelCombatHighlight, clearCombatHighlight, completeCombatHighlight, p
 import { moderateCombatHighlight } from "@/lib/combat-highlights/moderation";
 const playerId = "125a7a44-e834-4ef8-a415-093264053431";
 const uploadId = "f104712c-3ce5-478d-aebc-d116ec81f55a";
-const state = { playerId, enabled: true, publicProfileEnabled: true, slots: [{ slotNumber: 1, displayOrder: 1, revision: 1, hidden: false, clip: null, pendingUploadId: uploadId }] };
+const state = { playerId, enabled: true, slots: [{ slotNumber: 1, displayOrder: 1, revision: 1, hidden: false, clip: null, pendingUploadId: uploadId }] };
 const input = { slotNumber: 1, expectedRevision: 0, fileName: "clip.mp4", contentType: "video/mp4", byteLength: 100, posterByteLength: 0, title: "A good flank", declarationAccepted: true, declarationVersion: 1 };
 const metadata = { uploadId, fileName: "clip.mp4", contentType: "video/mp4", byteLength: 100, posterByteLength: 0, expiresAt: new Date(Date.now() + 300000).toISOString() };
 const verified = { codec: "avc", audioCodec: null, durationMs: 1000, width: 1280, height: 720, fps: 30, byteLength: 100, sha256: "a".repeat(64) };

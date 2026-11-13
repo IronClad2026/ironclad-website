@@ -22,7 +22,7 @@ const clip: PublicHighlightClip = {
 };
 const second = { ...clip, uploadId: "clip-two", title: "Holding the line", videoUrl: "https://media.example.test/public/two" };
 const initial = (): HighlightsState => ({
-  playerId: "player-one", enabled: true, publicProfileEnabled: true,
+  playerId: "player-one", enabled: true,
   slots: [
     { slotNumber: 1, displayOrder: 1, revision: 7, hidden: false, clip, pendingUploadId: null },
     { slotNumber: 2, displayOrder: 2, revision: 9, hidden: false, clip: second, pendingUploadId: null },
