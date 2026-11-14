@@ -656,7 +656,7 @@ const capabilities: Capability[] = [
     label: "dice snapshot",
     section: "matches",
     evidence: [
-      { file: "experience", includes: ["AuthenticatedMatchDiceRollOff", "get_match_dice_rolloff"] },
+      { file: "experience", includes: ["AuthenticatedMatchDiceRollOff", "getMatchDiceHistory"] },
       { file: "matches", includes: ["<AdminMatchManagementModal"] },
     ],
   },
@@ -1059,6 +1059,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261113071907_patch2_retire_legacy_registration_writes.sql",
         "20261113072932_patch2_verify_private_assistance_privacy_operators.sql",
         "20261113110000_patch2_gaming_profile_publication.sql",
+        "20261114064733_patch2_match_staff_authorization.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([

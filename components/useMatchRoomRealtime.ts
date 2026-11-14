@@ -11,8 +11,10 @@ const SAFETY_POLL_MS = 60_000;
 const TOKEN_REFRESH_MS = 25_000;
 const INVALIDATION_COALESCE_MS = 80;
 
-export function matchRoomRealtimeTopic(roomId: string, generation: number) {
-  return `match-room:${roomId}:${generation}`;
+async function matchRoomRealtimeTopic(roomId: string, generation: number, subject: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(subject));
+  const subjectHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `match-room:v2:${roomId}:${generation}:${subjectHash}`;
 }
 
 function visibleAndOnline() {
@@ -28,8 +30,9 @@ export default function useMatchRoomRealtime({ room, refresh, onReturn }: {
   const { getToken, isLoaded, isSignedIn, userId, sessionId } = useAuth();
   const roomId = room?.id;
   const generation = room?.communicationGeneration;
-  // Disabled and closed rooms retain polling, without a live subscription.
-  const eligible = !!room?.writable && room.closedAt === null;
+  // Staff outside the match and disabled or closed rooms use the same authorized polling path.
+  const eligible = !!room?.writable && room.closedAt === null &&
+    (room.viewerRegistrationId === room.playerOneRegistrationId || room.viewerRegistrationId === room.playerTwoRegistrationId);
 
   useEffect(() => {
     let alive = true;
@@ -100,7 +103,7 @@ export default function useMatchRoomRealtime({ room, refresh, onReturn }: {
       const connectionAttempt = ++attempt;
       const isCurrent = () => current() && connectionAttempt === attempt;
       try {
-        const token = await getToken();
+        const [token, topic] = await Promise.all([getToken(), matchRoomRealtimeTopic(roomId, generation, userId)]);
         if (!isCurrent()) return;
         if (!token) throw new Error("Match Room token unavailable");
         const connection = createAuthenticatedBrowserSupabaseClient(getToken);
@@ -109,7 +112,7 @@ export default function useMatchRoomRealtime({ room, refresh, onReturn }: {
         // passed to setAuth remains pinned until the application replaces it.
         await connection.realtime.setAuth(token);
         if (!isCurrent()) return;
-        const nextChannel = connection.channel(matchRoomRealtimeTopic(roomId, generation), {
+        const nextChannel = connection.channel(topic, {
           config: { private: true, broadcast: { self: false, ack: false } },
         });
         channel = nextChannel;
