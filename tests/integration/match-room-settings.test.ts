@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), client: vi.fn(), rpc: vi.fn(), revalidate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), client: vi.fn(), rpc: vi.fn(), revalidate: vi.fn(), currentStaff: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: mocks.client }));
+vi.mock("@/lib/patch2-admin-access", () => ({ hasCurrentPatch2AdminAccess: mocks.currentStaff }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
 import { getAdminMatchRoomSetting, setAdminMatchRoomEnabled } from "@/lib/match-room-settings";
 import { updateMatchRoomEnabled } from "@/app/admin/system/match-room-actions";
 
-const admin = { userId: "verified_admin", sessionClaims: { metadata: { role: "admin" } } };
+const admin = { userId: "verified_admin", sessionId: "session_admin", sessionClaims: { metadata: { role: "admin" } } };
 function form(value: string) { const data = new FormData(); data.set("enabled", value); return data; }
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.auth.mockResolvedValue(admin);
+  mocks.currentStaff.mockResolvedValue(true);
   mocks.client.mockReturnValue({ rpc: mocks.rpc });
   mocks.rpc.mockResolvedValue({ data: { enabled: false }, error: null });
 });
@@ -34,6 +36,11 @@ describe("scoped Match Room emergency control", () => {
   });
   it("repeats authorization inside the trusted helper", async () => {
     mocks.auth.mockResolvedValueOnce(admin).mockResolvedValueOnce({ userId: "player", sessionClaims: {} });
+    expect(await updateMatchRoomEnabled(null, form("false"))).toEqual({ ok: false, code: "forbidden" });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("does not let a stale admin token change the chat setting", async () => {
+    mocks.currentStaff.mockResolvedValue(false);
     expect(await updateMatchRoomEnabled(null, form("false"))).toEqual({ ok: false, code: "forbidden" });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });

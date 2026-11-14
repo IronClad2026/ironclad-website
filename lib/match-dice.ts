@@ -59,6 +59,10 @@ export type MatchDiceRollOffSnapshot = {
   activations: MatchDiceActivation[];
 };
 
+export type MatchDiceHistoryResult =
+  | { ok: true; snapshot: MatchDiceRollOffSnapshot }
+  | { ok: false; code: "auth_required" | "invalid_request" | "unavailable" };
+
 export type AuthoritativeMatchDiceRoll = {
   activationVersion: number;
   gameNumber: MatchDiceGameNumber;
@@ -157,7 +161,7 @@ export function isRollMatchDiceInput(value: unknown): value is RollMatchDiceInpu
   return Boolean(
     isRecord(value) &&
       hasOnlyKeys(value, ROLL_INPUT_KEYS) &&
-      isUuid(value.matchId) &&
+      isMatchDiceId(value.matchId) &&
       isPositiveInteger(value.expectedActivationVersion) &&
       isGameNumber(value.gameNumber) &&
       isPositiveInteger(value.expectedTieRound)
@@ -171,7 +175,7 @@ export function parseMatchDiceSnapshot(
   if (
     !isRecord(value) ||
     !hasOnlyKeys(value, SNAPSHOT_KEYS) ||
-    !isUuid(value.matchId) ||
+    !isMatchDiceId(value.matchId) ||
     (expectedMatchId !== undefined && value.matchId !== expectedMatchId) ||
     !isNonNegativeInteger(value.currentActivationVersion) ||
     (value.seriesBestOf !== 3 && value.seriesBestOf !== 5) ||
@@ -494,7 +498,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isUuid(value: unknown): value is string {
+export function isMatchDiceId(value: unknown): value is string {
   return (
     typeof value === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(

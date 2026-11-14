@@ -22,7 +22,7 @@ import {
   type TournamentRegistrationResult,
 } from "@/app/tournaments/actions";
 import { setLocalePreference } from "@/app/locale-actions";
-import { rollMatchDice } from "@/app/tournaments/dice-actions";
+import { getMatchDiceHistory, rollMatchDice } from "@/app/tournaments/dice-actions";
 import MatchDiceRollOff, {
   type MatchDiceLoadResult,
 } from "@/components/MatchDiceRollOff";
@@ -67,7 +67,6 @@ import {
 } from "@/lib/tournament-division-state";
 import { createAuthenticatedBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { RegistrationDocumentSet } from "@/lib/legal-document-types";
-import { parseMatchDiceSnapshot } from "@/lib/match-dice";
 import type { PlayerProfile } from "@/lib/player-profile";
 import type { PollViewerProjection } from "@/lib/polls";
 import {
@@ -1069,11 +1068,7 @@ function AuthenticatedMatchDiceRollOff({
   forceReadOnly?: boolean;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
-  const { getToken, isSignedIn } = useAuth();
-  const supabase = useMemo(
-    () => createAuthenticatedBrowserSupabaseClient(getToken),
-    [getToken]
-  );
+  const { isSignedIn } = useAuth();
   const loadSnapshot = useCallback(
     async (
       requestedMatchId: string,
@@ -1087,29 +1082,10 @@ function AuthenticatedMatchDiceRollOff({
       }
 
       try {
-        const request = supabase.rpc("get_match_dice_rolloff", {
-          p_match_id: requestedMatchId,
-        });
-        const { data, error } = await (signal
-          ? request.abortSignal(signal)
-          : request);
-
-        if (error) {
-          return {
-            ok: false,
-            message: t("dice.historyUnavailable"),
-          };
-        }
-
-        const snapshot = parseMatchDiceSnapshot(data, requestedMatchId);
-        if (!snapshot) {
-          return {
-            ok: false,
-            message: t("dice.loadError"),
-          };
-        }
-
-        return { ok: true, snapshot };
+        signal?.throwIfAborted();
+        const result = await getMatchDiceHistory(requestedMatchId);
+        signal?.throwIfAborted();
+        return result.ok ? result : { ok: false, message: t("dice.historyUnavailable") };
       } catch {
         return {
           ok: false,
@@ -1119,7 +1095,7 @@ function AuthenticatedMatchDiceRollOff({
         };
       }
     },
-    [isSignedIn, supabase, t]
+    [isSignedIn, t]
   );
 
   return (

@@ -2,13 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const createAuthenticatedSupabaseClientMock = vi.hoisted(() => vi.fn());
+const staffMock = vi.hoisted(() => ({ current: vi.fn(), rpc: vi.fn() }));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
 vi.mock("@/lib/supabase-server", () => ({
   createAuthenticatedSupabaseClient: createAuthenticatedSupabaseClientMock,
 }));
+vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: () => ({ rpc: staffMock.rpc }) }));
+vi.mock("@/lib/patch2-admin-access", () => ({ hasCurrentPatch2AdminAccess: staffMock.current }));
 
-import { rollMatchDice } from "@/app/tournaments/dice-actions";
+import { getMatchDiceHistory, rollMatchDice } from "@/app/tournaments/dice-actions";
 import { parseMatchDiceSnapshot } from "@/lib/match-dice";
 
 const MATCH_ID = "11111111-1111-4111-8111-111111111111";
@@ -110,6 +113,52 @@ describe("match dice read projection", () => {
         MATCH_ID
       )
     ).toBeNull();
+  });
+});
+
+describe("getMatchDiceHistory", () => {
+  const staff = { userId: "user_staff", sessionId: "session_staff", sessionClaims: { metadata: { role: "admin" } } };
+  const rpc = vi.fn();
+  beforeEach(() => {
+    authMock.mockResolvedValue(staff);
+    createAuthenticatedSupabaseClientMock.mockResolvedValue({ rpc });
+    rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
+    staffMock.current.mockResolvedValue(false);
+  });
+
+  it("permits a demoted participant to read their own dice history without a staff check", async () => {
+    rpc.mockResolvedValue({ data: snapshot, error: null });
+    expect(await getMatchDiceHistory(MATCH_ID)).toEqual({ ok: true, snapshot });
+    expect(staffMock.current).not.toHaveBeenCalled();
+    expect(staffMock.rpc).not.toHaveBeenCalled();
+  });
+
+  it("requires current authority for the staff branch and preserves a read-only response", async () => {
+    expect(await getMatchDiceHistory(MATCH_ID)).toEqual({ ok: false, code: "unavailable" });
+    expect(staffMock.rpc).not.toHaveBeenCalled();
+    staffMock.current.mockResolvedValue(true);
+    const staffSnapshot = { ...snapshot, viewerRole: "admin", viewerSlot: null,
+      activations: snapshot.activations.map((activation) => ({ ...activation,
+        games: activation.games.map((game) => ({ ...game, canRoll: false })),
+      })),
+    };
+    staffMock.rpc.mockResolvedValue({ data: staffSnapshot, error: null });
+    expect(await getMatchDiceHistory(MATCH_ID)).toEqual({ ok: true, snapshot: staffSnapshot });
+    expect(staffMock.current).toHaveBeenCalledWith(staff.userId, staff.sessionClaims, staff.sessionId, false);
+    expect(staffMock.rpc).toHaveBeenCalledExactlyOnceWith("call_patch2_match_staff", {
+      p_operation: "get_match_dice_rolloff", p_actor_clerk_user_id: staff.userId,
+      p_arguments: { p_match_id: MATCH_ID },
+    });
+  });
+
+  it("denies anonymous, malformed and unacknowledged requests without a service call", async () => {
+    expect(await getMatchDiceHistory("invalid")).toEqual({ ok: false, code: "invalid_request" });
+    authMock.mockResolvedValueOnce({ userId: null });
+    expect(await getMatchDiceHistory(MATCH_ID)).toEqual({ ok: false, code: "auth_required" });
+    rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "PROFILE_NOTICE_REQUIRED" } });
+    expect(await getMatchDiceHistory(MATCH_ID)).toEqual({ ok: false, code: "unavailable" });
+    expect(staffMock.current).not.toHaveBeenCalled();
+    expect(staffMock.rpc).not.toHaveBeenCalled();
   });
 });
 

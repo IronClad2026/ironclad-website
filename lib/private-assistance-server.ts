@@ -27,15 +27,15 @@ export async function authorizePrivateAssistance(admin = false, mutation = false
   try {
     const { userId, sessionClaims, sessionId } = await auth();
     if (!userId || !sessionId) return { ok: false, code: "auth_required" };
-    const claimsAdmin = (sessionClaims as { metadata?: { role?: unknown } } | null)?.metadata?.role === "admin";
-    if ((admin || claimsAdmin) && !await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId, true)) {
+    const isAdmin = await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId, true);
+    if (admin && !isAdmin) {
       return { ok: false, code: "forbidden" };
     }
     if (mutation) {
       try { await requireCurrentAccountLegalAcceptance(); }
       catch { return { ok: false, code: "legal_required" }; }
     }
-    return { ok: true, data: { clerkUserId: userId, isAdmin: claimsAdmin } };
+    return { ok: true, data: { clerkUserId: userId, isAdmin } };
   } catch {
     return { ok: false, code: "auth_required" };
   }

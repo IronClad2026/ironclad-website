@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   client: vi.fn(),
   rpc: vi.fn(),
+  staffRpc: vi.fn(),
+  currentStaff: vi.fn(),
   legal: vi.fn(),
   revalidate: vi.fn(),
 }));
@@ -11,6 +13,10 @@ vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/supabase-server", () => ({
   createAuthenticatedSupabaseClient: mocks.client,
 }));
+vi.mock("@/lib/supabase-admin", () => ({
+  createSupabaseAdminClient: () => ({ rpc: mocks.staffRpc }),
+}));
+vi.mock("@/lib/patch2-admin-access", () => ({ hasCurrentPatch2AdminAccess: mocks.currentStaff }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
 vi.mock("@/lib/account-legal-mutation-guard", () => ({
   requireCurrentAccountLegalAcceptance: mocks.legal,
@@ -37,6 +43,11 @@ const PLAYER_ONE = "33333333-3333-4333-8333-333333333333";
 const PLAYER_TWO = "44444444-4444-4444-8444-444444444444";
 const MESSAGE_ID = "55555555-5555-4555-8555-555555555555";
 const TIMESTAMP = "2026-09-19T01:00:00.000Z";
+const STAFF_SESSION = {
+  userId: "user_room_admin",
+  sessionId: "session_room_admin",
+  sessionClaims: { metadata: { role: "admin" } },
+};
 const input = {
   matchId: MATCH_ID,
   expectedRoomId: ROOM_ID,
@@ -80,6 +91,7 @@ const boundaries = [
 beforeEach(() => {
   mocks.auth.mockResolvedValue({ userId: "user_room_member", sessionClaims: {} });
   mocks.client.mockResolvedValue({ rpc: mocks.rpc });
+  mocks.currentStaff.mockResolvedValue(false);
   mocks.legal.mockResolvedValue(undefined);
   mocks.rpc.mockResolvedValue({ data: { message, duplicate: false }, error: null });
 });
@@ -111,21 +123,62 @@ describe("Match Room Server Action authorization", () => {
   });
 
   it("checks exact admin authority and uses the separate admin-send RPC", async () => {
-    mocks.auth.mockResolvedValue({
-      userId: "user_room_admin",
-      sessionClaims: { metadata: { role: "admin" } },
-    });
+    mocks.auth.mockResolvedValue(STAFF_SESSION);
+    mocks.currentStaff.mockResolvedValue(true);
     const adminMessage = { ...message, senderKind: "admin", senderRegistrationId: null };
-    mocks.rpc.mockResolvedValue({ data: { message: adminMessage, duplicate: false }, error: null });
+    mocks.staffRpc.mockResolvedValue({ data: { message: adminMessage, duplicate: false }, error: null });
 
     await expect(sendAdminMatchRoomMessage(input))
       .resolves.toEqual({ ok: true, data: { message: adminMessage, duplicate: false } });
     expect(mocks.legal).toHaveBeenCalledOnce();
-    expect(mocks.rpc).toHaveBeenCalledWith("send_admin_match_room_message", {
-      p_match_id: MATCH_ID,
-      p_expected_room_id: ROOM_ID,
-      p_client_message_id: MESSAGE_ID,
-      p_body: input.body,
+    expect(mocks.currentStaff).toHaveBeenCalledWith(STAFF_SESSION.userId, STAFF_SESSION.sessionClaims, STAFF_SESSION.sessionId, true);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.staffRpc).toHaveBeenCalledExactlyOnceWith("call_patch2_match_staff", {
+      p_operation: "send_admin_match_room_message",
+      p_actor_clerk_user_id: STAFF_SESSION.userId,
+      p_arguments: {
+        p_match_id: MATCH_ID, p_expected_room_id: ROOM_ID,
+        p_client_message_id: MESSAGE_ID, p_body: input.body,
+      },
+    });
+  });
+
+  it("keeps own-room participant reads for a demoted staff token and denies staff access elsewhere", async () => {
+    mocks.auth.mockResolvedValue(STAFF_SESSION);
+    const history = { room, messages: [message], hasMore: false, nextAfterSequence: 1 };
+    mocks.rpc.mockResolvedValueOnce({ data: history, error: null });
+    await expect(getMatchRoomHistory({ roomId: ROOM_ID, afterSequence: 0, limit: 50 }))
+      .resolves.toEqual({ ok: true, data: history });
+    expect(mocks.currentStaff).not.toHaveBeenCalled();
+
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
+    await expect(resolveMatchRoom({ matchId: MATCH_ID })).resolves.toEqual({ ok: false, code: "forbidden" });
+    await expect(getMatchRoomHistory({ roomId: ROOM_ID, afterSequence: 0, limit: 50 }))
+      .resolves.toEqual({ ok: false, code: "forbidden" });
+    await expect(getMatchRoomEarlierHistory({ roomId: ROOM_ID, beforeSequence: 2, limit: 50 }))
+      .resolves.toEqual({ ok: false, code: "forbidden" });
+    await expect(markMatchRoomRead({ roomId: ROOM_ID, throughSequence: 1 }))
+      .resolves.toEqual({ ok: false, code: "forbidden" });
+    await expect(sendAdminMatchRoomMessage(input)).resolves.toEqual({ ok: false, code: "forbidden" });
+    expect(mocks.staffRpc).not.toHaveBeenCalled();
+    expect(mocks.legal).not.toHaveBeenCalled();
+  });
+
+  it("routes nonparticipant staff history only after current verification, with no notice bypass", async () => {
+    mocks.auth.mockResolvedValue(STAFF_SESSION);
+    mocks.currentStaff.mockResolvedValue(true);
+    const history = { room: { ...room, viewerRegistrationId: null }, messages: [message], hasMore: false, nextAfterSequence: 1 };
+    const args = { roomId: ROOM_ID, afterSequence: 0, limit: 50 };
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "PROFILE_NOTICE_REQUIRED" } });
+    await expect(getMatchRoomHistory(args)).resolves.toEqual({ ok: false, code: "forbidden" });
+    expect(mocks.currentStaff).not.toHaveBeenCalled();
+
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
+    mocks.staffRpc.mockResolvedValue({ data: history, error: null });
+    await expect(getMatchRoomHistory(args)).resolves.toEqual({ ok: true, data: history });
+    expect(mocks.staffRpc).toHaveBeenCalledExactlyOnceWith("call_patch2_match_staff", {
+      p_operation: "get_match_room_history", p_actor_clerk_user_id: STAFF_SESSION.userId,
+      p_arguments: { p_room_id: ROOM_ID, p_after_sequence: 0, p_limit: 50 },
     });
   });
 

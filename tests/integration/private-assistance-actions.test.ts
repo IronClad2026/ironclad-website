@@ -75,11 +75,20 @@ describe("private assistance authenticated action boundary", () => {
   it("rechecks current admin authority for both shared conversation actions and the admin queue", async () => {
     const claims = { metadata: { role: "admin" } };
     mocks.auth.mockResolvedValue({ userId: "trusted-staff", sessionId: "synthetic-staff-session", sessionClaims: claims });
-    await expect(readPrivateAssistance(history)).resolves.toEqual({ ok: false, code: "forbidden" });
-    await expect(replyPrivateAssistance(reply)).resolves.toEqual({ ok: false, code: "forbidden" });
     await expect(getAdminPrivateAssistanceQueue(queue)).resolves.toEqual({ ok: false, code: "forbidden" });
     expect(mocks.currentAdmin).toHaveBeenCalledWith("trusted-staff", claims, "synthetic-staff-session", true);
     expect(mocks.rpc).not.toHaveBeenCalled();
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
+    await expect(readPrivateAssistance(history)).resolves.toEqual({ ok: false, code: "forbidden" });
+    await expect(replyPrivateAssistance(reply)).resolves.toEqual({ ok: false, code: "forbidden" });
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, "call_patch2_private_assistance", expect.objectContaining({
+      p_operation: "read_private_assistance", p_actor_clerk_user_id: "trusted-staff", p_actor_is_admin: false,
+    }));
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, "call_patch2_private_assistance", expect.objectContaining({
+      p_operation: "reply_private_assistance", p_actor_clerk_user_id: "trusted-staff", p_actor_is_admin: false,
+    }));
+    mocks.rpc.mockClear();
+    mocks.rpc.mockResolvedValue({ data: mutation, error: null });
     mocks.currentAdmin.mockResolvedValue(true);
     await expect(replyPrivateAssistance(reply)).resolves.toEqual({ ok: true, data: mutation });
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("call_patch2_private_assistance", expect.objectContaining({

@@ -32,13 +32,12 @@ import {
   type ResolveMatchRoomResult,
   type SendMatchRoomMessageInput,
 } from "@/lib/match-room";
+import { callVerifiedMatchStaff, getVerifiedMatchStaff, type MatchSession } from "@/lib/match-staff-server";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 export async function resolveMatchRoom(
   input: ResolveMatchRoomInput
 ): Promise<MatchRoomActionResult<ResolveMatchRoomResult>> {
-  const denied = await authorizeRoomAction();
-  if (denied) return denied;
   if (!isResolveMatchRoomInput(input)) return failure("invalid_request");
 
   return callRoomRpc(
@@ -48,12 +47,9 @@ export async function resolveMatchRoom(
   );
 }
 
-/** The same authenticated boundary permits authorized admin history access. */
 export async function getMatchRoomHistory(
   input: MatchRoomHistoryInput
 ): Promise<MatchRoomActionResult<MatchRoomHistory>> {
-  const denied = await authorizeRoomAction();
-  if (denied) return denied;
   if (!isMatchRoomHistoryInput(input)) return failure("invalid_request");
 
   return callRoomRpc(
@@ -71,8 +67,6 @@ export async function getMatchRoomHistory(
 export async function getMatchRoomEarlierHistory(
   input: MatchRoomEarlierHistoryInput
 ): Promise<MatchRoomActionResult<MatchRoomEarlierHistory>> {
-  const denied = await authorizeRoomAction();
-  if (denied) return denied;
   if (!isMatchRoomEarlierHistoryInput(input)) return failure("invalid_request");
   return callRoomRpc(
     "get_match_room_earlier_history",
@@ -100,8 +94,6 @@ export async function sendAdminMatchRoomMessage(
 export async function markMatchRoomRead(
   input: MarkMatchRoomReadInput
 ): Promise<MatchRoomActionResult<MatchRoomReadResult>> {
-  const denied = await authorizeRoomAction();
-  if (denied) return denied;
   if (!isMarkMatchRoomReadInput(input)) return failure("invalid_request");
 
   const result = await callRoomRpc(
@@ -117,9 +109,11 @@ async function sendRoomMessage(
   input: SendMatchRoomMessageInput,
   admin: boolean
 ): Promise<MatchRoomActionResult<MatchRoomSendResult>> {
-  const denied = await authorizeRoomAction(admin);
-  if (denied) return denied;
   if (!isSendMatchRoomMessageInput(input)) return failure("invalid_request");
+  const session = await readRoomSession();
+  if (!session) return failure("auth_required");
+  const staff = admin ? await getVerifiedMatchStaff(session, true) : null;
+  if (admin && !staff) return failure("forbidden");
 
   try {
     await requireCurrentAccountLegalAcceptance();
@@ -131,43 +125,63 @@ async function sendRoomMessage(
     return failure("unavailable");
   }
 
-  const result = await callRoomRpc(
-    admin ? "send_admin_match_room_message" : "send_match_room_message",
-    {
-      p_match_id: input.matchId,
-      p_expected_room_id: input.expectedRoomId,
-      p_client_message_id: input.clientMessageId,
-      p_body: input.body,
-    },
-    (value) => parseMatchRoomSendResult(value, input, admin ? "admin" : "player")
+  const args = {
+    p_match_id: input.matchId,
+    p_expected_room_id: input.expectedRoomId,
+    p_client_message_id: input.clientMessageId,
+    p_body: input.body,
+  };
+  const result = await parseRoomRpc(
+    () => staff ? callVerifiedMatchStaff(staff, "send_admin_match_room_message", args)
+      : callParticipantRoomRpc("send_match_room_message", args),
+    (value) => parseMatchRoomSendResult(value, input, admin ? "admin" : "player"),
   );
   // The room owns its refresh; preserve result/replay drafts in the workspace.
   return result;
 }
 
-async function authorizeRoomAction(
-  admin = false
-): Promise<MatchRoomActionFailure | null> {
+async function readRoomSession(): Promise<MatchSession | null> {
   try {
-    const { userId, sessionClaims } = await auth();
-    if (!userId) return failure("auth_required");
-    const claims = sessionClaims as { metadata?: { role?: unknown } } | null;
-    if (admin && claims?.metadata?.role !== "admin") return failure("forbidden");
-    return null;
+    const { userId, sessionId, sessionClaims } = await auth();
+    return userId ? { userId, sessionId, sessionClaims } : null;
   } catch {
-    return failure("auth_required");
+    return null;
   }
 }
 
-/** No service-role client, browser-supplied identity, raw rows or error text. */
+type RoomRpc = "resolve_match_room" | "get_match_room_history" |
+  "get_match_room_earlier_history" | "mark_match_room_read";
+type RoomRpcArgs = Record<string, string | number>;
+
 async function callRoomRpc<T>(
-  name: string,
-  args: Record<string, string | number>,
+  name: RoomRpc,
+  args: RoomRpcArgs,
   parse: (value: unknown) => T | null
 ): Promise<MatchRoomActionResult<T>> {
+  const session = await readRoomSession();
+  if (!session) return failure("auth_required");
+
+  return parseRoomRpc(async () => {
+    const result = await callParticipantRoomRpc(name, args);
+    if (result.error?.code !== "42501" || result.error.message === "PROFILE_NOTICE_REQUIRED") {
+      return result;
+    }
+    const staff = await getVerifiedMatchStaff(session, true);
+    return staff ? callVerifiedMatchStaff(staff, name, args) : result;
+  }, parse);
+}
+
+async function callParticipantRoomRpc(name: RoomRpc | "send_match_room_message", args: RoomRpcArgs) {
+  const supabase = await createAuthenticatedSupabaseClient();
+  return supabase.rpc(name, args);
+}
+
+async function parseRoomRpc<T>(
+  call: () => Promise<{ data: unknown; error: unknown }>,
+  parse: (value: unknown) => T | null,
+): Promise<MatchRoomActionResult<T>> {
   try {
-    const supabase = await createAuthenticatedSupabaseClient();
-    const { data, error } = await supabase.rpc(name, args);
+    const { data, error } = await call();
     if (error) return roomRpcFailure(error);
     const parsed = parse(data);
     return parsed === null ? failure("unavailable") : { ok: true, data: parsed };

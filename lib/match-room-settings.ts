@@ -1,6 +1,7 @@
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
+import { getVerifiedMatchStaff } from "@/lib/match-staff-server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type MatchRoomSettingResult =
@@ -9,9 +10,7 @@ export type MatchRoomSettingResult =
 
 async function adminIdentity(): Promise<string | null> {
   try {
-    const { userId, sessionClaims } = await auth();
-    return userId && (sessionClaims as { metadata?: { role?: unknown } } | null)?.metadata?.role === "admin"
-      ? userId : null;
+    return await getVerifiedMatchStaff(await auth(), false);
   } catch {
     return null;
   }
