@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHmac } from "node:crypto";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type ReadyIdentity = { userId: string; sessionId: string };
 
@@ -25,39 +26,19 @@ export function createReadyRateGuard(now = Date.now) {
 }
 
 export const allowReadyRequest = createReadyRateGuard();
-const dailyNeuronLimit = 2_000;
-const dailyAccountRequests = 100;
-const dailyUserRequests = 16;
-const dailySessionRequests = 10;
-const reservationExpiry = 172_800;
+type BudgetConfig = { key: string; day: string; cap: number };
 
-// Reject before creating any counters. Redis executes these reads and reservations atomically.
-const reserveScript = `
-for i = 1, 4 do
-  if tonumber(redis.call('GET', KEYS[i]) or '0') + tonumber(ARGV[i]) > tonumber(ARGV[i + 4]) then
-    return 0
-  end
-end
-for i = 1, 4 do
-  redis.call('INCRBY', KEYS[i], ARGV[i])
-  redis.call('EXPIRE', KEYS[i], ARGV[9])
-end
-return 1
-`;
-
-type BudgetConfig = { url: string; token: string; key: string };
-
-export function getReadyBudgetConfig(): BudgetConfig | null {
-  const { READY_REDIS_REST_URL, READY_REDIS_REST_TOKEN, READY_USAGE_HMAC_KEY } = process.env;
-  if (!READY_REDIS_REST_URL || !READY_REDIS_REST_TOKEN || !READY_USAGE_HMAC_KEY || READY_USAGE_HMAC_KEY.length < 32) return null;
-  try {
-    const url = new URL(READY_REDIS_REST_URL);
-    if (url.protocol !== "https:" || !url.hostname.endsWith(".upstash.io") ||
-      url.port || url.username || url.password || url.pathname !== "/" || url.search || url.hash) return null;
-    return { url: url.origin, token: READY_REDIS_REST_TOKEN, key: READY_USAGE_HMAC_KEY };
-  } catch {
-    return null;
-  }
+export function getReadyBudgetConfig(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+  now = new Date(),
+): BudgetConfig | null {
+  const { READY_USAGE_HMAC_KEY, READY_CF_TRIAL_UTC_DAY, READY_CF_TRIAL_NEURONS } = environment;
+  if (environment.VERCEL_ENV !== "preview" || environment.VERCEL_GIT_COMMIT_REF !== "staging" ||
+    environment.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") !== "https://zzbnneprhjicmajpjkdg.supabase.co") return null;
+  if (!READY_USAGE_HMAC_KEY || READY_USAGE_HMAC_KEY.length < 32 || !READY_CF_TRIAL_UTC_DAY ||
+    READY_CF_TRIAL_UTC_DAY !== now.toISOString().slice(0, 10) || !/^\d+$/.test(READY_CF_TRIAL_NEURONS ?? "")) return null;
+  const cap = Number(READY_CF_TRIAL_NEURONS);
+  return cap >= 1 && cap <= 2_000 ? { key: READY_USAGE_HMAC_KEY, day: READY_CF_TRIAL_UTC_DAY, cap } : null;
 }
 
 export async function reserveReadyInference(
@@ -67,25 +48,17 @@ export async function reserveReadyInference(
   neurons: number,
   signal: AbortSignal,
 ): Promise<"reserved" | "quota" | "unavailable"> {
-  const utcDay = new Date().toISOString().slice(0, 10);
   const digest = (id: string) => createHmac("sha256", config.key).update(id).digest("hex");
-  const prefix = `ironclad:ready:staging:${account}:${utcDay}`;
-  const keys = [`${prefix}:neurons`, `${prefix}:requests`,
-    `${prefix}:user:${digest(identity.userId)}`, `${prefix}:session:${digest(identity.sessionId)}`];
   try {
-    const response = await fetch(config.url, {
-      method: "POST",
-      headers: { authorization: `Bearer ${config.token}`, "content-type": "application/json" },
-      body: JSON.stringify(["EVAL", reserveScript, keys.length, ...keys, neurons, 1, 1, 1,
-        dailyNeuronLimit, dailyAccountRequests, dailyUserRequests, dailySessionRequests, reservationExpiry]),
-      signal: AbortSignal.any([signal, AbortSignal.timeout(900)]),
-      cache: "no-store",
-      redirect: "error",
-    });
-    if (!response.ok) return "unavailable";
-    const { result } = await response.json() as { result?: unknown };
-    if (result === 1) return "reserved";
-    return result === 0 ? "quota" : "unavailable";
+    const { data, error } = await createSupabaseAdminClient().rpc("reserve_ready_ai_usage", {
+      p_account: account,
+      p_user_hash: digest(`user:${identity.userId}`),
+      p_session_hash: digest(`session:${identity.sessionId}`),
+      p_day: config.day,
+      p_neurons: neurons,
+      p_neuron_cap: config.cap,
+    }).abortSignal(AbortSignal.any([signal, AbortSignal.timeout(1_200)]));
+    return !error && (data === "reserved" || data === "quota") ? data : "unavailable";
   } catch {
     return "unavailable";
   }

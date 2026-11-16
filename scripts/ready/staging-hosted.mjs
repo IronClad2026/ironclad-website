@@ -1,12 +1,14 @@
 // Read-only acceptance of an exact Staging deployment. Run in 'vercel env run'
 // for this project, which supplies the short-lived trusted-sources token in memory.
-// Optional Chromium contexts prevent app writes other than the Ready answer request.
+// Optional Chromium contexts allow Ready queries and scoped native fixture room reads.
 import { execFile } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { createClerkClient } from "@clerk/backend";
 import { createClient } from "@supabase/supabase-js";
+import { browserActiveMatch, isActiveFixtureRead, readActiveFixtures, verifyActiveApi } from "./active-acceptance.mjs";
+import { evaluateReadyAiQuality, readReadyAiEvidence, readyAiCandidateModels } from "./ai-evaluation.mjs";
 import {
   assertClerkDevelopmentInstance,
   loadFixtureEnvironment,
@@ -47,7 +49,7 @@ function args(tokens) {
     const key = tokens[i];
     if (["--headed", "--browser-only", "--navigation-only"].includes(key) && !options[key]) {
       options[key] = true;
-    } else if (["--url", "--deployment", "--commit", "--vercel-cli"].includes(key) && !options[key] && tokens[i + 1] && !tokens[i + 1].startsWith("--")) {
+    } else if (["--url", "--deployment", "--commit", "--vercel-cli", "--active-fixture-manifest", "--ai-quality-model"].includes(key) && !options[key] && tokens[i + 1] && !tokens[i + 1].startsWith("--")) {
       options[key] = tokens[++i];
     } else {
       throw new Error("ARGUMENTS");
@@ -56,6 +58,11 @@ function args(tokens) {
   verify(typeof options["--url"] === "string" && /^https:\/\/ironclad-website-[a-z0-9]+-ironclad-tournaments\.vercel\.app\/?$/.test(options["--url"]), "immutable website Preview URL");
   verify(/^dpl_[A-Za-z0-9]+$/.test(options["--deployment"] ?? "") &&
     /^[a-f0-9]{40}$/.test(options["--commit"] ?? "") && /[\\/]vc\.js$/.test(options["--vercel-cli"] ?? ""), "exact deployment metadata arguments");
+  if (options["--ai-quality-model"]) {
+    verify(readyAiCandidateModels.includes(options["--ai-quality-model"]) &&
+      !["--active-fixture-manifest", "--headed", "--browser-only", "--navigation-only"].some((mode) => options[mode]),
+    "one approved candidate and dedicated AI evaluation mode");
+  }
   return options;
 }
 
@@ -114,10 +121,11 @@ async function loadActor(admin, environment, alias) {
   };
 }
 
-async function query(origin, oidc, actor, label, payload) {
+async function query(origin, oidc, actor, label, payload, evaluationModel) {
   step = label;
   const headers = { [protectedHeader]: oidc, origin, "content-type": "application/json" };
   if (actor) headers.authorization = `Bearer ${await actor()}`;
+  if (evaluationModel) headers["x-ready-evaluation-model"] = evaluationModel;
   step = label;
   const started = performance.now();
   const response = await fetch(new URL("/api/ready", origin), {
@@ -127,15 +135,16 @@ async function query(origin, oidc, actor, label, payload) {
   const bodyIsJson = response.headers.get("content-type")?.startsWith("application/json");
   const body = bodyIsJson ? await response.json() : null;
   const serverTime = response.headers.get("server-timing")?.match(/(?:^|,\s*)ready;dur=(\d+(?:\.\d+)?)/)?.[1];
+  const wallMs = Math.round(performance.now() - started);
+  const serverMs = serverTime === undefined ? null : Number(serverTime);
   report.timings.push({
-    case: label, status: response.status, wallMs: Math.round(performance.now() - started),
-    serverMs: serverTime === undefined ? null : Number(serverTime),
+    case: label, status: response.status, wallMs, serverMs,
     ...(response.status === 403 ? { rejection: /account requirements/.test(body?.text ?? "") ? "account-legal-gate"
       : /authorised Staging review/.test(body?.text ?? "") ? "review-account-gate"
       : /Open Ready from IronClad/.test(body?.text ?? "") ? "request-origin" : "other" } : {}),
   });
   verify(bodyIsJson && response.headers.get("cache-control")?.includes("no-store"), `${label} JSON with private cache control`);
-  return [response.status, body];
+  return [response.status, body, { wallMs, serverMs, evidence: readReadyAiEvidence(response.headers) }];
 }
 
 async function answer(origin, oidc, actor, label, payload) {
@@ -212,7 +221,7 @@ async function browserMatchNavigation(page, expect, origin) {
   report.browser.push("clicked through to the existing in-site Admin Assistance page");
 }
 
-async function browserJourney(origin, oidc, actor, navigationOnly = false) {
+async function browserJourney(origin, oidc, actor, navigationOnly = false, active = null) {
   const rendered = await readPage(origin, oidc, actor, "/", "authenticated Staging homepage resolves");
   verify(rendered.includes("data-ready-dock"), "authenticated home server-render includes Ready dock");
   step = "launch visible Chrome";
@@ -221,7 +230,7 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false) {
   const output = resolve("test-results", "ready-staging");
   await mkdir(output, { recursive: true });
   try {
-    for (const mobile of navigationOnly ? [false] : [false, true]) {
+    for (const mobile of active ? [active.mobile] : navigationOnly ? [false] : [false, true]) {
       const journey = mobile ? "touch-emulated Ready journey" : "desktop Ready journey";
       step = journey;
       const context = await browser.newContext({
@@ -243,10 +252,19 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false) {
         }
         const readyQuery = url.pathname === "/api/ready" && request.method() === "POST";
         const readyAsset = url.pathname.startsWith("/mascot-v6/");
-        if (!["GET", "HEAD"].includes(request.method()) && !readyQuery) return route.abort();
+        const fixtureRead = active && isActiveFixtureRead(request, active.fixture, origin);
+        if (active && request.method() === "POST" && url.pathname === "/tournaments") {
+          let keys = [];
+          try { keys = Object.keys(request.postDataJSON()?.[0] ?? {}).sort(); } catch { /* no diagnostic body */ }
+          (report.fixtureRoomReads ??= []).push({
+            scoped: url.searchParams.get("match") === active.fixture.matchId,
+            keys, nextAction: !!request.headers()["next-action"], allowed: !!fixtureRead,
+          });
+        }
+        if (!["GET", "HEAD"].includes(request.method()) && !readyQuery && !fixtureRead) return route.abort();
         try {
           const headers = { ...request.headers(), [protectedHeader]: oidc };
-          if (request.isNavigationRequest() || readyQuery || readyAsset || request.headers()["rsc"]) {
+          if (request.isNavigationRequest() || readyQuery || readyAsset || fixtureRead || request.headers()["rsc"]) {
             headers.authorization = `Bearer ${await actor()}`;
           }
           // A cross-origin redirect receives no credentials from this request.
@@ -279,6 +297,18 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false) {
           { timeout: 15_000 }).not.toBe("loading");
         (report.browserNavigation.at(-1)).assetStatus = await page.locator("[data-mode='floating']").getAttribute("data-asset-status");
         await expect(page.locator("[data-mode='floating'][data-asset-status='ready']")).toHaveCount(1, { timeout: 15_000 });
+        if (active) {
+          step = `${journey} opens the active synthetic match`;
+          try {
+            await browserActiveMatch({ page, expect, origin, fixture: active.fixture, mobile, verify });
+          } catch (error) {
+            await page.screenshot({ path: resolve(output, mobile ? "ready-active-touch-debug.png" : "ready-active-desktop-debug.png") });
+            throw error;
+          }
+          await page.screenshot({ path: resolve(output, mobile ? "ready-active-touch.png" : "ready-active-desktop.png") });
+          report.browser.push(mobile ? "visible Chrome touch emulation active Match Room" : "visible Chrome desktop active Match Room");
+          continue;
+        }
         if (navigationOnly) {
           await browserMatchNavigation(page, expect, origin);
           continue;
@@ -363,7 +393,31 @@ try {
   clerk = createClerkClient({ secretKey: base.clerkSecretKey });
   const admin = createClient(stagingBackend, base.serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const a2 = await loadActor(admin, environment, "TestAcademy2");
-  if (options["--browser-only"] || options["--navigation-only"]) {
+  if (options["--active-fixture-manifest"]) {
+    const fixtures = await readActiveFixtures(options["--active-fixture-manifest"], verify);
+    const a1 = await loadActor(admin, environment, "TestAcademy1");
+    const a3 = await loadActor(admin, environment, "TestAcademy3");
+    const postflight = await verifyActiveApi({
+      fixtures, admin, environment, actors: [a1, a2, a3], origin, verify,
+      answer: (actor, label, payload) => answer(origin, oidc, actor, label, payload),
+      query: (actor, label, payload) => query(origin, oidc, actor, label, payload),
+    });
+    if (options["--headed"]) {
+      await browserJourney(origin, oidc, a1, false, { fixture: fixtures.a, mobile: false });
+      await browserJourney(origin, oidc, a2, false, { fixture: fixtures.a, mobile: true });
+    }
+    await postflight();
+  } else if (options["--ai-quality-model"]) {
+    const a1 = await loadActor(admin, environment, "TestAcademy1");
+    report.aiEvaluation = await evaluateReadyAiQuality({
+      expectedModel: options["--ai-quality-model"],
+      ask: async (actor, label, payload) => {
+        const [status, reply, observed] = await query(origin, oidc, actor === "a1" ? a1 : a2, label, payload, options["--ai-quality-model"]);
+        return { status, reply, ...observed };
+      },
+    });
+    verify(report.aiEvaluation.passed, "approved source, provider use and safety rubric");
+  } else if (options["--browser-only"] || options["--navigation-only"]) {
     await browserJourney(origin, oidc, a2, options["--navigation-only"]);
   } else {
   const a1 = await loadActor(admin, environment, "TestAcademy1");

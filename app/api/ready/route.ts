@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { loadAccountLegalGateState } from "@/lib/account-legal-acceptance";
 import { resolveReadyAnswer } from "@/lib/ready/answer";
 import { readReadyRequest, READY_BODY_LIMIT } from "@/lib/ready/contracts";
-import type { ReadyReply } from "@/lib/ready/contracts";
+import type { ReadyResolvedReply } from "@/lib/ready/answer";
 import { readyReviewAliases } from "@/lib/ready/review-access";
 import { loadReadySession } from "@/lib/ready/session";
 import { allowReadyRequest } from "@/lib/ready/usage";
@@ -56,14 +56,22 @@ async function withDeadline<T>(task: () => Promise<T>, signal: AbortSignal): Pro
 
 export async function POST(request: Request) {
   const started = performance.now();
-  const send = (body: ReadyReply, status = 200) => NextResponse.json(body, {
-    status,
-    headers: {
+  const send = ({ ai, ...body }: ReadyResolvedReply, status = 200) => {
+    const timing = [`ready;dur=${Math.round(performance.now() - started)}`];
+    if (ai?.durationMs !== undefined) timing.push(`ready-ai;dur=${ai.durationMs}`);
+    const headers = {
       "Cache-Control": "private, no-store",
-      "Server-Timing": `ready;dur=${Math.round(performance.now() - started)}`,
+      "Server-Timing": timing.join(", "),
+      "X-Ready-AI-Status": ai?.status ?? "not-attempted",
+      "X-Ready-AI-Attempted": ai?.attempted ? "1" : "0",
+      ...(ai?.model ? { "X-Ready-AI-Model": ai.model } : {}),
+      ...(ai?.inputTokens !== undefined ? { "X-Ready-AI-Input-Tokens": String(ai.inputTokens) } : {}),
+      ...(ai?.outputTokens !== undefined ? { "X-Ready-AI-Output-Tokens": String(ai.outputTokens) } : {}),
+      ...(ai?.reservedNeurons !== undefined ? { "X-Ready-AI-Reserved-Neurons": String(ai.reservedNeurons) } : {}),
       ...(status === 429 ? { "Retry-After": "60" } : {}),
-    },
-  });
+    };
+    return NextResponse.json(body, { status, headers });
+  };
   if (readyReviewAliases(process.env).length === 0) return send({ text: "Ready is unavailable.", actions: [publicRules] }, 404);
   if (request.headers.get("origin") !== new URL(request.url).origin) return send({ text: "Open Ready from IronClad and try again." }, 403);
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]);
@@ -78,7 +86,7 @@ export async function POST(request: Request) {
       const legal = await loadAccountLegalGateState();
       signal.throwIfAborted();
       if (legal.status !== "satisfied") return send({ text: "Complete your account requirements before using Ready.", actions: [publicRules] }, 403);
-      return send(await resolveReadyAnswer(input, viewer, signal));
+      return send(await resolveReadyAnswer(input, viewer, signal, request.headers.get("x-ready-evaluation-model")));
     }, signal);
   } catch {
     return send({

@@ -1,6 +1,7 @@
 import type { RegistrationDocumentKind } from "@/lib/legal-document-types";
 import type { ReadyAction, ReadyContext, ReadyReply, ReadyRequest, ReadySource } from "./contracts";
 import type { ReadyRuleScope } from "./platform";
+import type { ReadyModelCard } from "./provider";
 import {
   publishedReadyVersions,
   readyDocument,
@@ -166,6 +167,16 @@ const questions: [ReadyKnowledgeTopic, RegExp][] = [
 
 export function isReadyKnowledgeTopic(value: unknown): value is ReadyKnowledgeTopic {
   return typeof value === "string" && readyKnowledgeTopics.some((topic) => topic === value);
+}
+
+/** The provider receives only vetted passage text. Event names and URLs remain local. */
+export function readyModelCard(topic: ReadyKnowledgeTopic, scope: ReadyRuleScope): ReadyModelCard | null {
+  if (scope.kind === "unconfirmed" || topic === "rules" || topic === "discord") return null;
+  const passage: Passage = passages[topic];
+  const versions = scope.kind === "known" ? scope.versions : publishedReadyVersions;
+  if (!readyDocument(passage.kind, versions[passage.kind])) return null;
+  const summary = versions.rulebook === "3.2" ? passage.text : passage.earlierText ?? passage.text;
+  return { id: topic, summary, detail: passage.details };
 }
 
 export function getKnowledgeTopic(question: string, previousTopic?: string): ReadyKnowledgeTopic | null {
