@@ -45,8 +45,8 @@ function args(tokens) {
   const options = {};
   for (let i = 0; i < tokens.length; i++) {
     const key = tokens[i];
-    if (key === "--headed" && !options.headed) {
-      options.headed = true;
+    if (["--headed", "--browser-only", "--navigation-only"].includes(key) && !options[key]) {
+      options[key] = true;
     } else if (["--url", "--deployment", "--commit", "--vercel-cli"].includes(key) && !options[key] && tokens[i + 1] && !tokens[i + 1].startsWith("--")) {
       options[key] = tokens[++i];
     } else {
@@ -166,20 +166,73 @@ function matchDestination(reply, fixture, needsRoom = false) {
   });
 }
 
-async function browserJourney(origin, oidc, actor) {
+async function browserMatchNavigation(page, expect, origin) {
+  const dock = page.locator("[data-ready-dock]:visible");
+  const input = page.getByRole("textbox", { name: "Ask about IronClad" });
+  const surface = page.locator("[data-mode][data-asset-status]");
+  const dialog = page.getByRole("dialog");
+  async function returnHome() {
+    await page.goto(origin, { waitUntil: "domcontentloaded" });
+    await expect(surface).toHaveCount(1, { timeout: 15_000 });
+    if (await surface.getAttribute("data-mode") === "dock") await dock.click();
+    await expect(input).toBeVisible();
+  }
+  async function ask(question, text, action) {
+    await input.fill(question);
+    await page.getByRole("button", { name: "Send question" }).click();
+    await expect(page.locator("[data-mascot-message]")).toContainText(text, { timeout: 15_000 });
+    const skip = page.getByRole("button", { name: "Show full message" });
+    if (await skip.isVisible()) await skip.click();
+    const link = page.getByRole("link", { name: action, exact: true });
+    await expect(link).toBeVisible();
+    return { link, href: await link.getAttribute("href") };
+  }
+  async function clickMatch(answer, room) {
+    verify(matchDestination({ actions: [answer] }, fixtureA, room), "Ready browser link matches the selected owned fixture");
+    const target = new URL(answer.href, origin);
+    await answer.link.click();
+    await expect(page).toHaveURL(target.href, { timeout: 15_000 });
+    await expect(dialog.getByText("Tournament Match History", { exact: true })).toBeVisible({ timeout: 15_000 });
+    report.browser.push(room ? "clicked the owned earlier Match Room and reached the historical workspace"
+      : "clicked the owned match and reached its historical workspace");
+  }
+  step = "desktop click through to owned match";
+  await clickMatch(await ask(`Show my previous match for ${fixtureA.eventSlug}`, "Match status is", "Open my match"), false);
+  await returnHome();
+  step = "desktop click through to owned Match Room";
+  await clickMatch(await ask(`Open the chat with my opponent for ${fixtureA.eventSlug}`, "read-only", "Open earlier Match Room"), true);
+  await returnHome();
+  step = "desktop click through to existing private Admin Assistance";
+  const support = await ask(`I need an admin for ${fixtureA.eventSlug}`, "Discord support channel", "Open your Admin Assistance conversation");
+  verify(/^\/assistance\/[a-f0-9-]{36}\?tournament=[a-f0-9-]{36}$/i.test(support.href ?? ""), "Ready browser assistance link is an existing in-site conversation");
+  const target = new URL(support.href, origin);
+  await support.link.click();
+  await expect(page).toHaveURL(target.href, { timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Private assistance conversation" })).toBeVisible({ timeout: 15_000 });
+  report.browser.push("clicked through to the existing in-site Admin Assistance page");
+}
+
+async function browserJourney(origin, oidc, actor, navigationOnly = false) {
+  const rendered = await readPage(origin, oidc, actor, "/", "authenticated Staging homepage resolves");
+  verify(rendered.includes("data-ready-dock"), "authenticated home server-render includes Ready dock");
   step = "launch visible Chrome";
   const { chromium, expect } = await import("@playwright/test");
   const browser = await chromium.launch({ channel: "chrome", headless: false });
   const output = resolve("test-results", "ready-staging");
   await mkdir(output, { recursive: true });
   try {
-    for (const mobile of [false, true]) {
+    for (const mobile of navigationOnly ? [false] : [false, true]) {
       const journey = mobile ? "touch-emulated Ready journey" : "desktop Ready journey";
       step = journey;
       const context = await browser.newContext({
         viewport: mobile ? { width: 390, height: 780 } : { width: 1280, height: 800 },
         hasTouch: mobile, isMobile: mobile, deviceScaleFactor: 1,
       });
+      const jwt = await actor();
+      await context.addCookies([
+        { name: "__session", value: jwt, url: origin, secure: true, sameSite: "Lax" },
+        { name: "__client_uat", value: String(claims(jwt).iat), url: origin, secure: true, sameSite: "Lax" },
+      ]);
       let pauseAnswer = false;
       let releaseAnswer;
       await context.route("**/*", async (route) => {
@@ -189,14 +242,18 @@ async function browserJourney(origin, oidc, actor) {
           return ["GET", "HEAD"].includes(request.method()) ? route.continue() : route.abort();
         }
         const readyQuery = url.pathname === "/api/ready" && request.method() === "POST";
+        const readyAsset = url.pathname.startsWith("/mascot-v6/");
         if (!["GET", "HEAD"].includes(request.method()) && !readyQuery) return route.abort();
         try {
           const headers = { ...request.headers(), [protectedHeader]: oidc };
-          if (request.isNavigationRequest() || readyQuery || request.headers()["rsc"]) {
+          if (request.isNavigationRequest() || readyQuery || readyAsset || request.headers()["rsc"]) {
             headers.authorization = `Bearer ${await actor()}`;
           }
           // A cross-origin redirect receives no credentials from this request.
           const response = await route.fetch({ headers, maxRedirects: 0 });
+          if (readyAsset) (report.browserAssets ??= []).push({
+            file: url.pathname.slice("/mascot-v6/".length), status: response.status(),
+          });
           if (readyQuery && pauseAnswer) await new Promise((done) => { releaseAnswer = done; });
           await route.fulfill({ response });
         } catch {
@@ -205,13 +262,27 @@ async function browserJourney(origin, oidc, actor) {
       });
       try {
         const page = await context.newPage();
-        await page.goto(origin, { waitUntil: "domcontentloaded" });
+        const home = await page.goto(origin, { waitUntil: "domcontentloaded" });
         step = `${journey} mount`;
         const dock = page.locator("[data-ready-dock]:visible");
+        (report.browserNavigation ??= []).push({
+          journey, status: home?.status() ?? null, isHome: new URL(page.url()).pathname === "/",
+          readyDockCount: await page.locator("[data-ready-dock]").count(),
+        });
         await expect(dock).toBeVisible({ timeout: 15_000 });
+        step = `${journey} hydrates`;
+        await expect(page.locator("[data-mode='dock']")).toHaveCount(1, { timeout: 15_000 });
         if (mobile) await dock.tap();
         else await dock.click();
+        step = `${journey} loads the WebGL model`;
+        await expect.poll(async () => page.locator("[data-mode='floating']").getAttribute("data-asset-status"),
+          { timeout: 15_000 }).not.toBe("loading");
+        (report.browserNavigation.at(-1)).assetStatus = await page.locator("[data-mode='floating']").getAttribute("data-asset-status");
         await expect(page.locator("[data-mode='floating'][data-asset-status='ready']")).toHaveCount(1, { timeout: 15_000 });
+        if (navigationOnly) {
+          await browserMatchNavigation(page, expect, origin);
+          continue;
+        }
         const input = page.getByRole("textbox", { name: "Ask about IronClad" });
         await input.fill("How does a genuine disconnect work?");
         if (mobile) await page.setViewportSize({ width: 390, height: 580 });
@@ -291,8 +362,11 @@ try {
   await assertClerkDevelopmentInstance(base);
   clerk = createClerkClient({ secretKey: base.clerkSecretKey });
   const admin = createClient(stagingBackend, base.serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const a1 = await loadActor(admin, environment, "TestAcademy1");
   const a2 = await loadActor(admin, environment, "TestAcademy2");
+  if (options["--browser-only"] || options["--navigation-only"]) {
+    await browserJourney(origin, oidc, a2, options["--navigation-only"]);
+  } else {
+  const a1 = await loadActor(admin, environment, "TestAcademy1");
   const a3 = await loadActor(admin, environment, "TestAcademy3");
 
   const [denied, denial] = await query(origin, oidc, a3, "out-of-review account", { question: "Open my match" });
@@ -335,7 +409,8 @@ try {
     !foreign.actions?.some(({ href }) => href?.includes(fixtureB.matchId)), "foreign match context returns no private result or action");
   const unrelated = await answer(origin, oidc, a1, "unrelated prompt", { question: "What is the weather in Sydney?" });
   verify(/outside my orders/.test(unrelated.text) && !unrelated.sources?.length, "unrelated query stays outside Ready scope");
-  if (options.headed) await browserJourney(origin, oidc, a2);
+  if (options["--headed"]) await browserJourney(origin, oidc, a2);
+  }
 } catch {
   failed = true;
   report.blockedAt = step;
