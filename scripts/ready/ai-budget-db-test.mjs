@@ -165,7 +165,8 @@ try {
   await verify("The same reviewer and session is limited across independent database connections", async () => {
     const account = "3".repeat(32);
     expectReservations(await Promise.all(services.map((client) => reserve(client, { ...base, account }))), 4);
-    assert.deepEqual((await counters(account)).map(({ consumed }) => consumed), new Array(7).fill(4));
+    assert.deepEqual((await counters(account)).filter(({ counter }) => counter !== "neuron-ceiling")
+      .map(({ consumed }) => consumed), new Array(7).fill(4));
     assert.equal(await reserve(service, { ...base, account, session: "next-login" }), "reserved");
     const before = await counters(account);
     assert.equal(await reserve(service, { ...base, account, session: "third-login" }), "quota");
@@ -180,6 +181,18 @@ try {
     expectReservations(await Promise.all(services.map((client, index) => reserve(client, {
       ...base, account: "5".repeat(32), actor: `reviewer-${index}`, session: `login-${index}`,
     }))), 10);
+  });
+
+  await verify("An older deployment cannot raise a reduced ceiling in the same UTC day", async () => {
+    const account = "8".repeat(32);
+    assert.equal(await reserve(services[0], { ...base, account, cap: 100, neurons: 20 }), "reserved");
+    assert.equal(await reserve(services[1], { ...base, account, cap: 40, neurons: 10 }), "reserved");
+    const before = await counters(account);
+    assert.equal(before.find(({ counter }) => counter === "neuron-ceiling").consumed, 40);
+    assert.equal(await reserve(services[2], { ...base, account, cap: 100, neurons: 11 }), "quota");
+    assert.deepEqual(await counters(account), before);
+    assert.equal(await reserve(services[3], { ...base, account, cap: 100, neurons: 10 }), "reserved");
+    assert.equal((await counters(account)).find(({ counter }) => counter === "neurons").consumed, 40);
   });
 
   await verify("Prior UTC-day counters stay separate and spoofed UTC dates, budgets and identity values fail closed", async () => {
