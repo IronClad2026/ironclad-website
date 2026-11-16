@@ -130,6 +130,9 @@ async function query(origin, oidc, actor, label, payload) {
   report.timings.push({
     case: label, status: response.status, wallMs: Math.round(performance.now() - started),
     serverMs: serverTime === undefined ? null : Number(serverTime),
+    ...(response.status === 403 ? { rejection: /account requirements/.test(body?.text ?? "") ? "account-legal-gate"
+      : /authorised Staging review/.test(body?.text ?? "") ? "review-account-gate"
+      : /Open Ready from IronClad/.test(body?.text ?? "") ? "request-origin" : "other" } : {}),
   });
   verify(bodyIsJson && response.headers.get("cache-control")?.includes("no-store"), `${label} JSON with private cache control`);
   return [response.status, body];
@@ -142,6 +145,7 @@ async function answer(origin, oidc, actor, label, payload) {
 }
 
 async function readPage(origin, oidc, actor, href, label) {
+  verify(typeof href === "string", `${label} has a destination`);
   const url = new URL(href, origin);
   verify(url.origin === origin, "page inspection remains on Staging");
   const headers = { [protectedHeader]: oidc };
@@ -222,6 +226,7 @@ async function browserJourney(origin, oidc, actor) {
         if (mobile) await page.setViewportSize({ width: 390, height: 780 });
         await page.screenshot({ path: resolve(output, mobile ? "ready-narrow.png" : "ready-desktop.png") });
         const target = new URL(await source.getAttribute("href"), origin);
+        verify(target.origin === origin, "browser report source is within the guarded Staging origin");
         const document = await context.request.get(target.href, {
           headers: { [protectedHeader]: oidc, authorization: `Bearer ${await actor()}` }, maxRedirects: 0,
         });
@@ -297,7 +302,7 @@ try {
   const rules = await answer(origin, oidc, a1, "grounded disconnect", { question: "How does a genuine disconnect work?" });
   verify(/10:00/.test(rules.text) && rules.sources?.some(({ url, section }) =>
     url === `${appVersion}#page=9` && section.includes("10.1")), "answer cites rulebook disconnect section");
-  const reference = await fetch(new URL(rules.sources[0].url, origin), { headers: { [protectedHeader]: oidc },
+  const reference = await fetch(new URL(appVersion, origin), { headers: { [protectedHeader]: oidc },
     redirect: "error", signal: AbortSignal.timeout(15_000) });
   verify(reference.ok && reference.headers.get("content-type")?.includes("application/pdf"), "hosted citation is the approved PDF");
   await reference.body?.cancel();

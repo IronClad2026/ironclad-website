@@ -1,7 +1,7 @@
 import "server-only";
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
+import { loadReadyActiveProfile } from "./platform-data";
 import { isReadyReviewUser, readyReviewAliases } from "./review-access";
 
 export async function loadReadySession() {
@@ -13,10 +13,7 @@ export async function loadReadySession() {
     const client = await clerkClient();
     const user = await client.users.getUser(userId);
     if (!isReadyReviewUser(user, userId, aliases)) return null;
-    const supabase = await createAuthenticatedSupabaseClient();
-    const profile = await supabase.from("players").select("account_closed_at")
-      .eq("clerk_user_id", userId).maybeSingle();
-    return !profile.error && profile.data?.account_closed_at === null ? { userId, sessionId } : null;
+    return await loadReadyActiveProfile(userId) ? { userId, sessionId } : null;
   } catch {
     return null;
   }

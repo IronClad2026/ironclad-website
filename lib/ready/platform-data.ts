@@ -85,14 +85,19 @@ export async function loadReadyEvents(reference?: string): Promise<ReadyEvent[]>
   return getPublicTournamentRowsForRequest((result.data as ReadyEvent[]).filter(readEvent), reference ?? null);
 }
 
-/** The route supplies Clerk identity. Read account status on every private request. */
-export async function loadReadyPrivateContext(userId: string): Promise<ReadyPrivateContext> {
+/** The route supplies Clerk identity. Account closure is a service-only column. */
+export async function loadReadyActiveProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await createSupabaseAdminClient().from("players")
     .select("id,profile_completed,account_closed_at")
     .eq("clerk_user_id", userId).maybeSingle();
   if (error) throw new Error("Ready account unavailable");
   const profile = data as Profile | null;
-  if (!profile || !isUuid(profile.id) || profile.account_closed_at !== null) return { profile: null, registrations: [] };
+  return profile && isUuid(profile.id) && profile.account_closed_at === null ? profile : null;
+}
+
+export async function loadReadyPrivateContext(userId: string): Promise<ReadyPrivateContext> {
+  const profile = await loadReadyActiveProfile(userId);
+  if (!profile) return { profile: null, registrations: [] };
   const client = await createAuthenticatedSupabaseClient();
   const registrations = await client.from("registrations")
     .select("id,tournament_id,tournament_bracket_id,registration_status")
