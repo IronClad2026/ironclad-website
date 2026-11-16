@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/nextjs";
 import Image from "next/image";
@@ -142,7 +143,7 @@ function NavbarAccountControl({
   );
 }
 
-export default function Navbar() {
+export default function Navbar({ ready }: { ready?: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const pathname = usePathname();
@@ -273,7 +274,7 @@ export default function Navbar() {
           <button
             type="button"
             aria-label={t("nav.closeMenu")}
-            className={`fixed inset-0 z-[80] block h-full w-full cursor-default bg-black/55 backdrop-blur-sm ${mobileDisplay}`}
+            className={`fixed inset-0 block h-full w-full cursor-default bg-black/55 backdrop-blur-sm ${ready ? "z-[125]" : "z-[80]"} ${mobileDisplay}`}
             onPointerDown={() => {
               setIsOpen(false);
               mobileMenuButtonRef.current?.focus({ preventScroll: true });
@@ -301,7 +302,7 @@ export default function Navbar() {
       />
 
       <header
-        className="fixed top-0 left-0 z-[90] w-full border-b border-white/10 bg-black/20 backdrop-blur-md"
+        className={`fixed top-0 left-0 w-full border-b border-white/10 bg-black/20 backdrop-blur-md ${isOpen && ready ? "z-[126]" : "z-[90]"}`}
         lang={isAdminRoute ? "en" : undefined}
       >
         <nav
@@ -312,12 +313,13 @@ export default function Navbar() {
             data-navbar-area="brand"
             className="flex min-w-0 shrink-0 items-center text-sm font-medium text-zinc-300"
           >
+            {ready}
             <Link
               href="/"
               className="flex shrink-0 items-center"
               onClick={() => setIsOpen(false)}
             >
-              <Image
+              {ready ? <span className="px-2 text-sm font-bold tracking-[0.08em] text-orange-50 uppercase">IronClad</span> : <Image
                 src="/images/ironclad-logo.png"
                 alt="IronClad"
                 width={1365}
@@ -325,7 +327,7 @@ export default function Navbar() {
                 sizes="342px"
                 className="h-14 w-auto sm:h-16 min-[1440px]:h-14 min-[1800px]:h-16"
                 priority
-              />
+              />}
             </Link>
 
             <div
@@ -371,6 +373,7 @@ export default function Navbar() {
                     href={item.href}
                     className={navLinkClass(isActive, item.emphasis)}
                     aria-current={isActive ? "page" : undefined}
+                    data-mascot-attention={ready && (item.href === "/tournaments" || item.href === "/rules") ? `nav-${item.href.slice(1)}` : undefined}
                   >
                     {item.label}
                   </Link>
@@ -529,6 +532,7 @@ export default function Navbar() {
                       href={item.href}
                       onClick={() => setIsOpen(false)}
                       className={mobileNavLinkClass(isActiveRoute(pathname, item.href), item.emphasis)}
+                    data-mascot-attention={ready && (item.href === "/tournaments" || item.href === "/rules") ? `nav-${item.href.slice(1)}` : undefined}
                       aria-current={isActiveRoute(pathname, item.href) ? "page" : undefined}
                     >
                       {item.label}

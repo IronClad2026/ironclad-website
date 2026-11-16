@@ -8,6 +8,7 @@ import "./globals.css";
 import Footer from "@/components/Footer";
 import GlobalSmoke from "@/components/GlobalSmoke";
 import Navbar from "@/components/Navbar";
+import ReadyAssistant from "@/components/ready/ReadyAssistant";
 import NotificationBadgeRuntime from "@/components/NotificationBadgeRuntime";
 import ConsentAwareVercelAnalytics from "@/components/analytics/ConsentAwareVercelAnalytics";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
@@ -20,6 +21,7 @@ import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { getLegalDocument } from "@/lib/legal-corpus-publication";
 import { isPublicProfileNoticeInstalled, NOTICE_LAYOUT_HEADER } from "@/lib/public-gaming-profile-notice";
+import { loadReadySession } from "@/lib/ready/session";
 
 const icons: Metadata["icons"] = {
   icon: [
@@ -93,12 +95,13 @@ export default async function RootLayout({
     );
   }
   const isVercelProduction = process.env.VERCEL_ENV === "production";
-  const [common, clerkLocalization, legalRuntime] = await Promise.all([
+  const [common, clerkLocalization, legalRuntime, readySession] = await Promise.all([
     loadDictionary(locale, "common"),
     loadClerkLocalization(locale),
     loadAccountLegalRuntimeState({
       includeAnalytics: isVercelProduction,
     }),
+    loadReadySession(),
   ]);
   const rulebook = getLegalDocument("rulebook");
   const ppa = getLegalDocument("ppa");
@@ -117,7 +120,9 @@ export default async function RootLayout({
             >
               <SmoothScrollProvider>
                 <GlobalSmoke />
-                <Navbar />
+                <Navbar ready={readySession && legalRuntime.accountGate.status === "satisfied"
+                  ? <ReadyAssistant key={readySession.sessionId} />
+                  : undefined} />
 
                 <div>{children}</div>
 

@@ -131,6 +131,7 @@ function HeroSection({ copy }: { copy: PublicDictionary }) {
 
           <h1
             id="home-hero-title"
+            data-mascot-attention="home-heading"
             className="mt-5 max-w-5xl text-5xl font-black leading-[0.96] text-white sm:text-6xl lg:text-8xl"
           >
             {t("home.hero.title")}
@@ -144,6 +145,7 @@ function HeroSection({ copy }: { copy: PublicDictionary }) {
             <Link
               className="inline-flex min-h-12 w-full min-w-0 max-w-full items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto"
               href="/tournaments"
+              data-mascot-attention="view-tournaments"
             >
               <span className="min-w-0 text-center leading-5 [overflow-wrap:anywhere]">
                 {t("home.hero.viewTournaments")}

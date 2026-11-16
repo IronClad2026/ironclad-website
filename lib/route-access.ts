@@ -19,6 +19,7 @@ const SELF_AUTHENTICATED_EXACT_API_PATHS = [
   "/api/internal/transactional-email",
   "/api/notifications/click",
   "/api/partners/v1/tournaments",
+  "/api/ready",
 ] as const;
 
 export function isPublicPathname(pathname: string) {
