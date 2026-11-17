@@ -10,8 +10,10 @@ import { readyKnowledgeTopics } from "@/lib/ready/knowledge";
 import type { ReadyRuleScope } from "@/lib/ready/platform";
 
 const scope = vi.hoisted(() => vi.fn<() => Promise<ReadyRuleScope>>(async () => ({ kind: "general" })));
+const publicEvents = vi.hoisted(() => vi.fn());
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/ready/platform", () => ({ resolveReadyRuleScope: scope }));
+vi.mock("@/lib/ready/platform-data", () => ({ loadReadyEvents: publicEvents }));
 
 const viewer = { userId: "staging-review-user", sessionId: "review-session" };
 
@@ -71,5 +73,27 @@ describe("Ready guided catalogue", () => {
       })),
     });
     expect(scope).toHaveBeenLastCalledWith(undefined, viewer.userId, true);
+  });
+
+  it("keeps guest event choices public and sends a guest to sign-in for recorded editions", async () => {
+    const context = { eventSlug: "public-event", matchId: "867fdd44-3e2f-4dae-a8ac-dd697eab0c3f" };
+    const signal = AbortSignal.timeout(5_000);
+    publicEvents.mockResolvedValueOnce([{ slug: "public-event" }]);
+    const prizes = await resolveReadyAnswer({ kind: "question", id: "prizes", context }, null, signal);
+    expect(prizes).toMatchObject({
+      context: { eventSlug: "public-event", topic: "prizes" },
+      actions: [expect.objectContaining({
+        intent: { kind: "action", id: "event-prizes" }, context: { eventSlug: "public-event", topic: "prizes" },
+      })],
+    });
+    expect(prizes.context).not.toHaveProperty("matchId");
+    expect(publicEvents).toHaveBeenCalledWith("public-event");
+    publicEvents.mockResolvedValueOnce([]);
+    const unpublished = await resolveReadyAnswer({ kind: "question", id: "prizes", context: { eventSlug: "draft-event" } }, null, signal);
+    expect(unpublished.context).not.toHaveProperty("eventSlug");
+    const edition = await resolveReadyAnswer({ kind: "question", id: "governing-versions", context }, null, signal);
+    expect(edition.details).toContain("Sign in to check the document editions recorded for your own registration.");
+    expect(edition.actions).toContainEqual(expect.objectContaining({ actionId: "sign-in", href: "/sign-in" }));
+    expect(edition.context).not.toHaveProperty("matchId");
   });
 });

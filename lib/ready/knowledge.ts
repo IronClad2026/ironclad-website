@@ -15,7 +15,7 @@ export { READY_KNOWLEDGE_REVISION } from "./knowledge-sources";
 type Passage = {
   kind: RegistrationDocumentKind;
   section: string;
-  page?: number | readonly [earlier: number, current: number];
+  page?: number | Readonly<Record<string, number>>;
   text: string;
   earlierText?: string;
   details?: string;
@@ -23,7 +23,9 @@ type Passage = {
 };
 
 // These short, reviewed paraphrases retrieve only the passages relevant to the question.
-// The earlier Rulebook and PPA have the same section numbers and use the page mapping below.
+// The three tournament editions retain the sections but sometimes paginate them differently.
+const tournamentEditionPages = (legacy: number, current: number) => ({ "3.0": legacy, "3.1": legacy, "3.2": current });
+
 const passages = {
   eligibility: {
     kind: "ppa", section: "§§ 3.1, 3.5 and 4.1–4.2", page: 4,
@@ -31,7 +33,7 @@ const passages = {
     tournamentLink: true,
   },
   registration: {
-    kind: "rulebook", section: "§§ 4.3–4.5, 5.1–5.3 and 21.6", page: [5, 6],
+    kind: "rulebook", section: "§§ 5.1–5.4, 4.3–4.5 and 21.6", page: tournamentEditionPages(5, 6),
     text: "Sign in, complete your profile, link your own Steam account and open an eligible event in Tournaments. Registration is free. IronClad checks your current 1v1 data with Relic and records your acceptance of the exact documents shown.",
     details: "Registration requires the age and account-ownership declarations. Registration puts you into review or the waitlist depending on capacity and eligibility.",
     tournamentLink: true,
@@ -43,12 +45,12 @@ const passages = {
     tournamentLink: true,
   },
   waitlist: {
-    kind: "rulebook", section: "§§ 5.3–5.6", page: 6,
+    kind: "rulebook", section: "§§ 5.3–5.6", page: tournamentEditionPages(5, 6),
     text: "The first eight valid sign-ups are reviewed. Eligible players who sign up later can join a first-come waitlist. If you receive an offer, accept it by the deadline shown to return to the review queue.",
     tournamentLink: true,
   },
   events: {
-    kind: "rulebook", section: "§§ 3.1–3.5 and 6.1", page: 6,
+    kind: "rulebook", section: "§ 6.1", page: 6,
     text: "Open Tournaments and select the event. Its page shows the published format, registration status, divisions, deadlines, map pools and any applicable prize terms. Use that page for details specific to the event.",
     tournamentLink: true,
   },
@@ -59,7 +61,8 @@ const passages = {
   },
   final: {
     kind: "rulebook", section: "§ 3.3", page: 4,
-    text: "The grand final is best-of-five. Quarterfinals and semifinals are best-of-three.",
+    text: "Under the launch rules, the grand final is best-of-five. Quarterfinals and semifinals are best-of-three.",
+    details: "Check your tournament’s published format for the series it uses.",
   },
   scheduling: {
     kind: "rulebook", section: "§§ 9.1–9.9", page: 8,
@@ -77,17 +80,18 @@ const passages = {
     details: "Replay proof is private. Access is limited to authorised match participants and admins, subject to the Privacy Policy and law.",
   },
   disconnects: {
-    kind: "rulebook", section: "§§ 10.1–10.7", page: 9,
+    kind: "rulebook", section: "§§ 10.4–10.7 and 10.1–10.2", page: 9,
     text: "A genuine disconnect before 10:00 normally leads to a restart, subject to fairness exceptions. At or after 10:00, preserve the replay and ask an admin to rule. The clock alone does not award a win.",
     details: "For a genuine issue, each player normally has one pause per game of up to five minutes. An opponent agreement or admin approval is needed for extra or longer pauses.",
   },
   disputes: {
-    kind: "rulebook", section: "§§ 11.7–11.10 and 12.1–12.3", page: 10,
+    kind: "rulebook", section: "§§ 12.1–12.3 and 11.7–11.10", page: tournamentEditionPages(9, 10),
     text: "Use the dispute option on the match before the displayed deadline. Give a truthful reason and keep the relevant replays and communications. An admin reviews the evidence and decides the outcome.",
   },
   "no-shows": {
-    kind: "rulebook", section: "§§ 9.4–9.8 and 12.4–12.7", page: 10,
-    text: "Use the match’s no-show reporting process. Confirmation or admin review determines the result. If your opponent hasn’t replied after 48 hours or the deadline is at risk, request Admin Assistance.",
+    kind: "rulebook", section: "§§ 9.4–9.6 and 12.4–12.7", page: 8,
+    text: "If your opponent hasn’t replied after 48 hours, or sooner if the deadline is at risk, request Admin Assistance.",
+    details: "For an actual no-show, use the match’s no-show reporting process when available. Confirmation or admin review determines the result.",
   },
   withdrawal: {
     kind: "rulebook", section: "§§ 5.8 and 9.8", page: 6,
@@ -105,21 +109,21 @@ const passages = {
     tournamentLink: true,
   },
   decisions: {
-    kind: "rulebook", section: "§§ 6.5–6.17", page: 7,
+    kind: "rulebook", section: "§§ 6.10–6.11 and 6.14–6.17", page: 7,
     text: "Find approved Published Decisions on the event page. An advisory poll informs an admin’s decision. A binding poll determines its configured outcome when voting is valid. Its scope and the governing documents still apply.",
     tournamentLink: true,
   },
   prizes: {
-    kind: "ppa", section: "§§ 13.1–13.7", page: [7, 8],
+    kind: "ppa", section: "§§ 13.1–13.7", page: tournamentEditionPages(7, 8),
     text: "Some events have no prize. For a prize-bearing event, use its published Prize Terms for the amount, eligibility, fees, payout method and estimated timing. A payment depends on official placement, eligibility and the required information.",
     tournamentLink: true,
   },
   privacy: {
-    kind: "privacy", section: "§§ 11 and 13",
+    kind: "privacy", section: "§§ 11 and 13", page: { "1.0": 8, "1.1": 9, "1.2": 9 },
     text: "Match replay proof and Admin Assistance content are private operational information, with access restricted according to their purpose. See the Privacy Policy for how evidence and support information are used and retained.",
   },
   terms: {
-    kind: "terms", section: "§§ 2 and 4",
+    kind: "terms", section: "§§ 2 and 4", page: 4,
     text: "The Terms cover use of the IronClad platform. The Participation Agreement governs player participation, the Rulebook covers competition mechanics, and the Privacy Policy covers personal information.",
   },
   agreement: {
@@ -127,11 +131,11 @@ const passages = {
     text: "The Player Participation Agreement sets the conditions for taking part in IronClad events. Read it with the Rulebook for competition mechanics and with any published terms scoped to your event.",
   },
   "governing-versions": {
-    kind: "rulebook", section: "§§ 21.3–21.8", page: [13, 14],
+    kind: "rulebook", section: "§§ 21.3–21.8", page: tournamentEditionPages(13, 14),
     text: "An existing registration keeps its own recorded document versions. A newer document generally applies to new registrations. Check the version recorded for your event, and ask an admin if a published decision affects it.",
   },
   factions: {
-    kind: "rulebook", section: "§§ 7.3–7.10", page: 7,
+    kind: "rulebook", section: "§§ 7.1 and 7.7", page: 7,
     text: "You may play any permitted faction within your assigned side. Agree who has which side and which map you’ll use with your opponent before loading the game.",
   },
   dice: {
@@ -140,7 +144,7 @@ const passages = {
     details: "Rolls for games 3 and 5 can be done in advance. IronClad records the rolls. Players agree the actual map and side in the Match Room.",
   },
   pauses: {
-    kind: "rulebook", section: "§§ 10.1–10.7", page: 9,
+    kind: "rulebook", section: "§§ 10.1–10.2 and 9.1", page: tournamentEditionPages(8, 9),
     text: "For a genuine issue, each player normally has one pause per game of up to five minutes. An opponent agreement or admin approval is needed for extra or longer pauses.",
     details: "A game pause and a held match deadline are separate. Check your Match workspace for the current deadline or hold.",
   },
@@ -181,11 +185,11 @@ function sourceFor(
   const version = versions[kind];
   const document = readyDocument(kind, version);
   if (!document) return null;
-  const pageNumber = typeof page === "number" ? page : page?.[version === "3.2" ? 1 : 0];
+  const pageNumber = typeof page === "number" ? page : page?.[version];
   return {
     title: document.title,
     url: pageNumber ? `${document.url}#page=${pageNumber}` : document.url,
-    section: pageNumber ? `${section}, p. ${pageNumber}` : section,
+    section: pageNumber ? `${section}, opens to p. ${pageNumber}` : section,
   };
 }
 
@@ -218,7 +222,6 @@ export function answerKnowledgeTopic(
     };
   }
   if (eventScope.kind === "unconfirmed") return unconfirmed(nextContext, eventScope.eventTitle);
-  if (eventScope.kind === "general" && context?.eventSlug) return unconfirmed(nextContext);
   const versions = eventScope.kind === "known" ? eventScope.versions : publishedReadyVersions;
   const passage: Passage = topic === "discord" ? {
     kind: "rulebook", section: "§§ 4.8 and 9.3", page: 5,
@@ -237,18 +240,18 @@ export function answerKnowledgeTopic(
     }
   }
 
-  const eventSearch = new URLSearchParams();
-  if (context?.eventSlug) eventSearch.set("tournament", context.eventSlug);
-  if (topic === "decisions") eventSearch.set("tab", "decisions");
-  if (topic === "prizes") {
-    eventSearch.set("tab", "overview");
-    eventSearch.set("panel", "prizes");
+  const eventHref = eventScope.kind === "known" && context?.eventSlug
+    ? `/tournaments?${new URLSearchParams({ tournament: context.eventSlug })}` : "/tournaments";
+  const actions: ReadyAction[] = [];
+  if (topic === "decisions" || topic === "prizes") {
+    actions.push({
+      label: topic === "decisions" ? "Find published decisions" : "Find event prize terms",
+      intent: { kind: "action", id: topic === "decisions" ? "event-decisions" : "event-prizes" },
+      context: nextContext,
+    });
+  } else if (passage.tournamentLink) {
+    actions.push(readyLink("find-tournament", "Open Tournaments", eventHref));
   }
-  const eventHref = eventSearch.size ? `/tournaments?${eventSearch}` : "/tournaments";
-  const actionLabel = topic === "decisions" ? "See published decisions"
-    : topic === "prizes" ? "See event prize terms" : "Open Tournaments";
-  const eventAction = topic === "decisions" ? "event-decisions" : topic === "prizes" ? "event-prizes" : "find-tournament";
-  const actions: ReadyAction[] = passage.tournamentLink ? [readyLink(eventAction, actionLabel, eventHref)] : [];
   if (["disconnects", "disputes", "no-shows", "withdrawal", "scheduling", "pauses", "submission-help"].includes(topic)) {
     actions.push(adminHelp(nextContext));
   }

@@ -1,10 +1,22 @@
 import "server-only";
 
-import { readyQuestionCatalogue } from "./catalogue";
+import { readyLink, readyQuestionCatalogue } from "./catalogue";
 import type { ReadyMenuRequest, ReadyReply } from "./contracts";
 import { answerKnowledgeTopic } from "./knowledge";
 import { answerPlatformAction, resolveReadyRuleScope } from "./platform";
+import { loadReadyEvents } from "./platform-data";
 import type { ReadyIdentity } from "./usage";
+
+async function publicEventContext(eventSlug: string) {
+  try {
+    // Carry a verified public event into a follow-up action without accepting a guest match reference.
+    const [event] = await loadReadyEvents(eventSlug);
+    return event ? { eventSlug: event.slug } : undefined;
+  } catch {
+    // The prepared guidance still applies when the public event lookup is unavailable.
+    return undefined;
+  }
+}
 
 export async function resolveReadyAnswer(input: ReadyMenuRequest, identity: ReadyIdentity | null, signal: AbortSignal): Promise<ReadyReply> {
   const userId = identity?.userId ?? null;
@@ -18,7 +30,9 @@ export async function resolveReadyAnswer(input: ReadyMenuRequest, identity: Read
   }
 
   const topic = readyQuestionCatalogue[input.id].topic;
-  const context = identity ? input.context : undefined;
+  const eventSlug = input.context?.eventSlug;
+  const publicFollowUp = topic === "prizes" || topic === "decisions";
+  const context = identity ? input.context : eventSlug && publicFollowUp ? await publicEventContext(eventSlug) : undefined;
   const scope = identity && topic !== "rules"
     ? await resolveReadyRuleScope(context, identity.userId, input.id === "governing-versions")
     : { kind: "general" } as const;
@@ -33,5 +47,14 @@ export async function resolveReadyAnswer(input: ReadyMenuRequest, identity: Read
       intent,
     };
   }
-  return { ...answerKnowledgeTopic(topic, scope, context), intent };
+  const reply = answerKnowledgeTopic(topic, scope, context);
+  if (!identity && topic === "governing-versions") {
+    return {
+      ...reply,
+      details: "Sign in to check the document editions recorded for your own registration.",
+      actions: [readyLink("sign-in", "Sign in", "/sign-in")],
+      intent,
+    };
+  }
+  return { ...reply, intent };
 }

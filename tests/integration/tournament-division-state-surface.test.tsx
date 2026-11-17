@@ -14,9 +14,10 @@ import type { TournamentCard } from "@/lib/tournaments";
 
 const routerPush = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
+const authState = vi.hoisted(() => ({ isLoaded: true }));
 
 vi.mock("@clerk/nextjs", () => ({
-  useAuth: () => ({ getToken: vi.fn(), isSignedIn: false, userId: null }),
+  useAuth: () => ({ getToken: vi.fn(), isLoaded: authState.isLoaded, isSignedIn: false, userId: null }),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -218,6 +219,7 @@ const originalScrollIntoView = Object.getOwnPropertyDescriptor(
 
 describe("public Tournament division-state surface", () => {
   beforeEach(() => {
+    authState.isLoaded = true;
     restoreNativeDialog = stubNativeDialog();
     window.history.replaceState(
       {},
@@ -401,6 +403,30 @@ describe("public Tournament division-state surface", () => {
             ) && button.hasAttribute("disabled")
         )
     ).not.toHaveLength(0);
+  });
+
+  it("waits for authentication and handles a second deliberate registration deep link", () => {
+    const destination = "/tournaments?tournament=cancelled-event&register=1";
+    const cleaned = "/tournaments?tournament=cancelled-event";
+    const gateName = competitionEnglish.tournaments.gatePrompt.closedTitle;
+    window.history.replaceState({}, "", destination);
+    authState.isLoaded = false;
+    const view = render(experience([cancelledEvent]));
+    expect(screen.queryByRole("dialog", { name: gateName })).not.toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
+
+    authState.isLoaded = true;
+    view.rerender(experience([cancelledEvent]));
+    expect(screen.getByRole("dialog", { name: gateName })).toBeInTheDocument();
+    expect(routerReplace).toHaveBeenCalledExactlyOnceWith(cleaned, { scroll: false });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: gateName })).not.toBeInTheDocument();
+
+    window.history.replaceState({}, "", destination);
+    view.rerender(experience([cancelledEvent]));
+    expect(screen.getByRole("dialog", { name: gateName })).toBeInTheDocument();
+    expect(routerReplace).toHaveBeenCalledTimes(2);
+    expect(routerReplace).toHaveBeenLastCalledWith(cleaned, { scroll: false });
   });
 });
 

@@ -8,6 +8,7 @@ import { getTournamentRegistrationAvailability } from "@/lib/tournaments";
 import type { ReadyAction, ReadyContext, ReadyReply } from "./contracts";
 import { readyLink } from "./catalogue";
 import type { ReadyActionId } from "./catalogue";
+import { readyRulesHubSource } from "./knowledge-sources";
 import {
   loadReadyAcceptedVersions,
   loadReadyAssistanceRecord,
@@ -132,7 +133,7 @@ async function answerPlatformIntent(intent: PlatformIntent, id: ReadyActionId, c
     return {
       text: "The official rules hub links the Rulebook, Player Participation Agreement, Terms and Privacy Policy.",
       actions: [rules],
-      sources: [{ title: "IronClad Official Rules Hub", url: "https://www.ironcladtournaments.com/rules", section: "Official and legal documents" }],
+      sources: [readyRulesHubSource],
     };
   }
   try {
@@ -215,6 +216,10 @@ async function answerMatch(intent: MatchIntent, actionId: ReadyActionId, context
   const openMatch = readyLink("my-match", "Open my match", href);
   const header = `${eventTitle(match.event)} · ${matchLabel(match)}`;
   const held = match.hold_started_at !== null && match.hold_released_at === null;
+  const matchStatus = match.status.replaceAll("_", " ");
+  const eventClosed = ["completed", "cancelled", "voided"].includes(match.event.status);
+  const status = match.active ? `Match status is ${matchStatus}.`
+    : `Match status was recorded as ${matchStatus}.${eventClosed ? ` The tournament is ${match.event.status}.` : ""}`;
   const copy = {
     label: "Copy match reference", copyText: `${header} · ${match.id}`,
     actionId: "copy-match-reference", destinationType: "copy_reference",
@@ -239,18 +244,18 @@ async function answerMatch(intent: MatchIntent, actionId: ReadyActionId, context
   }
   if (intent === "deadline") {
     const deadline = dateLabel(match.deadline_at);
-    const state = held ? "The deadline is paused. Check the Match workspace for updates."
+    const state = match.active && held ? "The deadline is paused. Check the Match workspace for updates."
       : deadline ? `${match.active ? "The current deadline is" : "The recorded deadline was"} ${deadline}.`
         : "There’s no confirmed match deadline in the current record.";
-    return { text: `${state} Match status is ${match.status.replaceAll("_", " ")}. ${header}.`, actions: [openMatch], context: replyContext };
+    return { text: `${state} ${status} ${header}.`, actions: [openMatch], context: replyContext };
   }
   if (intent === "chat" || intent === "support") {
-    const record = await loadReadyAssistanceRecord(match, owned.profile.id);
     const settings = await loadReadyMatchSettings();
     if (intent === "chat") {
       if (settings.chat && canUseMatchRoom(match)) {
         return { text: `Open the Match Room for ${header}.`, actions: [readyLink("opponent-chat", "Open opponent chat", href)], context: replyContext };
       }
+      const record = await loadReadyAssistanceRecord(match, owned.profile.id);
       if (record) {
         return { text: "The earlier Match Room can be opened as read-only.",
           actions: [readyLink("opponent-chat", "Open earlier Match Room", matchHref(match, record.room_id))], context: replyContext };
@@ -259,9 +264,13 @@ async function answerMatch(intent: MatchIntent, actionId: ReadyActionId, context
         text: !match.opponentRegistrationId ? "This match does not have an assigned opponent yet."
           : settings.chat ? "This match is no longer active. Open its workspace to see any existing read-only room."
           : "Match Room activity is currently disabled. An existing room may be available as read-only.",
-        actions: [openMatch], context: replyContext, fallback: true,
+        actions: [match.opponentRegistrationId
+          ? readyLink("opponent-chat", "Check Match Room history", href)
+          : openMatch],
+        context: replyContext, fallback: true,
       };
     }
+    const record = await loadReadyAssistanceRecord(match, owned.profile.id);
     const support = supportLinks();
     if (record) {
       support.actions.unshift(assistanceLink(record.id, match.event.id));
@@ -292,8 +301,7 @@ async function answerMatch(intent: MatchIntent, actionId: ReadyActionId, context
       actions: [openMatch], context: replyContext,
     };
   }
-  const status = match.status.replaceAll("_", " ");
-  const detail = match.opponentRegistrationId ? `Match status is ${status}.` : "An opponent has not been assigned.";
+  const detail = match.opponentRegistrationId ? status : "An opponent has not been assigned.";
   const resultLink = intent === "result" ? readyLink("submit-result", "Open result workspace", href)
     : intent === "replay" ? readyLink("upload-replays", "Open replay workspace", href) : openMatch;
   return { text: workflow + `${header}. ${detail}`, actions: [resultLink], context: replyContext };
@@ -358,11 +366,13 @@ async function answerEvent(intent: EventIntent, actionId: ReadyActionId, context
     };
   }
   if (intent === "prizes") {
-    return {
-      text: event.prize_pool?.trim()
-        ? `The event lists this prize pool: ${event.prize_pool.trim().slice(0, 110)}. Check the Prizes panel for the published terms.`
-        : `I couldn’t verify a listed prize pool for ${title}.`,
+    const prize = event.prize_pool?.trim();
+    return prize ? {
+      text: `The event lists this prize pool: ${prize.slice(0, 110)}. Check the Prizes panel for the published terms.`,
       actions: [readyLink("event-prizes", "Open event prize terms", eventHref(event, { panel: "prizes" }))], context: replyContext,
+    } : {
+      text: `The tournament page does not list a prize pool for ${title}.`,
+      actions: [open], context: replyContext, fallback: true,
     };
   }
   if (intent === "register") {

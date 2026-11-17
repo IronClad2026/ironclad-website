@@ -5486,7 +5486,7 @@ export default function TournamentsExperience({
     useState<RegistrationGate | null>(null);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [isContinuingEnglish, setIsContinuingEnglish] = useState(false);
-  const { getToken, isSignedIn, userId } = useAuth();
+  const { getToken, isLoaded, isSignedIn, userId } = useAuth();
   const unreadCandidates = activeTab === "brackets" && isSignedIn &&
     !isTournamentTerminalStatus(selectedTournament.statusValue) && selectedTournament.statusValue !== "completed"
     ? selectedTournament.generatedBrackets.flatMap((bracket) => bracket.matches.filter((match) =>
@@ -5764,9 +5764,11 @@ export default function TournamentsExperience({
   }, [beginRegistration, locale, selectedViewerRegistration]);
 
   useEffect(() => {
-    if (rawRegisterParam !== "1" || automaticRegistrationRef.current) {
+    if (rawRegisterParam !== "1") {
+      automaticRegistrationRef.current = false;
       return;
     }
+    if (!isLoaded || automaticRegistrationRef.current) return;
 
     automaticRegistrationRef.current = true;
     const params = new URLSearchParams(searchParamString);
@@ -5778,6 +5780,7 @@ export default function TournamentsExperience({
     void handleRegisterClick();
   }, [
     handleRegisterClick,
+    isLoaded,
     pathname,
     rawRegisterParam,
     router,

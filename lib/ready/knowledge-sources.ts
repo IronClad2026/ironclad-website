@@ -1,15 +1,16 @@
 import deliveryManifest from "@/content/legal-document-delivery.json";
+import { getLegalDocument } from "@/lib/legal-corpus-publication";
 import type { RegistrationDocumentKind } from "@/lib/legal-document-types";
 
-export const READY_KNOWLEDGE_REVISION = "2026-11-16.1";
+export const READY_KNOWLEDGE_REVISION = "2026-11-17.1";
 
 export type ReadyDocumentVersions = Record<RegistrationDocumentKind, string>;
 
 export const publishedReadyVersions: ReadyDocumentVersions = {
-  rulebook: "3.2",
-  ppa: "3.2",
-  terms: "1.1",
-  privacy: "1.3",
+  rulebook: getLegalDocument("rulebook").version,
+  ppa: getLegalDocument("ppa").version,
+  terms: getLegalDocument("terms").version,
+  privacy: getLegalDocument("privacy").version,
 };
 
 const documentTitles = {
@@ -26,20 +27,8 @@ const documentScopes = {
   privacy: "Handling of personal information",
 } satisfies Record<RegistrationDocumentKind, string>;
 
-const officialHost = "https://www.ironcladtournaments.com";
-
 /** Historic deliveries reuse the same byte-verified artifacts supplied at registration. */
 export function readyDocument(kind: RegistrationDocumentKind, version: string) {
-  if (kind === "privacy" && version === "1.3") {
-    return {
-      title: "Privacy Policy v1.3",
-      url: officialHost + "/privacy",
-      version,
-      status: "published-current",
-      scope: documentScopes.privacy,
-    } as const;
-  }
-
   const delivery = deliveryManifest.documents.find(
     (document) => document.kind === kind && document.version === version,
   );

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { openQuickAction } from "./menu-journey.mjs";
 
-const runTag = "ready-active-20261116-v1";
+const runTags = new Set(["ready-active-20261116-v1", "ready-active-20261117-audit"]);
 const projectRef = "zzbnneprhjicmajpjkdg";
 const supabaseUrl = `https://${projectRef}.supabase.co`;
 const ticketUrl = "https://discord.com/channels/1440092095619662105/1440201093110960137";
@@ -11,11 +11,11 @@ const uuid = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 
 export async function readActiveFixtures(path, verify) {
   const manifest = JSON.parse(await readFile(resolve(path), "utf8"));
-  verify(manifest?.runTag === runTag && manifest.projectRef === projectRef &&
+  verify(runTags.has(manifest?.runTag) && manifest.projectRef === projectRef &&
     manifest.committed === true && manifest.tournaments?.length === 2, "exact committed Ready fixture manifest");
   const [a, b] = manifest.tournaments;
   for (const [fixture, label, opponent] of [[a, "A", "TestAcademy2"], [b, "B", "TestAcademy3"]]) {
-    verify(fixture?.label === label && fixture.tag === `${runTag}-${label.toLowerCase()}` &&
+    verify(fixture?.label === label && fixture.tag === `${manifest.runTag}-${label.toLowerCase()}` &&
       [fixture.tournamentId, fixture.bracketId, fixture.matchId, fixture.roomId].every((id) => typeof id === "string" && uuid.test(id)) &&
       fixture.requesterAlias === "TestAcademy1" && fixture.opponentAlias === opponent &&
       Date.parse(fixture.deadline) > Date.now(), `validated temporary fixture ${label}`);
@@ -207,4 +207,32 @@ export async function browserActiveMatch({ page, expect, origin, fixture, mobile
   verify(true, "native Match Room composer is available and untouched");
   await room.getByRole("textbox", { name: "Message" }).scrollIntoViewIfNeeded();
   verify(true, mobile ? "touch emulation opens active writable opponent chat" : "desktop Ready assistance link opens the correct active writable room");
+
+  const category = mobile ? "Upload replays" : "Submit my result";
+  const label = mobile ? "Open replay workspace" : "Open result workspace";
+  await page.goto(eventUrl.href, { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-mode='floating']")).toHaveCount(1, { timeout: 15_000 });
+  await openQuickAction(page, "Help", mobile);
+  await choose("Results & replays");
+  await choose(category);
+  await expect(message).toContainText(mobile ? "replay upload fields" : "use its result form", { timeout: 15_000 });
+  const skip = page.getByRole("button", { name: "Show full message" });
+  if (await skip.isVisible()) {
+    if (mobile) await skip.tap();
+    else await skip.click();
+  }
+  const result = page.getByRole("link", { name: label, exact: true });
+  const resultHref = await result.getAttribute("href");
+  verify(isFixtureDestination(resultHref, fixture, origin), "result or replay link targets the same isolated match");
+  if (mobile) await result.tap();
+  else await result.click();
+  await expect(page).toHaveURL(new URL(resultHref, origin).href, { timeout: 15_000 });
+  const workspace = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: /Match Workspace/i }) });
+  const outcome = workspace.getByRole("button", { name: /^(I )?won$/i }).first();
+  await expect(outcome).toBeEnabled();
+  if (mobile) await outcome.tap();
+  else await outcome.click();
+  await workspace.getByRole("combobox", { name: "Score", exact: true }).selectOption({ index: 1 });
+  await expect(workspace.locator('input[type="file"][accept=".rec"]').first()).toBeVisible();
+  verify(true, `${mobile ? "touch replay" : "desktop result"} link opens the native score and replay fields without upload or submit`);
 }

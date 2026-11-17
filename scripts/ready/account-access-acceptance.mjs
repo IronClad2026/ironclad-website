@@ -7,9 +7,10 @@ import { promisify } from "node:util";
 import { createClerkClient } from "@clerk/backend";
 import { chromium, expect } from "@playwright/test";
 import sharp from "sharp";
+import { browserActiveMatch, isActiveFixtureRead, readActiveFixtures } from "./active-acceptance.mjs";
 import { createHostedAuth } from "../four-division/hosted-auth.mjs";
 import { loadFixtureEnvironment, validateRuntimeGuards } from "../lib/staging-synthetic-uat.mjs";
-import { openQuickAction } from "./menu-journey.mjs";
+import { browserMenuJourney, installRendererObservation, openQuickAction } from "./menu-journey.mjs";
 
 const exec = promisify(execFile);
 const project = "prj_5os8tdLLkgGUSWnrxpiYj6OI6YEB";
@@ -40,11 +41,11 @@ const observedSessions = new Map();
 
 function readOptions(tokens) {
   const options = new Map();
-  const names = ["--url", "--deployment", "--commit", "--vercel-cli", "--environment-dir", "--admin-user-id", "--notice-fixture", "--browser-url", "--artifacts"];
+  const names = ["--url", "--deployment", "--commit", "--vercel-cli", "--environment-dir", "--admin-user-id", "--notice-fixture", "--browser-url", "--artifacts", "--audit-items", "--active-fixture-manifest"];
   for (let index = 0; index < tokens.length; index++) {
     const key = tokens[index];
     if (["--headless", "--guest-only", "--ordinary-only", "--desktop-only", "--touch-only", "--cloud-baseline", "--cloud-surfaces",
-      "--cloud-deep", "--cloud-brackets"].includes(key) && !options.has(key)) {
+      "--cloud-deep", "--cloud-brackets", "--all-menu", "--workflow-audit", "--experience-audit"].includes(key) && !options.has(key)) {
       options.set(key, true);
       continue;
     }
@@ -147,10 +148,11 @@ function isPinnedHistoryRead(target, input) {
     Object.keys(input).sort().join(",") === "afterSequence,limit,roomId" && input.roomId === ownedRoomId;
 }
 
-async function makeViewport(origin, oidc, mobile, headless = false, clerkCacheAction) {
+async function makeViewport(origin, oidc, mobile, headless = false, clerkCacheAction, recordVideo, activeFixture) {
   const context = await browser.newContext({
     viewport: mobile ? { width: 390, height: 780 } : { width: 1280, height: 800 },
     deviceScaleFactor: 1, hasTouch: mobile, isMobile: mobile, reducedMotion: headless ? "reduce" : "no-preference",
+    recordVideo,
   });
   const page = await context.newPage();
   const protocol = await context.newCDPSession(page);
@@ -181,8 +183,14 @@ async function makeViewport(origin, oidc, mobile, headless = false, clerkCacheAc
       const assistanceRead = historyArgs && permittedAssistance && target.pathname + target.search === permittedAssistance &&
         Object.keys(historyArgs).sort().join(",") === "afterSequence,limit,requestId,tournamentId" &&
         historyArgs.tournamentId === ownedTournamentId && target.pathname === "/assistance/" + historyArgs.requestId;
+      const activeRead = activeFixture && isActiveFixtureRead({
+        method: () => request.method,
+        headers: () => ({ "next-action": nextAction }),
+        url: () => request.url,
+        postDataJSON: () => JSON.parse(request.postData ?? "null"),
+      }, activeFixture, origin);
       if (read || (target.pathname === "/api/ready" && request.method === "POST") || authCacheRefresh ||
-        isPinnedHistoryRead(target, historyArgs) || assistanceRead) {
+        isPinnedHistoryRead(target, historyArgs) || assistanceRead || activeRead) {
         // Playwright routes cover only the first URL in a redirect chain. CDP pauses each
         // hop and never carries header overrides to a different origin automatically.
         const headers = Object.entries(request.headers)
@@ -829,6 +837,12 @@ try {
   const options = readOptions(process.argv.slice(2));
   assert(!(options.has("--guest-only") && options.has("--ordinary-only")));
   assert(!(options.has("--desktop-only") && options.has("--touch-only")));
+  assert(["--all-menu", "--workflow-audit", "--experience-audit", "--active-fixture-manifest"].filter((key) => options.has(key)).length <= 1);
+  assert(!options.has("--all-menu") || (options.has("--guest-only") && options.has("--artifacts")));
+  assert(!options.has("--workflow-audit") || options.has("--ordinary-only"));
+  assert(!options.has("--active-fixture-manifest") || (options.has("--ordinary-only") && options.has("--artifacts")));
+  assert(!options.has("--experience-audit") || (options.has("--ordinary-only") && options.has("--artifacts") && !options.has("--headless")));
+  assert(!options.has("--audit-items") || (options.has("--all-menu") && /^[a-z-]+(?:,[a-z-]+)*$/.test(options.get("--audit-items"))));
   const deploymentOrigin = new URL(options.get("--url")).origin;
   assert.match(deploymentOrigin, /^https:\/\/ironclad-website-[a-z0-9]+-ironclad-tournaments\.vercel\.app$/);
   const origin = options.get("--browser-url") ?? deploymentOrigin;
@@ -865,7 +879,102 @@ try {
   step = "identifying Clerk's cache-only authentication callback for this build";
   const clerkCacheAction = player ? await findClerkCacheAction(origin, oidc) : undefined;
   browser = await chromium.launch({ channel: "chrome", headless });
-  if (options.has("--cloud-deep") || options.has("--cloud-brackets")) {
+  if (options.has("--all-menu")) {
+    const output = resolve(options.get("--artifacts"));
+    const { auditReadyCatalogue } = await import("./catalogue-browser-audit.mjs");
+    await mkdir(output, { recursive: true });
+    const view = await makeViewport(origin, oidc, false, headless, clerkCacheAction);
+    try {
+      step = "visible signed-out Ready menu, all prepared questions and public actions";
+      const items = options.has("--audit-items") ? new Set(options.get("--audit-items").split(",")) : undefined;
+      const counts = await auditReadyCatalogue({ page: view.page, origin, output, commit: options.get("--commit"), items,
+        protectionHeader: { [trustedHeader]: oidc } });
+      assert.equal(view.attemptedUsageWrites(), 0);
+      passed(`Ready menu leaves verified in visible Chrome (${counts.question ?? 0} prepared questions and ${counts.action ?? 0} actions)`);
+    } catch (error) {
+      browserFailure = await view.diagnose().catch(() => undefined);
+      throw error;
+    } finally {
+      await view.context.close();
+    }
+  } else if (options.has("--active-fixture-manifest")) {
+    const { b } = await readActiveFixtures(options.get("--active-fixture-manifest"), (condition, label) => assert(condition, label));
+    assert.equal(player.alias, b.opponentAlias, "the browser uses the isolated fixture's designated seat");
+    const output = resolve(options.get("--artifacts"));
+    await mkdir(output, { recursive: true });
+    const mobileSizes = options.has("--touch-only") ? [true] : options.has("--desktop-only") ? [false] : [false, true];
+    for (const mobile of mobileSizes) {
+      const view = await makeViewport(origin, oidc, mobile, headless, clerkCacheAction, undefined, b);
+      const { page } = view;
+      try {
+        step = "signing in the isolated active match participant";
+        await page.goto(origin, { waitUntil: "domcontentloaded" });
+        await signIn(view, player);
+        await assertIdentity(page, player);
+        await showAssistant(page, mobile);
+        await browserActiveMatch({
+          page, expect, origin, fixture: b, mobile,
+          verify: (condition, label) => {
+            step = label;
+            assert(condition, label);
+            passed(label);
+          },
+        });
+        await page.screenshot({ path: resolve(output, mobile ? "ready-active-replays-mobile.png" : "ready-active-results-desktop.png") });
+        assert.equal(view.attemptedUsageWrites(), 0);
+      } catch (error) {
+        await page.screenshot({ path: resolve(output, mobile ? "ready-active-touch-debug.png" : "ready-active-desktop-debug.png") }).catch(() => undefined);
+        browserFailure = await view.diagnose().catch(() => undefined);
+        throw error;
+      } finally {
+        await view.context.close();
+      }
+    }
+    if (origin === stagingOrigin) await verifyCanonicalAlias(options);
+  } else if (options.has("--workflow-audit") || options.has("--experience-audit")) {
+    const auditExperience = options.has("--experience-audit");
+    const nativeAudit = auditExperience ? null : await import("./workflow-audit.mjs");
+    const output = auditExperience ? resolve(options.get("--artifacts")) : undefined;
+    if (output) await mkdir(output, { recursive: true });
+    const mobileSizes = options.has("--touch-only") ? [true] : options.has("--desktop-only") ? [false] : [false, true];
+    for (const mobile of mobileSizes) {
+      const recording = output && !mobile ? { dir: resolve(output, "captures"), size: { width: 1280, height: 800 } } : undefined;
+      const view = await makeViewport(origin, oidc, mobile, headless, clerkCacheAction, recording);
+      try {
+        step = "signing in the designated audit account";
+        if (auditExperience) await view.page.addInitScript(installRendererObservation);
+        await view.page.goto(origin, { waitUntil: "domcontentloaded" });
+        await signIn(view, player);
+        await assertIdentity(view.page, player);
+        if (auditExperience) {
+          step = "verifying and recording Ready’s visible renderer and menu experience";
+          await view.page.goto(origin, { waitUntil: "domcontentloaded" });
+          await showAssistant(view.page, mobile);
+          const video = view.page.video();
+          await browserMenuJourney({ page: view.page, expect, mobile, output,
+            verify: (ok, label) => { assert(ok, label); passed(label); }, recording: Boolean(video) });
+          if (video) {
+            await video.saveAs(resolve(output, "ready-mascot-desktop.webm"));
+            await video.delete();
+          }
+        } else {
+          step = "verifying native Ready destinations without performing an action on records";
+          await nativeAudit.verifyReadyNativeDestinations({
+            page: view.page, origin, mobile, allowAssistanceRead: view.allowAssistanceRead,
+            fixture: { own: owned, foreign, ownRoomId: ownedRoomId }, expect,
+          });
+        }
+        assert.equal(view.attemptedUsageWrites(), 0);
+        passed(`Ordinary Ready ${auditExperience ? "mascot experience" : "workflow destinations"} verified in ${mobile ? "touch emulation" : "desktop Chrome"}`);
+      } catch (error) {
+        browserFailure = await view.diagnose().catch(() => undefined);
+        throw error;
+      } finally {
+        await view.context.close();
+      }
+      await verifyAlreadyInactiveSessions();
+    }
+  } else if (options.has("--cloud-deep") || options.has("--cloud-brackets")) {
     await checkDeepDesktop(origin, oidc, player, headless, clerkCacheAction, options.has("--cloud-brackets"));
     if (surfaceFailures.length) process.exitCode = 1;
   } else if (options.has("--cloud-baseline") || options.has("--cloud-surfaces")) {

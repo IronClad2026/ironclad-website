@@ -152,8 +152,24 @@ try {
         if (directory) await page.screenshot({ animations: "disabled", path: resolve(directory, `${width}x${height}-${name}.png`) });
       };
       await expect(ready).toBeAttached({ timeout: 40_000 });
-      await invoke(dock);
+      if (width === 1280) {
+        await expect.poll(() => page.evaluate(() => globalThis.readyAcceptancePose?.()?.smokeParticles ?? 0))
+          .toBeGreaterThan(0);
+      }
+      if (mobile) {
+        await invoke(dock);
+      } else {
+        await dock.press("Enter");
+        await expect(conversation.locator("[data-thought-cloud]")).toBeFocused();
+      }
       await finish("welcomeFirst");
+      if (width === 780 || width === 320) {
+        const motion = await page.evaluate(() => {
+          const pose = globalThis.readyAcceptancePose?.();
+          return { smoke: pose?.smokeParticles, style: pose?.style };
+        });
+        assert.deepEqual(motion, { smoke: 0, style: null }, "reduced motion presents the text without continuous speech or smoke animation");
+      }
       if (width === 390) await screenshot("welcome");
       if (width === 390) {
         await invoke(page.getByRole("button", { name: "I’m never winning this… white flag’s up!", exact: true }));
@@ -262,7 +278,18 @@ try {
       }
       await invoke(page.getByRole("button", { name: "Dock assistant", exact: true }));
       await expect(dock).toHaveAttribute("aria-expanded", "false");
-      await invoke(dock);
+      if (mobile) {
+        await invoke(dock);
+      } else {
+        await dock.press("Enter");
+        const cloud = conversation.locator("[data-thought-cloud]");
+        await expect(cloud).toBeFocused();
+        await cloud.press("Escape");
+        await expect(dock).toBeFocused();
+        await expect(dock).toHaveAttribute("aria-expanded", "false");
+        await dock.press("Enter");
+        await expect(cloud).toBeFocused();
+      }
       await expect(dock).toHaveAttribute("aria-expanded", "true");
       console.log(`Ready component passed ${width}×${height} (${mobile ? "touch emulation" : "desktop"}).`);
     } finally { await context.close(); }

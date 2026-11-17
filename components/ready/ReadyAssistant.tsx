@@ -679,6 +679,7 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
 
   function openAssistant() {
     if (workspace.current.open) return;
+    moveFocus.current = dock.current?.matches(":focus-visible") === true;
     usage.track({ type: "manual_open" });
     if (cloudExitTimer.current !== null) window.clearTimeout(cloudExitTimer.current);
     cloudExitTimer.current = null;

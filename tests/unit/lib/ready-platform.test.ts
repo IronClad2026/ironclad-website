@@ -60,6 +60,7 @@ describe("Ready platform assistance", () => {
     });
     await expect(answerPlatformAction("rules-hub", undefined, null)).resolves.toMatchObject({
       actions: [{ label: "Open the official rules hub", href: "/rules" }],
+      sources: [expect.objectContaining({ url: "/rules" })],
     });
     expect(data.loadReadyPrivateContext).not.toHaveBeenCalled();
   });
@@ -156,6 +157,38 @@ describe("Ready platform assistance", () => {
     await expect(answerPlatformAction("opponent-chat", { matchId: MATCH }, user)).resolves.toMatchObject({
       text: expect.stringContaining("read-only"),
       actions: [{ label: "Open earlier Match Room", href: `/tournaments?tournament=${event.slug}&tab=brackets&match=${MATCH}&room=${ROOM}` }],
+    });
+  });
+
+  it("leaves unpinned history lookup to the native signed-in Match Room on explicit activation", async () => {
+    data.loadReadyOwnedMatches.mockResolvedValue([{ ...match, active: false, status: "completed" }]);
+    await expect(answerPlatformAction("opponent-chat", { matchId: MATCH }, user)).resolves.toMatchObject({
+      text: expect.stringContaining("any existing read-only room"),
+      actions: [{ label: "Check Match Room history", href: `/tournaments?tournament=${event.slug}&tab=brackets&match=${MATCH}` }],
+    });
+  });
+
+  it("describes the stored deadline and status as historical when an event was cancelled", async () => {
+    data.loadReadyOwnedMatches.mockResolvedValue([{
+      ...match, active: false, status: "in_progress", hold_started_at: "2026-11-17T17:00:00Z",
+      event: { ...event, status: "cancelled" },
+    }]);
+    const reply = await answerPlatformAction("deadline", { matchId: MATCH }, user);
+    expect(reply.text).toContain("recorded deadline");
+    expect(reply.text).toContain("Match status was recorded as in progress. The tournament is cancelled.");
+    expect(reply.text).not.toContain("deadline is paused");
+  });
+
+  it("links to the native Prizes panel only where one is published", async () => {
+    const context = { eventSlug: event.slug };
+    await expect(answerPlatformAction("event-prizes", context, null)).resolves.toMatchObject({
+      text: expect.stringContaining("does not list a prize pool"),
+      actions: [{ label: "Open tournament", href: `/tournaments?tournament=${event.slug}` }],
+    });
+    data.loadReadyEvents.mockResolvedValue([{ ...event, prize_pool: "Verified event prizes" }]);
+    await expect(answerPlatformAction("event-prizes", context, null)).resolves.toMatchObject({
+      text: expect.stringContaining("Verified event prizes"),
+      actions: [{ label: "Open event prize terms", href: `/tournaments?tournament=${event.slug}&panel=prizes` }],
     });
   });
 

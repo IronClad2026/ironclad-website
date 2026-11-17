@@ -238,8 +238,8 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
   const rendered = await readPage(origin, oidc, actor, "/", "authenticated Staging homepage resolves");
   verify(rendered.includes("data-ready-dock"), "authenticated home server-render includes Ready dock");
   step = "launch visible Chrome";
-  const output = resolve("test-results", "ready-staging");
-  const browserAssets = resolve(output, "playwright-assets");
+  const output = resolve(process.env.READY_BROWSER_ARTIFACTS ?? "test-results/ready-staging");
+  const browserAssets = resolve("test-results", "ready-staging", "playwright-assets");
   if (existsSync(browserAssets)) process.env.PLAYWRIGHT_BROWSERS_PATH ??= browserAssets;
   const { chromium, expect } = await import("@playwright/test");
   const browserAuth = await createHostedAuth({ environmentDirectory: envRoot, origin });
@@ -463,12 +463,14 @@ try {
   verify(claims(oidc).exp * 1000 > Date.now(), "unexpired OIDC token available in memory");
   await verifyDeployment(options, origin);
 
-  const guestRule = await answer(origin, oidc, null, "guest public rule", { kind: "question", id: "disconnects", context: fixtureA });
-  verify(/10:00/.test(guestRule.text) && guestRule.sources?.some(({ url }) => url === `${appVersion}#page=9`) &&
-    !guestRule.context?.matchId, "signed-out caller gets the prepared current rule even when supplied a match reference");
-  const guestMatch = await answer(origin, oidc, null, "guest private match", { kind: "action", id: "my-match", context: fixtureA });
-  verify(/sign in/i.test(guestMatch.text) && guestMatch.actions?.some(({ href }) => href === "/sign-in") &&
-    !JSON.stringify(guestMatch).includes(fixtureA.matchId), "guest private lookup offers sign-in without disclosing the match");
+  if (!options["--active-fixture-manifest"]) {
+    const guestRule = await answer(origin, oidc, null, "guest public rule", { kind: "question", id: "disconnects", context: fixtureA });
+    verify(/10:00/.test(guestRule.text) && guestRule.sources?.some(({ url }) => url === `${appVersion}#page=9`) &&
+      !guestRule.context?.matchId, "signed-out caller gets the prepared current rule even when supplied a match reference");
+    const guestMatch = await answer(origin, oidc, null, "guest private match", { kind: "action", id: "my-match", context: fixtureA });
+    verify(/sign in/i.test(guestMatch.text) && guestMatch.actions?.some(({ href }) => href === "/sign-in") &&
+      !JSON.stringify(guestMatch).includes(fixtureA.matchId), "guest private lookup offers sign-in without disclosing the match");
+  }
 
   step = "approved staging credentials";
   const environment = await loadFixtureEnvironment({ rootDir: envRoot, processEnv: {} });
@@ -485,6 +487,7 @@ try {
     report.temporarySessionsCreated += result.temporarySessionsCreated;
     report.temporarySessionsRevoked += result.temporarySessionsRevoked;
   } else if (options["--active-fixture-manifest"]) {
+    await verifyStagingAlias(options);
     const fixtures = await readActiveFixtures(options["--active-fixture-manifest"], verify);
     const a1 = await loadActor(admin, environment, "TestAcademy1");
     const a3 = await loadActor(admin, environment, "TestAcademy3");
@@ -493,9 +496,10 @@ try {
       answer: (actor, label, payload) => answer(origin, oidc, actor, label, payload),
     });
     if (options["--headed"]) {
-      await browserJourney(origin, oidc, a1, false, { fixture: fixtures.a, mobile: false });
-      await browserJourney(origin, oidc, a2, false, { fixture: fixtures.a, mobile: true });
+      await browserJourney(stagingAlias, oidc, a1, false, { fixture: fixtures.a, mobile: false });
+      await browserJourney(stagingAlias, oidc, a2, false, { fixture: fixtures.a, mobile: true });
     }
+    await verifyStagingAlias(options);
     await postflight();
   } else if (options["--usage-menu-journey"]) {
     const a1 = await loadActor(admin, environment, "TestAcademy1");
