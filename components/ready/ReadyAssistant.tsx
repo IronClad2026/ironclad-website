@@ -1,10 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ComponentPropsWithRef, FormEvent, KeyboardEvent, PointerEvent, TouchEvent } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 
 import { READY_MAIN_MESSAGE, readyCategories, readyQuestionCatalogue } from "@/lib/ready/catalogue";
 import type { ReadyActionId, ReadyCategoryId, ReadyMenuChoice, ReadyQuestionId } from "@/lib/ready/catalogue";
@@ -21,6 +20,7 @@ import type { MascotRenderer, TalkStyle } from "./renderer";
 import { compileSpeech, sampleSpeech } from "./speech";
 import ThoughtCloudShape from "./ThoughtCloudShape";
 import { ReadyCloudLink, ReadySources } from "./ReadyReplyContent";
+import ReadyPoster from "./ReadyPoster";
 import { useMascotCloudMenu } from "./useMascotCloudMenu";
 import styles from "./ReadyAssistant.module.css";
 
@@ -42,7 +42,6 @@ type Reveal = { frame: number; last: number | null; elapsed: number; gain: numbe
 type AssetStatus = "loading" | "ready" | "error";
 
 const defaultWorkspace: Workspace = { open: false, position: null, seenGreeting: false };
-const poster = "/images/ironclad-logo.png";
 const requestTimeoutMs = 12000;
 const reducedQuery = "(prefers-reduced-motion: reduce)";
 const resumeOnClient = () => true;
@@ -512,8 +511,16 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
       try {
         const create = await loadMascotRenderer();
         if (cancelled) return;
-        controller = create({ canvas: currentCanvas,
-          onStatus: (value) => { if (!cancelled) setStatus(value); }, onAnchor: showAnchor });
+        controller = create({
+          canvas: currentCanvas,
+          onStatus: (value) => {
+            if (cancelled) return;
+            // Swap layers before the compositor presents the first WebGL draw.
+            if (value === "ready") flushSync(() => setStatus(value));
+            else setStatus(value);
+          },
+          onAnchor: showAnchor,
+        });
         renderer.current = controller;
         controller.setReducedMotion(matchMedia(reducedQuery).matches);
         controller.setMode(workspace.current.open ? "floating" : "dock");
@@ -967,8 +974,9 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
   return (
     <div className={styles.brand}>
       <TouchButton aria-controls={open ? "ironclad-assistant" : undefined} aria-expanded={open} aria-label="Open Ready, the IronClad assistant"
-        className={styles.dock} data-ready-dock="" onActivate={openAssistant} ref={dock} tabIndex={open ? -1 : 0} title="Open Ready" type="button">
-        {!open && status !== "ready" && <Image alt="" className={styles.poster} height={56} src={poster} unoptimized width={56} />}
+        className={styles.dock} data-ready-dock="" data-ready-status={status} onActivate={openAssistant}
+        ref={dock} tabIndex={open ? -1 : 0} title="Open Ready" type="button">
+        {!open && status !== "ready" && <ReadyPoster />}
       </TouchButton>
       {client && createPortal(<>
         <div aria-hidden="true" className={styles.surface} data-asset-status={status} data-mode={open ? "floating" : "dock"} ref={surface}>
@@ -990,7 +998,7 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
               else dockAssistant();
             }}>
             {open && status !== "ready" && <>
-              <Image alt="IronClad mascot poster" className={styles.artPoster} fill sizes="320px" src={poster} unoptimized />
+              <ReadyPoster floating />
               <span aria-live="polite" className={styles.assetNotice}>{status === "loading" ? "Loading 3D mascot…" : "3D unavailable. Text controls are available."}</span>
             </>}
             {open && <>

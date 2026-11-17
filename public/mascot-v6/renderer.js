@@ -263,7 +263,9 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
   let width = canvas.clientWidth;
   let height = canvas.clientHeight;
   let requestedVisibility = true;
-  let intersecting = true;
+  // The initial canvas is offscreen at 1px until the assistant positions it.
+  let intersecting = false;
+  let needsPresentation = true;
   let contextLost = false;
   let disposed = false;
   let blinkIndex = 0;
@@ -272,6 +274,14 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
   let expressionIntensity = 1;
   let activeTalk = null;
   let reducedExpressionTimer;
+  let resolveReady;
+  let rejectReady;
+  const ready = new Promise((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
+  });
+  // Consumers may use either the status callback or the ready promise.
+  ready.catch(() => {});
 
   function visible() {
     return loaded && !disposed && !contextLost && requestedVisibility && intersecting && width > 0 && height > 0 && !document.hidden;
@@ -293,17 +303,43 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
     else pause('The mascot left the visible viewport.');
   }
 
+  function fail(error) {
+    const reason = error instanceof Error ? error : new Error(String(error));
+    loaded = false;
+    abort.abort();
+    pause(reason.message);
+    runtime?.dispose();
+    runtime = undefined;
+    rejectReady(reason);
+    onStatus?.('error', reason);
+  }
+
   function draw(timestamp) {
     frame = 0;
     if (!visible()) return;
     const delta = lastFrame ? clamp((timestamp - lastFrame) / 1000, 0, .075) : 0;
     lastFrame = timestamp;
-    runtime.resize(width, height, options.mode);
-    if (!options.reducedMotion && runtime.pose.now >= nextBlink) {
-      runtime.pose.blink();
-      nextBlink = runtime.pose.now + blinkIntervals[blinkIndex++ % blinkIntervals.length];
+    try {
+      runtime.resize(width, height, options.mode);
+      if (!options.reducedMotion && runtime.pose.now >= nextBlink) {
+        runtime.pose.blink();
+        nextBlink = runtime.pose.now + blinkIntervals[blinkIndex++ % blinkIntervals.length];
+      }
+      runtime.frame(timestamp, delta, options);
+    } catch (error) {
+      fail(error);
+      return;
     }
-    runtime.frame(timestamp, delta, options);
+    if (needsPresentation) {
+      if (runtime.renderer.getContext().isContextLost()) return;
+      if (!runtime.renderer.info.render.calls) {
+        fail(new Error('The Ready model did not draw.'));
+        return;
+      }
+      needsPresentation = false;
+      resolveReady();
+      onStatus?.('ready');
+    }
     if (!options.reducedMotion) schedule();
   }
 
@@ -331,13 +367,13 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
   const onContextLost = event => {
     event.preventDefault();
     contextLost = true;
+    needsPresentation = true;
     const error = new Error('The WebGL drawing context was lost.');
     pause(error.message);
     onStatus?.('error', error);
   };
   const onContextRestored = () => {
     contextLost = false;
-    if (loaded) onStatus?.('ready');
     reconcile();
   };
   const sizing = new ResizeObserver(entries => {
@@ -369,7 +405,7 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
     schedule();
   }
 
-  const ready = (async () => {
+  void (async () => {
     onStatus?.('loading');
     const loader = new GLTFLoader();
     try {
@@ -387,20 +423,11 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
       showExpression(activeExpression, expressionIntensity);
       if (activeTalk && !options.reducedMotion) runtime.pose.playTalk(activeTalk.style, activeTalk.gain);
       loaded = true;
-      if (!contextLost) onStatus?.('ready');
       reconcile();
     } catch (error) {
-      if (disposed) return;
-      abort.abort();
-      runtime?.dispose();
-      runtime = undefined;
-      const reason = error instanceof Error ? error : new Error(String(error));
-      onStatus?.('error', reason);
-      throw reason;
+      if (!disposed) fail(error);
     }
   })();
-  // Consumers may use either the status callback or the ready promise.
-  ready.catch(() => {});
 
   function stopTalk() {
     activeTalk = null;
@@ -453,6 +480,7 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
     dispose() {
       if (disposed) return;
       disposed = true;
+      rejectReady(new Error('The mascot renderer was disposed.'));
       clearTimeout(reducedExpressionTimer);
       abort.abort();
       pause('The mascot renderer was disposed.');

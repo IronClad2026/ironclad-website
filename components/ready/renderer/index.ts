@@ -61,6 +61,7 @@ export type MascotFrameReport = {
 };
 
 export type MascotRenderer = {
+  /** Resolves after the first visible model frame is drawn. */
   ready: Promise<void>;
   setMode(mode: MascotMode): void;
   setView(view: MascotView): void;

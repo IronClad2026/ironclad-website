@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReadyAssistant from "@/components/ready/ReadyAssistant";
 import ReadyHeader from "@/components/ready/ReadyHeader";
 
-const { mock, track, clerk, renderer } = vi.hoisted(() => ({
+const { mock, track, clerk, renderer, renderStatus } = vi.hoisted(() => ({
   mock: { path: "/", query: "", reduced: false, webgl: false },
   track: vi.fn(),
   clerk: { isLoaded: true, isSignedIn: true, sessionId: "first-session" as string | null },
+  renderStatus: { notify: undefined as ((status: "loading" | "ready" | "error") => void) | undefined },
   renderer: {
     ready: Promise.resolve(),
     setMode: vi.fn(), setDragging: vi.fn(), setExpression: vi.fn(), setReducedMotion: vi.fn(),
@@ -21,7 +23,12 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(mock.query),
 }));
 vi.mock("@/components/ready/renderer", () => ({
-  loadMascotRenderer: () => mock.webgl ? Promise.resolve(() => renderer) : new Promise(() => undefined),
+  loadMascotRenderer: () => mock.webgl
+    ? Promise.resolve(({ onStatus }: { onStatus: typeof renderStatus.notify }) => {
+      renderStatus.notify = onStatus;
+      return renderer;
+    })
+    : new Promise(() => undefined),
 }));
 vi.mock("@/lib/ready/use-ready-usage", () => ({
   useReadyUsage: () => ({ enabled: false, loaded: true, saving: false, error: null, setEnabled: vi.fn(), track }),
@@ -55,6 +62,7 @@ describe("Ready player menu", () => {
     mock.query = "";
     mock.reduced = false;
     mock.webgl = false;
+    renderStatus.notify = undefined;
     clerk.isLoaded = true;
     clerk.isSignedIn = true;
     clerk.sessionId = "first-session";
@@ -63,6 +71,39 @@ describe("Ready player menu", () => {
     cleanup();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it("renders the same inline poster before hydration and after auth settles", () => {
+    clerk.isLoaded = false;
+    const serverHeader = document.createElement("div");
+    serverHeader.innerHTML = renderToString(<ReadyHeader />);
+    const serverPoster = serverHeader.querySelector("[data-ready-dock] img")?.getAttribute("src");
+    expect(serverPoster).toMatch(/^data:image\/webp;base64,/);
+    expect(serverHeader.querySelector("[data-ready-dock]")?.getAttribute("data-ready-status")).toBe("loading");
+
+    const header = render(<ReadyHeader />);
+    clerk.isLoaded = true;
+    header.rerender(<ReadyHeader />);
+    expect(getButton("Open Ready, the IronClad assistant").querySelector("img")?.getAttribute("src"))
+      .toBe(serverPoster);
+  });
+
+  it("keeps the poster through renderer setup, switches on readiness and restores it on error", async () => {
+    mock.webgl = true;
+    render(assistant);
+    await act(async () => { vi.advanceTimersByTime(32); });
+    await act(async () => { vi.advanceTimersByTime(32); });
+    const header = getButton("Open Ready, the IronClad assistant");
+    expect(renderStatus.notify).toBeDefined();
+    expect(header.querySelector("[data-ready-poster]")).not.toBeNull();
+    act(() => renderStatus.notify?.("ready"));
+    expect(header.dataset.readyStatus).toBe("ready");
+    expect(header.querySelector("[data-ready-poster]")).toBeNull();
+    act(() => renderStatus.notify?.("error"));
+    expect(header.querySelector("[data-ready-poster]")).not.toBeNull();
+    dock();
+    expect(screen.getByText("3D unavailable. Text controls are available.")).toBeDefined();
+    expect(getButton("Move assistant with drag or arrow keys")).toBeDefined();
   });
 
   it("holds the Sad line before the Neutral line and hands off to the six choices", () => {

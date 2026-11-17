@@ -20,7 +20,7 @@
 }
 
 .dock[aria-expanded="true"] { pointer-events: none; }
-.poster { display: block; width: 100%; height: 100%; object-fit: contain; transform: scale(2.45); }
+.poster, .artPoster { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 .surface,
 .assistant {
@@ -123,10 +123,10 @@
 .close:hover span { border-color: var(--ready-focus); background: var(--ready-option); }
 
 .artPoster {
-  box-sizing: border-box;
-  padding: 4px 10px 22px;
-  object-fit: contain;
-  transform: scale(1.25);
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 5px 6px rgb(0 0 0 / 35%));
+  pointer-events: none;
 }
 
 .assetNotice {
