@@ -108,6 +108,66 @@ export function cloudOrigin(area: Bounds, skull: Rect, side: Side, width: number
   return cloudPosition(area, skull, side, width, height, controls).point;
 }
 
+export function placeCompactCloud(area: Bounds, skull: Rect, cloudHeight: number, controls: readonly Rect[]) {
+  const maxWidth = Math.min(370, area.right - area.left);
+  const minWidth = Math.min(214, maxWidth);
+  const minHeight = 72;
+  const clearance = 8;
+  const targetHeight = Math.max(minHeight, cloudHeight);
+  const sides: Record<Side, Bounds> = {
+    below: { ...area, top: skull.y + skull.height + gap },
+    left: { ...area, right: skull.x - gap },
+    above: { ...area, bottom: skull.y - gap },
+    right: { ...area, left: skull.x + skull.width + gap },
+  };
+  let best: { side: Side; x: number; width: number; top: number; bottom: number } | undefined;
+  let bestScore = -Infinity;
+
+  for (const [side, space] of Object.entries(sides) as [Side, Bounds][]) {
+    const availableWidth = Math.min(maxWidth, space.right - space.left);
+    if (availableWidth < minWidth || space.bottom - space.top < minHeight) continue;
+    const obstacles = controls.filter((control) =>
+      control.x - clearance < space.right && control.x + control.width + clearance > space.left &&
+      control.y - clearance < space.bottom && control.y + control.height + clearance > space.top,
+    ).sort((a, b) => a.y - b.y);
+
+    for (const width of new Set([Math.floor(availableWidth), Math.floor(minWidth)])) {
+      const maxX = space.right - width;
+      const anchor = cloudOrigin(area, skull, side, width, targetHeight);
+      const xs = new Set([anchor.x, space.left, maxX]);
+      for (const control of obstacles) {
+        xs.add(control.x - clearance - width);
+        xs.add(control.x + control.width + clearance);
+      }
+
+      for (const x of new Set(Array.from(xs, (value) => clamp(value, space.left, maxX)))) {
+        // Each control crossing this column splits it into usable vertical bands.
+        let top = space.top;
+        const fit = (bottom: number) => {
+          const capacity = bottom - top;
+          if (capacity < minHeight) return;
+          const height = Math.min(capacity, targetHeight);
+          const preferredY = cloudOrigin(area, skull, side, width, height).y;
+          const y = clamp(preferredY, top, bottom - height);
+          const distance = Math.hypot(x - anchor.x, y - preferredY);
+          const score = height + width * .26 - distance * .3;
+          if (score <= bestScore) return;
+          best = { side, width, x, top, bottom };
+          bestScore = score;
+        };
+        for (const control of obstacles) {
+          if (x + width <= control.x - clearance || x >= control.x + control.width + clearance) continue;
+          fit(Math.min(space.bottom, control.y - clearance));
+          top = Math.max(top, control.y + control.height + clearance);
+        }
+        fit(space.bottom);
+      }
+    }
+  }
+
+  return best;
+}
+
 export function placeContextMenu(
   area: Bounds,
   skull: Rect,

@@ -10,7 +10,7 @@ import { createClerkClient } from "@clerk/backend";
 import { createClient } from "@supabase/supabase-js";
 import { browserActiveMatch, isActiveFixtureRead, readActiveFixtures, verifyActiveApi } from "./active-acceptance.mjs";
 import { evaluateReadyAiQuality, readReadyAiEvidence, readyAiCandidateModels } from "./ai-evaluation.mjs";
-import { browserMenuJourney, installRendererObservation, openQuickAction, openReadySearch } from "./menu-journey.mjs";
+import { browserMenuJourney, browserMobileLayoutJourney, installRendererObservation, openQuickAction, openReadySearch } from "./menu-journey.mjs";
 import { browserUsageMenuJourney } from "./usage-menu-journey.mjs";
 import {
   assertClerkDevelopmentInstance,
@@ -50,7 +50,7 @@ function args(tokens) {
   const options = {};
   for (let i = 0; i < tokens.length; i++) {
     const key = tokens[i];
-    if (["--headed", "--browser-only", "--navigation-only", "--menu-journey", "--usage-menu-journey"].includes(key) && !options[key]) {
+    if (["--headed", "--browser-only", "--navigation-only", "--menu-journey", "--mobile-layout-journey", "--usage-menu-journey"].includes(key) && !options[key]) {
       options[key] = true;
     } else if (["--url", "--deployment", "--commit", "--vercel-cli", "--active-fixture-manifest", "--ai-quality-model"].includes(key) && !options[key] && tokens[i + 1] && !tokens[i + 1].startsWith("--")) {
       options[key] = tokens[++i];
@@ -63,7 +63,7 @@ function args(tokens) {
     /^[a-f0-9]{40}$/.test(options["--commit"] ?? "") && /[\\/]vc\.js$/.test(options["--vercel-cli"] ?? ""), "exact deployment metadata arguments");
   if (options["--ai-quality-model"]) {
     verify(readyAiCandidateModels.includes(options["--ai-quality-model"]) &&
-      !["--active-fixture-manifest", "--headed", "--browser-only", "--navigation-only", "--menu-journey", "--usage-menu-journey"].some((mode) => options[mode]),
+      !["--active-fixture-manifest", "--headed", "--browser-only", "--navigation-only", "--menu-journey", "--mobile-layout-journey", "--usage-menu-journey"].some((mode) => options[mode]),
     "one approved candidate and dedicated AI evaluation mode");
   }
   return options;
@@ -228,6 +228,7 @@ async function browserMatchNavigation(page, expect, origin) {
 }
 
 async function browserJourney(origin, oidc, actor, navigationOnly = false, active = null, menu = false, usage = false) {
+  const mobileLayout = menu === "mobile-layout";
   const rendered = await readPage(origin, oidc, actor, "/", "authenticated Staging homepage resolves");
   verify(rendered.includes("data-ready-dock"), "authenticated home server-render includes Ready dock");
   step = "launch visible Chrome";
@@ -238,7 +239,7 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
   const browser = await chromium.launch({ channel: "chrome", headless: false });
   await mkdir(output, { recursive: true });
   try {
-    for (const mobile of active ? [active.mobile] : navigationOnly || usage ? [false] : [false, true]) {
+    for (const mobile of active ? [active.mobile] : mobileLayout ? [true] : navigationOnly || usage ? [false] : [false, true]) {
       const journey = mobile ? "touch-emulated Ready journey" : "desktop Ready journey";
       step = journey;
       const context = await browser.newContext({
@@ -246,7 +247,7 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
         hasTouch: mobile, isMobile: mobile, deviceScaleFactor: 1,
         ...((menu || usage) && !mobile ? { recordVideo: { dir: resolve(output, "ready-videos"), size: { width: 1280, height: 800 } } } : {}),
       });
-      if (menu) await context.addInitScript(installRendererObservation);
+      if (menu === true) await context.addInitScript(installRendererObservation);
       const jwt = await actor();
       await context.addCookies([
         { name: "__session", value: jwt, url: origin, secure: true, sameSite: "Lax" },
@@ -335,6 +336,17 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
         }
         if (navigationOnly) {
           await browserMatchNavigation(page, expect, origin);
+          continue;
+        }
+        if (mobileLayout) {
+          step = "visible Chrome Ready mobile overlap regression";
+          try {
+            await browserMobileLayoutJourney({ page, expect, output, verify });
+          } catch (error) {
+            await page.screenshot({ path: resolve(output, "ready-mobile-layout-debug.png") });
+            throw error;
+          }
+          report.browser.push("visible Chrome Ready layout at 390×780 and 780×390 with touch emulation");
           continue;
         }
         if (menu || usage) {
@@ -467,6 +479,8 @@ try {
   } else if (options["--usage-menu-journey"]) {
     const a1 = await loadActor(admin, environment, "TestAcademy1");
     await browserJourney(origin, oidc, a1, false, null, false, true);
+  } else if (options["--mobile-layout-journey"]) {
+    await browserJourney(origin, oidc, a2, false, null, "mobile-layout");
   } else if (options["--browser-only"] || options["--navigation-only"] || options["--menu-journey"]) {
     await browserJourney(origin, oidc, a2, options["--navigation-only"], null, options["--menu-journey"]);
   } else {

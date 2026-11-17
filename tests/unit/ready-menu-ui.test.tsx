@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReadyAssistant from "@/components/ready/ReadyAssistant";
-import { placeCloud, placeSkull } from "@/components/ready/floating-layout";
+import { placeCloud, placeCompactCloud, placeSkull } from "@/components/ready/floating-layout";
 
 const { mock, track } = vi.hoisted(() => ({
   mock: { path: "/", query: "", reduced: false },
@@ -186,4 +186,25 @@ it("reserves enough vertical room for the default phone menu and a clear desktop
   const oval = placeCloud(desktop, placeSkull(desktop, null), 254, [], { width: 602, minWidth: 516, minHeight: 254 });
   expect(oval.side).toBe("left");
   expect(oval.width).toBe(602);
+});
+
+it("uses the clear band below both full-width portrait hero actions", () => {
+  const area = { left: 10, top: 101, right: 380, bottom: 770 };
+  const controls = [
+    { x: 20, y: 440, width: 350, height: 48 },
+    { x: 20, y: 500, width: 350, height: 48 },
+  ];
+  expect(placeCompactCloud(area, placeSkull(area, null), 290, controls)).toEqual({
+    side: "below", width: 370, x: 10, top: 556, bottom: 770,
+  });
+});
+
+it("keeps the landscape dialogue beside the mascot and beside or beyond a page control", () => {
+  const area = { left: 10, top: 92, right: 770, bottom: 380 };
+  const skull = { x: 520, y: 152, width: 180, height: 169 };
+  const control = { x: 20, y: 198, width: 234, height: 48 };
+  const slot = placeCompactCloud(area, skull, 270, [control]);
+  expect(slot?.side).toBe("left");
+  expect(slot?.x).toBeGreaterThanOrEqual(control.x + control.width + 8);
+  expect(slot?.bottom).toBe(area.bottom);
 });

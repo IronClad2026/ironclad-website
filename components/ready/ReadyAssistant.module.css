@@ -214,6 +214,8 @@
   stroke-width: var(--cloud-stroke-width, 1px);
 }
 
+.bubble > svg path { pointer-events: visiblePainted; }
+
 .messageLayout { display: grid; }
 .messageLayout > * { grid-area: 1 / 1; }
 .messageReserve { visibility: hidden; user-select: none; }
@@ -307,6 +309,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+.speech[data-compact-placement] .bubble { padding: 12px 13px; }
+.speech[data-compact-placement] .answers { row-gap: 4px; }
+.speech[data-compact-placement] .answers .answer { min-height: 44px; padding: 8px 10px; }
 
 .speech:is([data-ready-view="main"], [data-ready-view="submenu"]) .answers .answer {
   min-width: 0;

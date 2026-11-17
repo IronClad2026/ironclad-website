@@ -14,7 +14,7 @@ import type { ReadyContext, ReadyIntent, ReadyReply } from "@/lib/ready/contract
 import { useReadyUsage } from "@/lib/ready/use-ready-usage";
 import { dialogue } from "./dialogue";
 import type { DialogueAnswer, DialogueId, DialogueNode } from "./dialogue";
-import { cloudOrigin, placeCloud, placeContextMenu, placeSkull, thoughtTrail } from "./floating-layout";
+import { cloudOrigin, placeCloud, placeCompactCloud, placeContextMenu, placeSkull, thoughtTrail } from "./floating-layout";
 import type { Bounds, Point, Rect, Side } from "./floating-layout";
 import { loadMascotRenderer } from "./renderer";
 import type { MascotRenderer, TalkStyle } from "./renderer";
@@ -222,7 +222,7 @@ export default function ReadyAssistant() {
   const afterReveal = useRef<(shown: ReadyView) => void>(() => undefined);
   const pointer = useRef<Drag | null>(null);
   const anchor = useRef<Point>({ x: .5, y: .69 });
-  const projection = useRef<{ skull: Rect; bubble: Rect; side: Side } | null>(null);
+  const projection = useRef<{ skull: Rect; bubble: Rect; side: Side; compact: boolean } | null>(null);
   const obstacles = useRef<Rect[]>([]);
   const menuLayout = useRef<{ area: Bounds; skull: Rect; speech: Rect } | null>(null);
   const dockingTimer = useRef<number | null>(null);
@@ -247,7 +247,7 @@ export default function ReadyAssistant() {
   const showAnchor = useCallback((point: Point) => {
     anchor.current = point;
     if (!projection.current || !workspace.current.open) return;
-    const { skull, bubble: rect, side } = projection.current;
+    const { skull, bubble: rect, side, compact } = projection.current;
     const mouth = { x: skull.x + skull.width * point.x, y: skull.y + skull.height * point.y };
     if (!tether.current) return;
     const points = thoughtTrail(skull, rect, side, mouth);
@@ -255,9 +255,10 @@ export default function ReadyAssistant() {
     for (let index = 0; index < beads.length; index += 1) {
       const bead = beads[index] as HTMLSpanElement;
       const location = points[index];
-      const hidden = location === undefined;
+      const hidden = !location || (compact && obstacles.current.some(({ x, y, width, height }) =>
+        location.x + 5 > x && location.x - 5 < x + width && location.y + 5 > y && location.y - 5 < y + height));
       if (bead.hidden !== hidden) bead.hidden = hidden;
-      if (!location) continue;
+      if (hidden || !location) continue;
       bead.style.setProperty("--thought-x", `${location.x}px`);
       bead.style.setProperty("--thought-y", `${location.y}px`);
     }
@@ -298,13 +299,18 @@ export default function ReadyAssistant() {
         element.style.height = `${skull.height}px`;
       }
       const conversation = speech.current;
-      const broad = current.current.id === "main" && area.right - area.left >= 820
+      const compact = area.right - area.left < 620 || area.bottom - area.top < 420;
+      conversation.toggleAttribute("data-compact-placement", compact);
+      const clear = compact && placeCompactCloud(area, skull, conversation.scrollHeight, obstacles.current);
+      const broad = !compact && current.current.id === "main" && area.right - area.left >= 820
         ? placeCloud(area, skull, ovalBounds.minHeight, obstacles.current, ovalBounds)
         : null;
       const oval = !!broad && broad.width >= ovalBounds.minWidth && broad.maxHeight >= ovalBounds.minHeight;
       if (oval) conversation.dataset.menuLayout = "oval";
       else delete conversation.dataset.menuLayout;
-      const { side, width, maxHeight } = oval ? broad : placeCloud(area, skull, conversation.scrollHeight, obstacles.current);
+      const { side, width, maxHeight } = clear
+        ? { ...clear, maxHeight: Math.floor(clear.bottom - clear.top) }
+        : oval ? broad : placeCloud(area, skull, conversation.scrollHeight, obstacles.current);
       conversation.dataset.side = side;
       conversation.style.width = `${width}px`;
       conversation.style.maxHeight = `${maxHeight}px`;
@@ -316,7 +322,10 @@ export default function ReadyAssistant() {
         conversation.removeAttribute("data-overflow");
         conversation.removeAttribute("tabindex");
       }
-      const origin = cloudOrigin(area, skull, side, width, conversation.offsetHeight, obstacles.current);
+      const height = Math.min(conversation.offsetHeight, maxHeight);
+      const origin = clear
+        ? { x: clear.x, y: Math.min(clear.bottom - height, Math.max(clear.top, cloudOrigin(area, skull, side, width, height).y)) }
+        : cloudOrigin(area, skull, side, width, height, obstacles.current);
       conversation.style.transform = `translate3d(${origin.x - skull.x}px, ${origin.y - skull.y}px, 0)`;
       const bounds = conversation.getBoundingClientRect();
       if (overflowing && composer.current && document.activeElement === questionInput.current) {
@@ -328,7 +337,9 @@ export default function ReadyAssistant() {
       menuLayout.current = { area, skull, speech: bounds };
       if (menuPanel.current?.dataset.mascotMenuOpen === "true") layoutMenu();
       const bubbleVisible = rect.bottom > bounds.top && rect.top < bounds.bottom;
-      projection.current = bubbleVisible ? { skull, side, bubble: { x: rect.left, y: rect.top, width: rect.width, height: rect.height } } : null;
+      projection.current = bubbleVisible
+        ? { skull, side, compact, bubble: { x: rect.left, y: rect.top, width: rect.width, height: rect.height } }
+        : null;
       if (tether.current) tether.current.style.visibility = bubbleVisible ? "visible" : "hidden";
       showAnchor(anchor.current);
       return;

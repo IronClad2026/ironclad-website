@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { writeFile } from "node:fs/promises";
 
 const centralMessage = "What can I help you with today, Commander?";
 const entries = [
@@ -79,7 +80,7 @@ async function assertLayout(page, expect, mobile) {
   }
 }
 
-async function dragPhoneMascot(page) {
+async function dragPhoneMascot(page, deltaX = -190) {
   const grip = page.locator("[data-mascot-drag]");
   const pos = await grip.boundingBox();
   const from = { x: pos.x + pos.width / 2, y: pos.y + pos.height / 2 };
@@ -89,7 +90,7 @@ async function dragPhoneMascot(page) {
     await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from.x, from.y) });
     for (const portion of [.25, .5, .75, 1]) {
       await touch.send("Input.dispatchTouchEvent", {
-        type: "touchMove", touchPoints: point(from.x - 190 * portion, from.y - 74 * portion),
+        type: "touchMove", touchPoints: point(from.x + deltaX * portion, from.y - 74 * portion),
       });
     }
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
@@ -97,6 +98,117 @@ async function dragPhoneMascot(page) {
     await touch.detach();
   }
   return (await grip.boundingBox()).x;
+}
+
+function readHeroClearance() {
+  const heroLink = document.querySelector('[data-mascot-attention="view-tournaments"]');
+  const dialogue = document.querySelector("[data-mascot-dialogue]");
+  const thought = dialogue.querySelector("[data-thought-cloud]");
+  const grip = document.querySelector("[data-mascot-drag]");
+  const frame = dialogue.getBoundingClientRect();
+  const bounds = (element) => {
+    const { x, y, width, height } = element.getBoundingClientRect();
+    return { x, y, width, height };
+  };
+  const visibleClouds = [thought, ...dialogue.querySelectorAll("button, a[href], summary")].map((element) => {
+    const box = element.getBoundingClientRect();
+    return { left: Math.max(box.left, frame.left), top: Math.max(box.top, frame.top),
+      right: Math.min(box.right, frame.right), bottom: Math.min(box.bottom, frame.bottom) };
+  }).filter((box) => box.left < box.right && box.top < box.bottom);
+
+  const controls = [...heroLink.parentElement.querySelectorAll("a[href]")].map((link) => {
+    const box = link.getBoundingClientRect();
+    const overlapped = visibleClouds.some((cloud) =>
+      Math.min(box.right, cloud.right) - Math.max(box.left, cloud.left) > 1 &&
+      Math.min(box.bottom, cloud.bottom) - Math.max(box.top, cloud.top) > 1);
+    const tappable = [0.1, 0.5, 0.9].every((offset) => link.contains(
+      document.elementFromPoint(box.left + box.width * offset, box.top + box.height / 2),
+    ));
+    return { ...bounds(link), overlapped, tappable };
+  });
+  return { width: innerWidth, height: innerHeight, dialogue: bounds(dialogue), thought: bounds(thought),
+    skull: bounds(grip), controls };
+}
+
+async function assertCloudTap(page, expect) {
+  const point = await page.evaluate(() => {
+    const dialogue = document.querySelector("[data-mascot-dialogue]");
+    const thought = dialogue.querySelector("[data-thought-cloud]").getBoundingClientRect();
+    const frame = dialogue.getBoundingClientRect();
+    const x = Math.round(thought.x + thought.width / 2);
+    const y = Math.round((Math.max(thought.top, frame.top) + Math.min(thought.bottom, frame.bottom)) / 2);
+    const probe = document.createElement("button");
+    // A control under the cloud which does not affect layout or obstacle detection.
+    probe.id = "ready-cloud-tap-probe";
+    probe.type = "button";
+    probe.tabIndex = -1;
+    probe.setAttribute("aria-hidden", "true");
+    Object.assign(probe.style, { position: "fixed", zIndex: "118", opacity: "0",
+      left: `${x - 6}px`, top: `${y - 6}px`, width: "12px", height: "12px" });
+    probe.dataset.taps = "0";
+    probe.addEventListener("click", () => { probe.dataset.taps = String(Number(probe.dataset.taps) + 1); });
+    document.body.append(probe);
+    const stack = document.elementsFromPoint(x, y);
+    return { x, y, probePresent: stack.includes(probe), cloudOnTop: dialogue.contains(stack[0]) };
+  });
+  const probe = page.locator("#ready-cloud-tap-probe");
+  try {
+    expect(point.probePresent).toBe(true);
+    await page.touchscreen.tap(point.x, point.y);
+    await expect(probe).toHaveAttribute("data-taps", "0");
+    expect(point.cloudOnTop).toBe(true);
+  } finally {
+    await probe.evaluate((element) => element.remove());
+  }
+}
+
+export async function browserMobileLayoutJourney({ page, expect, output, verify }) {
+  const settled = (view) => page.locator(`[data-ready-view="${view}"]:not([data-revealing])`);
+  const button = (name) => page.getByRole("button", { name, exact: true });
+  const cta = page.locator('[data-mascot-attention="view-tournaments"]');
+  const grip = page.locator("[data-mascot-drag]");
+  await expect(cta).toHaveAttribute("href", "/tournaments");
+  await openQuickAction(page, "Help", true);
+  await expect(settled("main")).toBeVisible({ timeout: 16_000 });
+  for (const { name, width, height } of [{ name: "portrait", width: 390, height: 780 },
+    { name: "landscape", width: 780, height: 390 }]) {
+    await page.setViewportSize({ width, height });
+    if (name === "landscape") await cta.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    await expect(cta).toBeInViewport({ ratio: 1 });
+    await expect(settled("main")).toBeVisible();
+    const measure = async () => {
+      const layout = await page.evaluate(readHeroClearance);
+      await writeFile(resolve(output, `ready-mobile-${name}-geometry.json`), JSON.stringify(layout, null, 2));
+      return layout.controls.every(({ overlapped, tappable }) => !overlapped && tappable);
+    };
+    await expect.poll(measure, { message: `${name} hero controls fully clear of Ready` }).toBe(true);
+    await page.screenshot({ path: resolve(output, `ready-mobile-${name}.png`), animations: "disabled" });
+    await assertCloudTap(page, expect);
+    verify(true, `${width}×${height} Chrome touch emulation leaves both hero links clear and a cloud tap stays in Ready`);
+
+    await button("Rules & match help").tap();
+    await expect(settled("submenu")).toBeVisible({ timeout: 16_000 });
+    await button("Maps & match format").tap();
+    await expect(button("Which faction can I play?")).toBeVisible({ timeout: 16_000 });
+    await button("Back").tap();
+    await button("Disconnects & lag").tap();
+    await expect(page.getByRole("link", { name: /Official Tournament Rulebook/ })).toBeVisible({ timeout: 20_000 });
+    await button("Main menu").tap();
+    await expect(settled("main")).toBeVisible({ timeout: 16_000 });
+    const before = await grip.boundingBox();
+    const draggedX = await dragPhoneMascot(page, before.x > (width - before.width) / 2 ? -190 : 190);
+    expect(Math.abs(draggedX - before.x)).toBeGreaterThan(30);
+    await expect(grip).toHaveAttribute("aria-expanded", "false");
+    await button("Dock assistant").tap();
+    await expect(page.locator("[data-mode='dock'][data-asset-status='ready']")).toHaveCount(1);
+    await page.locator("[data-ready-dock]").tap();
+    await expect(settled("main")).toBeVisible({ timeout: 16_000 });
+    expect(Math.abs((await grip.boundingBox()).x - draggedX)).toBeLessThan(5);
+    verify(true, `${name} touch emulation verified nested submenu, prepared rule source, drag, dock and reopen`);
+  }
+  await cta.tap();
+  await expect(page).toHaveURL(/\/tournaments(?:[?#].*)?$/);
+  verify(true, "a real tap on the exposed View Tournaments control opens Tournaments");
 }
 
 export async function browserMenuJourney({ page, expect, mobile, output, verify, recording }) {
