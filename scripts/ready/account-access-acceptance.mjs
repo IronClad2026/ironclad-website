@@ -43,7 +43,8 @@ function readOptions(tokens) {
   const names = ["--url", "--deployment", "--commit", "--vercel-cli", "--environment-dir", "--admin-user-id", "--notice-fixture", "--browser-url", "--artifacts"];
   for (let index = 0; index < tokens.length; index++) {
     const key = tokens[index];
-    if (["--headless", "--guest-only", "--ordinary-only", "--desktop-only", "--touch-only", "--cloud-baseline", "--cloud-surfaces"].includes(key) && !options.has(key)) {
+    if (["--headless", "--guest-only", "--ordinary-only", "--desktop-only", "--touch-only", "--cloud-baseline", "--cloud-surfaces",
+      "--cloud-deep", "--cloud-brackets"].includes(key) && !options.has(key)) {
       options.set(key, true);
       continue;
     }
@@ -391,12 +392,12 @@ async function measurePaintedGap(page) {
   return { gapPx: Math.round(Math.sqrt(squares) * 10) / 10, side, oval, skullX: Math.round(skull.x), skullWidth: Math.round(skull.width) };
 }
 
-async function dragToward(page, x, y) {
+async function dragToward(page, x, y, steps = 25) {
   const grip = await page.locator("[data-mascot-drag]").boundingBox();
   assert(grip);
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
-  try { await page.mouse.move(x, y, { steps: 25 }); }
+  try { await page.mouse.move(x, y, { steps }); }
   finally { await page.mouse.up(); }
 }
 
@@ -497,15 +498,81 @@ async function checkDashboardClouds(origin, oidc, player, headless, clerkCacheAc
   }
 }
 
-async function verifySurface(page, origin, path, label, mobile, native) {
+async function exerciseDesktopClouds(page, label) {
+  const { width, height } = page.viewportSize();
+  const targets = [
+    ["left", 22, height * .50], ["right", width - 22, height * .50],
+    ["upper left", 22, 112], ["upper right", width - 22, 112],
+    ["lower left", 22, height - 22], ["lower right", width - 22, height - 22],
+  ];
+  const geometry = [];
+  const bounds = () => page.evaluate(() => {
+    const getBox = (selector) => document.querySelector(selector)?.getBoundingClientRect()?.toJSON();
+    return { skull: getBox('[data-mode="floating"]'), frame: getBox("[data-mascot-dialogue]") };
+  });
+  for (const [position, x, y] of targets) {
+    step = `${label}: ${position} desktop drag`;
+    await dragToward(page, x, y, 12);
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+    const { skull, frame } = await bounds();
+    assert(skull && frame && skull.width > 0 && frame.width > 0 && frame.height > 0);
+    for (const box of [skull, frame]) assert(box.left >= -1 && box.top >= -1 && box.right <= width + 1 && box.bottom <= height + 1);
+    assert((position.includes("left") ? skull.right <= width / 2 : skull.left >= width / 2), "skull reaches the requested viewport side");
+    if (position.startsWith("upper")) assert(skull.top < height / 3);
+    if (position.startsWith("lower")) assert(skull.bottom >= height - 30);
+    assert(Math.min(frame.right, skull.right) - Math.max(frame.left, skull.left) <= 1 ||
+      Math.min(frame.bottom, skull.bottom) - Math.max(frame.top, skull.top) <= 1, "dialogue stays clear of the skull at the chosen edge");
+    geometry.push({ position, x: Math.round(skull.x), y: Math.round(skull.y) });
+  }
+
+  step = `${label}: real submenu choice and sourced answer`;
+  // The older synthetic fixture can have unconfirmed governing-document versions.
+  // Exercise a sourced general rules-hub answer there without assuming its event terms.
+  const route = new URL(page.url());
+  const eventScoped = route.pathname === "/tournaments" && route.searchParams.has("tournament");
+  const question = eventScoped ? "Where are the official rules?" : "Disconnects & lag";
+  await choose(page, false, eventScoped ? "Tournaments & registration" : "Rules & match help");
+  await expect(page.locator('[data-ready-view="submenu"]')).toBeVisible();
+  if (eventScoped) {
+    await choose(page, false, "Event rules, prizes & decisions");
+    await choose(page, false, "Official documents & editions");
+  }
+  await choose(page, false, question);
+  const reply = page.locator('[data-ready-view="reply"]');
+  await expect(reply).toBeVisible({ timeout: 20_000 });
+  const full = reply.getByRole("button", { name: "Show full message", exact: true });
+  if (await full.isVisible()) await full.click();
+  await expect(reply.locator("[data-mascot-message]")).not.toBeEmpty({ timeout: 15_000 });
+  await expect(reply.getByRole("link", { name: eventScoped ? /IronClad Competition Rules/i : /Official Tournament Rulebook/i }).first())
+    .toHaveAttribute("href", eventScoped ? "/rules"
+      : /\/documents-rules-ppa\/ironclad-official-tournament-rulebook/, { timeout: 20_000 });
+  await choose(page, false, "Back");
+  await expect(page.locator('[data-ready-view="submenu"]').getByRole("button", { name: question, exact: true })).toBeVisible();
+
+  step = `${label}: dock and reopen at the saved position`;
+  const before = (await bounds()).skull;
+  await dockAssistant(page, false);
+  await expect(page.locator("[data-mascot-dialogue]")).toHaveCount(0);
+  await showAssistant(page, false);
+  await expect(page.locator('[data-ready-view="submenu"]')).toBeVisible();
+  const after = (await bounds()).skull;
+  assert(before && after && Math.abs(after.x - before.x) <= 1 && Math.abs(after.y - before.y) <= 1);
+  await expect(page.locator('[data-mode] canvas')).toHaveCount(1);
+  console.log(JSON.stringify({ checkedRoute: label, drags: geometry, sourcedReply: question, reopenedAtSavedPosition: true }));
+}
+
+async function verifySurface(page, origin, path, label, mobile, native, deep = false) {
   const url = new URL(path, origin);
-  step = `${mobile ? "Emulated touch" : "Desktop"} ${label}`;
+  const stage = `${mobile ? "Emulated touch" : "Desktop"} ${label}`;
+  step = stage;
   assert.equal(url.origin, origin);
   const response = await page.goto(url.href, { waitUntil: "domcontentloaded" });
   assert(response?.ok() && new URL(page.url()).pathname === url.pathname, "expected application route must load without a sign-in redirect");
   if (native) await native(page);
   await assertCloudMenu(page, mobile);
-  passed(step + " displays Ready with one canvas and six dark cloud choices");
+  if (deep) await exerciseDesktopClouds(page, stage);
+  passed(stage + (deep ? " passed six real drags, sourced reply, and saved-position dock/reopen" :
+    " displays Ready with one canvas and six dark cloud choices"));
 }
 
 async function collectSurface(check) {
@@ -521,10 +588,10 @@ function fixturePath(extra = {}) {
   return `/tournaments?${new URLSearchParams({ tournament: owned.eventSlug, tab: "brackets", ...extra })}`;
 }
 
-async function checkDesktopSurfaces({ page, allowAssistanceRead }, origin) {
+async function checkDesktopSurfaces({ page, allowAssistanceRead }, origin, deep = false) {
   for (const [path, label] of [["/", "homepage"], ["/tournaments", "tournament list"], [fixturePath(), "owned event Brackets"],
     ["/rules", "Rules"], ["/about", "About"], ["/profile", "Profile"], ["/players", "Players"], ["/rankings", "Rankings"]]) {
-    await collectSurface(() => verifySurface(page, origin, path, label, false));
+    await collectSurface(() => verifySurface(page, origin, path, label, false, undefined, deep));
   }
   await collectSurface(async () => {
     step = "resolving ordinary player's owned historical Match Room";
@@ -565,13 +632,48 @@ async function checkDesktopSurfaces({ page, allowAssistanceRead }, origin) {
       allowAssistanceRead(href);
       await verifySurface(page, origin, href, "existing requester-scoped Assistance", false, async (current) => {
         await expect(current.getByRole("log")).toBeVisible({ timeout: 25_000 });
-      });
+      }, deep);
     } else {
       const skipped = "No existing Assistance link returned for the guarded ordinary requester";
       checks.push(skipped);
       console.log(JSON.stringify({ skipped }));
     }
   });
+}
+
+async function checkDeepDesktop(origin, oidc, player, headless, clerkCacheAction, bracketsOnly) {
+  assert(player, "the desktop surface journey uses the guarded ordinary player");
+  const view = await makeViewport(origin, oidc, false, headless, clerkCacheAction);
+  const { page, context } = view;
+  try {
+    step = "signing in the guarded ordinary player for per-route desktop verification";
+    await page.goto(origin + "/", { waitUntil: "domcontentloaded" });
+    await signIn(view, player);
+    await assertIdentity(page, player);
+    if (bracketsOnly) {
+      await verifySurface(page, origin, fixturePath(), "owned event Brackets", false, undefined, true);
+      assert.equal(view.attemptedUsageWrites(), 0);
+      return;
+    }
+    await collectSurface(() => verifySurface(page, origin, "/dashboard", "ordinary Dashboard", false, undefined, true));
+    await collectSurface(async () => {
+      step = "native Dashboard-to-Tournaments navigation preserves the expanded assistant";
+      const nav = page.getByRole("link", { name: "Go to Tournaments", exact: true });
+      await expect(page.locator('[data-mode="floating"]')).toHaveCount(1);
+      await nav.click();
+      await expect(page).toHaveURL(origin + "/tournaments");
+      await expect(page.locator('[data-mode="floating"]')).toHaveCount(1);
+      await expect(page.locator('[data-mode] canvas')).toHaveCount(1);
+      passed(step);
+    });
+    await checkDesktopSurfaces(view, origin, true);
+    assert.equal(view.attemptedUsageWrites(), 0, "ordinary player without opted-in consent must not attempt analytics writes");
+  } catch (error) {
+    browserFailure = await view.diagnose().catch(() => undefined);
+    throw error;
+  } finally {
+    await context.close();
+  }
 }
 
 async function checkCloudTouch(origin, oidc, player, headless, clerkCacheAction, output) {
@@ -763,7 +865,10 @@ try {
   step = "identifying Clerk's cache-only authentication callback for this build";
   const clerkCacheAction = player ? await findClerkCacheAction(origin, oidc) : undefined;
   browser = await chromium.launch({ channel: "chrome", headless });
-  if (options.has("--cloud-baseline") || options.has("--cloud-surfaces")) {
+  if (options.has("--cloud-deep") || options.has("--cloud-brackets")) {
+    await checkDeepDesktop(origin, oidc, player, headless, clerkCacheAction, options.has("--cloud-brackets"));
+    if (surfaceFailures.length) process.exitCode = 1;
+  } else if (options.has("--cloud-baseline") || options.has("--cloud-surfaces")) {
     const output = options.has("--cloud-surfaces") ? resolve(options.get("--artifacts")) : undefined;
     if (output) await mkdir(output, { recursive: true });
     if (!output || !options.has("--touch-only")) {
