@@ -54,11 +54,20 @@ for (const width of [360, 390, 412, 430, 1280])
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
     await expect(page.getByText(/opponent has 30 minutes/)).toBeVisible();
     await expect(page.getByText(/remaining$/)).toBeVisible();
-    const assistance = page.getByRole("button", { name: "Request Admin Assistance" });
-    await expect(assistance).toBeVisible();
-    await assistance.click();
-    await expect(page.getByText("Assistance requested", { exact: true })).toBeVisible();
-    await expect(assistance).toHaveCount(0);
+    const help = page.getByRole("region", { name: "Get help", exact: true });
+    await expect(help.getByRole("button", { name: "Request Admin Assistance", exact: true })).toHaveCount(0);
+    await help.getByRole("button", { name: "Message IronClad admins", exact: true }).click();
+    const message = help.getByLabel("Explain the issue", { exact: true });
+    const send = help.getByRole("button", { name: "Send private request", exact: true });
+    await expect(send).toBeDisabled();
+    const reason = "Please check the replay behind this result.";
+    await message.fill(reason);
+    await send.click();
+    await expect(help.getByText("Your private assistance request was sent.", { exact: true })).toBeVisible();
+    const conversation = help.getByRole("region", { name: "Private assistance conversation", exact: true });
+    await expect(conversation.getByText(reason, { exact: true })).toBeVisible();
+    await expect(send).toHaveCount(0);
+    await expect(message).toHaveCount(0);
     await page.screenshot({
       path: testInfo.outputPath("waiting-" + width + ".png"),
       fullPage: true,

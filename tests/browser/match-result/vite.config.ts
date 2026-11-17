@@ -11,6 +11,8 @@ export default defineConfig({
       ...[
         "@/app/tournaments/match-actions",
         "@/app/tournaments/support-actions",
+        "@/app/tournaments/private-assistance-actions",
+        "@/app/admin/tournaments/assistance-actions",
         "@/lib/supabase-browser",
         "@clerk/nextjs",
         "next/navigation",

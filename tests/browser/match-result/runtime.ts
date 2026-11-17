@@ -1,6 +1,18 @@
 // Test-only module aliases. No credentials, network calls or database writes.
 import { uxMatch, uxReport } from "@/tests/fixtures/match-result-ux";
 import type { MatchResultActionState } from "@/app/tournaments/match-actions";
+import {
+  isAssistanceBody,
+  type AssistanceContext,
+  type AssistanceConversation,
+  type AssistanceHistoryInput,
+  type AssistanceMessage,
+  type AssistanceMutation,
+  type AssistanceOpenInput,
+  type AssistanceRequest,
+  type AssistanceResult,
+  type AssistanceRoom,
+} from "@/lib/private-assistance";
 import type { MatchResultReportGroup } from "@/lib/tournaments";
 
 export let report: MatchResultReportGroup | null = null;
@@ -10,7 +22,12 @@ export function setReport(value: MatchResultReportGroup | null) {
 }
 const token = async () => "fixture-only";
 export function useAuth() {
-  return { getToken: token };
+  return {
+    getToken: token,
+    isLoaded: true,
+    userId: "fixture-player",
+    sessionId: "fixture-session",
+  };
 }
 export function useRouter() {
   return {
@@ -92,25 +109,90 @@ export const reviewMatchResult = submitNoShowReport;
 export const reviewMatchResultReportGroup = submitNoShowReport;
 export const saveAdminMatchResult = submitNoShowReport;
 export const resetAdminMatch = submitNoShowReport;
-export const fixtureMatch = uxMatch;
 
+export const fixtureRoomId = "55555555-5555-4555-8555-555555555555";
+const room: AssistanceRoom = {
+  roomId: fixtureRoomId,
+  matchId: uxMatch.id,
+  matchReference: "Quarterfinal",
+  tournamentId: "66666666-6666-4666-8666-666666666666",
+  tournamentTitle: "Fixture tournament",
+  tournamentBracketId: "77777777-7777-4777-8777-777777777777",
+  divisionName: "Academy",
+  reference: "Fixture tournament · Academy · Quarterfinal",
+};
+let request: AssistanceRequest | null = null;
+let message: AssistanceMessage | null = null;
 
-let assistanceVersion = 0;
-let assistanceRequestedAt: string | null = null;
-export async function getMatchRoomAssistance(input: { roomId: string }) {
-  return { ok: true as const, data: {
-    roomId: input.roomId, status: assistanceVersion ? "requested" as const : "none" as const,
-    requestVersion: assistanceVersion, requestedAt: assistanceRequestedAt, resolvedAt: null, canResolve: false,
-  } };
+export async function getPrivateAssistanceContext(
+  input: { roomId: string },
+): Promise<AssistanceResult<AssistanceContext>> {
+  if (input.roomId !== fixtureRoomId) return { ok: false, code: "forbidden" };
+  return {
+    ok: true,
+    data: { room, request, newRequestsEnabled: true, canCreate: !request, discordUrl: null },
+  };
 }
-export async function requestMatchAdminAssistance(input: { roomId: string; expectedRequestVersion: number }) {
-  if (input.expectedRequestVersion !== assistanceVersion) return { ok: false as const, code: "stale_room" as const };
-  if (!assistanceVersion) { assistanceVersion = 1; assistanceRequestedAt = new Date().toISOString(); }
-  return getMatchRoomAssistance(input);
+
+export async function openPrivateAssistance(
+  input: AssistanceOpenInput,
+): Promise<AssistanceResult<AssistanceMutation>> {
+  if (input.roomId !== fixtureRoomId) return { ok: false, code: "forbidden" };
+  if (!isAssistanceBody(input.body)) return { ok: false, code: "invalid_request" };
+  if (request) return { ok: false, code: "conflict" };
+  const now = new Date().toISOString();
+  request = {
+    ...room,
+    id: crypto.randomUUID(),
+    requesterRegistrationId: uxMatch.playerOneRegistrationId!,
+    requesterName: "Marco",
+    status: "open",
+    version: 1,
+    lastSequence: 1,
+    createdAt: now,
+    updatedAt: now,
+    resolvedAt: null,
+    contentPurgedAt: null,
+  };
+  message = {
+    id: crypto.randomUUID(),
+    requestId: request.id,
+    sequence: 1,
+    senderKind: "requester",
+    body: input.body,
+    createdAt: now,
+    redactedAt: null,
+  };
+  return {
+    ok: true,
+    data: { request, message, accepted: true, acceptedClientMessageId: input.clientMessageId, duplicate: false },
+  };
 }
-export async function resolveMatchAdminAssistance() {
+
+export async function readPrivateAssistance(
+  input: AssistanceHistoryInput,
+): Promise<AssistanceResult<AssistanceConversation>> {
+  if (!request || input.requestId !== request.id || input.tournamentId !== room.tournamentId) {
+    return { ok: false, code: "forbidden" };
+  }
+  const messages = message && input.afterSequence < message.sequence ? [message] : [];
+  return {
+    ok: true,
+    data: {
+      request,
+      messages,
+      hasMore: false,
+      nextAfterSequence: messages[0]?.sequence ?? input.afterSequence,
+      canReply: true,
+      canSetStatus: false,
+    },
+  };
+}
+
+export async function replyPrivateAssistance() {
   return { ok: false as const, code: "forbidden" as const };
 }
+export const setPrivateAssistanceStatus = replyPrivateAssistance;
 export async function getMatchRoomOpponentDiscord() {
   return { discordUsername: null };
 }
