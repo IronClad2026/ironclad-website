@@ -6,7 +6,7 @@ import { getAnnouncementPlainText, parseAnnouncementDocument } from "@/lib/annou
 const migration = readFileSync(
   join(process.cwd(), "supabase/migrations/20261024173736_announcement_rich_documents.sql"),
   "utf8"
-).toLowerCase();
+).replace(/\r\n/g, "\n").toLowerCase();
 const normalized = migration.replace(/\s+/g, " ");
 const databaseContractSource = readFileSync(
   join(process.cwd(), "tests/database/announcement-rich-documents.sql"),

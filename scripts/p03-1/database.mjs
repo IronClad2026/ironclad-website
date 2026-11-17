@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { localClient, localPsqlArgument } from "./local-pg.mjs";
+import { localClient, localPsqlArgument, scopeReplayedPostgrestHook } from "./local-pg.mjs";
 
 const root = process.cwd();
 const database = "p03_realtime_" + Date.now();
@@ -21,6 +21,20 @@ for (const name of migrations) {
   try { await client.run(sql); } catch (error) { throw new Error("Migration " + name + ": " + error.message); }
 }
 console.log("PASS full staging migration replay: " + migrations.length);
+await scopeReplayedPostgrestHook(client);
+console.log("PASS authenticated PostgREST hook isolation");
+assert.equal(await client.run(`
+  select count(*) = 1 and bool_and(
+    jobname = 'ironclad-transactional-email-worker'
+    and schedule = '*/5 * * * *'
+    and command = 'select public.invoke_transactional_email_worker();'
+  )
+  from cron.job
+  where jobname = 'ironclad-transactional-email-worker'
+     or command ilike '%invoke_transactional_email_worker%'
+     or command ilike '%/api/internal/transactional-email%';
+`), "t", "Expected one five-minute transactional email schedule after migration replay");
+console.log("PASS transactional email cron inventory");
 await client.run("select public.set_match_room_enabled(true,'match-room-test-4');");
 const suites = [];
 for (const name of ["match-room-phase-1", "match-room-phase-3", "match-room-production-hardening", "match-room-unread-summary", "announcement-rich-documents"]) {

@@ -571,23 +571,27 @@ describe("transactional-email migration contract", () => {
 
   it("installs one idempotent five-minute database cron job", () => {
     expect(countMatches(compactMigration, /cron\.schedule\(/g)).toBe(1);
-    expect(compactMigration).toContain("cron.unschedule");
+    expect(compactMigration).toMatch(
+      /from cron\.job as job where job\.jobname = 'ironclad-transactional-email-worker' loop perform cron\.unschedule\(v_job_id\)/
+    );
     expect(compactMigration.indexOf("cron.unschedule")).toBeLessThan(
       compactMigration.indexOf("cron.schedule")
     );
-    expect(compactMigration).toContain(
-      "'ironclad-transactional-email-worker'"
-    );
-    expect(compactMigration).toContain("'*/5 * * * *'");
     expect(compactMigration).toMatch(
-      /(?:select|perform) (?:public|ironclad_private)\.invoke_transactional_email_worker\(\)/
+      /cron\.schedule\(\s*'ironclad-transactional-email-worker',\s*'\*\/5 \* \* \* \*',\s*'select public\.invoke_transactional_email_worker\(\);'\s*\)/
     );
     expect(compactMigration).not.toContain("vercel cron");
     expect(compactMigration).not.toContain("cron_secret");
     expect(compactMigration).not.toContain("exception when others");
-    expect(
-      existsSync(resolve(process.cwd(), "vercel.json"))
-    ).toBe(false);
+  });
+
+  it("keeps Vercel cron schedules empty while PostgreSQL owns scheduling", () => {
+    const configPath = resolve(process.cwd(), "vercel.json");
+    const config = existsSync(configPath)
+      ? JSON.parse(readFileSync(configPath, "utf8")) as { crons?: unknown }
+      : {};
+    const { crons = [] } = config;
+    expect(crons).toEqual([]);
   });
 });
 
@@ -689,20 +693,11 @@ describe("transactional-email Vercel protection bypass migration", () => {
   });
 
   it("leaves the one existing five-minute cron contract unchanged", () => {
-    const combinedMigrations =
-      `${compactMigration} ${compactVercelBypassMigration}`;
-
-    expect(
-      countMatches(compactVercelBypassMigration, /cron\.(?:un)?schedule\(/g)
-    ).toBe(0);
-    expect(countMatches(combinedMigrations, /cron\.schedule\(/g)).toBe(1);
-    expect(combinedMigrations).toContain(
-      "'ironclad-transactional-email-worker'"
+    expect(compactVercelBypassMigration).not.toMatch(
+      /\bcron\s*\.\s*(?:schedule(?:_in_database)?|unschedule|alter_job)\s*\(/
     );
-    expect(combinedMigrations).toContain("'*/5 * * * *'");
-    expect(combinedMigrations).toContain(
-      "'select public.invoke_transactional_email_worker();'"
+    expect(compactVercelBypassMigration).not.toMatch(
+      /\b(?:insert into|update|delete from|truncate(?: table)?)\s+cron\s*\.\s*job\b/
     );
-    expect(existsSync(resolve(process.cwd(), "vercel.json"))).toBe(false);
   });
 });

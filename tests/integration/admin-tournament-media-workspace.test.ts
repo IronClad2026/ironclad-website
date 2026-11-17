@@ -1,6 +1,13 @@
+// @vitest-environment jsdom
+
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { createElement } from "react";
+import { afterEach, describe, expect, it } from "vitest";
+import TournamentManagementMenu, {
+  TournamentDesktopSectionNavigation,
+} from "@/components/admin/tournaments/TournamentManagementMenu";
 
 function read(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
@@ -17,8 +24,39 @@ const media = read(
   "components/admin/tournaments/AdminTournamentMedia.tsx"
 );
 const actions = read("app/admin/tournaments/media-actions.ts");
+const tournamentId = "11111111-1111-4111-8111-111111111111";
+const sectionLinks = [
+  ["Overview", "overview"],
+  ["Edit Tournament", "edit"],
+  ["Registrations", "registrations"],
+  ["Players / Waitlist", "players-waitlist"],
+  ["Notifications", "notifications"],
+  ["Assistance", "assistance"],
+  ["Bracket", "bracket"],
+  ["Matches / Results", "matches"],
+  ["Replay Archive", "replays"],
+  ["Media", "media"],
+  ["Map Pool", "map-pool"],
+  ["Tournament Controls", "controls"],
+] as const;
+
+function expectWorkspaceLinks(navigation: HTMLElement) {
+  const links = within(navigation).getAllByRole("link");
+  expect(links).toHaveLength(sectionLinks.length);
+  for (const [index, [label, section]] of sectionLinks.entries()) {
+    expect(links[index]).toHaveAccessibleName(label);
+    expect(links[index]).toHaveAttribute(
+      "href",
+      `/admin/tournaments/${tournamentId}?section=${section}`
+    );
+  }
+  expect(within(navigation).getByRole("link", { current: "page" }))
+    .toHaveAccessibleName("Media");
+}
 
 describe("Admin Tournament Media workspace contract", () => {
+  afterEach(cleanup);
+
   it("keeps Media in the focused route, desktop nav, and drawer", () => {
     expect(workspace).toContain('"media",');
     expect(workspace).toContain('if (section === "media")');
@@ -28,8 +66,35 @@ describe("Admin Tournament Media workspace contract", () => {
       '{ icon: Clapperboard, label: "Media", section: "media" }'
     );
     expect(menu).toContain("?section=${item.section}");
-    expect(menu).toContain("2xl:grid-cols-10");
     expect(header).toContain('media: "Media"');
+    expect(header).toContain("<TournamentDesktopSectionNavigation");
+    expect(header).toContain("<TournamentManagementMenu");
+
+    render(createElement(TournamentDesktopSectionNavigation, {
+      activeSection: "media",
+      tournamentId,
+    }));
+    const desktop = screen.getByRole("navigation", {
+      name: "Tournament management sections",
+    });
+    expect(desktop).toHaveClass("hidden", "xl:block");
+    expect(within(desktop).getByRole("list"))
+      .toHaveClass("grid-cols-3", "2xl:grid-cols-6");
+    expectWorkspaceLinks(desktop);
+
+    render(createElement(TournamentManagementMenu, {
+      activeSection: "media",
+      tournamentId,
+    }));
+    const trigger = screen.getByRole("button", {
+      name: "Open Tournament management menu",
+    });
+    expect(trigger).toHaveClass("xl:hidden");
+    fireEvent.click(trigger);
+    const drawer = screen.getByRole("dialog", { name: "Manage Tournament" });
+    expectWorkspaceLinks(within(drawer).getByRole("navigation", {
+      name: "Tournament management sections",
+    }));
   });
 
   it("keeps terminal Tournaments manageable without a lifecycle lock", () => {

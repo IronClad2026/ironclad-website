@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { localClient, localPsqlArgument } from "../p03-1/local-pg.mjs";
+import { localClient, localPsqlArgument, scopeReplayedPostgrestHook } from "../p03-1/local-pg.mjs";
 
 const root = process.cwd();
 const database = "p03_four_division_regression_" + Date.now();
@@ -20,6 +20,8 @@ for (const name of migrations) {
   try { await client.run(sql); } catch (error) { throw new Error("Migration " + name + ": " + error.message); }
 }
 console.log("PASS full migration replay: " + migrations.length);
+await scopeReplayedPostgrestHook(client);
+console.log("PASS authenticated PostgREST hook isolation");
 await client.run(read("tests/database/four-division-model-fixtures-local.sql"));
 console.log("PASS four-division model, fixture, role and immutable-history contracts");
 
