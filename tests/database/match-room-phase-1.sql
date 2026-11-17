@@ -185,15 +185,26 @@ begin
   end loop;
   foreach v_rpc in array array[
     'public.resolve_match_room(uuid)', 'public.get_match_room_history(uuid,bigint,integer)',
-    'public.send_match_room_message(uuid,uuid,uuid,text)', 'public.send_admin_match_room_message(uuid,uuid,uuid,text)',
+    'public.send_match_room_message(uuid,uuid,uuid,text)',
     'public.mark_match_room_read(uuid,bigint)'
   ] loop
     perform pg_temp.mr_assert(has_function_privilege('authenticated', v_rpc, 'EXECUTE'), v_rpc || ' authenticated grant');
     perform pg_temp.mr_assert(not has_function_privilege('anon', v_rpc, 'EXECUTE'), v_rpc || ' anon denied');
     perform pg_temp.mr_assert(not has_function_privilege('service_role', v_rpc, 'EXECUTE'), v_rpc || ' service denied');
   end loop;
+  foreach v_role in array array['anon', 'authenticated', 'service_role'] loop
+    perform pg_temp.mr_assert(not has_function_privilege(v_role,
+      'public.send_admin_match_room_message(uuid,uuid,uuid,text)', 'EXECUTE'), v_role || ' legacy staff RPC denied');
+    perform pg_temp.mr_assert(has_function_privilege(v_role,
+      'public.call_patch2_match_staff(text,jsonb,text)', 'EXECUTE') = (v_role = 'service_role'), v_role || ' staff gateway grant');
+  end loop;
 end;
 $$;
+
+-- Reproduce the trusted server's verified actor with synthetic grants that roll back.
+insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference,revoked_at)
+values (sha256(convert_to('match-room-test-4','UTF8')),'Match Room phase 1 fixture',null),
+  (sha256(convert_to('match-room-test-3','UTF8')),'Match Room phase 1 revoked staff fixture',now());
 
 insert into match_room_test_state values ('competition-before', (
   select jsonb_agg(to_jsonb(m) order by id) from public.tournament_matches m
@@ -222,6 +233,10 @@ select pg_temp.mr_error($q$insert into public.match_messages(room_id,sequence,se
   '42501', 'direct spoofed sender insert denied');
 select pg_temp.mr_error($q$select public.send_admin_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(802),'spoof')$q$,
   '42501', 'participant cannot call admin send');
+select pg_temp.mr_error($q$select public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(301),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(802),'p_body','spoof'),'match-room-test-4')$q$,
+  '42501','participant cannot impersonate verified staff');
 select pg_temp.mr_error($q$select public.send_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(803),E' \t\n')$q$,
   '22023', 'ASCII whitespace-only body rejected');
 select pg_temp.mr_error($q$select public.send_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(804),U&'\2003\00a0')$q$,
@@ -251,14 +266,32 @@ select pg_temp.mr_error($q$select public.send_match_room_message(pg_temp.mr_id(3
 select pg_temp.mr_error($q$select public.mark_match_room_read(pg_temp.mr_room('ab'),1)$q$,'42501','unrelated C cannot mark AB read');
 select set_config('request.jwt.claims','{"role":"authenticated","sub":"match-room-test-3","user_metadata":{"role":"admin"}}',true);
 select pg_temp.mr_error($q$select public.send_admin_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(808),'forged user metadata')$q$,'42501','user_metadata does not grant admin authority');
-select pg_temp.mr_actor('match-room-test-4',true);
-select pg_temp.mr_assert(jsonb_array_length(public.get_match_room_history(pg_temp.mr_room('ab'),0,50) -> 'messages') = 2,'admin reads private room');
-select pg_temp.mr_assert(public.send_admin_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(809),'Admin context') -> 'message' ->> 'senderKind' = 'admin','admin sender kind is persisted distinctly');
-select pg_temp.mr_assert(not (public.get_match_room_history(pg_temp.mr_room('ab'),0,1)::text like '%actor_clerk_user_id%')
-  and not (public.get_match_room_history(pg_temp.mr_room('ab'),0,1)::text like '%match-room-test-%'), 'history projection excludes private Clerk attribution');
+select pg_temp.mr_actor('match-room-test-3',true);
+select pg_temp.mr_error($q$select public.get_match_room_history(pg_temp.mr_room('ab'),0,50)$q$,'42501','stale staff claim cannot read an unrelated room');
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_error($q$select public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(301),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(808),'p_body','revoked staff'),'match-room-test-3')$q$,
+  '42501','trusted gateway denies a revoked staff actor');
+select pg_temp.mr_assert(jsonb_array_length(public.call_patch2_match_staff('get_match_room_history',
+  jsonb_build_object('p_room_id',pg_temp.mr_room('ab'),'p_after_sequence',0,'p_limit',50),'match-room-test-4')->'messages')=2,
+  'verified server staff reads private room');
+select pg_temp.mr_assert(public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(301),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(809),'p_body','Admin context'),'match-room-test-4')->'message'->>'senderKind'='admin',
+  'admin sender kind is persisted distinctly');
+select pg_temp.mr_assert(history::text not like '%actor_clerk_user_id%' and history::text not like '%match-room-test-%',
+  'history projection excludes private Clerk attribution')
+from public.call_patch2_match_staff('get_match_room_history',
+  jsonb_build_object('p_room_id',pg_temp.mr_room('ab'),'p_after_sequence',0,'p_limit',1),'match-room-test-4') history;
 set local role anon;
 select pg_temp.mr_actor(null);
 select pg_temp.mr_error($q$select public.resolve_match_room(pg_temp.mr_id(301))$q$,'42501','anonymous RPC denied');
+select pg_temp.mr_error($q$select public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(301),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(808),'p_body','anonymous'),'match-room-test-4')$q$,
+  '42501','anonymous caller cannot use staff gateway');
 select pg_temp.mr_error('select * from public.match_rooms','42501','anonymous actual raw SELECT denied');
 set local role authenticated;
 select pg_temp.mr_actor(null);
@@ -375,10 +408,12 @@ select pg_temp.mr_assert(public.get_match_room_history(pg_temp.mr_room('ab'),0,5
   'official completion retains readable player transcript');
 select pg_temp.mr_error($q$select public.send_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(863),'after final')$q$,
   '55000','completed room denies new player message');
-select pg_temp.mr_actor('match-room-test-4',true);
-select pg_temp.mr_error($q$select public.send_admin_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(864),'after final')$q$,
-  '55000','completed room denies new admin message');
 set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_error($q$select public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(301),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(864),'p_body','after final'),'match-room-test-4')$q$,
+  '55000','completed room denies new admin message');
 select pg_temp.mr_actor('match-room-test-4',true);
 select public.admin_reset_tournament_match(pg_temp.mr_id(301),'match-room-test-4');
 select public.apply_admin_official_match_result(pg_temp.mr_id(311),2,0,pg_temp.mr_id(211),'match-room-test-4');
@@ -528,8 +563,11 @@ select pg_temp.mr_error($q$select public.mark_match_room_read(pg_temp.mr_room('a
 select pg_temp.mr_actor('match-room-test-1');
 select pg_temp.mr_assert(jsonb_array_length(public.get_match_room_history(pg_temp.mr_room('ab-return'),0,50)->'messages')=1,
   'remaining member can read retained transcript after opponent closure');
-select pg_temp.mr_actor('match-room-test-4',true);
-select pg_temp.mr_assert(jsonb_array_length(public.get_match_room_history(pg_temp.mr_room('ac'),0,50)->'messages')=1,'admin retains historical room inspection');
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_assert(jsonb_array_length(public.call_patch2_match_staff('get_match_room_history',
+  jsonb_build_object('p_room_id',pg_temp.mr_room('ac'),'p_after_sequence',0,'p_limit',50),'match-room-test-4')->'messages')=1,
+  'admin retains historical room inspection');
 reset role;
 select pg_temp.mr_error($q$select public.delete_tournament_data(pg_temp.mr_id(2),'match-room-test-4')$q$,null,
   'room history does not weaken protected tournament hard-delete guard');
@@ -547,8 +585,11 @@ select pg_temp.mr_assert(public.get_match_room_history(pg_temp.mr_room('ab-silen
   'void tournament retains transcript read-only');
 select pg_temp.mr_error($q$select public.send_match_room_message(pg_temp.mr_id(311),pg_temp.mr_room('ab-silent-return'),pg_temp.mr_id(883),'terminal')$q$,
   '55000','terminal tournament player send denied');
-select pg_temp.mr_actor('match-room-test-4',true);
-select pg_temp.mr_error($q$select public.send_admin_match_room_message(pg_temp.mr_id(311),pg_temp.mr_room('ab-silent-return'),pg_temp.mr_id(884),'terminal admin')$q$,
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_error($q$select public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(311),'p_expected_room_id',pg_temp.mr_room('ab-silent-return'),
+    'p_client_message_id',pg_temp.mr_id(884),'p_body','terminal admin'),'match-room-test-4')$q$,
   '55000','terminal tournament admin send denied');
 reset role;
 

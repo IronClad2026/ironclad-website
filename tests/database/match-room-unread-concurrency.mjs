@@ -63,6 +63,12 @@ function authenticated(sql, actor = 2, admin = false) {
     set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-${actor}","metadata":{"role":"${admin ? "admin" : "player"}"}}';
     ${sql}`;
 }
+function service(sql) {
+  return `set session authorization ${role}; set role service_role;
+    set request.jwt.claim.role='service_role';
+    set request.jwt.claims='{"role":"service_role"}';
+    ${sql}`;
+}
 function summary(matchId) { return `select public.get_match_room_unread_summary(array[${quote(matchId)}]::uuid[]);`; }
 function send(matchId, roomId, key) {
   return `select public.send_match_room_message(${quote(matchId)},${quote(roomId)},${quote(id(key))},'Concurrent private fixture');`;
@@ -93,16 +99,21 @@ try {
   assert.equal(await run("select (select count(*) from public.players)=0 and to_regprocedure('public.get_match_room_enabled()') is not null;", template), "t");
   await run(`create database ${database} template ${template};`, "postgres"); createdDatabase = true;
   await run(`create role ${role} login nosuperuser nocreatedb nocreaterole noinherit nobypassrls;`, "postgres"); createdRole = true;
-  await run(`grant authenticated to ${role};`, "postgres");
-  const migrationDirectory = new URL("../../supabase/migrations/", import.meta.url);
-  const migrationName = readdirSync(migrationDirectory).find((name) => name.endsWith("_match_room_unread_summary.sql"));
-  assert(migrationName);
-  await run(readFileSync(new URL(migrationName, migrationDirectory), "utf8"));
+  await run(`grant authenticated, service_role to ${role};`, "postgres");
+  const fullReplay = template.startsWith("p03_realtime_");
+  if (fullReplay) {
+    assert.equal(await run("select to_regprocedure('public.call_patch2_match_staff(text,jsonb,text)') is not null;"), "t");
+  } else {
+    const migrationDirectory = new URL("../../supabase/migrations/", import.meta.url);
+    const migrationName = readdirSync(migrationDirectory).find((name) => name.endsWith("_match_room_unread_summary.sql"));
+    assert(migrationName);
+    await run(readFileSync(new URL(migrationName, migrationDirectory), "utf8"));
+  }
   const fixture = readFileSync(new URL("./match-room-unread-summary.sql", import.meta.url), "utf8");
   const boundary = fixture.indexOf("select pg_temp.mr_assert(has_function_privilege");
   assert(boundary > 0);
   await run(fixture.slice(0, boundary) + "\ncommit;");
-  await run("select public.set_match_room_enabled(true, 'match-room-test-4');");
+  await run(service("select public.set_match_room_enabled(true, 'match-room-test-4');"));
   const matchId = id(311);
   const roomId = data(await start(authenticated(`select public.resolve_match_room(${quote(matchId)});`, 1)).done).room.id;
   success(await start(authenticated(send(matchId, roomId, 901), 1)).done);
@@ -142,12 +153,21 @@ try {
   passed("read-before-send race restores attention for the next message and genuine catch-up clears it");
 
   // An admin who is also a participant must not receive their own admin send.
-  success(await start(authenticated(`select public.send_admin_match_room_message(${quote(matchId)},${quote(roomId)},${quote(id(904))},'Own admin fixture');`, 2, true)).done);
+  if (fullReplay) {
+    await run(`insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+      values(sha256(convert_to('match-room-test-2','UTF8')),'disposable unread participant fixture');`);
+  }
+  const staffSend = fullReplay
+    ? service(`select public.call_patch2_match_staff('send_admin_match_room_message',
+      jsonb_build_object('p_match_id',${quote(matchId)},'p_expected_room_id',${quote(roomId)},
+        'p_client_message_id',${quote(id(904))},'p_body','Own admin fixture'),'match-room-test-2');`)
+    : authenticated(`select public.send_admin_match_room_message(${quote(matchId)},${quote(roomId)},${quote(id(904))},'Own admin fixture');`, 2, true);
+  success(await start(staffSend).done);
   assert.deepEqual(data(await start(authenticated(summary(matchId), 2, true)).done), { items: [] });
   assert.equal(data(await start(authenticated(summary(matchId), 1)).done).items[0].unreadSource, "admin");
   passed("admin participant self-sends are excluded while the other participant sees admin attention");
 
-  await run(`select public.admin_reset_tournament_match(${quote(matchId)},'match-room-test-4');`);
+  await run(service(`select public.admin_reset_tournament_match(${quote(matchId)},'match-room-test-4');`));
   assert.deepEqual(data(await start(authenticated(summary(matchId), 1)).done), { items: [] });
   const replacement = data(await start(authenticated(`select public.resolve_match_room(${quote(matchId)});`, 1)).done).room.id;
   assert.notEqual(replacement, roomId);

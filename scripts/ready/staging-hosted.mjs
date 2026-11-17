@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
+import { setTimeout as wait } from "node:timers/promises";
 import { createClerkClient } from "@clerk/backend";
 import { createClient } from "@supabase/supabase-js";
 import { browserActiveMatch, isActiveFixtureRead, readActiveFixtures, verifyActiveApi } from "./active-acceptance.mjs";
@@ -52,7 +53,7 @@ function args(tokens) {
   const options = {};
   for (let i = 0; i < tokens.length; i++) {
     const key = tokens[i];
-    if (["--headed", "--browser-only", "--navigation-only", "--menu-journey", "--mobile-layout-journey", "--usage-menu-journey", "--suggestions-journey"].includes(key) && !options[key]) {
+    if (["--headed", "--browser-only", "--navigation-only", "--menu-journey", "--mobile-layout-journey", "--usage-menu-journey", "--suggestions-journey", "--expired-session"].includes(key) && !options[key]) {
       options[key] = true;
     } else if (["--url", "--deployment", "--commit", "--vercel-cli", "--active-fixture-manifest"].includes(key) && !options[key] && tokens[i + 1] && !tokens[i + 1].startsWith("--")) {
       options[key] = tokens[++i];
@@ -463,7 +464,7 @@ try {
   verify(claims(oidc).exp * 1000 > Date.now(), "unexpired OIDC token available in memory");
   await verifyDeployment(options, origin);
 
-  if (!options["--active-fixture-manifest"]) {
+  if (!options["--active-fixture-manifest"] && !options["--expired-session"]) {
     const guestRule = await answer(origin, oidc, null, "guest public rule", { kind: "question", id: "disconnects", context: fixtureA });
     verify(/10:00/.test(guestRule.text) && guestRule.sources?.some(({ url }) => url === `${appVersion}#page=9`) &&
       !guestRule.context?.matchId, "signed-out caller gets the prepared current rule even when supplied a match reference");
@@ -486,6 +487,31 @@ try {
     await verifyStagingAlias(options);
     report.temporarySessionsCreated += result.temporarySessionsCreated;
     report.temporarySessionsRevoked += result.temporarySessionsRevoked;
+  } else if (options["--expired-session"]) {
+    const payload = { kind: "action", id: "opponent", context: fixtureA };
+    const reply = await answer(origin, oidc, a2, "temporary fixture session can access its own historical assignment", payload);
+    verify(matchDestination(reply, fixtureA), "historical assignment matches the designated fixture before expiration");
+    const token = await a2();
+    // Clerk's JWT validation allows clock skew. Test beyond that window.
+    const delay = claims(token).exp * 1_000 - Date.now() + 12_000;
+    verify(delay > 0 && delay <= 120_000, "guarded Clerk JWT expires within the bounded test window");
+    await wait(delay);
+    step = "requesting the same historical assignment with the expired claim";
+    const expired = await fetch(new URL("/api/ready", origin), {
+      method: "POST", headers: {
+        [protectedHeader]: oidc, origin, authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      }, body: JSON.stringify(payload), cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(15_000),
+    });
+    const body = expired.headers.get("content-type")?.startsWith("application/json") ? await expired.json() : null;
+    const privateRecord = JSON.stringify(body).includes(fixtureA.matchId) || !!body?.context?.matchId ||
+      !!body?.actions?.some(({ href, destinationType }) => destinationType === "match" || href?.startsWith("/assistance/"));
+    const asksForSignIn = /sign in/i.test(body?.text ?? "");
+    report.expiredSession = { status: expired.status, privateRecord, asksForSignIn };
+    verify(
+      ([401, 403].includes(expired.status) || (expired.status === 200 && asksForSignIn)) && !privateRecord,
+      "the expired fixture claim yields no opponent, private context, or native match link",
+    );
   } else if (options["--active-fixture-manifest"]) {
     await verifyStagingAlias(options);
     const fixtures = await readActiveFixtures(options["--active-fixture-manifest"], verify);

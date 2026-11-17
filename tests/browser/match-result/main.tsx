@@ -7,7 +7,7 @@ import {
   uxParticipants,
   uxReport,
 } from "@/tests/fixtures/match-result-ux";
-import { report, setReport } from "./runtime";
+import { fixtureRoomId, report, setReport } from "./runtime";
 import "@/app/globals.css";
 
 const scenario = new URLSearchParams(location.search).get("scenario");
@@ -68,7 +68,7 @@ function Fixture() {
           reportGroups={current ? [current] : []}
           submissions={[]}
         />
-        <DiscordSupportLink matchId={uxMatch.id} roomId="22222222-2222-4222-8222-222222222222" roomRevision={1} />
+        <DiscordSupportLink matchId={uxMatch.id} roomId={fixtureRoomId} roomRevision={1} />
       </article>
     </main>
   );

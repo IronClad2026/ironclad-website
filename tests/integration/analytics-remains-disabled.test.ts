@@ -6,6 +6,15 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const sourceRoots = ["app", "components", "lib"];
 const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".ts", ".tsx"]);
+const readyAssistantPath = join(root, "components", "ready", "ReadyAssistant.tsx");
+const approvedReadyCalls = new Set([
+  'usage.track({ type: "manual_open" })',
+  'usage.track({ type: "engage" })',
+  'usage.track({ type: "category_select", categoryId: category.id })',
+  'usage.track({ type: "question_select", questionId: request.id, categoryId })',
+  'usage.track({ type: "action_click", actionId, categoryId: view.categoryId, questionId: view.questionId })',
+  'usage.track({ type: "helpfulness", questionId, answerInstanceId, helpful })',
+].map((call) => call.replace(/\s+/g, "")));
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -16,22 +25,30 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe("PR B2 analytics privacy and activation contract", () => {
-  it("uses only the approved Vercel package and has no custom tracker", () => {
+  it("preserves the Vercel-only platform policy with a bounded Ready reviewer exception", () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(root, "package.json"), "utf8")
     ) as { dependencies?: Record<string, string> };
     const files = sourceRoots.flatMap((directory) =>
       sourceFiles(resolve(root, directory))
     );
-    const runtimeSource = files
-      .map((path) => readFileSync(path, "utf8"))
-      .join("\n");
-
     expect(packageJson.dependencies?.["@vercel/analytics"]).toBe("2.0.1");
-    expect(runtimeSource).not.toMatch(/\btrack\s*\(/);
-    expect(runtimeSource).not.toMatch(/sendBeacon\s*\(/);
-    expect(runtimeSource).not.toMatch(/\/_vercel\/insights/);
-    expect(runtimeSource).not.toMatch(/<script[^>]+(?:analytics|insights)/i);
+    for (const path of files) {
+      const source = readFileSync(path, "utf8");
+      const filename = relative(root, path);
+      expect(source, filename).not.toMatch(/sendBeacon\s*\(/);
+      expect(source, filename).not.toMatch(/\/_vercel\/insights/);
+      expect(source, filename).not.toMatch(/<script[^>]+(?:analytics|insights)/i);
+
+      let trackingSource = source;
+      if (path === readyAssistantPath) {
+        expect(source).toMatch(/import\s+\{\s*useReadyUsage\s*\}\s+from\s+"@\/lib\/ready\/use-ready-usage"/);
+        expect(source).toMatch(/\bconst\s+usage\s*=\s*useReadyUsage\(signedIn\)/);
+        trackingSource = source.replace(/\busage\s*\.\s*track\s*\(\s*\{[^{}]*\}\s*\)/g, (call) =>
+          approvedReadyCalls.has(call.replace(/\s+/g, "")) ? "" : call);
+      }
+      expect(trackingSource, filename).not.toMatch(/\btrack\s*\(/);
+    }
   });
 
   it("keeps every Analytics credential out of Client Components", () => {

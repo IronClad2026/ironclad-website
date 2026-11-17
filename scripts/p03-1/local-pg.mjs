@@ -19,6 +19,60 @@ export function localPort() {
   return port;
 }
 
+const matchRoomSettingActor = "match-room-ci-setting";
+
+// Use the same trust boundary as the settings server action. The fixture
+// models an operator-verified staff account without a Player record.
+export function matchRoomSettingSql(enabled) {
+  assert.equal(typeof enabled, "boolean");
+  return `
+    begin;
+    set local role service_role;
+    set local request.jwt.claims = '{"role":"service_role"}';
+    select public.set_match_room_enabled(${enabled}, '${matchRoomSettingActor}');
+    commit;
+  `;
+}
+
+export async function installMatchFixtureStaff(client) {
+  await client.run(`
+    insert into ironclad_private.patch2_staff_authorizations(subject_digest, verification_reference)
+    values (sha256(convert_to('${matchRoomSettingActor}', 'UTF8')), 'Disposable CI match room setting fixture');
+  `);
+}
+
+export async function scopeReplayedPostgrestHook(client) {
+  const preRequestFunction = "public.require_public_gaming_profile_notice_for_api";
+  const configName = "pgrst.db_pre_request";
+  const readHook = (database) => client.run(`
+    select setting
+    from pg_db_role_setting settings
+    join pg_roles role on role.oid = settings.setrole
+    cross join lateral unnest(settings.setconfig) setting
+    where role.rolname = 'authenticator'
+      and settings.setdatabase = ${database}
+      and split_part(setting, '=', 1) = '${configName}';
+  `);
+  const expected = `${configName}=${preRequestFunction}`;
+  assert.equal(await readHook(0), expected, "Replay must install the approved PostgREST hook");
+
+  // CI replays into distinct databases on one disposable cluster. Keep the
+  // verified setting in this database without leaking it into the next replay.
+  await client.run(`
+    begin;
+    alter role authenticator in database "${client.database}"
+      set ${configName} = '${preRequestFunction}';
+    alter role authenticator reset ${configName};
+    commit;
+  `);
+  assert.equal(await readHook(0), "", "Replay must not leave a cluster-global PostgREST hook");
+  assert.equal(
+    await readHook("(select oid from pg_database where datname = current_database())"),
+    expected,
+    "The replay database must retain the approved PostgREST hook"
+  );
+}
+
 export function localClient(psql, { port = localPort(), database = "p03_rehearsal" } = {}) {
   assert(psql && Number.isInteger(port) && port > 1024 && port < 65536);
   assert(/^p03_[a-z0-9_]+$/.test(database));

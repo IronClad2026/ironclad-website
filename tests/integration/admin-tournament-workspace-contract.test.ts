@@ -1036,6 +1036,14 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     const baselineMigrationNames = migrationNames.filter(
       (name) => name <= "20261024173736_announcement_rich_documents.sql"
     );
+    // The budget SQL is retained for history and has no authorised hosted deployment.
+    const unappliedReadyAiBudget = "20261116121500_ready_ai_budget.sql";
+    // These three files are approved only for the protected Staging Ready trial.
+    const readyStagingMigrations = [
+      "20261117090000_ready_usage_tracking.sql",
+      "20261117143000_ready_cloud_usage.sql",
+      "20261117190000_ready_topic_suggestions.sql",
+    ];
     expect(migrationNames.filter((name) => !baselineMigrationNames.includes(name)))
       .toEqual([
         "20261027181708_public_competitive_profile_read_projections.sql",
@@ -1055,7 +1063,12 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261113071907_patch2_retire_legacy_registration_writes.sql",
         "20261113072932_patch2_verify_private_assistance_privacy_operators.sql",
         "20261114064733_patch2_match_staff_authorization.sql",
+        unappliedReadyAiBudget,
+        ...readyStagingMigrations,
       ]);
+    expect(migrationTreeSha256([unappliedReadyAiBudget, ...readyStagingMigrations])).toBe(
+      "c93a859ef5e355eb1a1672f50598eabdf64abb76d360cc2ec58cdf9e84a9fadc"
+    );
 
     const badgeIntegrationMigrationNames = new Set([
       "20260821000000_badge_award_foundation.sql",

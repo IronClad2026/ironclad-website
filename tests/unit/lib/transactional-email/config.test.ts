@@ -81,6 +81,21 @@ describe("transactional email configuration", () => {
     });
   });
 
+  it("keeps configured provider credentials unavailable in disabled mode", () => {
+    const config = loadTransactionalEmailConfig({
+      ...COMPLETE_ENVIRONMENT,
+      TRANSACTIONAL_EMAIL_MODE: "disabled",
+    });
+
+    expect(config).toMatchObject({
+      mode: "disabled",
+      resendApiKey: null,
+      from: null,
+      replyTo: null,
+      appOrigin: null,
+    });
+  });
+
   it("still rejects a malformed supplied allowlist in disabled mode", () => {
     expectSafeConfigurationError({
       TRANSACTIONAL_EMAIL_MODE: "disabled",

@@ -83,10 +83,10 @@ async function run(sql, db = database) {
   success(result);
   return result.stdout;
 }
-function authenticated(sql, actor = 1) {
+function authenticated(sql, actor = 1, admin = false) {
   return `set session authorization ${role}; set role authenticated;
     set request.jwt.claim.role='authenticated';
-    set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-${actor}","metadata":{"role":"player"}}';
+    set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-${actor}","metadata":{"role":"${admin ? "admin" : "player"}"}}';
     ${sql}`;
 }
 function service(sql) {
@@ -177,13 +177,27 @@ try {
   await run('grant authenticated,service_role to '+role+';','postgres');
   const authorityHash="select md5(string_agg(pg_get_functiondef(p.oid),'' order by p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and (p.proname like '%tournament%' or p.proname like '%leaderboard%' or p.proname like '%result%' or p.proname like '%close_ironclad%');";
   const authorityBefore=await run(authorityHash);
-  await run(migration);
+  // The standalone migration rehearsal starts before hardening. CI instead
+  // clones the full current replay and uses the current server boundaries.
+  const fullReplay = sourceDatabase.startsWith("p03_realtime_");
+  const phase1=readFileSync(new URL('./match-room-phase-1.sql',import.meta.url),'utf8');
+  const fixture = phase1.slice(phase1.indexOf('begin;'),phase1.indexOf('-- Physical boundary:'))+'\ncommit;';
+  if (fullReplay) {
+    assert.equal(await run("select to_regprocedure('public.call_patch2_match_staff(text,jsonb,text)') is not null;"), "t");
+    await run(fixture);
+    await run(`insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+      values(sha256(convert_to('match-room-test-4','UTF8')),'disposable hardening race fixture');`);
+    await run(flag(false));
+  } else {
+    await run(migration);
+    await run(fixture);
+  }
   assert.equal(await run(authorityHash),authorityBefore);
   assert.equal(await run('select public.get_match_room_enabled();'),'f');
-  passed('full forward migration defaults off and leaves every competitive/reset/closure authority body unchanged');
+  passed(fullReplay
+    ? 'trusted operator disables the fully migrated room without changing competitive/reset/closure authority'
+    : 'full forward migration defaults off and leaves every competitive/reset/closure authority body unchanged');
   await run(flag(true));
-  const phase1=readFileSync(new URL('./match-room-phase-1.sql',import.meta.url),'utf8');
-  await run(phase1.slice(phase1.indexOf('begin;'),phase1.indexOf('-- Physical boundary:'))+'\ncommit;');
   const roomId=projection(await start(authenticated(resolveRoom(roundRobinMatch))).done).room.id;
   const abMatch=id(301);
   const abRoom=projection(await start(authenticated(resolveRoom(abMatch))).done).room.id;
@@ -208,22 +222,46 @@ try {
   assert.equal(await run('select count(*) from public.generated_brackets where tournament_bracket_id='+quote(id(13))),'0');
   passed('real Not Held vs room resolution settles without deadlock and no partial room or partial closure');
 
-  // Every authenticated communication entry point shares the same context.
+  // Player and trusted server entry points must share the same contention
+  // contract. For the historical cutoff, exercise its original entry points.
+  const staffSend = fullReplay
+    ? service(`select public.call_patch2_match_staff('send_admin_match_room_message',
+      jsonb_build_object('p_match_id',${quote(roundRobinMatch)},'p_expected_room_id',${quote(roomId)},
+        'p_client_message_id',${quote(id(1005))},'p_body','Admin busy'),'match-room-test-4');`)
+    : authenticated(`select public.send_admin_match_room_message(${quote(roundRobinMatch)},${quote(roomId)},${quote(id(1005))},'Admin busy');`, 4, true);
+  const assistanceRead = fullReplay
+    ? service(`select public.call_patch2_private_assistance('get_match_room_assistance',
+      jsonb_build_object('p_room_id',${quote(roomId)}),'match-room-test-1',false);`)
+    : authenticated(`select public.get_match_room_assistance(${quote(roomId)});`);
+  const assistanceResolve = fullReplay
+    ? service(`select public.call_patch2_private_assistance('resolve_match_room_assistance',
+      jsonb_build_object('p_room_id',${quote(roomId)},'p_expected_request_version',1),'match-room-test-4',true);`)
+    : authenticated(`select public.resolve_match_room_assistance(${quote(roomId)},1);`, 4, true);
+  const legacyRequest = (version) => authenticated(`select public.request_match_room_assistance(${quote(roomId)},${version});`);
+  const privateRequest = (actor, key) => service(`select public.call_patch2_private_assistance('open_private_assistance',
+    jsonb_build_object('p_room_id',${quote(roomId)},'p_client_message_id',${quote(id(key))},
+      'p_body','Synthetic private gate race'),'match-room-test-${actor}',false);`);
+  const privateFlag = (enabled) => `update public.platform_settings
+    set value=jsonb_build_object('enabled',${enabled}) where key='private_assistance_new_requests_enabled';`;
   const requests=[
-    resolveRoom(roundRobinMatch),
-    'select public.get_match_room_history('+quote(roomId)+',0,50);',
-    'select public.get_match_room_earlier_history('+quote(roomId)+',4,50);',
-    send(roundRobinMatch,roomId,1004,'Busy retry'),
-    'select public.send_admin_match_room_message('+quote(roundRobinMatch)+','+quote(roomId)+','+quote(id(1005))+",'Admin busy');",
-    read(roomId,3),
-    'select public.get_match_room_assistance('+quote(roomId)+');',
-    'select public.request_match_room_assistance('+quote(roomId)+',0);',
-    'select public.resolve_match_room_assistance('+quote(roomId)+',1);',
+    authenticated(resolveRoom(roundRobinMatch)),
+    authenticated('select public.get_match_room_history('+quote(roomId)+',0,50);'),
+    authenticated('select public.get_match_room_earlier_history('+quote(roomId)+',4,50);'),
+    authenticated(send(roundRobinMatch,roomId,1004,'Busy retry')),
+    staffSend,
+    authenticated(read(roomId,3)),
+    assistanceRead,
+    ...(!fullReplay ? [legacyRequest(0)] : []),
+    assistanceResolve,
   ];
   const busyGate=await holder(tournamentLock(2));
   for(let i=0;i<requests.length;i++){
-    const jwt=authenticated(requests[i],i===4||i===8?4:1).replace('"role":"player"','"role":"admin"');
-    rejected(await start(jwt,prefix+'busy-'+i).done,'55P03');
+    rejected(await start(requests[i],prefix+'busy-'+i).done,'55P03');
+  }
+  if (fullReplay) {
+    rejected(await start(legacyRequest(0)).done, "55000", /MESSAGE_REQUIRED/);
+    rejected(await start(privateRequest(1,1009)).done, "P0001", /ASSISTANCE_DISABLED/);
+    assert.equal(await run('select count(*) from public.assistance_requests where room_id='+quote(roomId)), '0');
   }
   await release(busyGate);
   assert.equal(await run('select count(*) from public.match_messages where room_id='+quote(roomId)),'3');
@@ -231,7 +269,9 @@ try {
   assert.equal(await run('select count(*) from public.match_room_assistance where room_id='+quote(roomId)),'0');
   const retried=projection(await start(authenticated(send(roundRobinMatch,roomId,1004,'Busy retry'))).done);
   assert.equal(retried.duplicate,false);assert.equal(retried.message.sequence,4);
-  passed('all nine communication entry points fail55P03 atomically while tournament busy; same message key retries normally');
+  passed(fullReplay
+    ? 'all eight current Match Room entry points fail55P03 without side effects while tournament busy; legacy creation is retired and private creation is separately gated'
+    : 'all nine communication entry points fail55P03 atomically while tournament busy; same message key retries normally');
 
   // The exact committed setting row is the disable/write serial boundary.
   const heldSend=await holder(authenticated(send(roundRobinMatch,roomId,1006,'Admitted before disable')));
@@ -248,12 +288,23 @@ try {
   assert.equal(await run('select count(*) from public.match_messages where room_id='+quote(roomId)),'5');
   passed('disable-first rejects a queued sender after the setting transaction commits');
   await run(flag(true));
-  const heldRequest=await holder(authenticated('select public.request_match_room_assistance('+quote(roomId)+',0);'));
-  const disableHelp=start(flag(false),prefix+'disable-after-help');await waitLocked([disableHelp.app],heldRequest);
-  await release(heldRequest);success(await disableHelp.done);
-  assert.equal(await run('select request_version from public.match_room_assistance where room_id='+quote(roomId)),'1');
-  rejected(await start(authenticated('select public.request_match_room_assistance('+quote(roomId)+',1);')).done,'P0001',/MATCH_ROOM_DISABLED/);
-  passed('disable serializes assistance creation and denies later requests/reopens');
+  if (fullReplay) {
+    await run(privateFlag(true));
+    const heldRequest=await holder(privateRequest(1,1009));
+    const disableHelp=start(privateFlag(false),prefix+'disable-after-help');await waitLocked([disableHelp.app],heldRequest);
+    assert.equal(projection(await release(heldRequest)).accepted,true);success(await disableHelp.done);
+    assert.equal(await run('select count(*) from public.assistance_requests where room_id='+quote(roomId)),'1');
+    rejected(await start(privateRequest(2,1011)).done,'P0001',/ASSISTANCE_DISABLED/);
+    assert.equal(await run('select count(*) from public.assistance_requests where room_id='+quote(roomId)),'1');
+    passed('private-assistance disable waits for admitted creation and denies later new requests');
+  } else {
+    const heldRequest=await holder(legacyRequest(0));
+    const disableHelp=start(flag(false),prefix+'disable-after-help');await waitLocked([disableHelp.app],heldRequest);
+    await release(heldRequest);success(await disableHelp.done);
+    assert.equal(await run('select request_version from public.match_room_assistance where room_id='+quote(roomId)),'1');
+    rejected(await start(legacyRequest(1)).done,'P0001',/MATCH_ROOM_DISABLED/);
+    passed('disable serializes assistance creation and denies later requests/reopens');
+  }
   await run(flag(true));
 
   // Real official-result completion already owns Match when deferred settlement

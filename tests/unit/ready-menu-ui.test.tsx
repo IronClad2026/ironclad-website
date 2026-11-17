@@ -162,6 +162,8 @@ describe("Ready player menu", () => {
     expect(currentView()).toBe("topicMissing");
     expect(say()).toContain("Something missing, Commander?");
     const topic = screen.getByRole("textbox", { name: "Which topic or question is missing?" });
+    expect(topic).toHaveAccessibleDescription(/will be saved for the IronClad team to review and improve Ready’s menu and answers/);
+    expect(topic).toHaveAccessibleDescription(/Please don’t include personal or sensitive information/);
     expect(topic).toHaveAttribute("maxlength", "500");
     expect(getButton("Send suggestion")).toBeDisabled();
     fireEvent.change(topic, { target: { value: "Fixture" } });

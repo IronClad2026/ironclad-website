@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { setTimeout as wait } from "node:timers/promises";
 import { expect } from "@playwright/test";
+import sharp from "sharp";
 import { READY_MAIN_MESSAGE, readyCategories, readyQuestionCatalogue } from "../../lib/ready/catalogue.ts";
 import { openQuickAction } from "./menu-journey.mjs";
 
@@ -113,8 +114,15 @@ export async function auditReadyCatalogue({ page, origin, output, commit, items,
           assert.match(document.headers()["content-type"] ?? "", /^application\/pdf\b/i);
           await expect(popup).toHaveURL(target.href);
           if (entry.id === "privacy") {
-            await popup.waitForLoadState("load");
-            await popup.screenshot({ path: resolve(output, "ready-catalogue-privacy-citation.png"), caret: "hide" });
+            // The browser's PDF viewer can paint after its document load event.
+            let screenshot;
+            await popup.bringToFront();
+            await expect.poll(async () => {
+              screenshot = await popup.screenshot({ caret: "hide" });
+              const { channels } = await sharp(screenshot).stats();
+              return channels[0].mean;
+            }).toBeGreaterThan(75);
+            await writeFile(resolve(output, "ready-catalogue-privacy-citation.png"), screenshot);
           }
           openedDocuments.add(target.pathname);
           results.push({ kind: "source opened", href: source.url });

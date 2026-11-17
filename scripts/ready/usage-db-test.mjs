@@ -101,6 +101,16 @@ try {
         value.destination, value.outcome, value.helpful, value.answer, value.menu])).rows[0].result;
   };
 
+  await verify("An eligible player defaults to off and pre-consent events persist no rows", async () => {
+    const player = account[2];
+    const id = randomUUID();
+    const current = await service.query("select public.get_ready_usage_choice($1) as value", [player]);
+    assert.deepEqual(current.rows[0].value, { enabled: false, epoch: null });
+    assert.equal(await event("engage", { player, id }), "off");
+    const saved = await owner.query("select exists(select 1 from ironclad_private.ready_usage_events where event_id=$1) as saved", [id]);
+    assert.equal(saved.rows[0].saved, false);
+  });
+
   await verify("API roles cannot read counters, write events or read the report", async () => {
     for (const role of ["anon", "authenticated"]) {
       const denied = await open(role);
@@ -227,6 +237,9 @@ try {
     (await client.query("select public.review_ready_topic_suggestion($1,$2,$3) as value", [suggestionId, status, remove])).rows[0].value;
 
   await verify("Written suggestions deduplicate concurrent retry IDs without deduplicating text", async () => {
+    const usageCount = async () =>
+      (await owner.query("select count(*)::int as n from ironclad_private.ready_usage_events")).rows[0].n;
+    const analyticsBefore = await usageCount();
     const statuses = await Promise.all([save(service), save(secondService)]);
     assert.deepEqual(statuses.sort(), ["duplicate", "stored"]);
     assert.equal(await save(service, { description: "Different wording with the same ID." }), "conflict");
@@ -241,6 +254,7 @@ try {
     assert.ok(Number.isFinite(Date.parse(row.submittedAt)));
     assert.equal(row.description, sameWording);
     assert.equal(row.status, "new");
+    assert.equal(await usageCount(), analyticsBefore);
     assert.equal(await list(service, null, 51), null);
   });
 
