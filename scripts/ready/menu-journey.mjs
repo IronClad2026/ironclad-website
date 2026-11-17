@@ -173,7 +173,19 @@ export async function browserMobileLayoutJourney({ page, expect, output, verify 
   for (const { name, width, height } of [{ name: "portrait", width: 390, height: 780 },
     { name: "landscape", width: 780, height: 390 }]) {
     await page.setViewportSize({ width, height });
-    if (name === "landscape") await cta.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    if (name === "landscape") {
+      await cta.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
+      await expect(cta).toBeInViewport({ ratio: 1 });
+      await expect.poll(async () => (await page.evaluate(readHeroClearance)).controls.every(({ overlapped }) => !overlapped)).toBe(true);
+      verify(true, "landscape cloud clears the hero links even with the skull parked at the previous drag position");
+      // Deliberate mascot placement may obscure a link. Move it away before checking the exposed hit targets.
+      await dragPhoneMascot(page, 480);
+      await expect(grip).toHaveAttribute("aria-expanded", "false");
+      await cta.evaluate((element) => {
+        const header = document.querySelector("header").getBoundingClientRect();
+        window.scrollBy({ top: element.getBoundingClientRect().top - header.bottom - 16, behavior: "instant" });
+      });
+    }
     await expect(cta).toBeInViewport({ ratio: 1 });
     await expect(settled("main")).toBeVisible();
     const measure = async () => {
