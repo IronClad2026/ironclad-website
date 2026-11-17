@@ -184,6 +184,14 @@ async function guardedPage(browser, { mobile, reduced, failModel, disableWebGL, 
   await protocol.send("Fetch.enable", { patterns: [{ urlPattern: "*", requestStage: "Request" }] });
   return {
     context, page, finish,
+    async captureDock(clip, path) {
+      // Capture the whole viewport. Playwright's clipped screenshot can rescale a
+      // concurrent screencast frame; crop the returned pixels outside the browser.
+      const { data } = await protocol.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+      const image = await sharp(Buffer.from(data, "base64")).extract(clip).png().toBuffer();
+      await writeFile(path, image);
+      return image;
+    },
     async signIn(operation) { signIn = true; try { await operation(); } finally { signIn = false; } },
     async throttle() {
       // Emulate a cache-disabled 10 Mbps connection with 180 ms round-trip delay.
@@ -275,16 +283,27 @@ async function checkJourney(browser, config) {
     const html = await response.text();
     assert.match(html, /data-ready-dock/);
     assert(html.includes(inlinePoster), "Server-rendered html must contain the same Ready poster");
-    await expect(page.getByRole("button", { name: "Open Ready, the IronClad assistant" })).toBeVisible({ timeout: 45000 });
+    await expect(page.locator(`button${dock}`)).toBeVisible({ timeout: 45000 });
+    if (identity) {
+      // This existing synthetic account can open Dashboard with a badge prompt.
+      // Close it locally to measure the header without its screen-wide dimmer.
+      const badge = page.locator('[role="dialog"][aria-labelledby^="badge-reveal-"]');
+      if (await badge.isVisible()) {
+        const dismiss = badge.getByRole("button", { name: "Not now", exact: true });
+        if (mobile) await dismiss.tap();
+        else await dismiss.click();
+        await expect(badge).toHaveCount(0);
+      }
+    }
     const bounds = await page.locator(dock).boundingBox();
     assert(bounds, "Dock bounding box");
-    const clip = { x: Math.round(bounds.x), y: Math.round(bounds.y), width: bounds.width, height: bounds.height };
-    const poster = await page.screenshot({ clip, path: resolve(directory, label + "-poster.png") });
+    const clip = { left: Math.round(bounds.x), top: Math.round(bounds.y), width: Math.round(bounds.width), height: Math.round(bounds.height) };
+    const poster = await browserPage.captureDock(clip, resolve(directory, label + "-poster.png"));
     let handoff;
     if (!failModel && !disableWebGL) {
       finish();
       await expect(page.locator(readySurface)).toBeVisible({ timeout: 75000 });
-      const first = await page.screenshot({ clip, path: resolve(directory, label + "-first-live.png") });
+      const first = await browserPage.captureDock(clip, resolve(directory, label + "-first-live.png"));
       handoff = await compareHandoff(poster, first);
     } else {
       await expect(page.locator(`${dock}[data-ready-status="error"]`)).toBeVisible({ timeout: 45000 });
