@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { localClient, localPsqlArgument, scopeReplayedPostgrestHook } from "./local-pg.mjs";
+import { installMatchFixtureStaff, localClient, localPsqlArgument, matchRoomSettingSql, scopeReplayedPostgrestHook } from "./local-pg.mjs";
 
 const root = process.cwd();
 const database = "p03_realtime_" + Date.now();
@@ -35,7 +35,10 @@ assert.equal(await client.run(`
      or command ilike '%/api/internal/transactional-email%';
 `), "t", "Expected one five-minute transactional email schedule after migration replay");
 console.log("PASS transactional email cron inventory");
-await client.run("select public.set_match_room_enabled(true,'match-room-test-4');");
+await installMatchFixtureStaff(client);
+await client.run(read("tests/database/match-room-settings-current.sql"));
+console.log("PASS trusted Match Room settings and caller denial");
+await client.run(matchRoomSettingSql(true));
 const suites = [];
 for (const name of ["match-room-phase-1", "match-room-phase-3", "match-room-production-hardening", "match-room-unread-summary", "announcement-rich-documents"]) {
   const output = await client.run(read("tests/database/" + name + ".sql"));

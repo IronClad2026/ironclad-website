@@ -19,6 +19,28 @@ export function localPort() {
   return port;
 }
 
+const matchRoomSettingActor = "match-room-ci-setting";
+
+// Use the same trust boundary as the settings server action. The fixture
+// models an operator-verified staff account without a Player record.
+export function matchRoomSettingSql(enabled) {
+  assert.equal(typeof enabled, "boolean");
+  return `
+    begin;
+    set local role service_role;
+    set local request.jwt.claims = '{"role":"service_role"}';
+    select public.set_match_room_enabled(${enabled}, '${matchRoomSettingActor}');
+    commit;
+  `;
+}
+
+export async function installMatchFixtureStaff(client) {
+  await client.run(`
+    insert into ironclad_private.patch2_staff_authorizations(subject_digest, verification_reference)
+    values (sha256(convert_to('${matchRoomSettingActor}', 'UTF8')), 'Disposable CI match room setting fixture');
+  `);
+}
+
 export async function scopeReplayedPostgrestHook(client) {
   const preRequestFunction = "public.require_public_gaming_profile_notice_for_api";
   const configName = "pgrst.db_pre_request";

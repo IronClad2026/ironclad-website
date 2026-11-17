@@ -10,8 +10,12 @@ const database = "p03_attention_" + Date.now();
 const client = localClient(localPsqlArgument(), { database });
 const id = (n) => "d19a0000-0000-4000-8000-" + String(n).padStart(12, "0");
 const quote = (value) => "'" + String(value).replaceAll("'", "''") + "'";
-const actor = (sql, n = 1, admin = false) => `set role authenticated; set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-${n}","metadata":{"role":"${admin ? "admin" : "player"}"}}';${sql}`;
-const flag = (value) => `select public.set_match_room_enabled(${value},'match-room-test-4');`;
+const actor = (sql, n = 1) => `set role authenticated; set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-${n}"}';${sql}`;
+const staff = (sql) => `set role service_role; set request.jwt.claims='{"role":"service_role"}';${sql}`;
+const flag = (value) => staff(`select public.set_match_room_enabled(${value},'match-room-test-4');`);
+const assistance = (room, version) => staff(version === undefined
+  ? `select public.call_patch2_private_assistance('get_match_room_assistance',jsonb_build_object('p_room_id',${quote(room)}),'match-room-test-4',true);`
+  : `select public.call_patch2_private_assistance('resolve_match_room_assistance',jsonb_build_object('p_room_id',${quote(room)},'p_expected_request_version',${version}),'match-room-test-4',true);`);
 const summary = () => `select public.get_match_room_unread_summary(array['${id(311)}'::uuid]);`;
 const project = (text) => JSON.parse(text.split(/\r?\n/).filter((line) => line.startsWith("{" )).at(-1));
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,7 +35,12 @@ async function blocked(app) { await until(async () => await client.run(`select e
 try {
   await client.run("create database " + database + " template " + template + ";", { db: "postgres" });
   const fixture = readFileSync(path.join(repositoryRoot, "tests/database/match-room-phase-1.sql"), "utf8");
-  await client.run(fixture.slice(fixture.indexOf("begin;"), fixture.indexOf("-- Physical boundary:")) + "\ncommit;\n" + flag(true));
+  await client.run(fixture.slice(fixture.indexOf("begin;"), fixture.indexOf("-- Physical boundary:")) + `
+    insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+    values(sha256(convert_to('match-room-test-4','UTF8')),'disposable attention race fixture');
+    commit;
+  `);
+  await client.run(flag(true));
   let room = project(await client.run(actor(`select public.resolve_match_room('${id(311)}');`))).room.id;
   const send = (sequence) => actor(`select public.send_match_room_message('${id(311)}','${room}','${id(1700 + sequence)}','Synthetic race ${sequence}');`);
   await client.run(send(1));
@@ -60,24 +69,30 @@ try {
   assert.notEqual(room, oldRoom);
   pass("reassignment atomically removes old-pair unread attention and exposes no old-room state to the replacement");
 
-  await client.run(actor(`select public.request_match_room_assistance('${room}',0);`));
-  const resolving = await hold(actor(`select public.resolve_match_room_assistance('${room}',1);`, 4, true));
+  // Textless creation is retired. Staff can still resolve requests that were
+  // already stored, so seed that historical input for both lock orderings.
+  await client.run(`insert into public.match_room_assistance(room_id,status,request_version,requested_by_registration_id,requested_at)
+    values(${quote(room)},'requested',1,'${id(211)}',now());`);
+  const resolving = await hold(assistance(room, 1));
   const disabling = client.start(flag(false), { app: "p03-disable-after-resolve" });
   await blocked("p03-disable-after-resolve");
   await release(resolving);
   assert.equal((await disabling.done).code, 0, disabling.stderr);
-  assert.equal(project(await client.run(actor(`select public.get_match_room_assistance('${room}');`, 4, true))).canResolve, false);
+  const resolved = project(await client.run(assistance(room)));
+  assert.equal(resolved.status, "resolved");
+  assert.equal(resolved.canResolve, false);
   pass("disable waits for an admitted admin resolution and OFF projects canResolve false");
 
   await client.run(flag(true));
-  await client.run(actor(`select public.request_match_room_assistance('${room}',1);`));
+  await client.run(`update public.match_room_assistance set status='requested',request_version=2,requested_at=now(),
+    resolved_at=null,resolved_by_clerk_user_id=null where room_id=${quote(room)};`);
   const disabled = await hold(flag(false));
-  const blockedResolution = client.start(actor(`select public.resolve_match_room_assistance('${room}',2);`, 4, true), { app: "p03-resolve-after-disable" });
+  const blockedResolution = client.start(assistance(room, 2), { app: "p03-resolve-after-disable" });
   await blocked("p03-resolve-after-disable");
   await release(disabled);
   const result = await blockedResolution.done;
   assert.notEqual(result.code, 0); assert.match(result.stderr, /MATCH_ROOM_DISABLED/);
-  const state = project(await client.run(actor(`select public.get_match_room_assistance('${room}');`, 4, true)));
+  const state = project(await client.run(assistance(room)));
   assert.equal(state.status, "requested"); assert.equal(state.canResolve, false);
   pass("disable-first rejects queued admin resolution without changing assistance state");
   writeFileSync(path.join(repositoryRoot, "scripts/p03-1/attention-concurrency-evidence.json"), JSON.stringify({

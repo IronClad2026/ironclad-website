@@ -1,6 +1,11 @@
 -- Synthetic retention/privacy contract. The local runner prepends the existing
 -- phase-one rollback fixture; all competition fixture changes roll back.
+insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+values(sha256(convert_to('match-room-test-4','UTF8')),'disposable retention fixture');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select public.set_match_room_enabled(true,'match-room-test-4');
+reset role;
 set local role authenticated;
 select pg_temp.mr_actor('match-room-test-1');
 insert into match_room_test_state values('retention_room',public.resolve_match_room(pg_temp.mr_id(301)));
@@ -9,12 +14,20 @@ select public.send_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('retent
 reset role;
 select pg_temp.mr_assert((select author_player_id=pg_temp.mr_id(101) from public.match_messages where client_message_id=pg_temp.mr_id(8001)),'author subject provenance follows authoritative sender');
 select pg_temp.mr_assert((ironclad_private.match_room_retention_state(pg_temp.mr_room('retention_room'))->>'blockedReason')='tournament_not_terminal_or_closure_unknown','active tournament blocks old-round routine purge');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
+select pg_temp.mr_error($q$select public.purge_match_room_retention(array[pg_temp.mr_room('retention_room')],'match-room-test-1')$q$,
+  '42501','trusted server cannot purge for an actor absent from the verified staff roster');
 select pg_temp.mr_assert((public.purge_match_room_retention(array[pg_temp.mr_room('retention_room')],'match-room-test-4')->>'messagesDeleted')::int=0,'active tournament purge deletes no message');
+reset role;
 select pg_temp.mr_assert((public.export_match_room_privacy_data(pg_temp.mr_id(101),pg_temp.mr_room('retention_room'),null,1,'match-room-test-4')->>'nextSequence')::int=1,'bounded subject export supplies cursor');
 select pg_temp.mr_assert(jsonb_array_length(public.locate_match_room_privacy_data(pg_temp.mr_id(101),null,100,'match-room-test-4')->'rooms')=1,'subject locate exposes only linked room metadata');
 select pg_temp.mr_error(format('select public.export_match_room_privacy_data(%L,%L,null,500,%L)',pg_temp.mr_id(103),pg_temp.mr_room('retention_room'),'match-room-test-4'),'42501','unrelated subject cannot export room');
 select pg_temp.mr_error(format('select public.preview_match_room_retention(null,%L)','unknown-actor'),'42501','unknown operator denied');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select pg_temp.mr_error(format('select public.purge_match_room_retention(null,%L)','match-room-test-4'),'22023','purge requires explicit bounded rooms');
+reset role;
 select pg_temp.mr_error(format('select public.export_match_room_privacy_data(%L,%L,null,501,%L)',pg_temp.mr_id(101),pg_temp.mr_room('retention_room'),'match-room-test-4'),'22023','export rejects oversized page');
 select pg_temp.mr_error(format('select public.redact_match_room_messages(%L,%L,array[%L]::uuid[],%L)',pg_temp.mr_id(102),pg_temp.mr_room('retention_room'),(select id from public.match_messages where client_message_id=pg_temp.mr_id(8001)),'match-room-test-4'),'42501','redaction cannot target another author');
 select pg_temp.mr_assert((public.redact_match_room_messages(pg_temp.mr_id(101),pg_temp.mr_room('retention_room'),array[(select id from public.match_messages where client_message_id=pg_temp.mr_id(8001))],'match-room-test-4')->>'redactedCount')::int=1,'approved privacy redaction changes only subject-authored message');
@@ -51,7 +64,10 @@ update ironclad_private.match_room_tournament_closures set completed_at=now()-in
 select pg_temp.mr_assert((ironclad_private.match_room_retention_state(pg_temp.mr_room('retention_room'))->>'eligibleMessageCount')::int=2,'40-day clock uses tournament closure');
 update public.tournaments set status='in_progress' where id=pg_temp.mr_id(1);
 select pg_temp.mr_assert(not exists(select 1 from ironclad_private.match_room_tournament_closures where tournament_id=pg_temp.mr_id(1)),'reopen clears current closure observation');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select pg_temp.mr_assert((public.purge_match_room_retention(array[pg_temp.mr_room('retention_room')],'match-room-test-4')->>'messagesDeleted')::int=0,'reopened tournament blocks purge');
+reset role;
 update public.tournaments set status='completed' where id=pg_temp.mr_id(1);
 select pg_temp.mr_assert((ironclad_private.match_room_retention_state(pg_temp.mr_room('retention_room'))->>'blockedReason')='routine_retention','second completion starts fresh clock');
 delete from ironclad_private.match_room_tournament_closures where tournament_id=pg_temp.mr_id(1);
@@ -125,7 +141,10 @@ insert into match_room_test_state values('hold',public.set_match_room_retention_
 select pg_temp.mr_assert((ironclad_private.match_room_retention_state(pg_temp.mr_room('retention_room'))->>'heldMessageCount')::int=1,'narrow hold counts only affected message');
 select pg_temp.mr_error(format('select public.set_match_room_retention_hold(%L,null,%L,%L,null,%L)',pg_temp.mr_room('retention_room'),pg_temp.mr_id(9011),'legal','match-room-test-4'),'22023','indefinite hold rejected');
 select pg_temp.mr_error(format('select public.set_match_room_retention_hold(%L,null,%L,%L,now()+interval ''367 days'',%L)',pg_temp.mr_room('retention_room'),pg_temp.mr_id(9011),'legal','match-room-test-4'),'22023','hold maximum expiry enforced');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select pg_temp.mr_assert((public.purge_match_room_retention(array[pg_temp.mr_room('retention_room')],'match-room-test-4')->>'messagesDeleted')::int=1,'purge removes unheld routine content without broadening hold');
+reset role;
 select pg_temp.mr_assert((select body='Second private text' from public.match_messages where client_message_id=pg_temp.mr_id(8002)),'held body survives purge');
 select pg_temp.mr_assert((select content_purged_at is null from public.match_rooms where id=pg_temp.mr_room('retention_room')),'partially held room not marked fully purged');
 
@@ -147,10 +166,16 @@ create temporary table retention_competition_before as
  (select jsonb_agg(to_jsonb(t) order by id) from public.tournament_matches t) matches,
  (select jsonb_agg(to_jsonb(t) order by id) from public.match_result_report_groups t) reports,
  (select jsonb_agg(to_jsonb(t) order by id) from public.registrations t) registrations;
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select pg_temp.mr_assert((public.purge_match_room_retention(array[pg_temp.mr_room('retention_room')],'match-room-test-4')->>'messagesDeleted')::int=1,'released hold permits final content purge');
+reset role;
 select pg_temp.mr_assert((select content_purged_at is not null and closed_at is not null and last_sequence=2 from public.match_rooms where id=pg_temp.mr_room('retention_room')),'minimal room tombstone keeps sequence and closes history');
 select pg_temp.mr_assert(not exists(select 1 from public.match_room_reads where room_id=pg_temp.mr_room('retention_room')) and not exists(select 1 from public.match_room_notification_episodes where room_id=pg_temp.mr_room('retention_room')) and not exists(select 1 from public.match_room_assistance where room_id=pg_temp.mr_room('retention_room')),'expired private reads episodes and assistance cleaned');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select pg_temp.mr_assert((public.purge_match_room_retention(array[pg_temp.mr_room('retention_room')],'match-room-test-4')->>'messagesDeleted')::int=0,'completed purge is idempotent');
+reset role;
 select pg_temp.mr_assert((public.preview_match_room_retention(null,'match-room-test-4')->'rooms'->0->>'eligibleMessageCount')::int=0,'default preview exposes zero eligibility for purged tombstone');
 select pg_temp.mr_assert((select tournaments=(select jsonb_agg(to_jsonb(t) order by id) from public.tournaments t) and matches=(select jsonb_agg(to_jsonb(t) order by id) from public.tournament_matches t) and reports=(select jsonb_agg(to_jsonb(t) order by id) from public.match_result_report_groups t) and registrations=(select jsonb_agg(to_jsonb(t) order by id) from public.registrations t) from retention_competition_before),'purge preserves exact competitive authority rows');
 set local role authenticated;
@@ -175,7 +200,10 @@ values(pg_temp.mr_id(8100),pg_temp.mr_id(301),2,2,1,pg_temp.mr_id(201),pg_temp.m
 insert into public.match_messages(id,room_id,sequence,sender_kind,sender_registration_id,actor_clerk_user_id,client_message_id,body)
 select pg_temp.mr_id(10000+n),pg_temp.mr_id(8100),n,'player',pg_temp.mr_id(202),'match-room-test-2',pg_temp.mr_id(20000+n),'Synthetic bounded retention body' from generate_series(1,1001)n;
 insert into match_room_test_state values('expired_hold',public.set_match_room_retention_hold(pg_temp.mr_id(8100),null,pg_temp.mr_id(9020),'security',now()+interval '1 day','match-room-test-4'));
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select pg_temp.mr_assert((public.purge_match_room_retention(array[pg_temp.mr_id(8100)],'match-room-test-4')->>'messagesDeleted')::int=0,'whole-room hold blocks exactly selected room');
+reset role;
 update ironclad_private.match_room_retention_holds set created_at=now()-interval '2 days',expires_at=now()-interval '1 day' where id=(select (value->>'holdId')::uuid from match_room_test_state where name='expired_hold');
 select pg_temp.mr_assert((ironclad_private.match_room_retention_state(pg_temp.mr_id(8100))->>'eligibleMessageCount')::int=1001,'finite hold expiry restores ordinary eligibility without restart');
 alter table public.tournaments disable trigger user;
@@ -184,9 +212,15 @@ select pg_temp.mr_assert((ironclad_private.match_room_retention_state(pg_temp.mr
 update public.tournaments set status='voided' where id=pg_temp.mr_id(1);
 select pg_temp.mr_assert((ironclad_private.match_room_retention_state(pg_temp.mr_id(8100))->>'eligibleMessageCount')::int=1001,'voided terminal timestamp gives same routine eligibility');
 alter table public.tournaments enable trigger user;
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select pg_temp.mr_assert((public.purge_match_room_retention(array[pg_temp.mr_id(8100)],'match-room-test-4')->>'messagesDeleted')::int=1000,'purge caps each room at 1000 bodies per invocation');
+reset role;
 select pg_temp.mr_assert((select count(*)=1 from public.match_messages where room_id=pg_temp.mr_id(8100)) and (select content_purged_at is null from public.match_rooms where id=pg_temp.mr_id(8100)),'partial bounded batch preserves resumable room state');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select pg_temp.mr_assert((public.purge_match_room_retention(array[pg_temp.mr_id(8100)],'match-room-test-4')->>'messagesDeleted')::int=1,'safe retry finishes bounded batch');
+reset role;
 select pg_temp.mr_assert(exists(select 1 from ironclad_private.match_room_privacy_audit where room_id=pg_temp.mr_id(8100) and operation='purge' and counts->>'messagesDeleted'='1000'),'purge audit attributes counts to correct room');
 insert into public.match_rooms(id,match_id,room_revision,communication_generation,activation_version_snapshot,player_one_registration_id,player_two_registration_id,closed_at,closure_reason)
 select pg_temp.mr_id(30000+n),pg_temp.mr_id(301),100+n,100+n,1,pg_temp.mr_id(201),pg_temp.mr_id(202),now(),'match_completed' from generate_series(1,101)n;

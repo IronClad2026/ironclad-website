@@ -163,10 +163,22 @@ alter table public.tournament_brackets enable trigger user;
 alter table public.tournaments enable trigger user;
 alter table public.players enable trigger user;
 
+insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+values(sha256(convert_to('match-room-test-4','UTF8')),'Match Room hardening fixture');
+
+create function pg_temp.mr_legacy_assistance(p_version bigint default null)
+returns jsonb language sql as $$
+  select case when p_version is null then public.call_patch2_private_assistance('get_match_room_assistance',
+    jsonb_build_object('p_room_id',pg_temp.mr_room('ab')),'match-room-test-4',true)
+  else public.call_patch2_private_assistance('resolve_match_room_assistance',
+    jsonb_build_object('p_room_id',pg_temp.mr_room('ab'),'p_expected_request_version',p_version),'match-room-test-4',true) end
+$$;
 
 -- Fail-closed setting and RPC permissions; no production network calls.
--- Save/restore the live flag transactionally; the concurrency harness checks the migration default.
+-- Save/restore the flag transactionally; the concurrency harness checks the migration default.
+set local role service_role; select pg_temp.mr_actor(null);
 select public.set_match_room_enabled(false,'match-room-test-4');
+reset role;
 select pg_temp.mr_assert(public.get_match_room_enabled()=false,'disabled setting is observable');
 select pg_temp.mr_assert(not has_function_privilege('anon','public.get_match_room_enabled()','execute'),'anonymous setting lookup denied');
 select pg_temp.mr_assert(has_function_privilege('authenticated','public.get_match_room_enabled()','execute'),'authenticated setting lookup allowed');
@@ -179,10 +191,13 @@ select pg_temp.mr_assert((public.resolve_match_room(pg_temp.mr_id(301))->'room')
 select pg_temp.mr_assert((public.resolve_match_room(pg_temp.mr_id(311))->'room')='null'::jsonb,'disabled lazy resolve does not create RR room');
 select pg_temp.mr_error('select public.set_match_room_enabled(true,''forged'')','42501','authenticated setter denied');
 select pg_temp.mr_actor('match-room-test-4',true);
-select pg_temp.mr_error('select public.set_match_room_enabled(true,''forged'')','42501','Clerk admin browser setter denied');
+select pg_temp.mr_error('select public.set_match_room_enabled(true,''match-room-test-4'')','42501','verified Clerk admin browser setter denied');
+set local role anon; select pg_temp.mr_actor(null);
+select pg_temp.mr_error('select public.set_match_room_enabled(true,''match-room-test-4'')','42501','anonymous setter denied');
 reset role;
 select pg_temp.mr_assert(not exists(select 1 from public.match_rooms where match_id::text like 'd19a0000-%'),'default off has zero private rooms');
-set local role service_role; select pg_temp.mr_actor('match-room-test-4',true);
+set local role service_role; select pg_temp.mr_actor(null);
+select pg_temp.mr_error('select public.set_match_room_enabled(true,''match-room-test-3'')','42501','trusted server cannot set the flag for unverified staff');
 select pg_temp.mr_assert(public.set_match_room_enabled(true,'match-room-test-4')='{"enabled":true}'::jsonb,'service enables exact setting');
 reset role;
 select pg_temp.mr_assert((select updated_by_clerk_user_id='match-room-test-4' from public.platform_settings where key='match_room'),'setting actor attributed');
@@ -190,9 +205,14 @@ select pg_temp.mr_assert(not exists(select * from hardening_other_settings excep
 set local role authenticated; select pg_temp.mr_actor('match-room-test-1');
 insert into match_room_test_state values('ab',public.resolve_match_room(pg_temp.mr_id(301))),('rr',public.resolve_match_room(pg_temp.mr_id(311)));
 select public.send_match_room_message(pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(901),'Retained private body');
-select public.request_match_room_assistance(pg_temp.mr_room('ab'),0);
+select pg_temp.mr_error($q$select public.request_match_room_assistance(pg_temp.mr_room('ab'),0)$q$,'55000',
+  'old textless assistance request is rejected even while Match Room is enabled');
 select public.mark_match_room_read(pg_temp.mr_room('ab'),1);
 reset role;
+-- Represent legacy assistance that predates the private request workflow.
+insert into public.match_room_assistance(room_id,status,request_version,requested_by_registration_id)
+values(pg_temp.mr_room('ab'),'requested',1,pg_temp.mr_id(201));
+set local role service_role; select pg_temp.mr_actor(null);
 select public.set_match_room_enabled(false,'match-room-test-4');
 set local role authenticated; select pg_temp.mr_actor('match-room-test-1');
 select pg_temp.mr_assert((public.resolve_match_room(pg_temp.mr_id(301))->'room'->>'id')::uuid=pg_temp.mr_room('ab'),'disabled resolves existing immutable room');
@@ -201,18 +221,21 @@ select pg_temp.mr_assert(public.get_match_room_history(pg_temp.mr_room('ab'),0,5
 select pg_temp.mr_assert(public.get_match_room_history(pg_temp.mr_room('ab'),0,50)->'messages'->0->>'body'='Retained private body','history retained while disabled');
 select pg_temp.mr_assert(jsonb_array_length(public.get_match_room_earlier_history(pg_temp.mr_room('ab'),2,50)->'messages')=1,'earlier history allowed while disabled');
 select pg_temp.mr_error(format('select public.send_match_room_message(%L,%L,%L,%L)',pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(902),'blocked'),'P0001','player send blocked while disabled');
-select pg_temp.mr_error(format('select public.request_match_room_assistance(%L,0)',pg_temp.mr_room('rr')),'P0001','new assistance blocked while disabled');
+select pg_temp.mr_error(format('select public.request_match_room_assistance(%L,0)',pg_temp.mr_room('rr')),'55000','old textless request remains blocked while disabled');
 select pg_temp.mr_error(format('select public.mark_match_room_read(%L,0)',pg_temp.mr_room('ab')),'P0001','disabled read does not advance existing cursor');
 select pg_temp.mr_actor('match-room-test-2');
 select pg_temp.mr_error(format('select public.mark_match_room_read(%L,1)',pg_temp.mr_room('ab')),'P0001','disabled read does not create cursor or falsely acknowledge');
 select pg_temp.mr_actor('match-room-test-3');
 select pg_temp.mr_error(format('select public.get_match_room_history(%L,0,50)',pg_temp.mr_room('ab')),'42501','off switch does not bypass fixed membership');
-select pg_temp.mr_actor('match-room-test-4',true);
-select pg_temp.mr_error(format('select public.send_admin_match_room_message(%L,%L,%L,%L)',pg_temp.mr_id(301),pg_temp.mr_room('ab'),pg_temp.mr_id(903),'blocked'),'P0001','admin send blocked while disabled');
-select pg_temp.mr_assert(public.get_match_room_assistance(pg_temp.mr_room('ab'))->>'status'='requested','assistance evidence readable while disabled');
-select pg_temp.mr_error($q$select public.resolve_match_room_assistance(pg_temp.mr_room('ab'),1)$q$,'P0001','admin resolution blocked while disabled');
-select pg_temp.mr_assert(public.get_match_room_assistance(pg_temp.mr_room('ab'))->>'canResolve'='false','disabled assistance projection denies resolution');
-select pg_temp.mr_error(format('select public.request_match_room_assistance(%L,1)',pg_temp.mr_room('ab')),'P0001','assistance reopening blocked while disabled');
+set local role service_role; select pg_temp.mr_actor(null);
+select pg_temp.mr_error($q$select public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(301),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(903),'p_body','blocked'),'match-room-test-4')$q$,'P0001','admin send blocked while disabled');
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance()->>'status'='requested','assistance evidence readable while disabled');
+select pg_temp.mr_error($q$select pg_temp.mr_legacy_assistance(1)$q$,'P0001','admin resolution blocked while disabled');
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance()->>'canResolve'='false','disabled assistance projection denies resolution');
+set local role authenticated; select pg_temp.mr_actor('match-room-test-1');
+select pg_temp.mr_error(format('select public.request_match_room_assistance(%L,1)',pg_temp.mr_room('ab')),'55000','legacy assistance reopening blocked while disabled');
 reset role;
 select pg_temp.mr_assert((select count(*)=1 from public.match_messages where room_id=pg_temp.mr_room('ab')),'blocked sends create no messages');
 select pg_temp.mr_assert((select count(*)=1 from public.match_room_reads where room_id=pg_temp.mr_room('ab')),'blocked cursor creates no private state');
@@ -224,21 +247,24 @@ update public.platform_settings set value='{}' where key='match_room';
 select pg_temp.mr_assert(not public.get_match_room_enabled(),'malformed setting fails closed');
 delete from public.platform_settings where key='match_room';
 select pg_temp.mr_assert(not public.get_match_room_enabled(),'missing setting fails closed');
-select pg_temp.mr_error('select public.set_match_room_enabled(null,''admin'')','22023','null enabled rejected');
+set local role service_role; select pg_temp.mr_actor(null);
+select pg_temp.mr_error('select public.set_match_room_enabled(null,''match-room-test-4'')','22023','null enabled rejected');
 select pg_temp.mr_error('select public.set_match_room_enabled(true,'' '')','22023','empty setting actor rejected');
 select public.set_match_room_enabled(true,'match-room-test-4');
-set local role authenticated; select pg_temp.mr_actor('match-room-test-4',true);
-select pg_temp.mr_assert(public.resolve_match_room_assistance(pg_temp.mr_room('ab'),1)->>'status'='resolved','reenabled admin resolves existing assistance');
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance(1)->>'status'='resolved','reenabled admin resolves existing assistance');
 set local role authenticated; select pg_temp.mr_actor('match-room-test-2');
 select pg_temp.mr_assert((public.get_match_room_history(pg_temp.mr_room('ab'),0,50)->'room'->>'writable')::boolean,'reenable restores same room writable');
 select public.mark_match_room_read(pg_temp.mr_room('ab'),1);
-select pg_temp.mr_assert((public.request_match_room_assistance(pg_temp.mr_room('ab'),1)->>'requestVersion')::bigint=2,'reenable permits new assistance revision');
-reset role;
+select pg_temp.mr_error($q$select public.request_match_room_assistance(pg_temp.mr_room('ab'),1)$q$,'55000',
+  'reenable cannot reopen retired shared assistance');
+set local role service_role; select pg_temp.mr_actor(null);
 select public.set_match_room_enabled(false,'match-room-test-4');
 -- Reset and closure are existing authorities and remain available while off.
 select public.admin_reset_tournament_match(pg_temp.mr_id(311),'match-room-test-4');
+reset role;
 select pg_temp.mr_assert((select closure_reason='lifecycle_changed' from public.match_rooms where id=pg_temp.mr_room('rr')),'reset while disabled still closes prior generation');
 select pg_temp.mr_assert((select count(*)=2 from public.match_rooms where match_id::text like 'd19a0000-%'),'reset while disabled creates no replacement room');
+set local role service_role; select pg_temp.mr_actor(null);
 select public.close_ironclad_player_account('match-room-test-2');
 set local role authenticated; select pg_temp.mr_actor('match-room-test-2');
 select pg_temp.mr_error(format('select public.get_match_room_history(%L,0,50)',pg_temp.mr_room('ab')),'42501','closed identity denied even while Clerk token remains');

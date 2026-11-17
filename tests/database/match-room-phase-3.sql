@@ -168,6 +168,19 @@ alter table public.tournament_brackets enable trigger user;
 alter table public.tournaments enable trigger user;
 alter table public.players enable trigger user;
 
+-- Two verified synthetic staff actors, including a tournament participant.
+insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+select sha256(convert_to(subject,'UTF8')),'Match Room phase 3 fixture'
+from unnest(array['match-room-test-1','match-room-test-4']) subject;
+
+create function pg_temp.mr_legacy_assistance(p_actor text, p_admin boolean, p_room text, p_version bigint default null)
+returns jsonb language sql as $$
+  select case when p_version is null then public.call_patch2_private_assistance('get_match_room_assistance',
+    jsonb_build_object('p_room_id',pg_temp.mr_room(p_room)),p_actor,p_admin)
+  else public.call_patch2_private_assistance('resolve_match_room_assistance',
+    jsonb_build_object('p_room_id',pg_temp.mr_room(p_room),'p_expected_request_version',p_version),p_actor,p_admin) end
+$$;
+
 -- New raw tables remain unavailable even to service-role application code.
 do $$
 declare v_table text; v_role text; v_privilege text; v_rpc text;
@@ -183,10 +196,17 @@ begin
     end loop;
   end loop;
   foreach v_rpc in array array['get_match_room_earlier_history(uuid,bigint,integer)',
-    'get_match_room_assistance(uuid)','request_match_room_assistance(uuid,bigint)','resolve_match_room_assistance(uuid,bigint)'] loop
+    'request_match_room_assistance(uuid,bigint)'] loop
     perform pg_temp.mr_assert(has_function_privilege('authenticated','public.' || v_rpc,'EXECUTE'),v_rpc || ' authenticated');
     perform pg_temp.mr_assert(not has_function_privilege('anon','public.' || v_rpc,'EXECUTE'),v_rpc || ' anon denied');
     perform pg_temp.mr_assert(not has_function_privilege('service_role','public.' || v_rpc,'EXECUTE'),v_rpc || ' service denied');
+  end loop;
+  foreach v_role in array array['anon','authenticated','service_role'] loop
+    foreach v_rpc in array array['get_match_room_assistance(uuid)','resolve_match_room_assistance(uuid,bigint)'] loop
+      perform pg_temp.mr_assert(not has_function_privilege(v_role,'public.' || v_rpc,'EXECUTE'),v_role || ' direct ' || v_rpc || ' denied');
+    end loop;
+    perform pg_temp.mr_assert(has_function_privilege(v_role,'public.call_patch2_private_assistance(text,jsonb,text,boolean)','EXECUTE')
+      = (v_role = 'service_role'),v_role || ' assistance gateway grant');
   end loop;
 end;
 $$;
@@ -241,14 +261,19 @@ select pg_temp.mr_assert((select push_delivery_status='skipped' and read_at is n
 set local role authenticated;
 select pg_temp.mr_actor('match-room-test-1');
 select public.send_match_room_message(pg_temp.mr_id(311),pg_temp.mr_room('ab'),pg_temp.mr_id(805),'New episode after catchup');
-select pg_temp.mr_actor('match-room-test-4',true);
-select public.send_admin_match_room_message(pg_temp.mr_id(311),pg_temp.mr_room('ab'),pg_temp.mr_id(806),'Admin message');
+set local role service_role;
+select pg_temp.mr_actor(null);
+select public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(311),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(806),'p_body','Admin message'),'match-room-test-4');
 reset role;
 select pg_temp.mr_assert((select count(*)=3 from public.notifications where type='match.message_received' and match_id=pg_temp.mr_id(311)),
   'new episode after catchup and admin notifies both original members as appropriate');
-set local role authenticated;
-select pg_temp.mr_actor('match-room-test-1',true);
-select public.send_admin_match_room_message(pg_temp.mr_id(311),pg_temp.mr_room('ab'),pg_temp.mr_id(807),'Participant acting as admin');
+set local role service_role;
+select pg_temp.mr_actor(null);
+select public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(311),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(807),'p_body','Participant acting as admin'),'match-room-test-1');
 reset role;
 select pg_temp.mr_assert((select count(*)=1 from public.notifications where type='match.message_received'
   and recipient_clerk_user_id='match-room-test-1' and match_id=pg_temp.mr_id(311)),
@@ -273,30 +298,97 @@ select pg_temp.mr_assert((select last_sequence=7 from public.match_rooms where i
 
 set local role authenticated;
 select pg_temp.mr_actor('match-room-test-1');
-select pg_temp.mr_assert(public.get_match_room_assistance(pg_temp.mr_room('ab'))->>'status'='none','initial assistance none');
-select pg_temp.mr_assert(public.request_match_room_assistance(pg_temp.mr_room('ab'),0)->>'status'='requested','participant requests assistance');
+select pg_temp.mr_error($q$select public.request_match_room_assistance(pg_temp.mr_room('ab'),0)$q$,'55000',
+  'old textless request cannot create shared assistance');
 select pg_temp.mr_actor('match-room-test-2');
-select pg_temp.mr_assert((public.request_match_room_assistance(pg_temp.mr_room('ab'),0)->>'requestVersion')::bigint=1,'duplicate open request coalesces per room');
 select pg_temp.mr_error($q$select public.resolve_match_room_assistance(pg_temp.mr_room('ab'),1)$q$,'42501','player cannot resolve assistance');
-select pg_temp.mr_actor('match-room-test-4',true);
+select pg_temp.mr_error($q$select pg_temp.mr_legacy_assistance('match-room-test-4',true,'ab',1)$q$,'42501','browser cannot forge staff on assistance gateway');
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance('match-room-test-1',false,'ab')->>'status'='none','initial assistance none');
 reset role;
+
+-- Old clients can no longer create these rows. Seed historical evidence, then
+-- exercise its notification, versioning and privacy through the live gateway.
+insert into public.notifications(id,recipient_role,type,title,message,tournament_id,match_id,event_key,metadata)
+values(pg_temp.mr_id(1851),'admin','match.admin_assistance_requested','Match Admin Assistance Requested',
+  'A Match Room requires administrator assistance.',pg_temp.mr_id(2),pg_temp.mr_id(311),'phase-3-legacy-assistance-1',
+  jsonb_build_object('roomId',pg_temp.mr_room('ab'),'requestVersion',1));
+insert into public.match_room_assistance(room_id,status,request_version,requested_by_registration_id,notification_id)
+values(pg_temp.mr_room('ab'),'requested',1,pg_temp.mr_id(211),pg_temp.mr_id(1851));
 update public.notifications set read_at=clock_timestamp(),in_app_hidden_at=clock_timestamp()
 where type='match.admin_assistance_requested' and match_id=pg_temp.mr_id(311);
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance('match-room-test-4',true,'ab')->>'status'='requested','notification dismissal does not resolve assistance');
+select pg_temp.mr_error($q$select pg_temp.mr_legacy_assistance('match-room-test-2',false,'ab',1)$q$,'42501','ordinary player cannot resolve assistance through server');
+select pg_temp.mr_error($q$select pg_temp.mr_legacy_assistance('match-room-test-3',true,'ab',1)$q$,'42501','unverified staff cannot resolve assistance through server');
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance('match-room-test-4',true,'ab',1)->>'status'='resolved','admin explicitly resolves assistance');
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance('match-room-test-4',true,'ab',1)->>'status'='resolved','resolve retry idempotent');
+reset role;
+select pg_temp.mr_assert((select push_delivery_status='skipped' from public.notifications where id=pg_temp.mr_id(1851)),
+  'legacy resolution retires the exact notification');
+insert into public.notifications(id,recipient_role,type,title,message,tournament_id,match_id,event_key,metadata)
+values(pg_temp.mr_id(1852),'admin','match.admin_assistance_requested','Match Admin Assistance Requested',
+  'A Match Room requires administrator assistance.',pg_temp.mr_id(2),pg_temp.mr_id(311),'phase-3-legacy-assistance-2',
+  jsonb_build_object('roomId',pg_temp.mr_room('ab'),'requestVersion',2));
+update public.match_room_assistance set status='requested',request_version=2,requested_at=clock_timestamp(),
+  resolved_at=null,resolved_by_clerk_user_id=null,notification_id=pg_temp.mr_id(1852)
+where room_id=pg_temp.mr_room('ab');
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_error($q$select pg_temp.mr_legacy_assistance('match-room-test-4',true,'ab',1)$q$,'40001','stale version cannot resolve a later legacy request');
+select pg_temp.mr_error($q$select pg_temp.mr_legacy_assistance('match-room-test-3',false,'ab')$q$,'42501','outsider cannot see assistance');
+select pg_temp.mr_error($q$select public.call_patch2_private_assistance('open_private_assistance',
+  jsonb_build_object('p_room_id',pg_temp.mr_room('ab'),'p_client_message_id',pg_temp.mr_id(1901),'p_body','Unrelated'),
+  'match-room-test-3',false)$q$,'42501','outsider cannot request assistance');
 set local role authenticated;
-select pg_temp.mr_assert(public.get_match_room_assistance(pg_temp.mr_room('ab'))->>'status'='requested','notification dismissal does not resolve assistance');
-select pg_temp.mr_assert(public.resolve_match_room_assistance(pg_temp.mr_room('ab'),1)->>'status'='resolved','admin explicitly resolves assistance');
-select pg_temp.mr_assert(public.resolve_match_room_assistance(pg_temp.mr_room('ab'),1)->>'status'='resolved','resolve retry idempotent');
-select pg_temp.mr_actor('match-room-test-1');
-select pg_temp.mr_error($q$select public.request_match_room_assistance(pg_temp.mr_room('ab'),0)$q$,'40001','stale request cannot reopen resolved assistance');
-select pg_temp.mr_assert((public.request_match_room_assistance(pg_temp.mr_room('ab'),1)->>'requestVersion')::bigint=2,'participant reopens a new assistance version');
 select pg_temp.mr_actor('match-room-test-3');
-select pg_temp.mr_error($q$select public.get_match_room_assistance(pg_temp.mr_room('ab'))$q$,'42501','outsider cannot see assistance');
-select pg_temp.mr_error($q$select public.request_match_room_assistance(pg_temp.mr_room('ab'),0)$q$,'42501','outsider cannot request assistance');
 select pg_temp.mr_error($q$select public.get_match_room_earlier_history(pg_temp.mr_room('ab'),8,50)$q$,'42501','outsider cannot read earlier history');
 select pg_temp.mr_error('select public.list_match_room_assistance_requests(200)','42501','browser cannot list operational assistance');
 reset role;
-select pg_temp.mr_assert((select count(*)=2 from public.notifications where type='match.admin_assistance_requested' and match_id=pg_temp.mr_id(311)),
-  'reopen creates separate canonical notification evidence');
+select pg_temp.mr_assert((select array_agg(metadata->>'requestVersion' order by metadata->>'requestVersion')=array['1','2']
+  from public.notifications where type='match.admin_assistance_requested' and match_id=pg_temp.mr_id(311)),
+  'historical request versions retain separate notification evidence');
+
+-- New operations use requester-only threads, including exact creation retries.
+update public.platform_settings set value='{"enabled":true}' where key='private_assistance_new_requests_enabled';
+set local role service_role;
+select pg_temp.mr_actor(null);
+insert into match_room_test_state values('private-assistance',public.call_patch2_private_assistance('open_private_assistance',
+  jsonb_build_object('p_room_id',pg_temp.mr_room('ab'),'p_client_message_id',pg_temp.mr_id(1901),'p_body','Synthetic issue'),
+  'match-room-test-1',false));
+select pg_temp.mr_assert((select value->>'accepted'='true' and value->'request'->>'version'='1'
+  from match_room_test_state where name='private-assistance'),'participant requests private assistance with an initial message');
+select pg_temp.mr_assert(public.call_patch2_private_assistance('open_private_assistance',
+  jsonb_build_object('p_room_id',pg_temp.mr_room('ab'),'p_client_message_id',pg_temp.mr_id(1901),'p_body','Synthetic issue'),
+  'match-room-test-1',false)->>'duplicate'='true','exact private request retry coalesces without another notification');
+select pg_temp.mr_assert(public.call_patch2_private_assistance('get_private_assistance_context',
+  jsonb_build_object('p_room_id',pg_temp.mr_room('ab')),'match-room-test-2',false)->'request'='null'::jsonb,
+  'opponent does not inherit the private request');
+reset role;
+select pg_temp.mr_assert((select count(*)=1 from public.notifications where type='assistance.requester_message' and match_id=pg_temp.mr_id(311)),
+  'private request retry produces no duplicate notification');
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_assert(public.call_patch2_private_assistance('set_private_assistance_status',
+  jsonb_build_object('p_tournament_id',pg_temp.mr_id(2),'p_request_id',value->'request'->>'id','p_status','resolved','p_expected_version',1),
+  'match-room-test-4',true)->'request'->>'status'='resolved','verified staff can resolve the private request')
+from match_room_test_state where name='private-assistance';
+select pg_temp.mr_assert((
+  select reply->'request'->>'status'='open' and reply->'request'->>'version'='3'
+  from match_room_test_state cross join lateral public.call_patch2_private_assistance('reply_private_assistance',
+    jsonb_build_object('p_request_id',value->'request'->>'id','p_client_message_id',pg_temp.mr_id(1902),
+      'p_body','Synthetic follow-up','p_tournament_id',null),'match-room-test-1',false) reply
+  where name='private-assistance'
+),'requester reopens the private request with a new message and version');
+select pg_temp.mr_error($q$select public.call_patch2_private_assistance('set_private_assistance_status',
+  jsonb_build_object('p_tournament_id',pg_temp.mr_id(2),'p_request_id',value->'request'->>'id','p_status','resolved','p_expected_version',2),
+  'match-room-test-4',true) from match_room_test_state where name='private-assistance'$q$,'40001',
+  'stale staff version cannot resolve the reopened private request');
+reset role;
+select pg_temp.mr_assert((select count(*)=2 from public.notifications where type='assistance.requester_message' and match_id=pg_temp.mr_id(311)),
+  'private reopening creates one separate notification');
 select pg_temp.mr_assert((select value from match_room_test_state where name='competition-before')=
   (select jsonb_agg(to_jsonb(m) order by id) from public.tournament_matches m where id::text like 'd19a0000%'),
   'messages cursors assistance resolution and reopen never modify competition facts');
@@ -329,9 +421,7 @@ update public.tournament_matches set player_two_registration_id=pg_temp.mr_id(21
 set local role authenticated;
 select pg_temp.mr_actor('match-room-test-3');
 insert into match_room_test_state values('ac',public.resolve_match_room(pg_temp.mr_id(311)));
-select pg_temp.mr_assert(public.get_match_room_assistance(pg_temp.mr_room('ac'))->>'status'='none','replacement participant does not inherit assistance');
 select pg_temp.mr_error($q$select public.get_match_room_earlier_history(pg_temp.mr_room('ab'),18,50)$q$,'42501','replacement C cannot read AB earlier history');
-select pg_temp.mr_error($q$select public.get_match_room_assistance(pg_temp.mr_room('ab'))$q$,'42501','replacement C cannot read AB assistance');
 select pg_temp.mr_actor('match-room-test-2');
 select pg_temp.mr_assert(jsonb_array_length(public.get_match_room_earlier_history(pg_temp.mr_room('ab'),18,50)->'messages')=17,
   'original B retains historical earlier access');
@@ -339,18 +429,22 @@ reset role;
 select pg_temp.mr_assert(not exists(select 1 from public.match_room_notification_episodes where room_id=pg_temp.mr_room('ac')),
   'replacement room does not inherit unread episode');
 set local role service_role;
-select pg_temp.mr_actor('match-room-test-4',true);
+select pg_temp.mr_actor(null);
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance('match-room-test-3',false,'ac')->>'status'='none','replacement participant does not inherit assistance');
+select pg_temp.mr_error($q$select pg_temp.mr_legacy_assistance('match-room-test-3',false,'ab')$q$,'42501','replacement C cannot read AB assistance');
 select pg_temp.mr_assert((select (value->>'totalCount')::integer>=1 and exists(
   select 1 from jsonb_array_elements(value->'requests') item
   where item->>'roomId'=pg_temp.mr_room('ab')::text and item->>'status'='requested'
-) from (select public.list_match_room_assistance_requests(5000) value) queue),
+) from (select public.call_patch2_private_assistance('list_legacy_room_assistance',
+  jsonb_build_object('p_tournament_id',pg_temp.mr_id(2),'p_page',1,'p_include_resolved',false),'match-room-test-4',true) value) queue),
   'service assistance list reflects fixture requested state without assuming an empty queue');
 reset role;
 
 -- Closed recipients are excluded and direct resolver attribution is removed.
-set local role authenticated;
-select pg_temp.mr_actor('match-room-test-4',true);
-select public.resolve_match_room_assistance(pg_temp.mr_room('ab'),2);
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_assert(pg_temp.mr_legacy_assistance('match-room-test-4',true,'ab',2)->>'status'='resolved',
+  'verified staff resolves the latest historical version');
 reset role;
 select public.close_ironclad_player_account('match-room-test-4');
 select pg_temp.mr_assert((select resolved_by_clerk_user_id is null from public.match_room_assistance where room_id=pg_temp.mr_room('ab')),
@@ -359,8 +453,9 @@ select public.close_ironclad_player_account('match-room-test-3');
 set local role authenticated;
 select pg_temp.mr_actor('match-room-test-1');
 select public.send_match_room_message(pg_temp.mr_id(311),pg_temp.mr_room('ac'),pg_temp.mr_id(1101),'Closed recipient ignored');
-select pg_temp.mr_actor('match-room-test-3');
-select pg_temp.mr_error($q$select public.get_match_room_assistance(pg_temp.mr_room('ac'))$q$,'42501','closed identity cannot access assistance');
+set local role service_role;
+select pg_temp.mr_actor(null);
+select pg_temp.mr_error($q$select pg_temp.mr_legacy_assistance('match-room-test-3',false,'ac')$q$,'42501','closed identity cannot access assistance');
 reset role;
 select pg_temp.mr_assert(not exists(select 1 from public.notifications where recipient_clerk_user_id='match-room-test-3'),
   'closed profile receives no message notifications');

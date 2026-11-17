@@ -1,6 +1,6 @@
 // Reuse controlled-session regressions against the fully migrated P03.1 tree.
-// Only local target names, template, and obsolete initial migration application
-// are adapted. Original tests and all their behavioral assertions stay intact.
+// Supply disposable target names, the full replay template and its port. Each
+// suite uses that schema's application boundary for its controlled races.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -24,17 +24,10 @@ for (const [name, legacyDatabase, legacyTemplate, legacyRole] of [
   ["match-room-unread-concurrency", "ironclad_match_room_unread_race_tests", "ironclad_match_room_hardening_tests", "ironclad_match_room_unread_race_client"],
 ]) {
   const file = path.join(root, "tests/database", name + ".mjs");
-  let source = readFileSync(file, "utf8").replaceAll(legacyDatabase, "p03_race_" + name.replaceAll("-", "_"))
+  const source = readFileSync(file, "utf8").replaceAll(legacyDatabase, "p03_race_" + name.replaceAll("-", "_"))
     .replaceAll(legacyTemplate, template).replaceAll(legacyRole, "p03_client_" + name.replaceAll("-", "_"))
     .replace('const port = "56591";', `const port = "${client.port}";`)
     .replaceAll("import.meta.url", JSON.stringify(pathToFileURL(file).href));
-  if (name === "match-room-production-hardening-concurrency") {
-    assert(source.includes("await run(migration);"));
-    source = source.replace("await run(migration);", "await run(\"select public.set_match_room_enabled(false,'match-room-test-4');\"); // Full template already has hardening; restore tested default.");
-  } else if (name === "match-room-unread-concurrency") {
-    assert(source.includes('await run(readFileSync(new URL(migrationName, migrationDirectory), "utf8"));'));
-    source = source.replace('await run(readFileSync(new URL(migrationName, migrationDirectory), "utf8"));', "// Full template already has unread summary.");
-  }
   const generated = path.join(directory, name + ".mjs");
   writeFileSync(generated, source);
   const result = spawnSync(process.execPath, [generated, psql], { encoding: "utf8", windowsHide: true, timeout: 180_000 });

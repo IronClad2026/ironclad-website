@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { localClient, localPsqlArgument, scopeReplayedPostgrestHook } from "../p03-1/local-pg.mjs";
+import { installMatchFixtureStaff, localClient, localPsqlArgument, matchRoomSettingSql, scopeReplayedPostgrestHook } from "../p03-1/local-pg.mjs";
 
 const root = process.cwd();
 const database = "p03_four_division_regression_" + Date.now();
@@ -35,7 +35,8 @@ function futureFixture(sql, division) {
   return result;
 }
 
-await client.run("select public.set_match_room_enabled(true,'match-room-test-4');");
+await installMatchFixtureStaff(client);
+await client.run(matchRoomSettingSql(true));
 const suites = [];
 for (const division of ["academy", "pro"]) {
   const fixture = futureFixture(read("tests/database/match-room-phase-1.sql"), division);

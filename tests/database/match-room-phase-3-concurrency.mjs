@@ -1,5 +1,5 @@
 // LOCAL ONLY: node tests/database/match-room-phase-3-concurrency.mjs <local-psql.exe>
-// Requires the empty full replay plus Phase 3 migration at 127.0.0.1:56591.
+// Requires the empty full Staging replay at 127.0.0.1:56591.
 // Clones the named template, then removes only its new database and login role.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -163,12 +163,17 @@ const send = (matchId, roomId, key, body) =>
   `select public.send_match_room_message('${matchId}','${roomId}','${id(key)}',${quote(body)});`;
 const read = (roomId, sequence) =>
   `select public.mark_match_room_read('${roomId}',${sequence});`;
+const assistance = (operation, args, actor) => service(
+  `select public.call_patch2_private_assistance(${quote(operation)},jsonb_build_object(${args}),'match-room-test-${actor}',false);`,
+);
+const openAssistance = (roomId, key, body, actor) => assistance("open_private_assistance",
+  `'p_room_id',${quote(roomId)},'p_client_message_id',${quote(id(key))},'p_body',${quote(body)}`, actor);
 
 try {
   assert.equal(await run("select inet_server_addr()='127.0.0.1'::inet and inet_server_port()="+port+";", "postgres"), "t");
   assert.equal(await run("select not exists(select 1 from pg_database where datname="+quote(database)+") and not exists(select 1 from pg_roles where rolname="+quote(role)+");", "postgres"), "t",
     "Refusing to overwrite a preexisting local database or role");
-  assert.equal(await run("select (select count(*) from public.players)=0 and to_regprocedure('public.get_match_room_assistance(uuid)') is not null;",sourceDatabase),"t");
+  assert.equal(await run("select (select count(*) from public.players)=0 and to_regprocedure('public.call_patch2_private_assistance(text,jsonb,text,boolean)') is not null;",sourceDatabase),"t");
   await run("create database "+database+" template "+sourceDatabase+";","postgres");
   createdDatabase=true;
   await run("create role "+role+" login nosuperuser nocreatedb nocreaterole noinherit nobypassrls;","postgres");
@@ -212,14 +217,41 @@ try {
     results.forEach(success);
     assert.equal(await run("select count(*)=2 and count(*) filter(where resolved_at is null)=1"+recipientEpisodes),"t");
   },"send-before-partial-cursor preserves the existing unread episode",true);
-  await race(matchLock(roomMatch),[
-    authenticated("select public.request_match_room_assistance("+quote(roomId)+",0);",1),
-    authenticated("select public.request_match_room_assistance("+quote(roomId)+",0);",2),
+  // The original shared, textless request can no longer create assistance.
+  // Real player requests carry an initial message and an explicit requester
+  // verified by the application server; each requester owns a private thread.
+  const legacy = `select public.request_match_room_assistance(${quote(roomId)},0);`;
+  for (const actor of [1, 2]) {
+    rejected(await start(authenticated(legacy, actor)).done, "55000", /MESSAGE_REQUIRED/);
+  }
+  assert.equal(await run(`select not exists(select from public.match_room_assistance where room_id=${quote(roomId)})
+    and not exists(select from public.notifications where type='match.admin_assistance_requested' and match_id=${quote(roomMatch)});`), "t");
+  passed("retired textless request cannot create shared assistance or a notification for either participant");
+  await run(`update public.platform_settings set value='{"enabled":true}' where key='private_assistance_new_requests_enabled';`);
+  const firstRequest = openAssistance(roomId, 1010, "Synthetic private request", 1);
+  await race(`select 1 from public.match_rooms where id=${quote(roomId)} for update`,[
+    firstRequest,
+    firstRequest,
+    openAssistance(roomId, 1011, "Synthetic opponent request", 2),
   ],async(results)=>{
-    const states=results.map(projection);
-    assert(states.every((x)=>x.status==="requested"&&x.requestVersion===1));
-    assert.equal(await run("select count(*) from public.notifications where type='match.admin_assistance_requested' and match_id="+quote(roomMatch)+";"),"1");
-  },"both participants requesting help create one operational request");
+    const [first, retry, opponent] = results.map(projection);
+    assert([first, retry, opponent].every((result) => result.accepted === true && result.request.status === "open" && result.request.version === 1));
+    assert.equal([first, retry].filter((result) => result.duplicate).length, 1);
+    assert.equal(first.request.id, retry.request.id);
+    assert.equal(first.message.id, retry.message.id);
+    assert.equal(opponent.duplicate, false);
+    assert.notEqual(first.request.id, opponent.request.id);
+    assert.equal(await run(`select count(*)=2 and count(distinct a.requester_player_id)=2
+      and count(m.id)=2 and bool_and(m.sequence=1)
+      from public.assistance_requests a left join public.assistance_messages m on m.request_id=a.id where a.room_id=${quote(roomId)};`), "t");
+    assert.equal(await run(`select count(*) from public.notifications where type='assistance.requester_message' and match_id=${quote(roomMatch)};`), "2");
+    const readThread = (request, actor) => assistance("read_private_assistance",
+      `'p_request_id',${quote(request.id)},'p_after_sequence',0,'p_limit',50,'p_tournament_id',${quote(request.tournamentId)}`, actor);
+    assert.deepEqual(projection(await start(readThread(first.request, 1)).done).messages, [first.message]);
+    assert.deepEqual(projection(await start(readThread(opponent.request, 2)).done).messages, [opponent.message]);
+    rejected(await start(readThread(first.request, 2)).done, "42501");
+    rejected(await start(readThread(opponent.request, 1)).done, "42501");
+  },"concurrent private requests create one case, initial message and notice per participant, with idempotent retries and no cross-access");
   await run(authenticated(read(roomId,5),2));
   const privacyLock="select pg_advisory_xact_lock(hashtextextended('ironclad:match-room-account-closure',0))";
   await race(privacyLock,[

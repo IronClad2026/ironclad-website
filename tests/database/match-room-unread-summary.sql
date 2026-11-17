@@ -152,6 +152,15 @@ alter table public.tournament_brackets enable trigger user;
 alter table public.tournaments enable trigger user;
 alter table public.players enable trigger user;
 
+-- The seed is also used by the historical unread race rehearsal, whose
+-- template predates the verified-staff roster.
+do $$ begin
+  if to_regclass('ironclad_private.patch2_staff_authorizations') is not null then
+    insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+    values(sha256(convert_to('match-room-test-4','UTF8')),'disposable unread fixture');
+  end if;
+end $$;
+
 select pg_temp.mr_assert(has_function_privilege('authenticated',
   'public.get_match_room_unread_summary(uuid[])', 'execute'), 'authenticated batch execute allowed');
 select pg_temp.mr_assert(not has_function_privilege('anon',
@@ -160,7 +169,10 @@ select pg_temp.mr_assert(not has_function_privilege('service_role',
   'public.get_match_room_unread_summary(uuid[])', 'execute'), 'service role has no unread shortcut');
 select pg_temp.mr_assert(not has_table_privilege('authenticated', 'public.match_messages', 'select'),
   'projection adds no broad message grant');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select public.set_match_room_enabled(true, 'match-room-test-4');
+reset role;
 create temporary table unread_competition_snapshot as
 select id, to_jsonb(m) value from public.tournament_matches m where id::text like 'd19a0000-%';
 
@@ -212,9 +224,12 @@ select pg_temp.mr_actor('match-room-test-2');
 insert into match_room_test_state values ('read-stale', public.mark_match_room_read(pg_temp.mr_room('ab'), 1));
 select pg_temp.mr_assert(public.get_match_room_unread_summary(array[pg_temp.mr_id(301)])
   ->'items'->0->>'unreadSource' = 'opponent', 'new incoming message survives stale read acknowledgement');
-select pg_temp.mr_actor('match-room-test-4', true);
-insert into match_room_test_state values ('send-admin', public.send_admin_match_room_message(
-  pg_temp.mr_id(301), pg_temp.mr_room('ab'), pg_temp.mr_id(903), 'Private admin message'));
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
+insert into match_room_test_state values ('send-admin', public.call_patch2_match_staff('send_admin_match_room_message',
+  jsonb_build_object('p_match_id',pg_temp.mr_id(301),'p_expected_room_id',pg_temp.mr_room('ab'),
+    'p_client_message_id',pg_temp.mr_id(903),'p_body','Private admin message'),'match-room-test-4'));
+set local role authenticated;
 select pg_temp.mr_actor('match-room-test-2');
 select pg_temp.mr_assert(public.get_match_room_unread_summary(array[pg_temp.mr_id(301)])
   ->'items'->0->>'unreadSource' = 'generic', 'mixed unread source uses generic label');
@@ -241,6 +256,12 @@ reset role;
 select pg_temp.mr_assert(not exists(select 1 from unread_competition_snapshot s
   join public.tournament_matches m using(id) where s.value <> to_jsonb(m)),
   'summary send and read leave all competition facts untouched');
+set local role authenticated;
+select pg_temp.mr_actor('match-room-test-2');
+select pg_temp.mr_error($q$select public.set_match_room_enabled(false,'match-room-test-4')$q$,
+  '42501', 'ordinary participants cannot change the Match Room setting');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select public.set_match_room_enabled(false, 'match-room-test-4');
 set local role authenticated;
 select pg_temp.mr_actor('match-room-test-2');
@@ -248,8 +269,10 @@ select pg_temp.mr_assert(public.get_match_room_unread_summary(array[pg_temp.mr_i
   'database kill switch safely removes all attention');
 select pg_temp.mr_error(format('select public.mark_match_room_read(%L,3)', pg_temp.mr_room('ab')),
   'P0001', 'summary does not bypass disabled read mutation');
-reset role;
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select public.set_match_room_enabled(true, 'match-room-test-4');
+reset role;
 
 -- Only synthetic fixtures are changed; existing pairing triggers perform the
 -- same immutable generation transition used by authorized match management.
@@ -278,12 +301,15 @@ select pg_temp.mr_assert(jsonb_array_length(public.get_match_room_unread_summary
 reset role;
 -- Complete only the synthetic fixture through the existing result authority.
 -- The summary must recheck lifecycle before any history call closes the room.
-select public.apply_admin_official_match_result(pg_temp.mr_id(311), 2, 0, pg_temp.mr_id(211), 'match-room-test-4');
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
+select public.apply_admin_official_match_result_api(pg_temp.mr_id(311), 2, 0, pg_temp.mr_id(211), 'match-room-test-4');
 set local role authenticated;
 select pg_temp.mr_actor('match-room-test-2');
 select pg_temp.mr_assert(public.get_match_room_unread_summary(array[pg_temp.mr_id(311)]) = '{"items":[]}',
   'completed match suppresses persistent historical glow');
-reset role;
+set local role service_role;
+select pg_temp.mr_actor('match-room-test-4');
 select public.close_ironclad_player_account('match-room-test-2');
 set local role authenticated;
 select pg_temp.mr_actor('match-room-test-2');

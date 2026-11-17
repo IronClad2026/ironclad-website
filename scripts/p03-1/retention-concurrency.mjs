@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { localClient, localPsqlArgument } from "./local-pg.mjs";
+import { localClient, localPsqlArgument, matchRoomSettingSql } from "./local-pg.mjs";
 const repositoryRoot = process.cwd();
 const template = JSON.parse(readFileSync(path.join(repositoryRoot, "scripts/p03-1/database-evidence.json"), "utf8")).database;
 assert(/^p03_realtime_\d+$/.test(template));
 const db="p03_retention_race_"+Date.now();
 const client=localClient(localPsqlArgument(),{database:db});
 const id=n=>"d19a0000-0000-4000-8000-"+String(n).padStart(12,"0");
+const staff=sql=>`set role service_role; set request.jwt.claims='{"role":"service_role"}'; ${sql}`;
 const checks=[];
 const pass=name=>{checks.push(name);console.log("PASS "+name);};
 
@@ -26,8 +27,11 @@ try{
  await client.run(`create database ${db} template ${template};`,{db:"postgres"});
 
  const seed=readFileSync(path.join(repositoryRoot,"tests/database/match-room-phase-1.sql"),"utf8");
- await client.run(seed.slice(seed.indexOf("begin;"),seed.indexOf("-- Physical boundary:"))+"\ncommit;");
- await client.run("select public.set_match_room_enabled(true,'match-room-test-4');");
+ await client.run(seed.slice(seed.indexOf("begin;"),seed.indexOf("-- Physical boundary:"))+`
+ insert into ironclad_private.patch2_staff_authorizations(subject_digest,verification_reference)
+ values(sha256(convert_to('match-room-test-4','UTF8')),'disposable retention race fixture');
+ commit;`);
+ await client.run(matchRoomSettingSql(true));
  const raw=await client.run(`set role authenticated;set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-1"}';select public.resolve_match_room('${id(301)}');`);
  const room=JSON.parse(raw.split(/\r?\n/).at(-1)).room.id;
  await client.run(`set role authenticated;set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-1"}';select public.send_match_room_message('${id(301)}','${room}','${id(8001)}','Synthetic concurrency retained body');`);
@@ -35,7 +39,8 @@ try{
  update public.tournaments set status='completed' where id='${id(1)}';
  update ironclad_private.match_room_tournament_closures set completed_at=now()-interval '41 days' where tournament_id='${id(1)}';
  alter table public.tournaments enable trigger user;commit;`);
- const purge=`select public.purge_match_room_retention(array['${room}']::uuid[],'match-room-test-4');`;
+ const purgeRooms=rooms=>staff(`select public.purge_match_room_retention(array[${rooms.map(value=>`'${value}'`).join(",")}]::uuid[],'match-room-test-4');`);
+ const purge=purgeRooms([room]);
  let a=await paused(`select 1 from public.tournaments where id='${id(1)}' for update;`);
  await locked(purge);await finish(a);
  assert.equal(await client.run(`select count(*) from public.match_messages where room_id='${room}';`),"1");
@@ -60,7 +65,7 @@ try{
  while(await client.run("select exists(select 1 from pg_stat_activity where application_name='p03-retention-finalizer' and wait_event_type='Lock');")!=="t"){
    assert(Date.now()<deadline,"finalizer did not wait on admitted tournament lock");await sleep(20);
  }
- a.child.stdin.end(`select public.purge_match_room_retention(array['${sorted[0]}','${sorted[1]}']::uuid[],'match-room-test-4');commit;\n`);
+ a.child.stdin.end(purgeRooms(sorted)+"commit;\n");
  const failedBatch=await a.done;assert.notEqual(failedBatch.code,0);assert.match(failedBatch.stderr,/55P03/);assert(!failedBatch.stderr.includes("40P01"));
  await finish(finalizer,true);
  assert.equal(await client.run("select jsonb_agg(to_jsonb(m) order by id) from public.match_messages m;"),beforeBatch);
