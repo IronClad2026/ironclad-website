@@ -14,14 +14,21 @@ export function placeSkull(area: Bounds, preferred: Point | null): Rect {
     Math.max(115, usableHeight * (compact ? .48 : .72)), usableWidth, usableHeight));
   const height = Math.round(width * .94);
   const defaultX = area.right - width - (compact ? 7 : 18);
-  // Leave room for the question field as well as the welcome options on narrow screens.
-  const defaultY = area.bottom - height - Math.min(compact ? 240 : 191, usableHeight * .39);
+  // Reserve room below the default pose for the two-column phone menu.
+  const reserveBelow = compact ? Math.min(342, usableHeight * .54) : Math.min(191, usableHeight * .39);
+  const defaultY = area.bottom - height - reserveBelow;
   return { x: Math.round(clamp(preferred?.x ?? defaultX, area.left, area.right - width)),
     y: Math.round(clamp(preferred?.y ?? defaultY, area.top, area.bottom - height)), width, height };
 }
 
-export function placeCloud(area: Bounds, skull: Rect, cloudHeight: number, controls: readonly Rect[] = []) {
-  const maxWidth = Math.min(344, area.right - area.left);
+export function placeCloud(
+  area: Bounds,
+  skull: Rect,
+  cloudHeight: number,
+  controls: readonly Rect[] = [],
+  options: { width?: number; minWidth?: number; minHeight?: number } = {},
+) {
+  const maxWidth = Math.min(options.width ?? 344, area.right - area.left);
   const right = skull.x + skull.width;
   const bottom = skull.y + skull.height;
   const candidates = [
@@ -33,7 +40,9 @@ export function placeCloud(area: Bounds, skull: Rect, cloudHeight: number, contr
   const targetHeight = Math.max(72, cloudHeight);
   // Use the actual reserved copy and choices when picking a side with room to reflow.
   const score = ({ side, width, height }: typeof candidates[number]) => {
-    if (width < Math.min(180, maxWidth) || height < 46) return -1000 + width * height / 100000;
+    if (width < (options.minWidth ?? Math.min(180, maxWidth)) || height < (options.minHeight ?? 46)) {
+      return -1000 + width * height / 100000;
+    }
     const displayedHeight = Math.min(height, targetHeight);
     const { penalty } = cloudPosition(area, skull, side, width, displayedHeight, controls);
     const room = Math.min(1, height / targetHeight);

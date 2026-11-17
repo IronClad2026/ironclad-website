@@ -36,7 +36,10 @@ describe("Ready read scoping", () => {
 
   it("reads registration IDs under player RLS with both the Clerk and profile ownership constraints", async () => {
     const account = query({ id: PROFILE, profile_completed: true, account_closed_at: null });
-    const own = { id: REGISTRATION, tournament_id: EVENT, tournament_bracket_id: DIVISION, registration_status: "approved" };
+    const own = {
+      id: REGISTRATION, tournament_id: EVENT, tournament_bracket_id: DIVISION, registration_status: "approved",
+      waitlist_offer_status: null, waitlist_offer_expires_at: null,
+    };
     const registrations = query([own]);
     adapters.server.mockReturnValue({ from: vi.fn().mockReturnValue(account) });
     const from = vi.fn().mockReturnValue(registrations);
@@ -52,7 +55,10 @@ describe("Ready read scoping", () => {
   it("requires an owned seat and matching event/division even if the response contains another player's match", async () => {
     const owned = {
       profile: { id: PROFILE, profile_completed: true, account_closed_at: null },
-      registrations: [{ id: REGISTRATION, tournament_id: EVENT, tournament_bracket_id: DIVISION, registration_status: "approved" }],
+      registrations: [{
+        id: REGISTRATION, tournament_id: EVENT, tournament_bracket_id: DIVISION, registration_status: "approved",
+        waitlist_offer_status: null, waitlist_offer_expires_at: null,
+      }],
     };
     const fixture = {
       id: MATCH, match_number: 1, status: "in_progress", activation_version: 1, outcome_type: null,

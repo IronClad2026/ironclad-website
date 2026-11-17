@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import { openQuickAction } from "./menu-journey.mjs";
 
 const runTag = "ready-active-20261116-v1";
 const projectRef = "zzbnneprhjicmajpjkdg";
@@ -164,20 +165,28 @@ export async function verifyActiveApi({ fixtures, admin, environment, actors, or
 }
 
 export async function browserActiveMatch({ page, expect, origin, fixture, mobile, verify }) {
-  const input = page.getByRole("textbox", { name: "Ask about IronClad" });
-  const send = page.getByRole("button", { name: "Send question" });
+  const eventUrl = new URL("/tournaments", origin);
+  eventUrl.searchParams.set("tournament", fixture.tag);
+  eventUrl.searchParams.set("match", fixture.matchId);
+  await page.goto(eventUrl.href, { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-mode='floating']")).toHaveCount(1, { timeout: 15_000 });
+  await openQuickAction(page, "Help", mobile);
+  const choose = (name) => {
+    const button = page.getByRole("button", { name, exact: true });
+    return mobile ? button.tap() : button.click();
+  };
   const message = page.locator("[data-mascot-message]");
   if (!mobile) {
-    await input.fill(`I need an admin for ${fixture.tag}`);
-    await send.click();
+    await choose("Contact an admin");
+    await choose("In-site Admin Assistance");
     await expect(message).toContainText("Discord support channel", { timeout: 15_000 });
     const showFull = page.getByRole("button", { name: "Show full message" });
     if (await showFull.isVisible()) await showFull.click();
     const discord = page.getByRole("link", { name: "Open Discord ticket channel" });
     await expect(discord).toHaveAttribute("href", ticketUrl);
   } else {
-    await input.fill(`Open the chat with my opponent for ${fixture.tag}`);
-    await send.tap();
+    await choose("My match");
+    await choose("Open opponent chat");
     await expect(message).toContainText("Open the Match Room", { timeout: 15_000 });
     const showFull = page.getByRole("button", { name: "Show full message" });
     if (await showFull.isVisible()) await showFull.tap();

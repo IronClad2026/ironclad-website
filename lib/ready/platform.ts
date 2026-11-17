@@ -6,6 +6,8 @@ import { loadTournamentPollsForRequest } from "@/lib/player-polls";
 import { VERIFIED_DISCORD_TICKET_URL } from "@/lib/support";
 import { getTournamentRegistrationAvailability } from "@/lib/tournaments";
 import type { ReadyAction, ReadyContext, ReadyReply, ReadyRequest } from "./contracts";
+import { readyLink } from "./catalogue";
+import type { ReadyActionId } from "./catalogue";
 import {
   loadReadyAcceptedVersions,
   loadReadyAssistanceRecord,
@@ -21,19 +23,35 @@ import {
 
 type MatchIntent = "match" | "opponent" | "deadline" | "chat" | "result" | "replay" | "support";
 type EventIntent = "event" | "register" | "prizes" | "decisions" | "event-rules";
-type Intent = MatchIntent | EventIntent | "rules" | "private";
+type PlatformIntent = MatchIntent | EventIntent | "rules";
+type Intent = PlatformIntent | "private";
 
 export type ReadyRuleScope =
   | { kind: "general" }
   | { kind: "known"; eventTitle: string; versions: { rulebook: string; ppa: string; terms: string; privacy: string } }
   | { kind: "unconfirmed"; eventTitle?: string; events?: { title: string; slug: string }[] };
 
-const tournaments = { label: "Browse tournaments", href: "/tournaments" };
-const rules = { label: "Open the official rules hub", href: "/rules" };
-const signIn = { label: "Sign in", href: "/sign-in" };
-const dashboard = { label: "Open dashboard", href: "/dashboard" };
-const invite = { label: "Join the IronClad Discord server", href: "https://discord.gg/ZQSQjBNRm3" };
-const eventIntents = new Set<Intent>(["event", "register", "prizes", "decisions", "event-rules"]);
+const tournaments = readyLink("find-tournament", "Browse tournaments", "/tournaments");
+const rules = readyLink("rules-hub", "Open the official rules hub", "/rules");
+const signIn = readyLink("sign-in", "Sign in", "/sign-in");
+const dashboard = readyLink("dashboard", "Open dashboard", "/dashboard");
+const invite = readyLink("discord-invite", "Join the IronClad Discord server", "https://discord.gg/ZQSQjBNRm3");
+const eventIntents = new Set<PlatformIntent>(["event", "register", "prizes", "decisions", "event-rules"]);
+const platformActions: Partial<Record<ReadyActionId, PlatformIntent>> = {
+  "my-match": "match", opponent: "opponent", "opponent-chat": "chat", deadline: "deadline", bracket: "match", "past-match": "match",
+  "submit-result": "result", "upload-replays": "replay",
+  "find-tournament": "event", "open-registration": "register", "registration-status": "register",
+  "event-rules": "event-rules", "event-prizes": "prizes", "event-decisions": "decisions", "rules-hub": "rules",
+  "admin-assistance": "support", "support-options": "support", "copy-match-reference": "support",
+};
+const legacyActions: Record<PlatformIntent, ReadyActionId> = {
+  match: "my-match", opponent: "opponent", deadline: "deadline", chat: "opponent-chat", result: "submit-result",
+  replay: "upload-replays", support: "support-options", event: "find-tournament", register: "open-registration",
+  prizes: "event-prizes", decisions: "event-decisions", "event-rules": "event-rules", rules: "rules-hub",
+};
+const pickAction = (id: ReadyActionId, label: string, context?: ReadyContext): ReadyAction => ({
+  label, intent: { kind: "action", id }, context,
+});
 
 function inferIntent(question: string, context?: ReadyContext): Intent | null {
   const q = question.toLowerCase().replaceAll("’", "'");
@@ -78,7 +96,7 @@ function matchHref(match: ReadyOwnedMatch, roomId?: string) {
 }
 
 function assistanceLink(requestId: string, tournamentId: string): ReadyAction {
-  return { label: "Open your Admin Assistance conversation", href: `/assistance/${requestId}?tournament=${tournamentId}` };
+  return readyLink("admin-assistance", "Open your Admin Assistance conversation", `/assistance/${requestId}?tournament=${tournamentId}`);
 }
 
 function eventTitle(event: ReadyEvent) {
@@ -93,9 +111,9 @@ function canUseMatchRoom(match: ReadyOwnedMatch) {
   return !!match.opponentRegistrationId && match.active;
 }
 
-function supportLinks() {
+function supportLinks(): ReadyReply & { actions: ReadyAction[] } {
   const actions: ReadyAction[] = VERIFIED_DISCORD_TICKET_URL
-    ? [{ label: "Open Discord ticket channel", href: VERIFIED_DISCORD_TICKET_URL }, invite]
+    ? [readyLink("discord-ticket", "Open Discord ticket channel", VERIFIED_DISCORD_TICKET_URL), invite]
     : [invite];
   return {
     text: VERIFIED_DISCORD_TICKET_URL
@@ -114,8 +132,41 @@ export async function answerPlatform(input: ReadyRequest, userId: string | null)
   const intent = inferIntent(input.question, input.context);
   if (!intent) return null;
   if (intent === "private") {
-    return { text: "I can only look up matches and match rooms that belong to your signed-in account, Commander." };
+    return { text: "I can only look up matches and match rooms that belong to your signed-in account, Commander.", fallback: true };
   }
+  const id = intent === "match" && /\b(?:previous|last|historical|past|completed)\b/i.test(input.question)
+    ? "past-match" : legacyActions[intent];
+  return answerPlatformIntent(intent, id, input, userId);
+}
+
+export async function answerPlatformAction(id: ReadyActionId, context: ReadyContext | undefined, userId: string): Promise<ReadyReply> {
+  if (id === "discord-ticket") return supportLinks();
+  if (id === "discord-invite") return { text: "Join the official IronClad server to access its support channels.", actions: [invite] };
+  if (id === "profile-steam") return {
+    text: "Open your player profile to edit your details and check your Steam connection.",
+    actions: [readyLink(id, "Open Profile & Steam", "/profile")],
+  };
+  if (id === "notifications") return {
+    text: "Your IronClad notifications are in the Dashboard’s competition updates.",
+    actions: [readyLink(id, "Open my notifications", "/dashboard#player-notifications")],
+  };
+  if (id === "history" || id === "statistics") return {
+    text: "Your Dashboard shows your own Career history and performance statistics.",
+    actions: [readyLink("history", "Open my history", "/dashboard#dashboard-history"),
+      readyLink("statistics", "Open my statistics", "/dashboard#dashboard-statistics")],
+  };
+  if (id === "rankings") return {
+    text: "The Rankings page shows the published competition standings and points.",
+    actions: [readyLink(id, "Open rankings", "/rankings")],
+  };
+  if (id === "dashboard") return { text: "Open your player Dashboard.", actions: [dashboard] };
+  if (id === "sign-in") return { text: "Sign in to see your player information, Commander.", actions: [signIn] };
+  const intent = platformActions[id];
+  if (!intent) return { text: "That action isn’t available, Commander.", actions: [rules], fallback: true };
+  return answerPlatformIntent(intent, id, { question: "", context }, userId);
+}
+
+async function answerPlatformIntent(intent: PlatformIntent, id: ReadyActionId, input: ReadyRequest, userId: string | null) {
   if (intent === "rules") {
     return {
       text: "The official rules hub links the Rulebook, Player Participation Agreement, Terms and Privacy Policy.",
@@ -125,28 +176,29 @@ export async function answerPlatform(input: ReadyRequest, userId: string | null)
   }
   try {
     return eventIntents.has(intent)
-      ? await answerEvent(intent as EventIntent, input, userId)
-      : await answerMatch(intent as MatchIntent, input, userId);
+      ? await answerEvent(intent as EventIntent, id, input, userId)
+      : await answerMatch(intent as MatchIntent, id, input, userId);
   } catch {
-    if (intent === "support") return supportLinks();
+    if (intent === "support") return { ...supportLinks(), fallback: true };
     return {
       text: "I couldn’t verify the current platform information, Commander. Try the platform page or ask an admin.",
       actions: [intent === "register" || eventIntents.has(intent) ? tournaments : dashboard,
-        { label: "Contact an admin", question: "Contact an admin" }],
+        pickAction("support-options", "Contact an admin")],
+      fallback: true,
     };
   }
 }
 
-async function answerMatch(intent: MatchIntent, input: ReadyRequest, userId: string | null): Promise<ReadyReply> {
+async function answerMatch(intent: MatchIntent, actionId: ReadyActionId, input: ReadyRequest, userId: string | null): Promise<ReadyReply> {
   const workflow = intent === "result" || intent === "replay" ? workflows[intent] + " " : "";
   if (!userId) {
     if (intent === "support") return supportLinks();
-    return { text: workflow + "Sign in to look up your own match, Commander.", actions: [signIn, tournaments] };
+    return { text: workflow + "Sign in to look up your own match, Commander.", actions: [signIn, tournaments], fallback: true };
   }
   const owned = await loadReadyPrivateContext(userId);
   if (!owned.profile) {
     if (intent === "support") return supportLinks();
-    return { text: workflow + "I couldn’t verify an active player profile for your account, Commander.", actions: [dashboard] };
+    return { text: workflow + "I couldn’t verify an active player profile for your account, Commander.", actions: [dashboard], fallback: true };
   }
 
   const context = input.context;
@@ -154,7 +206,7 @@ async function answerMatch(intent: MatchIntent, input: ReadyRequest, userId: str
     .filter((match) => !context?.eventSlug || [match.event.slug, match.event.id].includes(context.eventSlug));
   const named = matches.filter((match) => refersToEvent(input.question, match.event));
   const scoped = named.length ? named : matches;
-  const historical = /\b(?:previous|last|historical|past|completed)\b/i.test(input.question);
+  const historical = actionId === "past-match" || /\b(?:previous|last|historical|past|completed)\b/i.test(input.question);
   const current = scoped.filter((match) => match.active);
   const explicit = !!(context?.matchId || context?.eventSlug || named.length);
   const selected = historical ? scoped.filter((match) => !match.active)
@@ -162,9 +214,13 @@ async function answerMatch(intent: MatchIntent, input: ReadyRequest, userId: str
   if (!selected.length) {
     if (intent === "support") {
       const result = supportLinks();
+      if (actionId === "copy-match-reference") return {
+        text: "I couldn’t find a match reference for your selection, Commander.",
+        actions: [dashboard, ...result.actions], fallback: true,
+      };
       const latest = !explicit ? await loadReadyLatestAssistance(owned.profile.id) : null;
       if (latest) result.actions.unshift(assistanceLink(latest.id, latest.tournamentId));
-      return result;
+      return { ...result, fallback: true };
     }
     const scopedMessage = explicit
       ? "I couldn’t find that match under your current account."
@@ -172,7 +228,8 @@ async function answerMatch(intent: MatchIntent, input: ReadyRequest, userId: str
     return {
       text: workflow + scopedMessage,
       actions: [dashboard, ...(matches.some((match) => !match.active) && !context?.matchId
-        ? [{ label: "Find a past match", question: "Show my previous match" }] : [])],
+        ? [pickAction("past-match", "Find a past match")] : [])],
+      fallback: true,
     };
   }
   if (selected.length > 1) {
@@ -180,73 +237,101 @@ async function answerMatch(intent: MatchIntent, input: ReadyRequest, userId: str
     const limit = support ? 3 : 5;
     return {
       text: "I found more than one match under your account. Which one should I use?" + (support ? " " + support.text : ""),
-      actions: [...selected.slice(0, limit).map((match) => ({
-        label: `${eventTitle(match.event)} · ${matchLabel(match)}`,
-        question: input.question,
-        context: { topic: "match", eventSlug: match.event.slug, matchId: match.id },
-      })), ...(selected.length > limit ? [dashboard] : []), ...(support?.actions ?? [])],
+      actions: [...selected.slice(0, limit).map((match) =>
+        pickAction(actionId, `${eventTitle(match.event)} · ${matchLabel(match)}`,
+          { topic: "match", eventSlug: match.event.slug, matchId: match.id })),
+        ...(selected.length > limit ? [dashboard] : []), ...(support?.actions ?? [])],
     };
   }
 
   const match = selected[0];
   const replyContext = { topic: "match", eventSlug: match.event.slug, matchId: match.id };
   const href = matchHref(match);
-  const openMatch = { label: "Open my match", href };
+  const openMatch = readyLink("my-match", "Open my match", href);
   const header = `${eventTitle(match.event)} · ${matchLabel(match)}`;
+  const held = match.hold_started_at !== null && match.hold_released_at === null;
+  const copy = {
+    label: "Copy match reference", copyText: `${header} · ${match.id}`,
+    actionId: "copy-match-reference", destinationType: "copy_reference",
+  } as const;
+  if (actionId === "copy-match-reference") return {
+    text: `Copy this match reference to give the team the right match, Commander. ${header}.`,
+    actions: [copy], context: replyContext,
+  };
+  if (actionId === "bracket") return {
+    text: `Open Brackets for ${eventTitle(match.event)}, Commander.`,
+    actions: [readyLink("bracket", "Open my bracket", eventHref(match.event, { tab: "brackets" }))],
+    context: replyContext,
+  };
   if (intent === "opponent") {
     const opponent = await loadReadyOpponent(match);
     return {
       text: opponent ? `${match.active ? "Your opponent is" : "The recorded opponent was"} ${opponent}. ${header}.`
         : `There’s no opponent assigned yet for ${header}.`,
       actions: [openMatch], context: replyContext,
+      fallback: !opponent,
     };
   }
   if (intent === "deadline") {
     const deadline = dateLabel(match.deadline_at);
-    const held = match.hold_started_at !== null && match.hold_released_at === null;
     const state = held ? "The deadline is paused. Check the Match workspace for updates."
       : deadline ? `${match.active ? "The current deadline is" : "The recorded deadline was"} ${deadline}.`
         : "There’s no confirmed match deadline in the current record.";
-    return { text: `${state} ${header}.`, actions: [openMatch], context: replyContext };
+    return { text: `${state} Match status is ${match.status.replaceAll("_", " ")}. ${header}.`, actions: [openMatch], context: replyContext };
   }
   if (intent === "chat" || intent === "support") {
     const record = await loadReadyAssistanceRecord(match, owned.profile.id);
     const settings = await loadReadyMatchSettings();
     if (intent === "chat") {
       if (settings.chat && canUseMatchRoom(match)) {
-        return { text: `Open the Match Room for ${header}.`, actions: [{ label: "Open opponent chat", href }], context: replyContext };
+        return { text: `Open the Match Room for ${header}.`, actions: [readyLink("opponent-chat", "Open opponent chat", href)], context: replyContext };
       }
       if (record) {
         return { text: "The earlier Match Room can be opened as read-only.",
-          actions: [{ label: "Open earlier Match Room", href: matchHref(match, record.room_id) }], context: replyContext };
+          actions: [readyLink("opponent-chat", "Open earlier Match Room", matchHref(match, record.room_id))], context: replyContext };
       }
       return {
         text: !match.opponentRegistrationId ? "This match does not have an assigned opponent yet."
           : settings.chat ? "This match is no longer active. Open its workspace to see any existing read-only room."
           : "Match Room activity is currently disabled. An existing room may be available as read-only.",
-        actions: [openMatch], context: replyContext,
+        actions: [openMatch], context: replyContext, fallback: true,
       };
     }
     const support = supportLinks();
-    const reference = `${header} · ${match.id}`;
     if (record) {
       support.actions.unshift(assistanceLink(record.id, match.event.id));
     } else if (settings.assistance && settings.chat && canUseMatchRoom(match)) {
-      support.actions.unshift({ label: "Open Match Room for Admin Assistance", href });
+      support.actions.unshift(readyLink("admin-assistance", "Open Match Room for Admin Assistance", href));
       support.text += " In the Match Room’s Get help section, select Message IronClad admins to start an in-site request.";
     }
     return {
       ...support,
-      actions: [...support.actions, { label: "Copy match reference", copyText: reference }],
+      actions: [...support.actions, copy],
       context: replyContext,
     };
   }
   if (workflow && !match.active) {
     return { text: "This match is no longer active. Open its workspace to view the existing result and any replays available to you.", actions: [openMatch], context: replyContext };
   }
+  if (workflow && !match.opponentRegistrationId) return {
+    text: "This match has no assigned opponent yet. Check its workspace before preparing a result or replay submission.",
+    actions: [openMatch], context: replyContext, fallback: true,
+  };
+  if (workflow && (held || match.status === "pending_review" || (match.deadlineManaged &&
+      (match.status === "scheduled" || !match.deadline_at || Date.parse(match.deadline_at) <= Date.now())))) {
+    const restriction = held ? "This match’s deadline is paused."
+      : match.status === "pending_review" ? "This match already has a result pending review."
+      : "The result window is not open for this match.";
+    return {
+      text: `${restriction} Open your Match workspace to check its current status, Commander.`,
+      actions: [openMatch], context: replyContext,
+    };
+  }
   const status = match.status.replaceAll("_", " ");
   const detail = match.opponentRegistrationId ? `Match status is ${status}.` : "An opponent has not been assigned.";
-  return { text: workflow + `${header}. ${detail}`, actions: [openMatch], context: replyContext };
+  const resultLink = intent === "result" ? readyLink("submit-result", "Open result workspace", href)
+    : intent === "replay" ? readyLink("upload-replays", "Open replay workspace", href) : openMatch;
+  return { text: workflow + `${header}. ${detail}`, actions: [resultLink], context: replyContext };
 }
 
 function refersToEvent(question: string, event: ReadyEvent) {
@@ -255,34 +340,50 @@ function refersToEvent(question: string, event: ReadyEvent) {
   return (title.length >= 6 && value.includes(title)) || (event.slug.length >= 6 && value.includes(event.slug.toLowerCase()));
 }
 
-async function answerEvent(intent: EventIntent, input: ReadyRequest, userId: string | null): Promise<ReadyReply> {
+async function answerEvent(intent: EventIntent, actionId: ReadyActionId, input: ReadyRequest, userId: string | null): Promise<ReadyReply> {
   const reference = input.context?.eventSlug;
   const events = await loadReadyEvents(reference);
   const named = events.filter((event) => refersToEvent(input.question, event));
   const active = events.filter((event) => event.status === "upcoming" || event.status === "registration_open" || event.status === "in_progress");
-  const scoped = reference ? events : named.length ? named : active;
+  const owned = actionId === "registration-status" && userId ? await loadReadyPrivateContext(userId) : null;
+  const scope = reference ? events : named.length ? named : active;
+  const scoped = actionId === "registration-status"
+    ? scope.filter((event) => owned?.registrations.some((registration) => registration.tournament_id === event.id))
+    : scope;
   if (!scoped.length) {
     return {
-      text: reference ? "I couldn’t verify that event. Open Tournaments to choose an available event."
+      text: actionId === "registration-status" ? "I couldn’t find a registration for that selection. Check your Dashboard for your current registrations, Commander."
+        : reference ? "I couldn’t verify that event. Open Tournaments to choose an available event."
         : "There’s no upcoming or open event in the current list. The Tournaments page has the available event history.",
-      actions: [tournaments],
+      actions: [actionId === "registration-status" ? dashboard : tournaments],
+      fallback: true,
     };
   }
   if (scoped.length > 1) {
     return {
       text: "Which event do you mean, Commander?",
-      actions: [...scoped.slice(0, 5).map((event) => ({
-        label: eventTitle(event), question: input.question, context: { eventSlug: event.slug, topic: "event" },
-      })), tournaments],
+      actions: [...scoped.slice(0, 5).map((event) =>
+        pickAction(actionId, eventTitle(event), { eventSlug: event.slug, topic: "event" })), tournaments],
     };
   }
   const event = scoped[0];
   const title = eventTitle(event);
   const context = { topic: "event", eventSlug: event.slug };
-  const open = { label: "Open tournament", href: eventHref(event) };
+  const open = readyLink("find-tournament", "Open tournament", eventHref(event));
+  if (actionId === "registration-status") {
+    const registration = owned?.registrations.find((entry) => entry.tournament_id === event.id);
+    if (!registration) return { text: "I couldn’t confirm a registration for this event.", actions: [dashboard], fallback: true };
+    const expires = registration.waitlist_offer_status === "offered" ? dateLabel(registration.waitlist_offer_expires_at) : null;
+    const offer = expires && registration.waitlist_offer_expires_at && Date.parse(registration.waitlist_offer_expires_at) > Date.now()
+      ? ` Your recorded waitlist offer expires on ${expires}. Check the Dashboard to review it.` : "";
+    return {
+      text: `Your registration for ${title} is ${registration.registration_status.replaceAll("_", " ")}.${offer}`,
+      actions: [dashboard, open], context,
+    };
+  }
   if (intent === "event-rules") {
     return { text: `The tournament page shows the published event settings for ${title}. The official rules hub lists the governing documents.`,
-      actions: [{ label: "Open event rules", href: eventHref(event, { panel: "rules" }) }, rules], context };
+      actions: [readyLink("event-rules", "Open event rules", eventHref(event, { panel: "rules" })), rules], context };
   }
   if (intent === "decisions") {
     const result = await loadTournamentPollsForRequest([event.id], false);
@@ -291,7 +392,7 @@ async function answerEvent(intent: EventIntent, input: ReadyRequest, userId: str
     return {
       text: published ? `A final decision is published for ${title}. Open the Decisions tab for the outcome and its authority.`
         : `I couldn’t find a published final decision for ${title}. The Decisions tab shows the current record.`,
-      actions: [{ label: "Open event decisions", href: eventHref(event, { tab: "decisions", ...(published ? { poll: published.id } : {}) }) }], context,
+      actions: [readyLink("event-decisions", "Open event decisions", eventHref(event, { tab: "decisions", ...(published ? { poll: published.id } : {}) }))], context,
     };
   }
   if (intent === "prizes") {
@@ -299,7 +400,7 @@ async function answerEvent(intent: EventIntent, input: ReadyRequest, userId: str
       text: event.prize_pool?.trim()
         ? `The event lists this prize pool: ${event.prize_pool.trim().slice(0, 110)}. Check the Prizes panel for the published terms.`
         : `I couldn’t verify a listed prize pool for ${title}.`,
-      actions: [{ label: "Open event prize terms", href: eventHref(event, { panel: "prizes" }) }], context,
+      actions: [readyLink("event-prizes", "Open event prize terms", eventHref(event, { panel: "prizes" }))], context,
     };
   }
   if (intent === "register") {
@@ -334,7 +435,7 @@ async function answerEvent(intent: EventIntent, input: ReadyRequest, userId: str
     if (legal.status !== "satisfied") throw new Error("Ready legal acceptance unavailable");
     return {
       text: `The event’s registration window is open for ${title}. The registration form checks your current division and eligibility.`,
-      actions: [{ label: "Open registration", href: eventHref(event, { register: "1" }) }],
+      actions: [readyLink("open-registration", "Open registration", eventHref(event, { register: "1" }))],
       context,
     };
   }
@@ -342,8 +443,10 @@ async function answerEvent(intent: EventIntent, input: ReadyRequest, userId: str
   return { text: `${title} is ${event.status.replaceAll("_", " ")}.${date ? ` Its listed start is ${date}.` : ""}`, actions: [open], context };
 }
 
-export async function resolveReadyRuleScope(context: ReadyContext | undefined, userId: string | null, question = ""): Promise<ReadyRuleScope> {
-  const ownScope = /\b(?:my|this|that) (?:event|tournament|division|match)\b/i.test(question);
+export async function resolveReadyRuleScope(
+  context: ReadyContext | undefined, userId: string | null, question = "", requireOwnedEvent = false,
+): Promise<ReadyRuleScope> {
+  const ownScope = requireOwnedEvent || /\b(?:my|this|that) (?:event|tournament|division|match)\b/i.test(question);
   const namedScope = /\b(?:for|during|in) (?:the )?(?:event|tournament|season)\b/i.test(question);
   const eventRequired = !!(context?.eventSlug || context?.matchId) || ownScope || namedScope;
   if (!eventRequired) return { kind: "general" };

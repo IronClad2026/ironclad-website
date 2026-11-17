@@ -1,13 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ComponentPropsWithRef, FormEvent, KeyboardEvent, PointerEvent, TouchEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { READY_MAIN_MESSAGE, readyCategories, readyQuestionCatalogue } from "@/lib/ready/catalogue";
+import type { ReadyActionId, ReadyCategoryId, ReadyMenuChoice, ReadyQuestionId } from "@/lib/ready/catalogue";
 import { READY_QUESTION_LIMIT } from "@/lib/ready/contracts";
-import type { ReadyContext, ReadyReply, ReadyRequest } from "@/lib/ready/contracts";
+import { readReadyRequest } from "@/lib/ready/contracts";
+import type { ReadyContext, ReadyIntent, ReadyReply } from "@/lib/ready/contracts";
+import { useReadyUsage } from "@/lib/ready/use-ready-usage";
 import { dialogue } from "./dialogue";
 import type { DialogueAnswer, DialogueId, DialogueNode } from "./dialogue";
 import { cloudOrigin, placeCloud, placeContextMenu, placeSkull, thoughtTrail } from "./floating-layout";
@@ -21,7 +25,17 @@ import { useMascotCloudMenu } from "./useMascotCloudMenu";
 import styles from "./ReadyAssistant.module.css";
 
 type Workspace = { open: boolean; position: Point | null; seenGreeting: boolean };
-type ReadyView = { id: DialogueId | "thinking" | "reply"; node: DialogueNode; reply?: ReadyReply };
+type ReadyView = {
+  id: DialogueId | "main" | "submenu" | "search" | "thinking" | "reply";
+  node: DialogueNode;
+  categoryId?: ReadyCategoryId;
+  choices?: readonly ReadyMenuChoice[];
+  parent?: ReadyView;
+  reply?: ReadyReply;
+  questionId?: ReadyQuestionId;
+  answerInstanceId?: string;
+  fallback?: "no_result" | "unavailable" | "unsupported";
+};
 type Drag = { id: number; origin: Point; start: Point; startedAt: number; moved: boolean };
 type Tap = { id: number; target: HTMLButtonElement; start: Point };
 type Reveal = { frame: number; last: number | null; elapsed: number; gain: number; style: TalkStyle; advance: FrameRequestCallback };
@@ -37,16 +51,35 @@ const pauseOnServer = () => false;
 const subscribeClient = () => () => undefined;
 const menuButtonSize = { width: 72, height: 47 };
 const menuGap = 6;
+const ovalBounds = { width: 602, minWidth: 516, minHeight: 254 };
+const moraleReadMs = 2050;
+const neutralNode = (text: string): DialogueNode => ({ text, expression: "Neutral", style: "Talk_Normal", answers: [] });
 const dialogueView = (id: DialogueId): ReadyView => ({ id, node: dialogue[id] });
 const firstGreeting = dialogueView("welcomeFirst");
-const thinking: ReadyView = { id: "thinking", node: { text: "Thinking…", expression: "Pensierosa", style: "Talk_Normal", answers: [] } };
+const mainMenu: ReadyView = { id: "main", node: neutralNode(READY_MAIN_MESSAGE) };
+const searchMenu: ReadyView = {
+  id: "search", node: neutralNode("Search IronClad’s prepared answers, Commander."), parent: mainMenu,
+};
 const unavailableReply: ReadyReply = {
   text: "I couldn’t get an answer just now, Commander. Try again or open the rules and support page.",
-  actions: [{ label: "Rules and support", href: "/rules" }],
+  actions: [{ label: "Rules and support", href: "/rules", actionId: "rules-hub" }],
 };
 
-function replyView(reply: ReadyReply): ReadyView {
-  return { id: "reply", reply, node: { text: reply.text, expression: "Neutral", style: "Talk_Normal", answers: [] } };
+function categoryView(category: (typeof readyCategories)[number]): ReadyView {
+  return { id: "submenu", node: neutralNode(category.message), categoryId: category.id, choices: category.choices, parent: mainMenu };
+}
+
+function replyView(reply: ReadyReply, parent: ReadyView, fallback?: ReadyView["fallback"]): ReadyView {
+  const questionId = !fallback && reply.sources?.length && reply.intent?.kind === "question" ? reply.intent.id : undefined;
+  return {
+    id: "reply", reply, parent, node: neutralNode(reply.text), questionId, fallback,
+    categoryId: parent.categoryId ?? (questionId ? readyQuestionCatalogue[questionId]?.category : undefined),
+    answerInstanceId: questionId ? crypto.randomUUID() : undefined,
+  };
+}
+
+function isMoraleReply(view: ReadyView) {
+  return view.id === "welcomeReady" || view.id === "welcomeNervous" || view.id === "welcomeRough" || view.id === "welcomeResolve";
 }
 
 function subscribeMotion(callback: () => void) {
@@ -147,6 +180,8 @@ export default function ReadyAssistant() {
   const client = useSyncExternalStore(subscribeClient, resumeOnClient, pauseOnServer);
   const reducedMotion = useSyncExternalStore(subscribeMotion, () => matchMedia(reducedQuery).matches, pauseOnServer);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const locationKey = `${pathname}?${searchParams?.toString() ?? ""}`;
   const [open, setOpen] = useState(defaultWorkspace.open);
   const [view, setView] = useState(firstGreeting);
   const [status, setStatus] = useState<AssetStatus>("loading");
@@ -154,6 +189,11 @@ export default function ReadyAssistant() {
   const [cloudExit, setCloudExit] = useState<{ revealing: boolean } | null>(null);
   const [question, setQuestion] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
+  const usage = useReadyUsage();
+  const trackRef = useRef(usage.track);
+  const [votes, setVotes] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const voteRef = useRef(new Map<string, boolean>());
+  const moveFocus = useRef(false);
   const grip = useRef<HTMLButtonElement>(null);
   const menuPanel = useRef<HTMLDivElement>(null);
   const { open: menuOpen, dismiss: dismissMenu, toggle: toggleMenu, events: menuEvents } = useMascotCloudMenu(grip, menuPanel);
@@ -177,6 +217,9 @@ export default function ReadyAssistant() {
   const context = useRef<ReadyContext | undefined>(undefined);
   const reveal = useRef<Reveal | null>(null);
   const queuedText = useRef(0);
+  const followupFrame = useRef(0);
+  const completedViews = useRef(new WeakSet<ReadyView>());
+  const afterReveal = useRef<(shown: ReadyView) => void>(() => undefined);
   const pointer = useRef<Drag | null>(null);
   const anchor = useRef<Point>({ x: .5, y: .69 });
   const projection = useRef<{ skull: Rect; bubble: Rect; side: Side } | null>(null);
@@ -184,9 +227,16 @@ export default function ReadyAssistant() {
   const menuLayout = useRef<{ area: Bounds; skull: Rect; speech: Rect } | null>(null);
   const dockingTimer = useRef<number | null>(null);
   const cloudExitTimer = useRef<number | null>(null);
-  const previousPath = useRef(pathname);
+  const previousPath = useRef(locationKey);
 
   const { id: nodeId, node, reply } = view;
+
+  useEffect(() => { trackRef.current = usage.track; }, [usage.track]);
+
+  const cancelFollowup = useCallback(() => {
+    cancelAnimationFrame(followupFrame.current);
+    followupFrame.current = 0;
+  }, []);
 
   const abortPending = useCallback(() => {
     const previous = pending.current;
@@ -240,8 +290,7 @@ export default function ReadyAssistant() {
       const area = viewportBounds(floating.current, dock.current);
       const skull = placeSkull(area, position);
       if (!pointer.current) obstacles.current = mainControls(area);
-      // A soft keyboard can temporarily shrink the viewport. Keep the user's dragged position.
-      if (!position) workspace.current = { ...workspace.current, position: { x: skull.x, y: skull.y } };
+      // Keep a dragged position; a new player's default can adapt when the viewport changes.
       const placement = `translate3d(${skull.x}px, ${skull.y}px, 0)`;
       for (const element of [floating.current, visual]) {
         element.style.transform = placement;
@@ -249,7 +298,13 @@ export default function ReadyAssistant() {
         element.style.height = `${skull.height}px`;
       }
       const conversation = speech.current;
-      const { side, width, maxHeight } = placeCloud(area, skull, conversation.scrollHeight, obstacles.current);
+      const broad = current.current.id === "main" && area.right - area.left >= 820
+        ? placeCloud(area, skull, ovalBounds.minHeight, obstacles.current, ovalBounds)
+        : null;
+      const oval = !!broad && broad.width >= ovalBounds.minWidth && broad.maxHeight >= ovalBounds.minHeight;
+      if (oval) conversation.dataset.menuLayout = "oval";
+      else delete conversation.dataset.menuLayout;
+      const { side, width, maxHeight } = oval ? broad : placeCloud(area, skull, conversation.scrollHeight, obstacles.current);
       conversation.dataset.side = side;
       conversation.style.width = `${width}px`;
       conversation.style.maxHeight = `${maxHeight}px`;
@@ -288,7 +343,7 @@ export default function ReadyAssistant() {
     visual.style.height = `${rect.height}px`;
   }, [layoutMenu, menuPanel, showAnchor]);
 
-  const finishReveal = useCallback((displayFull: boolean) => {
+  const finishReveal = useCallback((displayFull: boolean, handoff = true) => {
     if (reveal.current) cancelAnimationFrame(reveal.current.frame);
     cancelAnimationFrame(queuedText.current);
     queuedText.current = 0;
@@ -296,9 +351,11 @@ export default function ReadyAssistant() {
     renderer.current?.stopTalk();
     if (displayFull && text.current) text.current.textContent = current.current.node.text;
     setRevealing(false);
+    if (displayFull && handoff) afterReveal.current(current.current);
   }, []);
 
   const begin = useCallback((next: ReadyView, animate = true) => {
+    cancelFollowup();
     if (reveal.current) cancelAnimationFrame(reveal.current.frame);
     cancelAnimationFrame(queuedText.current);
     queuedText.current = 0;
@@ -315,10 +372,16 @@ export default function ReadyAssistant() {
     if (!animate || reducedMotion || next.id === "thinking") {
       reveal.current = null;
       setRevealing(false);
-      if (text.current) text.current.textContent = entry.text;
+      if (text.current) {
+        text.current.textContent = entry.text;
+        if (next.id === "reply" || (animate && next.id !== "thinking")) afterReveal.current(next);
+      }
       else queuedText.current = requestAnimationFrame(() => {
         queuedText.current = 0;
-        if (workspace.current.open && current.current === next && text.current) text.current.textContent = entry.text;
+        if (workspace.current.open && current.current === next && text.current) {
+          text.current.textContent = entry.text;
+          if (next.id === "reply" || (animate && next.id !== "thinking")) afterReveal.current(next);
+        }
       });
       return;
     }
@@ -350,11 +413,56 @@ export default function ReadyAssistant() {
     reveal.current = target;
     renderer.current?.startTalk(entry.style, 0);
     if (!document.hidden) target.frame = requestAnimationFrame(advance);
-  }, [finishReveal, reducedMotion]);
+  }, [cancelFollowup, finishReveal, reducedMotion]);
 
   // Keep the current callbacks available to the one-time workspace hydration.
   const beginRef = useRef(begin);
   useEffect(() => { beginRef.current = begin; }, [begin]);
+
+  useEffect(() => {
+    afterReveal.current = (shown) => {
+      if (current.current !== shown || !workspace.current.open || completedViews.current.has(shown)) return;
+      completedViews.current.add(shown);
+      if (shown.questionId && shown.answerInstanceId) trackRef.current({
+        type: "answer_display", questionId: shown.questionId, answerInstanceId: shown.answerInstanceId, categoryId: shown.categoryId,
+      });
+      if (shown.fallback) trackRef.current({ type: "fallback", outcome: shown.fallback });
+      if (!isMoraleReply(shown)) return;
+
+      // Reading time uses visible frame time so a hidden tab cannot skip either line.
+      let elapsed = 0;
+      let last: number | undefined;
+      let neutralRequested = false;
+      const wait: FrameRequestCallback = (time) => {
+        if (current.current !== shown || !workspace.current.open) return;
+        if (!document.hidden && last !== undefined) elapsed += Math.min(80, time - last);
+        last = document.hidden ? undefined : time;
+        if (elapsed >= moraleReadMs) {
+          if (shown.id === "welcomeRough") {
+            if (!neutralRequested) {
+              neutralRequested = true;
+              renderer.current?.setExpression("Neutral");
+            }
+            const sample = renderer.current?.snapshot();
+            const settled = !sample || (sample.expression === "Neutral" && sample.expressionPhase === "idle"
+              && sample.tearOpacity < .02 && sample.tearDrops === 0);
+            if ((settled && elapsed >= moraleReadMs + (reducedMotion ? 0 : 180)) || elapsed >= moraleReadMs + 2600) {
+              beginRef.current(dialogueView("welcomeResolve"));
+              return;
+            }
+          } else {
+            const pose = renderer.current?.snapshot();
+            if (shown.id !== "welcomeReady" || !pose || pose.expressionPhase === "idle" || elapsed >= moraleReadMs + 1800) {
+              beginRef.current(mainMenu);
+              return;
+            }
+          }
+        }
+        followupFrame.current = requestAnimationFrame(wait);
+      };
+      followupFrame.current = requestAnimationFrame(wait);
+    };
+  }, [reducedMotion]);
 
   useEffect(() => {
     if (!client) return;
@@ -420,14 +528,7 @@ export default function ReadyAssistant() {
     let frame = 0;
     const schedule = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const before = workspace.current.position;
-        layout();
-        const after = workspace.current.position;
-        if (after && (before?.x !== after.x || before.y !== after.y) && !pointer.current) {
-          saveWorkspace(workspace.current);
-        }
-      });
+      frame = requestAnimationFrame(layout);
     };
     layout();
     const observer = new ResizeObserver(schedule);
@@ -453,21 +554,47 @@ export default function ReadyAssistant() {
     if (!open) return;
     const frame = requestAnimationFrame(layout);
     return () => cancelAnimationFrame(frame);
-  }, [layout, nodeId, open]);
+  }, [layout, open, view]);
+
+  useLayoutEffect(() => {
+    if (!moveFocus.current || !open) return;
+    moveFocus.current = false;
+    bubble.current?.focus({ preventScroll: true });
+  }, [open, view]);
 
   useEffect(() => {
-    if (previousPath.current === pathname) return;
-    previousPath.current = pathname;
-    abortPending();
-    const activeReveal = reveal.current;
-    const frame = requestAnimationFrame(() => {
-      dismissMenu();
-      if (current.current.id === "thinking") begin(lastSettled.current, false);
-      else if (reveal.current === activeReveal) finishReveal(true);
-      layout();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [abortPending, begin, dismissMenu, finishReveal, layout, pathname]);
+    let frame = 0;
+    const leavePage = () => {
+      abortPending();
+      cancelFollowup();
+      context.current = undefined;
+      setQuestion("");
+      const activeView = current.current;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        dismissMenu();
+        if (current.current !== activeView) return;
+        if (!workspace.current.open) {
+          if (lastSettled.current.id === "reply" || isMoraleReply(lastSettled.current)) lastSettled.current = mainMenu;
+          return;
+        }
+        if (activeView.id === "thinking" || activeView.id === "reply" || isMoraleReply(activeView)) begin(mainMenu, false);
+        else finishReveal(true, false);
+        layout();
+      });
+    };
+    if (previousPath.current !== locationKey) {
+      previousPath.current = locationKey;
+      leavePage();
+    }
+    window.addEventListener("hashchange", leavePage);
+    window.addEventListener("popstate", leavePage);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", leavePage);
+      window.removeEventListener("popstate", leavePage);
+    };
+  }, [abortPending, begin, cancelFollowup, dismissMenu, finishReveal, layout, locationKey]);
 
   useEffect(() => {
     const onVisibility = () => {
@@ -485,15 +612,17 @@ export default function ReadyAssistant() {
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       abortPending();
+      cancelFollowup();
       if (reveal.current) cancelAnimationFrame(reveal.current.frame);
       cancelAnimationFrame(queuedText.current);
       if (dockingTimer.current !== null) window.clearTimeout(dockingTimer.current);
       if (cloudExitTimer.current !== null) window.clearTimeout(cloudExitTimer.current);
     };
-  }, [abortPending]);
+  }, [abortPending, cancelFollowup]);
 
   function openAssistant() {
     if (workspace.current.open) return;
+    usage.track({ type: "manual_open" });
     if (cloudExitTimer.current !== null) window.clearTimeout(cloudExitTimer.current);
     cloudExitTimer.current = null;
     setCloudExit(null);
@@ -511,6 +640,7 @@ export default function ReadyAssistant() {
     if (!workspace.current.open) return;
     const restoreFocus = floating.current?.contains(document.activeElement);
     abortPending();
+    cancelFollowup();
     dismissMenu();
     if (pointer.current?.moved) renderer.current?.setDragging(false);
     pointer.current = null;
@@ -523,6 +653,7 @@ export default function ReadyAssistant() {
     }
     finishReveal(false);
     setQuestion("");
+    if (isMoraleReply(lastSettled.current)) lastSettled.current = mainMenu;
     workspace.current = { ...workspace.current, open: false };
     saveWorkspace(workspace.current);
     renderer.current?.setExpression("Neutral", 1);
@@ -592,44 +723,82 @@ export default function ReadyAssistant() {
     saveWorkspace(workspace.current);
   }
 
-  function show(id: DialogueId) {
+  function changeView(next: ReadyView, animate = false) {
+    const focused = document.activeElement;
+    moveFocus.current = !!focused && (focused === grip.current || !!speech.current?.contains(focused))
+      && focused.matches(":focus-visible");
     abortPending();
-    begin(dialogueView(id));
+    dismissMenu();
+    begin(next, animate);
   }
 
   function pick(answer: DialogueAnswer) {
     if (current.current !== view || reveal.current) return;
-    if ("next" in answer) show(answer.next);
-    if ("question" in answer) void ask(answer.question);
+    usage.track({ type: "engage" });
+    changeView(dialogueView(answer.next), true);
   }
 
-  async function ask(value: string, scope = context.current) {
-    const trimmed = value.trim();
-    if (!trimmed || [...trimmed].length > READY_QUESTION_LIMIT || !workspace.current.open) return;
-    abortPending();
+  function openCategory(category: (typeof readyCategories)[number]) {
+    if (current.current !== view) return;
+    usage.track({ type: "category_select", categoryId: category.id });
+    changeView(categoryView(category));
+  }
+
+  function choose(choice: ReadyMenuChoice, parent = view) {
+    if (current.current !== view) return;
+    if (choice.kind === "group") {
+      changeView({
+        id: "submenu", node: neutralNode(choice.message), categoryId: parent.categoryId, choices: choice.choices, parent,
+      });
+    } else if (choice.kind === "question") void ask({ kind: "question", id: choice.id }, parent);
+    else void ask({ kind: "action", id: choice.id }, parent);
+  }
+
+  async function ask(request: ReadyIntent | { kind: "search"; query: string }, parent: ReadyView, selected?: ReadyContext) {
+    const categoryId = parent.categoryId;
+    if (!workspace.current.open || current.current !== view) return;
+    const eventSlug = pathname === "/tournaments" ? searchParams?.get("tournament") ?? undefined : undefined;
+    const matchId = eventSlug ? searchParams?.get("match") ?? undefined : undefined;
+    const scope = selected ?? { eventSlug, matchId, ...context.current };
+    const payload = readReadyRequest({ ...request, context: scope }) ?? readReadyRequest(request);
+    if (!payload) return;
+    if (request.kind === "question") {
+      usage.track({ type: "question_select", questionId: request.id, categoryId });
+    } else {
+      usage.track({ type: "engage" });
+    }
+    changeView({ id: "thinking", node: neutralNode("Checking the site, Commander…"), parent, categoryId });
     const controller = new AbortController();
     pending.current = controller;
     const timeout = window.setTimeout(() => controller.abort(), requestTimeoutMs);
-    begin(thinking);
     try {
-      const request: ReadyRequest = { question: trimmed, context: scope };
       const response = await fetch("/api/ready", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       const answer = await response.json() as Partial<ReadyReply> | null;
       if (pending.current !== controller || !workspace.current.open) return;
       if (controller.signal.aborted || typeof answer?.text !== "string" || !answer.text.trim()) {
-        begin(replyView(unavailableReply));
+        trackRef.current({ type: "technical_error", outcome: controller.signal.aborted ? "timeout" : "invalid_reply" });
+        begin(replyView(unavailableReply, parent, "unavailable"));
         return;
       }
       const next = answer as ReadyReply;
-      if (response.ok) context.current = next.context;
-      begin(replyView(next));
+      if (response.ok) context.current = next.context ?? scope;
+      if (next.searchOutcome) trackRef.current({
+        type: "search_outcome", outcome: next.searchOutcome, questionId: next.intent?.kind === "question" ? next.intent.id : undefined,
+      });
+      if (response.status >= 500) trackRef.current({ type: "technical_error", outcome: "request_failed" });
+      const fallback = next.searchOutcome === "no_result" ? "no_result"
+        : !response.ok ? "unavailable" : next.fallback ? "unsupported" : undefined;
+      begin(replyView(next, parent, fallback));
     } catch {
-      if (pending.current === controller && workspace.current.open) begin(replyView(unavailableReply));
+      if (pending.current === controller && workspace.current.open) {
+        trackRef.current({ type: "technical_error", outcome: controller.signal.aborted ? "timeout" : "request_failed" });
+        begin(replyView(unavailableReply, parent, "unavailable"));
+      }
     } finally {
       window.clearTimeout(timeout);
       if (pending.current === controller) pending.current = null;
@@ -638,9 +807,15 @@ export default function ReadyAssistant() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!question.trim()) return;
+    const trimmed = question.trim();
+    if (!trimmed || [...trimmed].length > READY_QUESTION_LIMIT) return;
     setQuestion("");
-    void ask(question);
+    void ask({ kind: "search", query: trimmed }, searchMenu);
+  }
+
+  function actionPicked(actionId?: ReadyActionId) {
+    cancelFollowup();
+    if (actionId) usage.track({ type: "action_click", actionId, categoryId: view.categoryId, questionId: view.questionId });
   }
 
   async function copyReference(value: string) {
@@ -652,8 +827,18 @@ export default function ReadyAssistant() {
     }
   }
 
+  function vote(helpful: boolean) {
+    const { answerInstanceId, questionId } = view;
+    if (current.current !== view || !answerInstanceId || !questionId || voteRef.current.has(answerInstanceId)) return;
+    voteRef.current.set(answerInstanceId, helpful);
+    setVotes(new Map(voteRef.current));
+    usage.track({ type: "helpfulness", questionId, answerInstanceId, helpful });
+  }
+
   const displayRevealing = cloudExit?.revealing ?? revealing;
   const cloudExiting = !open ? "true" : undefined;
+  const voted = view.answerInstanceId ? votes.get(view.answerInstanceId) : undefined;
+  const related = voted === false ? readyCategories.find((item) => item.id === (view.parent?.categoryId ?? view.categoryId)) : undefined;
 
   return (
     <div className={styles.brand}>
@@ -693,12 +878,16 @@ export default function ReadyAssistant() {
               <div aria-label="IronClad quick actions" className={styles.contextMenu} data-mascot-menu=""
                 data-mascot-menu-open={menuOpen ? "true" : undefined} id="ironclad-cloud-menu" inert={!menuOpen}
                 ref={menuPanel} role="group" style={{ gap: menuGap }} {...menuEvents}>
-                <TouchButton className={styles.answer} onActivate={() => { dismissMenu(true); show("welcomeReturning"); }}
+                <TouchButton className={styles.answer} onActivate={() => { dismissMenu(true); changeView(dialogueView("welcomeReturning"), true); }}
                   style={menuButtonSize} type="button">
                   <ThoughtCloudShape variant="answer" />
                   <span>Welcome</span>
                 </TouchButton>
-                <TouchButton className={styles.answer} onActivate={() => { dismissMenu(true); show("help"); }}
+                <TouchButton className={styles.answer} onActivate={() => {
+                  usage.track({ type: "engage" });
+                  dismissMenu(true);
+                  changeView(mainMenu);
+                }}
                   style={menuButtonSize} type="button">
                   <ThoughtCloudShape variant="answer" />
                   <span>Help</span>
@@ -710,8 +899,8 @@ export default function ReadyAssistant() {
             </>}
 
             <div aria-label="Assistant message and answers" className={styles.speech} data-mascot-dialogue="" ref={speech} role="group"
-              data-exiting={cloudExiting} data-revealing={displayRevealing ? "true" : undefined}>
-              <div className={styles.bubble} data-thought-cloud="" ref={bubble}>
+              data-exiting={cloudExiting} data-revealing={displayRevealing ? "true" : undefined} data-ready-view={nodeId}>
+              <div className={styles.bubble} data-thought-cloud="" ref={bubble} tabIndex={-1}>
                 <ThoughtCloudShape variant="main" />
                 <div className={styles.messageLayout}>
                   <p aria-hidden="true" className={`${styles.message} ${styles.messageReserve}`}>{node.text}</p>
@@ -719,7 +908,7 @@ export default function ReadyAssistant() {
                 </div>
                 <p aria-live="polite" aria-atomic="true" className={styles.srOnly}>{displayRevealing ? "" : node.text}</p>
                 {!displayRevealing && reply && <ReadySources details={reply.details} sources={reply.sources} />}
-                {open && <form aria-label="Ask Ready" className={styles.composer} onSubmit={submit} ref={composer}>
+                {open && nodeId === "search" && <form aria-label="Search Ready’s prepared answers" className={styles.composer} onSubmit={submit} ref={composer}>
                   <input aria-label="Ask about IronClad" autoComplete="off" maxLength={READY_QUESTION_LIMIT}
                     name="question" onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about IronClad…"
                     ref={questionInput} type="text" value={question} enterKeyHint="send" />
@@ -731,29 +920,82 @@ export default function ReadyAssistant() {
               </div>
               <div className={styles.answerZone}>
                 <div className={styles.answers} inert={displayRevealing}>
-                  {node.answers.map((answer) => "href" in answer ? (
-                    <ReadyCloudLink href={answer.href} key={answer.id} label={answer.label} />
-                  ) : (
+                  {node.answers.map((answer) => (
                     <TouchButton className={styles.answer} data-answer-cloud="" key={answer.id} onActivate={() => pick(answer)} type="button">
                       <ThoughtCloudShape variant="answer" />
                       <span>{answer.label}</span>
                     </TouchButton>
                   ))}
+                  {nodeId === "main" && readyCategories.map((category) => (
+                    <TouchButton className={styles.answer} data-answer-cloud="" data-ready-category={category.id}
+                      key={category.id} onActivate={() => openCategory(category)} type="button">
+                      <ThoughtCloudShape variant="answer" />
+                      <span>{category.label}</span>
+                    </TouchButton>
+                  ))}
+                  {view.choices?.map((choice) => (
+                    <TouchButton className={styles.answer} data-answer-cloud="" data-ready-choice={choice.id}
+                      key={choice.id} onActivate={() => choose(choice)} type="button">
+                      <ThoughtCloudShape variant="answer" />
+                      <span>{choice.label}</span>
+                    </TouchButton>
+                  ))}
                   {reply?.actions?.map((action) => {
-                    if ("href" in action) return <ReadyCloudLink href={action.href} key={action.href} label={action.label} />;
+                    if ("href" in action) return <ReadyCloudLink href={action.href} key={action.href} label={action.label}
+                      onActivate={() => actionPicked(action.actionId)} />;
                     return <TouchButton className={styles.answer} data-answer-cloud="" key={action.label} onActivate={() => {
-                      if ("question" in action) void ask(action.question, action.context);
-                      else void copyReference(action.copyText);
+                      if ("intent" in action) void ask(action.intent, view, action.context);
+                      else if ("copyText" in action) {
+                        actionPicked(action.actionId);
+                        void copyReference(action.copyText);
+                      }
                     }} type="button">
                       <ThoughtCloudShape variant="answer" />
                       <span>{action.label}</span>
                     </TouchButton>;
                   })}
                 </div>
-                {displayRevealing && <div className={styles.revealAction}>
+                {displayRevealing && nodeId !== "main" && <div className={styles.revealAction}>
                   <TouchButton className={styles.textAction} onActivate={() => finishReveal(true)} type="button">Show full message</TouchButton>
                 </div>}
               </div>
+              {!displayRevealing && view.questionId && view.answerInstanceId && <div className={styles.feedback} aria-label="Answer feedback" role="group">
+                {voted === undefined ? <>
+                  <span>Was this helpful?</span>
+                  <TouchButton className={styles.textAction} onActivate={() => vote(true)} type="button">Helpful</TouchButton>
+                  <TouchButton className={styles.textAction} onActivate={() => vote(false)} type="button">Still need help</TouchButton>
+                </> : <span role="status">{voted ? "Glad that helped, Commander." : "Try another topic or contact an admin, Commander."}</span>}
+                {voted === false && <div className={styles.readyFooter}>
+                  {related && <TouchButton className={styles.textAction} onActivate={() => openCategory(related)} type="button">
+                    More about {related.label.toLowerCase()}
+                  </TouchButton>}
+                  <TouchButton className={styles.textAction} onActivate={() => {
+                    const support = readyCategories.find((item) => item.id === "support");
+                    if (support) openCategory(support);
+                  }} type="button">Contact an admin</TouchButton>
+                </div>}
+              </div>}
+              {nodeId === "main" && <div className={styles.readyFooter} inert={displayRevealing}>
+                <TouchButton className={styles.textAction} onActivate={() => changeView(searchMenu)} type="button">Search prepared answers</TouchButton>
+                {usage.loaded && <details className={styles.analyticsChoice}>
+                  <summary>Ready analytics</summary>
+                  <div className={styles.analyticsNotice}>
+                    <p>Optional for Staging reviewers. Ready usage analytics counts deliberate interactions such as chosen topics and link clicks. It does not collect what you type, morale choices, or private match details. Ready works the same with this off.</p>
+                    <label><input checked={usage.enabled} disabled={usage.saving || usage.withdrawalPending} onChange={(event) => {
+                      void usage.setEnabled(event.currentTarget.checked);
+                    }} type="checkbox" /> Allow Ready usage analytics</label>
+                    {usage.withdrawalPending && <TouchButton className={styles.textAction} disabled={usage.saving}
+                      onActivate={() => { void usage.setEnabled(false); }} type="button">Turn off</TouchButton>}
+                    {usage.error && <p role="status">{usage.error}</p>}
+                  </div>
+                </details>}
+              </div>}
+              {view.parent && <div className={styles.readyFooter} aria-label="Ready menu navigation" role="group">
+                {nodeId !== "search" && <TouchButton className={styles.textAction} onActivate={() => {
+                  if (view.parent) changeView(view.parent);
+                }} type="button">Back</TouchButton>}
+                <TouchButton className={styles.textAction} onActivate={() => changeView(mainMenu)} type="button">Main menu</TouchButton>
+              </div>}
               {copyStatus && <output className={styles.copyStatus}>{copyStatus}</output>}
             </div>
           </section>

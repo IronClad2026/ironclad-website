@@ -71,6 +71,9 @@ describe("Ready model quality rubric", () => {
     const badAction = { label: "Get admin help", href: "https://unverified.example" };
     expect(gradeReadyAiCase(fixture, { ...observed, reply: { ...reply, actions: [badAction] } }, model).failures)
       .toContain("unverified action destination or payload");
+    const privateAction = { ...reply.actions?.[0], context: { topic: "disconnects", matchId: "private" } };
+    expect(gradeReadyAiCase(fixture, { ...observed, reply: { ...reply, actions: [privateAction] } }, model).failures)
+      .toContain("unverified action destination or payload");
   });
 
   it("requires the exact accepted event edition and detects a leaked private context", () => {
@@ -79,6 +82,10 @@ describe("Ready model quality rubric", () => {
       kind: "known", eventTitle: "Synthetic", versions: { rulebook: "3.1", ppa: "3.1", terms: "1.1", privacy: "1.2" },
     }, { eventSlug: "test-2-2" });
     expect(gradeReadyAiCase(fixture, { status: 200, reply, evidence, wallMs: 1, serverMs: 1 }, model).pass).toBe(true);
+    const wrongAction = { ...reply.actions?.[0], actionId: "discord-ticket", destinationType: "discord" };
+    expect(gradeReadyAiCase(fixture, {
+      status: 200, reply: { ...reply, actions: [wrongAction] }, evidence, wallMs: 1, serverMs: 1,
+    }, model).failures).toContain("unverified action destination or payload");
     const wrongEdition = answerKnowledgeTopic("division", { kind: "general" });
     expect(gradeReadyAiCase(fixture, { status: 200, reply: wrongEdition, evidence, wallMs: 1, serverMs: 1 }, model).failures)
       .toContain("forbidden fact or private value");

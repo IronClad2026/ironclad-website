@@ -30,6 +30,8 @@ type Registration = {
   tournament_id: string;
   tournament_bracket_id: string;
   registration_status: string;
+  waitlist_offer_status: "offered" | "accepted" | "declined" | "expired" | "cancelled" | null;
+  waitlist_offer_expires_at: string | null;
 };
 type Related<T> = T | T[];
 type Division = { id: string; name: string; launched_at: string | null; tournaments: Related<ReadyEvent> };
@@ -52,6 +54,7 @@ export type ReadyOwnedMatch = Omit<MatchRow, "generated_brackets" | "bracket_rou
   event: ReadyEvent;
   division: string;
   divisionId: string;
+  deadlineManaged: boolean;
   round: number | null;
   registrationId: string;
   opponentRegistrationId: string | null;
@@ -100,7 +103,7 @@ export async function loadReadyPrivateContext(userId: string): Promise<ReadyPriv
   if (!profile) return { profile: null, registrations: [] };
   const client = await createAuthenticatedSupabaseClient();
   const registrations = await client.from("registrations")
-    .select("id,tournament_id,tournament_bracket_id,registration_status")
+    .select("id,tournament_id,tournament_bracket_id,registration_status,waitlist_offer_status,waitlist_offer_expires_at")
     .eq("clerk_user_id", userId).eq("profile_id", profile.id)
     .not("tournament_id", "is", null).not("tournament_bracket_id", "is", null)
     .order("created_at", { ascending: false }).limit(OWNED_MATCH_LIMIT);
@@ -144,6 +147,7 @@ export async function loadReadyOwnedMatches(owned: ReadyPrivateContext, requeste
         row.status !== "completed" && row.outcome_type === null && (row.activation_version > 0 || generated?.format === "round_robin");
       matches.set(row.id, {
         ...fields, event, division: division.name, divisionId: division.id,
+        deadlineManaged: generated?.format === "single_elimination",
         round: one(rounds)?.round_number ?? null, registrationId: registration.id, opponentRegistrationId: opponent, active,
       });
     }

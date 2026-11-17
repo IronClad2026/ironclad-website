@@ -14,12 +14,14 @@ function safeHref(value: string) {
   }
 }
 
-export function ReadyCloudLink({ href: destination, label }: { href: string; label: string }) {
+export function ReadyCloudLink({ href: destination, label, onActivate }: { href: string; label: string; onActivate?: () => void }) {
   const href = safeHref(destination);
   if (!href) return null;
   const external = !href.startsWith("/");
   return (
-    <Link className={styles.answer} data-answer-cloud="" href={href} prefetch={false}
+    <Link className={styles.answer} data-answer-cloud="" href={href} prefetch={false} onClick={onActivate} onAuxClick={(event) => {
+      if (event.button === 1) onActivate?.();
+    }}
       target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>
       <ThoughtCloudShape variant="answer" />
       <span>{label}</span>

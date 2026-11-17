@@ -102,7 +102,7 @@ export function GrowthCard({ title, periodLabel, growth }: { title: string; peri
   </section>;
 }
 type TrendSeries = { label: string; points: AdminOperationsDailyPoint[]; color: string; };
-export function TrendChart({ id, title, description, series, emptyMessage = "No daily activity is available for this period.", tableCaption = title + " in UTC" }: { id: string; title: string; description: string; series: TrendSeries[]; emptyMessage?: string; tableCaption?: string; }) {
+export function TrendChart({ id, title, description, series, emptyMessage = "No daily activity is available for this period.", timeZoneLabel = "UTC", tableCaption = title + " in " + timeZoneLabel }: { id: string; title: string; description: string; series: TrendSeries[]; emptyMessage?: string; timeZoneLabel?: string; tableCaption?: string; }) {
   const dates = [...new Set(series.flatMap((item) => item.points.map((point) => point.date)))].sort();
   const values = series.flatMap((item) => item.points.map((point) => point.value));
   const maximum = Math.max(1, ...values);
@@ -134,9 +134,9 @@ export function TrendChart({ id, title, description, series, emptyMessage = "No 
       <div aria-hidden="true" className="mt-1 flex justify-between gap-4 text-xs text-zinc-400"><span>{dates[0]}</span><span>{dates.at(-1)}</span></div>
       <details className="group mt-3 border-t border-white/10">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-semibold text-orange-200">View daily values <ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" /></summary>
-        <p className="mb-3 text-xs leading-5 text-zinc-400">Exact reported values by UTC date. “Not reported” means no observation, not zero. Gaps in the trace represent unreported days.</p>
+        <p className="mb-3 text-xs leading-5 text-zinc-400">Exact reported values by {timeZoneLabel} date. “Not reported” means no observation, not zero. Gaps in the trace represent unreported days.</p>
         <div className="max-h-80 overflow-auto rounded-lg border border-white/10" tabIndex={0} role="region" aria-label={title + " daily values"}>
-          <table className="w-full table-fixed text-left text-xs tabular-nums"><caption className="sr-only">{tableCaption}</caption><thead className="sticky top-0 bg-zinc-900"><tr><th scope="col" className="p-2">Date (UTC)</th>{series.map((item) => <th scope="col" key={item.label} className="p-2">{item.label}</th>)}</tr></thead><tbody>{dates.map((date) => <tr key={date} className="border-t border-white/10"><th scope="row" className="p-2 font-normal text-zinc-300">{date}</th>{indexed.map((points, index) => <td key={series[index].label} className="p-2">{points.has(date) ? numberFormatter.format(points.get(date)!) : "Not reported"}</td>)}</tr>)}</tbody></table>
+          <table className="w-full table-fixed text-left text-xs tabular-nums"><caption className="sr-only">{tableCaption}</caption><thead className="sticky top-0 bg-zinc-900"><tr><th scope="col" className="p-2">Date ({timeZoneLabel})</th>{series.map((item) => <th scope="col" key={item.label} className="p-2">{item.label}</th>)}</tr></thead><tbody>{dates.map((date) => <tr key={date} className="border-t border-white/10"><th scope="row" className="p-2 font-normal text-zinc-300">{date}</th>{indexed.map((points, index) => <td key={series[index].label} className="p-2">{points.has(date) ? numberFormatter.format(points.get(date)!) : "Not reported"}</td>)}</tr>)}</tbody></table>
         </div>
       </details>
     </> : <EmptyPanel className="mt-4">{emptyMessage}</EmptyPanel>}

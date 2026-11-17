@@ -211,7 +211,7 @@ export default async function PlayerDashboardPage() {
               loadError={divisionInvitationState.status === "error"}
             />
           </section>
-          <aside className="min-w-0" aria-label={t("dashboard.competition.updates")}>
+          <aside id="player-notifications" className="min-w-0 scroll-mt-28" aria-label={t("dashboard.competition.updates")}>
             <InAppNotificationCenter
               key={[
                 locale,

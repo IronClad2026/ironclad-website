@@ -1,10 +1,8 @@
 import type { MascotReaction, TalkStyle } from "./renderer";
 
-export type DialogueId = "welcomeFirst" | "welcomeReturning" | "welcomeReady" | "welcomeNervous" | "welcomeRough" | "help";
+export type DialogueId = "welcomeFirst" | "welcomeReturning" | "welcomeReady" | "welcomeNervous" | "welcomeRough" | "welcomeResolve";
 
-export type DialogueAnswer = { id: string; label: string } & (
-  { next: DialogueId } | { question: string } | { href: string }
-);
+export type DialogueAnswer = { id: string; label: string; next: DialogueId };
 
 export type DialogueNode = {
   text: string;
@@ -15,9 +13,6 @@ export type DialogueNode = {
   answers: readonly DialogueAnswer[];
 };
 
-const help = { id: "show-help", label: "Show me where to go", next: "help" } as const;
-const match = { id: "open-match", label: "Open my match", question: "Open my match" } as const;
-const rules = { id: "open-rules", label: "Open rules and support", href: "/rules" } as const;
 const welcomeAnswers = [
   { id: "ready", label: "Time to kick some ass!", next: "welcomeReady" },
   { id: "nervous", label: "A little nervous…", next: "welcomeNervous" },
@@ -43,31 +38,26 @@ export const dialogue: Record<DialogueId, DialogueNode> = {
     expression: "Ghigno",
     style: "Talk_Enthusiastic",
     reaction: "Reaction_Nod",
-    answers: [help, match],
+    answers: [],
   },
   welcomeNervous: {
     text: "Even commanders get nervous. One match at a time.",
     expression: "Neutral",
     style: "Talk_Gentle",
     reaction: "Reaction_Nod",
-    answers: [help, rules],
+    answers: [],
   },
   welcomeRough: {
-    text: "Permission to surrender? Denied. One match at a time, Commander.",
+    text: "Oh, poor you, Commander… let me shed a tactical tear.",
     expression: "Sad",
     intensity: 1,
     style: "Talk_Gentle",
-    answers: [help],
+    answers: [],
   },
-  help: {
-    text: "Where would you like to go, Commander?",
+  welcomeResolve: {
+    text: "Permission to surrender? Denied. One match at a time, Commander.",
     expression: "Neutral",
-    style: "Talk_Normal",
-    answers: [
-      { ...match, label: "My match" },
-      { id: "open-tournaments", label: "Tournament information", href: "/tournaments" },
-      { ...rules, label: "Rules and support" },
-      { id: "admin-assistance", label: "Contact an admin", question: "I need an admin" },
-    ],
+    style: "Talk_Gentle",
+    answers: [],
   },
 };

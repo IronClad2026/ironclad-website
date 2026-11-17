@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { loadAccountLegalGateState } from "@/lib/account-legal-acceptance";
 import { resolveReadyAnswer } from "@/lib/ready/answer";
+import { readyLink } from "@/lib/ready/catalogue";
 import { readReadyRequest, READY_BODY_LIMIT } from "@/lib/ready/contracts";
-import type { ReadyResolvedReply } from "@/lib/ready/answer";
+import type { ReadyReply } from "@/lib/ready/contracts";
 import { readyReviewAliases } from "@/lib/ready/review-access";
 import { loadReadySession } from "@/lib/ready/session";
 import { allowReadyRequest } from "@/lib/ready/usage";
@@ -10,7 +11,7 @@ import { allowReadyRequest } from "@/lib/ready/usage";
 export const runtime = "nodejs";
 export const maxDuration = 15;
 
-const publicRules = { label: "Open rules hub", href: "/rules" };
+const publicRules = readyLink("rules-hub", "Open rules hub", "/rules");
 
 async function readSmallBody(request: Request, signal: AbortSignal): Promise<unknown> {
   if (!request.body || Number(request.headers.get("content-length")) > READY_BODY_LIMIT) return null;
@@ -56,18 +57,12 @@ async function withDeadline<T>(task: () => Promise<T>, signal: AbortSignal): Pro
 
 export async function POST(request: Request) {
   const started = performance.now();
-  const send = ({ ai, ...body }: ReadyResolvedReply, status = 200) => {
-    const timing = [`ready;dur=${Math.round(performance.now() - started)}`];
-    if (ai?.durationMs !== undefined) timing.push(`ready-ai;dur=${ai.durationMs}`);
+  const send = (body: ReadyReply, status = 200) => {
     const headers = {
       "Cache-Control": "private, no-store",
-      "Server-Timing": timing.join(", "),
-      "X-Ready-AI-Status": ai?.status ?? "not-attempted",
-      "X-Ready-AI-Attempted": ai?.attempted ? "1" : "0",
-      ...(ai?.model ? { "X-Ready-AI-Model": ai.model } : {}),
-      ...(ai?.inputTokens !== undefined ? { "X-Ready-AI-Input-Tokens": String(ai.inputTokens) } : {}),
-      ...(ai?.outputTokens !== undefined ? { "X-Ready-AI-Output-Tokens": String(ai.outputTokens) } : {}),
-      ...(ai?.reservedNeurons !== undefined ? { "X-Ready-AI-Reserved-Neurons": String(ai.reservedNeurons) } : {}),
+      "Server-Timing": `ready;dur=${Math.round(performance.now() - started)}`,
+      "X-Ready-AI-Status": "not-attempted",
+      "X-Ready-AI-Attempted": "0",
       ...(status === 429 ? { "Retry-After": "60" } : {}),
     };
     return NextResponse.json(body, { status, headers });
@@ -82,16 +77,17 @@ export async function POST(request: Request) {
       if (!viewer) return send({ text: "Sign in with an authorised Staging review account to use Ready.", actions: [publicRules] }, 403);
       if (!allowReadyRequest(viewer)) return send({ text: "Stand by a minute before asking again, Commander.", actions: [publicRules] }, 429);
       const input = readReadyRequest(await readSmallBody(request, signal));
-      if (!input) return send({ text: "Enter a question of up to 300 characters, Commander." }, 400);
+      if (!input) return send({ text: "Choose a menu item or search using up to 300 characters, Commander." }, 400);
       const legal = await loadAccountLegalGateState();
       signal.throwIfAborted();
       if (legal.status !== "satisfied") return send({ text: "Complete your account requirements before using Ready.", actions: [publicRules] }, 403);
-      return send(await resolveReadyAnswer(input, viewer, signal, request.headers.get("x-ready-evaluation-model")));
+      return send(await resolveReadyAnswer(input, viewer, signal));
     }, signal);
   } catch {
     return send({
       text: "I couldn’t verify an answer right now, Commander. Try again in a moment.",
-      actions: [publicRules, { label: "Open Tournaments", href: "/tournaments" }],
+      actions: [publicRules, readyLink("find-tournament", "Open Tournaments", "/tournaments")],
+      fallback: true,
     }, 503);
   }
 }

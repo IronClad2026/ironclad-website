@@ -302,11 +302,94 @@
   transition: opacity 170ms ease-out, transform 170ms ease-out;
 }
 
+.speech[data-ready-view="main"] .answers,
+.speech[data-ready-view="submenu"] .answers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.speech:is([data-ready-view="main"], [data-ready-view="submenu"]) .answers .answer {
+  min-width: 0;
+  max-width: none;
+}
+
+.speech[data-menu-layout="oval"] {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 9px 6px;
+  align-items: center;
+}
+
+.speech[data-menu-layout="oval"] :is(.answerZone, .answers) { display: contents; }
+.speech[data-menu-layout="oval"] .bubble { grid-area: 2 / 4 / 3 / 10; text-align: center; }
+.speech[data-menu-layout="oval"] .answer[data-ready-category="match"] { grid-area: 1 / 3 / 2 / 7; }
+.speech[data-menu-layout="oval"] .answer[data-ready-category="results"] { grid-area: 1 / 7 / 2 / 11; }
+.speech[data-menu-layout="oval"] .answer[data-ready-category="rules"] { grid-area: 2 / 1 / 3 / 4; }
+.speech[data-menu-layout="oval"] .answer[data-ready-category="tournaments"] { grid-area: 2 / 10 / 3 / 13; }
+.speech[data-menu-layout="oval"] .answer[data-ready-category="profile"] { grid-area: 3 / 3 / 4 / 7; }
+.speech[data-menu-layout="oval"] .answer[data-ready-category="support"] { grid-area: 3 / 7 / 4 / 11; }
+.speech[data-menu-layout="oval"] .readyFooter { grid-area: 4 / 2 / 5 / 12; }
+
+.readyFooter,
+.feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px 6px;
+}
+
+.feedback {
+  color: #f6e6cd;
+  font-size: .76rem;
+  font-weight: 620;
+  text-shadow: 0 1px 3px #1c160d, 0 0 4px #1c160d;
+}
+
+.feedback .readyFooter { flex-basis: 100%; }
+
+.analyticsChoice {
+  max-width: 100%;
+  text-align: center;
+}
+
+.analyticsChoice[open] { flex-basis: 100%; }
+.analyticsChoice summary {
+  display: inline grid;
+  min-height: 32px;
+  place-items: center;
+  padding: 4px 9px;
+  border: 1px solid #78664d;
+  border-radius: 5px;
+  background: #282721;
+  color: #efd9b8;
+  font-size: .73rem;
+  font-weight: 620;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.analyticsNotice {
+  margin-top: 5px;
+  padding: 9px 12px;
+  border: 1px solid #8d7658;
+  border-radius: 8px;
+  background: #282721;
+  color: #fbefdc;
+  font-size: .76rem;
+  text-align: start;
+  pointer-events: auto;
+}
+.analyticsNotice p { margin: 0 0 4px; }
+.analyticsNotice label { display: flex; min-height: 44px; align-items: center; gap: 8px; cursor: pointer; }
+.analyticsNotice input { accent-color: #b69b73; }
+
 .speech[data-revealing="true"] .answers {
   visibility: hidden;
   opacity: 0;
   transform: translateY(2px);
 }
+
+.speech[data-revealing="true"][data-ready-view="main"] .readyFooter { visibility: hidden; }
 
 .contextMenu {
   position: absolute;
@@ -432,10 +515,11 @@
   .dock { width: 51px; height: 51px; }
   .speech { gap: 5px; }
   .textAction { min-height: 44px; }
+  .analyticsChoice summary { min-height: 44px; }
   .answerZone { min-height: 44px; container-type: inline-size; }
 
   @container (min-width: 282px) {
-    .answers:has(> :nth-child(3):last-child) .answer {
+    .speech:not([data-ready-view="submenu"]) .answers:has(> :nth-child(3):last-child) .answer {
       min-width: 0;
       flex-basis: calc((100% - 16px) / 3);
       padding: 8px 10px;

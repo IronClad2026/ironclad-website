@@ -30,7 +30,7 @@ export default function DashboardCareerHistory({
   const counts = { tournaments: groups.length, championships: champions.length };
 
   return (
-    <section className="mt-8 min-w-0" aria-labelledby={`${id}-title`} data-dashboard-section="history">
+    <section id="dashboard-history" className="mt-8 min-w-0 scroll-mt-28" aria-labelledby={`${id}-title`} data-dashboard-section="history">
       <h2 id={`${id}-title`} className="text-xl font-bold tracking-tight text-white sm:text-2xl">{t("dashboard.career.title")}</h2>
       <div className="mt-3 border border-white/12 bg-zinc-950/85">
         <div

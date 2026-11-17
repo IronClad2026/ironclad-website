@@ -22,7 +22,7 @@ export default function DashboardPerformance({
   ];
 
   return (
-    <section className="mt-8" aria-labelledby="dashboard-performance-title" data-dashboard-section="statistics">
+    <section id="dashboard-statistics" className="mt-8 scroll-mt-28" aria-labelledby="dashboard-performance-title" data-dashboard-section="statistics">
       <h2 id="dashboard-performance-title" className="text-xl font-bold text-white sm:text-2xl">
         {t("dashboard.statistics.title")}
       </h2>

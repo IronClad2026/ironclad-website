@@ -51,7 +51,9 @@ describe("Ready answers with approved sources", () => {
     expect(result?.text).toContain("Main / Pro (1400 or above)");
     expect(result?.text).not.toContain("1700");
     expect(result?.sources?.[0].url).toBe(`/documents-rules-ppa/ironclad-official-tournament-rulebook-v${version}.pdf#page=5`);
-    expect(result?.actions).toContainEqual({ label: "Open Tournaments", href: "/tournaments?tournament=legacy-event" });
+    expect(result?.actions).toContainEqual(expect.objectContaining({
+      actionId: "find-tournament", href: "/tournaments?tournament=legacy-event",
+    }));
   });
 
   it("shows the current four-division threshold only as general four-division guidance", () => {
@@ -78,16 +80,18 @@ describe("Ready answers with approved sources", () => {
     });
     expect(result?.sources).toBeUndefined();
     expect(result?.text).toContain("can’t confirm");
-    expect(result?.actions).toContainEqual({ label: "Get admin help", question: "I need an admin" });
+    expect(result?.actions).toContainEqual({
+      label: "Get admin help", intent: { kind: "action", id: "support-options" }, context: { eventSlug: "unknown", topic: "replays" },
+    });
   });
 
   it("uses the real event tabs for event decisions and prize terms", () => {
-    expect(answerKnowledge({ question: "Where are published decisions?" })?.actions).toContainEqual({
-      label: "See published decisions", href: "/tournaments?tab=decisions",
-    });
-    expect(answerKnowledge({ question: "Are there prize terms?" })?.actions).toContainEqual({
-      label: "See event prize terms", href: "/tournaments?tab=overview&panel=prizes",
-    });
+    expect(answerKnowledge({ question: "Where are published decisions?" })?.actions).toContainEqual(expect.objectContaining({
+      actionId: "event-decisions", href: "/tournaments?tab=decisions",
+    }));
+    expect(answerKnowledge({ question: "Are there prize terms?" })?.actions).toContainEqual(expect.objectContaining({
+      actionId: "event-prizes", href: "/tournaments?tab=overview&panel=prizes",
+    }));
   });
 
   it("declines unclassified, unrelated or prompt-override input", () => {

@@ -185,7 +185,7 @@ describe("Ready route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(response.headers.get("server-timing")).toMatch(/^ready;dur=\d+$/);
-    expect(resolveReadyAnswer).toHaveBeenCalledWith({ question: "Who am I playing?" }, viewer, expect.any(AbortSignal), null);
+    expect(resolveReadyAnswer).toHaveBeenCalledWith({ question: "Who am I playing?" }, viewer, expect.any(AbortSignal));
     expect(response.headers.get("x-ready-ai-attempted")).toBe("0");
   });
 });

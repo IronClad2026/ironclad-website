@@ -14,7 +14,8 @@ const data = vi.hoisted(() => ({
 vi.mock("@/lib/ready/platform-data", () => data);
 vi.mock("@/lib/player-polls", () => ({ loadTournamentPollsForRequest: vi.fn() }));
 
-import { answerPlatform, resolveReadyRuleScope } from "@/lib/ready/platform";
+import { resolveReadyAnswer } from "@/lib/ready/answer";
+import { answerPlatform, answerPlatformAction, resolveReadyRuleScope } from "@/lib/ready/platform";
 
 const MATCH = "1499cb0a-3786-401a-8de2-6c181fc7e4dd";
 const EVENT = "7799cb0a-3786-401a-8de2-6c181fc7e4dd";
@@ -32,7 +33,7 @@ const match: ReadyOwnedMatch = {
   id: MATCH, match_number: 2, status: "scheduled", series_best_of: 3, activation_version: 1,
   deadline_at: "2026-11-20T22:00:00Z", hold_started_at: null, hold_released_at: null, outcome_type: null,
   player_one_registration_id: REGISTRATION, player_two_registration_id: OPPONENT,
-  division: "Academy", divisionId: "6699cb0a-3786-401a-8de2-6c181fc7e4dd", round: 1,
+  division: "Academy", divisionId: "6699cb0a-3786-401a-8de2-6c181fc7e4dd", deadlineManaged: true, round: 1,
   event, registrationId: REGISTRATION, opponentRegistrationId: OPPONENT, active: true,
 };
 const user = "user_designated_staging";
@@ -55,7 +56,7 @@ describe("Ready platform assistance", () => {
   it("offers public help but does not query private records without a session", async () => {
     await expect(answerPlatform({ question: "Who am I playing?" }, null)).resolves.toMatchObject({
       text: expect.stringContaining("Sign in"),
-      actions: expect.arrayContaining([{ label: "Sign in", href: "/sign-in" }]),
+      actions: expect.arrayContaining([expect.objectContaining({ actionId: "sign-in", href: "/sign-in" })]),
     });
     await expect(answerPlatform({ question: "Where are the tournament rules?" }, null)).resolves.toMatchObject({
       actions: [{ label: "Open the official rules hub", href: "/rules" }],
@@ -89,8 +90,8 @@ describe("Ready platform assistance", () => {
     const reply = await answerPlatform({ question: "Open my match" }, user);
     expect(reply?.text).toContain("Which one");
     expect(reply?.actions).toEqual([
-      expect.objectContaining({ context: { topic: "match", eventSlug: event.slug, matchId: MATCH } }),
-      expect.objectContaining({ context: { topic: "match", eventSlug: event.slug, matchId: ANOTHER } }),
+      expect.objectContaining({ intent: { kind: "action", id: "my-match" }, context: { topic: "match", eventSlug: event.slug, matchId: MATCH } }),
+      expect.objectContaining({ intent: { kind: "action", id: "my-match" }, context: { topic: "match", eventSlug: event.slug, matchId: ANOTHER } }),
     ]);
   });
 
@@ -112,10 +113,10 @@ describe("Ready platform assistance", () => {
     const reply = await answerPlatform({ question: "I need an admin", context: { matchId: MATCH } }, user);
     expect(reply?.text).toContain("press the ticket button");
     expect(reply?.actions).toEqual([
-      { label: "Open your Admin Assistance conversation", href: `/assistance/${ASSISTANCE}?tournament=${EVENT}` },
-      { label: "Open Discord ticket channel", href: "https://discord.com/channels/1440092095619662105/1440201093110960137" },
-      { label: "Join the IronClad Discord server", href: "https://discord.gg/ZQSQjBNRm3" },
-      { label: "Copy match reference", copyText: expect.stringContaining(MATCH) },
+      expect.objectContaining({ actionId: "admin-assistance", href: `/assistance/${ASSISTANCE}?tournament=${EVENT}` }),
+      expect.objectContaining({ actionId: "discord-ticket", href: "https://discord.com/channels/1440092095619662105/1440201093110960137" }),
+      expect.objectContaining({ actionId: "discord-invite", href: "https://discord.gg/ZQSQjBNRm3" }),
+      expect.objectContaining({ actionId: "copy-match-reference", copyText: expect.stringContaining(MATCH) }),
     ]);
   });
 
@@ -166,5 +167,61 @@ describe("Ready platform assistance", () => {
       kind: "unconfirmed", events: [{ title: event.title, slug: event.slug }, { title: other.title, slug: other.slug }],
     });
     expect(data.loadReadyAcceptedVersions).not.toHaveBeenCalled();
+  });
+
+  it("uses the same owned registration check for a direct governing-edition request", async () => {
+    const versions = { rulebook: "3.0", ppa: "3.0", terms: "1.0", privacy: "1.2" };
+    data.loadReadyAcceptedVersions.mockResolvedValue(versions);
+    const identity = { userId: user, sessionId: "fixture-session" };
+    const signal = AbortSignal.timeout(5_000);
+    const answer = await resolveReadyAnswer({ kind: "question", id: "division", context: { matchId: MATCH } }, identity, signal);
+    expect(answer).toMatchObject({
+      text: expect.stringContaining("combined Main / Pro"),
+      sources: [{ title: "Official Tournament Rulebook v3.0" }],
+      intent: { kind: "question", id: "division" },
+    });
+
+    data.loadReadyAcceptedVersions.mockClear();
+    data.loadReadyOwnedMatches.mockResolvedValue([]);
+    await expect(resolveReadyAnswer({ kind: "question", id: "division", context: { matchId: ANOTHER } }, identity, signal))
+      .resolves.toMatchObject({ text: expect.stringContaining("can’t confirm"), fallback: true });
+    expect(data.loadReadyAcceptedVersions).not.toHaveBeenCalled();
+  });
+
+  it("dispatches direct match actions by ID and respects workspace restrictions", async () => {
+    await expect(answerPlatformAction("opponent-chat", { matchId: MATCH }, user)).resolves.toMatchObject({
+      actions: [{ actionId: "opponent-chat", destinationType: "match", href: expect.stringContaining(`match=${MATCH}`) }],
+    });
+    data.loadReadyOwnedMatches.mockResolvedValue([{ ...match, hold_started_at: "2026-11-17T17:00:00Z" }]);
+    await expect(answerPlatformAction("submit-result", { matchId: MATCH }, user)).resolves.toMatchObject({
+      text: expect.stringContaining("deadline is paused"),
+      actions: [{ actionId: "my-match" }],
+    });
+    const reference = await answerPlatformAction("copy-match-reference", { matchId: MATCH }, user);
+    expect(reference.actions).toEqual([expect.objectContaining({
+      actionId: "copy-match-reference", destinationType: "copy_reference", copyText: expect.stringContaining(MATCH),
+    })]);
+  });
+
+  it("serves the caller's waitlist state and only uses established platform destinations", async () => {
+    data.loadReadyPrivateContext.mockResolvedValue({
+      profile: { id: ANOTHER, profile_completed: true, account_closed_at: null },
+      registrations: [{
+        id: REGISTRATION, tournament_id: EVENT, registration_status: "waitlisted", waitlist_offer_status: "offered",
+        waitlist_offer_expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      }],
+    });
+    await expect(answerPlatformAction("registration-status", undefined, user)).resolves.toMatchObject({
+      text: expect.stringContaining("recorded waitlist offer expires"),
+      actions: [{ href: "/dashboard" }, { href: "/tournaments?tournament=staging-fixture" }],
+    });
+    for (const [id, href] of [
+      ["profile-steam", "/profile"], ["notifications", "/dashboard#player-notifications"],
+      ["history", "/dashboard#dashboard-history"], ["rankings", "/rankings"],
+    ] as const) {
+      await expect(answerPlatformAction(id, undefined, user)).resolves.toMatchObject({
+        actions: expect.arrayContaining([expect.objectContaining({ actionId: id, href })]),
+      });
+    }
   });
 });

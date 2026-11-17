@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  ChartNoAxesCombined,
   ClipboardCheck,
   LayoutDashboard,
   Map,
@@ -113,7 +114,7 @@ function isActiveRoute(
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ showReadyUsage = false }: { showReadyUsage?: boolean }) {
   const pathname = usePathname() ?? "";
 
   return (
@@ -135,7 +136,12 @@ export default function AdminSidebar() {
                 {group.label}
               </p>
               <ul className="mt-2 space-y-1">
-                {group.items.map((item) => {
+                {(showReadyUsage && group.label === "Overview" ? [...group.items, {
+                  href: "/admin/ready-usage",
+                  icon: ChartNoAxesCombined,
+                  label: "Ready usage",
+                  match: "exact" as const,
+                }] : group.items).map((item) => {
                   const active = isActiveRoute(pathname, item);
                   const Icon = item.icon;
 
@@ -143,6 +149,7 @@ export default function AdminSidebar() {
                     <li key={item.href}>
                       <Link
                         href={item.href}
+                        prefetch={item.href === "/admin/ready-usage" ? false : undefined}
                         aria-current={active ? "page" : undefined}
                         className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
                           active

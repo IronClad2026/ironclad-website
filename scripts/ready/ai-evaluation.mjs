@@ -4,10 +4,15 @@ const rulebookCitation = (version, page, section) => ({
   section,
 });
 
+const tournamentsAction = (href = "/tournaments") => ({
+  href, actionId: "find-tournament", destinationType: "tournaments",
+});
+const assistanceAction = { question: "I need an admin", intent: { kind: "action", id: "support-options" } };
+
 const disconnect = {
   topic: "disconnects",
   citation: rulebookCitation("3.2", 9, /10\.1/),
-  actions: [{ question: "I need an admin" }],
+  actions: [{ ...assistanceAction, topic: "disconnects" }],
 };
 const claims = {
   restart: /\brestart\b|\breplay the game\b/i,
@@ -47,14 +52,14 @@ export const readyAiQualityCases = Object.freeze([
     request: { question: "What are the division ELO thresholds for the current Rulebook?" },
     expected: "answered", facts: [/\bPro\b.{0,14}\b1700\b/i],
     citation: rulebookCitation("3.2", 5, /4\.4/),
-    actions: [{ href: "/tournaments" }],
+    actions: [tournamentsAction()],
   },
   {
     id: "accepted-division", actor: "a1", topic: "division",
     request: { question: "How are divisions determined?", context: { eventSlug: "test-2-2" } },
     expected: "answered", facts: [/\bMain\s*\/\s*Pro\b.{0,12}\b1400\b/i], forbidden: [/\b1700\b/],
     citation: rulebookCitation("3.1", 5, /4\.4/),
-    actions: [{ href: "/tournaments?tournament=test-2-2" }],
+    actions: [tournamentsAction("/tournaments?tournament=test-2-2")],
   },
   {
     id: "unsupported", actor: "a2",
@@ -74,12 +79,16 @@ export const readyAiQualityCases = Object.freeze([
     },
     expected: "local", facts: [/\b(?:under your current account|not authori[sz]ed|only.*your own match)\b/i],
     forbidden: [/\bTestAcademy\d+\b/i, /5ad14749-7fbf-4811-bfaa-4e4a892aed9e/i],
-    actions: [{ href: "/dashboard" }],
+    actions: [{ href: "/dashboard", actionId: "dashboard", destinationType: "profile" }],
     noPrivateContext: true,
   },
 ]);
 
-const ordinaryActions = [{ href: "/rules" }, { href: "/tournaments" }, { question: "I need an admin" }];
+const ordinaryActions = [
+  { href: "/rules", actionId: "rules-hub", destinationType: "rules" },
+  tournamentsAction(),
+  assistanceAction,
+];
 
 export const readyAiCandidateModels = Object.freeze([
   "@cf/ibm-granite/granite-4.0-h-micro",
@@ -115,8 +124,18 @@ export function readReadyAiEvidence(headers) {
 
 function actionMatches(action, allowed) {
   if (!action || typeof action !== "object" || typeof action.label !== "string") return false;
-  if (allowed.href !== undefined) return Object.keys(action).length === 2 && action.href === allowed.href;
-  return Object.keys(action).length === 2 && action.question === allowed.question;
+  const keys = Object.keys(action);
+  if (allowed.href !== undefined) {
+    return action.href === allowed.href && (keys.length === 2 ||
+      (keys.length === 4 && action.actionId === allowed.actionId && action.destinationType === allowed.destinationType));
+  }
+  if (keys.length === 2 && action.question === allowed.question) return true;
+  if (!allowed.intent || !keys.every((key) => ["label", "intent", "context"].includes(key)) ||
+      !action.intent || typeof action.intent !== "object" || Object.keys(action.intent).length !== 2 ||
+      action.intent.kind !== allowed.intent.kind || action.intent.id !== allowed.intent.id) return false;
+  if (action.context === undefined) return true;
+  return !!action.context && typeof action.context === "object" && Object.keys(action.context).length === 1 &&
+    typeof allowed.topic === "string" && action.context.topic === allowed.topic;
 }
 
 function finiteNonnegative(value) {

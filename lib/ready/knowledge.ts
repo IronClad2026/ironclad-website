@@ -2,6 +2,7 @@ import type { RegistrationDocumentKind } from "@/lib/legal-document-types";
 import type { ReadyAction, ReadyContext, ReadyReply, ReadyRequest, ReadySource } from "./contracts";
 import type { ReadyRuleScope } from "./platform";
 import type { ReadyModelCard } from "./provider";
+import { readyLink } from "./catalogue";
 import {
   publishedReadyVersions,
   readyDocument,
@@ -129,6 +130,25 @@ const passages = {
     kind: "rulebook", section: "§§ 21.3–21.8", page: [13, 14],
     text: "An existing registration keeps its own recorded document versions. A newer document generally applies to new registrations. Check the version recorded for your event, and ask an admin if a published decision affects it.",
   },
+  factions: {
+    kind: "rulebook", section: "§§ 7.3–7.10", page: 7,
+    text: "You may play any permitted faction within your assigned side. Agree who has which side and which map you’ll use with your opponent before loading the game.",
+  },
+  dice: {
+    kind: "rulebook", section: "§§ 7.3–7.10", page: 7,
+    text: "Each player starts their own IronClad 2d6 roll for games 1, 3 and 5, if reached. If the totals tie, both players roll again. The higher total chooses side or an eligible unused map, and the opponent chooses the other.",
+    details: "Rolls for games 3 and 5 can be done in advance. IronClad records the rolls. Players agree the actual map and side in the Match Room.",
+  },
+  pauses: {
+    kind: "rulebook", section: "§§ 10.1–10.7", page: 9,
+    text: "For a genuine issue, each player normally has one pause per game of up to five minutes. An opponent agreement or admin approval is needed for extra or longer pauses.",
+    details: "A game pause and a held match deadline are separate. Check your Match workspace for the current deadline or hold.",
+  },
+  "submission-help": {
+    kind: "rulebook", section: "§§ 11.1–11.6", page: 9,
+    text: "Use the result form in the workspace for your own active match. Check that the opponent is assigned and that you have the series score and one unique replay for each game actually played.",
+    details: "If you can’t find the form or it shows a restriction, check the status and deadline in the Match workspace. Ask an admin if you need help with the restriction.",
+  },
 } satisfies Record<string, Passage>;
 
 type PassageTopic = keyof typeof passages;
@@ -210,14 +230,17 @@ function sourceFor(
   };
 }
 
-const adminHelp = { label: "Get admin help", question: "I need an admin" };
+function adminHelp(context: ReadyContext): ReadyAction {
+  return { label: "Get admin help", intent: { kind: "action", id: "support-options" }, context };
+}
 
 function unconfirmed(context: ReadyContext, eventTitle?: string): ReadyReply {
   return {
     text: "I can’t confirm the governing document version for this event, Commander. Let’s get an admin involved.",
     details: eventTitle ? `Selected event: ${eventTitle}.` : undefined,
-    actions: [adminHelp, { label: "Open rules hub", href: readyRulesHubSource.url }],
+    actions: [adminHelp(context), readyLink("rules-hub", "Open rules hub", readyRulesHubSource.url)],
     context,
+    fallback: true,
   };
 }
 
@@ -231,7 +254,7 @@ export function answerKnowledgeTopic(
     return {
       text: "Open the rules hub for the official Rulebook, Participation Agreement, Terms and Privacy Policy. Existing events use the applicable recorded versions.",
       sources: [readyRulesHubSource],
-      actions: [{ label: "Open rules hub", href: readyRulesHubSource.url }],
+      actions: [readyLink("rules-hub", "Open rules hub", readyRulesHubSource.url)],
       context: nextContext,
     };
   }
@@ -265,9 +288,13 @@ export function answerKnowledgeTopic(
   const eventHref = eventSearch.size ? `/tournaments?${eventSearch}` : "/tournaments";
   const actionLabel = topic === "decisions" ? "See published decisions"
     : topic === "prizes" ? "See event prize terms" : "Open Tournaments";
-  const actions: ReadyAction[] = passage.tournamentLink ? [{ label: actionLabel, href: eventHref }] : [];
-  if (["disconnects", "disputes", "no-shows", "withdrawal", "scheduling"].includes(topic)) {
-    actions.push(adminHelp);
+  const eventAction = topic === "decisions" ? "event-decisions" : topic === "prizes" ? "event-prizes" : "find-tournament";
+  const actions: ReadyAction[] = passage.tournamentLink ? [readyLink(eventAction, actionLabel, eventHref)] : [];
+  if (["disconnects", "disputes", "no-shows", "withdrawal", "scheduling", "pauses", "submission-help"].includes(topic)) {
+    actions.push(adminHelp(nextContext));
+  }
+  if (["results", "disputes", "replays", "submission-help"].includes(topic)) {
+    actions.push({ label: "Find my match workspace", intent: { kind: "action", id: "my-match" }, context: nextContext });
   }
   const paragraph = versions.rulebook === "3.2" ? passage.text : passage.earlierText ?? passage.text;
   const details = [
