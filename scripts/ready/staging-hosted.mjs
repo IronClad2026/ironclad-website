@@ -11,6 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import { browserActiveMatch, isActiveFixtureRead, readActiveFixtures, verifyActiveApi } from "./active-acceptance.mjs";
 import { browserMenuJourney, browserMobileLayoutJourney, installRendererObservation, openQuickAction } from "./menu-journey.mjs";
 import { browserUsageMenuJourney } from "./usage-menu-journey.mjs";
+import { browserSuggestionsJourney } from "./suggestions-journey.mjs";
 import { createHostedAuth } from "../four-division/hosted-auth.mjs";
 import {
   assertClerkDevelopmentInstance,
@@ -50,7 +51,7 @@ function args(tokens) {
   const options = {};
   for (let i = 0; i < tokens.length; i++) {
     const key = tokens[i];
-    if (["--headed", "--browser-only", "--navigation-only", "--menu-journey", "--mobile-layout-journey", "--usage-menu-journey"].includes(key) && !options[key]) {
+    if (["--headed", "--browser-only", "--navigation-only", "--menu-journey", "--mobile-layout-journey", "--usage-menu-journey", "--suggestions-journey"].includes(key) && !options[key]) {
       options[key] = true;
     } else if (["--url", "--deployment", "--commit", "--vercel-cli", "--active-fixture-manifest"].includes(key) && !options[key] && tokens[i + 1] && !tokens[i + 1].startsWith("--")) {
       options[key] = tokens[++i];
@@ -418,7 +419,7 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
           await openRuleMenu();
           pauseAnswer = true;
           await choose("Disconnects & lag");
-          await expect(message).toContainText("Checking the site, Commander…");
+          await expect(message).toContainText("Checking the site…");
           await expect.poll(() => typeof releaseAnswer, { timeout: 12_000 }).toBe("function");
           await page.locator("[data-mascot-drag]").hover();
           await close.click();
@@ -467,8 +468,12 @@ try {
   await assertClerkDevelopmentInstance(base);
   clerk = createClerkClient({ secretKey: base.clerkSecretKey });
   const admin = createClient(stagingBackend, base.serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const a2 = await loadActor(admin, environment, "TestAcademy2");
-  if (options["--active-fixture-manifest"]) {
+  const a2 = options["--suggestions-journey"] ? null : await loadActor(admin, environment, "TestAcademy2");
+  if (options["--suggestions-journey"]) {
+    const result = await browserSuggestionsJourney({ origin, oidc, protectedHeader, envRoot, clerkIssuer, admin, verify });
+    report.temporarySessionsCreated += result.temporarySessionsCreated;
+    report.temporarySessionsRevoked += result.temporarySessionsRevoked;
+  } else if (options["--active-fixture-manifest"]) {
     const fixtures = await readActiveFixtures(options["--active-fixture-manifest"], verify);
     const a1 = await loadActor(admin, environment, "TestAcademy1");
     const a3 = await loadActor(admin, environment, "TestAcademy3");

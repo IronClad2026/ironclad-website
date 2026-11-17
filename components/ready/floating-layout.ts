@@ -5,7 +5,7 @@ export type Side = "below" | "left" | "above" | "right";
 export type ReadyPosition = Point & { width?: number };
 export type DialogueSlot = Point & { side: Side; width: number; maxHeight: number; oval: boolean };
 
-type DialogueSize = { height: number; bubbleHeight: number; main: boolean };
+type DialogueSize = { height: number; bubbleHeight: number; main: boolean; roomy?: boolean; editing?: boolean };
 type Placement = { skull: Rect; dialogue: DialogueSlot };
 type Scored = { clear: boolean; score: number };
 
@@ -89,7 +89,9 @@ function chooseDialogue(area: Bounds, skull: Rect, size: DialogueSize, controls:
       const targetHeight = oval ? Math.max(size.height, minOvalHeight) : Math.max(minCloudHeight, size.height);
       const minimumHeight = oval ? minOvalHeight + (ovalEntering ? 24 : 0) : minCloudHeight;
       // Above the head, keep the message itself close even if its controls need scrolling.
-      const limitAbove = oval ? minOvalHeight + 33 : clamp(size.bubbleHeight + 76, 125, 202);
+      const limitAbove = oval ? minOvalHeight + 33
+        : size.roomy ? clamp(size.bubbleHeight + 110, 185, 442)
+          : clamp(size.bubbleHeight + 76, 125, 202);
       const idealX = side === "left" ? skull.x - gap - width : side === "right" ? right(skull) + gap
         : skull.x + (skull.width - width) * .5;
       const x = clamp(Math.round(idealX), Math.ceil(area.left), Math.floor(area.right - width));
@@ -177,14 +179,22 @@ export function placeReady(area: Bounds, preferred: ReadyPosition | null, size: 
       }
     }
   }
-  if (best) return { skull: best.skull, dialogue: best.dialogue };
-
-  // A very shallow visual viewport can leave almost no space below the header.
-  const width = Math.max(1, Math.floor(area.right - area.left));
   const height = Math.max(1, area.bottom - area.top);
-  const skull = keepSkullInside(area, { x: initial.x, y: area.top },
-    Math.min(initial.width, Math.max(1, Math.floor(height * .48))));
-  const y = Math.min(area.bottom - 1, bottom(skull) + Math.min(gap, height * .10));
+  const editingHeight = Math.min(194, Math.floor(height * .72));
+  if (best && (!size.editing || best.dialogue.maxHeight >= editingHeight)) {
+    return { skull: best.skull, dialogue: best.dialogue };
+  }
+
+  // Keep the editor reachable when the phone keyboard leaves little space.
+  // This is display-only: the stored floating position remains intact.
+  const width = Math.max(1, Math.floor(area.right - area.left));
+  const separation = Math.min(gap, height * .10);
+  const skullBudget = size.editing ? (height - editingHeight - separation) / .94 : height * .48;
+  const skullWidth = Math.min(initial.width, Math.max(1, Math.floor(skullBudget)));
+  // At very small scales X is wider than the skull and needs its own horizontal clearance.
+  const skullX = Math.max(initial.x, area.left + 44 - skullWidth * .94);
+  const skull = keepSkullInside(area, { x: skullX, y: area.top }, skullWidth);
+  const y = Math.min(area.bottom - 1, bottom(skull) + separation);
   return { skull, dialogue: { x: area.left, y, side: "below", oval: false, width, maxHeight: Math.max(1, area.bottom - y) } };
 }
 

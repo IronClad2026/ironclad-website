@@ -14,6 +14,7 @@ const pg = resolve(tools, "postgresql-17.11/pgsql/bin");
 const { Client } = createRequire(import.meta.url)(resolve(tools, "pg-client/node_modules/pg"));
 const migration = "20261117090000_ready_usage_tracking.sql";
 const cloudMigration = "20261117143000_ready_cloud_usage.sql";
+const suggestionMigration = "20261117190000_ready_topic_suggestions.sql";
 const run = resolve(root, ".release-local", `ready-usage-${randomUUID()}`);
 const data = resolve(run, "data");
 const passwordFile = resolve(run, "password");
@@ -212,6 +213,72 @@ try {
     assert.equal((await report(past, today)).totals.engagedAccounts, null);
     assert.equal((await report(past, today)).totals.manualOpenings, 5);
   });
+  await owner.query(await readFile(resolve(root, "supabase/migrations", suggestionMigration), "utf8"));
+  const guestRateKey = randomBytes(32).toString("hex");
+  const memberRateKey = randomBytes(32).toString("hex");
+  const id = randomUUID();
+  const sameWording = "Staging fixture: explain replays for returning players.";
+  const save = async (client, { key = guestRateKey, suggestionId = id, description = sameWording, category = "results" } = {}) =>
+    (await client.query("select public.submit_ready_topic_suggestion($1,$2,$3,'2','1',$4) as value",
+      [suggestionId, description, category, key])).rows[0].value;
+  const list = async (client = service, status = null, limit = 20, offset = 0) =>
+    (await client.query("select public.get_ready_topic_suggestions($1,$2,$3) as value", [status, limit, offset])).rows[0].value;
+  const review = async (client, status, remove, suggestionId = id) =>
+    (await client.query("select public.review_ready_topic_suggestion($1,$2,$3) as value", [suggestionId, status, remove])).rows[0].value;
+
+  await verify("Written suggestions deduplicate concurrent retry IDs without deduplicating text", async () => {
+    const statuses = await Promise.all([save(service), save(secondService)]);
+    assert.deepEqual(statuses.sort(), ["duplicate", "stored"]);
+    assert.equal(await save(service, { description: "Different wording with the same ID." }), "conflict");
+    assert.equal(await save(service, { suggestionId: randomUUID(), key: memberRateKey, category: null }), "stored");
+    assert.equal(await save(service, { suggestionId: randomUUID(), description: " ".repeat(500) }), "invalid");
+    assert.equal(await save(service, { suggestionId: randomUUID(), description: "A".repeat(501) }), "invalid");
+    assert.equal(await save(service, { suggestionId: randomUUID(), category: "guessed" }), "invalid");
+    const suggestions = await list();
+    assert.equal(suggestions.total, 2);
+    const row = suggestions.rows.find((item) => item.id === id);
+    assert.deepEqual(Object.keys(row).sort(), ["id", "submittedAt", "categoryId", "description", "menuVersion", "catalogueVersion", "status"].sort());
+    assert.ok(Number.isFinite(Date.parse(row.submittedAt)));
+    assert.equal(row.description, sameWording);
+    assert.equal(row.status, "new");
+    assert.equal(await list(service, null, 51), null);
+  });
+
+  await verify("Written suggestion quota is atomic, anonymous and separate from opt-in usage", async () => {
+    const parallel = Array.from({ length: 8 }, () => randomUUID()).map((suggestionId, i) =>
+      save(i % 2 ? service : secondService, { suggestionId }));
+    const statuses = await Promise.all(parallel);
+    assert.equal(statuses.filter((value) => value === "stored").length, 4);
+    assert.equal(statuses.filter((value) => value === "rate_limited").length, 4);
+    assert.equal(await save(service), "duplicate");
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      const denied = await open(role);
+      await assert.rejects(denied.query("select description from ironclad_private.ready_topic_suggestions"), { code: "42501" });
+      await assert.rejects(denied.query("select actor_key from ironclad_private.ready_topic_suggestion_limits"), { code: "42501" });
+      if (role === "service_role") continue;
+      await assert.rejects(save(denied), { code: "42501" });
+      await assert.rejects(list(denied), { code: "42501" });
+      await assert.rejects(review(denied, "reviewed", false), { code: "42501" });
+    }
+  });
+
+  await verify("Only service RPCs can review and delete, with status filtering and retention", async () => {
+    assert.equal(await review(service, "reviewed", false), "updated");
+    assert.equal((await list(service, "reviewed", 1, 0)).rows[0].id, id);
+    assert.deepEqual(await list(service, "reviewed", 1, 1), { total: 1, rows: [] });
+    assert.equal(await review(service, "added", false), "updated");
+    assert.equal((await list(service, "added")).total, 1);
+    assert.equal(await review(service, null, true), "deleted");
+    assert.equal(await review(service, null, true), "not_found");
+    await owner.query(`
+      update ironclad_private.ready_topic_suggestions set submitted_at = now() - interval '91 days'
+        where id = (select id from ironclad_private.ready_topic_suggestions limit 1);
+      insert into ironclad_private.ready_topic_suggestion_limits values (now() - interval '2 hours', repeat('a', 64), 1);
+      select ironclad_private.maintain_ready_topic_suggestions();
+    `);
+    assert.equal((await list()).total, 4);
+    assert.equal((await owner.query("select count(*)::int as n from ironclad_private.ready_topic_suggestion_limits")).rows[0].n, 2);
+  });
 } catch (error) {
   failure = error;
 } finally {
@@ -221,7 +288,7 @@ try {
       { env, windowsHide: true, encoding: "utf8", timeout: 30_000 });
     if (stop.status !== 0 && !failure) failure = new Error("Disposable PostgreSQL did not stop");
   }
-  await writeFile(resolve(run, "report.json"), JSON.stringify({ passed: !failure, migrations: [migration, cloudMigration], checks }, null, 2) + "\n");
+  await writeFile(resolve(run, "report.json"), JSON.stringify({ passed: !failure, migrations: [migration, cloudMigration, suggestionMigration], checks }, null, 2) + "\n");
 }
 if (failure) throw failure;
 console.log(JSON.stringify({ passed: true, checks }, null, 2));

@@ -84,7 +84,9 @@ function PreparedQuestion({ id, usage, hasReport }: {
         <span className="min-w-0">
           <span className="block break-words text-sm font-semibold text-zinc-100">{entry.question}</span>
           <span className="block text-xs leading-5 text-zinc-400">
-            {readyCategoryLabels[entry.category]}{hasReport && <> · {number.format(usage?.selections ?? 0)} selections · {number.format(usage?.displays ?? 0)} displays</>}
+            {readyCategoryLabels[entry.category]}{hasReport && (usage
+              ? <> · {number.format(usage.selections)} selections · {number.format(usage.displays)} displays</>
+              : " · No activity recorded for this question")}
           </span>
         </span>
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-orange-300 group-open:rotate-180" />
@@ -100,7 +102,7 @@ function PreparedQuestion({ id, usage, hasReport }: {
             <AnswerPreview reply={previous} />
           </div>
         )}
-        {hasReport && <p className="text-xs text-zinc-400">Answer votes · {number.format(helpful)} Helpful · {number.format(stillNeedHelp)} Still need help · sample size {number.format(helpful + stillNeedHelp)}</p>}
+        {hasReport && usage && <p className="text-xs text-zinc-400">Answer votes · {number.format(helpful)} Helpful · {number.format(stillNeedHelp)} Still need help · {number.format(helpful + stillNeedHelp)} total</p>}
       </div>
     </details>
   );

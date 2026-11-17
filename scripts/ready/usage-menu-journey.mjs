@@ -68,10 +68,14 @@ export async function browserUsageMenuJourney({ page, expect, output, verify, tr
     }
     await page.screenshot({ path: resolve(output, "ready-usage-player-answer.png") });
 
-    traffic.phase = "missing topic acknowledgement";
+    traffic.phase = "missing topic form";
     await button("Back").click();
     await button("Topic missing").click();
-    await expect.poll(accepted).toContain("topic_missing");
+    await complete("Something missing, Commander? Tell us which topic or question you wanted Ready to cover.");
+    await expect(page.getByRole("textbox", { name: "Which topic or question is missing?" })).toBeVisible();
+    await expect(button("Send suggestion")).toBeDisabled();
+    await button("Cancel").click();
+    verify(!traffic.events.some(({ type }) => type === "topic_missing"), "opening and cancelling the form produces no missing-topic analytics flag");
 
     traffic.phase = "safe rules navigation";
     await button("Main menu").click();

@@ -112,6 +112,12 @@ describe("Admin Ready usage access", () => {
     expect(mocks.report).not.toHaveBeenCalled();
   });
 
+  it("loads the authorized dashboard without charts when the reviewer trial is inactive", async () => {
+    vi.stubEnv("READY_STAGING_REVIEW_ALIASES", "");
+    await expect(loadReadyUsageReport({})).resolves.toMatchObject({ status: "not-collected" });
+    expect(mocks.report).not.toHaveBeenCalled();
+  });
+
   it("omits identity data and exact distinct counts for a range containing archived days", async () => {
     const row = dbResponse();
     mocks.report.mockResolvedValue({

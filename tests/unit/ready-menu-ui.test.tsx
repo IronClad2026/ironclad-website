@@ -4,17 +4,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReadyAssistant from "@/components/ready/ReadyAssistant";
 import ReadyHeader from "@/components/ready/ReadyHeader";
 
-const { mock, track, clerk } = vi.hoisted(() => ({
-  mock: { path: "/", query: "", reduced: false },
+const { mock, track, clerk, renderer } = vi.hoisted(() => ({
+  mock: { path: "/", query: "", reduced: false, webgl: false },
   track: vi.fn(),
   clerk: { isLoaded: true, isSignedIn: true, sessionId: "first-session" as string | null },
+  renderer: {
+    ready: Promise.resolve(),
+    setMode: vi.fn(), setDragging: vi.fn(), setExpression: vi.fn(), setReducedMotion: vi.fn(),
+    react: vi.fn(), snapshot: vi.fn(), dispose: vi.fn(),
+    startTalk: vi.fn(), setTalkGain: vi.fn(), stopTalk: vi.fn(),
+  },
 }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => clerk }));
 vi.mock("next/navigation", () => ({
   usePathname: () => mock.path,
   useSearchParams: () => new URLSearchParams(mock.query),
 }));
-vi.mock("@/components/ready/renderer", () => ({ loadMascotRenderer: () => new Promise(() => undefined) }));
+vi.mock("@/components/ready/renderer", () => ({
+  loadMascotRenderer: () => mock.webgl ? Promise.resolve(() => renderer) : new Promise(() => undefined),
+}));
 vi.mock("@/lib/ready/use-ready-usage", () => ({
   useReadyUsage: () => ({ enabled: false, loaded: true, saving: false, error: null, setEnabled: vi.fn(), track }),
 }));
@@ -46,6 +54,7 @@ describe("Ready player menu", () => {
     mock.path = "/";
     mock.query = "";
     mock.reduced = false;
+    mock.webgl = false;
     clerk.isLoaded = true;
     clerk.isSignedIn = true;
     clerk.sessionId = "first-session";
@@ -86,6 +95,7 @@ describe("Ready player menu", () => {
     click("Time to kick some ass!");
     full();
     help();
+    full();
     click("My match");
     moveTime(10000);
     expect(currentView()).toBe("submenu");
@@ -98,7 +108,7 @@ describe("Ready player menu", () => {
     expect(currentView()).toBe("submenu");
   });
 
-  it("reports a missing topic using only its optional known category and keeps help reachable", () => {
+  it("keeps typing and cancelling a suggestion separate from prepared answers and site analytics", () => {
     mock.reduced = true;
     render(assistant);
     moveTime(32);
@@ -107,21 +117,61 @@ describe("Ready player menu", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("searchbox")).toBeNull();
     expect(screen.queryByRole("button", { name: /search prepared answers/i })).toBeNull();
-    const mainReport = getButton("Topic missing");
-    fireEvent.click(mainReport);
-    fireEvent.click(mainReport);
+    click("Topic missing");
     expect(currentView()).toBe("topicMissing");
-    expect(say()).toContain("That topic isn’t in Ready’s menu yet");
-    click("Main menu");
+    expect(say()).toContain("Something missing, Commander?");
+    const topic = screen.getByRole("textbox", { name: "Which topic or question is missing?" });
+    expect(topic).toHaveAttribute("maxlength", "500");
+    expect(getButton("Send suggestion")).toBeDisabled();
+    fireEvent.change(topic, { target: { value: "Fixture" } });
+    expect(screen.getByText("7 / 500 characters")).toBeInTheDocument();
+    click("Cancel");
+    expect(screen.queryByRole("textbox")).toBeNull();
     click("Rules & match help");
     click("Topic missing");
     click("Contact an admin");
     expect(getButton("In-site Admin Assistance")).toBeInTheDocument();
-    expect(track.mock.calls.filter(([event]) => event.type === "topic_missing")).toEqual([
-      [{ type: "topic_missing" }],
-      [{ type: "topic_missing", categoryId: "rules" }],
-    ]);
+    expect(track.mock.calls.some(([event]) => event.type === "topic_missing")).toBe(false);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("preserves a visitor’s draft, retries with the same ID, and confirms only a successful save", async () => {
+    mock.reduced = true;
+    let respond!: (response: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(new Promise((resolve) => { respond = resolve; }))
+      .mockResolvedValue(Response.json({ saved: true }));
+    render(<ReadyAssistant workspaceScope="visitor" signedIn={false} />);
+    moveTime(32);
+    dock();
+    help();
+    click("Rules & match help");
+    click("Topic missing");
+    const topic = screen.getByRole("textbox", { name: "Which topic or question is missing?" });
+    fireEvent.change(topic, { target: { value: "  A training fixture  " } });
+    const submit = getButton("Send suggestion");
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(say()).not.toContain("Suggestion received");
+    const [endpoint, first] = vi.mocked(fetch).mock.calls[0];
+    expect(endpoint).toBe("/api/ready/suggestions");
+    const body = JSON.parse(first?.body as string);
+    expect(body).toEqual({ description: "A training fixture", categoryId: "rules", submissionId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+    await act(async () => respond(Response.json({ error: "unavailable" }, { status: 503 })));
+    expect(say()).toContain("Your draft is still here");
+    expect(topic).toHaveValue("  A training fixture  ");
+    await act(async () => click("Send suggestion"));
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[1][1]?.body as string)).toEqual(body);
+    expect(say()).toContain("Suggestion received, Commander.");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    click("Main menu");
+    click("Topic missing");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: body.description } });
+    await act(async () => click("Send suggestion"));
+    const newBody = JSON.parse(vi.mocked(fetch).mock.calls[2][1]?.body as string);
+    expect(newBody).toEqual({ description: body.description, submissionId: expect.any(String) });
+    expect(newBody.submissionId).not.toBe(body.submissionId);
+    expect(JSON.stringify(track.mock.calls)).not.toContain(body.description);
   });
 
   it("dispatches the selected question ID, emits a single display and vote, and keeps navigation safe", async () => {
@@ -157,6 +207,7 @@ describe("Ready player menu", () => {
     const previousButton = getButton("Still need help");
     fireEvent.click(previousButton);
     fireEvent.click(previousButton);
+    expect(say()).toBe("Try another topic or contact an admin, Commander.");
     expect(track.mock.calls.filter(([event]) => event.type === "helpfulness")).toEqual([[
       { type: "helpfulness", questionId: "disconnects", answerInstanceId: display[0][0].answerInstanceId, helpful: false },
     ]]);
@@ -223,7 +274,9 @@ describe("Ready player menu", () => {
     moveTime(32);
     dock();
     help();
+    full();
     click("Rules & match help");
+    full();
     await act(async () => click("Disconnects & lag"));
     const count = () => track.mock.calls.filter(([event]) => event.type === "answer_display").length;
     expect(count()).toBe(0);
@@ -238,6 +291,85 @@ describe("Ready player menu", () => {
     dock();
     moveTime(32);
     expect(count()).toBe(1);
+  });
+
+  it("drives the jaw from the shared reveal for menus, answers, acknowledgements and suggestion outcomes", async () => {
+    mock.webgl = true;
+    const starts = () => renderer.startTalk.mock.calls.length;
+    const expectSpeaking = (previousStarts: number) => {
+      expect(starts()).toBe(previousStarts + 1);
+      expect(say()).toBe("");
+      moveTime(128);
+      expect(say()?.length).toBeGreaterThan(0);
+      expect(renderer.setTalkGain).toHaveBeenLastCalledWith(expect.any(Number));
+      expect(renderer.setTalkGain.mock.lastCall?.[0]).toBeGreaterThan(0);
+    };
+    const rendered = render(assistant);
+    await act(async () => { vi.advanceTimersByTime(32); });
+    let previousStarts = starts();
+    dock();
+    expectSpeaking(previousStarts);
+    let previousStops = renderer.stopTalk.mock.calls.length;
+    full();
+    expect(renderer.stopTalk).toHaveBeenCalledTimes(previousStops + 1);
+    previousStarts = starts();
+    help();
+    expectSpeaking(previousStarts);
+    full();
+    previousStarts = starts();
+    click("Rules & match help");
+    expectSpeaking(previousStarts);
+    full();
+
+    let finishLookup!: (response: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(new Promise((resolve) => { finishLookup = resolve; }));
+    previousStarts = starts();
+    click("Disconnects & lag");
+    expect(starts()).toBe(previousStarts);
+    await act(async () => finishLookup(Response.json({
+      text: "Use the published rule.",
+      intent: { kind: "question", id: "disconnects" },
+      sources: [{ title: "Rulebook", url: "/rules" }],
+    })));
+    expectSpeaking(previousStarts);
+    full();
+    previousStarts = starts();
+    click("Helpful");
+    expectSpeaking(previousStarts);
+    full();
+    expect(say()).toBe("Glad that helped, Commander.");
+    expect(track.mock.calls.filter(([event]) => event.type === "answer_display")).toHaveLength(1);
+
+    click("Back");
+    full();
+    previousStarts = starts();
+    click("Topic missing");
+    expectSpeaking(previousStarts);
+    full();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "A synthetic topic" } });
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ error: "unavailable" }, { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ saved: true }));
+    previousStarts = starts();
+    await act(async () => click("Send suggestion"));
+    expectSpeaking(previousStarts);
+    full();
+    expect(say()).toContain("I couldn’t confirm");
+    previousStarts = starts();
+    await act(async () => click("Send suggestion"));
+    expectSpeaking(previousStarts);
+    expect(renderer.setExpression).toHaveBeenLastCalledWith("Neutral", 1);
+
+    previousStarts = starts();
+    rendered.rerender(<ReadyAssistant workspaceScope="test-session" signedIn />);
+    expect(starts()).toBe(previousStarts);
+    previousStops = renderer.stopTalk.mock.calls.length;
+    click("Dock assistant");
+    expect(renderer.stopTalk).toHaveBeenCalledTimes(previousStops + 1);
+    moveTime(220);
+    dock();
+    moveTime(100);
+    expect(starts()).toBe(previousStarts);
+    expect(say()).toContain("Suggestion received, Commander.");
   });
 
   it("clears the open workspace and cancels a private reply when Clerk changes accounts", async () => {

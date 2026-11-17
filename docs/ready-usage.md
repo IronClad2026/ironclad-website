@@ -28,6 +28,33 @@ The trend reports daily manual openings, answer displays and destination clicks.
 - Event detail holds an opaque account key, server-assigned session and time, event ID, versions, allowlisted category, question and action IDs, destination category and limited outcomes or vote fields. The private consent record associates the opaque key with the player account. These keys are treated as personal information. Usage storage excludes raw queries, transcript or answer text, names and contact or platform identifiers, private URLs, match references, replay paths, fingerprints and motion recordings. The tables have row-level security and no direct player access. Only server-side service credentials can use reporting and write functions, and the Admin page exposes aggregates.
 - [The Staging migration](../supabase/migrations/20261117090000_ready_usage_tracking.sql) maintains up to 90 days of detail. The hourly `ironclad-ready-usage-retention` job, registered when `pg_cron` is available, drops events before today minus 88 Sydney dates and expires unused session records after one day. It retains eligible daily counts for up to 12 months, with no account, session, browser or event identifiers. Each archived group requires at least five contributing accounts. Account closure or deletion removes the consent record, session mappings and linked event detail. Already aggregated daily counts contain no account key for individual removal.
 
+## Written suggestions on protected Staging
+
+[Admin → Ready usage → Missing-topic suggestions](/admin/ready-usage?view=suggestions)
+shows voluntary suggestions submitted through Ready's **Topic missing** form.
+Signed-out visitors and eligible signed-in accounts can send a suggestion even
+when optional usage analytics is off. Opening the form, typing and cancelling
+do not save or send the draft. Ready explains who reviews the text before Send.
+The separate **Contact an admin** option leads to immediate support options.
+
+Each saved record contains the description, a random submission ID, the
+submission time, the selected category when known, menu/catalogue versions and
+review status. The app sends no account ID, match context or contact details with
+the written record. Suggestions and their text are excluded from usage
+analytics and session recordings. Historical category-only flags remain in their
+own analytics section and have no written descriptions.
+
+An authorised Staging admin can move a suggestion between **New**, **Reviewed**
+and **Added to menu**, or permanently delete it from the suggestion list.
+The hourly `ironclad-ready-suggestions-retention` job deletes suggestions older
+than 90 days. For abuse protection only, an isolated table counts up to five
+successful submissions per hour per signed-in account or visitor address using a
+keyed digest. There is no link from that table to any suggestion and no raw
+address or account ID stored in it. The same job removes elapsed hourly buckets.
+
+The in-form notice applies to this protected Staging feature. Existing published
+policy versions and historical acceptance records remain intact.
+
 ## Proposed public-release wording
 
 Draft for operator review. The effective policy covers limited optional public-site measurement. Introduce the following in a separately versioned successor before enabling public Ready measurement. Preserve the archived documents and immutable acceptance records. Use a separate, unselected Ready choice with the notice visible before consent. [Effective Privacy Policy v1.3](https://www.ironcladtournaments.com/privacy)

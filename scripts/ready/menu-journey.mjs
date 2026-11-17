@@ -233,6 +233,16 @@ export async function browserMenuJourney({ page, expect, mobile, output, verify,
     await expect(message).toHaveText(text, { timeout: 16_000 });
   };
   const main = () => complete(centralMessage);
+  const observeSpeech = async (label) => {
+    await expect.poll(() => page.evaluate(() => {
+      const pose = globalThis.readyAcceptancePose?.();
+      const cloud = document.querySelector("[data-mascot-dialogue]");
+      const hasText = Boolean(cloud?.querySelector("[data-mascot-message]")?.textContent);
+      return hasText && cloud.hasAttribute("data-revealing") && Boolean(pose && pose.talkWeight > .08
+        && Math.abs(pose.jaw - pose.restingJaw) > .01);
+    }), { timeout: 6000 }).toBe(true);
+    verify(true, `${label} visibly reveals text while the rendered jaw moves`);
+  };
 
   await complete("Welcome to IronClad, Commander. How’s morale today?");
   let draggedX;
@@ -273,14 +283,23 @@ export async function browserMenuJourney({ page, expect, mobile, output, verify,
   }
   verify(true, "six fixed categories, exact submenus and Back actions");
   await choose("Rules & match help");
+  await observeSpeech("Neutral category introduction");
   await choose("Maps & match format");
   await expect(button("Which faction can I play?")).toBeVisible();
   await expect(button("Which lobby settings should we use?")).toBeVisible();
   await choose("Back");
   await choose("Disconnects & lag");
+  await observeSpeech("Prepared rules answer");
   await expect(message).toContainText("10:00", { timeout: 16_000 });
   await expect(page.getByRole("link", { name: /Official Tournament Rulebook/ })).toBeVisible({ timeout: 16_000 });
   await choose("Still need help");
+  await observeSpeech("Feedback acknowledgement");
+  await complete("Try another topic or contact an admin, Commander.");
+  await expect.poll(() => page.evaluate(() => {
+    const pose = globalThis.readyAcceptancePose?.();
+    return Boolean(pose && pose.talkWeight < .01 && Math.abs(pose.jaw - pose.restingJaw) < .01);
+  })).toBe(true);
+  verify(true, "Jaw settles into its idle expression after text finishes");
   await expect(button("Still need help")).toHaveCount(0);
   await choose("Contact an admin");
   await expect(button("In-site Admin Assistance")).toBeVisible();
@@ -291,6 +310,8 @@ export async function browserMenuJourney({ page, expect, mobile, output, verify,
   if (!mobile) {
     await choose("Rules & match help");
     await choose("Topic missing");
+    await observeSpeech("Written suggestion instruction");
+    await expect(page.getByRole("textbox", { name: "Which topic or question is missing?" })).toBeVisible();
     await expect(button("Main menu")).toBeVisible();
     await expect(button("Contact an admin")).toBeVisible();
     await openQuickAction(page, "Help", false);

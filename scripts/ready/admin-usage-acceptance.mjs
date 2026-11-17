@@ -112,20 +112,23 @@ async function recordDashboard(origin, oidc, output, sourceContext) {
 }
 
 async function assertDenied(page, origin, anonymous = false) {
-  await page.goto(origin + route, { waitUntil: "domcontentloaded" });
-  await expect(page).toHaveURL((url) =>
-    url.origin === origin && (url.pathname === "/" || (anonymous && url.pathname === "/sign-in")),
-    { timeout: 15_000 });
-  await expect(page.getByRole("heading", { name: "Ready usage" })).toHaveCount(0);
+  for (const path of [route, route + "?view=suggestions"]) {
+    await page.goto(origin + path, { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL((url) =>
+      url.origin === origin && (url.pathname === "/" || (anonymous && url.pathname === "/sign-in")),
+      { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Ready usage" })).toHaveCount(0);
+    await expect(page.getByRole("list", { name: "Written Ready suggestions" })).toHaveCount(0);
+  }
 }
 
 const metricLabels = {
-  engagedAccounts: "Unique engaged accounts",
-  engagedSessions: "Engaged sessions",
-  manualOpenings: "Manual openings",
-  answerDisplays: "Answer displays",
+  engagedAccounts: "Accounts",
+  engagedSessions: "Sessions",
+  manualOpenings: "Openings",
+  answerDisplays: "Answers displayed",
   actionClicks: "Action clicks",
-  unmatchedSearches: "Unmatched searches",
+  unmatchedSearches: "Legacy unmatched searches",
   fallbacks: "Fallbacks shown",
   technicalErrors: "Technical errors",
   helpful: "Helpful",
@@ -136,38 +139,50 @@ async function inspectDashboard({ page, report, origin, output, mobile }) {
   await page.goto(origin + route, { waitUntil: "domcontentloaded" });
   const dashboard = page.getByRole("main").filter({ has: page.getByRole("heading", { name: "Ready usage", exact: true }) });
   await expect(dashboard).toBeVisible({ timeout: 20_000 });
-  await expect(dashboard.getByRole("link", { name: "Test and reviewer activity" })).toHaveAttribute("aria-current", "page");
+  await expect(dashboard.getByRole("link", { name: "Activity and feedback" })).toHaveAttribute("aria-current", "page");
+  await expect(dashboard.getByText("All-player adoption is unavailable.", { exact: false })).toBeVisible();
   for (const [key, label] of Object.entries(metricLabels)) {
+    if (["helpful", "stillNeedHelp"].includes(key) && report.totals.helpful + report.totals.stillNeedHelp === 0) continue;
     const value = report.totals[key];
     const formatted = value === null ? "Unavailable" : new Intl.NumberFormat("en-AU").format(value);
     await expect(dashboard.getByText(label, { exact: true }).and(dashboard.locator("dt")).locator("xpath=following-sibling::dd")).toHaveText(formatted);
   }
   await expect(dashboard.getByRole("heading", { name: "Daily Ready activity" })).toBeVisible();
-  await expect(dashboard.getByRole("heading", { name: "Action clicks by destination" })).toBeVisible();
+  await expect(dashboard.getByRole("heading", { name: "Most-used destinations" })).toBeVisible();
   await expect(dashboard.getByRole("heading", { name: "Most-used categories" })).toBeVisible();
+  await expect(dashboard.getByRole("heading", { name: "Historical category-only flags" })).toBeVisible();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
-  if (mobile) await dashboard.getByText("Unique engaged accounts", { exact: true }).scrollIntoViewIfNeeded();
+  if (mobile) await dashboard.getByText("Accounts", { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({
     path: resolve(output, mobile ? "admin-ready-usage-phone.png" : "admin-ready-usage-desktop.png"),
     animations: "disabled", mask: [page.locator(".cl-userButtonTrigger")],
   });
-  if (mobile) return;
+  if (!mobile) {
+    const filters = dashboard.getByRole("form", { name: "Ready usage filters" });
+    await filters.getByLabel("Date range").selectOption("custom");
+    await filters.getByLabel("Custom start").fill(sydneyDay(-6));
+    await filters.getByLabel("Custom end").fill(sydneyDay());
+    await filters.getByLabel("Menu / catalogue version").selectOption("1/1");
+    await filters.getByRole("button", { name: "Apply filters" }).click();
+    await expect(page).toHaveURL((url) =>
+      url.pathname === route && url.searchParams.get("period") === "custom" && url.searchParams.get("version") === "1/1");
 
-  const filters = dashboard.getByRole("form", { name: "Ready usage filters" });
-  await filters.getByLabel("Date range").selectOption("custom");
-  await filters.getByLabel("Custom start").fill(sydneyDay(-6));
-  await filters.getByLabel("Custom end").fill(sydneyDay());
-  await filters.getByLabel("Menu / catalogue version").selectOption("1/1");
-  await filters.getByRole("button", { name: "Apply filters" }).click();
-  await expect(page).toHaveURL((url) =>
-    url.pathname === route && url.searchParams.get("period") === "custom" && url.searchParams.get("version") === "1/1");
+    await dashboard.locator("summary").filter({ hasText: "When should I contact my opponent?" }).click();
+    await expect(dashboard.getByRole("link", { name: "Official Tournament Rulebook v3.2" })).toBeVisible();
+    await expect(dashboard.getByRole("link", { name: "Official Tournament Rulebook v3.1" })).toBeVisible();
+    await page.goto(origin + route + "?cohort=player", { waitUntil: "domcontentloaded" });
+    await expect(dashboard.getByText("Usage figures are unavailable for this view.", { exact: false })).toBeVisible();
+    await expect(dashboard.getByText("Accounts", { exact: true })).toHaveCount(0);
+  }
 
-  await dashboard.locator("summary").filter({ hasText: "When should I contact my opponent?" }).click();
-  await expect(dashboard.getByRole("link", { name: "Official Tournament Rulebook v3.2" })).toBeVisible();
-  await expect(dashboard.getByRole("link", { name: "Official Tournament Rulebook v3.1" })).toBeVisible();
-  await dashboard.getByRole("link", { name: "Player adoption" }).click();
-  await expect(dashboard.getByText("Player adoption is unavailable.", { exact: false })).toBeVisible();
-  await expect(dashboard.getByText("Unique engaged accounts", { exact: true })).toHaveCount(0);
+  await dashboard.getByRole("link", { name: "Missing-topic suggestions" }).click();
+  await expect(dashboard.getByRole("heading", { name: "Missing-topic suggestions" })).toBeVisible();
+  await expect(dashboard.getByText("Written suggestions could not be loaded.", { exact: false })).toHaveCount(0);
+  const suggestionsFilter = dashboard.getByRole("form", { name: "Filter written suggestions by review status" });
+  await suggestionsFilter.getByLabel("Review status").selectOption("added");
+  await suggestionsFilter.getByRole("button", { name: "Apply status filter" }).click();
+  await expect(page).toHaveURL((url) => url.searchParams.get("suggestionStatus") === "added");
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 }
 
 try {
@@ -220,6 +235,10 @@ try {
     await assertDenied(playerSession.page, origin);
     const denied = await auth.clientForPage(playerSession.page).rpc("get_ready_usage_report", query);
     assert.equal(denied.error?.code, "42501");
+    const suggestionsDenied = await auth.clientForPage(playerSession.page).rpc("get_ready_topic_suggestions", {
+      p_status: null, p_limit: 20, p_offset: 0,
+    });
+    assert.equal(suggestionsDenied.error?.code, "42501");
   } finally { await playerSession.context.close(); }
   checks.push(step);
 
@@ -236,8 +255,8 @@ try {
     checks.push(step);
 
     for (const mobile of [false, true]) {
-      step = mobile ? "checked reviewer dashboard totals and bounds in touch emulation"
-        : "checked reviewer totals, filters, published and archived sources, and cohort isolation in visible Chrome";
+      step = mobile ? "checked reviewer dashboard and written suggestion filter bounds in touch emulation"
+        : "checked reviewer totals, filters, published and archived sources, cohort isolation, and written suggestions in visible Chrome";
       const session = await browserSession(origin, oidc, admin, mobile);
       try {
         await inspectDashboard({ page: session.page, report, origin, output, mobile });

@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 
 import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { readyReviewAliases } from "./review-access";
+import { isReadyStagingEnabled, readyReviewAliases } from "./review-access";
 
 export const READY_USAGE_TIMEZONE = "Australia/Sydney";
 const DAY_MS = 86_400_000;
@@ -192,7 +192,7 @@ function normalizeReport(value: unknown, filters: ReadyUsageFilters): ReadyUsage
 }
 
 export async function loadReadyUsageReport(params: ReadyUsageSearchParams): Promise<ReadyUsageResult> {
-  if (!readyReviewAliases(process.env).length) return { status: "unauthorized" };
+  if (!isReadyStagingEnabled()) return { status: "unauthorized" };
   const identity = await auth().catch(() => null);
   if (!identity) return { status: "unauthorized" };
   const { userId, sessionId, sessionClaims } = identity;
@@ -200,7 +200,7 @@ export async function loadReadyUsageReport(params: ReadyUsageSearchParams): Prom
     return { status: "unauthorized" };
   }
   const filters = parseReadyUsageFilters(params);
-  if (filters.cohort === "player") return { status: "not-collected", filters };
+  if (filters.cohort === "player" || !readyReviewAliases(process.env).length) return { status: "not-collected", filters };
   if (filters.end < filters.retainedFrom) return { status: "outside-retention", filters };
 
   let report: ReadyUsageReport;

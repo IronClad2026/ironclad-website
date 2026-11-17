@@ -184,6 +184,7 @@
   gap: 7px;
   overflow: auto;
   padding: 6px;
+  scroll-padding-block: 8px;
   scrollbar-color: var(--ready-highlight) var(--ready-surface);
   scrollbar-width: thin;
   pointer-events: none;
@@ -199,7 +200,10 @@
   --cloud-border: var(--ready-accent);
   position: relative;
   isolation: isolate;
-  padding: 21px 22px 22px;
+  min-inline-size: 0;
+  /* The SVG shoulders curve inside the box. Reserve the painted interior,
+     including the lower left lobe, at every width and content height. */
+  padding: 27px max(18px, 8%) 29px;
 }
 
 .bubble > svg,
@@ -270,19 +274,38 @@
 .sources a:hover,
 .replyDetails summary:hover { color: var(--ready-highlight); }
 
-.copyStatus {
-  justify-self: center;
-  align-self: center;
-  padding: 4px 7px;
-  border-radius: 5px;
-  background: var(--ready-bubble);
-  overflow-wrap: anywhere;
+.suggestionForm {
+  display: grid;
+  gap: .5rem;
+  margin-block-start: .75rem;
   color: var(--ready-text);
-  font-size: .78rem;
-  text-align: center;
+  font-size: .86rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
   pointer-events: auto;
-  user-select: text;
 }
+
+.suggestionHint,
+.suggestionCounter { margin: 0; color: var(--ready-secondary); }
+.suggestionHint { font-size: .8rem; }
+.suggestionForm label { font-weight: 650; }
+
+.suggestionForm textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 5em;
+  padding: .5rem;
+  border: 1px solid var(--ready-accent);
+  border-radius: 8px;
+  background: var(--ready-surface);
+  color: var(--ready-text);
+  /* Keep the field readable and avoid mobile browser focus zoom. */
+  font-size: max(16px, .93rem);
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.suggestionCounter { font-size: .75rem; text-align: end; }
 
 .speech[data-revealing="true"] .bubble { animation: thought-message-in 170ms ease-out both; }
 
@@ -309,10 +332,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.speech[data-compact-placement] .bubble { padding: 12px 13px; }
 .speech[data-compact-placement] .answers { row-gap: 4px; }
-.speech[data-compact-placement] .answers .answer { min-height: 44px; padding: 8px 10px; }
-.speech[data-compact-placement] .answer[data-ready-category="tournaments"] { padding-inline: 4px; }
 
 .speech:is([data-ready-view="main"], [data-ready-view="submenu"]) .answers .answer {
   min-width: 0;
@@ -333,12 +353,12 @@
 .speech[data-menu-layout="oval"] .answer[data-ready-category="rules"] { grid-area: 2 / 1 / 3 / 4; }
 .speech[data-menu-layout="oval"] .answer[data-ready-category="tournaments"] { grid-area: 2 / 10 / 3 / 13; }
 .speech[data-menu-layout="oval"] .answer:is([data-ready-category="rules"], [data-ready-category="tournaments"]) {
-  padding-inline: 4px;
   font-size: .76rem;
 }
 .speech[data-menu-layout="oval"] .answer[data-ready-category="profile"] { grid-area: 3 / 3 / 4 / 7; }
 .speech[data-menu-layout="oval"] .answer[data-ready-category="support"] { grid-area: 3 / 7 / 4 / 11; }
 .speech[data-menu-layout="oval"] .readyFooter { grid-area: 4 / 2 / 5 / 12; }
+.speech[data-menu-layout="oval"] .revealAction { grid-area: 1 / 5 / 2 / 9; }
 
 .speech[data-menu-layout="oval"]:is([data-side="left"], [data-side="right"]) {
   .bubble { grid-area: 2 / 1 / 3 / 13; }
@@ -350,7 +370,6 @@
   .answer[data-ready-category="support"] { grid-area: 3 / 9 / 4 / 13; }
   .answer:is([data-ready-category="rules"], [data-ready-category="tournaments"]) {
     font-size: .81rem;
-    padding-inline: 14px;
   }
   .answer:is([data-ready-category="match"], [data-ready-category="rules"]) { margin-top: 6px; }
   .answer:is([data-ready-category="tournaments"], [data-ready-category="support"]) { margin-bottom: 6px; }
@@ -376,6 +395,7 @@
   color: var(--ready-secondary);
   font-size: .76rem;
   font-weight: 620;
+  overflow-wrap: anywhere;
 }
 
 .feedback > span {
@@ -415,6 +435,7 @@
   color: var(--ready-secondary);
   font-size: .76rem;
   text-align: start;
+  overflow-wrap: anywhere;
   pointer-events: auto;
 }
 .analyticsNotice p { margin: 0 0 4px; }
@@ -470,7 +491,7 @@
   flex: 0 1 calc((100% - 8px) / 2);
   min-width: min(89px, 100%);
   max-width: 176px;
-  padding: 12px 14px;
+  padding: 16px 17px;
   border: 0;
   background: transparent;
   color: var(--ready-text);
@@ -484,11 +505,14 @@
   transition: transform 130ms ease-out;
 }
 
+.answer > span { min-width: 0; }
+
 .contextMenu .answer {
-  min-width: 0;
+  min-width: 72px;
+  width: max(72px, 5rem);
+  min-height: 47px;
   flex: none;
-  padding: 8px;
-  white-space: nowrap;
+  padding: 14px 11px;
 }
 
 .speech[data-revealing="true"] .answers .answer,
@@ -526,6 +550,7 @@
   color: var(--ready-text);
   font-size: .73rem;
   font-weight: 620;
+  overflow-wrap: anywhere;
   pointer-events: auto;
 }
 
@@ -557,11 +582,10 @@
   .speech { gap: 5px; }
   .answerZone { min-height: 44px; container-type: inline-size; }
 
-  @container (min-width: 282px) {
+  @container (min-width: 340px) {
     .speech:not([data-ready-view="submenu"]) .answers:has(> :nth-child(3):last-child) .answer {
       min-width: 0;
       flex-basis: calc((100% - 16px) / 3);
-      padding: 8px 10px;
     }
 
     .assistant:is([data-dialogue-node="welcomeFirst"], [data-dialogue-node="welcomeReturning"]) .answers .answer {

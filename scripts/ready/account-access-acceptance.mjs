@@ -120,7 +120,7 @@ async function assertAdminDenied(page) {
     const response = await fetch("/admin/ready-usage", { cache: "no-store" });
     const html = await response.text();
     return {
-      reachableReport: /Unique engaged accounts/.test(html) && /Daily Ready activity/.test(html),
+      reachableReport: /Usage overview/.test(html) && /Ready usage filters/.test(html),
       concealed: response.status === 404 || response.status === 401 || response.status === 403 || response.redirected ||
         html.includes("NEXT_REDIRECT"),
     };

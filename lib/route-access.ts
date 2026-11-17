@@ -20,6 +20,7 @@ const SELF_AUTHENTICATED_EXACT_API_PATHS = [
   "/api/notifications/click",
   "/api/partners/v1/tournaments",
   "/api/ready",
+  "/api/ready/suggestions",
   "/api/ready/usage",
 ] as const;
 

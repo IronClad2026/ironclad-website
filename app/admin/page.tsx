@@ -14,7 +14,7 @@ import { redirect } from "next/navigation";
 
 import AdminAccessRequired from "@/components/admin/AdminAccessRequired";
 import { hasAdminPageAccess } from "@/lib/admin-page-access";
-import { readyReviewAliases } from "@/lib/ready/review-access";
+import { isReadyStagingEnabled } from "@/lib/ready/review-access";
 import type { AdminRegistrationStatus } from "@/lib/admin-registration-review";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
@@ -329,7 +329,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 label: "Operations & Analytics",
                 icon: Activity,
               },
-              ...(readyReviewAliases(process.env).length > 0 ? [{
+              ...(isReadyStagingEnabled() ? [{
                 href: "/admin/ready-usage",
                 label: "Ready usage",
                 icon: Activity,

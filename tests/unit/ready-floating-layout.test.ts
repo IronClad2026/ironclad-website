@@ -122,4 +122,20 @@ describe("Ready floating placement", () => {
       expect(last.dialogue.side).toBe(side);
     }
   });
+
+  it("makes space to edit and scroll a suggestion when an on-screen keyboard covers the lower viewport", () => {
+    const keyboard = { left: 10, right: 310, top: 86, bottom: 236 };
+    const preferred = { x: 10, y: 423, width: 202 };
+    const suggestion = { main: false, height: 555, bubbleHeight: 402 };
+    const { skull, dialogue } = placeReady(keyboard, preferred, { ...suggestion, editing: true });
+    const cloud = dialogueRect(dialogue, suggestion.height);
+    inside(skull, keyboard);
+    inside(cloud, keyboard);
+    expect(cloud.height).toBeGreaterThanOrEqual(108);
+    expect(intersects(skull, cloud)).toBe(false);
+    expect(skull.x + skull.width * .94 - 44).toBeGreaterThanOrEqual(keyboard.left - .5);
+    const reopened = placeReady(portrait, preferred, suggestion);
+    expect(reopened.skull.x).toBe(preferred.x);
+    expect(reopened.skull.y).toBe(preferred.y);
+  });
 });
