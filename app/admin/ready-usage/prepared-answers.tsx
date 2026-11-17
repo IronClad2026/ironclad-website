@@ -51,7 +51,7 @@ export default function PreparedAnswers({
       <div>
         <h2 id="ready-prepared-title" className="text-xl font-bold">Most-used questions and prepared answers</h2>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-400">
-          Questions are ordered by recorded selections and then displays. Selections count explicit question choices, including chosen search suggestions. Displays count when an answer appears. Vote samples include both answer feedback choices.
+          Questions are ordered by recorded selections and then displays. Selections count explicit question choices. Legacy figures can include selected search suggestions. Vote samples include both feedback choices.
         </p>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-400">
           {currentVersionSelected

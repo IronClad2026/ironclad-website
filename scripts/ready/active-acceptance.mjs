@@ -88,7 +88,7 @@ async function verifyNoWrites(admin, participant, fixtures, verify) {
     "no created assistance requests and no deliverable fixture notices");
 }
 
-export async function verifyActiveApi({ fixtures, admin, environment, actors, origin, answer, query, verify }) {
+export async function verifyActiveApi({ fixtures, admin, environment, actors, origin, answer, verify }) {
   const { a, b } = fixtures;
   const events = data(await admin.from("tournaments").select("id,slug,status,terminal_at")
     .in("id", [a.tournamentId, b.tournamentId]), "active fixtures exist in Staging", verify);
@@ -116,8 +116,8 @@ export async function verifyActiveApi({ fixtures, admin, environment, actors, or
   const owner = playerClient(a1);
   await verifyNoWrites(admin, owner, [a, b], verify);
   for (const [actor, opponent, label] of [[a1, "TestAcademy2", "participant 1"], [a2, "TestAcademy1", "participant 2"]]) {
-    const opponentReply = await answer(actor, `${label} current opponent`, { question: "Who am I playing?", context: contextFor(a) });
-    const deadlineReply = await answer(actor, `${label} current deadline`, { question: "What is my match deadline?", context: contextFor(a) });
+    const opponentReply = await answer(actor, `${label} current opponent`, { kind: "action", id: "opponent", context: contextFor(a) });
+    const deadlineReply = await answer(actor, `${label} current deadline`, { kind: "action", id: "deadline", context: contextFor(a) });
     const deadline = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })
       .format(new Date(a.deadline));
     verify(opponentReply.text.startsWith(`Your opponent is ${opponent}.`) &&
@@ -142,22 +142,23 @@ export async function verifyActiveApi({ fixtures, admin, environment, actors, or
     "signed-in player at a different seat is denied the room and its support context");
   verify((await assistanceContext(admin, a3, a)).error?.code === "42501",
     "server-mediated support lookup also denies the wrong seat");
-  const [status] = await query(a3, "outside Ready review gate", { question: "Who am I playing?", context: contextFor(a) });
-  verify(status === 403, "unrelated nonreview account is denied Ready access");
-  const forged = await answer(a2, "reviewer claims another active match", { question: "Who am I playing?", context: contextFor(b) });
+  const unrelated = await answer(a3, "ordinary player requests an unowned match", { kind: "action", id: "opponent", context: contextFor(a) });
+  verify(!unrelated.context?.matchId && !unrelated.actions?.some(({ href }) => isFixtureDestination(href, a, origin)),
+    "ordinary player can use Ready but cannot access another match");
+  const forged = await answer(a2, "reviewer claims another active match", { kind: "action", id: "opponent", context: contextFor(b) });
   verify(/couldn.t find that match under your current account/.test(forged.text) && !forged.context?.matchId &&
     !forged.actions?.some(({ href }) => isFixtureDestination(href, b, origin)), "reviewer at a different seat receives no opponent, deadline or link");
 
-  const multiple = await answer(a1, "multiple active matches", { question: "Open my match" });
+  const multiple = await answer(a1, "multiple active matches", { kind: "action", id: "my-match" });
   verify(/more than one match/.test(multiple.text) && !multiple.actions?.some(({ href }) => href?.includes("&match=")) &&
     [a, b].every((fixture) => multiple.actions?.some(({ context }) => context?.matchId === fixture.matchId && context.eventSlug === fixture.tag)),
   "multiple active matches require selection rather than guessing");
-  const chosen = await answer(a1, "selected active assignment", { question: "Open my match", context: contextFor(a) });
+  const chosen = await answer(a1, "selected active assignment", { kind: "action", id: "my-match", context: contextFor(a) });
   verify(chosen.actions?.some(({ href }) => isFixtureDestination(href, a, origin)), "choosing A opens only the selected active match");
-  const chat = await answer(a1, "authorized active opponent chat", { question: "Open the chat with my opponent", context: contextFor(a) });
+  const chat = await answer(a1, "authorized active opponent chat", { kind: "action", id: "opponent-chat", context: contextFor(a) });
   verify(chat.actions?.some(({ label, href }) => label === "Open opponent chat" && isFixtureDestination(href, a, origin)),
     "Ready offers the existing active opponent chat");
-  const help = await answer(a1, "authorized active administrative help", { question: "I need an admin", context: contextFor(a) });
+  const help = await answer(a1, "authorized active administrative help", { kind: "action", id: "admin-assistance", context: contextFor(a) });
   verify(help.actions?.some(({ href }) => href === ticketUrl) &&
     help.actions?.some(({ label, href }) => label === "Open Match Room for Admin Assistance" && isFixtureDestination(href, a, origin)) &&
     help.actions?.some(({ copyText }) => copyText?.includes(a.matchId)), "verified Discord ticket and active in-site support destinations offered");

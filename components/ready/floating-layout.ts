@@ -2,261 +2,234 @@ export type Point = { x: number; y: number };
 export type Bounds = { left: number; top: number; right: number; bottom: number };
 export type Rect = Point & { width: number; height: number };
 export type Side = "below" | "left" | "above" | "right";
+export type ReadyPosition = Point & { width?: number };
+export type DialogueSlot = Point & { side: Side; width: number; maxHeight: number; oval: boolean };
 
-const gap = 19;
+type DialogueSize = { height: number; bubbleHeight: number; main: boolean };
+type Placement = { skull: Rect; dialogue: DialogueSlot };
+
+const gap = 16;
+const controlClearance = 8;
+const minCloudWidth = 210;
+const ovalWidth = 540;
+const minOvalHeight = 248;
+const minCloudHeight = 96;
+const alignmentRoom = 44;
+const sides: readonly Side[] = ["below", "left", "above", "right"];
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(min, max), Math.max(min, value));
+const bottom = (rect: Rect) => rect.y + rect.height;
+const right = (rect: Rect) => rect.x + rect.width;
 
-export function placeSkull(area: Bounds, preferred: Point | null): Rect {
+function overlap(a: Rect, b: Rect) {
+  return Math.max(0, Math.min(right(a), right(b)) - Math.max(a.x, b.x)) *
+    Math.max(0, Math.min(bottom(a), bottom(b)) - Math.max(a.y, b.y));
+}
+
+function keepSkullInside(area: Bounds, position: Point, width: number): Rect {
+  const height = Math.round(width * .94);
+  return {
+    x: clamp(Math.round(position.x), Math.ceil(area.left), Math.floor(area.right - width)),
+    y: clamp(Math.round(position.y), Math.ceil(area.top), Math.floor(area.bottom - height)),
+    width, height,
+  };
+}
+
+function placeSkull(area: Bounds, preferred: ReadyPosition | null): Rect {
   const usableWidth = area.right - area.left;
   const usableHeight = area.bottom - area.top;
   const compact = usableWidth < 620;
-  const width = Math.round(Math.min(compact ? 228 : 324, usableWidth * (compact ? .67 : .33),
+  const normalWidth = Math.round(Math.min(compact ? 228 : 324, usableWidth * (compact ? .67 : .33),
     Math.max(115, usableHeight * (compact ? .48 : .72)), usableWidth, usableHeight));
-  const height = Math.round(width * .94);
-  const defaultX = area.right - width - (compact ? 7 : 18);
-  // Reserve room below the default pose for the two-column phone menu.
+  const width = preferred?.width ? Math.min(normalWidth, preferred.width) : normalWidth;
   const reserveBelow = compact ? Math.min(342, usableHeight * .54) : Math.min(191, usableHeight * .39);
-  const defaultY = area.bottom - height - reserveBelow;
-  return { x: Math.round(clamp(preferred?.x ?? defaultX, area.left, area.right - width)),
-    y: Math.round(clamp(preferred?.y ?? defaultY, area.top, area.bottom - height)), width, height };
+  return keepSkullInside(area, preferred ?? {
+    x: area.right - width - (compact ? 7 : 18), y: area.bottom - width * .94 - reserveBelow,
+  }, width);
 }
 
-export function placeCloud(
-  area: Bounds,
-  skull: Rect,
-  cloudHeight: number,
-  controls: readonly Rect[] = [],
-  options: { width?: number; minWidth?: number; minHeight?: number } = {},
-) {
-  const maxWidth = Math.min(options.width ?? 344, area.right - area.left);
-  const right = skull.x + skull.width;
-  const bottom = skull.y + skull.height;
-  const candidates = [
-    { side: "below", width: maxWidth, height: area.bottom - bottom - gap },
-    { side: "left", width: Math.min(maxWidth, skull.x - area.left - gap), height: area.bottom - area.top },
-    { side: "above", width: maxWidth, height: skull.y - area.top - gap },
-    { side: "right", width: Math.min(maxWidth, area.right - right - gap), height: area.bottom - area.top },
-  ] as const;
-  const targetHeight = Math.max(72, cloudHeight);
-  // Use the actual reserved copy and choices when picking a side with room to reflow.
-  const score = ({ side, width, height }: typeof candidates[number]) => {
-    if (width < (options.minWidth ?? Math.min(180, maxWidth)) || height < (options.minHeight ?? 46)) {
-      return -1000 + width * height / 100000;
-    }
-    const displayedHeight = Math.min(height, targetHeight);
-    const { penalty } = cloudPosition(area, skull, side, width, displayedHeight, controls);
-    const room = Math.min(1, height / targetHeight);
-    const readability = room * (.76 + room * .36);
-    return Math.min(1, width / maxWidth) * .24 + readability - penalty;
-  };
-  let best: (typeof candidates)[number] = candidates[0];
-  let bestScore = score(best);
-  for (const candidate of candidates.slice(1)) {
-    const candidateScore = score(candidate);
-    if (candidateScore <= bestScore + .015) continue;
-    best = candidate;
-    bestScore = candidateScore;
-  }
-  const width = Math.max(1, Math.floor(best.width));
-  const maxHeight = Math.max(1, Math.floor(best.height));
-  return { side: best.side, width, maxHeight };
+function occupied(rect: Rect, controls: readonly Rect[]) {
+  return controls.reduce((sum, control) => sum + overlap(rect, control) / (control.width * control.height), 0);
 }
 
-function cloudPosition(area: Bounds, skull: Rect, side: Side, width: number, height: number, controls: readonly Rect[]) {
-  const centeredX = skull.x + skull.width * .53 - width * .53;
-  const centeredY = skull.y + skull.height * .68 - Math.min(55, height * .3);
-  const anchor = {
-    x: Math.round(clamp(side === "left" ? skull.x - width - gap : side === "right" ? skull.x + skull.width + gap : centeredX,
-      area.left, area.right - width)),
-    y: Math.round(clamp(side === "above" ? skull.y - height - gap : side === "below" ? skull.y + skull.height + gap : centeredY,
-      area.top, area.bottom - height)),
-  };
-  const penalty = (point: Point) => {
-    const obscured = controls.reduce((total, control) => {
-      const overlapWidth = Math.max(0, Math.min(point.x + width, control.x + control.width) - Math.max(point.x, control.x));
-      const overlapHeight = Math.max(0, Math.min(point.y + height, control.y + control.height) - Math.max(point.y, control.y));
-      return total + overlapWidth * overlapHeight / (control.width * control.height);
-    }, 0);
-    const distance = Math.abs(point.x - anchor.x) + Math.abs(point.y - anchor.y);
-    return Math.min(.58, obscured * .6) + Math.min(.15, distance / 650);
-  };
-  let best = anchor;
-  let bestPenalty = penalty(anchor);
-  if (bestPenalty === 0) return { point: best, penalty: bestPenalty };
-
-  // Slide along the skull's side to clear nearby controls without moving or covering the mascot.
-  const vertical = side === "left" || side === "right";
-  const clearance = 8;
+function clearHeight(area: Bounds, controls: readonly Rect[], x: number, width: number, y: number, above: boolean) {
+  let height = above ? y - area.top : area.bottom - y;
   for (const control of controls) {
-    const offsets = vertical
-      ? [control.y - height - clearance, control.y + control.height + clearance]
-      : [control.x - width - clearance, control.x + control.width + clearance];
-    for (const offset of offsets) {
-      const point = vertical
-        ? { x: anchor.x, y: Math.round(clamp(offset, area.top, area.bottom - height)) }
-        : { x: Math.round(clamp(offset, area.left, area.right - width)), y: anchor.y };
-      const candidatePenalty = penalty(point);
-      if (candidatePenalty >= bestPenalty) continue;
-      best = point;
-      bestPenalty = candidatePenalty;
-    }
+    if (x >= right(control) + controlClearance || x + width <= control.x - controlClearance) continue;
+    if (above && control.y - controlClearance < y) height = Math.min(height, y - bottom(control) - controlClearance);
+    if (!above && bottom(control) + controlClearance > y) height = Math.min(height, control.y - controlClearance - y);
   }
-  return { point: best, penalty: bestPenalty };
+  return Math.max(0, height);
 }
 
-export function cloudOrigin(area: Bounds, skull: Rect, side: Side, width: number, height: number, controls: readonly Rect[] = []): Point {
-  return cloudPosition(area, skull, side, width, height, controls).point;
-}
+function chooseDialogue(area: Bounds, skull: Rect, size: DialogueSize, controls: readonly Rect[], previous?: DialogueSlot) {
+  const available = area.right - area.left;
+  // Keep room for a stacked phone cloud to track the skull across the screen.
+  const stackedWidth = available < 480 ? Math.max(minCloudWidth, available - 42) : available;
+  const normalWidth = Math.floor(Math.min(370, available, stackedWidth));
+  const compactWidth = Math.floor(Math.min(minCloudWidth, available));
+  const allowOval = size.main && available >= 820 && area.bottom - area.top >= 420;
+  let best: { slot: DialogueSlot; score: number } | undefined;
 
-export function placeCompactCloud(area: Bounds, skull: Rect, cloudHeight: number, controls: readonly Rect[]) {
-  const maxWidth = Math.min(370, area.right - area.left);
-  const minWidth = Math.min(214, maxWidth);
-  const minHeight = 72;
-  const clearance = 8;
-  const targetHeight = Math.max(minHeight, cloudHeight);
-  const sides: Record<Side, Bounds> = {
-    below: { ...area, top: skull.y + skull.height + gap },
-    left: { ...area, right: skull.x - gap },
-    above: { ...area, bottom: skull.y - gap },
-    right: { ...area, left: skull.x + skull.width + gap },
-  };
-  let best: { side: Side; x: number; width: number; top: number; bottom: number } | undefined;
-  let bestScore = -Infinity;
-
-  for (const [side, space] of Object.entries(sides) as [Side, Bounds][]) {
-    const availableWidth = Math.min(maxWidth, space.right - space.left);
-    if (availableWidth < minWidth || space.bottom - space.top < minHeight) continue;
-    const obstacles = controls.filter((control) =>
-      control.x - clearance < space.right && control.x + control.width + clearance > space.left &&
-      control.y - clearance < space.bottom && control.y + control.height + clearance > space.top,
-    ).sort((a, b) => a.y - b.y);
-
-    for (const width of new Set([Math.floor(availableWidth), Math.floor(minWidth)])) {
-      const maxX = space.right - width;
-      const anchor = cloudOrigin(area, skull, side, width, targetHeight);
-      const xs = new Set([anchor.x, space.left, maxX]);
-      for (const control of obstacles) {
-        xs.add(control.x - clearance - width);
-        xs.add(control.x + control.width + clearance);
+  for (const side of sides) {
+    const beside = side === "left" || side === "right";
+    const above = side === "above";
+    const maxWidth = side === "left" ? skull.x - gap - area.left
+      : side === "right" ? area.right - right(skull) - gap : available;
+    const widths = [...new Set([normalWidth, compactWidth, ...(allowOval ? [ovalWidth] : [])])];
+    for (const width of widths) {
+      const oval = width === ovalWidth;
+      const ovalEntering = oval && previous && !previous.oval;
+      if (width + (ovalEntering ? 26 : 0) > maxWidth || width < 1) continue;
+      if (beside && width === normalWidth && previous?.width === compactWidth && width !== compactWidth && maxWidth < width + 22) continue;
+      const targetHeight = oval ? Math.max(size.height, minOvalHeight) : Math.max(minCloudHeight, size.height);
+      const minimumHeight = oval ? minOvalHeight + (ovalEntering ? 24 : 0) : minCloudHeight;
+      // Above the head, keep the message itself close even if its controls need scrolling.
+      const limitAbove = oval ? minOvalHeight + 33 : clamp(size.bubbleHeight + 76, 125, 202);
+      const idealX = side === "left" ? skull.x - gap - width : side === "right" ? right(skull) + gap
+        : skull.x + (skull.width - width) * .5;
+      const x = clamp(Math.round(idealX), Math.ceil(area.left), Math.floor(area.right - width));
+      const startY = above ? skull.y - gap : side === "below" ? bottom(skull) + gap
+        : clamp(skull.y + skull.height * .64 - (oval ? 110 : 45), area.top, area.bottom - minimumHeight);
+      const minY = above ? startY - alignmentRoom
+        : beside ? Math.max(area.top, startY - alignmentRoom, skull.y - (oval ? 120 : 36)) : startY;
+      const maxY = above ? startY : beside
+        ? Math.min(area.bottom, startY + alignmentRoom, bottom(skull) - (oval ? 110 : 45)) : startY + alignmentRoom;
+      const ys = new Set([startY]);
+      for (const control of controls) {
+        if (x >= right(control) + controlClearance || x + width <= control.x - controlClearance) continue;
+        const y = above ? control.y - controlClearance : bottom(control) + controlClearance;
+        if (y >= minY && y <= maxY) ys.add(y);
       }
 
-      for (const x of new Set(Array.from(xs, (value) => clamp(value, space.left, maxX)))) {
-        // Each control crossing this column splits it into usable vertical bands.
-        let top = space.top;
-        const fit = (bottom: number) => {
-          const capacity = bottom - top;
-          if (capacity < minHeight) return;
-          const height = Math.min(capacity, targetHeight);
-          const preferredY = cloudOrigin(area, skull, side, width, height).y;
-          const y = clamp(preferredY, top, bottom - height);
-          const distance = Math.hypot(x - anchor.x, y - preferredY);
-          const score = height + width * .26 - distance * .3;
-          if (score <= bestScore) return;
-          best = { side, width, x, top, bottom };
-          bestScore = score;
-        };
-        for (const control of obstacles) {
-          if (x + width <= control.x - clearance || x >= control.x + control.width + clearance) continue;
-          fit(Math.min(space.bottom, control.y - clearance));
-          top = Math.max(top, control.y + control.height + clearance);
+      for (const y of ys) {
+        const fullHeight = Math.min(above ? y - area.top : area.bottom - y, above ? limitAbove : Infinity);
+        const free = Math.min(fullHeight, clearHeight(area, controls, x, width, y, above));
+        for (const maxHeight of new Set([Math.floor(fullHeight), Math.floor(free)])) {
+          if (maxHeight < (oval ? minimumHeight : 1)) continue;
+          const top = above ? y - maxHeight : y;
+          const height = Math.min(maxHeight, targetHeight);
+          const rect = { x, y: above ? y - height : y, width, height };
+          const clipped = height / targetHeight;
+          const score = clipped * 112 + width / normalWidth * 17 + (oval ? 26 : 0) + (beside ? 4 : 0) +
+            (previous?.side === side ? 11 : 0) + (previous?.width === width ? 4 : 0) -
+            (maxHeight < minCloudHeight ? 55 : 0) - Math.abs(y - startY) * .35 -
+            Math.min(190, occupied(rect, controls) * 94);
+          if (!best || score > best.score) best = { slot: { side, x, y: top, width, maxHeight, oval }, score };
         }
-        fit(space.bottom);
       }
     }
   }
 
   return best;
+}
+
+export function placeReady(area: Bounds, preferred: ReadyPosition | null, size: DialogueSize,
+  controls: readonly Rect[] = [], previous?: Placement): Placement {
+  const initial = placeSkull(area, preferred);
+  const obstacles = preferred ? [] : controls;
+  const initialDialogue = chooseDialogue(area, initial, size, obstacles, previous?.dialogue);
+  let best = initialDialogue ? {
+    skull: initial, dialogue: initialDialogue.slot, score: initialDialogue.score - occupied(initial, obstacles) * 96,
+  } : undefined;
+  const compact = area.right - area.left < 620 || area.bottom - area.top < 420;
+  if (!preferred && compact && obstacles.length &&
+    (!initialDialogue || occupied(initial, obstacles) ||
+      occupied(dialogueRect(initialDialogue.slot, size.height), obstacles) ||
+      initialDialogue.slot.maxHeight < Math.min(205, size.height))) {
+    // On a crowded narrow default layout, fit the entire group into nearby free space.
+    // A deliberate drag always keeps the full-size skull at the user's position.
+    const adjacentWidth = Math.floor(area.right - area.left - minCloudWidth - gap);
+    const compactWidth = Math.min(initial.width, Math.max(115, adjacentWidth));
+    for (const width of new Set([initial.width, compactWidth])) {
+      const height = Math.round(width * .94);
+      const xs = [initial.x, area.right - width, area.left];
+      const ys = [initial.y, area.top, area.bottom - height];
+      for (const control of obstacles) {
+        ys.push(control.y - controlClearance - height, bottom(control) + controlClearance);
+      }
+      for (const y of new Set(ys.map((value) => clamp(Math.round(value), Math.ceil(area.top), Math.floor(area.bottom - height))))) {
+        for (const x of xs) {
+          const skull = keepSkullInside(area, { x, y }, width);
+          const result = chooseDialogue(area, skull, size, obstacles, previous?.dialogue);
+          if (!result) continue;
+          const shift = Math.hypot(skull.x - initial.x, skull.y - initial.y);
+          const score = result.score - occupied(skull, obstacles) * 96 - shift * .046 - (initial.width - width) * .24;
+          if (!best || score > best.score) best = { skull, dialogue: result.slot, score };
+        }
+      }
+    }
+  }
+  if (best) return { skull: best.skull, dialogue: best.dialogue };
+
+  // A very shallow visual viewport can leave almost no space below the header.
+  const width = Math.max(1, Math.floor(area.right - area.left));
+  const height = Math.max(1, area.bottom - area.top);
+  const skull = keepSkullInside(area, { x: initial.x, y: area.top },
+    Math.min(initial.width, Math.max(1, Math.floor(height * .48))));
+  const y = Math.min(area.bottom - 1, bottom(skull) + Math.min(gap, height * .10));
+  return { skull, dialogue: { x: area.left, y, side: "below", oval: false, width, maxHeight: Math.max(1, area.bottom - y) } };
+}
+
+export function dialogueRect(slot: DialogueSlot, contentHeight: number): Rect {
+  const height = Math.min(slot.maxHeight, contentHeight);
+  return { x: slot.x, y: slot.side === "above" ? slot.y + slot.maxHeight - height : slot.y, width: slot.width, height };
 }
 
 export function placeContextMenu(
-  area: Bounds,
-  skull: Rect,
-  button: Pick<Rect, "width" | "height">,
-  spacing: number,
-  avoid: readonly Rect[],
+  area: Bounds, skull: Rect, button: Pick<Rect, "width" | "height">, spacing: number, avoid: readonly Rect[],
   pageControls: readonly Rect[] = [],
 ): (Rect & { direction: "row" | "column" }) | null {
-  const clearance = 6;
-  const obstacles = [skull, ...avoid];
-  const nearby = [...obstacles, ...pageControls];
-  const anchor = { x: skull.x + skull.width / 2, y: skull.y + skull.height * .39 };
+  const separation = 7;
   let best: (Rect & { direction: "row" | "column" }) | null = null;
-  let bestCost = Infinity;
-
-  const overlap = (a: Rect, b: Rect) =>
-    Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
-    Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
-
+  let bestScore = Infinity;
   for (const direction of ["column", "row"] as const) {
     const width = direction === "row" ? button.width * 2 + spacing : button.width;
     const height = direction === "column" ? button.height * 2 + spacing : button.height;
-    const maxX = area.right - width;
-    const maxY = area.bottom - height;
-    if (maxX < area.left || maxY < area.top) continue;
-
-    // The closest clear positions are next to an obstacle edge or aligned with the face.
-    const xs = new Set([area.left, maxX, clamp(anchor.x - width / 2, area.left, maxX)]);
-    const ys = new Set([area.top, maxY, clamp(anchor.y - height / 2, area.top, maxY)]);
-    for (const rect of nearby) {
-      xs.add(clamp(rect.x - width - clearance, area.left, maxX));
-      xs.add(clamp(rect.x + rect.width + clearance, area.left, maxX));
-      ys.add(clamp(rect.y - height - clearance, area.top, maxY));
-      ys.add(clamp(rect.y + rect.height + clearance, area.top, maxY));
-    }
-
-    for (const x of xs) {
-      for (const y of ys) {
-        const menu = { x, y, width, height, direction };
-        if (obstacles.some((rect) => overlap(menu, rect) > 0)) continue;
-        const dx = Math.max(0, skull.x - x - width, x - skull.x - skull.width);
-        const dy = Math.max(0, skull.y - y - height, y - skull.y - skull.height);
-        const alongside = x + width <= skull.x || x >= skull.x + skull.width;
-        const offCenter = alongside ? Math.abs(y + height / 2 - anchor.y) : Math.abs(x + width / 2 - anchor.x);
-        const alignment = (alongside ? direction === "row" : direction === "column") ? 8 : 0;
-        const covered = pageControls.reduce((sum, rect) => sum + overlap(menu, rect), 0);
-        const cost = Math.hypot(dx, dy) + offCenter * .26 + alignment + (alongside ? 0 : 8)
-          + Math.min(110, covered / (width * height) * 135);
-        if (cost < bestCost) {
-          best = menu;
-          bestCost = cost;
-        }
-      }
+    if (area.right - area.left < width || area.bottom - area.top < height) continue;
+    const across = [skull.x, skull.x + (skull.width - width) / 2, right(skull) - width];
+    const down = [skull.y, skull.y + (skull.height - height) * .40, bottom(skull) - height];
+    const points = [
+      ...across.flatMap((x) => [{ x, y: skull.y - height - separation }, { x, y: bottom(skull) + separation }]),
+      ...down.flatMap((y) => [{ x: skull.x - width - separation, y }, { x: right(skull) + separation, y }]),
+      // When a corner leaves no exterior slot, keep the controls on the helmet edge, clear of X.
+      { x: skull.x, y: skull.y - height + Math.min(30, height) },
+    ];
+    for (const { x, y } of points) {
+      const menu = {
+        x: clamp(x, area.left, area.right - width), y: clamp(y, area.top, area.bottom - height), width, height, direction,
+      };
+      if (avoid.some((rect) => overlap(menu, rect) > 0)) continue;
+      const intrudes = overlap(menu, skull);
+      if (intrudes > width * Math.min(30, height)) continue;
+      const offset = Math.abs(menu.x + width / 2 - skull.x - skull.width / 2) +
+        Math.abs(menu.y + height / 2 - skull.y - skull.height * .4);
+      const score = offset + intrudes * .28 + occupied(menu, pageControls) * 22;
+      if (score < bestScore) { best = menu; bestScore = score; }
     }
   }
   return best;
 }
 
-export function cloudTip(bubble: Rect, side: Side, mouth: Point): Point {
-  const edge = 14;
-  return {
-    x: side === "left" ? bubble.x + bubble.width : side === "right" ? bubble.x :
-      clamp(mouth.x, bubble.x + edge, bubble.x + bubble.width - edge),
-    y: side === "above" ? bubble.y + bubble.height : side === "below" ? bubble.y :
-      clamp(mouth.y, bubble.y + edge, bubble.y + bubble.height - edge),
-  };
-}
-
 export function thoughtTrail(skull: Rect, bubble: Rect, side: Side, mouth: Point): Point[] {
-  const end = cloudTip(bubble, side, mouth);
-  const dx = end.x - mouth.x;
-  const dy = end.y - mouth.y;
+  const edgePadding = 12;
+  const end = {
+    x: side === "left" ? right(bubble) : side === "right" ? bubble.x : clamp(mouth.x, bubble.x + edgePadding, right(bubble) - edgePadding),
+    y: side === "above" ? bottom(bubble) : side === "below" ? bubble.y : clamp(mouth.y, bubble.y + edgePadding, bottom(bubble) - edgePadding),
+  };
+  const dx = end.x - mouth.x, dy = end.y - mouth.y;
   const distance = Math.hypot(dx, dy);
   if (distance < 26) return [];
-
-  const x = dx / distance;
-  const y = dy / distance;
-  const inset = Math.min(skull.width, skull.height) * .1;
-  const faceEdgeX = x < 0 ? skull.x + inset : skull.x + skull.width - inset;
-  const faceEdgeY = y < 0 ? skull.y + inset : skull.y + skull.height - inset;
-  const edge = Math.max(0, Math.min(x ? (faceEdgeX - mouth.x) / x : Infinity,
+  const x = dx / distance, y = dy / distance;
+  const inset = Math.min(skull.width, skull.height) * .12;
+  const faceEdgeX = x < 0 ? skull.x + inset : right(skull) - inset;
+  const faceEdgeY = y < 0 ? skull.y + inset : bottom(skull) - inset;
+  const faceEdge = Math.max(0, Math.min(x ? (faceEdgeX - mouth.x) / x : Infinity,
     y ? (faceEdgeY - mouth.y) / y : Infinity));
-
-  // Let the first bead slip behind the face, then leave a little air before the cloud.
-  const last = Math.min(distance - 8, edge + 37);
-  const first = Math.max(7, Math.min(edge - 3, last - 26));
-  return [0, .48, 1].map((progress) => {
+  const last = Math.min(distance - 7, faceEdge + 79);
+  const first = Math.max(7, Math.min(faceEdge + 5, last - 16));
+  return [0, .49, 1].map((progress) => {
     const along = first + (last - first) * progress;
-    const curve = Math.sin(progress * Math.PI) * 4;
+    const curve = Math.sin(progress * Math.PI) * 3.5;
     return { x: mouth.x + x * along - y * curve, y: mouth.y + y * along + x * curve };
   });
 }

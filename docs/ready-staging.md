@@ -6,7 +6,7 @@ Ready uses the approved `cd0a72d` mascot artwork and renderer. The standalone ma
 
 Deploy from the dedicated `codex/ready-staging` worktree through the established protected `staging` Git ref. Ready renders on this Vercel Preview when it uses the dedicated Staging Supabase project and Clerk development keys. Signed-out visitors can use prepared public answers and public navigation after passing deployment protection. Signed-in requests use the current Clerk session and require current account legal acceptance. Match, registration and assistance lookups verify the requesting account’s active player profile and ownership. The existing public gaming profile notice still applies.
 
-`READY_STAGING_REVIEW_ALIASES` scopes the separate [optional Ready usage collection](ready-usage.md) to verified Staging test accounts. Users can open Ready and ask questions with analytics off.
+`READY_STAGING_REVIEW_ALIASES` scopes the separate [optional Ready usage collection](ready-usage.md) to verified Staging test accounts. Users can open Ready and choose prepared questions or platform actions with analytics off.
 
 The live feature uses read-only lookups. Existing player actions link to the established tournament and Match Room interfaces. Opening a route can perform that interface’s normal read and initialization work. Users retain control over sending messages, requesting assistance and submitting results. The Staging email-disable setting and push-claim permission block remain in place.
 
@@ -14,11 +14,11 @@ The integration baseline was Staging `d1b5ec42105dc48f5728cd6cec9e7a2df9c36905` 
 
 ## Sources and support
 
-See the [knowledge catalogue and refresh instructions](ready-knowledge.md) and the [published rules hub](https://www.ironcladtournaments.com/rules). The live user’s recorded and validated event document versions take precedence whenever an event is selected. Unsupported questions are routed to the existing support options. The [configured Discord ticket channel](https://discord.com/channels/1440092095619662105/1440201093110960137) contains the ticket panel according to the Staging operator verification. The separately labelled invitation is for people who have yet to join.
+See the [knowledge catalogue and refresh instructions](ready-knowledge.md) and the [published rules hub](https://www.ironcladtournaments.com/rules). The live user’s recorded and validated event document versions take precedence whenever an event is selected. Topic missing offers a return to the Main menu or the existing support options. The [configured Discord ticket channel](https://discord.com/channels/1440092095619662105/1440201093110960137) contains the ticket panel according to the Staging operator verification. The separately labelled invitation is for people who have yet to join.
 
 ## Earlier free inference evaluation
 
-This section records the earlier trial work. The current Ready route uses deterministic, source-backed answers.
+This section records the earlier trial work. The current Ready route accepts stable menu identifiers and uses deterministic, source-backed answers. Cloudflare AI remains off.
 
 Source-backed answers and authorised platform actions are available without a provider. Cloudflare receives approved public rules content and bounded signals from a fixed vocabulary. Player names and identifiers, match records, transcripts, emails and raw free text stay within IronClad. Application code resolves and validates the effective rule version, source and action links. The adapter uses stateless Workers AI inference. Cloudflare documents its standard-inference retention and no-training policy, including limited safety and legal exceptions. [Cloudflare data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/)
 

@@ -15,7 +15,7 @@ vi.mock("@/lib/ready/platform-data", () => data);
 vi.mock("@/lib/player-polls", () => ({ loadTournamentPollsForRequest: vi.fn() }));
 
 import { resolveReadyAnswer } from "@/lib/ready/answer";
-import { answerPlatform, answerPlatformAction, resolveReadyRuleScope } from "@/lib/ready/platform";
+import { answerPlatformAction, resolveReadyRuleScope } from "@/lib/ready/platform";
 
 const MATCH = "1499cb0a-3786-401a-8de2-6c181fc7e4dd";
 const EVENT = "7799cb0a-3786-401a-8de2-6c181fc7e4dd";
@@ -54,11 +54,11 @@ describe("Ready platform assistance", () => {
   });
 
   it("offers public help but does not query private records without a session", async () => {
-    await expect(answerPlatform({ question: "Who am I playing?" }, null)).resolves.toMatchObject({
+    await expect(answerPlatformAction("opponent", undefined, null)).resolves.toMatchObject({
       text: expect.stringContaining("Sign in"),
       actions: expect.arrayContaining([expect.objectContaining({ actionId: "sign-in", href: "/sign-in" })]),
     });
-    await expect(answerPlatform({ question: "Where are the tournament rules?" }, null)).resolves.toMatchObject({
+    await expect(answerPlatformAction("rules-hub", undefined, null)).resolves.toMatchObject({
       actions: [{ label: "Open the official rules hub", href: "/rules" }],
     });
     expect(data.loadReadyPrivateContext).not.toHaveBeenCalled();
@@ -117,20 +117,20 @@ describe("Ready platform assistance", () => {
   });
 
   it("renders authorised opponents and paused deadlines from current records", async () => {
-    await expect(answerPlatform({ question: "Who am I playing?" }, user)).resolves.toMatchObject({
+    await expect(answerPlatformAction("opponent", undefined, user)).resolves.toMatchObject({
       text: expect.stringContaining("Synthetic opponent"),
       context: { topic: "match", eventSlug: event.slug, matchId: MATCH },
     });
     expect(data.loadReadyOpponent).toHaveBeenCalledWith(match);
     data.loadReadyOwnedMatches.mockResolvedValue([{ ...match, hold_started_at: "2026-11-17T17:00:00Z" }]);
-    await expect(answerPlatform({ question: "When is my match deadline?" }, user)).resolves.toMatchObject({
+    await expect(answerPlatformAction("deadline", undefined, user)).resolves.toMatchObject({
       text: expect.stringContaining("deadline is paused"),
     });
   });
 
   it("does not open a match when a supplied identifier is excluded from the owned projection", async () => {
     data.loadReadyOwnedMatches.mockResolvedValue([]);
-    const reply = await answerPlatform({ question: "Open my match", context: { matchId: ANOTHER } }, user);
+    const reply = await answerPlatformAction("my-match", { matchId: ANOTHER }, user);
     expect(data.loadReadyOwnedMatches).toHaveBeenCalledWith(expect.any(Object), ANOTHER);
     expect(reply?.text).toContain("couldn’t find that match under your current account");
     expect(reply?.actions).not.toEqual(expect.arrayContaining([{ label: "Open my match", href: expect.any(String) }]));
@@ -139,7 +139,7 @@ describe("Ready platform assistance", () => {
 
   it("asks the caller to choose when more than one current assignment exists", async () => {
     data.loadReadyOwnedMatches.mockResolvedValue([match, { ...match, id: ANOTHER, match_number: 3 }]);
-    const reply = await answerPlatform({ question: "Open my match" }, user);
+    const reply = await answerPlatformAction("my-match", undefined, user);
     expect(reply?.text).toContain("Which one");
     expect(reply?.actions).toEqual([
       expect.objectContaining({ intent: { kind: "action", id: "my-match" }, context: { topic: "match", eventSlug: event.slug, matchId: MATCH } }),
@@ -148,13 +148,12 @@ describe("Ready platform assistance", () => {
   });
 
   it("navigates to existing Match Room and preserves read-only historical targeting", async () => {
-    const input = { question: "Open the chat with my opponent", context: { matchId: MATCH } };
-    await expect(answerPlatform(input, user)).resolves.toMatchObject({
+    await expect(answerPlatformAction("opponent-chat", { matchId: MATCH }, user)).resolves.toMatchObject({
       actions: [{ label: "Open opponent chat", href: `/tournaments?tournament=${event.slug}&tab=brackets&match=${MATCH}` }],
     });
     data.loadReadyOwnedMatches.mockResolvedValue([{ ...match, active: false, status: "completed" }]);
     data.loadReadyAssistanceRecord.mockResolvedValue({ id: ASSISTANCE, room_id: ROOM });
-    await expect(answerPlatform(input, user)).resolves.toMatchObject({
+    await expect(answerPlatformAction("opponent-chat", { matchId: MATCH }, user)).resolves.toMatchObject({
       text: expect.stringContaining("read-only"),
       actions: [{ label: "Open earlier Match Room", href: `/tournaments?tournament=${event.slug}&tab=brackets&match=${MATCH}&room=${ROOM}` }],
     });
@@ -162,7 +161,7 @@ describe("Ready platform assistance", () => {
 
   it("gives the operator-verified Discord panel, server invitation and own in-site request", async () => {
     data.loadReadyAssistanceRecord.mockResolvedValue({ id: ASSISTANCE, room_id: ROOM });
-    const reply = await answerPlatform({ question: "I need an admin", context: { matchId: MATCH } }, user);
+    const reply = await answerPlatformAction("support-options", { matchId: MATCH }, user);
     expect(reply?.text).toContain("press the ticket button");
     expect(reply?.actions).toEqual([
       expect.objectContaining({ actionId: "admin-assistance", href: `/assistance/${ASSISTANCE}?tournament=${EVENT}` }),
@@ -174,7 +173,7 @@ describe("Ready platform assistance", () => {
 
   it("fails closed when live reads fail instead of guessing assignment or status", async () => {
     data.loadReadyOwnedMatches.mockRejectedValue(new Error("no data"));
-    await expect(answerPlatform({ question: "When is my match deadline?" }, user)).resolves.toMatchObject({
+    await expect(answerPlatformAction("deadline", undefined, user)).resolves.toMatchObject({
       text: expect.stringContaining("couldn’t verify"),
     });
     expect(data.loadReadyOpponent).not.toHaveBeenCalled();
@@ -195,7 +194,7 @@ describe("Ready platform assistance", () => {
   it("uses the exact owned match's event and acceptance when the question only supplies a match", async () => {
     const versions = { rulebook: "3.0", ppa: "3.0", terms: "1.0", privacy: "1.2" };
     data.loadReadyAcceptedVersions.mockResolvedValue(versions);
-    await expect(resolveReadyRuleScope({ matchId: MATCH }, user, "What are the applicable rules?")).resolves.toEqual({
+    await expect(resolveReadyRuleScope({ matchId: MATCH }, user)).resolves.toEqual({
       kind: "known", eventTitle: event.title, versions,
     });
     expect(data.loadReadyEvents).not.toHaveBeenCalled();
@@ -215,7 +214,7 @@ describe("Ready platform assistance", () => {
       profile: { id: ASSISTANCE, account_closed_at: null, profile_completed: true },
       registrations: [{ tournament_id: EVENT }, { tournament_id: ANOTHER }],
     });
-    await expect(resolveReadyRuleScope(undefined, user, "Which rules apply to my tournament?")).resolves.toEqual({
+    await expect(resolveReadyRuleScope(undefined, user, true)).resolves.toEqual({
       kind: "unconfirmed", events: [{ title: event.title, slug: event.slug }, { title: other.title, slug: other.slug }],
     });
     expect(data.loadReadyAcceptedVersions).not.toHaveBeenCalled();

@@ -1,6 +1,6 @@
 import type { ReadyKnowledgeTopic } from "./knowledge";
 
-export const READY_MENU_VERSION = "1";
+export const READY_MENU_VERSION = "2";
 export const READY_CATALOGUE_VERSION = "1";
 export const READY_MAIN_MESSAGE = "What can I help you with today, Commander?";
 
@@ -14,39 +14,39 @@ export const readyCategoryLabels = {
 } as const;
 export type ReadyCategoryId = keyof typeof readyCategoryLabels;
 
-function prepared(category: ReadyCategoryId, topic: ReadyKnowledgeTopic, question: string, keywords: string) {
-  return { category, topic, label: question, question, keywords };
+function prepared(category: ReadyCategoryId, topic: ReadyKnowledgeTopic, question: string) {
+  return { category, topic, label: question, question };
 }
 
 export const readyQuestionCatalogue = {
-  eligibility: prepared("tournaments", "eligibility", "Who can enter?", "eligibility eligible age 18 relic steam account requirements"),
-  registration: prepared("tournaments", "registration", "How do I register?", "registration register sign up signup entry cost free"),
-  division: prepared("tournaments", "division", "How is my division decided?", "elo division divisions thresholds academy challenge main pro placement"),
-  waitlist: prepared("tournaments", "waitlist", "How does the waitlist work?", "wait list waitlist full division vacancy offer"),
-  events: prepared("tournaments", "events", "Where can I find an event?", "tournament event list browse campaign calendar upcoming"),
-  format: prepared("rules", "format", "What is the match format?", "format bracket series best of three bo3 launch"),
-  final: prepared("rules", "final", "How many games are in the grand final?", "final finals grand best of five bo5"),
-  scheduling: prepared("rules", "scheduling", "When should I contact my opponent?", "scheduling deadlines opponent contact time zones 24 48"),
-  results: prepared("results", "results", "How do results and confirmations work?", "result results score report submit confirm approval"),
-  replays: prepared("results", "replays", "Which replay files are required?", "replay replays proof files rec screenshot mib evidence upload"),
-  disconnects: prepared("rules", "disconnects", "What happens if the game disconnects or lags?", "disconnect disconnects technical failure lag connection crash restart 10 minutes"),
-  disputes: prepared("results", "disputes", "How do I dispute a result?", "dispute disputes wrong score wrong result contest review"),
-  "no-shows": prepared("rules", "no-shows", "What if my opponent is not responding?", "no show noshow no-shows walkover opponent not responding forfeit"),
-  withdrawal: prepared("tournaments", "withdrawal", "Can I withdraw from an event?", "withdraw withdrawal leave drop out surrender"),
-  maps: prepared("rules", "maps", "How do we choose sides and maps?", "map maps map pool sides selection swap repeat"),
-  lobby: prepared("rules", "lobby", "Which lobby settings should we use?", "lobby settings victory points resources cheating position"),
-  decisions: prepared("tournaments", "decisions", "How do published decisions work?", "decision decisions binding advisory polls vote"),
-  prizes: prepared("tournaments", "prizes", "Where are the event prize terms?", "prize prizes payout payout timing fees eligibility"),
-  privacy: prepared("tournaments", "privacy", "Who can see replays and assistance requests?", "privacy private personal information notices records"),
-  terms: prepared("tournaments", "terms", "What do the Terms of Service cover?", "terms service terms of service governing hierarchy"),
-  agreement: prepared("tournaments", "agreement", "What is the Player Participation Agreement?", "agreement participation player participation agreement ppa"),
-  "governing-versions": prepared("tournaments", "governing-versions", "Which document editions apply to my event?", "governing editions version versions archived older accepted historical"),
-  rules: prepared("tournaments", "rules", "Where are the official rules?", "rules official documents rulebook rules hub"),
-  discord: prepared("tournaments", "discord", "Do I need Discord to register?", "discord required mandatory optional"),
-  factions: prepared("rules", "factions", "Which faction can I play?", "faction factions axis allies permitted assigned side"),
-  dice: prepared("rules", "dice", "When do we roll dice?", "dice roll 2d6 ties games odds"),
-  pauses: prepared("rules", "pauses", "How long can I pause?", "pause pauses paused technical five minutes"),
-  "submission-help": prepared("results", "submission-help", "Why can’t I submit?", "cannot submit submission blocked result replay eligibility active opponent hold historical restriction"),
+  eligibility: prepared("tournaments", "eligibility", "Who can enter?"),
+  registration: prepared("tournaments", "registration", "How do I register?"),
+  division: prepared("tournaments", "division", "How is my division decided?"),
+  waitlist: prepared("tournaments", "waitlist", "How does the waitlist work?"),
+  events: prepared("tournaments", "events", "Where can I find an event?"),
+  format: prepared("rules", "format", "What is the match format?"),
+  final: prepared("rules", "final", "How many games are in the grand final?"),
+  scheduling: prepared("rules", "scheduling", "When should I contact my opponent?"),
+  results: prepared("results", "results", "How do results and confirmations work?"),
+  replays: prepared("results", "replays", "Which replay files are required?"),
+  disconnects: prepared("rules", "disconnects", "What happens if the game disconnects or lags?"),
+  disputes: prepared("results", "disputes", "How do I dispute a result?"),
+  "no-shows": prepared("rules", "no-shows", "What if my opponent is not responding?"),
+  withdrawal: prepared("tournaments", "withdrawal", "Can I withdraw from an event?"),
+  maps: prepared("rules", "maps", "How do we choose sides and maps?"),
+  lobby: prepared("rules", "lobby", "Which lobby settings should we use?"),
+  decisions: prepared("tournaments", "decisions", "How do published decisions work?"),
+  prizes: prepared("tournaments", "prizes", "Where are the event prize terms?"),
+  privacy: prepared("tournaments", "privacy", "Who can see replays and assistance requests?"),
+  terms: prepared("tournaments", "terms", "What do the Terms of Service cover?"),
+  agreement: prepared("tournaments", "agreement", "What is the Player Participation Agreement?"),
+  "governing-versions": prepared("tournaments", "governing-versions", "Which document editions apply to my event?"),
+  rules: prepared("tournaments", "rules", "Where are the official rules?"),
+  discord: prepared("tournaments", "discord", "Do I need Discord to register?"),
+  factions: prepared("rules", "factions", "Which faction can I play?"),
+  dice: prepared("rules", "dice", "When do we roll dice?"),
+  pauses: prepared("rules", "pauses", "How long can I pause?"),
+  "submission-help": prepared("results", "submission-help", "Why can’t I submit?"),
 } as const;
 export type ReadyQuestionId = keyof typeof readyQuestionCatalogue;
 
@@ -134,12 +134,12 @@ function category(id: ReadyCategoryId, message: string, ...choices: ReadyMenuCho
 
 export const readyCategories = [
   category("match", "Let’s check your mission, Commander. What do you need?",
-    a("opponent"), a("opponent-chat"), a("deadline"), a("bracket")),
+    a("opponent"), a("opponent-chat"), a("deadline"), a("bracket"), a("my-match"), a("past-match")),
   category("results", "Let’s get your match recorded, Commander.",
     a("submit-result"), a("upload-replays"),
     group("result-review", "Confirm or dispute a result", "Choose what you’d like to check, Commander.",
-      q("results"), q("disputes"), q("replays")),
-    q("submission-help")),
+      q("results"), q("disputes")),
+    q("submission-help"), q("replays", "Replay requirements")),
   category("rules", "What happened on the battlefield, Commander?",
     q("disconnects", "Disconnects & lag"), q("no-shows", "Opponent not responding"),
     group("pause-deadline", "Pauses & deadlines", "Let’s check the timing rules, Commander.",

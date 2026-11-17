@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildReadyGrounding } from "@/lib/ready/grounding";
-import { answerKnowledgeTopic, getKnowledgeTopic } from "@/lib/ready/knowledge";
+import { answerKnowledgeTopic, isReadyKnowledgeTopic } from "@/lib/ready/knowledge";
 import { evaluateReadyAiQuality, gradeReadyAiCase, readReadyAiEvidence, readyAiQualityCases } from "../../scripts/ready/ai-evaluation.mjs";
 
 const model = "@cf/ibm-granite/granite-4.0-h-micro";
@@ -20,7 +20,7 @@ describe("Ready model quality rubric", () => {
       if (fixture.expected === "local") continue;
       requestsBySession.set(fixture.actor, (requestsBySession.get(fixture.actor) ?? 0) + 1);
       const previous = "contextFrom" in fixture && fixture.contextFrom ? "disconnects" : undefined;
-      const preferred = getKnowledgeTopic(fixture.request.question, previous);
+      const preferred = "topic" in fixture && isReadyKnowledgeTopic(fixture.topic) ? fixture.topic : null;
       const scope = fixture.id === "accepted-division" ? {
         kind: "known" as const, eventTitle: "Private synthetic event title",
         versions: { rulebook: "3.1", ppa: "3.1", terms: "1.1", privacy: "1.2" },

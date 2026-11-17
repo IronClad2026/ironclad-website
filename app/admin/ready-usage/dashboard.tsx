@@ -3,8 +3,8 @@ import Link from "next/link";
 
 import { DistributionChart, EmptyPanel, MetricBand, TrendChart } from "@/components/admin/operations/OperationsPrimitives";
 import {
-  isReadyCategoryId, isReadyDestinationType, READY_CATALOGUE_VERSION, READY_MENU_VERSION,
-  readyCategoryLabels, type ReadyDestinationType,
+  isReadyCategoryId, isReadyDestinationType, isReadyQuestionId, READY_CATALOGUE_VERSION, READY_MENU_VERSION,
+  readyCategoryLabels, readyQuestionCatalogue, type ReadyDestinationType,
 } from "@/lib/ready/catalogue";
 import {
   readyUsageVersionKey, type ReadyUsageFilters, type ReadyUsageReport, type ReadyUsageResult,
@@ -67,7 +67,7 @@ function UsageFilters({ filters, report }: { filters: ReadyUsageFilters; report?
           Menu / catalogue version
           <select name="version" defaultValue={selectedVersion} className={fieldClass}>
             <option value="">All recorded versions</option>
-            {versions.map((version) => <option key={version} value={version}>{version}{version === currentVersion ? " (current)" : ""}</option>)}
+            {versions.map((version) => <option key={version} value={version}>{version}{version === currentVersion ? " (cloud menu)" : version === "1/1" ? " (legacy search era)" : ""}</option>)}
           </select>
         </label>
         <button type="submit" className={controlClass + " self-end border-orange-500/60 bg-orange-500/15 font-semibold text-orange-200 hover:bg-orange-500/25"}>
@@ -82,17 +82,18 @@ function UsageFilters({ filters, report }: { filters: ReadyUsageFilters; report?
   );
 }
 
-function UsageMetrics({ totals }: { totals: ReadyUsageReport["totals"] }) {
+function UsageMetrics({ totals, showLegacy }: { totals: ReadyUsageReport["totals"]; showLegacy: boolean }) {
   const sampleSize = totals.helpful + totals.stillNeedHelp;
   return (
     <>
       <MetricBand title="Engagement" metrics={[
-        { label: "Unique engaged accounts", value: totals.engagedAccounts ?? "Unavailable", qualifier: "Signed-in accounts counted once across the range after a recorded menu choice, search, action or vote." },
-        { label: "Engaged sessions", value: totals.engagedSessions ?? "Unavailable", qualifier: "Ready sessions with a recorded menu choice, search, action or vote. A session renews after 30 minutes of inactivity." },
+        { label: "Unique engaged accounts", value: totals.engagedAccounts ?? "Unavailable", qualifier: "Signed-in accounts counted once across the range after a recorded interaction." },
+        { label: "Engaged sessions", value: totals.engagedSessions ?? "Unavailable", qualifier: "Ready sessions with a recorded interaction. A session renews after 30 minutes of inactivity." },
         { label: "Manual openings", value: totals.manualOpenings, qualifier: "Player-initiated openings from the docked Ready logo." },
         { label: "Answer displays", value: totals.answerDisplays, qualifier: "Prepared answers that reached the end of the text reveal or were shown in full by the player." },
         { label: "Action clicks", value: totals.actionClicks, qualifier: "Destination link activations and attempts to copy a match reference." },
-        { label: "Unmatched searches", value: totals.unmatchedSearches, qualifier: "Searches without a match in the prepared catalogue. Topic unknown." },
+        { label: "Topic missing flags", value: totals.missingTopics, qualifier: "Cloud-menu flags grouped by category when known." },
+        ...(showLegacy ? [{ label: "Legacy unmatched searches", value: totals.unmatchedSearches, qualifier: "Unmatched typed searches from menu version 1. Their topics are unknown." }] : []),
         { label: "Fallbacks shown", value: totals.fallbacks, qualifier: "Fully displayed no-result, unavailable or unsupported responses." },
         { label: "Technical errors", value: totals.technicalErrors, qualifier: "Technical failures encountered while retrieving a Ready response." },
       ]} />
@@ -114,6 +115,13 @@ function MeasuredActivity({ report, filters }: { report: ReadyUsageReport; filte
   const destinations = report.destinations
     .flatMap(({ id, count }) => isReadyDestinationType(id) ? [{ label: destinationLabels[id], value: count }] : [])
     .sort((a, b) => b.value - a.value);
+  const missing = report.missingByCategory
+    .flatMap(({ id, count }) => isReadyCategoryId(id) ? [{ label: readyCategoryLabels[id], value: count }]
+      : id === "unknown" ? [{ label: "Unknown category", value: count }] : []);
+  const needsHelp = report.questions
+    .flatMap(({ id, helpful, stillNeedHelp }) => isReadyQuestionId(id) && stillNeedHelp > 0
+      ? [{ id, question: readyQuestionCatalogue[id].question, stillNeedHelp, votes: helpful + stillNeedHelp }] : [])
+    .sort((a, b) => b.stillNeedHelp - a.stillNeedHelp || b.votes - a.votes);
   return (
     <div className="space-y-4">
       <section aria-labelledby="ready-coverage-title" className="rounded-xl border border-orange-400/15 bg-orange-500/[0.045] p-4 text-sm leading-6 text-zinc-300 sm:p-5">
@@ -133,7 +141,7 @@ function MeasuredActivity({ report, filters }: { report: ReadyUsageReport; filte
       )}
       {coverage.collected && hasEvents && (
         <>
-          <UsageMetrics totals={totals} />
+          <UsageMetrics totals={totals} showLegacy={!filters.version || filters.version.menuVersion === "1"} />
           <TrendChart id="ready-usage-trend" title="Daily Ready activity" timeZoneLabel="Sydney"
             description="Recorded manual openings, prepared answers displayed and destination clicks by Sydney calendar date."
             series={[
@@ -148,7 +156,18 @@ function MeasuredActivity({ report, filters }: { report: ReadyUsageReport; filte
             <DistributionChart title="Action clicks by destination"
               description="How often players chose a destination or copy action. Result and Discord clicks record an opened destination."
               points={destinations} />
+            <DistributionChart title="Categories flagged as missing information"
+              description="Recorded Topic missing selections. Flags made from the main menu appear under Unknown category."
+              points={missing} />
           </div>
+          {needsHelp.length > 0 && <section className="rounded-xl border border-white/10 bg-zinc-950 p-4 sm:p-5" aria-labelledby="ready-needs-help">
+            <h2 id="ready-needs-help" className="font-semibold">Answers receiving Still need help</h2>
+            <ul className="mt-3 divide-y divide-white/10 text-sm">
+              {needsHelp.map(({ id, question, stillNeedHelp, votes }) => <li key={id} className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-2">
+                <span>{question}</span><span className="text-zinc-400">{stillNeedHelp} Still need help · {votes} total votes</span>
+              </li>)}
+            </ul>
+          </section>}
         </>
       )}
     </div>
@@ -189,7 +208,7 @@ export default function ReadyUsageDashboard({ result }: { result: Exclude<ReadyU
             {report && <MeasuredActivity report={report} filters={filters} />}
             {result.status === "outside-retention" && <EmptyPanel>The selected dates are outside retention. Daily data can be available from {filters.retainedFrom} onward.</EmptyPanel>}
             {result.status === "unavailable" && <EmptyPanel>Usage data is temporarily unavailable. Try reloading the report.</EmptyPanel>}
-            <PreparedAnswers report={report} currentVersionSelected={!filters.version || readyUsageVersionKey(filters.version) === currentVersion} />
+            <PreparedAnswers report={report} currentVersionSelected={!filters.version || filters.version.catalogueVersion === READY_CATALOGUE_VERSION} />
           </>
         )}
       </div>

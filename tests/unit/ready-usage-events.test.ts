@@ -11,6 +11,13 @@ describe("Ready usage payloads", () => {
     expect(readReadyUsageRequest(request)).toEqual(request);
   });
 
+  it("accepts a missing topic with a known category or with no category", () => {
+    for (const event of [{ type: "topic_missing" }, { type: "topic_missing", categoryId: "rules" }]) {
+      const request = { ...envelope, event };
+      expect(readReadyUsageRequest(request)).toEqual(request);
+    }
+  });
+
   it.each(["actorId", "accountId", "role", "environment", "cohort", "menuVersion", "destinationType"])(
     "rejects client-supplied authority and source classifications (%s)", (field) => {
       expect(readReadyUsageRequest({ ...envelope, [field]: "forged", event: { type: "engage" } })).toBeNull();
@@ -20,6 +27,10 @@ describe("Ready usage payloads", () => {
   it.each([
     { type: "search_outcome", outcome: "no_result", query: "private text" },
     { type: "search_outcome", outcome: "ambiguous", questionId: "disconnects" },
+    { type: "search_outcome", outcome: "no_result" },
+    { type: "topic_missing", categoryId: "made-up" },
+    { type: "topic_missing", categoryId: null },
+    { type: "topic_missing", categoryId: "rules", text: "private text" },
     { type: "question_select", questionId: "invented" },
     { type: "action_click", actionId: "invented", href: "/private/match" },
     { type: "answer_display", questionId: "disconnects", answerInstanceId: "invalid" },

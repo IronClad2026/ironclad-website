@@ -3,7 +3,6 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReadyAssistant from "@/components/ready/ReadyAssistant";
 import ReadyHeader from "@/components/ready/ReadyHeader";
-import { placeCloud, placeCompactCloud, placeSkull } from "@/components/ready/floating-layout";
 
 const { mock, track, clerk } = vi.hoisted(() => ({
   mock: { path: "/", query: "", reduced: false },
@@ -99,12 +98,39 @@ describe("Ready player menu", () => {
     expect(currentView()).toBe("submenu");
   });
 
+  it("reports a missing topic using only its optional known category and keeps help reachable", () => {
+    mock.reduced = true;
+    render(assistant);
+    moveTime(32);
+    dock();
+    help();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /search prepared answers/i })).toBeNull();
+    const mainReport = getButton("Topic missing");
+    fireEvent.click(mainReport);
+    fireEvent.click(mainReport);
+    expect(currentView()).toBe("topicMissing");
+    expect(say()).toContain("That topic isn’t in Ready’s menu yet");
+    click("Main menu");
+    click("Rules & match help");
+    click("Topic missing");
+    click("Contact an admin");
+    expect(getButton("In-site Admin Assistance")).toBeInTheDocument();
+    expect(track.mock.calls.filter(([event]) => event.type === "topic_missing")).toEqual([
+      [{ type: "topic_missing" }],
+      [{ type: "topic_missing", categoryId: "rules" }],
+    ]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("dispatches the selected question ID, emits a single display and vote, and keeps navigation safe", async () => {
     mock.path = "/tournaments";
     mock.query = "tournament=review-tournament";
     mock.reduced = true;
     vi.mocked(fetch).mockResolvedValue(Response.json({
       text: "Use the published rule.",
+      details: "The complete rule applies to the tournament edition linked below.",
       intent: { kind: "question", id: "disconnects" },
       sources: [{ title: "Applicable edition", url: "/rules", section: "10.1" }],
     }));
@@ -121,6 +147,10 @@ describe("Ready player menu", () => {
       kind: "question", id: "disconnects", context: { eventSlug: "review-tournament" },
     });
     expect(say()).toBe("Use the published rule.");
+    expect(screen.getByText("More detail").closest("details")).not.toHaveAttribute("open");
+    const source = screen.getByRole("link", { name: "Applicable edition · 10.1 (opens in a new tab)" });
+    expect(source).toHaveAttribute("href", "/rules");
+    expect(source).toHaveAttribute("target", "_blank");
     const display = track.mock.calls.filter(([event]) => event.type === "answer_display");
     expect(display).toHaveLength(1);
     expect(display[0][0]).toMatchObject({ questionId: "disconnects", categoryId: "rules" });
@@ -156,6 +186,31 @@ describe("Ready player menu", () => {
     await act(async () => { deliver(Response.json({ text: "The stale private reply." })); });
     expect(say()).toBe("What can I help you with today, Commander?");
     expect(track.mock.calls.some(([event]) => event.type === "answer_display" || event.type === "technical_error")).toBe(false);
+  });
+
+  it("starts a past-match lookup from the menu without carrying over an active match", async () => {
+    mock.reduced = true;
+    const currentMatch = "1499cb0a-3786-401a-8de2-6c181fc7e4dd";
+    const pastMatch = "9999cb0a-3786-401a-8de2-6c181fc7e4dd";
+    const selection = { eventSlug: "old-event", matchId: pastMatch };
+    const intent = { kind: "action", id: "past-match" };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(Response.json({ text: "Active match found.", context: { eventSlug: "current-event", matchId: currentMatch } }))
+      .mockResolvedValueOnce(Response.json({
+        text: "Choose a past match.", actions: [{ label: "An earlier match", intent, context: selection }],
+      }))
+      .mockResolvedValueOnce(Response.json({ text: "Past match found." }));
+    render(assistant);
+    moveTime(32);
+    dock();
+    help();
+    click("My match");
+    await act(async () => click("My opponent"));
+    click("Back");
+    await act(async () => click("Find a past match"));
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[1][1]?.body as string)).toEqual({ ...intent, context: {} });
+    await act(async () => click("An earlier match"));
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[2][1]?.body as string)).toEqual({ ...intent, context: selection });
   });
 
   it("counts an interrupted answer only when it becomes fully visible after reopening", async () => {
@@ -216,34 +271,4 @@ describe("Ready player menu", () => {
     dock();
     expect(currentView()).toBe("welcomeFirst");
   });
-});
-
-it("reserves enough vertical room for the default phone menu and a clear desktop oval", () => {
-  const narrow = { left: 10, right: 380, top: 72, bottom: 770 };
-  expect(placeCloud(narrow, placeSkull(narrow, null), 290).maxHeight).toBeGreaterThanOrEqual(290);
-  const desktop = { left: 10, right: 1270, top: 88, bottom: 790 };
-  const oval = placeCloud(desktop, placeSkull(desktop, null), 254, [], { width: 602, minWidth: 516, minHeight: 254 });
-  expect(oval.side).toBe("left");
-  expect(oval.width).toBe(602);
-});
-
-it("uses the clear band below both full-width portrait hero actions", () => {
-  const area = { left: 10, top: 101, right: 380, bottom: 770 };
-  const controls = [
-    { x: 20, y: 440, width: 350, height: 48 },
-    { x: 20, y: 500, width: 350, height: 48 },
-  ];
-  expect(placeCompactCloud(area, placeSkull(area, null), 290, controls)).toEqual({
-    side: "below", width: 370, x: 10, top: 556, bottom: 770,
-  });
-});
-
-it("keeps the landscape dialogue beside the mascot and beside or beyond a page control", () => {
-  const area = { left: 10, top: 92, right: 770, bottom: 380 };
-  const skull = { x: 520, y: 152, width: 180, height: 169 };
-  const control = { x: 20, y: 198, width: 234, height: 48 };
-  const slot = placeCompactCloud(area, skull, 270, [control]);
-  expect(slot?.side).toBe("left");
-  expect(slot?.x).toBeGreaterThanOrEqual(control.x + control.width + 8);
-  expect(slot?.bottom).toBe(area.bottom);
 });

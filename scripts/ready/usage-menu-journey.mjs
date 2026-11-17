@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { openQuickAction, openReadySearch } from "./menu-journey.mjs";
+import { openQuickAction } from "./menu-journey.mjs";
 
 const routePath = "/api/ready/usage";
 
@@ -68,11 +68,17 @@ export async function browserUsageMenuJourney({ page, expect, output, verify, tr
     }
     await page.screenshot({ path: resolve(output, "ready-usage-player-answer.png") });
 
+    traffic.phase = "missing topic acknowledgement";
+    await button("Back").click();
+    await button("Topic missing").click();
+    await expect.poll(accepted).toContain("topic_missing");
+
     traffic.phase = "safe rules navigation";
     await button("Main menu").click();
-    await openReadySearch(page, false);
-    await page.getByRole("textbox", { name: "Ask about IronClad" }).fill("weather on mars");
-    await button("Send question").click();
+    await button("Tournaments & registration").click();
+    await button("Event rules, prizes & decisions").click();
+    await button("Official documents & editions").click();
+    await button("Where are the official rules?").click();
     const rules = page.getByRole("link", { name: "Open rules hub", exact: true });
     await expect(rules).toBeVisible({ timeout: 16_000 });
     await rules.click();

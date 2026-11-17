@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readReadyRequest } from "@/lib/ready/contracts";
+import { readReadyRequest, type ReadyMenuRequest } from "@/lib/ready/contracts";
 import { isReadyReviewUser, isReadyStagingEnabled, readyReviewAliases } from "@/lib/ready/review-access";
 import { answerWithReadyModel } from "@/lib/ready/provider";
 import { buildReadyGrounding } from "@/lib/ready/grounding";
@@ -34,15 +34,17 @@ afterEach(() => {
 });
 
 describe("Ready input and review access", () => {
-  it("normalises input and rejects excess data, arbitrary IDs and impersonation parameters", () => {
-    expect(readReadyRequest({ question: "  What about the final?  ", context: { topic: "format" } }))
-      .toEqual({ question: "What about the final?", context: { topic: "format" } });
+  it("accepts a bounded selection and rejects typed input and impersonation parameters", () => {
+    const selection = { kind: "question", id: "final", context: { topic: "format" } };
+    expect(readReadyRequest(selection)).toEqual(selection);
     for (const payload of [
-      { question: "A".repeat(301) },
-      { question: "my match", userId: "another-user" },
-      { question: "my match", context: { matchId: "other", userId: "another-user" } },
-      { question: "format", context: { eventSlug: "https://unverified.test" } },
-      { question: "question\u0000" },
+      { question: "How many games are in the grand final?" },
+      { kind: "search", query: "final" },
+      { kind: "action", id: "my-match", userId: "another-user" },
+      { kind: "action", id: "my-match", context: { matchId: "other" } },
+      { kind: "action", id: "my-match", context: { userId: "another-user" } },
+      { kind: "question", id: "format", context: { eventSlug: "https://unverified.test" } },
+      { kind: "question", id: "format\u0000" },
     ]) expect(readReadyRequest(payload)).toBeNull();
   });
 
@@ -166,16 +168,18 @@ describe("Ready quota and optional provider", () => {
 
 describe("Ready route", () => {
   const path = "https://staging.example.test/api/ready";
-  const request = (question: string, origin = "https://staging.example.test") => new Request(path, {
-    method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ question }),
+  const publicQuestion = { kind: "question", id: "rules" } as const satisfies ReadyMenuRequest;
+  const personalAction = { kind: "action", id: "opponent" } as const satisfies ReadyMenuRequest;
+  const request = (selection: object, origin = "https://staging.example.test") => new Request(path, {
+    method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify(selection),
   });
 
   it("fails closed in Production and refuses cross-origin Staging calls", async () => {
     for (const [key, value] of Object.entries(staging)) vi.stubEnv(key, value);
     vi.stubEnv("VERCEL_ENV", "production");
-    expect((await POST(request("rules"))).status).toBe(404);
+    expect((await POST(request(publicQuestion))).status).toBe(404);
     vi.stubEnv("VERCEL_ENV", "preview");
-    expect((await POST(request("rules", "https://other.example.test"))).status).toBe(403);
+    expect((await POST(request(publicQuestion, "https://other.example.test"))).status).toBe(403);
     expect(resolveReadyAnswer).not.toHaveBeenCalled();
   });
 
@@ -183,30 +187,38 @@ describe("Ready route", () => {
     for (const [key, value] of Object.entries({ ...staging, READY_STAGING_REVIEW_ALIASES: "" })) vi.stubEnv(key, value);
     vi.mocked(loadReadyAccess).mockResolvedValue({ kind: "guest" });
     vi.mocked(resolveReadyAnswer).mockResolvedValue({ text: "An answer about public rules." });
-    const response = await POST(request("What are the rules?"));
+    const response = await POST(request(publicQuestion));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(resolveReadyAnswer).toHaveBeenCalledWith({ question: "What are the rules?" }, null, expect.any(AbortSignal));
+    expect(resolveReadyAnswer).toHaveBeenCalledWith(publicQuestion, null, expect.any(AbortSignal));
     expect(loadAccountLegalGateState).not.toHaveBeenCalled();
   });
 
   it("binds a personal answer to the signed-in account and preserves account restrictions", async () => {
     for (const [key, value] of Object.entries({ ...staging, READY_STAGING_REVIEW_ALIASES: "" })) vi.stubEnv(key, value);
     vi.mocked(loadReadyAccess).mockResolvedValue({ kind: "restricted" });
-    expect((await POST(request("Who am I playing?"))).status).toBe(403);
+    expect((await POST(request(personalAction))).status).toBe(403);
     expect(resolveReadyAnswer).not.toHaveBeenCalled();
     const viewer = { userId: "ordinary-player", sessionId: "ordinary-session" };
     vi.mocked(loadReadyAccess).mockResolvedValue({ kind: "signed-in", identity: viewer });
     vi.mocked(loadAccountLegalGateState).mockResolvedValue({ status: "required" } as Awaited<ReturnType<typeof loadAccountLegalGateState>>);
-    expect((await POST(request("Who am I playing?"))).status).toBe(403);
+    expect((await POST(request(personalAction))).status).toBe(403);
     expect(resolveReadyAnswer).not.toHaveBeenCalled();
     vi.mocked(loadAccountLegalGateState).mockResolvedValue({ status: "satisfied" });
     vi.mocked(resolveReadyAnswer).mockResolvedValue({ text: "An authorised answer." });
-    const response = await POST(request("Who am I playing?"));
+    const response = await POST(request(personalAction));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(response.headers.get("server-timing")).toMatch(/^ready;dur=\d+$/);
-    expect(resolveReadyAnswer).toHaveBeenCalledWith({ question: "Who am I playing?" }, viewer, expect.any(AbortSignal));
+    expect(resolveReadyAnswer).toHaveBeenCalledWith(personalAction, viewer, expect.any(AbortSignal));
     expect(response.headers.get("x-ready-ai-attempted")).toBe("0");
+  });
+
+  it("rejects historical typed payloads before calling the resolver", async () => {
+    for (const [key, value] of Object.entries(staging)) vi.stubEnv(key, value);
+    vi.mocked(loadReadyAccess).mockResolvedValue({ kind: "guest" });
+    expect((await POST(request({ question: "What are the rules?" }))).status).toBe(400);
+    expect((await POST(request({ kind: "search", query: "rules" }))).status).toBe(400);
+    expect(resolveReadyAnswer).not.toHaveBeenCalled();
   });
 });

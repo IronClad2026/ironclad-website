@@ -9,8 +9,7 @@ import { promisify } from "node:util";
 import { createClerkClient } from "@clerk/backend";
 import { createClient } from "@supabase/supabase-js";
 import { browserActiveMatch, isActiveFixtureRead, readActiveFixtures, verifyActiveApi } from "./active-acceptance.mjs";
-import { evaluateReadyAiQuality, readReadyAiEvidence, readyAiCandidateModels } from "./ai-evaluation.mjs";
-import { browserMenuJourney, browserMobileLayoutJourney, installRendererObservation, openQuickAction, openReadySearch } from "./menu-journey.mjs";
+import { browserMenuJourney, browserMobileLayoutJourney, installRendererObservation, openQuickAction } from "./menu-journey.mjs";
 import { browserUsageMenuJourney } from "./usage-menu-journey.mjs";
 import { createHostedAuth } from "../four-division/hosted-auth.mjs";
 import {
@@ -53,7 +52,7 @@ function args(tokens) {
     const key = tokens[i];
     if (["--headed", "--browser-only", "--navigation-only", "--menu-journey", "--mobile-layout-journey", "--usage-menu-journey"].includes(key) && !options[key]) {
       options[key] = true;
-    } else if (["--url", "--deployment", "--commit", "--vercel-cli", "--active-fixture-manifest", "--ai-quality-model"].includes(key) && !options[key] && tokens[i + 1] && !tokens[i + 1].startsWith("--")) {
+    } else if (["--url", "--deployment", "--commit", "--vercel-cli", "--active-fixture-manifest"].includes(key) && !options[key] && tokens[i + 1] && !tokens[i + 1].startsWith("--")) {
       options[key] = tokens[++i];
     } else {
       throw new Error("ARGUMENTS");
@@ -62,11 +61,6 @@ function args(tokens) {
   verify(typeof options["--url"] === "string" && /^https:\/\/ironclad-website-[a-z0-9]+-ironclad-tournaments\.vercel\.app\/?$/.test(options["--url"]), "immutable website Preview URL");
   verify(/^dpl_[A-Za-z0-9]+$/.test(options["--deployment"] ?? "") &&
     /^[a-f0-9]{40}$/.test(options["--commit"] ?? "") && /[\\/]vc\.js$/.test(options["--vercel-cli"] ?? ""), "exact deployment metadata arguments");
-  if (options["--ai-quality-model"]) {
-    verify(readyAiCandidateModels.includes(options["--ai-quality-model"]) &&
-      !["--active-fixture-manifest", "--headed", "--browser-only", "--navigation-only", "--menu-journey", "--mobile-layout-journey", "--usage-menu-journey"].some((mode) => options[mode]),
-    "one approved candidate and dedicated AI evaluation mode");
-  }
   return options;
 }
 
@@ -126,11 +120,10 @@ async function loadActor(admin, environment, alias) {
   return Object.assign(tokenForRequest, { alias });
 }
 
-async function query(origin, oidc, actor, label, payload, evaluationModel) {
+async function query(origin, oidc, actor, label, payload) {
   step = label;
   const headers = { [protectedHeader]: oidc, origin, "content-type": "application/json" };
   if (actor) headers.authorization = `Bearer ${await actor()}`;
-  if (evaluationModel) headers["x-ready-evaluation-model"] = evaluationModel;
   step = label;
   const started = performance.now();
   const response = await fetch(new URL("/api/ready", origin), {
@@ -149,7 +142,8 @@ async function query(origin, oidc, actor, label, payload, evaluationModel) {
       : /Open Ready from IronClad/.test(body?.text ?? "") ? "request-origin" : "other" } : {}),
   });
   verify(bodyIsJson && response.headers.get("cache-control")?.includes("no-store"), `${label} JSON with private cache control`);
-  return [response.status, body, { wallMs, serverMs, evidence: readReadyAiEvidence(response.headers) }];
+  verify(response.headers.get("x-ready-ai-attempted") === "0", `${label} runs without AI`);
+  return [response.status, body];
 }
 
 async function answer(origin, oidc, actor, label, payload) {
@@ -380,12 +374,18 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
             : mobile ? "menu verified with visible Chrome touch emulation" : "menu and renderer verified in visible Chrome desktop");
           continue;
         }
-        const input = page.getByRole("textbox", { name: "Ask about IronClad" });
-        await openReadySearch(page, mobile);
-        await input.fill("What happens if the game disconnects or lags?");
+        const choose = (name) => {
+          const button = page.getByRole("button", { name, exact: true });
+          return mobile ? button.tap() : button.click();
+        };
+        async function openRuleMenu() {
+          await openQuickAction(page, "Help", mobile);
+          await choose("Rules & match help");
+        }
+        await openRuleMenu();
         if (mobile) await page.setViewportSize({ width: 390, height: 580 });
         step = `${journey} answer`;
-        await page.getByRole("button", { name: "Send question" }).click();
+        await choose("Disconnects & lag");
         const message = page.locator("[data-mascot-message]");
         await expect(message).toContainText("10:00", { timeout: 15_000 });
         const showFull = page.getByRole("button", { name: "Show full message" });
@@ -415,10 +415,9 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
         await expect(message).toContainText("10:00");
         if (!mobile) {
           step = "expired response after docking";
-          await openReadySearch(page, false);
+          await openRuleMenu();
           pauseAnswer = true;
-          await input.fill("Are there prize terms?");
-          await page.getByRole("button", { name: "Send question" }).click();
+          await choose("Disconnects & lag");
           await expect(message).toContainText("Checking the site, Commander…");
           await expect.poll(() => typeof releaseAnswer, { timeout: 12_000 }).toBe("function");
           await page.locator("[data-mascot-drag]").hover();
@@ -427,11 +426,11 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
           pauseAnswer = false;
           releaseAnswer?.();
           await dock.click();
-          await expect(input).toBeVisible();
-          await expect(message).toContainText("Search IronClad’s prepared answers");
+          await expect(page.getByRole("button", { name: "Disconnects & lag", exact: true })).toBeVisible();
+          await expect(message).toContainText("What happened on the battlefield");
           report.browser.push("desktop in-flight answer canceled on docking");
         }
-        report.browser.push(mobile ? "visible Chrome touch emulation, text entry and viewport resize" : "visible Chrome desktop");
+        report.browser.push(mobile ? "visible Chrome touch emulation and viewport resize" : "visible Chrome desktop");
       } finally {
         pauseAnswer = false;
         releaseAnswer?.();
@@ -476,23 +475,12 @@ try {
     const postflight = await verifyActiveApi({
       fixtures, admin, environment, actors: [a1, a2, a3], origin, verify,
       answer: (actor, label, payload) => answer(origin, oidc, actor, label, payload),
-      query: (actor, label, payload) => query(origin, oidc, actor, label, payload),
     });
     if (options["--headed"]) {
       await browserJourney(origin, oidc, a1, false, { fixture: fixtures.a, mobile: false });
       await browserJourney(origin, oidc, a2, false, { fixture: fixtures.a, mobile: true });
     }
     await postflight();
-  } else if (options["--ai-quality-model"]) {
-    const a1 = await loadActor(admin, environment, "TestAcademy1");
-    report.aiEvaluation = await evaluateReadyAiQuality({
-      expectedModel: options["--ai-quality-model"],
-      ask: async (actor, label, payload) => {
-        const [status, reply, observed] = await query(origin, oidc, actor === "a1" ? a1 : a2, label, payload, options["--ai-quality-model"]);
-        return { status, reply, ...observed };
-      },
-    });
-    verify(report.aiEvaluation.passed, "approved source, provider use and safety rubric");
   } else if (options["--usage-menu-journey"]) {
     const a1 = await loadActor(admin, environment, "TestAcademy1");
     await browserJourney(origin, oidc, a1, false, null, false, true);
@@ -508,42 +496,41 @@ try {
   verify(matchDestination(ordinary, fixtureB), "ordinary non-review account can look up their own match");
   const ordinaryRules = await readPage(origin, oidc, a3, "/rules", "ordinary Rules page loads for a non-review account");
   verify(ordinaryRules.includes("data-ready-dock"), "ordinary Rules includes the Ready header dock");
-  const rules = await answer(origin, oidc, a1, "grounded disconnect", { question: "How does a genuine disconnect work?" });
+  const rules = await answer(origin, oidc, a1, "grounded disconnect", { kind: "question", id: "disconnects" });
   verify(/10:00/.test(rules.text) && rules.sources?.some(({ url, section }) =>
     url === `${appVersion}#page=9` && section.includes("10.1")), "answer cites rulebook disconnect section");
   const reference = await fetch(new URL(appVersion, origin), { headers: { [protectedHeader]: oidc },
     redirect: "error", signal: AbortSignal.timeout(15_000) });
   verify(reference.ok && reference.headers.get("content-type")?.includes("application/pdf"), "hosted citation is the approved PDF");
   await reference.body?.cancel();
-  const format = await answer(origin, oidc, a1, "match format", { question: "Tell me the match format" });
-  const final = await answer(origin, oidc, a1, "bounded follow-up", { question: "What about the final?", context: format.context });
-  verify(/grand final is best-of-five/.test(final.text), "follow-up uses tournament format context");
-  const noMatch = await answer(origin, oidc, a1, "no active fixture", { question: "Open my match" });
+  const final = await answer(origin, oidc, a1, "grand final format", { kind: "question", id: "final" });
+  verify(/grand final is best-of-five/.test(final.text), "explicit grand final choice uses the approved text");
+  const noMatch = await answer(origin, oidc, a1, "no active fixture", { kind: "action", id: "my-match" });
   verify(/no active match assigned/.test(noMatch.text), "no active match reported honestly");
-  const multiple = await answer(origin, oidc, a1, "multiple historical matches", { question: "Show my previous match" });
+  const multiple = await answer(origin, oidc, a1, "multiple historical matches", { kind: "action", id: "past-match" });
   verify(/more than one match/.test(multiple.text) &&
     new Set(multiple.actions?.map(({ context }) => context?.matchId).filter(Boolean)).size > 1, "multiple owned matches offer a choice");
-  const own = await answer(origin, oidc, a1, "own earlier match room", { question: "Open the chat with my opponent", context: fixtureA });
+  const own = await answer(origin, oidc, a1, "own earlier match room", { kind: "action", id: "opponent-chat", context: fixtureA });
   verify(/read-only/.test(own.text) && matchDestination(own, fixtureA, true), "owned closed room links to verified read-only workspace");
   const earlierRoomUrl = own.actions.find(({ href }) => href?.startsWith("/tournaments?") && href.includes("&room="))?.href;
   await readPage(origin, oidc, a1, earlierRoomUrl, "live existing Match Room destination resolves");
-  const support = await answer(origin, oidc, a1, "owned support links", { question: "I need an admin", context: fixtureA });
+  const support = await answer(origin, oidc, a1, "owned support links", { kind: "action", id: "admin-assistance", context: fixtureA });
   verify(support.actions?.some(({ href }) => href === ticketUrl) && support.actions?.some(({ href }) => href?.startsWith("/assistance/")) &&
     support.actions?.some(({ copyText }) => copyText?.includes(fixtureA.matchId)), "verified Discord destination, in-site support and copyable reference");
   const assistanceHref = support.actions.find(({ href }) => href?.startsWith("/assistance/"))?.href;
   await readPage(origin, oidc, a1, assistanceHref, "live in-site Admin Assistance destination resolves");
   const historic = await answer(origin, oidc, a1, "historical accepted rules", {
-    question: "How are divisions determined?", context: { eventSlug: "test-2-2" },
+    kind: "question", id: "division", context: { eventSlug: "test-2-2" },
   });
   verify(/Main \/ Pro.*1400/.test(historic.text) && historic.sources?.some(({ url }) => url.includes("rulebook-v3.1.pdf")) &&
     !historic.sources?.some(({ url }) => url.includes("rulebook-v3.2.pdf")), "historical answer uses accepted v3.1 and combined division");
-  const opponent = await answer(origin, oidc, a2, "owned opponent", { question: "Who am I playing?", context: fixtureA });
+  const opponent = await answer(origin, oidc, a2, "owned opponent", { kind: "action", id: "opponent", context: fixtureA });
   verify(/TestAcademy1/.test(opponent.text) && matchDestination(opponent, fixtureA), "current session resolves its own recorded opponent");
-  const foreign = await answer(origin, oidc, a2, "forged foreign match", { question: "Open the chat with my opponent", context: fixtureB });
+  const foreign = await answer(origin, oidc, a2, "forged foreign match", { kind: "action", id: "opponent-chat", context: fixtureB });
   verify(/couldn.t find that match under your current account/.test(foreign.text) && !foreign.context?.matchId &&
     !foreign.actions?.some(({ href }) => href?.includes(fixtureB.matchId)), "foreign match context returns no private result or action");
-  const unrelated = await answer(origin, oidc, a1, "unrelated prompt", { question: "What is the weather in Sydney?" });
-  verify(/outside my orders/.test(unrelated.text) && !unrelated.sources?.length, "unrelated query stays outside Ready scope");
+  const [retired, reply] = await query(origin, oidc, a1, "retired typed search", { kind: "search", query: "Rules" });
+  verify(retired === 400 && !reply.sources?.length, "retired typed search is refused by the route");
   if (options["--headed"]) await browserJourney(origin, oidc, a2);
   }
 } catch {

@@ -1,5 +1,5 @@
 import type { RegistrationDocumentKind } from "@/lib/legal-document-types";
-import type { ReadyAction, ReadyContext, ReadyReply, ReadyRequest, ReadySource } from "./contracts";
+import type { ReadyAction, ReadyContext, ReadyReply, ReadySource } from "./contracts";
 import type { ReadyRuleScope } from "./platform";
 import type { ReadyModelCard } from "./provider";
 import { readyLink } from "./catalogue";
@@ -158,33 +158,6 @@ export const readyKnowledgeTopics = [
   "rules", "discord", ...Object.keys(passages) as PassageTopic[],
 ] as readonly ReadyKnowledgeTopic[];
 
-const questions: [ReadyKnowledgeTopic, RegExp][] = [
-  ["governing-versions", /\b(?:rulebook|rules?|documents?|agreement) (?:version|versions|appl(?:y|ies)|govern)|which (?:rulebook|rules?|documents?|agreement).*(?:appl|govern|use)|(?:accepted|historical|older|newer) (?:rulebook|rules?|documents?|agreement)|\bv3\.[012]\b/],
-  ["withdrawal", /\b(?:withdraw\w*|drop out|surrender|leave (?:the|my) (?:event|tournament))\b/],
-  ["disconnects", /\b(?:disconnect\w*|technical fail\w*|crashed|game crash|paus(?:e|es|ed))\b/],
-  ["replays", /\breplays?\b|\.rec\b/],
-  ["no-shows", /\b(?:no[- ]show|walkover|forfeit)\b/],
-  ["disputes", /\b(?:disput\w+|wrong (?:score|result))\b/],
-  ["prizes", /\b(?:prize\w*|payout\w*|paid out|prize money)\b/],
-  ["privacy", /\b(?:privacy|data protection|are (?:the |my )?replays private)\b/],
-  ["terms", /\b(?:terms of service|service terms|governing hierarchy)\b/],
-  ["agreement", /\b(?:player participation agreement|participation agreement|ppa)\b/],
-  ["decisions", /\b(?:published decisions?|advisory|binding polls?|tournament polls?)\b/],
-  ["waitlist", /\b(?:wait[- ]?list\w*|division is full|vacancy offer)\b/],
-  ["division", /\b(?:divisions?|elo|ranking) (?:thresholds?|determin\w+|cutoff)|which division|what division|elo (?:do i|range)|\b(?:main\/?\s?pro|academy threshold|pro threshold)\b/],
-  ["eligibility", /\b(?:eligible|eligibility|under 18|age (?:limit|requirement)|how old|link (?:my )?steam|relic verification)\b/],
-  ["discord", /\b(?:discord (?:required|mandatory|optional)|(?:need|require|have to use) discord|do i need (?:to join )?discord)\b/],
-  ["registration", /\b(?:regist(?:er|ration|ering|ered) (?:for|on|a tournament|an event|free)|how (?:do|can|to) i?\s*(?:register|sign up)|(?:registration|registering) (?:work|process|steps|cost)|register for (?:an|my|the) (?:event|tournament))\b/],
-  ["results", /\b(?:(?:submit|confirm|report|upload|enter|record) (?:my |a |the )?(?:match |series )?(?:result|score)s?|results? (?:submission|confirm\w+))\b/],
-  ["scheduling", /\b(?:schedul\w+|deadlines?|time zones?|first contact|reach my opponent|opponent hasn.t replied|how long to contact)\b/],
-  ["maps", /\b(?:map pools?|map selections?|(?:what|which) maps?|dice|side selection|choose sides?)\b/],
-  ["lobby", /\b(?:lobb(?:y|ies)|victory points|game settings|who hosts)\b/],
-  ["final", /\b(?:grand final|the final|final format)\b/],
-  ["format", /\b(?:match format|tournament format|series format|best[- ]of[- ](?:three|five|3|5)|bo[35]|quarterfinals?|semifinals?|how many games)\b/],
-  ["events", /\b(?:event selection|which tournament|tournament page|tournaments? (?:are |is )?(?:open|available)|choose (?:a |an |my )?(?:event|tournament)|open tournaments)\b/],
-  ["rules", /\b(?:official rules|(?:tournament|competition|ironclad) rules|rulebook|rules hub|show (?:me )?(?:the )?rules|where are (?:the )?rules)\b/],
-];
-
 export function isReadyKnowledgeTopic(value: unknown): value is ReadyKnowledgeTopic {
   return typeof value === "string" && readyKnowledgeTopics.some((topic) => topic === value);
 }
@@ -197,20 +170,6 @@ export function readyModelCard(topic: ReadyKnowledgeTopic, scope: ReadyRuleScope
   if (!readyDocument(passage.kind, versions[passage.kind])) return null;
   const summary = versions.rulebook === "3.2" ? passage.text : passage.earlierText ?? passage.text;
   return { id: topic, summary, detail: passage.details };
-}
-
-export function getKnowledgeTopic(question: string, previousTopic?: string): ReadyKnowledgeTopic | null {
-  const text = question.normalize("NFKC").toLowerCase().replace(/[’‘]/g, "'").trim();
-  if (/\b(?:ignore|override|bypass) (?:all |any |the |your )?(?:previous |prior |system |security )?(?:instructions?|rules?|permissions?)\b|\b(?:system prompt|service.role|api keys?|credentials?|passwords?|access tokens?)\b/.test(text)) {
-    return null;
-  }
-  if (/^(?:what about|how about|and) (?:the )?final[?.! ]*$/.test(text)) {
-    return previousTopic === "prizes" || previousTopic === "scheduling" ? previousTopic : "final";
-  }
-  if (/^(?:can you explain|what about|tell me more about|and) (?:that|this|it)[?.! ]*$/.test(text)) {
-    return isReadyKnowledgeTopic(previousTopic) ? previousTopic : null;
-  }
-  return questions.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
 }
 
 function sourceFor(
@@ -302,9 +261,4 @@ export function answerKnowledgeTopic(
     passage.details,
   ].filter(Boolean).join(" ");
   return { text: paragraph, details: details || undefined, sources, actions, context: nextContext };
-}
-
-export function answerKnowledge(input: ReadyRequest, eventScope?: ReadyRuleScope): ReadyReply | null {
-  const topic = getKnowledgeTopic(input.question, input.context?.topic);
-  return topic ? answerKnowledgeTopic(topic, eventScope, input.context) : null;
 }

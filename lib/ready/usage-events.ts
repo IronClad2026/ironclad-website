@@ -13,7 +13,7 @@ export type ReadyUsageInput =
   | ({ type: "question_select" } & Question & Category)
   | ({ type: "answer_display" } & Answer & Category)
   | ({ type: "action_click"; actionId: ReadyActionId; questionId?: ReadyQuestionId } & Category)
-  | { type: "search_outcome"; outcome: "matched" | "ambiguous" | "no_result"; questionId?: ReadyQuestionId }
+  | ({ type: "topic_missing" } & Category)
   | { type: "fallback"; outcome: "no_result" | "unavailable" | "unsupported" }
   | ({ type: "helpfulness"; helpful: boolean } & Answer)
   | { type: "technical_error"; outcome: "request_failed" | "invalid_reply" | "timeout" };
@@ -53,9 +53,9 @@ function readEvent(value: unknown): ReadyUsageInput | null {
     case "action_click": return hasOnly(value, "type", "categoryId", "questionId", "actionId") &&
       category && (question || questionId === undefined) && isReadyActionId(actionId)
       ? { type, categoryId, questionId, actionId } : null;
-    case "search_outcome": return hasOnly(value, "type", "outcome", "questionId") &&
-      (outcome === "matched" ? question : (outcome === "ambiguous" || outcome === "no_result") && questionId === undefined)
-      ? { type, outcome, questionId } as ReadyUsageInput : null;
+    case "topic_missing": return hasOnly(value, "type", "categoryId") && category
+      ? categoryId === undefined ? { type } : { type, categoryId }
+      : null;
     case "fallback": return hasOnly(value, "type", "outcome") &&
       (outcome === "no_result" || outcome === "unavailable" || outcome === "unsupported") ? { type, outcome } : null;
     case "technical_error": return hasOnly(value, "type", "outcome") &&

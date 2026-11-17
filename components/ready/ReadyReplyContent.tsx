@@ -22,7 +22,7 @@ export function ReadyCloudLink({ href: destination, label, onActivate }: { href:
     <Link className={styles.answer} data-answer-cloud="" href={href} prefetch={false} onClick={onActivate} onAuxClick={(event) => {
       if (event.button === 1) onActivate?.();
     }}
-      target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>
+      target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined}>
       <ThoughtCloudShape variant="answer" />
       <span>{label}</span>
     </Link>
@@ -30,17 +30,21 @@ export function ReadyCloudLink({ href: destination, label, onActivate }: { href:
 }
 
 export function ReadySources({ details, sources }: { details?: string; sources?: ReadySource[] }) {
+  const links = sources?.flatMap((source) => {
+    const href = safeHref(source.url);
+    return href ? [{ ...source, href }] : [];
+  }) ?? [];
   return <>
     {details && <details className={styles.replyDetails}>
       <summary>More detail</summary>
       <p>{details}</p>
     </details>}
-    {!!sources?.length && <ul className={styles.sources} aria-label="Sources">
-      {sources.map((source) => {
-        const href = safeHref(source.url);
-        return href && <li key={source.url + source.section}>
-          <Link href={href} prefetch={false} target="_blank" rel="noreferrer">
-            {source.title}{source.section ? ` · ${source.section}` : ""}
+    {links.length > 0 && <ul aria-label="Sources" className={styles.sources} role="list">
+      {links.map(({ href, section, title }) => {
+        const label = section ? `${title} · ${section}` : title;
+        return <li key={`${href} ${section}`}>
+          <Link aria-label={`${label} (opens in a new tab)`} href={href} prefetch={false} target="_blank" rel="noopener noreferrer">
+            {label}
           </Link>
         </li>;
       })}

@@ -46,9 +46,10 @@ type UsageCount = { id: string; count: number };
 export type ReadyUsageReport = {
   coverage: { availableFrom: string | null; retainedDetailFrom: string; collected: boolean; timezone: typeof READY_USAGE_TIMEZONE };
   versions: UsageVersion[];
-  totals: Counts<(typeof totalKeys)[number]> & { engagedAccounts: number | null; engagedSessions: number | null };
+  totals: Counts<(typeof totalKeys)[number]> & { engagedAccounts: number | null; engagedSessions: number | null; missingTopics: number };
   trend: (Counts<(typeof trendKeys)[number]> & { date: string })[];
   categories: UsageCount[];
+  missingByCategory: UsageCount[];
   questions: (Counts<(typeof questionKeys)[number]> & { id: string })[];
   destinations: UsageCount[];
   errors: UsageCount[];
@@ -170,6 +171,7 @@ function normalizeReport(value: unknown, filters: ReadyUsageFilters): ReadyUsage
     }, 128),
     totals: {
       ...counts(totals, totalKeys),
+      missingTopics: totals.missingTopics === undefined ? 0 : count(totals.missingTopics),
       engagedAccounts: totals.engagedAccounts === null || !exactCoverage ? null : count(totals.engagedAccounts),
       engagedSessions: totals.engagedSessions === null || !exactCoverage ? null : count(totals.engagedSessions),
     },
@@ -179,6 +181,7 @@ function normalizeReport(value: unknown, filters: ReadyUsageFilters): ReadyUsage
       return { ...counts(entry, trendKeys), date: entry.date };
     }, MAX_RANGE_DAYS),
     categories: array(root.categories, usageCount, 128),
+    missingByCategory: root.missingByCategory === undefined ? [] : array(root.missingByCategory, usageCount, 7),
     questions: array(root.questions, (value) => {
       const entry = record(value);
       return { ...counts(entry, questionKeys), id: aggregateId(entry.id) };

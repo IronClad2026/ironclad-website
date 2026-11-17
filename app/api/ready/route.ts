@@ -77,9 +77,9 @@ export async function POST(request: Request) {
       if (access.kind === "restricted") return send({ text: "This account can’t use Ready at the moment.", actions: [publicRules] }, 403);
       const viewer = access.kind === "signed-in" ? access.identity : null;
       const allowed = viewer ? allowReadyRequest(viewer) : allowReadyGuestRequest(request.headers);
-      if (!allowed) return send({ text: "Stand by a minute before asking again, Commander.", actions: [publicRules] }, 429);
+      if (!allowed) return send({ text: "Stand by a minute before making another selection, Commander.", actions: [publicRules] }, 429);
       const input = readReadyRequest(await readSmallBody(request, signal));
-      if (!input) return send({ text: "Choose a menu item or search using up to 300 characters, Commander." }, 400);
+      if (!input) return send({ text: "Choose a question or action from Ready’s menu, Commander." }, 400);
       if (viewer) {
         const legal = await loadAccountLegalGateState();
         signal.throwIfAborted();

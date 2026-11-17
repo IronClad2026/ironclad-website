@@ -3,8 +3,8 @@ import { writeFile } from "node:fs/promises";
 
 const centralMessage = "What can I help you with today, Commander?";
 const entries = [
-  ["match", "My match", ["My opponent", "Open opponent chat", "Deadline & match status", "View my bracket"]],
-  ["results", "Results & replays", ["Submit my result", "Upload replays", "Confirm or dispute a result", "Why can’t I submit?"]],
+  ["match", "My match", ["My opponent", "Open opponent chat", "Deadline & match status", "View my bracket", "Open my match", "Find a past match"]],
+  ["results", "Results & replays", ["Submit my result", "Upload replays", "Confirm or dispute a result", "Why can’t I submit?", "Replay requirements"]],
   ["rules", "Rules & match help", ["Disconnects & lag", "Opponent not responding", "Pauses & deadlines", "Maps & match format"]],
   ["tournaments", "Tournaments & registration", ["Find or join a tournament", "My registration & waitlist", "Eligibility & divisions", "Event rules, prizes & decisions"]],
   ["profile", "My profile & progress", ["Profile & Steam", "Notifications", "My history & statistics", "Rankings & points"]],
@@ -21,13 +21,6 @@ export async function openQuickAction(page, label, mobile) {
     await grip.hover();
     await button.click();
   }
-}
-
-export async function openReadySearch(page, mobile) {
-  const search = page.getByRole("button", { name: "Search prepared answers", exact: true });
-  if (!await search.isVisible()) await openQuickAction(page, "Help", mobile);
-  if (mobile) await search.tap();
-  else await search.click();
 }
 
 export function installRendererObservation() {
@@ -258,6 +251,8 @@ export async function browserMenuJourney({ page, expect, mobile, output, verify,
   });
   verify(recovered, "Sad first line shows real particles; second line runs in Neutral after particles fade");
   await main();
+  await expect(page.locator("[data-mascot-dialogue]").getByRole("textbox")).toHaveCount(0);
+  await expect(button("Search prepared answers")).toHaveCount(0);
   await assertLayout(page, expect, mobile);
   await page.screenshot({ path: resolve(output, mobile ? "ready-menu-touch.png" : "ready-menu-desktop.png") });
 
@@ -286,11 +281,10 @@ export async function browserMenuJourney({ page, expect, mobile, output, verify,
   verify(true, "prepared answer, source and optional Still need help route");
 
   if (!mobile) {
-    await openReadySearch(page, false);
-    await page.getByRole("textbox", { name: "Ask about IronClad" }).fill("weather on mars");
-    await choose("Send question");
-    await expect(view("reply")).toBeVisible({ timeout: 16_000 });
+    await choose("Rules & match help");
+    await choose("Topic missing");
     await expect(button("Main menu")).toBeVisible();
+    await expect(button("Contact an admin")).toBeVisible();
     await openQuickAction(page, "Help", false);
     await main();
     await openQuickAction(page, "Welcome", false);

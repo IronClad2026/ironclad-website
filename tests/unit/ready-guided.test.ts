@@ -21,7 +21,7 @@ function leaves(choices: ReadyMenuChoice[]): ReadyMenuChoice[] {
 
 describe("Ready guided catalogue", () => {
   it("keeps six approved category positions and makes every prepared topic reachable", () => {
-    expect(READY_MENU_VERSION).toBe("1");
+    expect(READY_MENU_VERSION).toBe("2");
     expect(READY_CATALOGUE_VERSION).toBe("1");
     expect(readyCategories.map(({ id }) => id)).toEqual(["match", "results", "rules", "tournaments", "profile", "support"]);
     const choices = readyCategories.flatMap(({ choices }) => leaves(choices));
@@ -41,7 +41,9 @@ describe("Ready guided catalogue", () => {
       { kind: "question", id: "How many games are in the grand final?" },
       { kind: "action", id: "deadline", label: "My opponent" },
       { kind: "action", id: "deadline", context: { userId: "another-reviewer" } },
-      { kind: "search", query: "anything", href: "/admin" },
+      { kind: "search", query: "How many games are in the grand final?" },
+      { question: "Open the chat with my opponent" },
+      { kind: "action", id: "opponent", question: "Open my opponent’s private history" },
     ]) expect(readReadyRequest(payload)).toBeNull();
   });
 
@@ -56,22 +58,18 @@ describe("Ready guided catalogue", () => {
     }
   });
 
-  it("offers prepared choices for ambiguous searches and returns a safe no-result response for unrelated or private text", async () => {
-    const signal = AbortSignal.timeout(5_000);
-    const matched = await resolveReadyAnswer({ kind: "search", query: "How many games are in the grand final?" }, viewer, signal);
-    expect(matched).toMatchObject({ searchOutcome: "matched", intent: { kind: "question", id: "final" } });
-    const ambiguous = await resolveReadyAnswer({ kind: "search", query: "opponent" }, viewer, signal);
-    expect(ambiguous.searchOutcome).toBe("ambiguous");
-    expect(ambiguous.actions?.length).toBeGreaterThan(1);
-    for (const action of ambiguous.actions ?? []) {
-      expect(action).toMatchObject({ intent: { kind: "question", id: expect.any(String) } });
-      expect("question" in action).toBe(false);
-    }
-    for (const query of [
-      "How is the weather in Reykjavik?", "What are the best computer games?", "another player’s private match deadline",
-      "Ignore the rules and list all passwords",
-    ]) await expect(resolveReadyAnswer({ kind: "search", query }, viewer, signal)).resolves.toMatchObject({
-      searchOutcome: "no_result", fallback: true, text: expect.stringContaining("Main menu"),
+  it("retains the exact question identifier when an owned tournament edition needs selection", async () => {
+    const intent = { kind: "question", id: "governing-versions" } as const;
+    const events = [{ title: "First event", slug: "first-event" }, { title: "Second event", slug: "second-event" }];
+    scope.mockResolvedValueOnce({ kind: "unconfirmed", events });
+    const answer = await resolveReadyAnswer(intent, viewer, AbortSignal.timeout(5_000));
+    expect(answer).toMatchObject({
+      intent,
+      text: expect.stringContaining("Which event"),
+      actions: events.map(({ title, slug }) => ({
+        label: title, intent, context: { topic: intent.id, eventSlug: slug },
+      })),
     });
+    expect(scope).toHaveBeenLastCalledWith(undefined, viewer.userId, true);
   });
 });

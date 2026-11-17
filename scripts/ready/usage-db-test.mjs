@@ -13,6 +13,7 @@ const tools = resolve(root, "../release-execution-tools");
 const pg = resolve(tools, "postgresql-17.11/pgsql/bin");
 const { Client } = createRequire(import.meta.url)(resolve(tools, "pg-client/node_modules/pg"));
 const migration = "20261117090000_ready_usage_tracking.sql";
+const cloudMigration = "20261117143000_ready_cloud_usage.sql";
 const run = resolve(root, ".release-local", `ready-usage-${randomUUID()}`);
 const data = resolve(run, "data");
 const passwordFile = resolve(run, "password");
@@ -93,10 +94,10 @@ try {
   )).rows[0].value;
   const event = async (type, fields = {}, client = service) => {
     const value = { player: account[0], epoch, browser, id: randomUUID(), category: null,
-      question: null, action: null, destination: null, outcome: null, helpful: null, answer: null, ...fields };
-    return (await client.query("select public.record_ready_usage_event($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'1','1') as result",
+      question: null, action: null, destination: null, outcome: null, helpful: null, answer: null, menu: "1", ...fields };
+    return (await client.query("select public.record_ready_usage_event($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'1') as result",
       [value.player, value.epoch, value.browser, value.id, type, value.category, value.question, value.action,
-        value.destination, value.outcome, value.helpful, value.answer])).rows[0].result;
+        value.destination, value.outcome, value.helpful, value.answer, value.menu])).rows[0].result;
   };
 
   await verify("API roles cannot read counters, write events or read the report", async () => {
@@ -137,6 +138,39 @@ try {
     assert.deepEqual(categories, [{ id: "match", count: 1 }]);
     assert.deepEqual(destinations, [{ id: "match", count: 1 }]);
     assert.equal((await report(today, today, "2")).coverage.collected, false);
+  });
+  await verify("Cloud-only flags store only known category or unknown and preserve legacy measurements", async () => {
+    await owner.query(await readFile(resolve(root, "supabase/migrations", cloudMigration), "utf8"));
+    const id = randomUUID();
+    const known = { id, category: "rules", menu: "2" };
+    assert.deepEqual((await Promise.all([
+      event("topic_missing", known), event("topic_missing", known, secondService),
+    ])).sort(), ["duplicate", "stored"]);
+    assert.equal(await event("topic_missing", { menu: "2" }), "stored");
+    assert.equal(await event("topic_missing", { menu: "2", category: "guessed_category" }), "invalid");
+    assert.equal(await event("topic_missing", { menu: "2", question: "disconnects" }), "invalid");
+    assert.equal(await event("topic_missing", { menu: "2", outcome: "raw text" }), "invalid");
+    assert.equal(await event("topic_missing", { category: "rules" }), "invalid");
+    assert.equal(await event("search_outcome", { menu: "2", outcome: "no_result" }), "invalid");
+    assert.equal(await event("topic_missing", { player: account[2], menu: "2" }), "off");
+    const displayed = { menu: "2", question: "disconnects", answer: randomUUID() };
+    assert.equal(await event("answer_display", displayed), "stored");
+    assert.equal(await event("helpfulness", { ...displayed, helpful: false }), "stored");
+    const current = await report(today, today, "2");
+    assert.deepEqual(current.missingByCategory, [{ id: "rules", count: 1 }, { id: "unknown", count: 1 }]);
+    assert.equal(current.totals.missingTopics, 2);
+    assert.equal(current.totals.unmatchedSearches, 0);
+    assert.equal(current.totals.engagedAccounts, 1);
+    assert.deepEqual(current.questions, [{ id: "disconnects", selections: 0, displays: 1, helpful: 0, stillNeedHelp: 1 }]);
+    const legacy = await report();
+    assert.equal(legacy.totals.missingTopics, 0);
+    assert.equal(legacy.totals.unmatchedSearches, 1);
+    assert.deepEqual(legacy.missingByCategory, []);
+    for (const role of ["anon", "authenticated"]) {
+      const denied = await open(role);
+      await assert.rejects(event("topic_missing", { menu: "2" }, denied), { code: "42501" });
+      await assert.rejects(denied.query("select public.get_ready_usage_report(current_date,current_date,'2','1','reviewer')"), { code: "42501" });
+    }
   });
   await verify("Withdrawal invalidates pending and outdated epochs and closure removes linked records", async () => {
     assert.equal(await event("engage", { player: account[2] }), "off");
@@ -187,7 +221,7 @@ try {
       { env, windowsHide: true, encoding: "utf8", timeout: 30_000 });
     if (stop.status !== 0 && !failure) failure = new Error("Disposable PostgreSQL did not stop");
   }
-  await writeFile(resolve(run, "report.json"), JSON.stringify({ passed: !failure, migration, checks }, null, 2) + "\n");
+  await writeFile(resolve(run, "report.json"), JSON.stringify({ passed: !failure, migrations: [migration, cloudMigration], checks }, null, 2) + "\n");
 }
 if (failure) throw failure;
 console.log(JSON.stringify({ passed: true, checks }, null, 2));

@@ -3,19 +3,18 @@
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { ComponentPropsWithRef, FormEvent, KeyboardEvent, PointerEvent, TouchEvent } from "react";
+import type { ComponentPropsWithRef, KeyboardEvent, PointerEvent, TouchEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { READY_MAIN_MESSAGE, readyCategories, readyQuestionCatalogue } from "@/lib/ready/catalogue";
 import type { ReadyActionId, ReadyCategoryId, ReadyMenuChoice, ReadyQuestionId } from "@/lib/ready/catalogue";
-import { READY_QUESTION_LIMIT } from "@/lib/ready/contracts";
 import { readReadyRequest } from "@/lib/ready/contracts";
 import type { ReadyContext, ReadyIntent, ReadyReply } from "@/lib/ready/contracts";
 import { useReadyUsage } from "@/lib/ready/use-ready-usage";
 import { dialogue } from "./dialogue";
 import type { DialogueAnswer, DialogueId, DialogueNode } from "./dialogue";
-import { cloudOrigin, placeCloud, placeCompactCloud, placeContextMenu, placeSkull, thoughtTrail } from "./floating-layout";
-import type { Bounds, Point, Rect, Side } from "./floating-layout";
+import { dialogueRect, placeContextMenu, placeReady, thoughtTrail } from "./floating-layout";
+import type { Bounds, Point, ReadyPosition, Rect, Side } from "./floating-layout";
 import { loadMascotRenderer } from "./renderer";
 import type { MascotRenderer, TalkStyle } from "./renderer";
 import { compileSpeech, sampleSpeech } from "./speech";
@@ -24,9 +23,9 @@ import { ReadyCloudLink, ReadySources } from "./ReadyReplyContent";
 import { useMascotCloudMenu } from "./useMascotCloudMenu";
 import styles from "./ReadyAssistant.module.css";
 
-type Workspace = { open: boolean; position: Point | null; seenGreeting: boolean };
+type Workspace = { open: boolean; position: ReadyPosition | null; seenGreeting: boolean };
 type ReadyView = {
-  id: DialogueId | "main" | "submenu" | "search" | "thinking" | "reply";
+  id: DialogueId | "main" | "submenu" | "thinking" | "reply" | "topicMissing";
   node: DialogueNode;
   categoryId?: ReadyCategoryId;
   choices?: readonly ReadyMenuChoice[];
@@ -34,7 +33,7 @@ type ReadyView = {
   reply?: ReadyReply;
   questionId?: ReadyQuestionId;
   answerInstanceId?: string;
-  fallback?: "no_result" | "unavailable" | "unsupported";
+  fallback?: "unavailable" | "unsupported";
 };
 type Drag = { id: number; origin: Point; start: Point; startedAt: number; moved: boolean };
 type Tap = { id: number; target: HTMLButtonElement; start: Point };
@@ -50,14 +49,13 @@ const pauseOnServer = () => false;
 const subscribeClient = () => () => undefined;
 const menuButtonSize = { width: 72, height: 47 };
 const menuGap = 6;
-const ovalBounds = { width: 602, minWidth: 516, minHeight: 254 };
 const moraleReadMs = 2050;
 const neutralNode = (text: string): DialogueNode => ({ text, expression: "Neutral", style: "Talk_Normal", answers: [] });
 const dialogueView = (id: DialogueId): ReadyView => ({ id, node: dialogue[id] });
 const firstGreeting = dialogueView("welcomeFirst");
 const mainMenu: ReadyView = { id: "main", node: neutralNode(READY_MAIN_MESSAGE) };
-const searchMenu: ReadyView = {
-  id: "search", node: neutralNode("Search IronClad’s prepared answers, Commander."), parent: mainMenu,
+const missingTopic: ReadyView = {
+  id: "topicMissing", node: neutralNode("That topic isn’t in Ready’s menu yet, Commander. Try another topic or contact an admin for help."),
 };
 const unavailableReply: ReadyReply = {
   text: "I couldn’t get an answer just now, Commander. Try again or open the rules and support page.",
@@ -96,7 +94,11 @@ function loadWorkspace(key: string): Workspace {
       open: value.open === true,
       seenGreeting: value.seenGreeting === true,
       position: value.position && Number.isFinite(value.position.x) && Number.isFinite(value.position.y)
-        ? value.position : null,
+        ? {
+          x: value.position.x, y: value.position.y,
+          width: typeof value.position.width === "number" && Number.isFinite(value.position.width) && value.position.width > 0
+            ? value.position.width : undefined,
+        } : null,
     };
   } catch {
     return defaultWorkspace;
@@ -111,7 +113,7 @@ function saveWorkspace(key: string, value: Workspace) {
   }
 }
 
-function viewportBounds(element: HTMLElement, logo: HTMLElement | null, menu = false): Bounds {
+function viewportBounds(element: HTMLElement, logo: HTMLElement | null): Bounds {
   const viewport = window.visualViewport;
   const width = viewport?.width ?? innerWidth;
   const height = viewport?.height ?? innerHeight;
@@ -125,7 +127,7 @@ function viewportBounds(element: HTMLElement, logo: HTMLElement | null, menu = f
     left: left + inset("left") + margin,
     top: Math.max(top + inset("top") + margin, Math.min(headerBottom + 9, top + height * .31)),
     right: left + width - inset("right") - margin,
-    bottom: top + height - inset("bottom") - (menu ? 2 : margin),
+    bottom: top + height - inset("bottom") - margin,
   };
 }
 
@@ -187,7 +189,6 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
   const [status, setStatus] = useState<AssetStatus>("loading");
   const [revealing, setRevealing] = useState(false);
   const [cloudExit, setCloudExit] = useState<{ revealing: boolean } | null>(null);
-  const [question, setQuestion] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   const usage = useReadyUsage(signedIn);
   const trackRef = useRef(usage.track);
@@ -203,8 +204,6 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
   const floating = useRef<HTMLElement>(null);
   const bubble = useRef<HTMLDivElement>(null);
   const speech = useRef<HTMLDivElement>(null);
-  const composer = useRef<HTMLFormElement>(null);
-  const questionInput = useRef<HTMLInputElement>(null);
   const text = useRef<HTMLParagraphElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -221,9 +220,12 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
   const completedViews = useRef(new WeakSet<ReadyView>());
   const afterReveal = useRef<(shown: ReadyView) => void>(() => undefined);
   const pointer = useRef<Drag | null>(null);
+  const dragFrame = useRef(0);
+  const nextDragPosition = useRef<Point | null>(null);
   const anchor = useRef<Point>({ x: .5, y: .69 });
   const projection = useRef<{ skull: Rect; bubble: Rect; side: Side; compact: boolean } | null>(null);
   const obstacles = useRef<Rect[]>([]);
+  const lastPlacement = useRef<ReturnType<typeof placeReady> | undefined>(undefined);
   const menuLayout = useRef<{ area: Bounds; skull: Rect; speech: Rect } | null>(null);
   const dockingTimer = useRef<number | null>(null);
   const cloudExitTimer = useRef<number | null>(null);
@@ -271,8 +273,7 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
     const { area, skull, speech: dialogueBounds } = geometry;
     const close = closeButton.current?.getBoundingClientRect();
     const avoid = close ? [dialogueBounds, close] : [dialogueBounds];
-    const position = placeContextMenu(area, skull, menuButtonSize, menuGap, avoid, obstacles.current)
-      ?? placeContextMenu(viewportBounds(floating.current, dock.current, true), skull, menuButtonSize, menuGap, avoid, obstacles.current);
+    const position = placeContextMenu(area, skull, menuButtonSize, menuGap, avoid, obstacles.current);
     panel.toggleAttribute("data-positioned", !!position);
     if (!position) return;
     panel.style.flexDirection = position.direction;
@@ -289,31 +290,28 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
     if (!visual) return;
     if (expanded && floating.current && speech.current && bubble.current) {
       const area = viewportBounds(floating.current, dock.current);
-      const skull = placeSkull(area, position);
-      if (!pointer.current) obstacles.current = mainControls(area);
-      // Keep a dragged position; a new player's default can adapt when the viewport changes.
-      const placement = `translate3d(${skull.x}px, ${skull.y}px, 0)`;
-      for (const element of [floating.current, visual]) {
-        element.style.transform = placement;
-        element.style.width = `${skull.width}px`;
-        element.style.height = `${skull.height}px`;
-      }
       const conversation = speech.current;
       const compact = area.right - area.left < 620 || area.bottom - area.top < 420;
       conversation.toggleAttribute("data-compact-placement", compact);
-      const clear = compact && placeCompactCloud(area, skull, conversation.scrollHeight, obstacles.current);
-      const broad = !compact && current.current.id === "main" && area.right - area.left >= 820
-        ? placeCloud(area, skull, ovalBounds.minHeight, obstacles.current, ovalBounds)
-        : null;
-      const oval = !!broad && broad.width >= ovalBounds.minWidth && broad.maxHeight >= ovalBounds.minHeight;
-      if (oval) conversation.dataset.menuLayout = "oval";
+      obstacles.current = position ? [] : mainControls(area);
+      const placement = placeReady(area, position, {
+        height: conversation.scrollHeight,
+        bubbleHeight: bubble.current.offsetHeight,
+        main: current.current.id === "main",
+      }, obstacles.current, lastPlacement.current);
+      lastPlacement.current = placement;
+      const { skull, dialogue: slot } = placement;
+      const skullTransform = `translate3d(${skull.x}px, ${skull.y}px, 0)`;
+      for (const element of [floating.current, visual]) {
+        element.style.transform = skullTransform;
+        element.style.width = `${skull.width}px`;
+        element.style.height = `${skull.height}px`;
+      }
+      if (slot.oval) conversation.dataset.menuLayout = "oval";
       else delete conversation.dataset.menuLayout;
-      const { side, width, maxHeight } = clear
-        ? { ...clear, maxHeight: Math.floor(clear.bottom - clear.top) }
-        : oval ? broad : placeCloud(area, skull, conversation.scrollHeight, obstacles.current);
-      conversation.dataset.side = side;
-      conversation.style.width = `${width}px`;
-      conversation.style.maxHeight = `${maxHeight}px`;
+      conversation.dataset.side = slot.side;
+      conversation.style.width = `${slot.width}px`;
+      conversation.style.maxHeight = `${slot.maxHeight}px`;
       const overflowing = conversation.scrollHeight > conversation.clientHeight + 1;
       if (overflowing) {
         conversation.setAttribute("data-overflow", "true");
@@ -322,23 +320,16 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
         conversation.removeAttribute("data-overflow");
         conversation.removeAttribute("tabindex");
       }
-      const height = Math.min(conversation.offsetHeight, maxHeight);
-      const origin = clear
-        ? { x: clear.x, y: Math.min(clear.bottom - height, Math.max(clear.top, cloudOrigin(area, skull, side, width, height).y)) }
-        : cloudOrigin(area, skull, side, width, height, obstacles.current);
-      conversation.style.transform = `translate3d(${origin.x - skull.x}px, ${origin.y - skull.y}px, 0)`;
-      const bounds = conversation.getBoundingClientRect();
-      if (overflowing && composer.current && document.activeElement === questionInput.current) {
-        const { bottom, top } = composer.current.getBoundingClientRect();
-        if (bottom > bounds.bottom) conversation.scrollTop += Math.ceil(bottom - bounds.bottom);
-        else if (top < bounds.top) conversation.scrollTop -= Math.ceil(bounds.top - top);
-      }
+      const bounds = dialogueRect(slot, conversation.offsetHeight);
+      conversation.style.transform = `translate3d(${bounds.x - skull.x}px, ${bounds.y - skull.y}px, 0)`;
       const rect = bubble.current.getBoundingClientRect();
       menuLayout.current = { area, skull, speech: bounds };
       if (menuPanel.current?.dataset.mascotMenuOpen === "true") layoutMenu();
-      const bubbleVisible = rect.bottom > bounds.top && rect.top < bounds.bottom;
+      const top = Math.max(bounds.y, rect.top);
+      const height = Math.min(bounds.y + bounds.height, rect.bottom) - top;
+      const bubbleVisible = height > 10;
       projection.current = bubbleVisible
-        ? { skull, side, compact, bubble: { x: rect.left, y: rect.top, width: rect.width, height: rect.height } }
+        ? { skull, side: slot.side, compact, bubble: { x: rect.left, y: top, width: rect.width, height } }
         : null;
       if (tether.current) tether.current.style.visibility = bubbleVisible ? "visible" : "hidden";
       showAnchor(anchor.current);
@@ -578,8 +569,12 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
     const leavePage = () => {
       abortPending();
       cancelFollowup();
+      if (pointer.current?.moved) renderer.current?.setDragging(false);
+      pointer.current = null;
+      cancelAnimationFrame(dragFrame.current);
+      dragFrame.current = 0;
+      nextDragPosition.current = null;
       context.current = undefined;
-      setQuestion("");
       const activeView = current.current;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
@@ -624,6 +619,7 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
       document.removeEventListener("visibilitychange", onVisibility);
       abortPending();
       cancelFollowup();
+      cancelAnimationFrame(dragFrame.current);
       if (reveal.current) cancelAnimationFrame(reveal.current.frame);
       cancelAnimationFrame(queuedText.current);
       if (dockingTimer.current !== null) window.clearTimeout(dockingTimer.current);
@@ -655,6 +651,9 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
     dismissMenu();
     if (pointer.current?.moved) renderer.current?.setDragging(false);
     pointer.current = null;
+    cancelAnimationFrame(dragFrame.current);
+    dragFrame.current = 0;
+    nextDragPosition.current = null;
     if (!reducedMotion) {
       setCloudExit({ revealing });
       cloudExitTimer.current = window.setTimeout(() => {
@@ -663,7 +662,6 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
       }, 160);
     }
     finishReveal(false);
-    setQuestion("");
     if (isMoraleReply(lastSettled.current)) lastSettled.current = mainMenu;
     workspace.current = { ...workspace.current, open: false };
     saveWorkspace(workspaceKey, workspace.current);
@@ -681,10 +679,10 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
 
   function moveTo(position: Point) {
     if (!floating.current) return;
-    workspace.current = { ...workspace.current, position };
+    workspace.current = { ...workspace.current, position: { ...position, width: lastPlacement.current?.skull.width } };
     layout();
-    const { x, y } = floating.current.getBoundingClientRect();
-    workspace.current = { ...workspace.current, position: { x, y } };
+    const skull = lastPlacement.current?.skull;
+    if (skull) workspace.current = { ...workspace.current, position: { x: skull.x, y: skull.y, width: skull.width } };
   }
 
   function dragStart(event: PointerEvent<HTMLButtonElement>) {
@@ -705,13 +703,25 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
       action.moved = true;
       renderer.current?.setDragging(true);
     }
-    moveTo({ x: action.origin.x + x, y: action.origin.y + y });
+    nextDragPosition.current = { x: action.origin.x + x, y: action.origin.y + y };
+    if (dragFrame.current) return;
+    dragFrame.current = requestAnimationFrame(() => {
+      dragFrame.current = 0;
+      const target = nextDragPosition.current;
+      nextDragPosition.current = null;
+      if (target) moveTo(target);
+    });
   }
 
   function dragEnd(event: PointerEvent<HTMLButtonElement>) {
     const action = pointer.current;
     if (action?.id !== event.pointerId) return;
     if (action.moved) {
+      cancelAnimationFrame(dragFrame.current);
+      dragFrame.current = 0;
+      const target = nextDragPosition.current;
+      nextDragPosition.current = null;
+      if (target) moveTo(target);
       renderer.current?.setDragging(false);
       saveWorkspace(workspaceKey, workspace.current);
     }
@@ -765,12 +775,13 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
     else void ask({ kind: "action", id: choice.id }, parent);
   }
 
-  async function ask(request: ReadyIntent | { kind: "search"; query: string }, parent: ReadyView, selected?: ReadyContext) {
+  async function ask(request: ReadyIntent, parent: ReadyView, selected?: ReadyContext) {
     const categoryId = parent.categoryId;
     if (!workspace.current.open || current.current !== view) return;
     const eventSlug = pathname === "/tournaments" ? searchParams?.get("tournament") ?? undefined : undefined;
     const matchId = eventSlug ? searchParams?.get("match") ?? undefined : undefined;
-    const scope = selected ?? { eventSlug, matchId, ...context.current };
+    const historical = request.kind === "action" && request.id === "past-match";
+    const scope = selected ?? (historical ? { eventSlug } : { eventSlug, matchId, ...context.current });
     const payload = readReadyRequest({ ...request, context: scope }) ?? readReadyRequest(request);
     if (!payload) return;
     if (request.kind === "question") {
@@ -798,12 +809,8 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
       }
       const next = answer as ReadyReply;
       if (response.ok) context.current = next.context ?? scope;
-      if (next.searchOutcome) trackRef.current({
-        type: "search_outcome", outcome: next.searchOutcome, questionId: next.intent?.kind === "question" ? next.intent.id : undefined,
-      });
       if (response.status >= 500) trackRef.current({ type: "technical_error", outcome: "request_failed" });
-      const fallback = next.searchOutcome === "no_result" ? "no_result"
-        : !response.ok ? "unavailable" : next.fallback ? "unsupported" : undefined;
+      const fallback = !response.ok ? "unavailable" : next.fallback ? "unsupported" : undefined;
       begin(replyView(next, parent, fallback));
     } catch {
       if (pending.current === controller && workspace.current.open) {
@@ -816,12 +823,16 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
     }
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = question.trim();
-    if (!trimmed || [...trimmed].length > READY_QUESTION_LIMIT) return;
-    setQuestion("");
-    void ask({ kind: "search", query: trimmed }, searchMenu);
+  function reportMissingTopic() {
+    if (current.current !== view) return;
+    if (view.categoryId) usage.track({ type: "topic_missing", categoryId: view.categoryId });
+    else usage.track({ type: "topic_missing" });
+    changeView(missingTopic);
+  }
+
+  function contactAdmin() {
+    const support = readyCategories.find((item) => item.id === "support");
+    if (support) openCategory(support);
   }
 
   function actionPicked(actionId?: ReadyActionId) {
@@ -919,15 +930,6 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
                 </div>
                 <p aria-live="polite" aria-atomic="true" className={styles.srOnly}>{displayRevealing ? "" : node.text}</p>
                 {!displayRevealing && reply && <ReadySources details={reply.details} sources={reply.sources} />}
-                {open && nodeId === "search" && <form aria-label="Search Ready’s prepared answers" className={styles.composer} onSubmit={submit} ref={composer}>
-                  <input aria-label="Ask about IronClad" autoComplete="off" maxLength={READY_QUESTION_LIMIT}
-                    name="question" onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about IronClad…"
-                    ref={questionInput} type="text" value={question} enterKeyHint="send" />
-                  <button aria-label="Send question" className={styles.answer} disabled={!question.trim()} type="submit">
-                    <ThoughtCloudShape variant="answer" />
-                    <span>Ask</span>
-                  </button>
-                </form>}
               </div>
               <div className={styles.answerZone}>
                 <div className={styles.answers} inert={displayRevealing}>
@@ -956,7 +958,7 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
                       onActivate={() => actionPicked(action.actionId)} />;
                     return <TouchButton className={styles.answer} data-answer-cloud="" key={action.label} onActivate={() => {
                       if ("intent" in action) void ask(action.intent, view, action.context);
-                      else if ("copyText" in action) {
+                      else {
                         actionPicked(action.actionId);
                         void copyReference(action.copyText);
                       }
@@ -980,18 +982,15 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
                   {related && <TouchButton className={styles.textAction} onActivate={() => openCategory(related)} type="button">
                     More about {related.label.toLowerCase()}
                   </TouchButton>}
-                  <TouchButton className={styles.textAction} onActivate={() => {
-                    const support = readyCategories.find((item) => item.id === "support");
-                    if (support) openCategory(support);
-                  }} type="button">Contact an admin</TouchButton>
+                  <TouchButton className={styles.textAction} onActivate={contactAdmin} type="button">Contact an admin</TouchButton>
                 </div>}
               </div>}
               {nodeId === "main" && <div className={styles.readyFooter} inert={displayRevealing}>
-                <TouchButton className={styles.textAction} onActivate={() => changeView(searchMenu)} type="button">Search prepared answers</TouchButton>
+                <TouchButton className={styles.textAction} onActivate={reportMissingTopic} type="button">Topic missing</TouchButton>
                 {usage.loaded && <details className={styles.analyticsChoice}>
                   <summary>Ready analytics</summary>
                   <div className={styles.analyticsNotice}>
-                    <p>Optional for Staging reviewers. Ready usage analytics counts deliberate interactions such as chosen topics and link clicks. It does not collect what you type, morale choices, or private match details. Ready works the same with this off.</p>
+                    <p>Optional for Staging reviewers. Ready usage analytics counts selected topics and link clicks. A Topic missing flag includes only the current category, when there is one. It excludes morale choices and private match details. Ready works the same with this off.</p>
                     <label><input checked={usage.enabled} disabled={usage.saving || usage.withdrawalPending} onChange={(event) => {
                       void usage.setEnabled(event.currentTarget.checked);
                     }} type="checkbox" /> Allow Ready usage analytics</label>
@@ -1002,10 +1001,15 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
                 </details>}
               </div>}
               {view.parent && <div className={styles.readyFooter} aria-label="Ready menu navigation" role="group">
-                {nodeId !== "search" && <TouchButton className={styles.textAction} onActivate={() => {
+                <TouchButton className={styles.textAction} onActivate={() => {
                   if (view.parent) changeView(view.parent);
-                }} type="button">Back</TouchButton>}
+                }} type="button">Back</TouchButton>
                 <TouchButton className={styles.textAction} onActivate={() => changeView(mainMenu)} type="button">Main menu</TouchButton>
+                {nodeId === "submenu" && <TouchButton className={styles.textAction} onActivate={reportMissingTopic} type="button">Topic missing</TouchButton>}
+              </div>}
+              {nodeId === "topicMissing" && <div className={styles.readyFooter} aria-label="Ready menu navigation" role="group">
+                <TouchButton className={styles.textAction} onActivate={() => changeView(mainMenu)} type="button">Main menu</TouchButton>
+                <TouchButton className={styles.textAction} onActivate={contactAdmin} type="button">Contact an admin</TouchButton>
               </div>}
               {copyStatus && <output className={styles.copyStatus}>{copyStatus}</output>}
             </div>
