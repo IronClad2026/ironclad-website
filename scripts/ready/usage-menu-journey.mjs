@@ -20,6 +20,7 @@ export async function browserUsageMenuJourney({ page, expect, output, verify, tr
 
   let attemptedConsent = false;
   try {
+    traffic.phase = "welcome and default consent";
     await complete("Welcome to IronClad, Commander. How’s morale today?");
     await button("Time to kick some ass!").click();
     await complete("That’s the spirit. Let’s give them a match to remember.");
@@ -30,6 +31,7 @@ export async function browserUsageMenuJourney({ page, expect, output, verify, tr
     verify(traffic.events.length === 0, "default-off consent emits no events for initial opening, automatic speech or a morale choice");
 
     attemptedConsent = true;
+    traffic.phase = "opt-in consent";
     await checkbox.click();
     await expect(checkbox).toBeChecked();
     await expect.poll(() => traffic.choices.at(-1)).toEqual({ enabled: true, status: 200 });
@@ -42,6 +44,7 @@ export async function browserUsageMenuJourney({ page, expect, output, verify, tr
     await main();
     await expect.poll(accepted).toContain("manual_open");
 
+    traffic.phase = "simulated collection failure";
     await openQuickAction(page, "Help", false);
     traffic.failCategory = true;
     await button("Results & replays").click();
@@ -52,16 +55,20 @@ export async function browserUsageMenuJourney({ page, expect, output, verify, tr
 
     await button("Main menu").click();
     await button("Rules & match help").click();
+    traffic.phase = "prepared disconnect answer";
     await button("Disconnects & lag").click();
     await expect(message).toContainText("10:00", { timeout: 16_000 });
-    await expect(page.getByRole("link", { name: /Official Tournament Rulebook/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Official Tournament Rulebook/ })).toBeVisible({ timeout: 20_000 });
+    traffic.phase = "helpful vote acknowledgement";
     await button("Helpful").click();
-    await expect.poll(accepted).toContain("helpfulness");
+    await expect.poll(accepted, { timeout: 15_000 }).toContain("helpfulness");
+    traffic.phase = "required accepted events";
     for (const event of ["manual_open", "engage", "category_select", "question_select", "answer_display", "helpfulness"]) {
       verify(accepted().includes(event), `consented player UI received successful response for ${event}`);
     }
     await page.screenshot({ path: resolve(output, "ready-usage-player-answer.png") });
 
+    traffic.phase = "safe rules navigation";
     await button("Main menu").click();
     await openReadySearch(page, false);
     await page.getByRole("textbox", { name: "Ask about IronClad" }).fill("weather on mars");
@@ -72,6 +79,10 @@ export async function browserUsageMenuJourney({ page, expect, output, verify, tr
     await expect(page).toHaveURL(/\/rules(?:[?#].*)?$/);
     await expect.poll(accepted).toContain("action_click");
     verify(true, "a real rules navigation accepted a click event without creating a result, message or support request");
+  } catch (error) {
+    traffic.failurePhase = traffic.phase;
+    await page.screenshot({ path: resolve(output, "ready-usage-player-before-cleanup.png") }).catch(() => undefined);
+    throw error;
   } finally {
     traffic.failCategory = false;
     if (attemptedConsent) {

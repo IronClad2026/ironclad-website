@@ -167,7 +167,7 @@ export async function verifyActiveApi({ fixtures, admin, environment, actors, or
 export async function browserActiveMatch({ page, expect, origin, fixture, mobile, verify }) {
   const eventUrl = new URL("/tournaments", origin);
   eventUrl.searchParams.set("tournament", fixture.tag);
-  eventUrl.searchParams.set("match", fixture.matchId);
+  eventUrl.searchParams.set("tab", "brackets");
   await page.goto(eventUrl.href, { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-mode='floating']")).toHaveCount(1, { timeout: 15_000 });
   await openQuickAction(page, "Help", mobile);

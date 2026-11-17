@@ -185,8 +185,8 @@ async function browserMatchNavigation(page, expect, origin) {
   async function returnHome() {
     const event = new URL("/tournaments", origin);
     event.searchParams.set("tournament", fixtureA.eventSlug);
-    event.searchParams.set("match", fixtureA.matchId);
-    await page.goto(event, { waitUntil: "domcontentloaded" });
+    event.searchParams.set("tab", "brackets");
+    await page.goto(event.href, { waitUntil: "domcontentloaded" });
     await expect(surface).toHaveCount(1, { timeout: 15_000 });
     if (await surface.getAttribute("data-mode") === "dock") await dock.click();
     await openQuickAction(page, "Help", false);
@@ -254,7 +254,8 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
       ]);
       let pauseAnswer = false;
       let releaseAnswer;
-      const traffic = { events: [], choices: [], failCategory: false };
+      const traffic = { events: [], choices: [], replies: [], failCategory: false };
+      if (usage) report.usageTraffic = traffic;
       await context.route("**/*", async (route) => {
         const request = route.request();
         const url = new URL(request.url());
@@ -291,6 +292,10 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
           });
           if (collect?.kind === "choice") traffic.choices.push({ enabled: collect.enabled, status: response.status() });
           if (collect?.kind === "event") traffic.events.push({ type: collect.event.type, status: response.status() });
+          if (usage && readyQuery) {
+            const reply = await response.json().catch(() => null);
+            traffic.replies.push({ status: response.status(), sources: reply?.sources?.length ?? 0, fallback: reply?.fallback === true });
+          }
           if (readyQuery && pauseAnswer) await new Promise((done) => { releaseAnswer = done; });
           await route.fulfill({ response });
         } catch {
