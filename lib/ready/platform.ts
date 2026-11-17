@@ -139,9 +139,12 @@ export async function answerPlatform(input: ReadyRequest, userId: string | null)
   return answerPlatformIntent(intent, id, input, userId);
 }
 
-export async function answerPlatformAction(id: ReadyActionId, context: ReadyContext | undefined, userId: string): Promise<ReadyReply> {
+export async function answerPlatformAction(id: ReadyActionId, context: ReadyContext | undefined, userId: string | null): Promise<ReadyReply> {
   if (id === "discord-ticket") return supportLinks();
   if (id === "discord-invite") return { text: "Join the official IronClad server to access its support channels.", actions: [invite] };
+  if (!userId && (id === "profile-steam" || id === "notifications" || id === "history" || id === "statistics" || id === "dashboard")) {
+    return { text: "Sign in to see your own player information, Commander.", actions: [signIn] };
+  }
   if (id === "profile-steam") return {
     text: "Open your player profile to edit your details and check your Steam connection.",
     actions: [readyLink(id, "Open Profile & Steam", "/profile")],
@@ -192,7 +195,13 @@ async function answerPlatformIntent(intent: PlatformIntent, id: ReadyActionId, i
 async function answerMatch(intent: MatchIntent, actionId: ReadyActionId, input: ReadyRequest, userId: string | null): Promise<ReadyReply> {
   const workflow = intent === "result" || intent === "replay" ? workflows[intent] + " " : "";
   if (!userId) {
-    if (intent === "support") return supportLinks();
+    if (actionId === "copy-match-reference") {
+      return { text: "Sign in to find a reference for your own match, Commander.", actions: [signIn, tournaments], fallback: true };
+    }
+    if (intent === "support") {
+      const support = supportLinks();
+      return { text: "Sign in to access your own in-site Admin Assistance. " + support.text, actions: [signIn, ...support.actions] };
+    }
     return { text: workflow + "Sign in to look up your own match, Commander.", actions: [signIn, tournaments], fallback: true };
   }
   const owned = await loadReadyPrivateContext(userId);
@@ -341,6 +350,9 @@ function refersToEvent(question: string, event: ReadyEvent) {
 }
 
 async function answerEvent(intent: EventIntent, actionId: ReadyActionId, input: ReadyRequest, userId: string | null): Promise<ReadyReply> {
+  if (actionId === "registration-status" && !userId) {
+    return { text: "Sign in to see your own tournament registrations and waitlist status, Commander.", actions: [signIn, tournaments], fallback: true };
+  }
   const reference = input.context?.eventSlug;
   const events = await loadReadyEvents(reference);
   const named = events.filter((event) => refersToEvent(input.question, event));

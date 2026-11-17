@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { loadReadyActiveProfile } from "@/lib/ready/platform-data";
-import { loadReadySession } from "@/lib/ready/session";
+import { loadReadyAccess, loadReadyUsageReviewer } from "@/lib/ready/session";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: vi.fn(), clerkClient: vi.fn() }));
@@ -29,14 +29,42 @@ it("checks account closure through the scoped server lookup only after fixture a
   } };
   const getUser = vi.fn().mockResolvedValue({ ...fixture, locked: true });
   vi.mocked(clerkClient).mockResolvedValue({ users: { getUser } } as unknown as Awaited<ReturnType<typeof clerkClient>>);
-  expect(await loadReadySession()).toBeNull();
+  expect(await loadReadyUsageReviewer()).toBeNull();
   expect(loadReadyActiveProfile).not.toHaveBeenCalled();
 
   getUser.mockResolvedValue(fixture);
   vi.mocked(loadReadyActiveProfile).mockResolvedValue(null);
-  expect(await loadReadySession()).toBeNull();
+  expect(await loadReadyUsageReviewer()).toBeNull();
   expect(loadReadyActiveProfile).toHaveBeenCalledWith("actor");
 
   vi.mocked(loadReadyActiveProfile).mockResolvedValue({ id: "profile", profile_completed: true, account_closed_at: null });
-  expect(await loadReadySession()).toEqual({ userId: "actor", sessionId: "session" });
+  expect(await loadReadyUsageReviewer()).toEqual({ userId: "actor", sessionId: "session" });
+});
+
+it("does not look up a Clerk user or player profile for a visitor", async () => {
+  vi.mocked(auth).mockResolvedValue({ userId: null, sessionId: null } as Awaited<ReturnType<typeof auth>>);
+  expect(await loadReadyAccess()).toEqual({ kind: "guest" });
+  expect(clerkClient).not.toHaveBeenCalled();
+  expect(loadReadyActiveProfile).not.toHaveBeenCalled();
+});
+
+it.each([{}, { role: "admin" }])("admits an active signed-in account independently of a player profile (%o)", async (publicMetadata) => {
+  vi.mocked(auth).mockResolvedValue({ userId: "actor", sessionId: "session" } as Awaited<ReturnType<typeof auth>>);
+  const getUser = vi.fn().mockResolvedValue({ id: "actor", banned: false, locked: false, privateMetadata: {}, publicMetadata });
+  vi.mocked(clerkClient).mockResolvedValue({ users: { getUser } } as unknown as Awaited<ReturnType<typeof clerkClient>>);
+  expect(await loadReadyAccess()).toEqual({ kind: "signed-in", identity: { userId: "actor", sessionId: "session" } });
+  expect(loadReadyActiveProfile).not.toHaveBeenCalled();
+});
+
+it.each([{ banned: true }, { locked: true }, { id: "different" }])("rejects a restricted Clerk account (%o)", async (restriction) => {
+  vi.mocked(auth).mockResolvedValue({ userId: "actor", sessionId: "session" } as Awaited<ReturnType<typeof auth>>);
+  const getUser = vi.fn().mockResolvedValue({ id: "actor", banned: false, locked: false, ...restriction });
+  vi.mocked(clerkClient).mockResolvedValue({ users: { getUser } } as unknown as Awaited<ReturnType<typeof clerkClient>>);
+  expect(await loadReadyAccess()).toEqual({ kind: "restricted" });
+});
+
+it("fails closed when a signed-in actor is missing a session", async () => {
+  vi.mocked(auth).mockResolvedValue({ userId: "actor", sessionId: null } as unknown as Awaited<ReturnType<typeof auth>>);
+  expect(await loadReadyAccess()).toEqual({ kind: "restricted" });
+  expect(clerkClient).not.toHaveBeenCalled();
 });

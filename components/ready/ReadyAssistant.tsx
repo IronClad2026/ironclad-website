@@ -41,7 +41,6 @@ type Tap = { id: number; target: HTMLButtonElement; start: Point };
 type Reveal = { frame: number; last: number | null; elapsed: number; gain: number; style: TalkStyle; advance: FrameRequestCallback };
 type AssetStatus = "loading" | "ready" | "error";
 
-const workspaceKey = "ironclad-ready:workspace:v1";
 const defaultWorkspace: Workspace = { open: false, position: null, seenGreeting: false };
 const poster = "/images/ironclad-logo.png";
 const requestTimeoutMs = 12000;
@@ -88,9 +87,9 @@ function subscribeMotion(callback: () => void) {
   return () => query.removeEventListener("change", callback);
 }
 
-function loadWorkspace(): Workspace {
+function loadWorkspace(key: string): Workspace {
   try {
-    const raw = sessionStorage.getItem(workspaceKey);
+    const raw = sessionStorage.getItem(key);
     if (!raw) return defaultWorkspace;
     const value = JSON.parse(raw) as Partial<Workspace>;
     return {
@@ -104,9 +103,9 @@ function loadWorkspace(): Workspace {
   }
 }
 
-function saveWorkspace(value: Workspace) {
+function saveWorkspace(key: string, value: Workspace) {
   try {
-    sessionStorage.setItem(workspaceKey, JSON.stringify(value));
+    sessionStorage.setItem(key, JSON.stringify(value));
   } catch {
     // The assistant still works while browser storage is unavailable.
   }
@@ -176,7 +175,8 @@ function TouchButton({ onActivate, ...props }: TouchButtonProps) {
     onTouchEnd={tapEnd} onTouchCancel={() => { tap.current = null; }} />;
 }
 
-export default function ReadyAssistant() {
+export default function ReadyAssistant({ workspaceScope, signedIn }: { workspaceScope: string; signedIn: boolean }) {
+  const workspaceKey = `ironclad-ready:workspace:v2:${workspaceScope}`;
   const client = useSyncExternalStore(subscribeClient, resumeOnClient, pauseOnServer);
   const reducedMotion = useSyncExternalStore(subscribeMotion, () => matchMedia(reducedQuery).matches, pauseOnServer);
   const pathname = usePathname();
@@ -189,7 +189,7 @@ export default function ReadyAssistant() {
   const [cloudExit, setCloudExit] = useState<{ revealing: boolean } | null>(null);
   const [question, setQuestion] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
-  const usage = useReadyUsage();
+  const usage = useReadyUsage(signedIn);
   const trackRef = useRef(usage.track);
   const [votes, setVotes] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const voteRef = useRef(new Map<string, boolean>());
@@ -479,7 +479,7 @@ export default function ReadyAssistant() {
     if (!client) return;
     const frame = requestAnimationFrame(() => {
       if (workspace.current !== defaultWorkspace) return;
-      const saved = loadWorkspace();
+      const saved = loadWorkspace(workspaceKey);
       workspace.current = { ...saved, seenGreeting: saved.open || saved.seenGreeting };
       setOpen(saved.open);
       const initial = saved.seenGreeting ? dialogueView("welcomeReturning") : firstGreeting;
@@ -488,7 +488,7 @@ export default function ReadyAssistant() {
       if (saved.open) beginRef.current(initial, !saved.seenGreeting);
     });
     return () => cancelAnimationFrame(frame);
-  }, [client]);
+  }, [client, workspaceKey]);
 
   useEffect(() => {
     if (!client || !canvas.current) return;
@@ -642,7 +642,7 @@ export default function ReadyAssistant() {
     surface.current?.removeAttribute("data-mascot-travel");
     const animate = !workspace.current.seenGreeting;
     workspace.current = { ...workspace.current, open: true, seenGreeting: true };
-    saveWorkspace(workspace.current);
+    saveWorkspace(workspaceKey, workspace.current);
     setOpen(true);
     begin(lastSettled.current, animate);
   }
@@ -666,7 +666,7 @@ export default function ReadyAssistant() {
     setQuestion("");
     if (isMoraleReply(lastSettled.current)) lastSettled.current = mainMenu;
     workspace.current = { ...workspace.current, open: false };
-    saveWorkspace(workspace.current);
+    saveWorkspace(workspaceKey, workspace.current);
     renderer.current?.setExpression("Neutral", 1);
     if (!reducedMotion && surface.current && status === "ready") {
       surface.current.setAttribute("data-mascot-travel", "docking");
@@ -713,7 +713,7 @@ export default function ReadyAssistant() {
     if (action?.id !== event.pointerId) return;
     if (action.moved) {
       renderer.current?.setDragging(false);
-      saveWorkspace(workspace.current);
+      saveWorkspace(workspaceKey, workspace.current);
     }
     pointer.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -731,7 +731,7 @@ export default function ReadyAssistant() {
     const step = event.shiftKey ? 40 : 14;
     moveTo({ x: position.x + (event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0),
       y: position.y + (event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0) });
-    saveWorkspace(workspace.current);
+    saveWorkspace(workspaceKey, workspace.current);
   }
 
   function changeView(next: ReadyView, animate = false) {

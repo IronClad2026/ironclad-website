@@ -4,6 +4,7 @@ import {
   isPublicPathname,
   isSelfAuthenticatedApiPathname,
 } from "@/lib/route-access";
+import { isReadyStagingEnabled } from "@/lib/ready/review-access";
 import {
   buildPublicProfileNoticeUrl,
   isNoticeAccessDocument,
@@ -16,9 +17,14 @@ import { loadPublicGamingProfileNotice } from "@/lib/public-gaming-profile-notic
 
 export default clerkMiddleware(async (auth, request) => {
   const pathname = request.nextUrl.pathname;
+  const isPageRead = request.method === "GET" || request.method === "HEAD";
+  const isReadyAssetRead = isPageRead &&
+    (pathname === "/mascot-v6/assets/interaction.json" || pathname === "/mascot-v6/assets/ironclad.glb") &&
+    isReadyStagingEnabled();
   if (
     !isPublicPathname(pathname) &&
-    !isSelfAuthenticatedApiPathname(pathname)
+    !isSelfAuthenticatedApiPathname(pathname) &&
+    !isReadyAssetRead
   ) {
     await auth.protect();
   }
@@ -26,7 +32,6 @@ export default clerkMiddleware(async (auth, request) => {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.delete(NOTICE_LAYOUT_HEADER);
-  const isPageRead = request.method === "GET" || request.method === "HEAD";
   if (isPageRead && isNoticeAccessPage(pathname)) {
     requestHeaders.set(NOTICE_LAYOUT_HEADER, "account-access");
     return NextResponse.next({ request: { headers: requestHeaders } });

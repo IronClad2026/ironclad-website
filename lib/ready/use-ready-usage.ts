@@ -38,7 +38,7 @@ function post(input: ReadyUsageRequest, signal: AbortSignal, keepalive = false) 
   });
 }
 
-export function useReadyUsage() {
+export function useReadyUsage(signedIn: boolean) {
   const [enabled, setLocalEnabled] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -76,18 +76,27 @@ export function useReadyUsage() {
   }, [stop]);
 
   useEffect(() => {
+    if (!signedIn) return;
     const request = new AbortController();
     void fetch(endpoint, { cache: "no-store", signal: request.signal })
-      .then(readChoice)
-      .then((choice) => { if (!request.signal.aborted) accept(choice); })
-      .catch(() => { if (!request.signal.aborted) setError("Ready analytics is unavailable."); })
-      .finally(() => { if (!request.signal.aborted) setLoaded(true); });
+      .then(async (response) => {
+        if (response.status === 403) return;
+        const choice = await readChoice(response);
+        if (request.signal.aborted) return;
+        accept(choice);
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (request.signal.aborted) return;
+        setError("Ready analytics is unavailable.");
+        setLoaded(true);
+      });
     return () => {
       request.abort();
       change.current?.abort();
       stop();
     };
-  }, [accept, stop]);
+  }, [accept, signedIn, stop]);
 
   const setEnabled = useCallback(async (allow: boolean) => {
     if (!loaded || change.current) return;

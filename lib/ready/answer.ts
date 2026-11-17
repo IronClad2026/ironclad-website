@@ -26,12 +26,12 @@ function questionChoice(id: ReadyQuestionId, context?: ReadyContext, label = rea
 async function preparedAnswer(
   id: ReadyQuestionId,
   context: ReadyContext | undefined,
-  identity: ReadyIdentity,
+  identity: ReadyIdentity | null,
   signal: AbortSignal,
   legacyQuestion = "",
 ): Promise<ReadyReply> {
   const topic = readyQuestionCatalogue[id].topic;
-  const scope = topic === "rules" ? { kind: "general" } as const
+  const scope = !identity || topic === "rules" ? { kind: "general" } as const
     : await resolveReadyRuleScope(context, identity.userId, legacyQuestion, id === "governing-versions");
   signal.throwIfAborted();
   const intent = { kind: "question", id } as const;
@@ -80,31 +80,37 @@ function searchCatalogue(query: string): ReadyQuestionId[] {
   return matches.filter(({ score }) => score >= bestScore - 1).slice(0, 4).map(({ id }) => id);
 }
 
-export async function resolveReadyAnswer(input: ReadyMenuRequest, identity: ReadyIdentity, signal: AbortSignal): Promise<ReadyReply> {
+export async function resolveReadyAnswer(input: ReadyMenuRequest, identity: ReadyIdentity | null, signal: AbortSignal): Promise<ReadyReply> {
+  const context = identity ? input.context : undefined;
+  const userId = identity?.userId ?? null;
+  // Public navigation can look up a published event. Only authenticated flows may
+  // carry personal match or registration context through Ready's conversation.
+  const eventSlug = input.context?.eventSlug;
+  const platformContext = context ?? (eventSlug ? { eventSlug } : undefined);
   if ("kind" in input) {
     if (input.kind === "action") {
-      const reply = await answerPlatformAction(input.id, input.context, identity.userId);
+      const reply = await answerPlatformAction(input.id, platformContext, userId);
       signal.throwIfAborted();
       return { ...reply, intent: { kind: input.kind, id: input.id } };
     }
-    if (input.kind === "question") return preparedAnswer(input.id, input.context, identity, signal);
+    if (input.kind === "question") return preparedAnswer(input.id, context, identity, signal);
 
     const privateRequest = /\b(?:another|someone else|other)\b.{0,35}\b(?:player|account|user)\b/i.test(input.query) &&
       /\b(?:match|chat|transcript|personal|private|account|identity|deadline|replays?)\b/i.test(input.query);
     const matches = isReadyBoundaryAttempt(input.query) || privateRequest ? [] : searchCatalogue(input.query);
     if (matches.length === 1) {
-      return { ...(await preparedAnswer(matches[0], input.context, identity, signal)), searchOutcome: "matched" };
+      return { ...(await preparedAnswer(matches[0], context, identity, signal)), searchOutcome: "matched" };
     }
     if (matches.length > 1) {
       return {
         text: "Which prepared question did you mean, Commander?",
-        actions: matches.map((id) => questionChoice(id, input.context)),
+        actions: matches.map((id) => questionChoice(id, context)),
         searchOutcome: "ambiguous",
       };
     }
     return {
       text: "I couldn’t find a prepared answer for that, Commander. Choose a category from the Main menu or contact an admin.",
-      actions: supportActions(input.context),
+      actions: supportActions(context),
       searchOutcome: "no_result",
       fallback: true,
     };
@@ -115,19 +121,19 @@ export async function resolveReadyAnswer(input: ReadyMenuRequest, identity: Read
     actions: supportActions(),
     fallback: true,
   };
-  const platform = await answerPlatform(input, identity.userId);
+  const platform = await answerPlatform({ ...input, context: platformContext }, userId);
   signal.throwIfAborted();
   if (platform) return platform;
 
-  const topic = getKnowledgeTopic(input.question, input.context?.topic);
-  if (isReadyQuestionId(topic)) return preparedAnswer(topic, input.context, identity, signal, input.question);
+  const topic = getKnowledgeTopic(input.question, context?.topic);
+  if (isReadyQuestionId(topic)) return preparedAnswer(topic, context, identity, signal, input.question);
 
   const related = /\b(?:ironclad|tournament|event|match|register|registration|rules?|bracket|opponent|replays?|admin|payout|prize|steam|discord)\b/i.test(input.question);
   return {
     text: related
       ? "I can’t confirm that from the available information, Commander. Let’s get an admin involved."
       : "That’s outside my orders, Commander. I can help with IronClad rules, tournaments, your matches and platform support.",
-    actions: supportActions(input.context),
+    actions: supportActions(context),
     fallback: true,
   };
 }

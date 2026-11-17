@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { loadAccountLegalGateState } from "@/lib/account-legal-acceptance";
 import { READY_CATALOGUE_VERSION, READY_MENU_VERSION, readyActionCatalogue } from "@/lib/ready/catalogue";
 import { loadReadyActiveProfile } from "@/lib/ready/platform-data";
-import { loadReadySession } from "@/lib/ready/session";
+import { loadReadyUsageReviewer } from "@/lib/ready/session";
 import { isReadyUsageUuid, readReadyUsageRequest } from "@/lib/ready/usage-events";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -14,7 +14,7 @@ function send(body: object, status = 200) {
 }
 
 async function usagePlayer() {
-  const viewer = await loadReadySession();
+  const viewer = await loadReadyUsageReviewer();
   if (!viewer) return null;
   const [legal, player] = await Promise.all([
     loadAccountLegalGateState(), loadReadyActiveProfile(viewer.userId),

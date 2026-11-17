@@ -6,15 +6,16 @@ type FixtureUser = {
   privateMetadata: Record<string, unknown>;
 };
 
-export function readyReviewAliases(environment: ReadyEnvironment): readonly string[] {
-  if (
-    environment.VERCEL_ENV !== "preview" ||
-    environment.VERCEL_GIT_COMMIT_REF !== "staging" ||
-    environment.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") !== "https://zzbnneprhjicmajpjkdg.supabase.co" ||
-    !environment.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_") ||
-    !environment.CLERK_SECRET_KEY?.startsWith("sk_test_")
-  ) return [];
+export function isReadyStagingEnabled(environment: ReadyEnvironment = process.env): boolean {
+  return environment.VERCEL_ENV === "preview" &&
+    environment.VERCEL_GIT_COMMIT_REF === "staging" &&
+    environment.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") === "https://zzbnneprhjicmajpjkdg.supabase.co" &&
+    environment.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_") === true &&
+    environment.CLERK_SECRET_KEY?.startsWith("sk_test_") === true;
+}
 
+export function readyReviewAliases(environment: ReadyEnvironment): readonly string[] {
+  if (!isReadyStagingEnabled(environment)) return [];
   return (environment.READY_STAGING_REVIEW_ALIASES ?? "")
     .split(",").map((value) => value.trim()).filter((value) => /^TestAcademy[1-4]$/.test(value));
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
+import { isIP } from "node:net";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type ReadyIdentity = { userId: string; sessionId: string };
@@ -26,6 +27,19 @@ export function createReadyRateGuard(now = Date.now) {
 }
 
 export const allowReadyRequest = createReadyRateGuard();
+
+const guestRateKey = randomBytes(32);
+
+export function allowReadyGuestRequest(headers: Headers): boolean {
+  // Vercel supplies this header in the only environment that accepts Ready requests.
+  // Keep only a pseudonymous, process-local key in the one-minute rate window.
+  const value = headers.get("x-vercel-forwarded-for")?.trim() ?? "";
+  const visitor = isIP(value)
+    ? createHmac("sha256", guestRateKey).update(value).digest("hex")
+    : "unknown";
+  const key = `guest:${visitor}`;
+  return allowReadyRequest({ userId: key, sessionId: key });
+}
 type BudgetConfig = { key: string; day: string; cap: number };
 
 export function getReadyBudgetConfig(

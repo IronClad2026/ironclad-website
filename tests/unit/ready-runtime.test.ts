@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readReadyRequest } from "@/lib/ready/contracts";
-import { isReadyReviewUser, readyReviewAliases } from "@/lib/ready/review-access";
+import { isReadyReviewUser, isReadyStagingEnabled, readyReviewAliases } from "@/lib/ready/review-access";
 import { answerWithReadyModel } from "@/lib/ready/provider";
 import { buildReadyGrounding } from "@/lib/ready/grounding";
 import { createReadyRateGuard, getReadyBudgetConfig } from "@/lib/ready/usage";
 import { POST } from "@/app/api/ready/route";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/ready/session", () => ({ loadReadySession: vi.fn() }));
+vi.mock("@/lib/ready/session", () => ({ loadReadyAccess: vi.fn() }));
 vi.mock("@/lib/account-legal-acceptance", () => ({ loadAccountLegalGateState: vi.fn() }));
 vi.mock("@/lib/ready/answer", () => ({ resolveReadyAnswer: vi.fn() }));
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: vi.fn() }));
 
-import { loadReadySession } from "@/lib/ready/session";
+import { loadReadyAccess } from "@/lib/ready/session";
 import { loadAccountLegalGateState } from "@/lib/account-legal-acceptance";
 import { resolveReadyAnswer } from "@/lib/ready/answer";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -30,6 +30,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 describe("Ready input and review access", () => {
@@ -45,7 +46,14 @@ describe("Ready input and review access", () => {
     ]) expect(readReadyRequest(payload)).toBeNull();
   });
 
-  it("permits only the opt-in Staging Git ref, exact database and Clerk test mode", () => {
+  it("enables Ready on the exact Staging deployment without requiring review aliases", () => {
+    const publicStaging = { ...staging, READY_STAGING_REVIEW_ALIASES: "" };
+    expect(isReadyStagingEnabled(publicStaging)).toBe(true);
+    for (const invalid of [
+      { VERCEL_ENV: "production" }, { VERCEL_GIT_COMMIT_REF: "codex/ready-staging" },
+      { NEXT_PUBLIC_SUPABASE_URL: "https://other.supabase.co" },
+      { NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_example" }, { CLERK_SECRET_KEY: "sk_live_example" },
+    ]) expect(isReadyStagingEnabled({ ...publicStaging, ...invalid })).toBe(false);
     expect(readyReviewAliases(staging)).toEqual(["TestAcademy1", "TestAcademy2"]);
     expect(readyReviewAliases({ ...staging, VERCEL_ENV: "production" })).toEqual([]);
     expect(readyReviewAliases({ ...staging, VERCEL_GIT_COMMIT_REF: "codex/ready-staging" })).toEqual([]);
@@ -171,14 +179,27 @@ describe("Ready route", () => {
     expect(resolveReadyAnswer).not.toHaveBeenCalled();
   });
 
-  it("binds the answer to the authenticated reviewer and sends a private no-store response", async () => {
-    for (const [key, value] of Object.entries(staging)) vi.stubEnv(key, value);
-    vi.mocked(loadReadySession).mockResolvedValue(null);
+  it("answers a signed-out request without performing account lookups or granting an identity", async () => {
+    for (const [key, value] of Object.entries({ ...staging, READY_STAGING_REVIEW_ALIASES: "" })) vi.stubEnv(key, value);
+    vi.mocked(loadReadyAccess).mockResolvedValue({ kind: "guest" });
+    vi.mocked(resolveReadyAnswer).mockResolvedValue({ text: "An answer about public rules." });
+    const response = await POST(request("What are the rules?"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(resolveReadyAnswer).toHaveBeenCalledWith({ question: "What are the rules?" }, null, expect.any(AbortSignal));
+    expect(loadAccountLegalGateState).not.toHaveBeenCalled();
+  });
+
+  it("binds a personal answer to the signed-in account and preserves account restrictions", async () => {
+    for (const [key, value] of Object.entries({ ...staging, READY_STAGING_REVIEW_ALIASES: "" })) vi.stubEnv(key, value);
+    vi.mocked(loadReadyAccess).mockResolvedValue({ kind: "restricted" });
     expect((await POST(request("Who am I playing?"))).status).toBe(403);
-    const viewer = { userId: "verified", sessionId: "session" };
-    vi.mocked(loadReadySession).mockResolvedValue(viewer);
+    expect(resolveReadyAnswer).not.toHaveBeenCalled();
+    const viewer = { userId: "ordinary-player", sessionId: "ordinary-session" };
+    vi.mocked(loadReadyAccess).mockResolvedValue({ kind: "signed-in", identity: viewer });
     vi.mocked(loadAccountLegalGateState).mockResolvedValue({ status: "required" } as Awaited<ReturnType<typeof loadAccountLegalGateState>>);
     expect((await POST(request("Who am I playing?"))).status).toBe(403);
+    expect(resolveReadyAnswer).not.toHaveBeenCalled();
     vi.mocked(loadAccountLegalGateState).mockResolvedValue({ status: "satisfied" });
     vi.mocked(resolveReadyAnswer).mockResolvedValue({ text: "An authorised answer." });
     const response = await POST(request("Who am I playing?"));

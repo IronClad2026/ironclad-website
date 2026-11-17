@@ -64,6 +64,58 @@ describe("Ready platform assistance", () => {
     expect(data.loadReadyPrivateContext).not.toHaveBeenCalled();
   });
 
+  it("answers from the public edition without storing or reflecting guest match context", async () => {
+    const context = { matchId: MATCH, eventSlug: "unpublished-event" };
+    const signal = AbortSignal.timeout(5_000);
+    const answer = await resolveReadyAnswer({ kind: "question", id: "disconnects", context }, null, signal);
+    expect(answer).toMatchObject({
+      text: expect.stringContaining("10:00"),
+      sources: [expect.objectContaining({ title: "Official Tournament Rulebook v3.2" })],
+      context: { topic: "disconnects" },
+    });
+    expect(JSON.stringify(answer)).not.toContain(MATCH);
+    expect(JSON.stringify(answer)).not.toContain(context.eventSlug);
+    expect(data.loadReadyEvents).not.toHaveBeenCalled();
+    expect(data.loadReadyPrivateContext).not.toHaveBeenCalled();
+    expect(data.loadReadyAcceptedVersions).not.toHaveBeenCalled();
+  });
+
+  it("uses sign-in guidance for guest personal actions without private or event reads", async () => {
+    const context = { matchId: MATCH, eventSlug: "unpublished-event" };
+    const signal = AbortSignal.timeout(5_000);
+    for (const id of ["my-match", "opponent-chat", "registration-status", "profile-steam", "notifications",
+      "history", "dashboard", "admin-assistance", "copy-match-reference"] as const) {
+      const reply = await resolveReadyAnswer({ kind: "action", id, context }, null, signal);
+      expect(reply).toMatchObject({
+        text: expect.stringContaining("Sign in"),
+        actions: expect.arrayContaining([expect.objectContaining({ href: "/sign-in" })]),
+      });
+      expect(JSON.stringify(reply)).not.toContain(MATCH);
+      expect(JSON.stringify(reply)).not.toContain(context.eventSlug);
+      expect(JSON.stringify(reply)).not.toContain("/assistance/");
+    }
+    expect(data.loadReadyPrivateContext).not.toHaveBeenCalled();
+    expect(data.loadReadyEvents).not.toHaveBeenCalled();
+    expect(data.loadReadyAssistanceRecord).not.toHaveBeenCalled();
+  });
+
+  it("exposes a public tournament link only after the public event lookup verifies its scope", async () => {
+    const signal = AbortSignal.timeout(5_000);
+    const reply = await resolveReadyAnswer({ kind: "action", id: "find-tournament", context: { eventSlug: event.slug, matchId: MATCH } },
+      null, signal);
+    expect(reply).toMatchObject({
+      context: { eventSlug: event.slug, topic: "event" },
+      actions: [expect.objectContaining({ href: `/tournaments?tournament=${event.slug}` })],
+    });
+    expect(JSON.stringify(reply)).not.toContain(MATCH);
+    data.loadReadyEvents.mockResolvedValueOnce([]);
+    const unavailable = await resolveReadyAnswer({ kind: "action", id: "find-tournament", context: { eventSlug: "unpublished-event" } },
+      null, signal);
+    expect(unavailable).toMatchObject({ actions: [expect.objectContaining({ href: "/tournaments" })], fallback: true });
+    expect(JSON.stringify(unavailable)).not.toContain("unpublished-event");
+    expect(data.loadReadyPrivateContext).not.toHaveBeenCalled();
+  });
+
   it("renders authorised opponents and paused deadlines from current records", async () => {
     await expect(answerPlatform({ question: "Who am I playing?" }, user)).resolves.toMatchObject({
       text: expect.stringContaining("Synthetic opponent"),

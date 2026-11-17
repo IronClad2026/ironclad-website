@@ -4,9 +4,9 @@ import { resolveReadyAnswer } from "@/lib/ready/answer";
 import { readyLink } from "@/lib/ready/catalogue";
 import { readReadyRequest, READY_BODY_LIMIT } from "@/lib/ready/contracts";
 import type { ReadyReply } from "@/lib/ready/contracts";
-import { readyReviewAliases } from "@/lib/ready/review-access";
-import { loadReadySession } from "@/lib/ready/session";
-import { allowReadyRequest } from "@/lib/ready/usage";
+import { isReadyStagingEnabled } from "@/lib/ready/review-access";
+import { loadReadyAccess } from "@/lib/ready/session";
+import { allowReadyGuestRequest, allowReadyRequest } from "@/lib/ready/usage";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -67,20 +67,24 @@ export async function POST(request: Request) {
     };
     return NextResponse.json(body, { status, headers });
   };
-  if (readyReviewAliases(process.env).length === 0) return send({ text: "Ready is unavailable.", actions: [publicRules] }, 404);
+  if (!isReadyStagingEnabled()) return send({ text: "Ready is unavailable.", actions: [publicRules] }, 404);
   if (request.headers.get("origin") !== new URL(request.url).origin) return send({ text: "Open Ready from IronClad and try again." }, 403);
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]);
   try {
     return await withDeadline(async () => {
-      const viewer = await loadReadySession();
+      const access = await loadReadyAccess();
       signal.throwIfAborted();
-      if (!viewer) return send({ text: "Sign in with an authorised Staging review account to use Ready.", actions: [publicRules] }, 403);
-      if (!allowReadyRequest(viewer)) return send({ text: "Stand by a minute before asking again, Commander.", actions: [publicRules] }, 429);
+      if (access.kind === "restricted") return send({ text: "This account can’t use Ready at the moment.", actions: [publicRules] }, 403);
+      const viewer = access.kind === "signed-in" ? access.identity : null;
+      const allowed = viewer ? allowReadyRequest(viewer) : allowReadyGuestRequest(request.headers);
+      if (!allowed) return send({ text: "Stand by a minute before asking again, Commander.", actions: [publicRules] }, 429);
       const input = readReadyRequest(await readSmallBody(request, signal));
       if (!input) return send({ text: "Choose a menu item or search using up to 300 characters, Commander." }, 400);
-      const legal = await loadAccountLegalGateState();
-      signal.throwIfAborted();
-      if (legal.status !== "satisfied") return send({ text: "Complete your account requirements before using Ready.", actions: [publicRules] }, 403);
+      if (viewer) {
+        const legal = await loadAccountLegalGateState();
+        signal.throwIfAborted();
+        if (legal.status !== "satisfied") return send({ text: "Complete your account requirements before using Ready.", actions: [publicRules] }, 403);
+      }
       return send(await resolveReadyAnswer(input, viewer, signal));
     }, signal);
   } catch {

@@ -2,12 +2,15 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReadyAssistant from "@/components/ready/ReadyAssistant";
+import ReadyHeader from "@/components/ready/ReadyHeader";
 import { placeCloud, placeCompactCloud, placeSkull } from "@/components/ready/floating-layout";
 
-const { mock, track } = vi.hoisted(() => ({
+const { mock, track, clerk } = vi.hoisted(() => ({
   mock: { path: "/", query: "", reduced: false },
   track: vi.fn(),
+  clerk: { isLoaded: true, isSignedIn: true, sessionId: "first-session" as string | null },
 }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => clerk }));
 vi.mock("next/navigation", () => ({
   usePathname: () => mock.path,
   useSearchParams: () => new URLSearchParams(mock.query),
@@ -18,6 +21,7 @@ vi.mock("@/lib/ready/use-ready-usage", () => ({
 }));
 
 const getButton = (name: string) => screen.getByRole("button", { name });
+const assistant = <ReadyAssistant workspaceScope="test-session" signedIn />;
 const click = (name: string) => fireEvent.click(getButton(name));
 const say = () => document.querySelector("[data-mascot-message]")?.textContent;
 const moveTime = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
@@ -43,6 +47,9 @@ describe("Ready player menu", () => {
     mock.path = "/";
     mock.query = "";
     mock.reduced = false;
+    clerk.isLoaded = true;
+    clerk.isSignedIn = true;
+    clerk.sessionId = "first-session";
   });
   afterEach(() => {
     cleanup();
@@ -51,7 +58,7 @@ describe("Ready player menu", () => {
   });
 
   it("holds the Sad line before the Neutral line and hands off to the six choices", () => {
-    render(<ReadyAssistant />);
+    render(assistant);
     moveTime(32);
     dock();
     full();
@@ -73,7 +80,7 @@ describe("Ready player menu", () => {
   });
 
   it("cancels an obsolete morale timer when Help opens and does not redock or restart it", () => {
-    render(<ReadyAssistant />);
+    render(assistant);
     moveTime(32);
     dock();
     full();
@@ -101,7 +108,7 @@ describe("Ready player menu", () => {
       intent: { kind: "question", id: "disconnects" },
       sources: [{ title: "Applicable edition", url: "/rules", section: "10.1" }],
     }));
-    render(<ReadyAssistant />);
+    render(assistant);
     moveTime(32);
     dock();
     help();
@@ -134,7 +141,7 @@ describe("Ready player menu", () => {
     mock.reduced = true;
     let deliver!: (reply: Response) => void;
     vi.mocked(fetch).mockReturnValue(new Promise((resolve) => { deliver = resolve; }));
-    const rendered = render(<ReadyAssistant />);
+    const rendered = render(assistant);
     moveTime(32);
     dock();
     help();
@@ -143,7 +150,7 @@ describe("Ready player menu", () => {
     expect(currentView()).toBe("thinking");
     const signal = vi.mocked(fetch).mock.calls[0][1]?.signal;
     mock.query = "tournament=event-two";
-    rendered.rerender(<ReadyAssistant />);
+    rendered.rerender(<ReadyAssistant workspaceScope="test-session" signedIn />);
     moveTime(32);
     expect(signal?.aborted).toBe(true);
     await act(async () => { deliver(Response.json({ text: "The stale private reply." })); });
@@ -157,7 +164,7 @@ describe("Ready player menu", () => {
       intent: { kind: "question", id: "disconnects" },
       sources: [{ title: "Rulebook", url: "/rules", section: "10.1" }],
     }));
-    render(<ReadyAssistant />);
+    render(assistant);
     moveTime(32);
     dock();
     help();
@@ -176,6 +183,38 @@ describe("Ready player menu", () => {
     dock();
     moveTime(32);
     expect(count()).toBe(1);
+  });
+
+  it("clears the open workspace and cancels a private reply when Clerk changes accounts", async () => {
+    mock.reduced = true;
+    let deliver!: (reply: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(new Promise((resolve) => { deliver = resolve; }));
+    const rendered = render(<ReadyHeader />);
+    moveTime(32);
+    dock();
+    help();
+    click("My match");
+    click("My opponent");
+    const signal = vi.mocked(fetch).mock.calls[0][1]?.signal;
+    expect(currentView()).toBe("thinking");
+
+    clerk.sessionId = "second-session";
+    rendered.rerender(<ReadyHeader />);
+    moveTime(32);
+    expect(signal?.aborted).toBe(true);
+    expect(currentView()).toBeUndefined();
+    await act(async () => { deliver(Response.json({ text: "Previous account confidential reply" })); });
+    dock();
+    expect(currentView()).toBe("welcomeFirst");
+    expect(say()).not.toContain("Previous account");
+
+    clerk.sessionId = null;
+    clerk.isSignedIn = false;
+    rendered.rerender(<ReadyHeader />);
+    moveTime(32);
+    expect(currentView()).toBeUndefined();
+    dock();
+    expect(currentView()).toBe("welcomeFirst");
   });
 });
 

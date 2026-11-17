@@ -12,6 +12,7 @@ import { browserActiveMatch, isActiveFixtureRead, readActiveFixtures, verifyActi
 import { evaluateReadyAiQuality, readReadyAiEvidence, readyAiCandidateModels } from "./ai-evaluation.mjs";
 import { browserMenuJourney, browserMobileLayoutJourney, installRendererObservation, openQuickAction, openReadySearch } from "./menu-journey.mjs";
 import { browserUsageMenuJourney } from "./usage-menu-journey.mjs";
+import { createHostedAuth } from "../four-division/hosted-auth.mjs";
 import {
   assertClerkDevelopmentInstance,
   loadFixtureEnvironment,
@@ -112,7 +113,7 @@ async function loadActor(admin, environment, alias) {
   report.temporarySessionsCreated++;
   let current;
   let expires = 0;
-  return async () => {
+  const tokenForRequest = async () => {
     if (current && expires > Date.now() + 15_000) return current;
     const token = (await clerk.sessions.getToken(session.id)).jwt;
     const identity = claims(token);
@@ -122,6 +123,7 @@ async function loadActor(admin, environment, alias) {
     expires = identity.exp * 1000;
     return current;
   };
+  return Object.assign(tokenForRequest, { alias });
 }
 
 async function query(origin, oidc, actor, label, payload, evaluationModel) {
@@ -143,7 +145,7 @@ async function query(origin, oidc, actor, label, payload, evaluationModel) {
   report.timings.push({
     case: label, status: response.status, wallMs, serverMs,
     ...(response.status === 403 ? { rejection: /account requirements/.test(body?.text ?? "") ? "account-legal-gate"
-      : /authorised Staging review/.test(body?.text ?? "") ? "review-account-gate"
+      : /This account can’t use Ready/.test(body?.text ?? "") ? "account-restricted"
       : /Open Ready from IronClad/.test(body?.text ?? "") ? "request-origin" : "other" } : {}),
   });
   verify(bodyIsJson && response.headers.get("cache-control")?.includes("no-store"), `${label} JSON with private cache control`);
@@ -236,6 +238,8 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
   const browserAssets = resolve(output, "playwright-assets");
   if (existsSync(browserAssets)) process.env.PLAYWRIGHT_BROWSERS_PATH ??= browserAssets;
   const { chromium, expect } = await import("@playwright/test");
+  const browserAuth = await createHostedAuth({ environmentDirectory: envRoot, origin });
+  const identity = await browserAuth.fixture(actor.alias);
   const browser = await chromium.launch({ channel: "chrome", headless: false });
   await mkdir(output, { recursive: true });
   try {
@@ -248,11 +252,7 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
         ...((menu || usage) && !mobile ? { recordVideo: { dir: resolve(output, "ready-videos"), size: { width: 1280, height: 800 } } } : {}),
       });
       if (menu === true) await context.addInitScript(installRendererObservation);
-      const jwt = await actor();
-      await context.addCookies([
-        { name: "__session", value: jwt, url: origin, secure: true, sameSite: "Lax" },
-        { name: "__client_uat", value: String(claims(jwt).iat), url: origin, secure: true, sameSite: "Lax" },
-      ]);
+      let signingIn = false;
       let pauseAnswer = false;
       let releaseAnswer;
       const traffic = { events: [], choices: [], replies: [], failCategory: false };
@@ -261,7 +261,10 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
         const request = route.request();
         const url = new URL(request.url());
         if (url.origin !== origin) {
-          return ["GET", "HEAD"].includes(request.method()) ? route.continue() : route.abort();
+          const reading = ["GET", "HEAD"].includes(request.method());
+          const clerkSession = url.origin === clerkIssuer && (signingIn ||
+            /^\/v1\/client\/sessions\/sess_[a-z0-9]+\/tokens(?:\/|$)/i.test(url.pathname));
+          return reading || clerkSession ? route.continue() : route.abort();
         }
         const readyQuery = url.pathname === "/api/ready" && request.method() === "POST";
         const readyAsset = url.pathname.startsWith("/mascot-v6/");
@@ -283,9 +286,6 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
         if (!["GET", "HEAD"].includes(request.method()) && !readyQuery && !fixtureRead && !readyUsage) return route.abort();
         try {
           const headers = { ...request.headers(), [protectedHeader]: oidc };
-          if (request.isNavigationRequest() || readyQuery || readyAsset || readyUsage || fixtureRead || request.headers()["rsc"]) {
-            headers.authorization = `Bearer ${await actor()}`;
-          }
           // A cross-origin redirect receives no credentials from this request.
           const response = await route.fetch({ headers, maxRedirects: 0 });
           if (readyAsset) (report.browserAssets ??= []).push({
@@ -304,10 +304,20 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
         }
       });
       try {
+        const signInPage = await context.newPage();
+        signingIn = true;
+        try {
+          await browserAuth.signIn(signInPage, identity);
+        } finally {
+          signingIn = false;
+          await signInPage.close();
+        }
         const page = await context.newPage();
         const home = await page.goto(origin, { waitUntil: "domcontentloaded" });
         step = `${journey} mount`;
-        const dock = page.locator("[data-ready-dock]:visible");
+        await page.waitForFunction((userId) => window.Clerk?.loaded && window.Clerk.user?.id === userId,
+          identity.userId, { timeout: 30_000 });
+        const dock = page.locator("button[data-ready-dock]:visible");
         (report.browserNavigation ??= []).push({
           journey, status: home?.status() ?? null, isHome: new URL(page.url()).pathname === "/",
           readyDockCount: await page.locator("[data-ready-dock]").count(),
@@ -387,7 +397,7 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
         const target = new URL(await source.getAttribute("href"), origin);
         verify(target.origin === origin, "browser report source is within the guarded Staging origin");
         const document = await context.request.get(target.href, {
-          headers: { [protectedHeader]: oidc, authorization: `Bearer ${await actor()}` }, maxRedirects: 0,
+          headers: { [protectedHeader]: oidc }, maxRedirects: 0,
         });
         verify(document.ok() && document.headers()["content-type"]?.includes("application/pdf"), "browser verifies citation destination");
         step = `${journey} opens citation`;
@@ -430,6 +440,9 @@ async function browserJourney(origin, oidc, actor, navigationOnly = false, activ
     }
   } finally {
     await browser.close();
+    const result = await browserAuth.close();
+    report.temporarySessionsCreated += result.temporarySessionsCreated;
+    report.temporarySessionsRevoked += result.temporarySessionsRevoked;
   }
 }
 
@@ -441,8 +454,12 @@ try {
   verify(claims(oidc).exp * 1000 > Date.now(), "unexpired OIDC token available in memory");
   await verifyDeployment(options, origin);
 
-  const [anonymous, publicReply] = await query(origin, oidc, null, "anonymous gate", { question: "Open my match" });
-  verify(anonymous === 403 && publicReply.actions?.some(({ href }) => href === "/rules"), "anonymous API access denied with rules available");
+  const guestRule = await answer(origin, oidc, null, "guest public rule", { kind: "question", id: "disconnects", context: fixtureA });
+  verify(/10:00/.test(guestRule.text) && guestRule.sources?.some(({ url }) => url === `${appVersion}#page=9`) &&
+    !guestRule.context?.matchId, "signed-out caller gets the prepared current rule even when supplied a match reference");
+  const guestMatch = await answer(origin, oidc, null, "guest private match", { kind: "action", id: "my-match", context: fixtureA });
+  verify(/sign in/i.test(guestMatch.text) && guestMatch.actions?.some(({ href }) => href === "/sign-in") &&
+    !JSON.stringify(guestMatch).includes(fixtureA.matchId), "guest private lookup offers sign-in without disclosing the match");
 
   step = "approved staging credentials";
   const environment = await loadFixtureEnvironment({ rootDir: envRoot, processEnv: {} });
@@ -487,10 +504,10 @@ try {
   const a1 = await loadActor(admin, environment, "TestAcademy1");
   const a3 = await loadActor(admin, environment, "TestAcademy3");
 
-  const [denied, denial] = await query(origin, oidc, a3, "out-of-review account", { question: "Open my match" });
-  verify(denied === 403 && /authorised staging review/i.test(denial.text), "non-review account denied");
+  const ordinary = await answer(origin, oidc, a3, "ordinary account private match", { kind: "action", id: "opponent", context: fixtureB });
+  verify(matchDestination(ordinary, fixtureB), "ordinary non-review account can look up their own match");
   const ordinaryRules = await readPage(origin, oidc, a3, "/rules", "ordinary Rules page loads for a non-review account");
-  verify(!ordinaryRules.includes("data-ready-dock"), "Ready stays hidden while ordinary Rules remains available");
+  verify(ordinaryRules.includes("data-ready-dock"), "ordinary Rules includes the Ready header dock");
   const rules = await answer(origin, oidc, a1, "grounded disconnect", { question: "How does a genuine disconnect work?" });
   verify(/10:00/.test(rules.text) && rules.sources?.some(({ url, section }) =>
     url === `${appVersion}#page=9` && section.includes("10.1")), "answer cites rulebook disconnect section");
