@@ -26,6 +26,7 @@ const envRoot = "C:/Users/pc/Documents/IronClad/03_Website/ironclad-website";
 const stagingBackend = "https://zzbnneprhjicmajpjkdg.supabase.co";
 const clerkIssuer = "https://guided-goshawk-34.clerk.accounts.dev";
 const protectedHeader = "x-vercel-trusted-oidc-idp-token";
+const stagingAlias = "https://ironclad-website-git-staging-ironclad-tournaments.vercel.app";
 const appVersion = "/documents-rules-ppa/ironclad-official-tournament-rulebook-v3.2.pdf";
 const ticketUrl = "https://discord.com/channels/1440092095619662105/1440201093110960137";
 const fixtureA = { eventSlug: "patch3-staging-assistance-20261103-v1-a", matchId: "5131a673-4df4-4530-8f35-969997e2a5ec" };
@@ -82,6 +83,14 @@ async function verifyDeployment(options, origin) {
     (deploy.meta?.githubCommitRef ?? deploy.meta?.gitCommitRef ?? deploy.gitSource?.ref) === "staging" &&
     (deploy.meta?.githubCommitSha ?? deploy.meta?.gitCommitSha ?? deploy.gitSource?.sha) === options["--commit"],
   "verified exact READY Staging commit on the website project");
+}
+
+async function verifyStagingAlias(options) {
+  const { stdout } = await run(process.execPath, [
+    resolve(options["--vercel-cli"]), "api", "/v4/aliases/" + new URL(stagingAlias).hostname,
+    "--method", "GET", "--scope", "ironclad-tournaments",
+  ], { timeout: 15_000, windowsHide: true, maxBuffer: 512_000 });
+  verify(JSON.parse(stdout).deploymentId === options["--deployment"], "canonical protected Staging alias points to this exact deployment");
 }
 
 async function loadActor(admin, environment, alias) {
@@ -470,7 +479,9 @@ try {
   const admin = createClient(stagingBackend, base.serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const a2 = options["--suggestions-journey"] ? null : await loadActor(admin, environment, "TestAcademy2");
   if (options["--suggestions-journey"]) {
-    const result = await browserSuggestionsJourney({ origin, oidc, protectedHeader, envRoot, clerkIssuer, admin, verify });
+    await verifyStagingAlias(options);
+    const result = await browserSuggestionsJourney({ origin: stagingAlias, oidc, protectedHeader, envRoot, clerkIssuer, admin, verify });
+    await verifyStagingAlias(options);
     report.temporarySessionsCreated += result.temporarySessionsCreated;
     report.temporarySessionsRevoked += result.temporarySessionsRevoked;
   } else if (options["--active-fixture-manifest"]) {
@@ -538,9 +549,9 @@ try {
   verify(retired === 400 && !reply.sources?.length, "retired typed search is refused by the route");
   if (options["--headed"]) await browserJourney(origin, oidc, a2);
   }
-} catch {
+} catch (error) {
   failed = true;
-  report.blockedAt = step;
+  report.blockedAt = error?.readySuggestionFailure ?? step;
 } finally {
   for (const id of sessions) {
     try {
