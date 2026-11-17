@@ -312,6 +312,7 @@
 .speech[data-compact-placement] .bubble { padding: 12px 13px; }
 .speech[data-compact-placement] .answers { row-gap: 4px; }
 .speech[data-compact-placement] .answers .answer { min-height: 44px; padding: 8px 10px; }
+.speech[data-compact-placement] .answer[data-ready-category="tournaments"] { padding-inline: 4px; }
 
 .speech:is([data-ready-view="main"], [data-ready-view="submenu"]) .answers .answer {
   min-width: 0;
@@ -326,11 +327,11 @@
 }
 
 .speech[data-menu-layout="oval"] :is(.answerZone, .answers) { display: contents; }
-.speech[data-menu-layout="oval"] .bubble { grid-area: 2 / 3 / 3 / 11; text-align: center; }
+.speech[data-menu-layout="oval"] .bubble { grid-area: 2 / 4 / 3 / 10; text-align: center; }
 .speech[data-menu-layout="oval"] .answer[data-ready-category="match"] { grid-area: 1 / 3 / 2 / 7; }
 .speech[data-menu-layout="oval"] .answer[data-ready-category="results"] { grid-area: 1 / 7 / 2 / 11; }
-.speech[data-menu-layout="oval"] .answer[data-ready-category="rules"] { grid-area: 2 / 1 / 3 / 3; }
-.speech[data-menu-layout="oval"] .answer[data-ready-category="tournaments"] { grid-area: 2 / 11 / 3 / 13; }
+.speech[data-menu-layout="oval"] .answer[data-ready-category="rules"] { grid-area: 2 / 1 / 3 / 4; }
+.speech[data-menu-layout="oval"] .answer[data-ready-category="tournaments"] { grid-area: 2 / 10 / 3 / 13; }
 .speech[data-menu-layout="oval"] .answer:is([data-ready-category="rules"], [data-ready-category="tournaments"]) {
   padding-inline: 4px;
   font-size: .76rem;
@@ -338,6 +339,22 @@
 .speech[data-menu-layout="oval"] .answer[data-ready-category="profile"] { grid-area: 3 / 3 / 4 / 7; }
 .speech[data-menu-layout="oval"] .answer[data-ready-category="support"] { grid-area: 3 / 7 / 4 / 11; }
 .speech[data-menu-layout="oval"] .readyFooter { grid-area: 4 / 2 / 5 / 12; }
+
+.speech[data-menu-layout="oval"]:is([data-side="left"], [data-side="right"]) {
+  .bubble { grid-area: 2 / 1 / 3 / 13; }
+  .answer[data-ready-category="match"] { grid-area: 1 / 1 / 2 / 5; }
+  .answer[data-ready-category="results"] { grid-area: 1 / 5 / 2 / 9; }
+  .answer[data-ready-category="rules"] { grid-area: 1 / 9 / 2 / 13; }
+  .answer[data-ready-category="tournaments"] { grid-area: 3 / 1 / 4 / 5; }
+  .answer[data-ready-category="profile"] { grid-area: 3 / 5 / 4 / 9; }
+  .answer[data-ready-category="support"] { grid-area: 3 / 9 / 4 / 13; }
+  .answer:is([data-ready-category="rules"], [data-ready-category="tournaments"]) {
+    font-size: .81rem;
+    padding-inline: 14px;
+  }
+  .answer:is([data-ready-category="match"], [data-ready-category="rules"]) { margin-top: 6px; }
+  .answer:is([data-ready-category="tournaments"], [data-ready-category="support"]) { margin-bottom: 6px; }
+}
 
 .speech[data-menu-layout="oval"][data-side="above"] {
   .readyFooter { grid-row: 1; }

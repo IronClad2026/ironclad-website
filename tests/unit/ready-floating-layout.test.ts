@@ -40,10 +40,10 @@ describe("Ready floating placement", () => {
     expect(last.dialogue.side).toBe("left");
     expect(last.dialogue.oval).toBe(true);
     const center = dialogueRect(last.dialogue, main.height);
-    const inset = Math.ceil(center.width / 6);
+    const inset = 8;
     const speech = { x: center.x + inset, width: center.width - 2 * inset,
       y: center.y + 55, height: main.bubbleHeight };
-    expect(gap(last.skull, speech)).toBeLessThanOrEqual(108);
+    expect(gap(last.skull, speech)).toBeLessThanOrEqual(26);
     expect(thoughtTrail(last.skull, speech, last.dialogue.side, {
       x: last.skull.x + last.skull.width / 2, y: last.skull.y + last.skull.height * .69,
     })).toHaveLength(3);
@@ -61,6 +61,21 @@ describe("Ready floating placement", () => {
       expect(intersects(cloud, control)).toBe(false);
     }
     expect(gap(result.skull, cloud)).toBeLessThanOrEqual(30);
+  });
+
+  it("places the default dashboard group clear of match controls and Browse Tournaments", () => {
+    const controls = [
+      { x: 632, y: 525, width: 177, height: 46 },
+      { x: 24, y: 376, width: 806, height: 76 },
+      { x: 853, y: 328, width: 388, height: 81 },
+    ];
+    const result = placeReady(desktop, null, main, controls);
+    const cloud = dialogueRect(result.dialogue, main.height);
+    for (const control of controls) {
+      expect(intersects(result.skull, control)).toBe(false);
+      expect(intersects(cloud, control)).toBe(false);
+    }
+    expect(gap(result.skull, cloud)).toBeLessThanOrEqual(60);
   });
 
   it("lets the stacked portrait menu follow a horizontal drag", () => {

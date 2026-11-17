@@ -28,6 +28,8 @@ function passed(label) {
   checks.push(label);
   console.log(JSON.stringify({ passed: label }));
 }
+
+const reportPath = (value) => value.replace(/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}/gi, "[fixture]");
 let step = "validating arguments";
 let browser;
 let auth;
@@ -205,7 +207,7 @@ async function makeViewport(origin, oidc, mobile, headless = false, clerkCacheAc
     const current = new URL(response.url());
     const location = response.headers().location;
     const next = location ? new URL(location, current) : null;
-    navigations.push({ host: current.hostname, page: current.pathname, status: response.status(), to: next?.hostname });
+    navigations.push({ host: current.hostname, page: reportPath(current.pathname), status: response.status(), to: next?.hostname });
   });
   const failedRequests = {};
   page.on("requestfailed", (request) => {
@@ -238,7 +240,7 @@ async function makeViewport(origin, oidc, mobile, headless = false, clerkCacheAc
       const { x, y, width, height } = dock.getBoundingClientRect();
       return { width, height, receivesPointer: dock.contains(document.elementFromPoint(x + width / 2, y + height / 2)) };
     }),
-  })).then((state) => ({ ...state, failedRequests, navigations, clerkCallbacks }));
+  })).then((state) => ({ ...state, page: reportPath(state.page), failedRequests, navigations, clerkCallbacks }));
   const allowAssistanceRead = (href) => {
     const target = new URL(href, origin);
     assert(target.origin === origin && /^\/assistance\/[a-f0-9-]{36}$/i.test(target.pathname) && target.searchParams.size === 1 &&
@@ -485,10 +487,6 @@ async function checkDashboardClouds(origin, oidc, player, headless, clerkCacheAc
     if (output) {
       await writeFile(resolve(output, "dashboard-painted-gap.json"), JSON.stringify(measurements, null, 2));
       await checkDesktopSurfaces(view, origin);
-      step = "closing the ordinary desktop session before touch emulation";
-      await page.goto(origin + "/tournaments", { waitUntil: "domcontentloaded" });
-      await signOut(view, origin);
-      await assertIdentity(page, null);
     }
     assert.equal(view.attemptedUsageWrites(), 0, "ordinary player without opted-in consent must not attempt analytics writes");
   } catch (error) {
@@ -768,8 +766,14 @@ try {
   if (options.has("--cloud-baseline") || options.has("--cloud-surfaces")) {
     const output = options.has("--cloud-surfaces") ? resolve(options.get("--artifacts")) : undefined;
     if (output) await mkdir(output, { recursive: true });
-    await checkDashboardClouds(origin, oidc, player, headless, clerkCacheAction, output);
-    if (output) await checkCloudTouch(origin, oidc, player, headless, clerkCacheAction, output);
+    if (!output || !options.has("--touch-only")) {
+      await checkDashboardClouds(origin, oidc, player, headless, clerkCacheAction, output);
+      if (output && !options.has("--desktop-only")) {
+        step = "revoking the closed ordinary desktop session before touch emulation";
+        await verifyAlreadyInactiveSessions();
+      }
+    }
+    if (output && !options.has("--desktop-only")) await checkCloudTouch(origin, oidc, player, headless, clerkCacheAction, output);
     if (surfaceFailures.length) process.exitCode = 1;
   } else {
     const mobileSizes = options.has("--touch-only") ? [true] : options.has("--desktop-only") ? [false] : [false, true];

@@ -132,7 +132,7 @@ function viewportBounds(element: HTMLElement, logo: HTMLElement | null): Bounds 
 }
 
 function mainControls(area: Bounds): Rect[] {
-  return Array.from(document.querySelectorAll("main a[href],main button:not([disabled])")).flatMap((control) => {
+  return Array.from(document.querySelectorAll("main a[href],main button:not([disabled]),main summary")).flatMap((control) => {
     const { x, y, right, bottom, width, height } = control.getBoundingClientRect();
     return width && height && x < area.right && right > area.left && y < area.bottom && bottom > area.top
       ? [{ x, y, width, height }] : [];

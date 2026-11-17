@@ -61,15 +61,23 @@ async function assertLayout(page, expect, mobile) {
       && bounds.y < skull.y + skull.height && bounds.y + bounds.height > skull.y;
     expect(intersects).toBe(false);
   }
-  if (mobile) {
+  const oval = !mobile && await main.getAttribute("data-menu-layout") === "oval";
+  if (!oval) {
     expect(new Set(buttons.map(({ x }) => Math.round(x))).size).toBe(2);
     expect(buttons[0].y).toBeGreaterThanOrEqual(box.y + box.height);
   } else {
-    await expect(main).toHaveAttribute("data-menu-layout", "oval");
-    expect(buttons[2].x + buttons[2].width).toBeLessThanOrEqual(box.x);
-    expect(buttons[3].x).toBeGreaterThanOrEqual(box.x + box.width - 1);
-    expect(buttons[0].y).toBeLessThan(box.y);
-    expect(buttons[4].y).toBeGreaterThan(box.y);
+    const side = await main.getAttribute("data-side");
+    if (side === "left" || side === "right") {
+      for (const button of buttons.slice(0, 3)) expect(button.y + button.height).toBeLessThanOrEqual(box.y);
+      for (const button of buttons.slice(3)) expect(button.y).toBeGreaterThanOrEqual(box.y + box.height);
+      const distance = Math.max(0, skull.x - box.x - box.width, box.x - skull.x - skull.width);
+      expect(distance).toBeLessThan(60);
+    } else {
+      expect(buttons[2].x + buttons[2].width).toBeLessThanOrEqual(box.x);
+      expect(buttons[3].x).toBeGreaterThanOrEqual(box.x + box.width - 1);
+      expect(buttons[0].y).toBeLessThan(box.y);
+      expect(buttons[4].y).toBeGreaterThan(box.y);
+    }
   }
 }
 

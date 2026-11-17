@@ -7,6 +7,7 @@ export type DialogueSlot = Point & { side: Side; width: number; maxHeight: numbe
 
 type DialogueSize = { height: number; bubbleHeight: number; main: boolean };
 type Placement = { skull: Rect; dialogue: DialogueSlot };
+type Scored = { clear: boolean; score: number };
 
 const gap = 16;
 const controlClearance = 8;
@@ -51,6 +52,10 @@ function occupied(rect: Rect, controls: readonly Rect[]) {
   return controls.reduce((sum, control) => sum + overlap(rect, control) / (control.width * control.height), 0);
 }
 
+function improves(candidate: Scored, previous?: Scored) {
+  return !previous || (candidate.clear !== previous.clear ? candidate.clear : candidate.score > previous.score);
+}
+
 function clearHeight(area: Bounds, controls: readonly Rect[], x: number, width: number, y: number, above: boolean) {
   let height = above ? y - area.top : area.bottom - y;
   for (const control of controls) {
@@ -68,7 +73,7 @@ function chooseDialogue(area: Bounds, skull: Rect, size: DialogueSize, controls:
   const normalWidth = Math.floor(Math.min(370, available, stackedWidth));
   const compactWidth = Math.floor(Math.min(minCloudWidth, available));
   const allowOval = size.main && available >= 820 && area.bottom - area.top >= 420;
-  let best: { slot: DialogueSlot; score: number } | undefined;
+  let best: { slot: DialogueSlot } & Scored | undefined;
 
   for (const side of sides) {
     const beside = side === "left" || side === "right";
@@ -104,17 +109,22 @@ function chooseDialogue(area: Bounds, skull: Rect, size: DialogueSize, controls:
       for (const y of ys) {
         const fullHeight = Math.min(above ? y - area.top : area.bottom - y, above ? limitAbove : Infinity);
         const free = Math.min(fullHeight, clearHeight(area, controls, x, width, y, above));
-        for (const maxHeight of new Set([Math.floor(fullHeight), Math.floor(free)])) {
-          if (maxHeight < (oval ? minimumHeight : 1)) continue;
-          const top = above ? y - maxHeight : y;
-          const height = Math.min(maxHeight, targetHeight);
+        for (const capacity of new Set([Math.floor(fullHeight), Math.floor(free)])) {
+          if (capacity < (oval ? minimumHeight : 1)) continue;
+          const height = Math.min(capacity, targetHeight);
           const rect = { x, y: above ? y - height : y, width, height };
+          const covered = occupied(rect, controls);
+          // When there's room for the message and several choices, keep the default
+          // group clear of actionable page controls before rewarding a wider layout.
+          const clear = controls.length > 0 && !covered && height >= Math.min(targetHeight, size.main ? 186 : 130);
+          const maxHeight = clear && free >= height ? Math.floor(free) : capacity;
           const clipped = height / targetHeight;
           const score = clipped * 112 + width / normalWidth * 17 + (oval ? 26 : 0) + (beside ? 4 : 0) +
             (previous?.side === side ? 11 : 0) + (previous?.width === width ? 4 : 0) -
             (maxHeight < minCloudHeight ? 55 : 0) - Math.abs(y - startY) * .35 -
-            Math.min(190, occupied(rect, controls) * 94);
-          if (!best || score > best.score) best = { slot: { side, x, y: top, width, maxHeight, oval }, score };
+            Math.min(190, covered * 94);
+          const candidate = { slot: { side, x, y: above ? y - maxHeight : y, width, maxHeight, oval }, clear, score };
+          if (improves(candidate, best)) best = candidate;
         }
       }
     }
@@ -128,33 +138,41 @@ export function placeReady(area: Bounds, preferred: ReadyPosition | null, size: 
   const initial = placeSkull(area, preferred);
   const obstacles = preferred ? [] : controls;
   const initialDialogue = chooseDialogue(area, initial, size, obstacles, previous?.dialogue);
+  const initialCovered = occupied(initial, obstacles);
   let best = initialDialogue ? {
-    skull: initial, dialogue: initialDialogue.slot, score: initialDialogue.score - occupied(initial, obstacles) * 96,
+    skull: initial, dialogue: initialDialogue.slot, clear: initialDialogue.clear && !initialCovered,
+    score: initialDialogue.score - initialCovered * 96,
   } : undefined;
   const compact = area.right - area.left < 620 || area.bottom - area.top < 420;
-  if (!preferred && compact && obstacles.length &&
-    (!initialDialogue || occupied(initial, obstacles) ||
+  if (!preferred && obstacles.length &&
+    (!initialDialogue || initialCovered ||
       occupied(dialogueRect(initialDialogue.slot, size.height), obstacles) ||
-      initialDialogue.slot.maxHeight < Math.min(205, size.height))) {
-    // On a crowded narrow default layout, fit the entire group into nearby free space.
-    // A deliberate drag always keeps the full-size skull at the user's position.
+      (compact && initialDialogue.slot.maxHeight < Math.min(205, size.height)))) {
+    // Fit the entire default group into nearby space. A deliberate drag keeps the user's position.
     const adjacentWidth = Math.floor(area.right - area.left - minCloudWidth - gap);
     const compactWidth = Math.min(initial.width, Math.max(115, adjacentWidth));
-    for (const width of new Set([initial.width, compactWidth])) {
+    const localShift = compact ? Infinity : 122;
+    for (const width of new Set(compact ? [initial.width, compactWidth] : [initial.width])) {
       const height = Math.round(width * .94);
-      const xs = [initial.x, area.right - width, area.left];
+      const xs = [initial.x, Math.min(area.right - width, initial.x + localShift), Math.max(area.left, initial.x - localShift)];
       const ys = [initial.y, area.top, area.bottom - height];
       for (const control of obstacles) {
         ys.push(control.y - controlClearance - height, bottom(control) + controlClearance);
       }
-      for (const y of new Set(ys.map((value) => clamp(Math.round(value), Math.ceil(area.top), Math.floor(area.bottom - height))))) {
+      const minY = Math.max(area.top, initial.y - localShift);
+      const maxY = Math.min(area.bottom - height, initial.y + localShift);
+      for (const y of new Set(ys.map((value) => clamp(Math.round(value), Math.ceil(minY), Math.floor(maxY))))) {
         for (const x of xs) {
           const skull = keepSkullInside(area, { x, y }, width);
           const result = chooseDialogue(area, skull, size, obstacles, previous?.dialogue);
           if (!result) continue;
           const shift = Math.hypot(skull.x - initial.x, skull.y - initial.y);
-          const score = result.score - occupied(skull, obstacles) * 96 - shift * .046 - (initial.width - width) * .24;
-          if (!best || score > best.score) best = { skull, dialogue: result.slot, score };
+          const covered = occupied(skull, obstacles);
+          const candidate = {
+            skull, dialogue: result.slot, clear: result.clear && !covered,
+            score: result.score - covered * 96 - shift * .046 - (initial.width - width) * .24,
+          };
+          if (improves(candidate, best)) best = candidate;
         }
       }
     }
