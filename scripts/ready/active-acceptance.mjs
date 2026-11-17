@@ -159,9 +159,10 @@ export async function verifyActiveApi({ fixtures, admin, environment, actors, or
   verify(chat.actions?.some(({ label, href }) => label === "Open opponent chat" && isFixtureDestination(href, a, origin)),
     "Ready offers the existing active opponent chat");
   const help = await answer(a1, "authorized active administrative help", { kind: "action", id: "admin-assistance", context: contextFor(a) });
-  verify(help.actions?.some(({ href }) => href === ticketUrl) &&
-    help.actions?.some(({ label, href }) => label === "Open Match Room for Admin Assistance" && isFixtureDestination(href, a, origin)) &&
-    help.actions?.some(({ copyText }) => copyText?.includes(a.matchId)), "verified Discord ticket and active in-site support destinations offered");
+  verify(help.actions?.some(({ href }) => href === ticketUrl), "verified Discord ticket destination is offered");
+  verify(help.actions?.some(({ label, href }) => label === "Open Match Room for Admin Assistance" && isFixtureDestination(href, a, origin)),
+    "active in-site support links to the exact owned Match Room");
+  verify(help.actions?.some(({ copyText }) => copyText?.includes(a.matchId)), "support offers the exact owned match reference to copy");
   return () => verifyNoWrites(admin, owner, [a, b], verify);
 }
 

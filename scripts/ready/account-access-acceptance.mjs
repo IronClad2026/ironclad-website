@@ -206,7 +206,11 @@ async function makeViewport(origin, oidc, mobile, headless = false, clerkCacheAc
     } else {
       const sessionMaintenance = request.method === "POST" && (target.pathname === "/v1/client" ||
         /^\/v1\/client\/sessions\/sess_[a-zA-Z0-9]+\/(?:tokens|touch)$/.test(target.pathname));
-      task = read || (target.origin === clerkOrigin && (managingSession || sessionMaintenance || request.method === "OPTIONS"))
+      const preflightMethod = Object.entries(request.headers).find(([name]) => name.toLowerCase() === "access-control-request-method")?.[1];
+      const registrationProfilePreflight = target.origin === "https://zzbnneprhjicmajpjkdg.supabase.co" &&
+        target.pathname === "/rest/v1/players" && request.method === "OPTIONS" && preflightMethod === "GET";
+      task = read || registrationProfilePreflight ||
+        (target.origin === clerkOrigin && (managingSession || sessionMaintenance || request.method === "OPTIONS"))
         ? proceed() : refuse();
     }
     void task.catch(() => refuse().catch(() => undefined));

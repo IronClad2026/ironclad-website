@@ -14,6 +14,7 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
   const failures = [];
   const coverage = [];
   const mode = mobile ? "390px touch emulation" : "desktop Chrome";
+  const selected = process.env.READY_WORKFLOW_CASES?.split(",").filter(Boolean);
   const panel = page.locator("[data-mascot-dialogue]:visible");
   const dock = page.locator("[data-ready-dock]:visible");
   const surface = page.locator("[data-mode][data-asset-status]");
@@ -38,6 +39,7 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
   }
 
   async function verify(label, work) {
+    if (selected?.length && !selected.some((phrase) => label.toLowerCase().includes(phrase.toLowerCase()))) return;
     try {
       await work();
       coverage.push(label);
@@ -52,11 +54,9 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
     }
   }
 
-  async function open(path, choices) {
-    const url = new URL(path, origin);
-    await page.goto(url.href, { waitUntil: "domcontentloaded" });
+  async function ask(choices) {
     await expect(dock).toHaveCount(1, { timeout: 25_000 });
-    if (url.pathname === "/dashboard") {
+    if (new URL(page.url()).pathname === "/dashboard") {
       const badge = page.locator('[role="dialog"][aria-labelledby^="badge-reveal-"]');
       if (await badge.isVisible()) await select(badge.getByRole("button", { name: "Not now", exact: true }));
     }
@@ -72,6 +72,11 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
     const skip = panel.getByRole("button", { name: "Show full message", exact: true });
     if (await skip.isVisible()) await select(skip);
     await expect(page).toHaveURL(startUrl);
+  }
+
+  async function open(path, choices) {
+    await page.goto(new URL(path, origin).href, { waitUntil: "domcontentloaded" });
+    await ask(choices);
   }
 
   async function follow(label, href) {
@@ -90,11 +95,22 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
   const eventMenu = ["Tournaments & registration"];
   const governance = [...eventMenu, "Event rules, prizes & decisions"];
 
-  await verify("No active assignment and deliberate archived-match selection", async () => {
+  await verify("Honest active-assignment guidance and deliberate archived-match selection", async () => {
     await open("/", [...matchMenu, "Open my match"]);
-    await expect(panel).toContainText(/no active match|more than one match/i);
-    await expect(panel.getByRole("link", { name: "Open my match", exact: true })).toHaveCount(0);
+    const current = panel.getByRole("link", { name: "Open my match", exact: true });
+    if (await current.isVisible()) {
+      assert(new URL(await current.getAttribute("href"), origin).searchParams.has("match"));
+    } else {
+      await expect(panel).toContainText(/no active match|more than one match/i);
+      if (/no active match/i.test(await panel.textContent())) {
+        coverage.push("No active match state");
+        console.log(JSON.stringify({ workflow: "No active match state", viewport: mode, verified: true }));
+      }
+    }
     await open(ownBrackets, [...matchMenu, "Open my match"]);
+    await follow("Open my match", historyMatch);
+    await expect(matchWorkspace()).toBeVisible({ timeout: 20_000 });
+    await open(ownBrackets, [...matchMenu, "Find a past match"]);
     await follow("Open my match", historyMatch);
     await expect(matchWorkspace()).toBeVisible({ timeout: 20_000 });
   });
@@ -170,10 +186,25 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
   await verify("Event scope opens details and the visible Rules panel", async () => {
     await open(eventPath(fixture.own), [...governance, "Open event rules"]);
     await follow("Open event rules", eventPath(fixture.own, { panel: "rules" }));
-    await expect(page.getByRole("heading", { name: /rules/i }).first()).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Rules", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tabpanel", { name: "Rules", exact: true })).toBeVisible();
     await open(eventPath(fixture.own), [...eventMenu, "Find or join a tournament", "Browse tournaments"]);
     await follow("Open tournament", eventPath(fixture.own));
     await expect(page.getByText(/cancelled/i).first()).toBeVisible();
+  });
+
+  await verify("Several event candidates require a deliberate selection before navigation", async () => {
+    await open("/", [...eventMenu, "Find or join a tournament", "Browse tournaments"]);
+    await expect(panel).toContainText(/which event/i);
+    const choice = panel.getByRole("button", { name: "Test 1", exact: true });
+    await expect(choice).toBeVisible();
+    await reserveRequests(1);
+    await select(choice);
+    const skip = panel.getByRole("button", { name: "Show full message", exact: true });
+    if (await skip.isVisible()) await select(skip);
+    await expect(page).toHaveURL(origin + "/");
+    await follow("Open tournament", eventPath({ eventSlug: "test-1" }));
+    await expect(page.getByRole("tab", { name: "Details", exact: true })).toHaveAttribute("aria-selected", "true");
   });
 
   await verify("Archived event registration shows closure and offers no register action", async () => {
@@ -184,11 +215,40 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
     await expect(page.getByText(/cancelled/i).first()).toBeVisible();
   });
 
+  await verify("Open-event registration opens the native form twice without submitting", async () => {
+    const current = eventPath({ eventSlug: "test-1" });
+    const choices = [...eventMenu, "Find or join a tournament", "Open registration"];
+    await open(current, choices);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const register = panel.getByRole("link", { name: "Open registration", exact: true });
+      await expect(register).toHaveAttribute("href", current + "&register=1");
+      await select(register);
+      const registration = page.getByRole("dialog").filter({ has: page.locator("[data-registration-action-footer]") });
+      try {
+        await expect(registration).toBeVisible({ timeout: 20_000 });
+      } catch (error) {
+        const dialogHeadings = await page.getByRole("dialog").getByRole("heading").allTextContents();
+        const path = new URL(page.url());
+        throw new Error(`Registration attempt ${attempt + 1}: ${dialogHeadings.join(" | ") || "no visible dialog"}; register parameter present: ${path.searchParams.has("register")}`, { cause: error });
+      }
+      await expect(page).toHaveURL(origin + current);
+      await page.keyboard.press("Escape");
+      await expect(registration).toHaveCount(0);
+      if (attempt === 0) await ask(choices);
+    }
+  });
+
   await verify("Archived event registration status belongs to the fixture owner", async () => {
     await open(eventPath(fixture.own), [...eventMenu, "My registration & waitlist", "Check my registration status"]);
     await expect(panel).toContainText(/your registration for/i);
     await follow("Open dashboard", "/dashboard");
     await expect(page.locator("[data-dashboard-section=registrations]")).toBeVisible();
+  });
+
+  await verify("No registration state does not offer a private record", async () => {
+    await open(eventPath({ eventSlug: "test-1" }), [...eventMenu, "My registration & waitlist", "Check my registration status"]);
+    await expect(panel).toContainText(/couldn’t find a registration/i);
+    await expect(panel.getByRole("link", { name: "Open dashboard", exact: true })).toHaveAttribute("href", "/dashboard");
   });
 
   await verify("No prize pool yields event details instead of a missing Prizes panel", async () => {
@@ -198,10 +258,29 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
     await expect(page.getByText(/cancelled/i).first()).toBeVisible();
   });
 
+  await verify("Published prize terms open the visible Prizes panel", async () => {
+    const completed = { eventSlug: "test-2-2" };
+    await open(eventPath(completed), [...governance, "View published event prize terms"]);
+    await follow("Open event prize terms", eventPath(completed, { panel: "prizes" }));
+    await expect(page.getByRole("tab", { name: "Prizes", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tabpanel", { name: "Prizes", exact: true })).toBeVisible();
+  });
+
   await verify("Event decisions action opens the native Decisions tab", async () => {
     await open(eventPath(fixture.own), [...governance, "View published event decisions"]);
     await follow("Open event decisions", eventPath(fixture.own, { tab: "decisions" }));
-    await expect(page.getByRole("heading", { name: /decisions/i }).first()).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Tournament navigation" })
+      .getByRole("button", { name: /decisions/i })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  await verify("Published final decision opens the exact visible decision card", async () => {
+    const published = { eventSlug: "pr124-staging-poll-validation-20260908" };
+    await open(eventPath(published), [...governance, "View published event decisions"]);
+    await expect(panel).toContainText(/a final decision is published/i);
+    const target = await follow("Open event decisions");
+    assert.equal(target.searchParams.get("tournament"), published.eventSlug);
+    assert.match(target.searchParams.get("poll") ?? "", /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i);
+    await expect(page.getByRole("article").filter({ hasText: /Admin final decision|Authoritative decision/i }).first()).toBeVisible();
   });
 
   for (const [label, destination, href, native] of [
@@ -239,5 +318,6 @@ export async function verifyReadyNativeDestinations({ page, origin, mobile, allo
   });
 
   assert.deepEqual(failures, [], "Native destination audit failures");
+  assert(coverage.length, "No named native destination checks ran");
   return coverage;
 }

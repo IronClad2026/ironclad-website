@@ -308,4 +308,21 @@ describe("Ready platform assistance", () => {
       });
     }
   });
+
+  it("keeps public guidance available to a new account without guessing private match or registration records", async () => {
+    data.loadReadyPrivateContext.mockResolvedValue({ profile: null, registrations: [] });
+    data.loadReadyEvents.mockResolvedValue([{ ...event, status: "registration_open", registration_enabled: true }]);
+    await expect(answerPlatformAction("opponent", undefined, user)).resolves.toMatchObject({
+      text: expect.stringContaining("couldn’t verify an active player profile"),
+      actions: [{ href: "/dashboard" }],
+    });
+    expect(data.loadReadyOwnedMatches).not.toHaveBeenCalled();
+    await expect(answerPlatformAction("open-registration", { eventSlug: event.slug }, user)).resolves.toMatchObject({
+      text: expect.stringContaining("Complete your player profile"),
+      actions: [{ href: "/dashboard" }, { href: `/tournaments?tournament=${event.slug}` }],
+    });
+    await expect(answerPlatformAction("rules-hub", undefined, user)).resolves.toMatchObject({
+      actions: [{ href: "/rules" }],
+    });
+  });
 });
