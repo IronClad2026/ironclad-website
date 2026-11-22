@@ -1,0 +1,40 @@
+name: Ready Wardrobe pilot
+
+on:
+  push:
+    branches:
+      - codex/ready-wardrobe-pilot
+
+permissions:
+  contents: read
+
+jobs:
+  verify-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLERK_SECRET_KEY: sk_test_not-a-real-secret
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsudGVzdCQ=
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-only-publishable-key
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      SUPABASE_SERVICE_ROLE_KEY: test-only-service-role-key
+    steps:
+      - name: Check out the pilot
+        uses: actions/checkout@v6
+      - name: Use project CI Node version
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Wardrobe access, Ready renderer and Pro standings
+        run: >-
+          npm test --
+          tests/integration/ready-wardrobe.test.ts
+          tests/unit/ready-runtime.test.ts
+          tests/unit/components/LeaderboardExperience.test.tsx
+          tests/integration/leaderboard-public-projection.test.ts
+          tests/integration/public-content-alignment.test.ts
+      - run: npm run build
