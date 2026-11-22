@@ -1,3 +1,5 @@
+import type { WardrobeItemId } from "@/lib/wardrobe/catalogue";
+
 export type MascotMode = "dock" | "floating";
 export type MascotView = "front" | "three-quarter";
 export type TalkStyle = "Talk_Normal" | "Talk_Enthusiastic" | "Talk_Gentle";
@@ -76,6 +78,11 @@ export type MascotRenderer = {
   setTears(value: "auto" | "on" | "off"): void;
   setReducedMotion(enabled: boolean): void;
   setVisible(enabled: boolean): void;
+  prepareWardrobe(items: WardrobeItemId[], signal: AbortSignal): Promise<{
+    commit(): void;
+    discard(): void;
+  }>;
+  clearWardrobe(): void;
   snapshot(): MascotSnapshot | null;
   measure(durationMs?: number): Promise<MascotFrameReport>;
   dispose(): void;
@@ -85,6 +92,7 @@ type Factory = (options: {
   canvas: HTMLCanvasElement;
   onStatus?: (status: MascotStatus, error?: Error) => void;
   onAnchor?: (anchor: Anchor) => void;
+  wardrobe?: boolean;
 }) => MascotRenderer;
 
 type Module = { createMascotRenderer: Factory };

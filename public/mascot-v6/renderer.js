@@ -244,6 +244,7 @@ class MascotScene {
   dispose() {
     this.metrics.cancel('The mascot renderer was disposed.');
     this.attention.dispose();
+    this.wardrobe?.clear();
     this.smoke?.dispose();
     this.tears?.dispose();
     disposeAsset(this.model);
@@ -251,7 +252,7 @@ class MascotScene {
   }
 }
 
-export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
+export function createMascotRenderer({ canvas, onStatus, onAnchor, wardrobe = false }) {
   const options = { mode: 'dock', view: 'front', dragging: false, reducedMotion: false, smoke: true, tears: 'auto' };
   const abort = new AbortController();
   const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -420,6 +421,11 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
         return;
       }
       runtime.setup(config, asset);
+      if (wardrobe) {
+        const { createWardrobe } = await import('./wardrobe.js');
+        if (disposed) return;
+        runtime.wardrobe = createWardrobe(runtime, nodeNamed, disposeAsset);
+      }
       showExpression(activeExpression, expressionIntensity);
       if (activeTalk && !options.reducedMotion) runtime.pose.playTalk(activeTalk.style, activeTalk.gain);
       loaded = true;
@@ -471,6 +477,23 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor }) {
     setTears(value) { options.tears = value; schedule(); },
     setReducedMotion,
     setVisible(value) { requestedVisibility = value; reconcile(); },
+    async prepareWardrobe(items, signal) {
+      await ready;
+      if (!runtime?.wardrobe || disposed) throw new Error('The wardrobe preview is unavailable.');
+      const prepared = await runtime.wardrobe.prepare(items, signal);
+      return {
+        commit() {
+          if (disposed) {
+            prepared.discard();
+            return;
+          }
+          prepared.commit();
+          schedule();
+        },
+        discard: prepared.discard,
+      };
+    },
+    clearWardrobe() { runtime?.wardrobe?.clear(); schedule(); },
     snapshot() { return loaded ? runtime.snapshot() : null; },
     async measure(durationMs = 3500) {
       await ready;

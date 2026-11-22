@@ -416,6 +416,80 @@ describe("LeaderboardExperience", () => {
     expect(within(table).queryByText("Main Progression")).not.toBeInTheDocument();
   });
 
+  it("shows first and second place in Pro seasons without publishing or carrying forward awards", () => {
+    const currentProSeason = {
+      ...featuredSeason,
+      id: "pro-existing",
+      name: "2026 Pro Season 1",
+      seasonNumber: 1,
+      officialBracketType: "pro" as const,
+    };
+    const archivedSeason = {
+      id: "previous-pro-champion",
+      seasonName: "2025 Pro Season 1",
+      bracketType: "pro" as const,
+      playerId: null,
+      playerName: "Archived Pro Champion",
+      country: null,
+      hasAvatar: false,
+      avatarUrl: null,
+      finalRank: 1,
+      finalPoints: 125,
+    };
+    const finalized = {
+      ...currentProSeason,
+      isActive: false,
+      isFinalized: true,
+      validQualifyingEventCount: 6,
+    };
+    const nextProSeason = {
+      ...currentProSeason,
+      id: "pro-next",
+      name: "2026 Pro Season 2",
+      seasonNumber: 2,
+    };
+
+    const view = render(<LeaderboardExperience data={leaderboardData({
+      currentSeason: currentProSeason,
+      seasonStandings: [],
+    })} />);
+    for (const [season, firstPlace] of [
+      [currentProSeason, "First Commander"],
+      [finalized, "First Commander"],
+      [nextProSeason, "New Season Leader"],
+    ] as const) {
+      view.rerender(<LeaderboardExperience data={leaderboardData({
+        currentSeason: season,
+        seasonStandings: [
+          standing({ seasonId: season.id, bracketType: "pro", playerName: firstPlace }),
+          standing({
+            seasonId: season.id,
+            bracketType: "pro",
+            playerId: "22222222-2222-4222-8222-222222222222",
+            playerName: "Second Commander",
+            rank: 2,
+            displayOrder: 2,
+            totalPoints: 90,
+          }),
+        ],
+        seasonChampions: [archivedSeason],
+      })} />);
+
+      const podium = within(screen.getByRole("region", { name: /top standings/i }));
+      expect(screen.getAllByText(season.name).length).toBeGreaterThan(0);
+      expect(podium.getByText(season.isFinalized ? "Final Standings" : "Current Standings")).toBeInTheDocument();
+      expect(podium.getByText(firstPlace)).toBeInTheDocument();
+      expect(podium.getByText("Second Commander")).toBeInTheDocument();
+      expect(podium.getByText("Rank #1")).toBeInTheDocument();
+      expect(podium.getByText("Rank #2")).toBeInTheDocument();
+      expect(screen.getByText("Archived Pro Champion")).toBeInTheDocument();
+      expect(view.container).not.toHaveTextContent(
+        /[$€£]\s*\d|\b\d[\d,.]*\s*(?:AUD|USD|EUR|GBP)\b|\b(?:season prize|cash prize|prize pool|payout)s?\b/i
+      );
+    }
+    expect(screen.queryByText("First Commander")).not.toBeInTheDocument();
+  });
+
   it("keeps Career divisions separate with public active identities and protected closed identities", () => {
     const academyRows = [
       standing({

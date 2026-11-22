@@ -5,6 +5,7 @@ import {
   isSelfAuthenticatedApiPathname,
 } from "@/lib/route-access";
 import { isReadyStagingEnabled } from "@/lib/ready/review-access";
+import { isReadyWardrobePilotEnabled } from "@/lib/wardrobe/environment";
 import {
   buildPublicProfileNoticeUrl,
   isNoticeAccessDocument,
@@ -21,10 +22,16 @@ export default clerkMiddleware(async (auth, request) => {
   const isReadyAssetRead = isPageRead &&
     (pathname === "/mascot-v6/assets/interaction.json" || pathname === "/mascot-v6/assets/ironclad.glb") &&
     isReadyStagingEnabled();
+  const isWardrobePilotRoute = isReadyWardrobePilotEnabled() && (
+    (isPageRead && pathname === "/profile/ready") ||
+    pathname === "/api/ready/wardrobe" ||
+    pathname.startsWith("/api/ready/wardrobe/assets/")
+  );
   if (
     !isPublicPathname(pathname) &&
     !isSelfAuthenticatedApiPathname(pathname) &&
-    !isReadyAssetRead
+    !isReadyAssetRead &&
+    !isWardrobePilotRoute
   ) {
     await auth.protect();
   }

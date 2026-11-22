@@ -172,6 +172,17 @@ export class Smoke {
     }
   }
 
+  retarget(anchor) {
+    if (this.anchor === anchor) return;
+    this.anchor = anchor;
+    this.emission = 0;
+    this.cursor = 0;
+    for (const point of this.points) {
+      point.age = Infinity;
+      point.sprite.visible = false;
+    }
+  }
+
   update(delta, intensity, camera) {
     this.emission += delta;
     const spacing = .071 + .021 * Math.sin(this.cursor * 2.39996);
