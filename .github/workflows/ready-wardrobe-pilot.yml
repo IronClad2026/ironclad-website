@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/ready-wardrobe-pilot
+      - codex/ready-wardrobe-dashboard
 
 permissions:
   contents: read
@@ -33,8 +34,11 @@ jobs:
         run: >-
           npm test --
           tests/integration/ready-wardrobe.test.ts
+          tests/integration/dashboard-ready-wardrobe.test.tsx
           tests/unit/ready-runtime.test.ts
+          tests/unit/ready-menu-ui.test.tsx
           tests/unit/components/WardrobePilot.test.tsx
+          tests/unit/components/ReadyDockInvitation.test.tsx
           tests/unit/components/LeaderboardExperience.test.tsx
           tests/integration/leaderboard-public-projection.test.ts
           tests/integration/public-content-alignment.test.ts

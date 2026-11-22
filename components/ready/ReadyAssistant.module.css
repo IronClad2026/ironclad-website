@@ -22,6 +22,37 @@
 .dock[aria-expanded="true"] { pointer-events: none; }
 .poster, .artPoster { display: block; width: 100%; height: 100%; object-fit: contain; }
 
+.dockInvitation {
+  position: fixed;
+  z-index: 121;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #fb923c;
+  border-radius: 18px;
+  background: #18181b;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 35%);
+  color: #f4f4f5;
+  font-size: .875rem;
+  line-height: 1.4;
+  overscroll-behavior: contain;
+}
+
+.dockInvitationActions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dockInvitationAction,
+.dockInvitationDismiss {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  touch-action: manipulation;
+}
+.dockInvitationAction { background: #fb923c; color: #0a0a0a; }
+.dockInvitationDismiss { color: #f4f4f5; text-decoration: underline; text-underline-offset: 3px; }
+.dockInvitationAction:hover { background: #fdba74; }
+.dockInvitation :focus-visible { outline: 2px solid #fdba74; outline-offset: 2px; }
+
 .surface,
 .assistant {
   --ready-surface: #09090b;

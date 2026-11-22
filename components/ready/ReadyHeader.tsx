@@ -5,7 +5,7 @@ import ReadyAssistant from "./ReadyAssistant";
 import ReadyPoster from "./ReadyPoster";
 import styles from "./ReadyAssistant.module.css";
 
-export default function ReadyHeader() {
+export default function ReadyHeader({ wardrobePilotEnabled = false }: { wardrobePilotEnabled?: boolean }) {
   const { isLoaded, isSignedIn, sessionId } = useAuth();
   if (!isLoaded || (isSignedIn && !sessionId)) {
     return (
@@ -18,5 +18,6 @@ export default function ReadyHeader() {
   }
 
   const scope = sessionId ?? "visitor";
-  return <ReadyAssistant key={scope} workspaceScope={scope} signedIn={isSignedIn === true} />;
+  return <ReadyAssistant key={scope} workspaceScope={scope} signedIn={isSignedIn === true}
+    wardrobePilotEnabled={wardrobePilotEnabled} />;
 }

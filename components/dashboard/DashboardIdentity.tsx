@@ -1,5 +1,6 @@
 import { ArrowUpRight, Pencil, UserRound } from "lucide-react";
 import Link from "next/link";
+import DashboardReadyWardrobe from "@/components/dashboard/DashboardReadyWardrobe";
 import { getPlayerAvatarDisplayUrl } from "@/lib/avatar";
 import { getLocalizedCountryName, getLocalizedPlayerRegion } from "@/lib/countries";
 import type { Locale } from "@/lib/i18n/config";
@@ -15,12 +16,14 @@ export default function DashboardIdentity({
   locale,
   t,
   showcaseEnabled = false,
+  wardrobeEnabled = false,
 }: {
   profile: PlayerProfile | null;
   error: boolean;
   locale: Locale;
   t: Translator;
   showcaseEnabled?: boolean;
+  wardrobeEnabled?: boolean;
 }) {
   const complete = profile?.profile_completed === true;
   const avatarUrl = profile ? getPlayerAvatarDisplayUrl(profile) : null;
@@ -36,9 +39,12 @@ export default function DashboardIdentity({
       </h1>
       <div data-dashboard-section="identity">
         {error ? (
-          <p role="alert" className="border-l-2 border-red-400 bg-red-500/10 p-4 text-sm text-red-200">
-            {t("dashboard.profile.loadError")}
-          </p>
+          <>
+            <p role="alert" className="border-l-2 border-red-400 bg-red-500/10 p-4 text-sm text-red-200">
+              {t("dashboard.profile.loadError")}
+            </p>
+            {wardrobeEnabled ? <DashboardReadyWardrobe /> : null}
+          </>
         ) : profile ? (
           <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-4 sm:gap-x-5 xl:grid-cols-[auto_minmax(0,1fr)_auto]">
             <div
@@ -53,6 +59,7 @@ export default function DashboardIdentity({
               <h2 className="break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
                 {profile.display_name}
               </h2>
+              {wardrobeEnabled ? <DashboardReadyWardrobe /> : null}
               <p className="mt-1 break-words text-sm font-semibold text-zinc-300">{profile.in_game_name}</p>
               <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
                 <p className="text-sm text-zinc-400">
@@ -100,6 +107,7 @@ export default function DashboardIdentity({
           <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-bold text-white">{t("dashboard.profile.requiredTitle")}</h2>
+              {wardrobeEnabled ? <DashboardReadyWardrobe /> : null}
               <p className="mt-1 text-sm leading-5 text-zinc-400">{t("dashboard.profile.requiredDescription")}</p>
             </div>
             <Link href="/profile" className="inline-flex min-h-11 items-center bg-orange-500 px-4 py-2 text-sm font-bold text-black transition hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300">

@@ -21,6 +21,7 @@ import { compileSpeech, sampleSpeech } from "./speech";
 import ThoughtCloudShape from "./ThoughtCloudShape";
 import { ReadyCloudLink, ReadySources } from "./ReadyReplyContent";
 import ReadyPoster from "./ReadyPoster";
+import ReadyDockInvitation from "./ReadyDockInvitation";
 import { useMascotCloudMenu } from "./useMascotCloudMenu";
 import styles from "./ReadyAssistant.module.css";
 
@@ -178,7 +179,8 @@ function TouchButton({ onActivate, ...props }: TouchButtonProps) {
     onTouchEnd={tapEnd} onTouchCancel={() => { tap.current = null; }} />;
 }
 
-export default function ReadyAssistant({ workspaceScope, signedIn }: { workspaceScope: string; signedIn: boolean }) {
+export default function ReadyAssistant({ workspaceScope, signedIn, wardrobePilotEnabled = false }:
+  { workspaceScope: string; signedIn: boolean; wardrobePilotEnabled?: boolean }) {
   const workspaceKey = `ironclad-ready:workspace:v2:${workspaceScope}`;
   const client = useSyncExternalStore(subscribeClient, resumeOnClient, pauseOnServer);
   const reducedMotion = useSyncExternalStore(subscribeMotion, () => matchMedia(reducedQuery).matches, pauseOnServer);
@@ -677,9 +679,9 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
     };
   }, [abortPending, cancelFollowup]);
 
-  function openAssistant() {
+  function openAssistant(entry = lastSettled.current, focusMessage = false) {
     if (workspace.current.open) return;
-    moveFocus.current = dock.current?.matches(":focus-visible") === true;
+    moveFocus.current = focusMessage || dock.current?.matches(":focus-visible") === true;
     usage.track({ type: "manual_open" });
     if (cloudExitTimer.current !== null) window.clearTimeout(cloudExitTimer.current);
     cloudExitTimer.current = null;
@@ -687,12 +689,12 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
     if (dockingTimer.current !== null) window.clearTimeout(dockingTimer.current);
     dockingTimer.current = null;
     surface.current?.removeAttribute("data-mascot-travel");
-    const newReply = !openedThisMount.current;
+    const newReply = !openedThisMount.current || entry !== lastSettled.current;
     openedThisMount.current = true;
     workspace.current = { ...workspace.current, open: true, seenGreeting: true };
     saveWorkspace(workspaceKey, workspace.current);
     setOpen(true);
-    begin(lastSettled.current, newReply);
+    begin(entry, newReply);
   }
 
   function dockAssistant() {
@@ -975,11 +977,14 @@ export default function ReadyAssistant({ workspaceScope, signedIn }: { workspace
   return (
     <div className={styles.brand}>
       <TouchButton aria-controls={open ? "ironclad-assistant" : undefined} aria-expanded={open} aria-label="Open Ready, the IronClad assistant"
-        className={styles.dock} data-ready-dock="" data-ready-status={status} onActivate={openAssistant}
+        className={styles.dock} data-ready-dock="" data-ready-status={status} onActivate={() => openAssistant()}
         ref={dock} tabIndex={open ? -1 : 0} title="Open Ready" type="button">
         {!open && status !== "ready" && <ReadyPoster />}
       </TouchButton>
       {client && createPortal(<>
+        {!open && !cloudExit && <ReadyDockInvitation key={locationKey} dock={dock}
+          wardrobeSessionId={wardrobePilotEnabled && signedIn ? workspaceScope : null}
+          onAsk={() => openAssistant(mainMenu, true)} />}
         <div aria-hidden="true" className={styles.surface} data-asset-status={status} data-mode={open ? "floating" : "dock"} ref={surface}>
           <canvas className={styles.canvas} ref={canvas} />
         </div>

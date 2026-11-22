@@ -22,6 +22,7 @@ import { getRequestLocale } from "@/lib/i18n/request";
 import { getLegalDocument } from "@/lib/legal-corpus-publication";
 import { isPublicProfileNoticeInstalled, NOTICE_LAYOUT_HEADER } from "@/lib/public-gaming-profile-notice";
 import { isReadyStagingEnabled } from "@/lib/ready/review-access";
+import { isReadyWardrobePilotEnabled } from "@/lib/wardrobe/environment";
 
 const icons: Metadata["icons"] = {
   icon: [
@@ -119,7 +120,7 @@ export default async function RootLayout({
             >
               <SmoothScrollProvider>
                 <GlobalSmoke />
-                <Navbar ready={isReadyStagingEnabled() ? <ReadyHeader /> : undefined} />
+                <Navbar ready={isReadyStagingEnabled() ? <ReadyHeader wardrobePilotEnabled={isReadyWardrobePilotEnabled()} /> : undefined} />
 
                 <div>{children}</div>
 

@@ -24,6 +24,7 @@ import {
 } from "@/lib/player-profile";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 import type { TournamentStatus } from "@/lib/tournaments";
+import { isReadyWardrobePilotEnabled } from "@/lib/wardrobe/environment";
 import DashboardIdentity from "@/components/dashboard/DashboardIdentity";
 import DashboardCareerHistory from "@/components/dashboard/DashboardCareerHistory";
 import DashboardRegistrationNavigation from "@/components/dashboard/DashboardRegistrationNavigation";
@@ -155,7 +156,14 @@ export default async function PlayerDashboardPage() {
     >
       <div className="relative z-10 mx-auto max-w-7xl">
         <DashboardRegistrationNavigation key={currentRegistrations.map((registration) => registration.id).join("|")} />
-        <DashboardIdentity profile={profile} error={Boolean(profileResult.error)} locale={locale} t={t} showcaseEnabled={showcaseEnabled} />
+        <DashboardIdentity
+          profile={profile}
+          error={Boolean(profileResult.error)}
+          locale={locale}
+          t={t}
+          showcaseEnabled={showcaseEnabled}
+          wardrobeEnabled={isReadyWardrobePilotEnabled()}
+        />
 
         <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)]" data-dashboard-section="current-actions">
           <section className="min-w-0" aria-labelledby="dashboard-competition-title">

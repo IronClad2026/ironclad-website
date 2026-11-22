@@ -1,3 +1,6 @@
+export const readyWardrobeHref = "/dashboard?wardrobe=open#ready-wardrobe";
+export const readyWardrobeOpenEvent = "ready-wardrobe:open";
+
 export const wardrobeItems = [
   { id: "eyewear_smoked_aviators", name: "Smoked Aviators" },
   { id: "mouth_cigarette", name: "Cigarette" },
