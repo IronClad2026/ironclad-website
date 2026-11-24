@@ -94,7 +94,7 @@ async function waitsAtRoot(observer,pid,owner) {
  return false;
 }
 
-export async function checkLegacyProConcurrency(coordinator) {
+export async function checkLegacyProConcurrency(coordinator,{independentSeasonFinalization=false}={}) {
  await attest(coordinator);
  assert.equal((await coordinator.query("select to_regprocedure('pg_temp.fd_id(text,integer,integer)') is not null ok")).rows[0].ok,true,'Lifecycle helpers must be loaded on the coordinator');
  const source=(await coordinator.query("select x.season_id,x.tournament_id,x.tournament_bracket_id from ironclad_private.legacy_main_pro_season_transition x join public.leaderboard_seasons s on s.id=x.season_id where x.activated_at is not null and s.official_bracket_type='main' and s.finalized_at is null and (select count(*) from public.leaderboard_tournament_season_memberships m where m.season_id=s.id and m.qualifying_event_number is not null and m.voided_at is null)=1")).rows;
@@ -105,12 +105,19 @@ export async function checkLegacyProConcurrency(coordinator) {
  try {
   mutationStarted=true;
   await begin(coordinator);await coordinator.query("set local ironclad.test_model='four_division_v1';");
+  if(independentSeasonFinalization) {
+   for(const event of [2,3,4,5]) {
+    await coordinator.query("select pg_temp.fd_create($1,'Pro',$1)",[event]);
+    await coordinator.query("select pg_temp.fd_play($1,'Pro')",[event]);
+   }
+   await coordinator.query("select pg_temp.fd_create(100,'Academy',100)");
+  }
   for(const event of [100,101]) {
    await coordinator.query("select pg_temp.fd_create($1,'Pro',$1)",[event]);
    await coordinator.query("select pg_temp.fd_play($1,'Pro',6)",[event]);
   }
   await coordinator.query('commit');
-  const events=(await coordinator.query("select t.id tournament_id,b.id bracket_id,m.id match_id,m.series_best_of/2+1 winning_score,m.player_one_registration_id winner_registration_id from public.tournaments t join public.tournament_brackets b on b.tournament_id=t.id join public.generated_brackets g on g.tournament_bracket_id=b.id join public.tournament_matches m on m.generated_bracket_id=g.id where t.id in(pg_temp.fd_id('event',100),pg_temp.fd_id('event',101)) and m.status='in_progress' order by t.slug")).rows;
+  const events=(await coordinator.query("select t.id tournament_id,b.id bracket_id,m.id match_id,m.series_best_of/2+1 winning_score,m.player_one_registration_id winner_registration_id from public.tournaments t join public.tournament_brackets b on b.tournament_id=t.id join public.generated_brackets g on g.tournament_bracket_id=b.id join public.tournament_matches m on m.generated_bracket_id=g.id where t.id in(pg_temp.fd_id('event',100),pg_temp.fd_id('event',101)) and b.name='Pro' and m.status='in_progress' order by t.slug")).rows;
   assert.equal(events.length,2,'Each future Pro event must have exactly one real final remaining');
   for(let i=0;i<3;i++){const client=await connect();clients.push(client);await attest(client);await begin(client,true);}
   // The normal first final writer itself takes and holds the existing root lock.
@@ -129,15 +136,26 @@ export async function checkLegacyProConcurrency(coordinator) {
    legacy.then(async result=>{try{if(result.error)throw result.error;unchanged(result.result);await clients[2].query('commit');}catch(error){await clients[2].query('rollback');throw error;}}),
   ]);
   for(const result of commits)if(result.status==='rejected')throw result.reason;
-  const memberships=(await coordinator.query('select tournament_id,season_id,qualifying_event_number,scored_at is not null scored,voided_at is null valid from public.leaderboard_tournament_season_memberships where tournament_id=any($1::uuid[]) order by qualifying_event_number',[events.map(event=>event.tournament_id)])).rows;
-  assert.deepEqual(memberships.map(row=>row.qualifying_event_number),[2,3],'Racing genuine Pro completions need distinct sequential slots');
-  assert(memberships.every(row=>row.season_id===source[0].season_id&&row.scored&&row.valid),'Race assigned a different season or fabricated an unscored/void membership');
-  assert.equal((await coordinator.query('select count(*)::integer n from public.leaderboard_seasons where id=$1 and official_bracket_type=\'main\' and finalized_at is null',[source[0].season_id])).rows[0].n,1);
+  const memberships=(await coordinator.query('select tournament_id,season_id,qualifying_event_number,scored_at is not null scored,voided_at is null valid from public.leaderboard_tournament_season_memberships where tournament_id=any($1::uuid[]) order by array_position($1::uuid[],tournament_id)',[events.map(event=>event.tournament_id)])).rows;
+  assert(memberships.every(row=>row.scored&&row.valid),'Race fabricated an unscored or void membership');
+  if(independentSeasonFinalization) {
+   assert.deepEqual(memberships.map(row=>row.qualifying_event_number),[6,1],'Concurrent final results must fill old slot six and new slot one');
+   assert.equal(memberships[0].season_id,source[0].season_id);
+   assert.notEqual(memberships[1].season_id,source[0].season_id);
+   assert.equal((await coordinator.query("select status='in_progress' and first_completed_at is null ok from public.tournaments where id=$1",[events[0].tournament_id])).rows[0].ok,true);
+   assert.equal((await coordinator.query('select count(*)::integer n from public.leaderboard_seasons where finalized_at is not null and not is_active')).rows[0].n,1);
+   assert.equal((await coordinator.query("select count(*)::integer n from public.leaderboard_seasons where id=$1 and official_bracket_type='pro' and finalized_at is null and is_active",[memberships[1].season_id])).rows[0].n,1);
+   assert.equal((await coordinator.query("select count(*)::integer n from public.leaderboard_seasons where official_bracket_type='pro'")).rows[0].n,1,'Race created a duplicate successor');
+  } else {
+   assert.deepEqual(memberships.map(row=>row.qualifying_event_number),[2,3],'Racing genuine Pro completions need distinct sequential slots');
+   assert(memberships.every(row=>row.season_id===source[0].season_id),'Race assigned a different season');
+   assert.equal((await coordinator.query('select count(*)::integer n from public.leaderboard_seasons where id=$1 and official_bracket_type=\'main\' and finalized_at is null',[source[0].season_id])).rows[0].n,1);
+  }
   for(const event of events) {
    const outcomes=await Promise.all(clients.slice(0,2).map(async client=>{await begin(client,true);try{const result=(await client.query('select public.settle_leaderboard_division($1,null) result',[event.bracket_id])).rows[0].result;await client.query('commit');return result;}catch(error){await client.query('rollback');throw error;}}));
    outcomes.forEach(unchanged);
   }
-  assert.equal((await coordinator.query('select count(*)::integer n from public.leaderboard_tournament_season_memberships where season_id=$1 and qualifying_event_number is not null and voided_at is null',[source[0].season_id])).rows[0].n,3,'Retries consumed additional qualifying slots');
+  assert.equal((await coordinator.query('select count(*)::integer n from public.leaderboard_tournament_season_memberships where season_id=$1 and qualifying_event_number is not null and voided_at is null',[source[0].season_id])).rows[0].n,independentSeasonFinalization?6:3,'Retries consumed additional qualifying slots');
   assert.equal((await coordinator.query('select count(*)::integer n from public.leaderboard_point_events where tournament_id=any($1::uuid[])',[events.map(event=>event.tournament_id)])).rows[0].n,30,'Racing settlement or retries duplicated genuine Pro point events');
   let oldPoints;
   await coordinator.query("begin transaction isolation level repeatable read read only;set local timezone='UTC';");
@@ -156,5 +174,8 @@ export async function checkLegacyProConcurrency(coordinator) {
   assert.deepEqual(await capture(coordinator),applicationBefore,'Concurrency cleanup changed schema/data/migration ledger/retention fingerprint');
  }
  if(proofError)throw proofError;
- return ['Separate connections serialize two genuine Pro final-result/settlement transactions at the original all-time lock into same-season slots2 and3; concurrent legacy retry and same-event retries preserve authority','Complete synthetic in-memory row/sequence/provider restoration and full schema/data/ledger capture are byte-exact; no persistent fixtures or exports'];
+ return [independentSeasonFinalization
+  ? 'Separate connections serialize two Pro finals at the existing root lock, closing the old season independently at slot 6 and placing the next final in the sole successor at slot 1'
+  : 'Separate connections serialize two genuine Pro final-result/settlement transactions at the original all-time lock into same-season slots2 and3; concurrent legacy retry and same-event retries preserve authority',
+  'Complete synthetic in-memory row/sequence/provider restoration and full schema/data/ledger capture are byte-exact; no persistent fixtures or exports'];
 }

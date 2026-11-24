@@ -16,6 +16,7 @@ import type {
   LeaderboardBracketType,
   LeaderboardScope,
   PublicLeaderboardData,
+  PublicSeasonEventImpact,
   PublicLeaderboardSeason,
   PublicLeaderboardStanding,
   PublicSeasonChampion,
@@ -86,8 +87,6 @@ export default function LeaderboardExperience({
   const isCurrentOfficialView = rankingView === (data.currentSeason?.officialBracketType ?? "pro");
   const isOfficialSeason = isCurrentOfficialView && officialScope === "season";
   const scope: LeaderboardScope = isCurrentOfficialView ? officialScope : "all_time";
-  const currentOfficialFamily = data.currentSeason?.officialBracketType;
-  const requiresHistoricalSource = currentOfficialFamily === "pro" && data.currentSeason?.hasLegacyMainTransition === true;
 
   const activeRows = useMemo(() => {
     const source = scope === "season"
@@ -114,14 +113,6 @@ export default function LeaderboardExperience({
     [data.seasonStandings, data.currentSeason?.officialBracketType]
   );
 
-  const historyItems = useMemo(
-    () =>
-      buildTournamentHistory(
-        data.seasonStandings.filter((row) => row.bracketType === currentOfficialFamily),
-        requiresHistoricalSource
-      ),
-    [data.seasonStandings, currentOfficialFamily, requiresHistoricalSource]
-  );
   const translatedRankingOptions = rankingOptions.map((option) => ({
     value: option.value,
     label: t(option.value === "pro" ? "rankings.proCareer" : option.labelKey),
@@ -259,7 +250,7 @@ export default function LeaderboardExperience({
             }
           >
             {isOfficialSeason && (
-              <TournamentHistoryLeaderboard items={historyItems} />
+              <TournamentHistoryLeaderboard items={data.seasonEventImpacts} />
             )}
             <SeasonChampionsArchive champions={data.seasonChampions} />
           </ScrollReveal>
@@ -912,7 +903,7 @@ function SegmentedControl<T extends string>({
 function TournamentHistoryLeaderboard({
   items,
 }: {
-  items: TournamentHistoryItem[];
+  items: PublicSeasonEventImpact[];
 }) {
   const t = usePublicTranslations();
   const locale = useOptionalLocale();
@@ -1196,47 +1187,6 @@ function EmptyPanel({
         {message}
       </p>
     </section>
-  );
-}
-
-type TournamentHistoryItem = {
-  tournamentId: string;
-  title: string;
-  bracketType: LeaderboardBracketType;
-  playerName: string;
-  points: number;
-};
-
-function buildTournamentHistory(
-  rows: PublicLeaderboardStanding[],
-  requireSourceBracketType = false
-): TournamentHistoryItem[] {
-  const items = new Map<string, TournamentHistoryItem>();
-
-  for (const row of rows) {
-    const bracketType = row.lastTournamentBracketType ?? (requireSourceBracketType ? null : row.bracketType);
-    if (!row.lastTournamentId || !row.lastTournamentTitle || !bracketType) {
-      continue;
-    }
-
-    const key = `${row.lastTournamentId}:${bracketType}`;
-    const existing = items.get(key);
-
-    if (existing && existing.points >= row.lastTournamentPoints) {
-      continue;
-    }
-
-    items.set(key, {
-      tournamentId: row.lastTournamentId,
-      title: row.lastTournamentTitle,
-      bracketType,
-      playerName: row.playerName,
-      points: row.lastTournamentPoints,
-    });
-  }
-
-  return [...items.values()].sort(
-    (left, right) => right.points - left.points
   );
 }
 

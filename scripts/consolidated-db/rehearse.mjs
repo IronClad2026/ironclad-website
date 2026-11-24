@@ -13,12 +13,18 @@ import {checkLegacyProConcurrency} from '../../tests/consolidated-db/legacy-pro-
 import {checkRelationAclFingerprints} from './relation-acl-regression.mjs';
 import {checkHistoricalConstraintInventory} from './historical-constraint-regression.mjs';
 import {checkLegacyProReleaseGate} from '../../tests/consolidated-db/legacy-pro-gate-contract.mjs';
+import {checkProSeasonHotfix} from '../../tests/consolidated-db/pro-season-hotfix.mjs';
 const client=await connect();
 const steps=[];
 const passed=step=>{steps.push(step);console.log('PASS '+step);};
 const providerMode=process.env.CONSOLIDATED_PROVIDER_MODE??'native-compatibility';
+const proSeasonHotfix=process.argv.includes('--pro-season-hotfix');
 try {
   await run(client,read('tests/consolidated-db/lifecycle-helpers.sql'));
+  if(proSeasonHotfix) {
+    assert(!process.argv.includes('--seeded')&&!process.argv.includes('--seed-only'),'Hotfix exact fixture requires the unseeded replay');
+    await client.query("select set_config('ironclad.test_legacy_semifinal_no_show','on',false)");
+  }
   if(!process.argv.includes('--seeded')) {
     assert.equal(await scalar(client,'select count(*)::integer from public.players'),0,'Requires unseeded faithful Production replay');
     if(await scalar(client,'select count(*)::integer from public.legal_documents')===0)await run(client,read('tests/consolidated-db/legal-registry.sql'));
@@ -100,6 +106,12 @@ try {
   assert.deepEqual(await scalar(client,historySql()),afterLegal,'Postdeploy guard changed old history/core flags');
   await run(client,read('tests/consolidated-db/editor-compatibility.sql'));
   passed('Postdeployment guard/Showcase activation rollback, apply and exact retry: cached19 creation rejected, legacy edits retained, HighlightsOFF/core flags/history unchanged');
+  if(proSeasonHotfix) {
+    for(const proof of await checkProSeasonHotfix(client))passed(proof);
+    console.log(JSON.stringify({status:'PASS',scope:'isolated synthetic Pro season hotfix',providerMode,steps}));
+    await client.end();
+    process.exit(0);
+  }
   await run(client,read('tests/consolidated-db/legacy-pro-badge-contract.sql'));
   passed('Same-season legacy Main Event 1 plus five genuine Pro events: badges, podiums, source identity and immutable earned awards');
   await run(client,read('tests/consolidated-db/legacy-pro-completion-contract.sql'));

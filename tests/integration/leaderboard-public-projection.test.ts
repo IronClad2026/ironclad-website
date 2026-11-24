@@ -140,6 +140,7 @@ describe("public leaderboard projection", () => {
   it("starts independent reads while the season is pending and starts standings as soon as it resolves", async () => {
     const season = deferredQueryResult();
     const standings = deferredQueryResult();
+    const eventImpacts = deferredQueryResult();
     const allTime = deferredQueryResult();
     const champions = deferredQueryResult();
     const started = new Set<string>();
@@ -147,6 +148,7 @@ describe("public leaderboard projection", () => {
     const results: Record<string, Promise<QueryResult>> = {
       leaderboard_current_season: season.promise,
       leaderboard_public_season_standings: standings.promise,
+      leaderboard_public_season_event_impacts: eventImpacts.promise,
       leaderboard_public_all_time_standings: allTime.promise,
       leaderboard_public_season_champions: champions.promise,
     };
@@ -173,22 +175,36 @@ describe("public leaderboard projection", () => {
 
     await vi.waitFor(() => {
       expect(started.has("leaderboard_public_season_standings")).toBe(true);
+      expect(started.has("leaderboard_public_season_event_impacts")).toBe(true);
     });
     expect(queries.get("leaderboard_public_season_standings")?.calls)
       .toContainEqual({ method: "eq", args: ["season_id", "season-1"] });
+    expect(queries.get("leaderboard_public_season_event_impacts")?.calls)
+      .toContainEqual({ method: "eq", args: ["season_id", "season-1"] });
 
     standings.resolve({ data: [seasonStanding], error: null });
+    eventImpacts.resolve({
+      data: [
+        { tournament_id: "historical", tournament_title: "THE NEW FRONT", bracket_type: "main", top_scorer_name: "Reakly", top_scorer_points: 25 },
+        { tournament_id: "native", tournament_title: "HOLD THE LINE", bracket_type: "pro", top_scorer_name: "Reakly", top_scorer_points: 25 },
+      ],
+      error: null,
+    });
     allTime.resolve({ data: [allTimeStanding], error: null });
     champions.resolve({ data: [], error: null });
 
     await expect(result).resolves.toMatchObject({
       currentSeason: { id: "season-1" },
       seasonStandings: [{ playerId: "player-1", totalPoints: 12 }],
+      seasonEventImpacts: [
+        { tournamentId: "historical", title: "THE NEW FRONT", bracketType: "main", playerName: "Reakly", points: 25 },
+        { tournamentId: "native", title: "HOLD THE LINE", bracketType: "pro", playerName: "Reakly", points: 25 },
+      ],
       allTimeStandings: [{ playerId: "player-1", totalPoints: 24 }],
       seasonChampions: [],
       errors: [],
     });
-    expect(fromMock).toHaveBeenCalledTimes(4);
+    expect(fromMock).toHaveBeenCalledTimes(5);
   });
 
   it.each([
@@ -259,6 +275,7 @@ describe("public leaderboard projection", () => {
         data: [{ ...seasonStanding, bracket_type: "pro", total_points: 17 }],
         error: null,
       },
+      leaderboard_public_season_event_impacts: { data: [], error: null },
       leaderboard_public_all_time_standings: {
         data: [
           { ...allTimeStanding, bracket_type: "pro", total_points: 37 },
@@ -297,6 +314,7 @@ describe("public leaderboard projection", () => {
         ],
         error: null,
       },
+      leaderboard_public_season_event_impacts: { data: [], error: null },
       leaderboard_public_all_time_standings: { data: [allTimeStanding], error: null },
       leaderboard_public_season_champions: { data: [], error: null },
     };
@@ -317,6 +335,7 @@ describe("public leaderboard projection", () => {
     const results: Record<string, QueryResult> = {
       leaderboard_current_season: { data: { ...currentSeason, official_bracket_type: "pro", has_legacy_main_transition: flag }, error: null },
       leaderboard_public_season_standings: { data: [], error: null },
+      leaderboard_public_season_event_impacts: { data: [], error: null },
       leaderboard_public_all_time_standings: { data: [], error: null },
       leaderboard_public_season_champions: { data: [], error: null },
     };
@@ -336,6 +355,7 @@ describe("public leaderboard projection", () => {
           data: [{ ...seasonStanding, season_id: `season-${revision}` }],
           error: null,
         },
+        leaderboard_public_season_event_impacts: { data: [], error: null },
         leaderboard_public_all_time_standings: {
           data: [{ ...allTimeStanding, total_points: 24 + revision }],
           error: null,
@@ -352,11 +372,11 @@ describe("public leaderboard projection", () => {
         allTimeStandings: [{ totalPoints: 24 + revision }],
         errors: [],
       });
-      expect(fromMock).toHaveBeenCalledTimes(4 * revision);
+      expect(fromMock).toHaveBeenCalledTimes(5 * revision);
     }
   });
 
-  it("loads all three public views with their existing anonymous contracts", async () => {
+  it("loads the public ranking views with their anonymous contracts", async () => {
     const queries = new Map<string, ReturnType<typeof createQuery>>();
     const results: Record<string, QueryResult> = {
       leaderboard_current_season: { data: currentSeason, error: null },
@@ -364,6 +384,7 @@ describe("public leaderboard projection", () => {
         data: [seasonStanding],
         error: null,
       },
+      leaderboard_public_season_event_impacts: { data: [], error: null },
       leaderboard_public_all_time_standings: {
         data: [allTimeStanding],
         error: null,
@@ -383,6 +404,7 @@ describe("public leaderboard projection", () => {
       expect.arrayContaining([
         "leaderboard_current_season",
         "leaderboard_public_season_standings",
+        "leaderboard_public_season_event_impacts",
         "leaderboard_public_all_time_standings",
         "leaderboard_public_season_champions",
       ])
@@ -563,6 +585,7 @@ describe("public leaderboard projection", () => {
         ],
         error: null,
       },
+      leaderboard_public_season_event_impacts: { data: [], error: null },
       leaderboard_public_all_time_standings: { data: [], error: null },
       leaderboard_public_season_champions: {
         data: [
@@ -639,6 +662,7 @@ describe("public leaderboard projection", () => {
         data: [activeStanding],
         error: null,
       },
+      leaderboard_public_season_event_impacts: { data: [], error: null },
       leaderboard_public_all_time_standings: {
         data: [{
           ...allTimeStanding,
@@ -718,6 +742,7 @@ describe("public leaderboard projection", () => {
       leaderboard_public_season_standings: {
         data: [{ ...seasonStanding, current_elo: null }], error: null,
       },
+      leaderboard_public_season_event_impacts: { data: [], error: null },
       leaderboard_public_all_time_standings: {
         data: [{ ...allTimeStanding, current_elo: null }], error: null,
       },
@@ -738,6 +763,7 @@ describe("public leaderboard projection", () => {
         data: [{ ...seasonStanding, current_rank: null }],
         error: null,
       },
+      leaderboard_public_season_event_impacts: { data: [], error: null },
       leaderboard_public_all_time_standings: { data: [], error: null },
       leaderboard_public_season_champions: { data: [], error: null },
     };

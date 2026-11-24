@@ -71,9 +71,18 @@ export type PublicSeasonChampion = {
   finalPoints: number;
 };
 
+export type PublicSeasonEventImpact = {
+  tournamentId: string;
+  title: string;
+  bracketType: "main" | "pro";
+  playerName: string;
+  points: number;
+};
+
 export type PublicLeaderboardData = {
   currentSeason: PublicLeaderboardSeason | null;
   seasonStandings: PublicLeaderboardStanding[];
+  seasonEventImpacts: PublicSeasonEventImpact[];
   allTimeStandings: PublicLeaderboardStanding[];
   seasonChampions: PublicSeasonChampion[];
   errors: string[];
@@ -155,16 +164,28 @@ type ChampionRow = {
   final_points: number;
 };
 
+type SeasonEventImpactRow = {
+  tournament_id: string;
+  tournament_title: string;
+  bracket_type: "main" | "pro";
+  top_scorer_name: string;
+  top_scorer_points: number;
+};
+
 export async function getPublicLeaderboardData(): Promise<PublicLeaderboardData> {
   const errors: string[] = [];
   const currentSeasonRequest = loadCurrentSeason(errors);
   const seasonStandingsRequest = currentSeasonRequest.then((currentSeason) =>
     currentSeason ? loadSeasonStandings(currentSeason.id, errors) : []
   );
-  const [currentSeason, seasonStandings, allTimeStandings, seasonChampions] =
+  const seasonEventImpactsRequest = currentSeasonRequest.then((currentSeason) =>
+    currentSeason ? loadSeasonEventImpacts(currentSeason.id, errors) : []
+  );
+  const [currentSeason, seasonStandings, seasonEventImpacts, allTimeStandings, seasonChampions] =
     await Promise.all([
       currentSeasonRequest,
       seasonStandingsRequest,
+      seasonEventImpactsRequest,
       loadAllTimeStandings(errors),
       loadSeasonChampions(errors),
     ]);
@@ -172,10 +193,34 @@ export async function getPublicLeaderboardData(): Promise<PublicLeaderboardData>
   return {
     currentSeason,
     seasonStandings,
+    seasonEventImpacts,
     allTimeStandings,
     seasonChampions,
     errors,
   };
+}
+
+async function loadSeasonEventImpacts(seasonId: string, errors: string[]) {
+  const { data, error } = await supabase
+    .from("leaderboard_public_season_event_impacts")
+    .select("tournament_id, tournament_title, bracket_type, top_scorer_name, top_scorer_points")
+    .eq("season_id", seasonId)
+    .order("top_scorer_points", { ascending: false })
+    .order("qualifying_event_number", { ascending: true });
+
+  if (error) {
+    console.error("Public leaderboard tournament impact load failed:", error);
+    errors.push("Published tournament impact could not be loaded.");
+    return [];
+  }
+
+  return ((data ?? []) as SeasonEventImpactRow[]).map((row): PublicSeasonEventImpact => ({
+    tournamentId: row.tournament_id,
+    title: row.tournament_title,
+    bracketType: row.bracket_type,
+    playerName: row.top_scorer_name,
+    points: row.top_scorer_points,
+  }));
 }
 
 async function loadCurrentSeason(errors: string[]) {

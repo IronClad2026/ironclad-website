@@ -79,6 +79,7 @@ function leaderboardData(
   return {
     currentSeason: featuredSeason,
     seasonStandings: [standing()],
+    seasonEventImpacts: [],
     allTimeStandings: [],
     seasonChampions: [],
     errors: [],
@@ -90,7 +91,8 @@ describe("LeaderboardExperience", () => {
   it("shows the approved Event 1 continuation beside Pro progress without moving Career totals", () => {
     render(<LeaderboardExperience data={leaderboardData({
       currentSeason: { ...featuredSeason, officialBracketType: "pro", validQualifyingEventCount: 1, hasLegacyMainTransition: true },
-      seasonStandings: [standing({ bracketType: "pro", totalPoints: 12, lastTournamentId: "historical-event", lastTournamentTitle: "Historical Highest Division Event", lastTournamentBracketType: "main" })],
+      seasonStandings: [standing({ bracketType: "pro", totalPoints: 12 })],
+      seasonEventImpacts: [{ tournamentId: "historical-event", title: "Historical Highest Division Event", bracketType: "main", playerName: "Alpha", points: 12 }],
       allTimeStandings: [standing({ scope: "all_time", seasonId: null, bracketType: "main", totalPoints: 24 })],
     })} />);
 
@@ -109,12 +111,25 @@ describe("LeaderboardExperience", () => {
     expect(within(screen.getByRole("table")).getByText("24")).toBeInTheDocument();
   });
 
-  it("does not relabel a bridged event when its historical source identity is unavailable", () => {
+  it("renders complete event impact even when the historical winner's most recent event changes", () => {
     render(<LeaderboardExperience data={leaderboardData({
-      currentSeason: { ...featuredSeason, officialBracketType: "pro", hasLegacyMainTransition: true },
-      seasonStandings: [standing({ bracketType: "pro", lastTournamentId: "unverified-event", lastTournamentTitle: "Unverified Source Event" })],
+      currentSeason: { ...featuredSeason, officialBracketType: "pro", validQualifyingEventCount: 2, hasLegacyMainTransition: true },
+      seasonStandings: [
+        standing({ bracketType: "pro", playerName: "Reakly", totalPoints: 50, lastTournamentId: "new", lastTournamentTitle: "HOLD THE LINE", lastTournamentBracketType: "pro", lastTournamentPoints: 25 }),
+        standing({ bracketType: "pro", playerName: "Fractured", totalPoints: 10, rank: 8, displayOrder: 2, lastTournamentId: "old", lastTournamentTitle: "THE NEW FRONT", lastTournamentBracketType: "main", lastTournamentPoints: 10 }),
+      ],
+      seasonEventImpacts: [
+        { tournamentId: "old", title: "THE NEW FRONT", bracketType: "main", playerName: "Reakly", points: 25 },
+        { tournamentId: "new", title: "HOLD THE LINE", bracketType: "pro", playerName: "Reakly", points: 25 },
+      ],
     })} />);
-    expect(screen.queryByText("Unverified Source Event")).not.toBeInTheDocument();
+
+    expect(screen.getByText("2 / 6")).toBeInTheDocument();
+    const history = screen.getByRole("heading", { name: "Published Tournament Impact" }).closest("section")!;
+    expect(within(history).getByText("THE NEW FRONT").parentElement).toHaveTextContent("Legacy · Main / Pro");
+    expect(within(history).getByText("HOLD THE LINE").parentElement).toHaveTextContent("Pro");
+    expect(within(history).getAllByText("25 pts")).toHaveLength(2);
+    expect(within(history).getAllByText("Top published scorer: Reakly")).toHaveLength(2);
   });
 
   it("archives the finalized continuation as a Pro season while historical Main Career remains separate", () => {

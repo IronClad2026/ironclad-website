@@ -22,10 +22,12 @@ declare
   gid uuid:=pg_temp.fd_id(division||'-generated',event);
   pid uuid; rid uuid; rd uuid; idx integer; round_no integer; match_no integer;
   elo integer:=case division when 'Academy' then 1000 when 'Challenge' then 1250 when 'Pro' then 1800 when 'Main' then 1500 end;
+  event_title text:=coalesce(case when current_setting('ironclad.test_legacy_semifinal_no_show',true)='on' then
+    case event when 1 then 'THE NEW FRONT' when 2 then 'HOLD THE LINE' end end,'Local consolidated '||event);
 begin
   perform set_config('session_replication_role','replica',true);
   insert into public.tournaments(id,title,slug,format,status,description,banner_image_url,prize_pool,registration_enabled)
-  values(tid,'Local consolidated '||event,'local-consolidated-'||event,'1v1','in_progress','Disposable local lifecycle inputs','','',false)
+  values(tid,event_title,'local-consolidated-'||event,'1v1','in_progress','Disposable local lifecycle inputs','','',false)
   on conflict(id) do nothing;
   if current_setting('ironclad.test_model',true)='four_division_v1' then
     execute 'update public.tournaments set division_model_version=$1 where id=$2' using 'four_division_v1',tid;
@@ -39,7 +41,7 @@ begin
     values(pid,'local-consolidated-'||pid,'Local fixture '||idx,'Local fixture '||idx,elo,true)
     on conflict(id) do nothing;
     insert into public.registrations(id,profile_id,clerk_user_id,player_name,submitted_elo,tournament_title,bracket_name,registration_status,elo_status,tournament_id,tournament_bracket_id,elo_verified_elo,elo_highest_faction,elo_checked_mode,elo_checked_at,elo_verification_source,elo_verified_division,elo_calculation_version)
-    values(rid,pid,'local-consolidated-'||pid,'Local fixture '||idx,elo,'Local consolidated '||event,division,'approved','verified',tid,bid,elo,'US Forces','1v1',now(),'relic',case when division='Main' and current_setting('ironclad.test_model',true) is distinct from 'four_division_v1' then 'Main / Pro' else division end,case when current_setting('ironclad.test_model',true)='four_division_v1' then 'relic-highest-1v1-v2' else 'relic-highest-1v1-v1' end);
+    values(rid,pid,'local-consolidated-'||pid,'Local fixture '||idx,elo,event_title,division,'approved','verified',tid,bid,elo,'US Forces','1v1',now(),'relic',case when division='Main' and current_setting('ironclad.test_model',true) is distinct from 'four_division_v1' then 'Main / Pro' else division end,case when current_setting('ironclad.test_model',true)='four_division_v1' then 'relic-highest-1v1-v2' else 'relic-highest-1v1-v1' end);
   end loop;
   insert into public.generated_brackets(id,tournament_bracket_id,format,participant_count,slot_count,generated_by,competition_locked_at)
   values(gid,bid,'single_elimination',8,8,'local-consolidated-admin',now());
@@ -76,7 +78,11 @@ begin
       and tm.player_two_registration_id is not null
     order by r.round_number,tm.match_number limit 1;
     exit when not found;
-    if event=1 and division='Main' and m.id=pg_temp.fd_id('Main-match-1',1,1)
+    if event=1 and division='Main' and m.id=(case
+      when current_setting('ironclad.test_legacy_semifinal_no_show',true)='on'
+        then pg_temp.fd_id('Main-match-2',1,2)
+      else pg_temp.fd_id('Main-match-1',1,1)
+    end)
       and current_setting('ironclad.test_model',true) is distinct from 'four_division_v1' then
       -- Synthetic genuine-shaped no-show report; the ordinary finalization writer scores it.
       insert into public.match_result_report_groups(id,match_id,tournament_id,submitted_by_clerk_user_id,
