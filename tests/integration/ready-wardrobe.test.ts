@@ -102,6 +102,25 @@ describe("Ready Wardrobe pilot", () => {
     expect((await GET(unlisted.request, unlisted.context)).status).toBe(404);
   });
 
+  it("routes only the Crown model to its smaller lossless file after a fresh access check", async () => {
+    const crown = "tankers_crown";
+    const model = asset("wearable.glb", "GET", crown);
+    const clearPreview = asset("standalone.webp", "HEAD", crown);
+    expect((await GET(model.request, model.context)).status).toBe(403);
+    expect((await HEAD(clearPreview.request, clearPreview.context)).status).toBe(403);
+    expect(mocks.download).not.toHaveBeenCalled();
+
+    mocks.authority.mockResolvedValue({ access: "subscriber", sessionId: demoSession, userId: owner });
+    const response = await GET(model.request, model.context);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("model/gltf-binary");
+    expect(response.headers.get("cache-control")).toContain("private, no-store");
+    expect(mocks.download).toHaveBeenLastCalledWith("v3/tankers_crown/wearable.glb", {}, expect.anything());
+
+    expect((await HEAD(clearPreview.request, clearPreview.context)).status).toBe(200);
+    expect(mocks.download).toHaveBeenLastCalledWith("v2/tankers_crown/standalone.webp", {}, expect.anything());
+  });
+
   it("saves only the authenticated owner's validated choice and supports removal", async () => {
     const input = { userId: "player-other", sessionId: demoSession, itemIds: [aviators] };
     expect((await save(input)).status).toBe(403);
