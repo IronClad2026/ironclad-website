@@ -78,7 +78,7 @@ describe("match actions card presentation", () => {
   it("opens the existing result workflow from the Overview spotlight and restores focus", async () => {
     const notification = actionNotification({ confirmationDeadlineAt: "2099-08-21T01:00:00.000Z" });
     const model = buildDashboardOverviewEvent({ notifications: [notification], registrations: [], events: [], profileCompleted: true });
-    render(<>
+    const { container } = render(<>
       <DashboardOverviewEvent event={model} locale="en" />
       <DashboardNotifications presentation="dashboard-overview" notifications={[notification]} />
     </>);
@@ -88,12 +88,16 @@ describe("match actions card presentation", () => {
     fireEvent.click(opener);
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toBeVisible();
+    expect(dialog.closest("[data-dashboard-notification-overlay]")?.parentElement).toBe(document.body);
+    expect(container).not.toContainElement(dialog);
+    expect(document.body.style.overflow).toBe("hidden");
     expect(await within(dialog).findByRole("button", { name: "Confirm result" })).toBeEnabled();
     expect(confirmDashboardMatchResultMock).not.toHaveBeenCalled();
     expect(disputeDashboardMatchResultMock).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: /close/i }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     await waitFor(() => expect(opener).toHaveFocus());
+    expect(document.body.style.overflow).not.toBe("hidden");
   });
 
   it("ignores unknown, expired and unauthorized spotlight review requests", () => {

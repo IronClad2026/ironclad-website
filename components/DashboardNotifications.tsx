@@ -24,6 +24,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   confirmDashboardMatchResult,
   dismissDashboardNotifications,
@@ -594,8 +595,8 @@ function NotificationModal({
     return () => window.removeEventListener("keydown", handleDialogKeyDown);
   }, [requestClose]);
 
-  return (
-    <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6">
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] grid place-items-center p-4 sm:p-6" data-dashboard-notification-overlay>
       <motion.div
         aria-hidden="true"
         data-notification-dialog-backdrop
@@ -843,7 +844,8 @@ function NotificationModal({
           {pending ? t("dashboard.updating") : message}
         </p>
       </motion.article>
-    </div>
+    </div>,
+    document.body
   );
 }
 
