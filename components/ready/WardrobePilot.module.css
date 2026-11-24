@@ -400,14 +400,12 @@
   top: var(--preview-top);
 }
 
-.workspace[data-browse-open] .studio .previewSummary {
+.workspace[data-browse-open] .studio:not([data-larger="true"]) .previewSummary {
   grid-template-columns: 5.25rem minmax(0, 1fr);
   grid-template-areas: "model heading" "model controls" "model feedback";
   row-gap: 0.2rem;
 }
 
-.workspace[data-browse-open] .studio[data-larger="true"] .previewSummary {
-  grid-template-columns: clamp(6rem, 18vw, 10rem) minmax(0, 1fr);
+.workspace[data-browse-open] .studio[data-larger="true"] .model {
+  width: min(100%, 33svh, 25rem);
 }
-
-.workspace[data-browse-open] .studio[data-larger="true"] .model { width: 100%; }
