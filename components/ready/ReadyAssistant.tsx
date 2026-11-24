@@ -17,6 +17,7 @@ import { dialogueRect, placeContextMenu, placeReady, thoughtTrail } from "./floa
 import type { Bounds, Point, ReadyPosition, Rect, Side } from "./floating-layout";
 import { loadMascotRenderer } from "./renderer";
 import type { MascotRenderer, TalkStyle } from "./renderer";
+import { followSavedReadyOutfit } from "./followSavedReadyOutfit";
 import { compileSpeech, sampleSpeech } from "./speech";
 import ThoughtCloudShape from "./ThoughtCloudShape";
 import { ReadyCloudLink, ReadySources } from "./ReadyReplyContent";
@@ -216,6 +217,8 @@ export default function ReadyAssistant({ workspaceScope, signedIn, wardrobePilot
   const canvas = useRef<HTMLCanvasElement>(null);
   const tether = useRef<HTMLSpanElement>(null);
   const renderer = useRef<MascotRenderer | null>(null);
+  const refreshOutfit = useRef<(() => void) | null>(null);
+  const wardrobeScope = signedIn && wardrobePilotEnabled ? workspaceScope : undefined;
   const workspace = useRef<Workspace>(defaultWorkspace);
   const openedThisMount = useRef(false);
   const current = useRef(firstGreeting);
@@ -508,6 +511,7 @@ export default function ReadyAssistant({ workspaceScope, signedIn, wardrobePilot
     if (!client || !canvas.current) return;
     let cancelled = false;
     let controller: MascotRenderer | null = null;
+    let outfit: ReturnType<typeof followSavedReadyOutfit> | undefined;
     const currentCanvas = canvas.current;
     const start = async () => {
       try {
@@ -522,8 +526,14 @@ export default function ReadyAssistant({ workspaceScope, signedIn, wardrobePilot
             else setStatus(value);
           },
           onAnchor: showAnchor,
+          wardrobeScope,
+          onWardrobeReset: () => outfit?.reset(),
         });
         renderer.current = controller;
+        if (wardrobeScope) {
+          outfit = followSavedReadyOutfit(controller, wardrobeScope);
+          refreshOutfit.current = outfit.refresh;
+        }
         controller.setReducedMotion(matchMedia(reducedQuery).matches);
         controller.setMode(workspace.current.open ? "floating" : "dock");
         controller.setDragging(Boolean(pointer.current?.moved));
@@ -545,10 +555,14 @@ export default function ReadyAssistant({ workspaceScope, signedIn, wardrobePilot
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame);
+      outfit?.stop();
+      if (refreshOutfit.current === outfit?.refresh) refreshOutfit.current = null;
       controller?.dispose();
       if (renderer.current === controller) renderer.current = null;
     };
-  }, [client, showAnchor]);
+  }, [client, showAnchor, wardrobeScope]);
+
+  useEffect(() => { refreshOutfit.current?.(); }, [pathname]);
 
   useEffect(() => {
     renderer.current?.setReducedMotion(reducedMotion);

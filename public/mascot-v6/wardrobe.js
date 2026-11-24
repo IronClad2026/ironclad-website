@@ -4,6 +4,7 @@ import { createItemAdapter } from './wardrobe-items.js';
 
 const idleAssetLimit = 8;
 const idleByteLimit = 112 * 1024 * 1024;
+const sessionPools = new Map();
 const extraFraming = {
   tankers_crown: [.16, .035],
   headwear_flip_up_welding_mask: [.30, .015],
@@ -38,7 +39,7 @@ function estimatedBytes(scene, wireBytes) {
   return Math.max(wireBytes, bytes);
 }
 
-function createResourceCache(stock, disposeAsset) {
+function createResourceCache(disposeAsset) {
   const loader = new GLTFLoader();
   const entries = new Map();
 
@@ -70,19 +71,9 @@ function createResourceCache(stock, disposeAsset) {
       const blob = await response.blob();
       signal.throwIfAborted();
       const bitmap = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-      const original = kind === 'upperPaint' ? stock.skull : stock.jaw;
-      const map = original.map.clone();
-      map.source = new THREE.Source(bitmap);
-      map.needsUpdate = true;
-      const material = original.clone();
-      material.map = map;
       entry.bytes = bitmap.width * bitmap.height * 4 * 4 / 3;
-      entry.release = () => {
-        material.dispose();
-        map.dispose();
-        bitmap.close();
-      };
-      return material;
+      entry.release = () => bitmap.close();
+      return bitmap;
     }
     const data = await response.arrayBuffer();
     signal.throwIfAborted();
@@ -112,10 +103,14 @@ function createResourceCache(stock, disposeAsset) {
         entries.set(key, entry);
       }
       entry.refs++;
+      let released = false;
       return {
         key,
+        kind,
         promise: entry.promise,
         release() {
+          if (released) return;
+          released = true;
           entry.refs--;
           entry.lastUsed = performance.now();
           if (!entry.refs && !entry.release) retire(entry);
@@ -129,6 +124,30 @@ function createResourceCache(stock, disposeAsset) {
   };
 }
 
+function scopedResources(scope, disposeAsset) {
+  const prior = scope && sessionPools.get(scope);
+  if (prior) return prior;
+  const pool = { cache: createResourceCache(disposeAsset), views: new Set() };
+  if (scope) sessionPools.set(scope, pool);
+  return pool;
+}
+
+function clonePaint(bitmap, original) {
+  const map = original.map.clone();
+  // The bitmap is shared, but each viewer needs a Source and material owned by its stock model.
+  map.source = new THREE.Source(bitmap);
+  map.needsUpdate = true;
+  const material = original.clone();
+  material.map = map;
+  return {
+    material,
+    release() {
+      material.dispose();
+      map.dispose();
+    },
+  };
+}
+
 function abortable(promise, signal) {
   signal.throwIfAborted();
   let onAbort;
@@ -138,22 +157,30 @@ function abortable(promise, signal) {
   })]).finally(() => signal.removeEventListener('abort', onAbort));
 }
 
-export function createWardrobe(runtime, nodeNamed, disposeAsset) {
+export function createWardrobe(runtime, nodeNamed, disposeAsset, scope) {
   const { nodes } = runtime.config;
   const skull = nodeNamed(runtime.model, nodes.headMesh);
   const jaw = nodeNamed(runtime.model, nodes.jawMesh);
   const stock = { geometry: skull.geometry, skull: skull.material, jaw: jaw.material };
-  const cache = createResourceCache(stock, disposeAsset);
   const adapter = createItemAdapter(runtime, nodeNamed);
+  const session = typeof scope === 'string' && scope.length ? scope : null;
+  const pool = scopedResources(session, disposeAsset);
+  const { cache, views } = pool;
   const equipped = new Map();
+  const preparations = new Set();
+  let disposed = false;
   let available = 0;
   let visibility = new Map();
   let ids = [];
   let time = 0;
 
-  function detach(entry) {
+  function unmount(entry) {
     for (const { object } of entry.item.mounts ?? []) object.removeFromParent();
-    entry.item.dispose?.();
+  }
+
+  function release(entry) {
+    entry.item?.dispose?.();
+    for (const paint of entry.paints) paint.release();
     for (const resource of entry.resources) resource.release();
   }
 
@@ -185,44 +212,91 @@ export function createWardrobe(runtime, nodeNamed, disposeAsset) {
     runtime.smoke.retarget(smoke);
   }
 
+  function reset() {
+    available++;
+    const removed = [...equipped.values()];
+    const abandoned = [...preparations];
+    for (const entry of removed) unmount(entry);
+    equipped.clear();
+    ids = [];
+    apply();
+    return () => {
+      for (const entry of removed) release(entry);
+      for (const discard of abandoned) discard(true);
+    };
+  }
+
+  const viewer = { reset, notify: () => runtime.onWardrobeReset?.() };
+  views.add(viewer);
+
   return {
     clear() {
-      available++;
-      for (const entry of equipped.values()) detach(entry);
-      equipped.clear();
-      apply();
+      if (disposed) return;
+      // Restore stock on every canvas before any shared decoded object can be released.
+      const attached = [...views];
+      const releaseAll = attached.map(view => view.reset());
+      for (const finalize of releaseAll) finalize();
       cache.clear();
-      ids = [];
+      for (const view of attached) view.notify();
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      const finalize = reset();
+      finalize();
+      views.delete(viewer);
+      if (!views.size) {
+        cache.clear();
+        if (session) sessionPools.delete(session);
+      }
     },
     async prepare(next, signal) {
+      signal.throwIfAborted();
+      if (disposed) throw new Error('The wardrobe preview is unavailable.');
       const generation = available;
       const additions = next.filter(id => !equipped.has(id))
-        .map(id => ({ id, resources: adapter.resources(id).map(resource => cache.acquire(resource)) }));
+        .map(id => ({ id, resources: adapter.resources(id).map(resource => cache.acquire(resource)), paints: [] }));
       let settled = false;
-      const release = () => {
-        for (const entry of additions) {
-          entry.item?.dispose?.();
-          for (const resource of entry.resources) resource.release();
-        }
+      let invalidated = false;
+      const discard = (invalidate = false) => {
+        if (settled) return;
+        settled = true;
+        invalidated = invalidate;
+        preparations.delete(discard);
+        for (const entry of additions) release(entry);
       };
+      const current = () => {
+        signal.throwIfAborted();
+        if (generation !== available) throw new Error('The wardrobe selection is no longer current.');
+      };
+      preparations.add(discard);
       try {
         const pending = additions.flatMap(entry => entry.resources.map(resource => resource.promise));
-        await abortable(Promise.all(pending), signal);
+        const values = await abortable(Promise.all(pending), signal);
+        current();
+        let offset = 0;
         for (const entry of additions) {
-          const values = await Promise.all(entry.resources.map(resource => resource.promise));
-          const byKey = new Map(entry.resources.map(({ key }, index) => [key, values[index]]));
+          const byKey = new Map(entry.resources.map(({ key, kind }) => {
+            const resource = values[offset++];
+            if (kind !== 'upperPaint' && kind !== 'lowerPaint') return [key, resource];
+            const paint = clonePaint(resource, kind === 'upperPaint' ? stock.skull : stock.jaw);
+            entry.paints.push(paint);
+            return [key, paint.material];
+          }));
           entry.item = adapter.create(entry.id, (owner, file) => byKey.get(owner + '/' + file));
         }
         return {
           commit() {
-            if (settled) return;
-            signal.throwIfAborted();
-            if (generation !== available) throw new Error('The wardrobe selection is no longer current.');
+            if (settled && !invalidated) return;
+            current();
             settled = true;
+            preparations.delete(discard);
             available++;
+            const removed = [];
             for (const [id, entry] of equipped) {
               if (next.includes(id)) continue;
-              detach(entry);
+              unmount(entry);
+              removed.push(entry);
               equipped.delete(id);
             }
             for (const entry of additions) {
@@ -230,16 +304,13 @@ export function createWardrobe(runtime, nodeNamed, disposeAsset) {
               equipped.set(entry.id, entry);
             }
             apply();
+            for (const entry of removed) release(entry);
             ids = [...next];
           },
-          discard() {
-            if (settled) return;
-            settled = true;
-            release();
-          },
+          discard: () => discard(),
         };
       } catch (error) {
-        release();
+        discard();
         throw error;
       }
     },

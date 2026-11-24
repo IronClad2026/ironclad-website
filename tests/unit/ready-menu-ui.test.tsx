@@ -4,6 +4,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReadyAssistant from "@/components/ready/ReadyAssistant";
 import ReadyHeader from "@/components/ready/ReadyHeader";
+import { saveWardrobe } from "@/lib/wardrobe/client";
 
 const { mock, track, clerk, renderer, renderStatus } = vi.hoisted(() => ({
   mock: { path: "/", query: "", reduced: false, webgl: false },
@@ -15,6 +16,7 @@ const { mock, track, clerk, renderer, renderStatus } = vi.hoisted(() => ({
     setMode: vi.fn(), setDragging: vi.fn(), setExpression: vi.fn(), setReducedMotion: vi.fn(),
     react: vi.fn(), snapshot: vi.fn(), dispose: vi.fn(),
     startTalk: vi.fn(), setTalkGain: vi.fn(), stopTalk: vi.fn(),
+    prepareWardrobe: vi.fn(), clearWardrobe: vi.fn(),
   },
 }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => clerk }));
@@ -71,6 +73,7 @@ describe("Ready player menu", () => {
     cleanup();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   it("renders the same inline poster before hydration and after auth settles", () => {
@@ -104,6 +107,64 @@ describe("Ready player menu", () => {
     dock();
     expect(screen.getByText("3D unavailable. Text controls are available.")).toBeDefined();
     expect(getButton("Move assistant with drag or arrow keys")).toBeDefined();
+  });
+
+  it("follows successful saves on the same docked and expanded canvas and ignores a stale read", async () => {
+    mock.webgl = true;
+    const ids = ["eyewear_smoked_aviators", "headwear_tanker_beret"] as const;
+    const commit = vi.fn();
+    renderer.prepareWardrobe.mockResolvedValue({ commit, discard: vi.fn() });
+    let finishRead: ((response: Response) => void) | undefined;
+    let readSignal: AbortSignal | null | undefined;
+    vi.mocked(fetch).mockImplementation((_url, options) => {
+      if (options?.method === "POST") return Promise.resolve(Response.json({
+        sessionId: clerk.sessionId, access: "admin", itemIds: ids,
+      }));
+      readSignal = options?.signal;
+      return new Promise(resolve => { finishRead = resolve; });
+    });
+    render(<ReadyHeader wardrobePilotEnabled />);
+    await act(async () => { vi.advanceTimersByTime(32); });
+    expect(finishRead).toBeDefined();
+    const canvas = document.querySelector("[data-mode=dock] canvas");
+    expect(canvas).not.toBeNull();
+    await act(async () => {
+      await saveWardrobe("first-session", { itemIds: [...ids] }, new AbortController().signal);
+    });
+    expect(readSignal?.aborted).toBe(true);
+    expect(renderer.prepareWardrobe).toHaveBeenCalledWith(ids, expect.any(AbortSignal));
+    expect(commit).toHaveBeenCalledOnce();
+    await act(async () => finishRead?.(Response.json({
+      sessionId: clerk.sessionId, access: "admin", itemIds: [],
+    })));
+    expect(renderer.prepareWardrobe).toHaveBeenCalledOnce();
+    dock();
+    expect(document.querySelector("[data-mode=floating] canvas")).toBe(canvas);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 503 }));
+    await expect(saveWardrobe("first-session", { itemIds: [] }, new AbortController().signal)).rejects.toThrow();
+    expect(commit).toHaveBeenCalledOnce();
+    expect(renderer.clearWardrobe).not.toHaveBeenCalled();
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({
+      sessionId: clerk.sessionId, access: "locked", itemIds: [],
+    }));
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(renderer.clearWardrobe).toHaveBeenCalledOnce();
+    expect(getButton("Move assistant with drag or arrow keys")).toBeDefined();
+  });
+
+  it("keeps Help available with the wardrobe disabled or no signed-in session", async () => {
+    mock.webgl = true;
+    const header = render(<ReadyHeader />);
+    await act(async () => { vi.advanceTimersByTime(32); });
+    expect(fetch).not.toHaveBeenCalledWith("/api/ready/wardrobe", expect.anything());
+    dock();
+    expect(getButton("Move assistant with drag or arrow keys")).toBeDefined();
+    clerk.isSignedIn = false;
+    clerk.sessionId = null;
+    header.rerender(<ReadyHeader wardrobePilotEnabled />);
+    await act(async () => { vi.advanceTimersByTime(32); });
+    expect(fetch).not.toHaveBeenCalledWith("/api/ready/wardrobe", expect.anything());
+    expect(renderer.prepareWardrobe).not.toHaveBeenCalled();
   });
 
   it("holds the Sad line before the Neutral line and hands off to the six choices", () => {

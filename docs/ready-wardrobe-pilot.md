@@ -1,6 +1,6 @@
 # Ready Wardrobe pilot
 
-Protected `staging` only. Select **Open wardrobe** on the dashboard or open `/profile/ready`. Both views share the saved outfit and access checks. The site header uses stock Ready. The pilot grants wardrobe access only.
+Protected `staging` only. Select **Open wardrobe** on the dashboard or open `/profile/ready`. Both views share the saved outfit and access checks. After the first stock frame, the header and Ask Ready display the eligible player’s saved outfit. A successful save updates both without a page reload. The pilot grants wardrobe access only.
 
 ## Access and files
 
@@ -9,7 +9,7 @@ Protected `staging` only. Select **Open wardrobe** on the dashboard or open `/pr
 - The application authorizes every selection read and save. Selection writes are tied to the current Clerk session and account. Expiry or revoked access restores stock Ready while retaining the recorded choice. A new signed-in session starts from its own selection.
 - The two replacement mouth props share the approved repaired bite. Tanker Beret and Australian Slouch Hat share the R5 head and crown liner. Open Cranium uses the matching R2 base. Helmet mounts and replacement mouth props are inactive with a replacement head. The full-face helmet also conceals the face, accessories, smoke and tears. Inactive choices stay in the outfit and return when compatible.
 - Dynamite Set groups the existing band and stick. A single save records both pieces and the affected slots to restore when the set is removed. Other outfit choices remain available.
-- The open viewer keeps active geometry and textures, retains a bounded cache of recently used assets in memory and clears it when the account view or access changes. The dashboard poster requires no wardrobe assets.
+- The header and wardrobe viewer share a bounded in-memory cache of decoded assets within the current account session. They keep their own pose and effects. A permission check can reset both views to stock. The dashboard poster requires no wardrobe assets.
 
 `scripts/ready/wardrobe-catalogue-upload.mjs` verifies the approved HDD manifest, Staging environment and private bucket. It uploads the 87 immutable catalogue files and checks their hashes after readback. Browser captures and part exports belong on HDD 1T. The web page needs only the hosted files.
 

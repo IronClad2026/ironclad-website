@@ -210,10 +210,10 @@ class MascotScene {
     }
     const start = performance.now();
     this.renderer.render(this.scene, this.camera);
+    const canvas = this.renderer.domElement;
+    const items = this.wardrobe?.ids.join(',') ?? '';
+    if (canvas.dataset.wardrobeDrawn !== items) canvas.dataset.wardrobeDrawn = items;
     if (this.wardrobe) {
-      const canvas = this.renderer.domElement;
-      const items = this.wardrobe.ids.join(',');
-      if (canvas.dataset.wardrobeDrawn !== items) canvas.dataset.wardrobeDrawn = items;
       const caption = this.wardrobe.caption();
       if (this.wardrobeCaption !== caption) {
         this.wardrobeCaption = caption;
@@ -257,7 +257,7 @@ class MascotScene {
   dispose() {
     this.metrics.cancel('The mascot renderer was disposed.');
     this.attention.dispose();
-    this.wardrobe?.clear();
+    this.wardrobe?.dispose();
     this.smoke?.dispose();
     this.tears?.dispose();
     disposeAsset(this.model);
@@ -265,12 +265,15 @@ class MascotScene {
   }
 }
 
-export function createMascotRenderer({ canvas, onStatus, onAnchor, onWardrobeCaption, wardrobe = false }) {
+export function createMascotRenderer({
+  canvas, onStatus, onAnchor, onWardrobeCaption, onWardrobeReset, wardrobe = false, wardrobeScope,
+}) {
   const options = { mode: 'dock', view: 'front', dragging: false, reducedMotion: false, smoke: true, tears: 'auto' };
   const abort = new AbortController();
   const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   options.reducedMotion = motionQuery.matches;
   let runtime;
+  let wardrobeInitialization;
   let loaded = false;
   let frame = 0;
   let lastFrame = 0;
@@ -432,12 +435,8 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor, onWardrobeCap
         return;
       }
       runtime.setup(config, asset);
-      if (wardrobe) {
-        const { createWardrobe } = await import('./wardrobe.js');
-        if (disposed) return;
-        runtime.wardrobe = createWardrobe(runtime, nodeNamed, disposeAsset);
-        runtime.onWardrobeCaption = onWardrobeCaption;
-      }
+      runtime.onWardrobeCaption = onWardrobeCaption;
+      runtime.onWardrobeReset = () => { onWardrobeReset?.(); schedule(); };
       showExpression(activeExpression, expressionIntensity);
       if (activeTalk && !options.reducedMotion) runtime.pose.playTalk(activeTalk.style, activeTalk.gain);
       loaded = true;
@@ -491,7 +490,19 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor, onWardrobeCap
     setVisible(value) { requestedVisibility = value; reconcile(); },
     async prepareWardrobe(items, signal) {
       await ready;
-      if (!runtime?.wardrobe || disposed) throw new Error('The wardrobe preview is unavailable.');
+      signal.throwIfAborted();
+      if (!runtime || disposed || (!wardrobe && !wardrobeScope)) {
+        throw new Error('The wardrobe preview is unavailable.');
+      }
+      // First stock paint and Help do not depend on wardrobe code or private assets.
+      if (!runtime.wardrobe) {
+        wardrobeInitialization ??= import('./wardrobe.js').then(({ createWardrobe }) => {
+          if (!runtime || disposed) throw new Error('The wardrobe preview is unavailable.');
+          runtime.wardrobe = createWardrobe(runtime, nodeNamed, disposeAsset, wardrobeScope);
+        }).finally(() => { wardrobeInitialization = undefined; });
+        await wardrobeInitialization;
+      }
+      signal.throwIfAborted();
       const prepared = await runtime.wardrobe.prepare(items, signal);
       return {
         commit() {

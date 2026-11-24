@@ -15,6 +15,7 @@ import {
   type WardrobeSelection,
   type WardrobeState,
 } from "@/lib/wardrobe/catalogue";
+import { invalidateWardrobe, observeWardrobe, readWardrobe, saveWardrobe } from "@/lib/wardrobe/client";
 import {
   loadMascotRenderer,
   type MascotRenderer,
@@ -23,7 +24,6 @@ import {
   type TalkStyle,
 } from "./renderer";
 
-const endpoint = "/api/ready/wardrobe";
 const control = "min-h-11 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-semibold text-zinc-100 hover:border-orange-500 focus-visible:outline-2 focus-visible:outline-orange-400 disabled:opacity-50";
 const selected = "aria-pressed:border-orange-400 aria-pressed:text-orange-300";
 const talkStyles: [string, TalkStyle][] = [
@@ -74,21 +74,27 @@ function WardrobePreview({ initial, sessionId, embedded }: {
     const active = new AbortController();
     lifetime.current = active;
     let controller: MascotRenderer | undefined;
-    const refresh = async () => {
-      if (saving.current || refreshJob.current || active.signal.aborted) return;
+    function lock() {
+      refreshJob.current?.abort();
+      preparing.current?.abort();
+      requested.current = null;
+      controller?.clearWardrobe();
+      rendered.current = "";
+      setVisibleItems("");
+      accepted.current = emptyWardrobe;
+      setState(emptyWardrobe);
+    }
+    const refresh = async (received?: WardrobeState) => {
+      if (!sessionId || saving.current || active.signal.aborted) return;
+      if (received) refreshJob.current?.abort();
+      else if (refreshJob.current) return;
       const attempt = new AbortController();
       refreshJob.current = attempt;
       try {
-        const next = await fetch(endpoint, { cache: "no-store", signal: attempt.signal })
-          .then(response => response.ok ? response.json() as Promise<WardrobeState> : emptyWardrobe)
-          .catch(() => emptyWardrobe);
+        const next = received ?? await readWardrobe(sessionId, attempt.signal);
         attempt.signal.throwIfAborted();
-        if (next.sessionId !== sessionId || next.access === "locked") {
-          controller?.clearWardrobe();
-          rendered.current = "";
-          setVisibleItems("");
-          accepted.current = emptyWardrobe;
-          setState(emptyWardrobe);
+        if (!next) {
+          invalidateWardrobe(sessionId);
           return;
         }
         accepted.current = next;
@@ -112,10 +118,19 @@ function WardrobePreview({ initial, sessionId, embedded }: {
         if (refreshJob.current === attempt) refreshJob.current = null;
       }
     };
+    const unobserve = sessionId && observeWardrobe(sessionId, state => {
+      if (state) void refresh(state);
+      else lock();
+    });
     void loadMascotRenderer().then(create => {
       if (active.signal.aborted || !canvas.current) return;
       controller = create({
-        canvas: canvas.current, onStatus: setStatus, onWardrobeCaption: setCaption, wardrobe: true,
+        canvas: canvas.current, onStatus: setStatus, onWardrobeCaption: setCaption,
+        wardrobeScope: sessionId ?? undefined,
+        onWardrobeReset() {
+          rendered.current = "";
+          setVisibleItems("");
+        },
       });
       renderer.current = controller;
       controller.setMode("floating");
@@ -133,6 +148,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
     document.addEventListener("visibilitychange", recheck);
     return () => {
       active.abort();
+      if (unobserve) unobserve();
       refreshJob.current?.abort();
       refreshJob.current = null;
       preparing.current?.abort();
@@ -173,27 +189,12 @@ function WardrobePreview({ initial, sessionId, embedded }: {
           attempt.signal.throwIfAborted();
           if (requested.current !== next) continue;
           preparing.current = null;
-          // Serialize saves. Aborting a request cannot undo a write already received by the server.
-          const response = await fetch(endpoint, {
-            method: "POST", cache: "no-store",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId, itemIds: next.itemIds, dynamiteRestore: next.dynamiteRestore }),
-          });
+          const saved = await saveWardrobe(sessionId, next, active.signal);
           if (active.signal.aborted) return;
-          if (response.status === 403) {
-            controller.clearWardrobe();
-            rendered.current = "";
-            accepted.current = emptyWardrobe;
-            requested.current = null;
-            setVisibleItems("");
-            setState(emptyWardrobe);
+          if (!saved) {
             setMessage("Wardrobe access has changed.");
             return;
           }
-          if (!response.ok) throw new Error("Save failed.");
-          const saved = await response.json() as WardrobeState;
-          if (active.signal.aborted) return;
-          if (saved.sessionId !== sessionId || saved.access === "locked") throw new Error("Session changed.");
           prepared.commit();
           rendered.current = visible.join(",");
           setVisibleItems(rendered.current);

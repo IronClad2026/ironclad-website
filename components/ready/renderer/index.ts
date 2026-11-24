@@ -94,7 +94,9 @@ type Factory = (options: {
   onStatus?: (status: MascotStatus, error?: Error) => void;
   onAnchor?: (anchor: Anchor) => void;
   onWardrobeCaption?: (caption: string) => void;
+  onWardrobeReset?: () => void;
   wardrobe?: boolean;
+  wardrobeScope?: string;
 }) => MascotRenderer;
 
 type Module = { createMascotRenderer: Factory };
